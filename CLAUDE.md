@@ -294,7 +294,9 @@ branch/worktree, current story, dependencies being consumed, tables/entities it 
 tables/entities it is consuming, and verification status.
 
 **Current status:** Only the **Foundation Agent** is active. All other agents are
-dormant pending explicit user dispatch.
+dormant pending explicit user dispatch. See
+[`docs/RUN_ORDER.md`](docs/RUN_ORDER.md) for the recommended dispatch order and
+the exact command to type for each agent.
 
 ---
 
