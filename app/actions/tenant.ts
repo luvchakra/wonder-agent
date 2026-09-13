@@ -1,0 +1,91 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+import { supabaseServer } from "@/lib/db/supabaseServer";
+import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
+
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/(^-|-$)/g, "") || "tenant"
+  );
+}
+
+/**
+ * FOUNDATION-P0-03.2 — self-service tenant creation. Delegates the actual
+ * write to the create_tenant_with_owner() security-definer RPC
+ * (supabase/migrations/0008_foundation_create_tenant_rpc.sql) rather than
+ * inserting into tenants/tenant_memberships directly, since neither table
+ * grants an authenticated client an INSERT policy.
+ */
+export async function createTenantAction(formData: FormData) {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) {
+    throw new Error("Organization name is required");
+  }
+
+  const supabase = await supabaseServer();
+  const slug = `${slugify(name)}-${Math.random().toString(36).slice(2, 8)}`;
+
+  const { data: tenantId, error } = await supabase.rpc("create_tenant_with_owner", {
+    tenant_name: name,
+    tenant_slug: slug,
+  });
+
+  if (error || !tenantId) {
+    throw new Error(error?.message ?? "Failed to create tenant");
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(TENANT_COOKIE_NAME, tenantId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+
+  redirect("/");
+}
+
+/**
+ * Sets the active-tenant cookie after verifying the caller actually has an
+ * active membership in the requested tenant — never trust the posted value
+ * on its own (CLAUDE.md non-negotiable #2).
+ */
+export async function selectTenantAction(formData: FormData) {
+  const tenantId = String(formData.get("tenantId") ?? "");
+  const supabase = await supabaseServer();
+
+  const { data: membership } = await supabase
+    .from("tenant_memberships")
+    .select("tenant_id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .maybeSingle();
+
+  if (!membership) {
+    throw new Error("Not a member of the requested tenant");
+  }
+
+  const cookieStore = await cookies();
+  cookieStore.set(TENANT_COOKIE_NAME, tenantId, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+  });
+
+  redirect("/");
+}
+
+export async function signOutAction() {
+  const supabase = await supabaseServer();
+  await supabase.auth.signOut();
+  const cookieStore = await cookies();
+  cookieStore.delete(TENANT_COOKIE_NAME);
+  redirect("/sign-in");
+}
