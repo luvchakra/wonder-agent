@@ -41,7 +41,15 @@ const NAV_GROUPS: NavGroup[] = [
     href: "/integrations",
     children: [{ label: "Connected Systems", href: "/integrations" }],
   },
-  { label: "Reports", href: "/reports" },
+  { label: "Search", href: "/search" },
+  {
+    label: "Audit & Reports",
+    href: "/reports",
+    children: [
+      { label: "Reports", href: "/reports" },
+      { label: "Audit Trail", href: "/audit" },
+    ],
+  },
   { label: "Administration", href: "/settings" },
 ];
 

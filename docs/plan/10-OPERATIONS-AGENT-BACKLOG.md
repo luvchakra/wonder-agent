@@ -18,16 +18,16 @@ issued.
 
 | Story | Title | Status |
 |---|---|---|
-| OPERATIONS-P0-01.1 | Audit log viewer | Not Started |
-| OPERATIONS-P0-01.2 | Evidence export | Not Started |
-| OPERATIONS-P0-02.1 | Schema & channels | Not Started |
-| OPERATIONS-P0-02.2 | `notify(event)` and trigger wiring | Not Started |
-| OPERATIONS-P0-03.1 | Global search (higher bar) | Not Started |
-| OPERATIONS-P0-03.2 | Search traceability & role-based field masking | Not Started |
-| OPERATIONS-P0-04.1 | P0 report set | Not Started |
-| OPERATIONS-P0-04.2 | Report traceability (linked records + data freshness) | Not Started |
-| OPERATIONS-P0-05.1 | Notification preferences | Not Started |
-| OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Not Started |
+| OPERATIONS-P0-01.1 | Audit log viewer | Done |
+| OPERATIONS-P0-01.2 | Evidence export | Done |
+| OPERATIONS-P0-02.1 | Schema & channels | Partial — in-app channel real and working; email channel not implemented (no transactional email provider wired into this project yet, and the backlog explicitly forbids adding one without asking) |
+| OPERATIONS-P0-02.2 | `notify(event)` and trigger wiring | Partial — `notify()` published, working, and live-verified; no producing module (Risk/Compliance/Identity/Integration, all already built) has been updated to call it yet — that is each producing module's own story to pick up, per non-negotiable #18, not something to retrofit here |
+| OPERATIONS-P0-03.1 | Global search (higher bar) | Partial — 6 of 9 named object types implemented (agent, application, finding, certification_campaign, policy, integration), each backed by a real tenant-wide list contract; identity/owner/entitlement have no such contract published yet, so building one would mean reaching into another module's internals rather than composing its existing contract |
+| OPERATIONS-P0-03.2 | Search traceability & role-based field masking | Done |
+| OPERATIONS-P0-04.1 | P0 report set | Done |
+| OPERATIONS-P0-04.2 | Report traceability (linked records + data freshness) | Done |
+| OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
+| OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Partial — `getJobStatusSummary()` and `GET /api/v1/jobs/status` built; no dedicated customer-facing page this session (scope cut, flagged) |
 
 ---
 

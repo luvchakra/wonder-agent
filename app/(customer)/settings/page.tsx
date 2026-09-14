@@ -19,10 +19,10 @@ export default function SettingsPage() {
           <Link href="/settings/security" className="block text-accent hover:underline">
             Security (Multi-Factor Authentication)
           </Link>
-          <p className="text-sm text-text-muted">
-            Tenant Settings and Audit Logs administration screens are not yet
-            available.
-          </p>
+          <Link href="/settings/notifications" className="block text-accent hover:underline">
+            Notification Preferences
+          </Link>
+          <p className="text-sm text-text-muted">Tenant Settings administration screens are not yet available.</p>
         </CardBody>
       </Card>
     </div>

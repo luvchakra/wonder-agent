@@ -75,7 +75,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `risk_campaigns` / `risk_campaign_items` | RiskA | Planned — RISK-P1-03 (risk campaigns), not yet implemented |
 | `platform_ai_provider_configs` | PA | Planned — PLATFORM-P0-05.2 (AI provider configuration), not yet implemented |
 | `platform_announcements` | PA | Planned — PLATFORM-P0-05.4 (maintenance mode/platform announcements); Experience Agent will need a read-only contract to render these in the customer shell once built |
-| `notification_preferences` | OA | Planned — OPERATIONS-P0-05.1 (notification preferences), not yet implemented |
+| `notification_preferences` | OA | OPERATIONS-P0-05.1 (notification preferences) — migration `0048`, built 2026-09-14 |
 
 ### Pending ownership/architecture decisions (2026-09-14 requirements refresh — not resolved, flagged for the user)
 
@@ -113,7 +113,7 @@ consume and persist into their own tables.
 | `/api/v1/runtime/events` | RA |
 | `/api/v1/findings` | RiskA |
 | `/api/v1/certifications` | CA |
-| `/api/v1/reports` (customer-facing reports/search/notifications) | OA |
+| `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 
 All API authorization happens server-side, inside the route handler or a shared
