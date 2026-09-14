@@ -44,6 +44,7 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-11 | Input/Output Safety (shared validation/encoding utility) | Done — 2026-09-14: `lib/security/validate.ts` published, unit-tested, adopted by the new SSO route |
 | FOUNDATION-P0-12 | Database Migration Discipline (explicit policy) | Done — already followed as informal practice every module this session; now written down explicitly, see Requirements Refresh below |
 | FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
+| FOUNDATION-P1-05 | CSRF protection verification & hardening for state-changing `/api/v1/*` routes | Not Started — baseline mitigation exists (`sameSite: "lax"` on every WonderAgent-set cookie: `app/auth/callback/route.ts`, `app/actions/auth.ts`, `app/actions/tenant.ts`) but is not yet verified/documented as covering all 50 state-changing routes under `app/api/**`, and Supabase Auth's own session-cookie `SameSite` setting has not been confirmed; see Requirements Refresh (round 2) below |
 
 ---
 
@@ -675,6 +676,79 @@ this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
 requirement, and is called out to the user separately rather than silently
 changed here.
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-supplied `01_FOUNDATION_SECURITY.md` at a new upload path,
+described as a newer/expanded version of the same module doc reconciled in
+the round-1 refresh directly above. Full reconciliation performed against:
+the round-2 doc's narrative sections (1 Research-Informed Product
+Principles, 2 Target Users, 3 Multi-Tenant Architecture, 26 SSO, 27 Customer
+RBAC, 39 Recommended Technology Stack, 40 Database Core Model, 41 RLS
+Requirements, 42 API Architecture, 43 Integration Job Architecture, 44
+Security Requirements, 45 AI/LLM Architecture) and its own "Expanded
+Requirements — Foundation P0/P1/P2" section (FOUNDATION-P0-01 through
+FOUNDATION-P0-15, FOUNDATION-P1-01 through FOUNDATION-P1-04,
+FOUNDATION-P2-01, FOUNDATION-P2-02) plus its "Foundation test matrix" note;
+also cross-checked against the live codebase under `lib/security/`,
+`lib/tenant/`, `lib/jobs/`, `lib/rbac/`, `lib/audit/`, `lib/auth/`,
+`app/api/`, and `supabase/migrations/` rather than trusting the backlog's own
+bookkeeping alone.
+
+**Finding:** every numbered `FOUNDATION-P0-*`/`P1-*`/`P2-*` item in the
+round-2 doc's "Expanded Requirements" section is identical in substance to
+the round-1 doc already reconciled directly above (same 15 P0 items, same 4
+P1 items, same 2 P2 items, same acceptance wording) — nothing new there. The
+round-2 doc's narrative sections (1, 2, 3, 26, 27, 39–45) are the same
+supporting master-PRD text already used to write the existing stories (tenant
+hierarchy → FOUNDATION-P0-02.*; SSO claims/domain/JIT shape → FOUNDATION-P0-
+03.3; RBAC role/permission catalog → FOUNDATION-P0-02.3, seeded verbatim;
+RLS → FOUNDATION-P0-02.4; API route prefixes → `CLAUDE.md` §5 and every
+module's `app/api/v1/*`; job-architecture fields (status/records-processed/
+records-failed/retry-count/correlation-id) → correctly Integration Agent's
+`integration_sync_jobs` schema, not Foundation's, since `lib/jobs/
+tenantScopedJob.ts`'s own docblock deliberately leaves per-job status/
+progress schema to each owning module; AI/LLM architecture → `CLAUDE.md`
+non-negotiable #9 plus Product Boundaries item 10, already binding).
+
+**One genuinely new item found**, not present anywhere in the round-1
+refresh or the existing stories: section 44's mandatory Security
+Requirements list names **"CSRF protection where relevant"** alongside items
+that already have dedicated stories (rate limiting, secure headers — both
+FOUNDATION-P0-05.3). No story, audit-log entry, or code comment anywhere in
+this module addresses CSRF explicitly, and the app now has 50 state-changing
+`POST`/`PUT`/`PATCH`/`DELETE` routes under `app/api/**` authorized via
+cookie-forwarded sessions (`supabaseServer()`), which is exactly the shape of
+surface CSRF protection applies to. It wasn't caught in round 1 because the
+round-1 refresh reconciled only the doc's numbered `FOUNDATION-P0-*` items,
+and CSRF appears solely as a bullet inside section 44's prose list, not as
+its own numbered story in either round's "Expanded Requirements" section.
+
+Added **FOUNDATION-P1-05 — CSRF protection verification & hardening** to the
+Progress Tracker as `Not Started`. Scoped P1 (enterprise readiness), not P0,
+because: (a) every cookie WonderAgent itself sets already carries `sameSite:
+"lax"` (`app/auth/callback/route.ts`, `app/actions/auth.ts`,
+`app/actions/tenant.ts`), which already blocks the classic cross-site
+`<form>`-POST CSRF vector for same-site-lax-respecting browsers — this is a
+real, if unverified-as-sufficient, existing baseline, not an open door; and
+(b) per `CLAUDE.md` §3, ambiguous/undertiered scope defaults to P1/P2 rather
+than P0, and the doc itself does not tier this item or give it a distinct
+acceptance criterion beyond the one-line mandatory-list mention. The story
+still needs real work before `Done`: confirm Supabase Auth's own session
+cookie is also `SameSite=Lax` (or add explicit Origin/Referer header
+verification for API routes if it is not), and add the isolation-style
+positive/negative test this module holds every security story to (a
+same-origin mutation succeeds; a forged cross-origin request without the
+expected same-site cookie context is rejected).
+
+No other rows were added — everything else in the round-2 doc was already
+covered by an existing `Done`/`Partial`/`Deferred` row or by another module's
+backlog (`npm audit` + GitHub secret scanning: QA Agent, `QA-P0-12`;
+integration-credential rotation: Integration Agent, `INTEGRATION-P0-05.1`;
+encryption-key rotation: Platform Agent, `09-PLATFORM-AGENT-BACKLOG.md`).
+"Magic link" auth under section 39 is explicitly optional ("if desired") in
+the doc and was not added as a story for that reason. No existing `Done` or
+`Partial` row's status was changed.
+
 ## P1 (do not build ahead of P0)
 
 - Per-tenant custom role creation/editing (beyond assigning existing system roles).
@@ -687,6 +761,10 @@ changed here.
   failed authorization, credential changes, admin mutations (FOUNDATION-P1-03).
 - Tenant-configurable data retention for runtime events/audit evidence/exported
   reports, subject to platform minimums (FOUNDATION-P1-04).
+- CSRF protection verification & hardening for state-changing `/api/v1/*` routes —
+  confirm Supabase Auth's session cookie `SameSite` setting, add explicit
+  Origin/Referer verification if needed, and add positive/negative tests
+  (FOUNDATION-P1-05).
 - Redis-backed or distributed rate limiting.
 - Per-tenant custom branding (that's Platform Agent's "Global Branding" for the
   platform level; per-tenant branding is a distinct, later feature).

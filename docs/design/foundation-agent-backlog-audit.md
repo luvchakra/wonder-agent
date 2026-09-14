@@ -451,3 +451,78 @@ the suite was touched.
 `it("rejects a tampered ciphertext", ...)` block) — no change to
 `lib/security/encryptSecret.ts` itself, since the encryption/decryption
 logic was never the defect.
+
+---
+
+## 2026-09-14 — Requirements re-check against expanded doc (round 2), documentation only
+
+**Agent:** Foundation Agent. **Nature of this entry:** planning/backlog
+reconciliation only — no application code, migration, or test was written or
+modified in this pass, per the task's explicit scope.
+
+The user re-supplied `01_FOUNDATION_SECURITY.md` (at a new upload path) as a
+newer/expanded version of the same module doc already reconciled once in the
+"Requirements Refresh — 2026-09-14" section of
+`docs/plan/01-FOUNDATION-AGENT-BACKLOG.md` (round 1). This entry records a
+fresh, independent re-check of the new upload against: (a) the full current
+backlog (Progress Tracker + every existing story + the round-1 refresh
+section), and (b) the live codebase — `lib/security/`, `lib/tenant/`,
+`lib/jobs/`, `lib/rbac/`, `lib/audit/`, `lib/auth/`, `app/api/**`, and
+`supabase/migrations/` — so that anything already *implemented* but not yet
+*recorded* would not be mistaken for a gap.
+
+**Method:** diffed the new doc's own "Expanded Requirements — Foundation
+P0/P1/P2" section (its numbered `FOUNDATION-P0-01` … `P0-15`, `P1-01` …
+`P1-04`, `P2-01`/`P2-02` items) against the round-1 refresh's reconciliation
+of the same numbering — found them identical in substance and acceptance
+wording, confirming round 1 already fully captured that section. Then
+separately walked the doc's supporting narrative sections (1 Research-
+Informed Product Principles, 2 Target Users, 3 Multi-Tenant Architecture, 26
+SSO, 27 Customer RBAC, 39 Recommended Technology Stack, 40 Database Core
+Model, 41 RLS Requirements, 42 API Architecture, 43 Integration Job
+Architecture, 44 Security Requirements, 45 AI/LLM Architecture, "Foundation
+test matrix") line by line against existing stories/code, since those
+sections carry more free-text detail than the numbered items and were the
+most likely place for something to have been missed.
+
+**Result:** one genuinely new, previously-untracked item found — **CSRF
+protection**, named explicitly in section 44's mandatory Security
+Requirements list ("CSRF protection where relevant") but absent from every
+existing Foundation story, the round-1 refresh, and any code comment in the
+repo, despite the app now exposing 50 state-changing `POST`/`PUT`/`PATCH`/
+`DELETE` routes under `app/api/**` authorized via cookie-forwarded sessions
+— exactly the surface CSRF protection is about. Verified via `grep` that no
+existing file mentions CSRF, and confirmed the only existing mitigation is
+incidental: every cookie WonderAgent itself sets already uses `sameSite:
+"lax"` (`app/auth/callback/route.ts`, `app/actions/auth.ts`,
+`app/actions/tenant.ts`) — a real baseline, but never verified against
+Supabase Auth's own session cookie or tested.
+
+**Added:** `FOUNDATION-P1-05 — CSRF protection verification & hardening for
+state-changing /api/v1/* routes`, status `Not Started`, to the Progress
+Tracker and to the P1 list, plus a new "Requirements Refresh — 2026-09-14
+(round 2, expanded doc)" section in the backlog documenting the full
+reconciliation and the reasoning for scoping it P1 (existing `SameSite=Lax`
+baseline already blocks the classic cross-site form-POST CSRF vector; the
+doc doesn't tier or give this item its own acceptance criterion beyond a
+one-line mandatory-list mention; CLAUDE.md §3 defaults ambiguous/undertiered
+scope to P1/P2 rather than P0).
+
+**Not added (already covered elsewhere, verified rather than assumed):**
+`npm audit` + GitHub secret scanning → QA Agent (`QA-P0-12`, confirmed
+present in `docs/plan/11-QA-AGENT-BACKLOG.md`); integration-credential
+rotation → Integration Agent (`INTEGRATION-P0-05.1`, confirmed `Done`);
+platform/encryption-key rotation → Platform Agent
+(`09-PLATFORM-AGENT-BACKLOG.md`); job-architecture status/progress fields
+(records processed/failed, retry count) → correctly out of Foundation's
+scope by `lib/jobs/tenantScopedJob.ts`'s own design (each owning module's
+job table, e.g. Integration Agent's `integration_sync_jobs`, carries its own
+status schema; Foundation's wrapper only standardizes the tenant-context/
+authorization/idempotency envelope — confirmed this is a deliberate,
+documented design choice, not an oversight, by reading the file's docblock).
+"Magic link" auth (section 39) not added — explicitly optional ("if
+desired") in the doc, no acceptance criterion attached.
+
+**No existing row's status was changed.** No application code, migration, or
+test was touched in this pass — this was a documentation/planning-only
+reconciliation as instructed.
