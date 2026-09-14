@@ -167,9 +167,14 @@ Each agent works one story at a time from its own backlog doc:
    re-check advisories). Build the app if UI/routes changed.
 4. **Update the module's own audit log** with a dated entry: what was built, how it
    was verified, what was deliberately left out or deferred.
-5. **Commit** with a focused message scoped to the story, then push and merge per
+5. **Update the Progress Tracker table** at the top of the module's own backlog doc
+   (`docs/plan/NN-*-BACKLOG.md`, right before its first `## Epic` heading): set the
+   story's row to `Done`, `Partial`, or `Deferred` as appropriate. This table must
+   always reflect the true current state — never mark a row `Done` before its
+   acceptance criteria are actually met and verified.
+6. **Commit** with a focused message scoped to the story, then push and merge per
    [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md).
-6. Move to the next unfinished story. Never restart or duplicate completed work.
+7. Move to the next unfinished story. Never restart or duplicate completed work.
 
 If a story's correct behavior depends on a real architecture or security decision the
 backlog doesn't fully specify, stop and record the open question in the audit log

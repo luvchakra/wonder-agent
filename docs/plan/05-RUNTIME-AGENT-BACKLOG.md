@@ -49,6 +49,25 @@ correct and reproducible from stored evidence.
 
 ---
 
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Runtime Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| RUNTIME-P0-01.1 | Schema | Not Started |
+| RUNTIME-P0-01.2 | Idempotent ingestion (higher bar) | Not Started |
+| RUNTIME-P0-01.3 | Timeline queries | Not Started |
+| RUNTIME-P0-02.1 | DID aggregation (higher bar) | Not Started |
+| RUNTIME-P0-02.2 | Comparison engine (higher bar) | Not Started |
+
+---
+
 ## Epic RUNTIME-P0-01 — Normalized Runtime Event Model
 
 ### RUNTIME-P0-01.1 — Schema

@@ -41,6 +41,25 @@ mounts into — get its route/slot contract right or every module's UI story bre
 
 ---
 
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Experience Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| EXPERIENCE-P0-01.1 | Shell layout | Not Started |
+| EXPERIENCE-P0-01.2 | Responsive behavior | Not Started |
+| EXPERIENCE-P0-02.1 | Overview dashboard cards | Not Started |
+| EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Not Started |
+| EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Not Started |
+
+---
+
 ## Epic EXPERIENCE-P0-01 — Application Shell & Navigation
 
 ### EXPERIENCE-P0-01.1 — Shell layout

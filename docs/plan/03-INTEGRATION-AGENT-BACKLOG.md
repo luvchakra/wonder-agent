@@ -47,6 +47,31 @@ verification) are higher bar.
 
 ---
 
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Integration Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| INTEGRATION-P0-01.1 | Adapter contract & capability declaration | Not Started |
+| INTEGRATION-P0-01.2 | Schema (higher bar on credential storage) | Not Started |
+| INTEGRATION-P0-01.3 | `integration_sync_jobs` | Not Started |
+| INTEGRATION-P0-01.4 | Normalized object storage | Not Started |
+| INTEGRATION-P0-02.1 | Saviynt REST adapter | Not Started |
+| INTEGRATION-P0-02.2 | Sync status & health surfaces | Not Started |
+| INTEGRATION-P0-03.1 | Configurable connector | Not Started |
+| INTEGRATION-P0-03.2 | Object/field mapping UI | Not Started |
+| INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Not Started |
+| INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Not Started |
+| INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Not Started |
+
+---
+
 ## Epic INTEGRATION-P0-01 — Connector Framework
 
 ### INTEGRATION-P0-01.1 — Adapter contract & capability declaration

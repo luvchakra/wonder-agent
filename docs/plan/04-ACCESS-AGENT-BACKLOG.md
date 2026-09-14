@@ -51,6 +51,26 @@ CustomerDB scenario depends on most directly.
 
 ---
 
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Access Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| ACCESS-P0-01.1 | Canonical access schema | Not Started |
+| ACCESS-P0-01.2 | Effective access computation & explainability (higher bar) | Not Started |
+| ACCESS-P0-01.3 | Access requests (P0 minimal) | Not Started |
+| ACCESS-P0-02.1 | Policy schema (higher bar) | Not Started |
+| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Not Started |
+| ACCESS-P0-02.3 | Segregation of Duties (SoD) (higher bar) | Not Started |
+
+---
+
 ## Epic ACCESS-P0-01 — Effective Access Graph
 
 ### ACCESS-P0-01.1 — Canonical access schema

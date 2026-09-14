@@ -42,6 +42,26 @@ compliant; see non-negotiable and product-boundary #10.
 
 ---
 
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Compliance Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| COMPLIANCE-P0-01.1 | Schema | Not Started |
+| COMPLIANCE-P0-01.2 | Campaign launch & item population | Not Started |
+| COMPLIANCE-P0-01.3 | Reviewer decision flow | Not Started |
+| COMPLIANCE-P0-01.4 | Certification detail panel data | Not Started |
+| COMPLIANCE-P0-02.1 | Schema (higher bar) | Not Started |
+| COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Not Started |
+
+---
+
 ## Epic COMPLIANCE-P0-01 — Access Certification
 
 ### COMPLIANCE-P0-01.1 — Schema

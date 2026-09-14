@@ -47,6 +47,26 @@ wrong is expensive for every downstream module. Stop and report on ambiguity.
 
 ---
 
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
+
+| Story | Title | Status |
+|---|---|---|
+| IDENTITY-P0-01.1 | `agents` table and registration | Done |
+| IDENTITY-P0-01.2 | Agent identity correlation (`agent_identities`) | Done |
+| IDENTITY-P0-01.3 | Agent discovery inbox | Partial — always returns empty pending Integration Agent's contract |
+| IDENTITY-P0-02.1 | Lifecycle state machine (higher bar) | Done |
+| IDENTITY-P0-02.2 | Ownership & accountability | Done |
+| IDENTITY-P0-02.3 | Agent relationships | Done |
+| IDENTITY-P0-03.1 | `agent_contracts` (higher bar) | Done |
+
+---
+
 ## Epic IDENTITY-P0-01 — Canonical Agent Identity
 
 ### IDENTITY-P0-01.1 — `agents` table and registration
