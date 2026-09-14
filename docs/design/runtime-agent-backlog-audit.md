@@ -298,3 +298,58 @@ calls it with a real `asOf` value yet (no consumer wiring, per above), so
 the story's full acceptance criterion ("re-running an evaluation... does
 not retroactively erase evidence") isn't yet demonstrated end-to-end
 against a real finding.
+
+---
+
+## 2026-09-14 — Documentation-only re-check against re-uploaded expanded requirements doc
+
+**Agent:** Runtime Agent (documentation/planning pass only — no application
+code, migrations, or tests touched). Triggered by the user re-uploading
+`707001e1-05_RUNTIME_ASSURANCE.md`, described as a newer/expanded version of
+the doc already reconciled in the "Requirements Refresh — 2026-09-14"
+section of `docs/plan/05-RUNTIME-AGENT-BACKLOG.md`.
+
+**Method:** read the full re-uploaded document; read the full current
+backlog (Progress Tracker, all epics, the existing Requirements Refresh
+section, and the P1/P2 prose); skimmed this audit log's prior entries; and
+spot-checked `modules/runtime-assurance/*.ts` and
+`supabase/migrations/0032_runtime_events.sql`,
+`0033_runtime_indexes.sql`, `0043_runtime_ingestion_hardening.sql` to make
+sure nothing the doc describes was already built without being reflected in
+the backlog.
+
+**Finding: no genuinely new requirements, stories, or acceptance criteria.**
+The re-uploaded document's numbered "Expanded Requirements" section
+(`RUNTIME-P0-01` through `RUNTIME-P0-10`, `RUNTIME-P1-01` through
+`RUNTIME-P1-04`, `RUNTIME-P2-01` through `RUNTIME-P2-03`) and its PRD/
+execution-plan sections are, substantively, the same content already
+reconciled in the prior refresh pass — including detail-level items like the
+`latency` canonical field and the "environments"/"delayed events"/
+"unsupported actions" vocabulary, which the existing refresh section already
+quotes and accounts for (as a flagged, not-spun-out schema gap for
+`latency`, and as explicit scope of already-tracked `RUNTIME-P0-12` and
+`RUNTIME-P0-14` respectively). Every numbered item in the doc traces to an
+existing Progress Tracker row (`RUNTIME-P0-01.1/.2/.3`, `RUNTIME-P0-02.1/.2`,
+`RUNTIME-P0-11` through `RUNTIME-P0-14`) or to an already-named story in the
+backlog's `## P1`/`## P2` prose (`RUNTIME-P1-03`, `RUNTIME-P1-04`,
+`RUNTIME-P2-01`, `RUNTIME-P2-02`, `RUNTIME-P2-03`, plus the AWS/Azure and
+behavioral-baseline P1 items covered generically there). No item was found
+that exists in the doc but nowhere in the backlog.
+
+**No changes made to the Progress Tracker.** No row was added (nothing
+qualified as genuinely new) and no existing row's status was changed —
+`RUNTIME-P0-13`'s `Partial` status from the immediately prior entry above
+was left exactly as is, per this task's explicit instruction not to reopen
+or re-flag it.
+
+**What was added:** a new dated section, "## Requirements Refresh —
+2026-09-14 (round 2, expanded doc)," in
+`docs/plan/05-RUNTIME-AGENT-BACKLOG.md` (placed directly above `## P1`),
+recording this re-check and its per-item mapping so a future pass against
+yet another re-upload of this doc has a clear record of what was already
+checked and found to be identical.
+
+**Not fabricated:** this entry deliberately reports zero new gaps rather
+than inventing scope to appear thorough — the re-uploaded file's content,
+line for line in its substantive sections, matches what the earlier,
+smaller-labeled version already supplied.

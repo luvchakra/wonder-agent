@@ -339,3 +339,72 @@ From the requirements refresh above — strategic, after P0/P1 proven:
 
 - Any domain business logic — Operations only reads, aggregates and presents.
 - A separate search index/table that duplicates source-of-truth data outside RLS.
+
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded the Operations module requirements document
+(`10_AUDIT_REPORTING_OPERATIONS.md`) at
+`/root/.claude/uploads/7af02f4f-be08-5f91-b0d5-fc0907e4645c/3964c18a-10_AUDIT_REPORTING_OPERATIONS.md`,
+asking for a fresh, thorough re-check against this newer/expanded copy in
+case it contains detail the first refresh (the "Requirements Refresh —
+2026-09-14" section above) missed.
+
+**Result: no new stories added.** The uploaded document was read in full
+(all 260 lines — "# 29. Audit Trail" through the closing "Notification
+safety" note) and compared section-by-section against both the module's
+Original Master PRD text and the existing Requirements Refresh above.
+Every numbered item in the doc's "Expanded Requirements" section
+(`OPS-P0-01` through `OPS-P0-10`, `OPS-P1-01` through `OPS-P1-05`,
+`OPS-P2-01` through `OPS-P2-03`) is already accounted for by name in the
+first-pass refresh or by an existing Progress Tracker row:
+
+- `OPS-P0-01` Unified Audit Event, `OPS-P0-02` Immutable Evidence
+  Semantics, `OPS-P0-03` Notifications, `OPS-P0-05` Reports, `OPS-P0-07`
+  Evidence Export, `OPS-P0-08` Search — already reconciled under "Already
+  covered, no new row needed" in the first-pass refresh above.
+- `OPS-P0-04` Notification Preferences → `OPERATIONS-P0-05.1` (already a
+  tracked row, Partial).
+- `OPS-P0-06` Report Traceability → `OPERATIONS-P0-04.2` (already a
+  tracked row, Done).
+- `OPS-P0-09` Search Traceability → `OPERATIONS-P0-03.2` (already a
+  tracked row, Done).
+- `OPS-P0-10` Operational Job Reporting → `OPERATIONS-P0-06.1` (already a
+  tracked row, Partial).
+- `OPS-P1-01` through `OPS-P1-05` and `OPS-P2-01` through `OPS-P2-03` —
+  every one already appears, by name and description, in this file's `##
+  P1` and `## P2` sections above (Scheduled Reports, SIEM/ITSM
+  Notifications, Alert Routing, Advanced Search, Operational Dashboards,
+  Analytics Store, Advanced Retention, Executive Reporting Automation).
+
+The document's closing **"Notification safety"** note ("Never place
+credentials, access tokens or raw sensitive payloads into notification
+text. Notifications should link to authorized evidence views.") is not a
+new capability or story — it is a constraint on the already-tracked
+`OPERATIONS-P0-02.2` (`notify(event)` and trigger wiring), and it is
+already covered in substance by `CLAUDE.md` non-negotiable #10 (secrets
+must never be exposed to logs, browser code or source control) and this
+module's own "Engineering rules for every module" #6 ("Never expose
+secrets, service-role keys or connector credentials to the browser").
+Spot-checked `modules/operations/notifications.ts` (no reference to any
+credential/token/secret field when constructing a notification's `title`/
+`body`) — nothing in the current implementation violates this, and future
+producing modules calling `notify()` should keep notification bodies to
+human-readable summaries with links (matching `OPERATIONS-P0-04.2`/
+`03.2`'s existing drill-through-link pattern) rather than embedding raw
+sensitive payloads. No new Progress Tracker row added for it — it is
+recorded here as a standing constraint on `OPERATIONS-P0-02.2`, the same
+way the first-pass refresh recorded the "runtime events" search object
+type as a scope note on `OPERATIONS-P0-03.1` rather than a new row.
+
+The Original Master PRD sections (`# 29` through `# 32`) and the "Claude
+Code Execution Plan" / critical-acceptance-test text in the uploaded doc
+are byte-for-byte the same requirements already reflected in this file's
+own "Original Master PRD Requirements" and "Critical acceptance test"
+sections — no drift found.
+
+**No Progress Tracker rows were added, changed, or reordered in this
+pass.** The four known, already-tracked partial gaps named in this task's
+instructions (email channel not wired, `notify()` not yet called by
+producing modules, search covering 6 of 9 object types, no dedicated
+job-status customer page) remain exactly as recorded in the existing
+tracker rows and are not restated as new items.

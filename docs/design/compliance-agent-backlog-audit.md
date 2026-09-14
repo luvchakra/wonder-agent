@@ -309,3 +309,53 @@ other module's file).
 `CertificationSnapshot`, `CampaignMetrics`, `EvidenceExportPackage`, and the
 `snapshot`/`escalatedAt`/`escalatedTo` fields on `CertificationItem`/
 `CertificationDecision` (`lib/shared/types/compliance.ts`).
+
+---
+
+## 2026-09-14 — Requirements refresh, round 2 (documentation-only reconciliation, no stories added)
+
+**Agent:** Compliance Agent (documentation/planning task, no application code
+touched). The user re-uploaded the Certification & Compliance requirements
+document a second time (`07_CERTIFICATION_COMPLIANCE.md`, described as a
+newer/expanded version) and asked for a fresh reconciliation pass against
+this module's backlog, independent of the round-one pass recorded above.
+
+**Finding: nothing new to add.** Read the full re-uploaded document
+(243 lines) and compared it section-by-section against
+`docs/plan/07-COMPLIANCE-AGENT-BACKLOG.md` (its Progress Tracker, its
+original "Original Master PRD Requirements" section, and its existing
+"Requirements Refresh — 2026-09-14" section from round one). The re-upload
+is **content-identical** to the document already reconciled in round one —
+same master-PRD `# 16`/`# 17`/`# 20` sections, same "Claude Code Execution
+Plan," same `CERT-P0-01` through `CERT-P0-09`, `CERT-P1-01` through
+`CERT-P1-05`, `CERT-P2-01` through `CERT-P2-03` items with matching wording,
+same critical acceptance test. Every item in it was already either (a) a
+tracked Progress Tracker row (`COMPLIANCE-P0-01.1` through
+`COMPLIANCE-P0-06`), (b) explicitly listed in round one's "Already covered,
+no new tracker row needed" bullets, or (c) already present in the backlog's
+`## P1` / `## P2` sections. No genuinely new requirement, story, or
+acceptance criterion was found.
+
+Before concluding this, sanity-checked the actual codebase rather than
+trusting the backlog text alone: `ls modules/certification-compliance/`
+confirms `campaigns.ts`, `decisions.ts`, `escalation.ts`, `export.ts`,
+`snapshot.ts`, `controls.ts`, `mappers.ts`, `service.ts` all exist, backed
+by migrations `0036_compliance_certification.sql`,
+`0037_compliance_indexes.sql`, and
+`0046_compliance_evidence_snapshot_sod_escalation.sql` — consistent with
+what the Progress Tracker and the two 2026-09-14 entries above already
+record as `Done`/`Partial`. This is not fabricated thoroughness: the doc
+really does appear to be the same upload as round one, not an expanded
+version, so there is no gap to report beyond documenting that the check was
+done and came back empty.
+
+**Changed:** added a "## Requirements Refresh — 2026-09-14 (round 2,
+expanded doc)" section to `docs/plan/07-COMPLIANCE-AGENT-BACKLOG.md`
+recording this finding. No Progress Tracker rows added or modified; no
+existing row's status changed; no application code, migration, or test
+touched.
+
+**Open items carried forward unchanged from round one** (not re-decided
+here): the evidence-export file/delivery ownership question
+(Compliance vs. Operations Agent) and the `CERT-P2-03` Auditor Workspace
+authorization-boundary question both remain open for the user.

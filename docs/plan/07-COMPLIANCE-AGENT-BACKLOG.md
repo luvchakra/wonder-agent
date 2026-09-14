@@ -353,6 +353,46 @@ this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
 requirement, and is called out to the user separately rather than silently
 changed here.
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded the Certification & Compliance requirements document
+(`07_CERTIFICATION_COMPLIANCE.md`, path
+`7af02f4f-be08-5f91-b0d5-fc0907e4645c/8dd148e8-07_CERTIFICATION_COMPLIANCE.md`),
+described as a newer/expanded version, for a fresh reconciliation pass
+against the current backlog (which already absorbed one round of this same
+document on 2026-09-14 — see the "Requirements Refresh — 2026-09-14" section
+above).
+
+**Finding: no new stories added.** A full line-by-line comparison of the
+re-uploaded document against the backlog above found it to be **content-
+identical** to what was already reconciled in round one — the same
+`# 16. Access Certification`, `# 17. Certification UX` and `# 20. Control
+Framework Module` master-PRD sections, the same "Claude Code Execution
+Plan," the same expanded `CERT-P0-01` through `CERT-P0-09`,
+`CERT-P1-01` through `CERT-P1-05`, and `CERT-P2-01` through `CERT-P2-03`
+items (matching wording throughout), and the same critical acceptance test.
+Every one of those already maps onto an existing Progress Tracker row
+(`COMPLIANCE-P0-01.1` through `COMPLIANCE-P0-06`) or is explicitly listed
+under round one's "Already covered, no new tracker row needed" bullets, its
+`## P1` section, or its `## P2` section — there is no requirement, story, or
+acceptance criterion in this upload that isn't already reflected there.
+
+Re-confirmed against the actual codebase (not just the backlog text) before
+concluding this: `modules/certification-compliance/` contains
+`campaigns.ts`, `decisions.ts`, `escalation.ts`, `export.ts`, `snapshot.ts`
+and `controls.ts`, backed by migrations `0036_compliance_certification.sql`,
+`0037_compliance_indexes.sql` and
+`0046_compliance_evidence_snapshot_sod_escalation.sql` — consistent with
+what the Progress Tracker and the 2026-09-14 audit log entries already
+claim as `Done`/`Partial`. No status on any existing row was changed by this
+pass.
+
+The two open ownership-map flags from round one (evidence-export file/
+delivery mechanism vs. Operations Agent; the Auditor Workspace
+authorization boundary for `CERT-P2-03`) remain open and are not
+re-litigated here — they were already surfaced to the user in round one and
+nothing in this re-upload adds detail that resolves them.
+
 ## P1
 
 Full control libraries per framework. Executive/board compliance reporting.

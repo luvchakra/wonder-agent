@@ -501,6 +501,54 @@ changed here.
   `agent_identities`, without WonderAgent becoming a generic NHI platform
   (Product Boundaries §10.7) (new doc's IDENTITY-P2-03).
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-supplied the module 02 requirements document at a fresh upload
+path (`0a38fac6-02_AGENT_IDENTITY_LIFECYCLE.md`), described as a newer/
+expanded version superseding the doc reconciled in the "Requirements
+Refresh — 2026-09-14" pass above, and asked for a fresh, thorough re-check
+in case it contains additional detail, new stories, or refined acceptance
+criteria.
+
+**Full read of the re-supplied document, cross-checked requirement-by-
+requirement against this backlog's Progress Tracker, the existing
+"Requirements Refresh — 2026-09-14" section above (including its "Already
+covered, no new tracker row needed" list), and the `## P1`/`## P2` sections
+below.** Result: **no genuinely new requirements, stories, or acceptance
+criteria found.** The re-supplied document's content — the "Identity data
+model" field summary; IDENTITY-P0-01 through IDENTITY-P0-10; IDENTITY-P1-01
+through IDENTITY-P1-04; IDENTITY-P2-01 through IDENTITY-P2-03; and the
+critical acceptance criteria paragraph — is, requirement ID for requirement
+ID and substantively wording for wording, the same content the original
+2026-09-14 pass already reconciled against:
+
+- Doc's P0-01, P0-03, P0-04 (Identity Contract), P0-05 (Lifecycle State
+  Machine), P0-06, P0-07, P0-08, P0-10 → already resolved to `Done` stories
+  (IDENTITY-P0-01.1/01.2/02.1/02.2/03.1) in the first pass's "Already
+  covered" list; re-verified still accurate against the current schema.
+- Doc's P0-02 (Agent Registration — duplicate detection/merge workflow) and
+  P0-09 (Discovery Reconciliation) → already added as this backlog's own
+  IDENTITY-P0-04 and IDENTITY-P0-05 rows in the first pass. Both are now
+  `Done`; spot-checked against the codebase and confirmed actually
+  implemented: `modules/agent-identity/duplicates.ts` +
+  `duplicates.test.ts` + migration `0041_identity_duplicate_candidates.sql`
+  for P0-04, and `modules/agent-identity/discovery.ts` (reading Integration
+  Agent's published `listIntegrations`/`getNormalizedObjects` contract) for
+  P0-05 — matching the module's own audit log entries for both stories.
+- Doc's P1-01 (Agent Relationships) → already exceeded (built as P0,
+  IDENTITY-P0-02.3, `Done`), per the first pass's finding.
+- Doc's P1-02/P1-03/P1-04 (Attestation, Expiry Controls, Bulk Lifecycle) →
+  already carried in `## P1` below.
+- Doc's P2-01/P2-02/P2-03 (Federated Agent Identity, Agent-to-Agent
+  Delegation Governance, NHI Convergence) → already carried in `## P2`
+  below.
+
+No Progress Tracker rows were added, and no existing row's status was
+changed, because there was nothing genuinely new to add. This is reported
+explicitly rather than fabricating a gap to appear thorough — see the
+corresponding 2026-09-14 (round 2) entry in
+`docs/design/identity-agent-backlog-audit.md`.
+
 ## DO NOT IMPLEMENT
 
 - Effective access computation (Access Agent).

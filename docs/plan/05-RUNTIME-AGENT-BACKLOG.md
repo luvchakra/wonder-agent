@@ -377,6 +377,60 @@ this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
 requirement, and is called out to the user separately rather than silently
 changed here.
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded the requirements document for this module at
+`707001e1-05_RUNTIME_ASSURANCE.md`, described as a newer/expanded version of
+the doc reconciled in the "Requirements Refresh — 2026-09-14" pass above, and
+asked for a fresh, thorough re-check against it in case it carried additional
+detail, new stories, or refined acceptance criteria not present in the
+smaller original.
+
+**Finding: nothing new.** The re-uploaded document's substantive content —
+its "Runtime Assurance" and "SHOULD vs CAN vs DID Engine" PRD sections, its
+"Claude Code Execution Plan," and its full "Expanded Requirements — Runtime
+Assurance P0/P1/P2" numbering (`RUNTIME-P0-01` through `RUNTIME-P0-10`,
+`RUNTIME-P1-01` through `RUNTIME-P1-04`, `RUNTIME-P2-01` through
+`RUNTIME-P2-03`, and its closing "Critical acceptance" note) — is, item for
+item, the same content already reconciled above. Every one of its numbered
+requirements maps cleanly onto something already present in this backlog:
+
+- `RUNTIME-P0-01` → `RUNTIME-P0-01.1` (including the already-flagged
+  `latency`-field gap, not spun into a new story).
+- `RUNTIME-P0-02` → `RUNTIME-P0-01.2` (idempotency) + `RUNTIME-P0-11`
+  (replay protection & quarantine).
+- `RUNTIME-P0-03` → `RUNTIME-P0-01.3`.
+- `RUNTIME-P0-04` → `RUNTIME-P0-12`.
+- `RUNTIME-P0-05` and `RUNTIME-P0-08` → `RUNTIME-P0-13` (already moved from
+  `Deferred` to `Partial` in the prior commit — left untouched here per this
+  task's instructions).
+- `RUNTIME-P0-06` → `RUNTIME-P0-02.1`.
+- `RUNTIME-P0-07` → `RUNTIME-P0-02.2` (severity deliberately not adopted,
+  per the existing `DO NOT IMPLEMENT` boundary).
+- `RUNTIME-P0-09` → `RUNTIME-P0-02.2`'s evidence bundle.
+- `RUNTIME-P0-10` → `RUNTIME-P0-14`.
+- `RUNTIME-P1-01` (Cloud Runtime Adapters) and `RUNTIME-P1-02` (Behavioural
+  Baselines) → already reflected in the `## P1` section's "AWS/Azure runtime
+  sources... a behavioral-anomaly engine beyond simple set comparison"
+  prose below.
+- `RUNTIME-P1-03` (Streaming Evaluation) and `RUNTIME-P1-04` (Session
+  Reconstruction) → already tracked under those exact story IDs in the
+  `## P1` section below.
+- `RUNTIME-P2-01`/`RUNTIME-P2-02`/`RUNTIME-P2-03` → already tracked under
+  those exact story IDs in the `## P2` section below.
+- The closing "Critical acceptance" note → matches this file's own
+  "Critical acceptance test" section above essentially verbatim.
+
+No new Progress Tracker row was added and no existing row's status was
+changed. Sanity-checked against the live codebase
+(`modules/runtime-assurance/*.ts`, `supabase/migrations/0032`, `0033`,
+`0043_runtime_*.sql`) and this module's own audit log before concluding
+this — the implementation and tracking already visible there account for
+everything the re-uploaded doc describes; nothing was found that exists in
+code but is undocumented, and nothing was found that the doc requires but no
+part of this backlog mentions. See the dated audit-log entry for the same
+conclusion in more detail.
+
 ## P1
 
 AWS/Azure runtime sources, application log ingestion, SIEM integration, a
