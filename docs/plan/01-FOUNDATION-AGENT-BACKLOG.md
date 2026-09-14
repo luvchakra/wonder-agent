@@ -39,6 +39,11 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-06.2 | Route/middleware enforcement | Done |
 | FOUNDATION-P0-07.1 | Fixtures (higher bar) | Done |
 | FOUNDATION-P0-07.2 | Isolation tests — critical acceptance test (higher bar) | Done |
+| FOUNDATION-P0-08 | Job Security primitive (tenant-scoped, idempotent background jobs) | Not Started — new story, see Requirements Refresh below |
+| FOUNDATION-P0-09 | Session Security (idle/absolute expiry, fixation protection) | Not Started — new story, see Requirements Refresh below |
+| FOUNDATION-P0-11 | Input/Output Safety (shared validation/encoding utility) | Not Started — new story, see Requirements Refresh below |
+| FOUNDATION-P0-12 | Database Migration Discipline (explicit policy) | Done — already followed as informal practice every module this session; now written down explicitly, see Requirements Refresh below |
+| FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
 
 ---
 
@@ -592,15 +597,107 @@ database connection.
 
 ---
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`01_FOUNDATION_SECURITY.md`) that expands this module's P0/P1/P2 scope beyond
+what was already tracked above. Reconciled against the existing Progress
+Tracker (nothing already `Done` was reopened); the following are genuinely
+new or newly-explicit stories added to the tracker:
+
+### FOUNDATION-P0-08 — Job Security primitive
+
+Background/async jobs (consumed today by Integration Agent's sync jobs) must
+carry tenant context resolved server-side (never from job payload alone
+without verification), use idempotency keys, enforce authorization at job
+*creation* time, record status, and be structurally unable to execute across
+tenants. Foundation's job is to publish the shared contract/helper (e.g. a
+`createTenantScopedJob()` wrapper or documented pattern) other modules'
+job-creation code must use, rather than each module inventing its own
+tenant-context plumbing for jobs. Integration Agent's existing
+`integration_sync_jobs` implementation already does this per-module — this
+story is about extracting/documenting the shared pattern so it doesn't drift
+per module. **Not started.**
+
+### FOUNDATION-P0-09 — Session Security
+
+Explicit secure cookie/session configuration (idle expiry, absolute expiry,
+logout invalidation, session-fixation protection) on top of Supabase Auth's
+defaults. Audit exactly what Supabase Auth already provides out of the box
+vs. what WonderAgent must configure explicitly (e.g. JWT expiry, refresh
+token rotation) and document the gap. **Not started.**
+
+### FOUNDATION-P0-11 — Input/Output Safety
+
+A shared server-side validation/encoding utility other modules' API routes
+use at their trust boundary (structured input validation, untrusted-output
+encoding, file-upload constraints, import-metadata sanitization, no unsafe
+dynamic SQL). Today each module validates its own route inputs ad hoc
+(e.g. with hand-rolled checks); this story is to publish one shared
+`lib/security/validate.ts`-style contract other modules adopt going forward,
+without rewriting already-shipped route handlers unless a real gap is found.
+**Not started.**
+
+### FOUNDATION-P0-12 — Database Migration Discipline (made explicit)
+
+Every module this session has already followed additive-only,
+forward-applicable migrations with sortable numeric prefixes — this is
+existing practice, not a gap. Marked `Done` in the tracker to reflect that
+the practice is real and has held for 39 migrations so far, not merely
+aspirational.
+
+### FOUNDATION-P0-15 — Tenant Lifecycle (made explicit)
+
+Already satisfied: `tenants.status` (`active`/`suspended`/`deprovisioned`)
+has existed since the first schema migration, and the enforcement gap
+Platform Agent surfaced (suspended tenants could still read/write data) was
+closed in migration `0039` — see this log's 2026-09-14 entry above.
+
+### Already covered, no new tracker row needed
+
+FOUNDATION-P0-01 (Tenant Context), -02 (RLS Coverage), -05 (Secure Secrets),
+-06 (Audit Primitive), -13 (Permission Bootstrap), -14 (Platform Boundary)
+map directly onto already-`Done` stories above (02.4/02.5, 05.1, 05.2, 02.3,
+06.1/06.2 respectively) — no scope change. FOUNDATION-P0-03 (Authorization
+Matrix) and -10 (Security Headers) map onto existing `Done`/`Deferred`
+stories (04.1/04.2 and 05.3) with no change to their current status.
+FOUNDATION-P0-04 (SSO), -07 (rate-limiting portion of API Security) remain
+`Deferred` exactly as already tracked (03.3, 05.3) — the new doc does not
+change their acceptance criteria in a way that invalidates prior scoping.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
 ## P1 (do not build ahead of P0)
 
 - Per-tenant custom role creation/editing (beyond assigning existing system roles).
 - Invitation emails / multi-step teammate onboarding.
 - Delegated administration (temporary elevated access with expiry).
-- SCIM provisioning.
+- SCIM provisioning (FOUNDATION-P1-01).
+- Step-up authentication for high-impact operations — agent suspension, credential
+  rotation, platform changes, bulk remediation (FOUNDATION-P1-02).
+- Security event hooks — normalized events for login anomalies, permission changes,
+  failed authorization, credential changes, admin mutations (FOUNDATION-P1-03).
+- Tenant-configurable data retention for runtime events/audit evidence/exported
+  reports, subject to platform minimums (FOUNDATION-P1-04).
 - Redis-backed or distributed rate limiting.
 - Per-tenant custom branding (that's Platform Agent's "Global Branding" for the
   platform level; per-tenant branding is a distinct, later feature).
+
+## P2 (strategic, after P0/P1 proven)
+
+- Adaptive/risk-aware authentication and conditional access signals, without
+  changing the core RBAC contract (FOUNDATION-P2-01).
+- IP restrictions, device posture signals, privileged admin approval workflows,
+  customer-managed encryption options where architecture permits
+  (FOUNDATION-P2-02).
 
 ## DO NOT IMPLEMENT (out of scope for this module, ever)
 

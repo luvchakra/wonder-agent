@@ -23,6 +23,10 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-01.4 | Certification detail panel data | Done |
 | COMPLIANCE-P0-02.1 | Schema (higher bar) | Done |
 | COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Partial — status computed from evidence recency only; live policy-violation state not checked, blocked on Access/Risk publishing a policy-scoped violation query |
+| COMPLIANCE-P0-03 | Evidence snapshot (contract/policy versions) | Not Started |
+| COMPLIANCE-P0-04 | Reviewer authorization & Segregation of Duties | Not Started |
+| COMPLIANCE-P0-05 | Escalation of overdue certification items | Not Started |
+| COMPLIANCE-P0-06 | Tamper-evident evidence export package | Not Started |
 
 ---
 
@@ -220,11 +224,172 @@ vs. Recommendation exactly as the worked table above, capture
 Approve/Revoke/Modify/Delegate/Request Information decisions, and retain immutable
 evidence/audit history for each.
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`07_CERTIFICATION_COMPLIANCE.md`) that expands this module's P0/P1/P2 scope
+beyond what was already tracked above. Reconciled against the existing
+Progress Tracker (nothing already `Done` or `Partial` was reopened or marked
+down); the following are genuinely new stories added to the tracker, each
+verified against the actual code in `modules/certification-compliance/`
+before being marked `Not Started` rather than assumed:
+
+### COMPLIANCE-P0-03 — Evidence Snapshot (contract/policy versions)
+
+The new doc's CERT-P0-03 requires that "certification decisions preserve a
+point-in-time snapshot of access, contract, runtime usage, risk **and policy
+versions**." Today's `certification_items` schema only snapshots
+`risk_at_review` and `usage_at_review` at campaign-launch time
+(`modules/certification-compliance/campaigns.ts`); there is no snapshot of
+the agent's contract version or the policy version(s) the access was
+evaluated against, and no snapshot is captured again at *decision* time (only
+at item-population time), so a decision made weeks after launch is not
+provably reproducible against what was true when the reviewer actually acted.
+**Objective:** extend the schema (a `snapshot jsonb` column on
+`certification_items` and/or `certification_decisions`) to capture agent
+contract version/id, the effective access grant detail, and relevant policy
+version/id at both population and decision time. **Acceptance:** given a
+decided item, the system can reproduce exactly what the reviewer saw —
+access, approved contract, usage, risk and policy version — even if the
+live agent contract or policy has since changed.
+
+### COMPLIANCE-P0-04 — Reviewer Authorization & Segregation of Duties
+
+The new doc's CERT-P0-04 requires "only authorized reviewers can act on an
+item" and "reviewer must not certify their own access where SoD rules
+prohibit it." `recordDecision()` (`modules/certification-compliance/decisions.ts`)
+today only checks the caller holds the `compliance.manage` permission —
+it never checks that `actorId` matches the item's assigned `reviewer_id`,
+and has no self-certification/SoD check at all (e.g. an agent's own business
+owner certifying that agent's own access). **Objective:** enforce that only
+the item's current `reviewer_id` (or an explicitly delegated reviewer) may
+record a decision, and reject (or require an explicit override with its own
+audit trail) a decision where the reviewer is also the agent's owner, subject
+to Access Agent's SoD rule definitions. **Acceptance:** an authenticated user
+who is not the assigned reviewer cannot record a decision on an item; a
+configured SoD rule blocks self-certification and is audited when it fires.
+
+### COMPLIANCE-P0-05 — Escalation of Overdue Certification Items
+
+The new doc's CERT-P0-06 requires overdue reviews to escalate to configured
+owners/managers and remain visible in campaign metrics. No escalation logic
+exists anywhere in the current module — items simply carry a `due_date` with
+no follow-up behavior when it passes. **Objective:** a scheduled or
+on-read check that identifies `pending` items past `due_date`, escalates
+them (recorded, auditable escalation event; actual notification delivery is
+Operations Agent's contract once published) to a configured owner/manager,
+and surfaces an overdue count in campaign-level metrics. **Acceptance:** a
+campaign's summary reports its count of overdue/escalated items, and each
+escalation is an audited event with actor, target item and timestamp.
+
+### COMPLIANCE-P0-06 — Tamper-Evident Evidence Export Package
+
+The new doc's CERT-P0-07 requires generating a tamper-evident evidence
+package (campaign metadata, items, decisions, timestamps, reviewer identity
+and linked evidence references) for a completed campaign. No export
+mechanism exists in the module today. **Objective:** a service function that
+assembles the full campaign evidence bundle and produces a checksummed/
+signed artifact (e.g. content hash recorded alongside the export event) so
+tampering after export is detectable. This module owns assembling the
+compliance-specific evidence content; see the ownership-map flag below on
+where the generic export/delivery mechanism should live. **Acceptance:**
+given a campaign, an export contains every item, every decision with
+reviewer identity and justification, and a verifiable integrity marker, and
+the export action itself is audited.
+
+### Already covered, no new tracker row needed
+
+- **CERT-P0-01** (Certification Campaign) maps onto `COMPLIANCE-P0-01.1`
+  (schema: name/scope/scope_type/cadence/status/due_date) and
+  `COMPLIANCE-P0-01.2` (launch logic) — no scope change. Note: the new doc's
+  campaign fields also mention an explicit "reviewer type" and an
+  "escalation and evidence policy" on the campaign itself, which the current
+  schema doesn't carry as first-class campaign fields; this is folded into
+  `COMPLIANCE-P0-05` (escalation) above rather than tracked separately, since
+  the escalation *policy* and the escalation *behavior* are the same piece
+  of work.
+- **CERT-P0-02** (Agent Access Review Item: Access/Approved/Used/Risk/
+  Recommendation, with approve/revoke/modify/delegate/request-information)
+  maps directly onto `COMPLIANCE-P0-01.2` (population with risk/usage/
+  recommendation) and `COMPLIANCE-P0-01.3` (decision flow) — no scope
+  change.
+- **CERT-P0-05** (Decision Reasons required, all decisions audited) maps
+  onto `COMPLIANCE-P0-01.3`, which already requires a non-empty
+  `justification` on every decision (stricter than "where policy requires
+  it") and writes an audit event via `writeAudit()` — no scope change.
+- **CERT-P0-08** (Control Framework Foundation: framework → control →
+  requirement → policy/evidence mapping, with version/source metadata) maps
+  onto `COMPLIANCE-P0-02.1` — no scope change.
+- **CERT-P0-09** (No Compliance Overclaim) maps onto `COMPLIANCE-P0-02.2`,
+  which already bakes this exact wording rule into the higher-bar
+  acceptance criteria — no scope change.
+- **CERT-P1-02** (Framework Libraries per framework) is already listed
+  below under `## P1` as "Full control libraries per framework" — not
+  duplicated.
+
+### Ownership-map flags for the user
+
+- `COMPLIANCE-P0-06`'s tamper-evident evidence export overlaps in spirit
+  with Operations Agent's ownership of generic "exports" and "audit evidence
+  presentation" (`docs/design/ownership-map.md` §1/§3). This module should
+  own assembling the compliance-specific evidence content/contract; whether
+  the actual export file generation/delivery mechanism belongs to this
+  module or should be handed to Operations Agent's existing export
+  machinery is not decided here — flagged for the user rather than guessed,
+  per `CLAUDE.md` §5 of the ownership map.
+- `COMPLIANCE-P2-03` (Auditor Workspace, below) implies a read-only external
+  or semi-external access mode into compliance evidence that doesn't map
+  cleanly onto the existing customer RBAC model or Platform Administration's
+  vendor-only boundary; flagged for the user to decide which authorization
+  boundary it belongs to before it is scoped as a story.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
 ## P1
 
 Full control libraries per framework. Executive/board compliance reporting.
 Certification campaign templates and recurring auto-scheduling beyond a single
 `due_date`.
+
+- **Continuous Certification** (CERT-P1-01): trigger event-driven
+  micro-certification after significant access/risk/runtime changes to an
+  agent, rather than relying solely on periodic campaigns.
+- **Certification Delegation, time-bound** (CERT-P1-03): today's `delegate`
+  decision (`COMPLIANCE-P0-01.3`) reassigns `reviewer_id` with no expiry or
+  scope limit; extend to a time-bound delegation with an explicit scope and
+  its own audit trail.
+- **Exception Governance** (CERT-P1-04): exceptions to a control mapping's
+  status require an owner, rationale, compensating control, approval,
+  expiry and periodic review — distinct from Access Agent's
+  `policy_exceptions`, which govern access policy, not control-framework
+  status.
+- **Evidence Collection Jobs** (CERT-P1-05): scheduled jobs that collect
+  evidence from Integration Agent's connectors on a cadence and associate
+  each evidence row with its source timestamp and sync job id, rather than
+  requiring evidence to be added manually.
+
+## P2
+
+Strategic, after P0/P1 proven — from the new requirements doc's CERT-P2-*
+items:
+
+- **Continuous Control Monitoring** (CERT-P2-01): evaluate control status
+  continuously from live access/runtime events rather than on-demand/batch
+  recomputation.
+- **Regulatory Packs** (CERT-P2-02): country/industry-specific control packs
+  maintained as versioned configuration data, never hard-coded UI logic.
+- **Auditor Workspace** (CERT-P2-03): read-only evidence exploration,
+  traceability and controlled exports for external auditors — see the
+  ownership-map flag above; the authorization boundary for this needs a
+  decision before it is scoped.
 
 ## DO NOT IMPLEMENT
 

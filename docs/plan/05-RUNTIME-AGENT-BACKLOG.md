@@ -22,6 +22,10 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-01.3 | Timeline queries | Done |
 | RUNTIME-P0-02.1 | DID aggregation (higher bar) | Done |
 | RUNTIME-P0-02.2 | Comparison engine (higher bar) | Done |
+| RUNTIME-P0-11 | Ingestion Hardening — replay protection & event quarantine | Not Started — new story, see Requirements Refresh below |
+| RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Not Started — new story, see Requirements Refresh below |
+| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Not Started — new story, see Requirements Refresh below |
+| RUNTIME-P0-14 | Runtime Data Quality Tracking | Not Started — new story, see Requirements Refresh below |
 
 ---
 
@@ -221,10 +225,185 @@ CustomerDB with timestamp, identity, tool/resource/action and an evidence trace
 sufficient for `compareShouldCanDid` to reproduce the SHOULD/CAN/DID divergence above
 from stored data alone.
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`05_RUNTIME_ASSURANCE.md`) that expands this module's P0/P1/P2 scope beyond
+what was already tracked above. Reconciled against the existing Progress
+Tracker (nothing already `Done` was reopened, and mapping was done by
+content/meaning against the new doc's flat `RUNTIME-P0-NN` numbering, not by
+matching IDs to this backlog's epic-based `RUNTIME-P0-EE.S` numbering); the
+following are genuinely new stories added to the tracker.
+
+### RUNTIME-P0-11 — Ingestion Hardening: Replay Protection & Event Quarantine
+
+Maps to the new doc's RUNTIME-P0-02 ("Event Ingestion"). The idempotency half
+of that requirement is already satisfied by RUNTIME-P0-01.2 (deterministic
+`dedupe_key` + `unique (tenant_id, dedupe_key)`), and basic shape validation
+already exists inline in `app/api/v1/runtime/events/route.ts`. Two pieces of
+that requirement are genuinely unimplemented: (1) replay protection distinct
+from idempotency — the ingestion endpoint has no timestamp/nonce or
+signed-request window check, so a captured request can be resubmitted
+indefinitely as long as its `dedupe_key` inputs are altered even slightly;
+and (2) event quarantine — invalid events today are rejected with a plain
+400 and never persisted, so there is no queryable record for an
+administrator/Integration Agent to investigate a misbehaving source. **Not
+started.**
+
+**Acceptance criteria:** an event failing schema/replay-window validation is
+written to a quarantine store (tenant-scoped, RLS-protected) with a safe
+(non-secret-leaking) error reason instead of being silently dropped, and a
+duplicate/replayed submission outside the legitimate idempotency case is
+rejected rather than accepted as new.
+
+**Dependency note:** may need Integration Agent's shared-secret/bearer-token
+ingestion mechanism (per the existing authentication-decision comment in
+`app/api/v1/runtime/events/route.ts`) to make replay protection meaningful
+for machine-to-machine submitters; if so, record that as a consumed contract
+rather than inventing credential infrastructure here (non-negotiable #6/#14).
+
+### RUNTIME-P0-12 — SHOULD Normalization Model (unknown-safe)
+
+Maps to the new doc's RUNTIME-P0-04 ("SHOULD Model"). Today
+`compareShouldCanDid` (RUNTIME-P0-02.2) consumes `agent_contracts`'
+`approved_applications`/`approved_data` fields directly as the SHOULD set —
+it does not normalize contract purpose into the fuller vocabulary the new
+doc specifies (approved tools, resource classes, actions, environments, data
+categories), and it has no explicit "unknown" representation: an
+agent/contract field that is empty or ambiguous today is simply absent from
+`should`, which is observationally similar to "not approved" but is not the
+same as a flagged "unknown — do not assume compliant" state the new doc
+requires. **Not started.**
+
+**Acceptance criteria:** a contract with an unset/ambiguous purpose field
+produces an explicit `unknown` marker in the SHOULD model (never silently
+treated as either fully permitted or fully denied), and the normalized SHOULD
+shape includes tools and actions, not only application/data, so
+`compareShouldCanDid` can be extended to compare on those dimensions without
+another schema change.
+
+### RUNTIME-P0-13 — Point-in-Time CAN Resolution & Historical Accuracy
+
+Merges the new doc's RUNTIME-P0-05 ("CAN Model" — resolve whether an
+observed action was technically possible *at the relevant point in time*)
+and RUNTIME-P0-08 ("Historical Accuracy" — evaluate using the access/policy
+version effective at event time, not today's). Both describe the same
+underlying gap: `compareShouldCanDid` currently calls
+`getEffectiveAccess(tenantId, agentId)` for *current* access only, so an
+evaluation of a 90-day-old event today is scored against today's
+entitlements, not the entitlements that were actually in force when the
+event happened — a real distortion risk if access has changed since (e.g. an
+entitlement was already revoked, which would make a genuine historical
+`excessive_access` finding disappear on re-evaluation). **Not started.**
+
+**Acceptance criteria:** `compareShouldCanDid` (or a new time-scoped variant)
+can resolve CAN as of a given timestamp, and re-running an evaluation after
+an entitlement change does not retroactively erase evidence of access that
+was actually granted at the time of the observed event.
+
+**Dependency note:** this requires Access Agent to expose effective access
+*as of a point in time* (an access-history/versioning contract), which does
+not appear to exist as a published contract yet. Per non-negotiable #18,
+this is recorded here as a required contract addition from Access Agent
+rather than something Runtime Agent should build itself — if Access Agent's
+backlog does not already plan this, that should be raised with the user
+rather than guessed at.
+
+### RUNTIME-P0-14 — Runtime Data Quality Tracking
+
+Maps to the new doc's RUNTIME-P0-10 ("Runtime Data Quality"). No existing
+story tracks missing identity mappings, unknown resources, duplicate-event
+volume, delayed events, or unsupported actions — `ingestRuntimeEvent` stores
+`identity_id` as nullable and silently accepts a null resolution today, with
+no signal surfaced anywhere that this happened. The new doc's explicit
+requirement — "unknown must not silently become compliant" — is not met: an
+event with an unresolved identity or unrecognized resource flows into DID
+and the comparison engine exactly like a fully-resolved one. **Not started.**
+
+**Acceptance criteria:** a queryable data-quality view/table records at
+least missing-identity-mapping and unknown-resource counts per tenant/agent,
+and the comparison engine's evidence bundle (RUNTIME-P0-02.2) is able to
+distinguish "known compliant" from "unknown, unscored" rather than treating
+both as absence of a violation.
+
+### Already covered, no new tracker row needed
+
+- **RUNTIME-P0-01** (Canonical Runtime Event) → `RUNTIME-P0-01.1` (schema).
+  One minor field gap noted, not worth a separate story: the new doc lists
+  `latency` as a canonical field; the current `runtime_events` schema has no
+  `latency` column. Flagged for whoever next touches the schema rather than
+  spun out on its own.
+- **RUNTIME-P0-02** (Event Ingestion) → its idempotency/dedup and basic
+  validation halves are covered by `RUNTIME-P0-01.2`; its replay-protection
+  and quarantine halves are the genuinely new `RUNTIME-P0-11` above.
+- **RUNTIME-P0-03** (Activity Timeline) → `RUNTIME-P0-01.3`
+  (`GET /api/v1/runtime/events`), which already supports chronological,
+  filtered, paginated per-agent queries with full event evidence in each row.
+  Drill-down to *related policy/risk findings* is inherently cross-module
+  (Risk Agent owns findings) and not a gap in what Runtime Agent itself must
+  expose.
+- **RUNTIME-P0-06** (DID Model) → `RUNTIME-P0-02.1` (`getDid`).
+- **RUNTIME-P0-07** (SHOULD/CAN/DID Evaluation) → `RUNTIME-P0-02.2`
+  (`compareShouldCanDid`), which already returns all applicable mismatch
+  categories with attributed evidence. The new doc's mention of "severity" as
+  part of this evaluation is **not** adopted here — this backlog's existing
+  `DO NOT IMPLEMENT` boundary (severity/finding creation is Risk Agent's,
+  per module ownership and non-negotiable #18) is preserved unchanged; the
+  new doc's wording does not override module ownership.
+- **RUNTIME-P0-09** (Evidence Chain) → `RUNTIME-P0-02.2`'s evidence bundle
+  already attributes every comparison outcome to the specific
+  `access_grants`/`runtime_events` row(s) that produced it, satisfying the
+  reproducibility requirement; the remaining links in the chain (finding,
+  access path) are owned and asserted by Risk Agent and Access Agent
+  respectively on their own sides of the published contracts.
+
+**Ownership-map flags for the user:** `RUNTIME-P0-11`'s quarantine store and
+`RUNTIME-P0-14`'s data-quality tracking table/view are new database objects
+that do not yet appear in `docs/design/ownership-map.md` (only
+`runtime_events`, `runtime_tools`, `runtime_resources` are listed for this
+module today). Both fit squarely within Runtime Agent's existing ownership
+description ("Runtime event model... MCP runtime observation") so no
+cross-module ownership conflict is expected, but the ownership map itself is
+not edited here per this task's constraints — flagged for the user/Runtime
+Agent to add the table names to the ownership map when actually implemented.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
 ## P1
 
 AWS/Azure runtime sources, application log ingestion, SIEM integration, a
-behavioral-anomaly engine beyond simple set comparison (e.g. statistical baselining).
+behavioral-anomaly engine beyond simple set comparison (e.g. statistical
+baselining).
+
+- **RUNTIME-P1-03 — Streaming Evaluation.** Evaluate events near real time
+  (bounded latency) with durable retry semantics, rather than only on-demand
+  `compareShouldCanDid` calls. New from the requirements refresh above.
+- **RUNTIME-P1-04 — Session Reconstruction.** Group related events by
+  session/`correlation_id` into a coherent agent action chain for
+  investigation. `runtime_events.correlation_id` already exists in the
+  schema; the reconstruction/grouping view itself is not built. New from the
+  requirements refresh above.
+
+## P2 (strategic, after P0/P1 proven)
+
+- **RUNTIME-P2-01 — Runtime Interception Integrations.** Optional
+  pre-execution authorization integrations where the customer's runtime
+  supports them, without replacing the customer's own IAM (per non-negotiable
+  #7 and Product Boundary #6).
+- **RUNTIME-P2-02 — Advanced Sequence Detection.** Detect suspicious
+  multi-step action sequences and privilege-escalation patterns with
+  explainable evidence, beyond RUNTIME-P1-02's baseline statistical
+  approach.
+- **RUNTIME-P2-03 — Runtime Replay.** Let investigators reconstruct an
+  historical session exactly from immutable evidence alone.
 
 ## DO NOT IMPLEMENT
 

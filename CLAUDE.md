@@ -17,6 +17,13 @@ The conceptual source of truth is the WonderAgent master PRD. The documents in
 `docs/plan/*-BACKLOG.md` are the execution-scoped derivation of that PRD and are what
 agents actually implement against.
 
+**2026-09-14 requirements refresh:** the user supplied an updated 11-module master
+requirements package (plus an execution guide) expanding P0/P1/P2 scope per module.
+Every `docs/plan/NN-*-BACKLOG.md` file has a dated "Requirements Refresh" section
+recording what changed; nothing already `Done` was reopened. See §3's new Priority
+tiers note and `docs/ORCHESTRATION.md`'s note on the package's proposed process model
+(flagged, not adopted, pending user direction).
+
 ---
 
 ## 1. Architecture Non-Negotiables
@@ -155,6 +162,24 @@ check the ownership map first.
   Guardrails) in addition to non-negotiables #1, #2 and #4.
 - Any data-fetching or long-running operation must follow §15 (Performance &
   Responsiveness Standards).
+
+### Priority tiers (P0 / P1 / P2)
+
+Every module backlog scopes its stories into three tiers, seeded from the master
+requirements package and now recorded per-module in each `docs/plan/NN-*-BACKLOG.md`'s
+own `## P1` / `## P2` sections plus its dated "Requirements Refresh" entries:
+
+- **P0 — release blocker.** Required for a secure, demonstrable commercial MVP.
+  Missing P0 blocks the release gate (QA Agent's final pass, §11 module).
+- **P1 — enterprise readiness.** Required for the first serious enterprise rollout,
+  but may follow the P0 critical path.
+- **P2 — scale/advanced capability.** Strategic enhancements pursued only after the
+  core P0/P1 product is proven.
+
+An agent must never silently build P1/P2 scope ahead of its module's own P0 stories,
+except where a P1/P2 item is a required extension point with no meaningful scope
+increase (e.g. an additive, optional field). If unsure whether something is a
+required extension point or genuine scope creep, treat it as scope creep and stop.
 
 ---
 

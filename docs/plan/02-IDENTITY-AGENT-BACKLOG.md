@@ -24,6 +24,8 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-02.2 | Ownership & accountability | Done |
 | IDENTITY-P0-02.3 | Agent relationships | Done |
 | IDENTITY-P0-03.1 | `agent_contracts` (higher bar) | Done |
+| IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Not Started |
+| IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Not Started |
 
 ---
 
@@ -357,6 +359,114 @@ through `DISCOVERED → REGISTERED → APPROVED → PROVISIONED → ACTIVE`, and
 complete, audited transition history (`agent_lifecycle_events` rows matching every
 transition, each with a corresponding `audit_logs` entry).
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`02_AGENT_IDENTITY_LIFECYCLE.md`) that expands this module's P0/P1/P2 scope
+beyond what was already tracked above. Reconciled against the existing
+Progress Tracker (nothing already `Done` was reopened, and no existing
+`Partial` row's status was lowered); the following are genuinely new stories
+added to the tracker:
+
+### IDENTITY-P0-04 — Duplicate Detection & Merge/Review Workflow
+
+Corresponds to the new doc's IDENTITY-P0-02 ("Agent Registration"), which
+raises duplicate detection using *configurable identity keys* and a
+merge/review workflow to P0 — the existing backlog explicitly deferred any
+automatic correlation/dedup to P1 (see IDENTITY-P0-01.2's "DO NOT IMPLEMENT"
+note and the existing P1 list below). Objective: when an agent is registered
+(manually, or promoted from the discovery inbox), run a duplicate-candidate
+check against existing `agents` rows in the same tenant using one or more
+admin-configurable identity keys (e.g. `agent_name` + `source_system` +
+`source_object_id`), rather than silently creating a second record for the
+same real-world agent. Acceptance criteria: a match at/above a configurable
+threshold produces a reviewable duplicate-candidate record instead of
+silently completing registration; an authorized reviewer can either merge
+(void the duplicate while preserving the surviving record's lifecycle/audit
+history) or confirm-as-distinct (registration proceeds normally); both
+outcomes are audited via `writeAudit()`; tenant-isolated and RLS-protected if
+a new table is introduced. **Not started.** Note: this likely needs a new
+Identity-owned table (e.g. `agent_duplicate_candidates`) not yet listed in
+`docs/design/ownership-map.md` — clearly within Identity Agent's existing
+registration/discovery ownership, so not an ownership *ambiguity*, but it
+still needs a map entry added when built; flagged here rather than edited
+directly per this task's constraints.
+
+### IDENTITY-P0-05 — Discovery Reconciliation & Orphaned Identity Detection
+
+Corresponds to the new doc's IDENTITY-P0-09 ("Discovery Reconciliation").
+Extends IDENTITY-P0-01.3's existing discovery inbox (currently `Partial`,
+blocked on Integration Agent's contract — that dependency is unchanged by
+this story) so that discovered agent-like identities are reconciled against
+already-registered `agents`/`agent_identities` (avoiding the duplicate
+registrations IDENTITY-P0-04 targets) and so that orphaned technical
+identities — an identity reference with no live owning agent, e.g. because
+its agent was retired or never registered — are surfaced as a distinct list
+rather than silently dropped or conflated with net-new discoveries.
+Acceptance criteria: the discovery inbox view distinguishes "genuinely new,"
+"likely duplicate of an existing agent" and "orphaned identity, no owning
+agent" categories; no fake/stubbed data is returned when Integration's
+contract isn't available (same rule as IDENTITY-P0-01.3). **Not started.**
+
+### Already covered, no new tracker row needed
+
+- **IDENTITY-P0-01** (First-Class Agent Record — stable identifier
+  independent of vendor/runtime identifiers) → `agents.id` from
+  IDENTITY-P0-01.1; the table's own primary key is already independent of
+  `source_object_id`/`enterprise_identity_id`/`service_account_id`.
+- **IDENTITY-P0-03** (Ownership — required before APPROVED, changes audited)
+  → IDENTITY-P0-02.2 (`agent_owners`) plus the `REGISTERED → APPROVED`
+  precondition in IDENTITY-P0-02.1's transition table.
+- **IDENTITY-P0-04** *(new-doc numbering; not to be confused with this
+  backlog's own new IDENTITY-P0-04 row above)* — Identity Contract (purpose,
+  approved tools/resources/actions, environment restrictions, owner,
+  expiry/review date, risk constraints) → IDENTITY-P0-03.1 (`agent_contracts`)
+  already implements purpose/owner/approved & prohibited applications, data
+  and actions, and `maximum_risk` as the SHOULD source. Fields the new doc
+  names that the current schema doesn't yet carry explicitly (a distinct
+  "approved tools" list separate from applications, per-contract environment
+  restriction, and an explicit contract expiry/review date rather than the
+  agent-level `next_review_at`) are content gaps to fold into a future
+  revision of IDENTITY-P0-03.1 rather than a new story, since the contract
+  concept and table already exist and are `Done`.
+- **IDENTITY-P0-05** (new-doc numbering) — Lifecycle State Machine →
+  IDENTITY-P0-02.1, already `Done` with the same state sequence and a
+  server-side-enforced transition table.
+- **IDENTITY-P0-06** — Lifecycle Evidence (actor/system, reason, timestamp,
+  prev/new state, evidence/correlation ID) → IDENTITY-P0-02.1's
+  `agent_lifecycle_events` plus the paired `writeAudit()` call already carry
+  actor, reason, timestamps and prior/new state; audit correlation context
+  comes from Foundation's shared audit primitive.
+- **IDENTITY-P0-07** — IAM Mapping (one-to-many external identities,
+  confidence, source, sync timestamps, rationale) → IDENTITY-P0-01.2's
+  `agent_identities` (`external_reference`, `source_system`, `confidence`,
+  `status`) already covers the core concept; per-mapping first/last-sync
+  timestamps and a free-text rationale field are minor schema gaps, not a
+  new story.
+- **IDENTITY-P0-08** — Ownership Health (missing/inactive/conflicting owner,
+  changes near certification deadlines) → IDENTITY-P0-02.2's documented
+  ownership-check queries (missing owner, inactive owner, ownership
+  conflict, stale ownership).
+- **IDENTITY-P0-10** — Environment Separation (explicit dev/test/staging/
+  production; stronger controls for production) → `agents.environment`
+  (IDENTITY-P0-01.1) plus IDENTITY-P0-02.2's rule that only *production*
+  agents are hard-gated on business/technical ownership before leaving
+  `DISCOVERED`.
+- **IDENTITY-P1-01** (new doc, P1-tier) — Agent Relationships (parent/child,
+  orchestrator/sub-agent, delegation, invocation) → already exceeded: this
+  backlog implemented relationship storage/listing as **P0**
+  (IDENTITY-P0-02.3, `Done`), not merely planned for P1.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
 ## P1
 
 - Automatic identity correlation/fuzzy matching.
@@ -364,6 +474,32 @@ transition, each with a corresponding `audit_logs` entry).
 - Per-tenant custom lifecycle states.
 - Delegated/temporary ownership.
 - Contract templates library.
+- Attestation — allow owners to attest that an agent's purpose, owner,
+  runtime and identity mapping remain accurate (new doc's IDENTITY-P1-02).
+  Likely needs a new Identity-owned `agent_attestations` table, not yet in
+  `docs/design/ownership-map.md` — flagged here for the user, not created.
+- Expiry controls — contract expiry with mandatory re-approval before
+  continued operation (new doc's IDENTITY-P1-03); would extend
+  IDENTITY-P0-03.1's `agent_contracts` schema with an explicit expiry/review
+  field.
+- Bulk lifecycle — safe bulk approve/restrict/suspend/retire with preview,
+  authorization and a per-agent audit record for each affected agent (new
+  doc's IDENTITY-P1-04); must call the existing `transitionAgentLifecycle`
+  per agent rather than introducing a bulk-only code path that bypasses the
+  transition table.
+
+## P2 (strategic, after P0/P1 proven)
+
+- Federated Agent Identity — portable identity relationships across agent
+  runtimes and organizational domains (new doc's IDENTITY-P2-01).
+- Agent-to-Agent Delegation Governance — delegated authority, delegation
+  expiry, transitive access and chain-of-responsibility evidence, building on
+  the existing `agent_relationships` table's `delegates_to` type (new doc's
+  IDENTITY-P2-02).
+- NHI Convergence — correlate agent identities with service accounts,
+  workload identities, bots and other non-human identities via
+  `agent_identities`, without WonderAgent becoming a generic NHI platform
+  (Product Boundaries §10.7) (new doc's IDENTITY-P2-03).
 
 ## DO NOT IMPLEMENT
 

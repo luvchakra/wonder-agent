@@ -23,6 +23,9 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-02.1 | Policy schema (higher bar) | Done |
 | ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Partial — `agent.external_communication` and `agent.days_since_last_certification` are always unknown pending other modules |
 | ACCESS-P0-02.3 | Segregation of Duties (SoD) (higher bar) | Done |
+| ACCESS-P0-03 | Access Graph (graph-compatible relationships + tabular view) | Not Started — new story, see Requirements Refresh below |
+| ACCESS-P0-04 | Contract Comparison (SHOULD vs CAN diff: approved / excessive / missing / unknown) | Not Started — new story, see Requirements Refresh below |
+| ACCESS-P0-05 | Policy Versioning, Priority & Change History (extends ACCESS-P0-02.1) | Not Started — new story, see Requirements Refresh below |
 
 ---
 
@@ -304,11 +307,155 @@ Contract — i.e. `getEffectiveAccess` + `explainAccessPath` both succeed and ag
 and `evaluatePolicies` records the divergence as evidence (even if Access Agent
 itself doesn't decide the finding severity).
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`04_ACCESS_GOVERNANCE.md`) that expands this module's P0/P1/P2 scope beyond what was
+already tracked above. Reconciled against the existing Progress Tracker by content,
+not by ID (the new doc's flat `ACCESS-P0-01`..`ACCESS-P0-10` numbering does not line
+up with this backlog's epic-based `ACCESS-P0-0X.Y` numbering) — nothing already
+`Done` was reopened. The following are genuinely new stories added to the tracker:
+
+### ACCESS-P0-03 — Access Graph
+
+The new doc's "Effective Access Graph" section (and its expanded requirement
+`ACCESS-P0-03`) asks for the canonical relationships to be exposed as
+graph-compatible nodes/edges plus a tabular representation, explicitly as "a view
+over canonical relationships, not a separate source of truth." Today
+`getEffectiveAccess`/`explainAccessPath` (ACCESS-P0-01.2, Done) compute single-agent
+lists and single-resource paths on the fly, but there is no published function/API
+returning the full multi-hop graph (agent → account → role/group → entitlement →
+application/resource → data) for Experience Agent's graph visualization to render.
+This reinforces, rather than reverses, the prior decision not to materialize an
+`access_paths` table (ACCESS-P0-01.1's documented gap): the graph stays computed,
+not stored. **Acceptance criteria:** a `getAccessGraph(agentId)`-style function
+(or `/api/v1/access/agents/:id/graph` route) returns nodes/edges covering direct,
+inherited, group, role, delegated, token/OAuth/API scope, MCP tool permission and
+service-account relationship types, plus an equivalent flat/tabular row list for
+non-graph UI consumers. **Not started.**
+
+### ACCESS-P0-04 — Contract Comparison (also covers ACCESS-P0-10 — Access Change Traceability)
+
+The new doc asks for an explicit comparison of the approved Agent Contract (SHOULD,
+from Identity Agent) against effective access (CAN, ACCESS-P0-01.2) at
+resource/action/data-classification level, classifying every item as approved,
+excessive, missing or unknown (`ACCESS-P0-04`) — and for every such difference to
+carry its source system, entitlement, path and last-sync time plus the specific
+agent contract/policy it was checked against (`ACCESS-P0-10`). This is distinct from
+`evaluatePolicies()` (which evaluates policy *rules*, not a raw SHOULD-vs-CAN diff)
+and is exactly the computation the P0 critical acceptance scenario in CLAUDE.md §11
+describes ("SHOULD = financial data only, CAN = financial data + CustomerDB") before
+Risk Agent turns it into a finding. Neither exists today as a published function.
+**Acceptance criteria:** a new `compareAccessToContract(agentId)` function
+(published alongside `getEffectiveAccess`/`explainAccessPath` in
+`modules/access-governance/service.ts` and `lib/shared/types/access-governance.ts`)
+returns one row per effective-access item classified as `approved` / `excessive` /
+`missing` / `unknown`, each row carrying `source_integration_id` (or manual),
+`entitlement`, the `explainAccessPath` chain, `last_synced_at` (from Integration's
+sync metadata where available) and the `agent_contract_id`/`policy_id` it was
+compared against. Access Agent still only computes and evidences this diff — per
+"DO NOT IMPLEMENT" below, it never turns it into a `risk_findings` row itself; Risk
+Agent consumes this function's output the same way it consumes
+`evaluatePolicies()`. **Not started.**
+
+### ACCESS-P0-05 — Policy Versioning, Priority & Change History (also closes part of ACCESS-P0-06)
+
+The new doc's Policy Model requirement (`ACCESS-P0-05`) asks for policies to carry a
+stable ID, name, **version**, status, scope, **priority**, rule conditions,
+effective dates, owner, exception reference and audit history. ACCESS-P0-02.1
+(Done) already implemented ID, name, status, scope, rule conditions, effective/
+expiry dates, owner and exception_process — but the `policies` table
+(`supabase/migrations/0029_access_policies.sql`) has no `version` or `priority`
+column, and there is no policy change-history trail. This same gap is why
+ACCESS-P0-02.2's determinism story (Partial) cannot fully satisfy the new doc's
+`ACCESS-P0-06` requirement to "store policy version and evaluation inputs/outputs"
+for reproducibility — `policy_evaluations` stores `evidence` (inputs/outputs) but no
+`policy_version`. **Acceptance criteria:** add `version integer not null default 1`
+and `priority integer not null default 0` to `policies`; add a
+`policy_versions`-style history table (or a trigger-populated audit trail) recording
+prior field values on every update; add a `policy_version` column to
+`policy_evaluations` populated with the policy's version at evaluation time, so a
+stored evaluation is reproducible against the exact rule set that produced it. This
+is an additive migration on top of already-owned tables — no ownership-map change
+needed. **Not started.**
+
+### Already covered, no new tracker row needed
+
+- **ACCESS-P0-01** (Canonical Access Model) and **ACCESS-P0-02** (Effective Access
+  Calculation) map directly onto already-`Done` **ACCESS-P0-01.1**/**ACCESS-P0-01.2**
+  — no scope change (ACCESS-P0-01.1's documented "no `access_paths` table" gap
+  stands as previously recorded, not reopened).
+- **ACCESS-P0-08** (SoD Baseline) maps onto already-`Done` **ACCESS-P0-02.3** — no
+  scope change.
+- **ACCESS-P0-09** (Exceptions) maps onto the `policy_exceptions` table shipped as
+  part of already-`Done` **ACCESS-P0-02.1** (`approved_by` required, `agent_id`
+  scoping, `expires_at` present). Minor gap: `expires_at` is nullable rather than
+  mandatory for approved exceptions; not significant enough on its own to warrant a
+  new tracker row — worth enforcing (`not null` for `status = 'approved'`) whenever
+  ACCESS-P1-04's fuller exception workflow (below) is built.
+- **ACCESS-P0-07** (Risk-Sensitive Policy Actions) maps onto **ACCESS-P0-02.1**'s
+  `action` field (`flag`/`restrict`/`block`) and **ACCESS-P0-02.2**'s evaluation
+  engine (Partial) — "the MVP does not autonomously revoke access" is already the
+  documented behavior (no `revoke` action exists). Minor gap: no explicit
+  "require certification" action value; Compliance Agent can already trigger
+  certification from a `violation` evaluation result without Access Agent adding a
+  dedicated enum value, so no new row.
+- **ACCESS-P0-06** (Deterministic Evaluation) maps onto already-`Done`/`Partial`
+  **ACCESS-P0-02.2** for reproducibility of rule evaluation itself; its remaining
+  "store policy version" gap is folded into the new ACCESS-P0-05 story above rather
+  than tracked twice.
+- **ACCESS-P0-10** (Access Change Traceability) is folded into the new ACCESS-P0-04
+  story above rather than tracked as a separate row, since the new doc's own
+  traceability fields (source system, entitlement, path, last sync, associated
+  contract/policy) are acceptance criteria of the same comparison function.
+
+No ownership-map addition is needed for any of the above — ACCESS-P0-03 and
+ACCESS-P0-04 are new *functions/API routes* under `/api/v1/access` (already AA-owned
+per `docs/design/ownership-map.md`) computed over already-AA-owned tables, and
+ACCESS-P0-05 only adds columns/a history table to `policies`/`policy_evaluations`
+(already AA-owned tables), not a new table needing a map entry.
+
+**Not a decision made unilaterally:** the new requirements package's "Modular
+Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a different *process*
+model ("Only the agent explicitly activated by the user may start work. Agents must
+never launch another agent automatically") than this repository's standing
+autopilot/auto-chain policy in `CLAUDE.md` §7 and `docs/ORCHESTRATION.md` §2. That is
+a meta/process question, not a product requirement, and is called out to the user
+separately rather than silently changed here.
+
 ## P1
 
 Delegated/temporary access with expiry as a first-class grant type beyond the basic
 `delegated` grant_type value. Access simulation ("what would happen if we changed
 policy X"). Full SoD conflict-graph analysis. Automatic policy recommendation.
+
+Added from the 2026-09-14 requirements refresh (not already represented above):
+
+- **Advanced ABAC** (`ACCESS-P1-02`): policy conditions over additional attributes —
+  environment, data classification, geography, time and agent type — beyond the
+  ABAC worked example already in ACCESS-P0-02.2.
+- **Delegated access modeling detail** (`ACCESS-P1-03`): the existing "delegated
+  access with expiry" P1 item above should, when built, explicitly model approver,
+  delegator, delegatee and transitive access paths, not just an expiry timestamp on
+  the grant.
+- **Exception Workflow** (`ACCESS-P1-04`): a full request/approval/expiry/renewal/
+  revocation workflow around `policy_exceptions`, with evidence — P0 only supports
+  minimal read-only/manually-approved exceptions (ACCESS-P0-02.1).
+
+## P2 (strategic, after P0/P1 proven)
+
+Added from the 2026-09-14 requirements refresh:
+
+- **Policy Optimization** (`ACCESS-P2-01`): recommend least-privilege policy
+  improvements from recurring access patterns and approved outcomes; recommendations
+  remain human-reviewed, never auto-applied (non-negotiable #9).
+- **Continuous Access Graph** (`ACCESS-P2-02`): incrementally update effective
+  access as source events arrive rather than relying solely on batch rebuilds from
+  Integration Agent's sync jobs.
+- **What-if Governance** (`ACCESS-P2-03`): answer "what changes if this entitlement
+  is removed?" across certification, risk and runtime behavior — builds on
+  ACCESS-P1-01 (Access Simulation).
 
 ## DO NOT IMPLEMENT
 

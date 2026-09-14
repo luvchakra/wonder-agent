@@ -29,6 +29,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Partial — discovery done; tool `object_type` classification is a flagged judgment call pending Runtime Agent |
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
+| INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Not Started — new story, see Requirements Refresh below |
 
 ---
 
@@ -349,12 +350,110 @@ normalize identities/accounts/applications/entitlements/access into
 prove credentials never reach client-side code (per INTEGRATION-P0-01.2's
 acceptance criteria).
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`03_INTEGRATIONS.md`) that expands this module's P0/P1/P2 scope beyond what
+was already tracked above. Reconciled against the existing Progress Tracker
+(nothing already `Done` was reopened, and INTEGRATION-P0-02.1's `Partial`
+status — including this session's real Saviynt endpoint/pagination
+correction documented in `docs/design/integration-agent-backlog-audit.md` —
+is left exactly as-is). The new doc's flat `INTEG-P0-01`..`INTEG-P0-11`
+numbering maps onto this backlog's epic-based stories by content, not by ID;
+one item is genuinely new.
+
+### INTEGRATION-P0-05.1 — Verified credential rotation
+
+The new doc's `INTEG-P0-10` ("Credential Rotation") requires: allow
+credential replacement without exposing previous values, **and** failed
+authentication must not delete existing valid configuration until the
+replacement is verified. `modules/integrations/credentials.ts`'s
+`setCredential()` already satisfies the first half (it updates
+`integration_credentials` in place and never returns the old or new
+plaintext value, only `{ ok: true }`), but it does not satisfy the second
+half: it overwrites the stored encrypted secret immediately, with no call to
+the connector's `testConnection()` against the new credential before
+committing — so a bad replacement credential currently clobbers a working
+one with no rollback. **Objective:** before persisting a rotated credential,
+run the integration's `testConnection()` against the *new* value first; only
+commit the overwrite on success, and on failure return an error while
+leaving the existing (still-valid) `integration_credentials` row untouched.
+**Acceptance criteria:** a test proves that submitting an invalid
+replacement credential leaves the previously-stored encrypted secret
+byte-for-byte unchanged and a subsequent sync still succeeds using the old
+credential; a valid replacement still audits as
+`integration.credential_rotated` exactly as today. **Not started.**
+
+### Already covered, no new tracker row needed
+
+- `INTEG-P0-01` (Common Adapter Contract) and `INTEG-P0-02` (Connector
+  Capability Model) — both map onto the existing `INTEGRATION-P0-01.1`
+  (adapter interface + declared capabilities on the `integrations` row).
+- `INTEG-P0-03` (Saviynt Read Connector) and `INTEG-P0-04` (Saviynt
+  Normalization) — map onto `INTEGRATION-P0-02.1` (`Partial`, unchanged) plus
+  the `raw`/`normalized`/`external_id` shape already established by
+  `INTEGRATION-P0-01.4`, which preserves source IDs, source attributes and
+  the full raw source object for investigation.
+- `INTEG-P0-05` (Generic REST Connector) — maps onto `INTEGRATION-P0-03.1`.
+- `INTEG-P0-06` (MCP Registration) — maps onto `INTEGRATION-P0-04.1`.
+- `INTEG-P0-07` (Runtime Webhooks) — maps onto `INTEGRATION-P0-04.3`: HMAC
+  signature verification, per-integration secret, event IDs
+  (`parsed.id`/`parsed.eventId`), and idempotent processing (upsert on
+  `(integration_id, object_type, external_id)`) are already implemented.
+- `INTEG-P0-08` (Sync Jobs) — maps onto `INTEGRATION-P0-01.3`
+  (`integration_sync_jobs` queued/running/succeeded/failed/partial states).
+- `INTEG-P0-09` (Connection Health) — maps onto `INTEGRATION-P0-02.2` (last
+  sync, next sync, duration, counts, errors via `GET
+  /api/v1/integrations/:id` and `.../jobs`).
+- `INTEG-P0-11` (Source Traceability) — maps onto `INTEGRATION-P0-01.4`
+  (`integration_id`, `external_id`, `sync_job_id` on every
+  `integration_objects` row).
+
+**Ownership-map flag for the user:** `INTEG-P1-05` (SIEM Integration) asks
+for delivery status and retry tracking on outbound normalized-event/finding
+exports to a SIEM. No existing table (`integrations`, `integration_types`,
+`integration_credentials`, `integration_sync_jobs`, `integration_objects`,
+`integration_mappings`) is a clean fit for tracking outbound export
+delivery/retry state — this looks like it would need a new table (e.g.
+`integration_exports` or similar) that isn't in
+`docs/design/ownership-map.md` yet. Not created here; flagged for the user
+to add to the ownership map (naturally Integration Agent-owned, but map
+changes require the process this task's constraints reserve to the user)
+before that P1 story is picked up.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
 ## P1
 
 SailPoint, Entra, Okta, AWS, Azure, SIEM, ServiceNow connectors. Saviynt
 write/remediation (`createAccessRequest`, `removeAccess`). Full provisioning.
 Automated deprovisioning. mTLS for generic REST (unless trivial in P0). A real
 durable job queue if the P0 approach proves insufficient.
+
+- AWS/Azure activity adapters specifically for agent execution and resource
+  access *evidence* (runtime-observation angle), not just identity/access
+  import — distinct from the generic AWS/Azure connector line above
+  (`INTEG-P1-04`).
+- SIEM export of normalized security events/findings with delivery status
+  and retry, once the ownership-map addition flagged above is resolved
+  (`INTEG-P1-05`).
+
+## P2
+
+- Integration marketplace: versioned connector catalog, install/configure/
+  test lifecycle and compatibility metadata (`INTEG-P2-01`).
+- Scalable event streaming/ingestion without changing the canonical
+  runtime-event model (`INTEG-P2-02`).
+- Documented connector adapter SDK, contract tests and a connector
+  certification process (`INTEG-P2-03`).
 
 ## DO NOT IMPLEMENT
 

@@ -34,6 +34,26 @@ stop-and-report rule always wins).
 Update the Status column in the same commit that starts or finishes an agent's run,
 so this table stays a live, accurate picture of where the build stands.
 
+## Release sequencing (2026-09-14 requirements refresh)
+
+The updated master requirements package frames the same dependency chain as four
+releases, cross-referenced here for traceability (no change to the Wave table above
+or to auto-chain order — this is descriptive, not a new schedule):
+
+- **Release 0 — Secure foundation:** Foundation P0 → Platform Agent's security
+  boundary pieces → shared contracts. (Wave 1 + the security-boundary slice of Wave 5.)
+- **Release 1 — First agent governed:** Identity P0 → Integration's Saviynt/MCP P0 →
+  Access P0 → Runtime P0. (Waves 2-3.)
+- **Release 2 — First finding and remediation loop:** Risk P0 → Compliance
+  certification P0 → Operations evidence/reporting P0. (Wave 4 + Operations' slice of
+  Wave 5.)
+- **Release 3 — Enterprise productization:** Experience P0 completion → Platform's
+  remaining P0 → QA P0 release gate. (The rest of Wave 5 + Wave 6.)
+
+Each module backlog's own dated "Requirements Refresh" section records the specific
+new/expanded P0/P1/P2 stories this package added; P1/P2 items must not destabilize
+the releases above (see `CLAUDE.md` §3 "Priority tiers").
+
 ## Notes
 
 - **Waves 2, 3, and 4 pairs can run in either order within the pair**

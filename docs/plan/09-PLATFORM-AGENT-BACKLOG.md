@@ -26,6 +26,10 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-03.2 | Platform health surface | Done |
 | PLATFORM-P0-04.1 | `platform_audit_logs` | Done |
 | PLATFORM-P0-04.2 | Support access (higher bar) | Deferred — no time-bound/audited support-access infrastructure exists; the backlog explicitly forbids shipping an unbounded shortcut, so nothing was built |
+| PLATFORM-P0-05.1 | Usage & Limits tracking/enforcement | Not Started — new story, see Requirements Refresh below |
+| PLATFORM-P0-05.2 | AI Provider Configuration | Not Started — new story, see Requirements Refresh below |
+| PLATFORM-P0-05.3 | Global Configuration Versioning | Not Started — new story, see Requirements Refresh below |
+| PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Not Started — new story, see Requirements Refresh below |
 
 ---
 
@@ -219,6 +223,68 @@ circumstance; this is a hard line, not a judgment call to make silently.
 
 ---
 
+## Epic PLATFORM-P0-05 — Expanded Platform Governance Capabilities
+
+New stories added by the 2026-09-14 requirements refresh (see that section below for
+full context and source attribution).
+
+### PLATFORM-P0-05.1 — Usage & Limits tracking/enforcement
+
+Track actual usage against the limit columns already stored on `subscriptions`
+(`max_users`, `max_agents`, `max_integrations`, `max_runtime_events_per_month`,
+`audit_retention_days`) for agents, runtime events, integrations, users, storage and
+AI consumption where applicable, and define safe behavior at hard/soft limit
+boundaries (block vs. warn vs. throttle). Today the schema stores the limit numbers
+but nothing measures or enforces usage against them.
+
+**Acceptance criteria:** a published usage-check contract (e.g.
+`checkUsageLimit(tenantId, resource)`) other modules' write paths can call before a
+consequential create (mirroring the `isFeatureEnabled()` pattern already published);
+platform-admin UI surfaces current usage vs. limit per tenant; soft/hard limit
+behavior is documented and testable; no cross-tenant usage aggregation.
+
+### PLATFORM-P0-05.2 — AI Provider Configuration
+
+Store AI provider credentials securely server-side (using Foundation's
+`encryptSecret()`/`decryptSecret()`, never a module-invented scheme) and configure
+model routing, allowed capabilities, budget and safety controls, gating the
+platform-wide `ai_assistant` feature flag. Credentials must never reach browser code,
+logs or source control (non-negotiable #10).
+
+**Ownership-map flag:** this needs a new table (e.g. `platform_ai_provider_configs`)
+that isn't yet listed in `docs/design/ownership-map.md`. Not added here per this
+task's constraints — flagged for the user to approve an ownership-map addition
+before implementation.
+
+### PLATFORM-P0-05.3 — Global Configuration Versioning
+
+Version critical platform configuration (branding, feature-flag defaults, AI
+provider config) and provide diff/rollback metadata rather than silently
+overwriting historical configuration. Builds on top of PLATFORM-P0-03.1 (Global
+branding), which today is a single mutable row with no history.
+
+**Acceptance criteria:** every write to versioned configuration retains the prior
+version (append-only or explicit version table) with actor/timestamp; a rollback
+path exists; `platform_audit_logs` continues to record before/after as it already
+does for branding changes.
+
+### PLATFORM-P0-05.4 — Maintenance Mode & Platform Announcements
+
+Publish platform notices and maintenance-mode windows with scope (global or
+per-tenant), start/end time and full audit. Customer-facing UI must be able to
+communicate service state clearly during a maintenance window.
+
+**Ownership-map flag:** this needs a new table (e.g. `platform_announcements`) not
+yet listed in the ownership map. It also has a cross-module dependency: Platform
+Agent owns the admin-side data model and publishing UI, but rendering the notice
+inside customer-facing UI is Experience Agent's ownership (`app/(customer)/*`) per
+the existing UI-ownership split in `docs/design/ownership-map.md` §3 — Platform
+Agent should publish a read contract (e.g. `getActiveAnnouncements(tenantId)`) for
+Experience Agent to consume rather than reaching into customer UI itself. Flagged
+for the user; not implemented here.
+
+---
+
 ## Critical acceptance test
 
 A platform owner can manage tenants/subscriptions/feature flags/platform health; a
@@ -227,10 +293,107 @@ route/API, verified by attempting every `/platform-admin/*` page and every
 `/api/platform/v1/*` route as a `TENANT_SUPER_ADMIN` fixture user and asserting 403
 or an equivalent hard redirect on every single one.
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`09_PLATFORM_ADMIN.md`) that expands this module's P0/P1/P2 scope beyond what was
+already tracked above. Reconciled against the existing Progress Tracker (nothing
+currently `Done` — including the critical cross-module tenant-suspension finding
+this module surfaced this session — was reopened or marked down); the following are
+genuinely new stories added to the tracker as Epic PLATFORM-P0-05 above:
+
+- **PLATFORM-P0-05.1 — Usage & Limits tracking/enforcement** (from the new doc's
+  PLATFORM-P0-04 "Usage & Limits"). See epic section above for objective and
+  acceptance criteria.
+- **PLATFORM-P0-05.2 — AI Provider Configuration** (from the new doc's PLATFORM-P0-06
+  "AI Provider Configuration"). See epic section above. Ownership-map addition
+  flagged for the user.
+- **PLATFORM-P0-05.3 — Global Configuration Versioning** (from the new doc's
+  PLATFORM-P0-09 "Global Configuration Versioning"). See epic section above.
+- **PLATFORM-P0-05.4 — Maintenance Mode & Platform Announcements** (from the new
+  doc's PLATFORM-P0-11 "Maintenance/Announcements"). See epic section above.
+  Ownership-map addition and an Experience Agent cross-module dependency flagged
+  for the user.
+
+### Already covered, no new tracker row needed
+
+- New doc's **PLATFORM-P0-01** (Separate Security Boundary) → already satisfied by
+  existing **PLATFORM-P0-01.1** (Route isolation, higher bar) — `Done`.
+- New doc's **PLATFORM-P0-02** (Tenant Management) → already satisfied by existing
+  **PLATFORM-P0-02.1** (Schema, `Done`) and **PLATFORM-P0-02.2** (Tenant lifecycle
+  actions, `Partial` per the tenant-suspension-enforcement finding, tracked
+  separately and not reopened here). The new doc's "region" and "admin contact"
+  fields are not present on `platform_tenants` today; this is a minor field-level
+  gap, not a missing capability, and is noted here rather than spawning a new story.
+- New doc's **PLATFORM-P0-03** (Plans & Entitlements — the "define plan → feature →
+  limit in data" portion) → already satisfied by the existing `subscriptions` schema
+  (PLATFORM-P0-02.1) plus the published `isFeatureEnabled()` entitlement contract
+  (PLATFORM-P0-02.3). The portion of PLATFORM-P0-03 about actually *consuming*
+  numeric limits at write time is what's new — see PLATFORM-P0-05.1 above rather
+  than duplicating it here.
+- New doc's **PLATFORM-P0-05** (Feature Flags) → already satisfied by existing
+  **PLATFORM-P0-02.3** (Feature flags) — `Done`. The new doc's additional attributes
+  (rollout state, owner, rationale, formal rollback) are not present on
+  `platform_feature_flags`/`feature_flags` today; audit trail for toggles is already
+  covered by PLATFORM-P0-04.1. Not spawning a new story for these attributes alone.
+- New doc's **PLATFORM-P0-07** (Platform Audit) → already satisfied by existing
+  **PLATFORM-P0-04.1** (`platform_audit_logs`) — `Done`.
+- New doc's **PLATFORM-P0-08** (Platform Health) → already satisfied by existing
+  **PLATFORM-P0-03.2** (Platform health surface) — `Done`.
+- New doc's **PLATFORM-P0-10** (Branding) → already satisfied by existing
+  **PLATFORM-P0-03.1** (Global branding) — `Done`.
+- New doc's **PLATFORM-P1-02** (Support Tools) → already tracked in this backlog's
+  P1 list ("Scoped, audited support-access ('view as') if not completed in P0") and
+  in PLATFORM-P0-04.2's deferral note — no change.
+- New doc's **PLATFORM-P1-04** (Billing Integration) → already tracked in this
+  backlog's P1 list ("Usage-based billing integration") — no change.
+
+**Not a decision made unilaterally:** the new requirements package's "Modular
+Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a different *process*
+model ("Only the agent explicitly activated by the user may start work. Agents must
+never launch another agent automatically") than this repository's standing
+autopilot/auto-chain policy in `CLAUDE.md` §7 and `docs/ORCHESTRATION.md` §2. That is
+a meta/process question, not a product requirement, and is called out to the user
+separately rather than silently changed here.
+
 ## P1
 
 Usage-based billing integration. Per-tenant SLAs. Scoped, audited support-access
 ("view as") if not completed in P0. Multi-region tenant placement.
+
+- **Configuration Import/Export** (new doc PLATFORM-P1-01): export/import platform
+  configuration without secrets, with schema/version validation, preview and
+  rollback.
+- **Subscription Lifecycle** (new doc PLATFORM-P1-03): explicit trial, active,
+  grace, suspended and cancelled subscription states with defined entitlement
+  impact per state — today `subscriptions.status` only models
+  `active`/`past_due`/`cancelled`.
+- **Release Management** (new doc PLATFORM-P1-05): feature rollout, staged release,
+  rollback and tenant-cohort management, building on the existing feature-flag
+  infrastructure (PLATFORM-P0-02.3).
+- **Platform API Administration** (new doc PLATFORM-P1-06): manage platform API
+  clients, scopes, rotation and audit for any platform-level API access (distinct
+  from customer-facing API clients, which are out of this module's scope).
+
+## P2 (strategic, after P0/P1 proven)
+
+New in the 2026-09-14 requirements refresh — no existing P2 section previously
+existed for this module.
+
+- **Regional Control Planes** (new doc PLATFORM-P2-01): future architecture may
+  support regional data/control planes while preserving global tenant identity and
+  policy semantics. Overlaps with, and expands on, the already-tracked P1 item
+  "Multi-region tenant placement" above — that item is about placement, this is
+  about full regional control-plane architecture; kept as a distinct, later-stage
+  concept rather than merged.
+- **Customer-Managed Keys** (new doc PLATFORM-P2-02): optional enterprise
+  encryption-key management with rotation and recovery procedures, layered on top
+  of Foundation's `encryptSecret()`/`decryptSecret()` primitive rather than
+  replacing it.
+- **Advanced Operator Roles** (new doc PLATFORM-P2-03): separate support, billing,
+  security, release and platform-owner responsibilities within the platform-admin
+  boundary, without creating any customer-role escalation path.
 
 ## DO NOT IMPLEMENT
 

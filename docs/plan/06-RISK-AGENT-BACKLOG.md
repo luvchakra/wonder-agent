@@ -25,6 +25,10 @@ this module is higher bar (see below).
 | RISK-P0-03.1 | Assignment & recommendation | Done |
 | RISK-P0-03.2 | Human-initiated remediation | Partial — endpoint/UI exist and behave honestly (`wired: false`); blocked on Access Agent publishing a remediation-initiation contract |
 | RISK-P0-03.3 | Re-evaluation & resolution | Done |
+| RISK-P0-01.4 | Evaluator version on evidence pack | Not Started |
+| RISK-P0-02.2 | Configurable severity weights & INFO tier | Not Started |
+| RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Not Started |
+| RISK-P0-03.5 | False positive disposition with reason & expiry | Not Started |
 
 ---
 
@@ -266,12 +270,172 @@ access, generate a CRITICAL finding with evidence (referencing the specific
 CustomerDB entitlement — then, after that entitlement is removed, prove the same
 finding resolves via re-evaluation rather than a manual status flip.
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package module doc
+`06_RISK_ROGUE_DETECTION.md`, whose "Expanded Requirements — Risk & Rogue
+Detection P0/P1/P2" section (`RISK-P0-01` .. `RISK-P0-10`, `RISK-P1-01` ..
+`RISK-P1-04`, `RISK-P2-01` .. `RISK-P2-03`) expands this module's scope
+beyond what was already tracked above. Reconciled against the existing
+Progress Tracker (nothing already `Done`/`Partial` was reopened or marked
+down); checked `modules/risk/scoring.ts`, `modules/risk/findings.ts`,
+`modules/risk/service.ts` and `lib/shared/types/risk.ts` directly rather than
+assuming — the following are genuinely new or newly-explicit stories added
+to the tracker, all `Not Started` (none could be verified as already
+implicitly satisfied):
+
+### RISK-P0-01.4 — Evaluator version on evidence pack
+
+The new doc's Evidence Pack requirement (`RISK-P0-05`) explicitly lists
+"evaluator version" alongside source events, access path, contract/policy,
+timestamps and recommendation. `risk_findings`/`risk_evidence` (migration
+covered by RISK-P0-01.1) do not carry an evaluator/rule-version column today
+— confirmed by reading the schema and `findings.ts`'s insert paths. Add an
+`evaluator_version` (or equivalent) column populated by `rules.ts` at
+finding-creation time, so a finding's evidence pack can show exactly which
+version of the deterministic rule produced it, per non-negotiable #11's
+immutable-audit-context intent. Acceptance: every new finding row carries a
+non-null evaluator/rule version; existing rows may backfill to a documented
+baseline version rather than blocking on a data migration story of their
+own.
+
+### RISK-P0-02.2 — Configurable severity weights & INFO tier
+
+The new doc's Severity Model (`RISK-P0-02`) calls for CRITICAL/HIGH/MEDIUM/
+LOW/**INFO** (this module currently implements only
+low/medium/high/critical — confirmed in `lib/shared/types/risk.ts` and
+`scoring.ts`) and "configurable policy weights" (today's weights in
+`scoring.ts` are hard-coded constants, not tenant/admin-adjustable).
+Acceptance: add an `info` band below the existing `low` floor for
+sub-threshold observations that shouldn't read as `low` risk; move the
+factor-weight table into a queryable, auditable configuration source (a
+table or a versioned config record is acceptable) that `computeSeverity`
+reads instead of inlining, with a change to any weight itself being an
+audited, admin-only action — never silently tunable, and never delegated to
+an LLM (non-negotiable #9). This does not change the existing
+`applyProhibitedDataOverride` behavior or any already-`Done` scoring
+outcome for the FinanceBot scenario.
+
+### RISK-P0-03.4 — Expanded finding lifecycle states
+
+The new doc's Finding Lifecycle (`RISK-P0-03`) specifies: `OPEN →
+ACKNOWLEDGED → INVESTIGATING → REMEDIATION_PENDING →
+MITIGATED/RESOLVED or FALSE_POSITIVE/EXCEPTION`. The implemented
+`FindingStatus` union (`open | assigned | remediation_in_progress | resolved
+| false_positive`) covers the shape but not the finer-grained
+`acknowledged`/`investigating`/`mitigated`/`exception` states the new doc
+calls out by name, and every transition must remain audited (already true
+of `assignFinding`/`resolveFinding`'s `writeAudit` calls — that part
+carries over unchanged). Acceptance: extend the status enum and its check
+constraint additively (per CLAUDE.md §13, migrations stay backward
+compatible), add the missing transition entry points, and keep every
+transition producing an audit record exactly as today's `assigned`/
+`resolved` transitions do. `remediation_in_progress` already maps to the new
+doc's `REMEDIATION_PENDING` in meaning — keep the existing column value
+rather than renaming it, to avoid an unnecessary breaking rename of an
+already-`Done` contract.
+
+### RISK-P0-03.5 — False positive disposition with reason & expiry
+
+The new doc's False Positive Handling (`RISK-P0-08`) requires: human
+disposition with a reason, evidence, and an optional expiry, and that a
+false-positive decision must not erase original evidence. Today,
+`resolveFinding` only implements `resolution.type` of `verified_fixed` and
+`accepted_risk` (confirmed in `findings.ts`) — no code path ever actually
+sets `status = 'false_positive'`, even though that value exists in the
+schema's check constraint and the `FindingStatus` type. Acceptance: add a
+`false_positive` resolution path requiring a `reason` (same non-empty check
+already applied to `accepted_risk`), an optional `expires_at` after which
+the finding's rule is automatically re-evaluated (reusing the RISK-P0-03.3
+re-evaluation machinery rather than inventing a second one), and confirm the
+existing `risk_evidence` rows are left untouched — never deleted or
+overwritten — when a finding is dispositioned as a false positive.
+
+### Already covered, no new tracker row needed
+
+- `RISK-P0-01` (Deterministic Risk Model) — matches `RISK-P0-02.1` (Done):
+  reproducible weighted scoring over stored factors, already implemented in
+  `scoring.ts`.
+- `RISK-P0-04` (Rogue Categories) — matches `RISK-P0-01.2` (Done): all eight
+  categories (excessive access, unauthorized resource/action, sensitive-data
+  violation, behavioral deviation, identity anomaly, ownership violation,
+  lifecycle violation) already implemented as deterministic rules.
+- `RISK-P0-05` (Evidence Pack), except the evaluator-version gap called out
+  above as `RISK-P0-01.4` — source events, access path, contract/policy,
+  timestamps, affected resource/action and recommendation are already
+  covered by `RISK-P0-01.1`'s `risk_evidence` schema and `RISK-P0-01.3`'s
+  explanation/recommendation generation.
+- `RISK-P0-06` (Explainability) — matches `RISK-P0-01.3` (Done): the
+  deterministic, evidence-referencing `explanation` string already answers
+  what/why/how-severe/what-evidence/what-action.
+- `RISK-P0-07` (Deduplication) — matches `RISK-P0-01.2`'s dedup rule (Done):
+  `createOrUpdateFinding` already updates an existing open/assigned/
+  remediation-in-progress finding's evidence instead of creating a
+  duplicate.
+- `RISK-P0-09` (Recommendation Engine) — matches `RISK-P0-03.1` (Done): every
+  finding already carries a specific least-privilege `recommendation` at
+  creation time, advisory until a human acts.
+- `RISK-P0-10` (Re-evaluation) — matches `RISK-P0-03.3` (Done): re-evaluation
+  and history-preserving resolution are already implemented and are exactly
+  what closes the loop on the Critical acceptance test above.
+- `RISK-P1-01` (Behavioural Anomaly Score) — already represented, at scoping
+  level, by this backlog's existing P1 line "Statistical/ML-free-but-more-
+  sophisticated behavioral baselining"; not duplicated below, but the new
+  doc's framing (keep the anomaly signal separate from deterministic policy
+  risk, never mixed in invisibly) is retained as the binding detail for
+  whenever that P1 item is picked up.
+
+**Ownership-map flag for the user:** the new doc's `RISK-P1-03` ("Risk
+Campaigns" — recurring risk review queues with SLA tracking) implies a new
+table (e.g. `risk_campaigns`/`risk_campaign_items`) that does not exist
+today and is not listed in `docs/design/ownership-map.md` under any module.
+It is conceptually adjacent to Compliance Agent's already-owned
+`certification_campaigns`/`certification_items` but is a distinct risk-review
+concept, not a certification one. This backlog does not add it to the
+ownership map itself (per this task's constraints) — flagged for the user to
+decide ownership before that P1 item is scoped.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
 ## P1
 
 Statistical/ML-free-but-more-sophisticated behavioral baselining. Attack-path
 scoring across multiple agents. Auto-remediation for pre-approved low-risk
 categories (still requires an explicitly approved automation path per
 non-negotiable #15 — do not build this speculatively).
+
+- **RISK-P1-02 — Aggregate Risk.** Calculate agent, owner, application,
+  business-unit and tenant risk views with drill-down to the underlying
+  findings — a read/aggregation layer over `risk_findings`, no new owned
+  entity.
+- **RISK-P1-03 — Risk Campaigns.** Recurring risk-review queues and SLA
+  tracking (see the ownership-map flag above — needs a table-ownership
+  decision before scoping).
+- **RISK-P1-04 — Risk Correlation.** Correlate multiple low/medium-severity
+  signals into a single higher-level case where the evidence actually
+  supports the correlation — distinct from the existing "attack-path scoring"
+  line above, which is about access-path traversal rather than signal
+  correlation.
+
+## P2 (strategic, after P0/P1 proven)
+
+- **RISK-P2-01 — Predictive Risk.** Estimate emerging risk from historical
+  patterns, with predictions clearly labeled as probabilistic — never
+  presented as a deterministic finding.
+- **RISK-P2-02 — Graph Risk Propagation.** Model how a compromised/high-risk
+  identity could affect connected resources and agents (depends on Access
+  Agent's effective-access graph).
+- **RISK-P2-03 — Continuous Risk Optimization.** Recommend contract/access
+  changes that reduce risk without materially reducing approved business
+  capability — advisory only, same human-approval boundary as
+  `RISK-P0-09`'s recommendation engine.
 
 ## DO NOT IMPLEMENT
 

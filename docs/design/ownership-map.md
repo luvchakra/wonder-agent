@@ -65,6 +65,33 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `feature_flags` | PA | Per-tenant feature flag state |
 | `subscriptions` | PA | Per-tenant plan/subscription record |
 | `platform_audit_logs` | PA | Platform-admin action audit (separate from tenant `audit_logs`) |
+| `agent_duplicate_candidates` | IA | Planned — IDENTITY-P0-04 (duplicate detection/merge review), not yet implemented |
+| `agent_attestations` | IA | Planned — IDENTITY-P1-02 (attestation), not yet implemented |
+| `integration_exports` | INT | Planned — INTEGRATION-P1-05 (SIEM export delivery/retry status), not yet implemented |
+| `runtime_event_quarantine` | RA | Planned — RUNTIME-P0-11 (ingestion hardening: replay protection/quarantine), not yet implemented; exact name TBD when built |
+| `runtime_data_quality` | RA | Planned — RUNTIME-P0-14 (data-quality tracking: missing identity/unknown resource/unsupported action), not yet implemented; exact name TBD when built |
+| `risk_campaigns` / `risk_campaign_items` | RiskA | Planned — RISK-P1-03 (risk campaigns), not yet implemented |
+| `platform_ai_provider_configs` | PA | Planned — PLATFORM-P0-05.2 (AI provider configuration), not yet implemented |
+| `platform_announcements` | PA | Planned — PLATFORM-P0-05.4 (maintenance mode/platform announcements); Experience Agent will need a read-only contract to render these in the customer shell once built |
+| `notification_preferences` | OA | Planned — OPERATIONS-P0-05.1 (notification preferences), not yet implemented |
+
+### Pending ownership/architecture decisions (2026-09-14 requirements refresh — not resolved, flagged for the user)
+
+- **Tamper-evident evidence export** (Compliance's new COMPLIANCE-P0-06) overlaps with
+  Operations Agent's existing ownership of generic audit-evidence export/presentation.
+  Undecided: does Compliance build a control/certification-specific export package that
+  calls into Operations' export primitive, or does Operations own the export mechanism
+  entirely with Compliance only supplying the data? Do not build either side of this
+  until the user picks a direction.
+- **Auditor Workspace** (Compliance P2) implies an external/semi-external read-only
+  access mode that fits neither the current customer RBAC model nor the platform-admin
+  boundary (non-negotiable #3). Needs an explicit architecture decision before any P2
+  design work starts.
+- **Point-in-time effective access** (Runtime's new RUNTIME-P0-13) needs Access Agent
+  to publish a new "effective access as of a given timestamp" contract; Access Agent's
+  current `getEffectiveAccess()`/`explainAccessPath()` only resolve *current* state.
+  Not yet requested of Access Agent — record here so it isn't invented unreviewed by
+  Runtime Agent when this story is picked up.
 
 `agent-identity` (IA) and `access-governance` (AA) are deliberately separate: IA owns
 *who the agent is*; AA owns *what it can reach*. Integration (INT) owns the raw

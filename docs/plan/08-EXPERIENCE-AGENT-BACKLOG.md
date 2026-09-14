@@ -24,6 +24,11 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-02.1 | Overview dashboard cards | Done — all nine cards, real queries, parallel fetch |
 | EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Done |
 | EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Partial — only new Risk/Runtime index pages built; every other domain module's existing bare page is unrestyled and the PRD's specific worked layouts (Agent Detail/Risk/Rogue) are not implemented — substantial remaining work, see audit log |
+| EXPERIENCE-P0-04 | Action Safety (confirmation, scope preview, bulk-action reporting) | Not Started — new story, see Requirements Refresh below |
+| EXPERIENCE-P0-05 | Accessibility Foundation (keyboard nav, focus management, ARIA, contrast) | Not Started — new story, see Requirements Refresh below |
+| EXPERIENCE-P0-06 | Evidence Drawer & Investigation Deep Links | Not Started — new story, see Requirements Refresh below |
+| EXPERIENCE-P0-07 | Shell Global Search & Notifications | Not Started — new story, see Requirements Refresh below |
+| EXPERIENCE-P0-08 | Data Table Primitive (sort/filter/pagination/saved URL state/responsive card transform) | Not Started — new story, see Requirements Refresh below |
 
 ---
 
@@ -214,12 +219,140 @@ same walkthrough in both light and dark mode, and at mobile/tablet/desktop width
 per `CLAUDE.md` §13 — no visual regression, no unstyled/generic fallback in either
 mode at any width.
 
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc `08_UI_UX.md`) that
+expands this module's P0/P1/P2 scope beyond what was already tracked above.
+Reconciled against the existing Progress Tracker (nothing already `Done` or
+`Partial` was reopened or marked down — EXPERIENCE-P0-03's existing large,
+honestly-flagged gap already absorbs most of the new doc's domain-screen detail).
+Checked `modules/ui/` and `app/(customer)/` before adding any row: no shared
+data-table primitive with sort/filter/pagination exists (`modules/ui/Table.tsx` is
+a bare table shell), no shell slot for global search or notifications exists in
+`modules/ui/Nav.tsx`/`UserMenu.tsx`, no confirmation/`AlertDialog` primitive exists
+despite `@radix-ui/react-dialog` already being a dependency, and no evidence-drawer
+component exists — so the following are tracked `Not Started` rather than assumed
+`Done`. The following are genuinely new stories added to the tracker:
+
+### EXPERIENCE-P0-04 — Action Safety
+
+Shared `modules/ui/*` primitives for destructive/high-impact actions (certify,
+restrict, suspend, remediate, bulk operations): a confirmation dialog showing a
+scope preview (what/how many records are affected), an optional reason field where
+the calling module's contract requires one, a disabled+spinner in-flight state, and
+a clear post-action result (success/partial-failure with per-item detail for bulk
+operations). This is a presentation primitive only — the underlying
+authorization/approval decision remains the owning domain module's (non-negotiable
+#15); Experience Agent never decides whether an action is allowed, only renders the
+confirmation/result UX consistently. **Not started.**
+
+### EXPERIENCE-P0-05 — Accessibility Foundation
+
+`docs/design/UI-UX-DESIGN-RULES.md` already requires accessibility, but there is no
+tracked story auditing/implementing it as a first-class deliverable: keyboard
+navigation across nav/tables/dialogs, visible focus states, semantic labels and
+landmark roles, accessible dialog/drawer patterns (focus trap, `Escape` to close,
+labelled by/described by), WCAG AA contrast in both themes, and screen-reader-
+friendly status/severity badges and tables (not color-only). Today only a handful
+of `aria-label`s exist on the nav toggle; this story is to make accessibility a
+verified property of `modules/ui/*` rather than incidental. **Not started.**
+
+### EXPERIENCE-P0-06 — Evidence Drawer & Investigation Deep Links
+
+A shared contextual side-drawer primitive (built on the existing
+`@radix-ui/react-dialog` dependency, not a new library) that opens evidence
+(runtime events, access-path detail, finding evidence, certification evidence)
+without navigating away from — or losing scroll/filter/pagination position in —
+the underlying list. Deep links (a shareable URL) into a specific evidence item
+must restore that same investigation context (which list, which filters, which
+item) rather than dropping the user on a bare detail page. **Not started.**
+
+### EXPERIENCE-P0-07 — Shell Global Search & Notifications
+
+The PRD's Enterprise Shell (§33, EXPERIENCE-P0-01.1, already `Done`) built the top
+bar's logo/tenant-selector/user-menu, but not a global search entry point or a
+notifications affordance — both are explicitly named in the new doc's UX-P0-01.
+This is scoped as its own new story rather than reopening the `Done` P0-01.1: a
+top-bar search entry point and a notifications indicator/panel, both composing
+Operations Agent's published search/notifications contracts once available (a
+"Not yet available" placeholder until then, per the same pattern used elsewhere in
+this backlog) — Experience Agent renders, Operations Agent supplies the data and
+matching logic. **Not started.**
+
+### EXPERIENCE-P0-08 — Data Table Primitive
+
+`modules/ui/Table.tsx` today is a bare table shell (container, head, row, cell)
+with no built-in sorting, filtering, pagination or responsive card-transform
+behavior — each consuming page would otherwise reinvent these. Publish a shared
+data-table primitive (sortable columns, filter affordances, keyset or
+limit/offset pagination controls wired to the calling page's query per `CLAUDE.md`
+§15, saved-URL-state for the current sort/filter/page, and a responsive
+card-transform for narrow viewports) that EXPERIENCE-P0-03's domain screens (Agent
+Inventory, Access, Findings, etc.) consume instead of hand-rolling their own.
+**Not started.**
+
+### Already covered, no new tracker row needed
+
+- UX-P0-01 (Enterprise Shell) — the nav/tenant-selector/user-menu portion maps onto
+  EXPERIENCE-P0-01.1 (`Done`); the global-search/notifications portion is newly
+  tracked separately as EXPERIENCE-P0-07 above rather than reopening a `Done` row.
+- UX-P0-02 (Light/Dark Themes) maps onto EXPERIENCE-P0-01.0 (`Partial`) — no scope
+  change.
+- UX-P0-03 (Agent Inventory), UX-P0-04 (Agent Detail), UX-P0-05 (SHOULD/CAN/DID
+  Visualization) and UX-P0-06 (Risk UX) all map onto EXPERIENCE-P0-03 (`Partial`,
+  already carrying a large, honestly-flagged known gap covering exactly these
+  worked layouts) — no new row; the new doc's detail is additional acceptance
+  detail for that existing story, not new scope.
+- UX-P0-09 (Loading/Empty/Error) maps onto EXPERIENCE-P0-01.3 (`Partial`).
+- UX-P0-12 (Responsive Navigation) maps onto EXPERIENCE-P0-01.2 (`Partial`).
+
+No ownership-map addition is needed for this refresh: Experience Agent owns no
+database tables per `docs/design/ownership-map.md` (UI composition only), and every
+new item above is either a `modules/ui/*` presentation primitive or a shell slot
+that composes another module's already-owned contract (Operations Agent's
+notifications/search for EXPERIENCE-P0-07; Risk/Compliance/Runtime's evidence for
+EXPERIENCE-P0-06) rather than a new table, route or shared type.
+
+**Not a decision made unilaterally:** the new requirements package's "Modular
+Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a different
+*process* model ("Only the agent explicitly activated by the user may start work.
+Agents must never launch another agent automatically") than this repository's
+standing autopilot/auto-chain policy in `CLAUDE.md` §7 and `docs/ORCHESTRATION.md`
+§2. That is a meta/process question, not a product requirement, and is called out
+to the user separately rather than silently changed here.
+
 ## P1
 
 Saved views/filters. Bulk actions beyond single-item decisions. Keyboard-shortcut
 power-user mode.
 
+Additions from the 2026-09-14 requirements refresh (`08_UI_UX.md` UX-P1-03,
+UX-P1-04 — UX-P1-01 "Saved Views" and UX-P1-02 "Bulk Governance" already match the
+items above, so no duplicate entry was added for them):
+
+- Natural-language command search across agents/findings/access paths, with every
+  result linking to the authoritative structured record rather than standing alone
+  as an LLM-generated answer (non-negotiable #9).
+- Personalization: role-aware dashboard defaults, user-configurable table columns,
+  and a density preference (compact/comfortable).
+
 Note: dark mode is **P0**, not P1 — see EXPERIENCE-P0-01.0 and `CLAUDE.md` §13.
+
+## P2
+
+Added from the 2026-09-14 requirements refresh (`08_UI_UX.md` UX-P2-01 through
+UX-P2-03) — strategic scope, not to be built ahead of P0/P1:
+
+- **Investigation Workspace** — a multi-pane workspace combining the access graph,
+  runtime timeline, evidence and findings for one agent, with persistent
+  investigation state across a session.
+- **Advanced Graph Exploration** — filter the effective-access graph by identity,
+  application, entitlement, resource, policy, runtime and risk dimensions, with an
+  accessible tabular fallback for anything the graph view can't render accessibly.
+- **Executive Command Center** — a high-level risk-posture/certification-health/
+  rogue-trend/coverage/remediation-outcome view for executive stakeholders, without
+  losing the ability to drill down into evidence.
 
 ## DO NOT IMPLEMENT
 

@@ -30,6 +30,16 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-04.2 | Migration validation | Not Started |
 | QA-P0-04.3 | Responsive & performance spot-check | Not Started |
 | QA-P0-04.4 | Regression fixes only, smallest safe change | Not Started |
+| QA-P0-05 | Clean install verification | Not Started |
+| QA-P0-06 | Authentication suite (SAML/OIDC/session) | Not Started |
+| QA-P0-07 | Connector contract tests | Not Started |
+| QA-P0-08 | Runtime test corpus | Not Started |
+| QA-P0-09 | SHOULD/CAN/DID reproducibility | Not Started |
+| QA-P0-10 | Risk regression suite | Not Started |
+| QA-P0-11 | Certification regression | Not Started |
+| QA-P0-12 | Security scanning | Not Started |
+| QA-P0-13 | Failure recovery (retry/idempotency) | Not Started |
+| QA-P0-14 | Observability sweep | Not Started |
 
 ---
 
@@ -177,6 +187,185 @@ effective access, SHOULD/CAN/DID, risk findings, certification, remediation,
 audit/evidence, reports/search and responsive UI all pass their critical tests, and
 `INTEGRATION_STATUS.md` reflects the true state (including any P1-deferred or
 not-yet-buildable items) rather than an aspirational one.
+
+## Requirements Refresh — 2026-09-14
+
+The user supplied an updated master requirements package
+(`WonderAgent_Updated_Requirements_11_Docs.zip`, module doc
+`11_INTEGRATION_QA_HARDENING.md`) that expands this module's P0/P1/P2 scope
+beyond what was already tracked above. The new doc uses a flat numbering
+scheme (`QA-P0-01`...`QA-P0-15`) that is unrelated to this backlog's existing
+epic/story numbering (`QA-P0-01.1`, `QA-P0-02.1`, etc.) and happens to reuse
+`QA-P0-01`–`QA-P0-04` for different content than this file's existing epics of
+the same number — reconciliation below is by actual content, not by ID match.
+Nothing already tracked was reopened or renumbered; new stories below are
+given fresh sequential IDs (`QA-P0-05`–`QA-P0-14`) to avoid colliding with the
+existing epic numbers, with each new story's source ID from the new doc noted
+in parentheses.
+
+### QA-P0-05 — Clean install verification (source: QA-P0-01)
+
+Verify a clean checkout (no cached `node_modules`, no local `.env.local`
+carried over from a prior run) can `npm install`, apply every module's
+migrations to a fresh database, and `npm run build` successfully — proving the
+repository doesn't secretly depend on some engineer's local machine state.
+Distinct from QA-P0-04.1 (which re-runs the pipeline on the existing checkout
+for cross-module drift): this story specifically exercises a from-scratch
+environment. **Acceptance:** a documented from-scratch run (fresh clone, fresh
+dependency install, fresh migration apply, production build) succeeds with no
+manual undocumented steps.
+
+### QA-P0-06 — Authentication suite (source: QA-P0-05)
+
+Test SAML/OIDC success and failure paths, session expiry, logout, invalid
+assertions/tokens, wrong tenant/domain, and unauthorized roles — beyond the
+JIT-provisioning-only check already in QA-P0-02.2. **Acceptance:** each case
+above has at least one automated test exercising Foundation's real
+auth/session code paths (no UI-only mocking).
+
+### QA-P0-07 — Connector contract tests (source: QA-P0-06)
+
+For every connector Integration Agent has shipped by QA time: test
+authentication, discovery, pagination, partial failure, retry, rate limiting,
+idempotency, credential rotation, and source-record traceability.
+**Acceptance:** each shipped connector has a passing contract-test suite
+covering all eight properties above, or a documented gap if the connector
+doesn't yet support one (e.g. no rotation support).
+
+### QA-P0-08 — Runtime test corpus (source: QA-P0-07)
+
+Maintain a deterministic fixture set of runtime events covering: an allowed
+action, CAN-only excessive access (access exists but wasn't used),
+DID-only unexpected behavior (used but not approved), unauthorized-resource
+access, sensitive-data access, and unknown/unmappable events. **Acceptance:**
+the fixture set exists under `tests/**`, is versioned, and is reused (not
+re-authored per test) by QA-P0-09 and Risk Agent's own regression tests.
+
+### QA-P0-09 — SHOULD/CAN/DID reproducibility (source: QA-P0-08)
+
+Given an identical agent contract, effective-access snapshot, and runtime
+event set, `compareShouldCanDid` must produce byte-identical output across
+repeated runs, and that output must reference the specific
+policy/evaluator version(s) used. **Acceptance:** a test re-runs the same
+inputs twice (and once more after an unrelated code change) and asserts
+identical SHOULD/CAN/DID results and stable version references.
+
+### QA-P0-10 — Risk regression suite (source: QA-P0-09)
+
+For every rogue/finding category Risk Agent implements: a positive test (the
+condition fires), a negative test (it doesn't fire when it shouldn't), a
+duplicate-event test (no duplicate finding from replayed/duplicate events), an
+exception test (an approved exception suppresses the finding), and a
+resolution test (finding resolves when the underlying condition clears).
+**Acceptance:** each shipped risk category has all five test kinds passing.
+
+### QA-P0-11 — Certification regression (source: QA-P0-10)
+
+Test reviewer authorization (only assigned/eligible reviewers can decide),
+self-review restrictions (an owner cannot certify their own agent's access
+unless explicitly permitted), decision evidence capture, overdue-campaign
+escalation, and that a historical certification snapshot reproduces the exact
+Access/Approved/Used/Risk data it was decided against. **Acceptance:** each
+of the five behaviors above has a passing test against Compliance Agent's
+real certification flow.
+
+### QA-P0-12 — Security scanning (source: QA-P0-11)
+
+Enable (or document the chosen tool for) dependency vulnerability scanning,
+secret scanning, static analysis where available, secure-HTTP-headers
+checks, and production configuration validation (e.g. no debug flags,
+no service-role key reachable client-side — extending FOUNDATION-P0-01.3's
+bundle check). **Acceptance:** each scan type runs at least once against the
+current codebase with results recorded in `INTEGRATION_STATUS.md`, and any
+finding is triaged (fixed or explicitly accepted with rationale).
+
+### QA-P0-13 — Failure recovery (source: QA-P0-12)
+
+Prove that retrying a failed connector sync or failed job never produces
+duplicate imported records or duplicate findings (idempotency holds under
+retry), and that partial failures remain visible in the UI/status record
+rather than silently succeeding or silently disappearing. **Acceptance:** a
+test forces a mid-sync failure, retries, and asserts row counts and finding
+counts are unchanged by the retry.
+
+### QA-P0-14 — Observability sweep (source: QA-P0-13)
+
+Verify every async operation (connector sync, runtime ingestion, risk
+evaluation, certification campaign actions) already carries a correlation
+ID, status, duration, tenant context, and a safe (non-leaking) error
+classification, and that basic metrics are recorded — this is a verification
+story against other modules' existing job/audit plumbing, not a new
+observability system owned by QA. **Acceptance:** a checklist per async
+operation type confirming these fields are present and populated in real
+runs; gaps are logged against the owning module's audit log per
+"smallest safe change," not fixed inside QA's own files.
+
+### Already covered, no new row needed
+
+- New doc's **QA-P0-02** (Type/Lint/Build Gate) — content-identical to
+  existing **QA-P0-04.1** (Pipeline sweep: typecheck/lint/test/build across
+  the repo). The new doc's "documented non-blocking baseline defect"
+  exception is a minor clarification, not new scope.
+- New doc's **QA-P0-03** (Tenant Isolation Suite: UI/API/RPC/DB/search/
+  reports/exports/jobs/caches) — content-identical to existing **QA-P0-02.1**
+  (Full cross-tenant sweep), which already enumerates the same surfaces.
+- New doc's **QA-P0-04** (Platform Isolation Suite) — content-identical to
+  existing **QA-P0-02.3** (Platform-admin isolation sweep).
+- New doc's **QA-P0-14** (End-to-End Golden Scenario: Saviynt + FinanceBot +
+  MCP) — content-identical to existing **QA-P0-03.1** (The FinanceBot
+  acceptance scenario, executed live).
+- New doc's **QA-P0-15** (Responsive UI Gate) — same core topic as existing
+  **QA-P0-04.3** (Responsive & performance spot-check); the new doc adds more
+  granular acceptance detail (long names/tags, empty states, dense tables,
+  accessibility keyboard paths) which QA-P0-04.3's existing acceptance
+  criteria already implicitly covers via "reuse Experience Agent's critical
+  acceptance test path" — no new row, but note the expanded detail when
+  executing that story.
+
+No new database tables, API routes, or shared types are introduced by this
+module's expanded P0 scope — every new story above is test/verification work
+against other modules' existing or planned contracts, consistent with this
+module owning no new domain tables (per "Owned entities" above). No
+ownership-map addition is needed for this module's refresh.
+
+**Not a decision made unilaterally:** the new requirements package's
+"Modular Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a
+different *process* model ("Only the agent explicitly activated by the user
+may start work. Agents must never launch another agent automatically") than
+this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md` §2. That is a meta/process question, not a product
+requirement, and is called out to the user separately rather than silently
+changed here.
+
+## P1 (do not build ahead of P0)
+
+- **QA-P1-01 — Performance Baseline.** Define measurable targets for page
+  load, API latency, search latency, sync throughput, and runtime event
+  processing under representative tenant sizes.
+- **QA-P1-02 — Load Testing.** Test large agent/access/event datasets,
+  concurrent users, concurrent sync jobs, and burst runtime events.
+- **QA-P1-03 — Chaos/Resilience.** Test database transient failure, connector
+  outage, expired credentials, queue delay, duplicate webhook delivery, and
+  partial upstream responses.
+- **QA-P1-04 — Compatibility Matrix.** Validate supported browsers, IdPs,
+  connector versions, and API versions.
+- **QA-P1-05 — Migration Rehearsal.** Run migrations against production-like
+  snapshots and verify rollback/recovery procedures for non-destructive
+  migration failures.
+- **QA-P1-06 — Security Penetration Readiness.** Prepare endpoint inventory,
+  threat model, authorization matrix, test accounts, and evidence for
+  external security testing.
+
+## P2 (strategic, after P0/P1 proven)
+
+- **QA-P2-01 — Continuous Synthetic Monitoring.** Periodically execute safe
+  synthetic tenant workflows to detect broken auth, integrations, search, and
+  critical UI paths.
+- **QA-P2-02 — Automated Security Regression.** Run authorization/RLS/
+  security suites continuously in CI for changed modules.
+- **QA-P2-03 — Capacity Forecasting.** Track growth of tenants, agents,
+  access edges, runtime events, and audit records, and recommend scaling
+  thresholds.
 
 ## DO NOT IMPLEMENT
 
