@@ -173,8 +173,11 @@ Each agent works one story at a time from its own backlog doc:
    always reflect the true current state — never mark a row `Done` before its
    acceptance criteria are actually met and verified.
 6. **Commit** with a focused message scoped to the story, then push and merge per
-   [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md).
-7. Move to the next unfinished story. Never restart or duplicate completed work.
+   [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) — which includes an automatic
+   fast-forward push to `main` after every commit; no need to ask first.
+7. Move to the next unfinished story automatically. Never restart or duplicate
+   completed work, and never stop to ask before continuing — only a genuine
+   blocker or a key decision the backlog doesn't specify is a reason to pause.
 
 If a story's correct behavior depends on a real architecture or security decision the
 backlog doesn't fully specify, stop and record the open question in the audit log
@@ -271,22 +274,35 @@ something already listed there as owned by another module.
 
 ## 7. Agent Dispatch Instructions
 
-- Only the **Foundation Agent** is started initially. All other agents remain dormant
-  until explicitly started by the user.
-- The user starts an agent by referring to its assigned name, e.g. **"Run Identity
-  Agent"**, **"Run Integration Agent"**.
-- When an agent is started, it must read this file (`CLAUDE.md`), its module backlog,
-  and the tail of its own audit log before doing anything.
-- An agent must never automatically start, invoke, delegate to, or implement another
-  module's agent.
+**Standing autopilot policy (superseding the original "manual dispatch only" rule):**
+once an agent finishes every story in its own backlog, it automatically starts the
+next dormant agent in `docs/RUN_ORDER.md`'s order — no need to stop and ask the user
+first. Likewise, within a module, finishing one story flows straight into the next
+without stopping to ask. The only reasons to stop and wait for the user are:
+
+- A genuine blocker (a required dependency truly isn't available and the backlog
+  doesn't allow a documented stub/workaround).
+- A key architecture or security decision the backlog doesn't fully specify — the
+  stop-and-report rule in `docs/ORCHESTRATION.md` §7 always wins over "keep going."
+- The full run order (all dormant agents in `docs/RUN_ORDER.md`) is exhausted.
+
+Everything else below still applies to how each agent behaves once running:
+
+- When an agent is started (by the user, or automatically per the policy above), it
+  must read this file (`CLAUDE.md`), its module backlog, and the tail of its own
+  audit log before doing anything.
+- An agent must never invoke, delegate to, or implement another module's agent
+  concurrently, or claim ownership of another module's tables, routes or services in
+  its status reports — auto-chaining means starting the *next* agent only after the
+  current one has fully finished and reported, never running two at once.
 - An agent must never assume another module is complete merely because its backlog
   document exists.
 - If a required dependency from another module is not implemented yet: use the
   documented contract/stub only where the consuming module's backlog explicitly
   permits it; otherwise record the dependency in the audit log and stop rather than
   inventing that module's architecture.
-- An agent must not claim ownership of another module's tables, routes or services in
-  its status reports.
+- The user can still start any agent by name at any time (e.g. **"Run Identity
+  Agent"**) — useful for resuming after a stop, or jumping out of run order.
 
 Use these exact agent names everywhere (status reports, audit logs, commits):
 
@@ -298,10 +314,10 @@ When started, an agent must report: agent name, module owned, current
 branch/worktree, current story, dependencies being consumed, tables/entities it owns,
 tables/entities it is consuming, and verification status.
 
-**Current status:** Only the **Foundation Agent** is active. All other agents are
-dormant pending explicit user dispatch. See
-[`docs/RUN_ORDER.md`](docs/RUN_ORDER.md) for the recommended dispatch order and
-the exact command to type for each agent.
+**Current status:** see [`docs/RUN_ORDER.md`](docs/RUN_ORDER.md) for which agents
+have completed their P0 backlog, which is currently running, and which remain
+dormant. Per the autopilot policy above, completed agents auto-chain into the next
+dormant one in that file's order without waiting for the user.
 
 ---
 

@@ -48,9 +48,22 @@ sequence.
 **Never force-push. Never rewrite history on the integration branch or any feature
 branch.**
 
-**IMPORTANT: auto-merge does not mean auto-start another module.** After completing
-its own story or backlog, an agent must never start or invoke another module's agent.
-Only the user decides when another agent starts (see `CLAUDE.md` §7).
+**Standing instruction: also fast-forward `main` after every push.** Once the
+feature/integration branch push above succeeds, push the same commit(s) to `main`
+as well (`git push origin <branch>:main`) — no need to ask first, per the user's
+standing instruction. Only do this when it is a clean fast-forward (verify with
+`git rev-list --left-right --count origin/main...<branch>` showing 0 commits `main`
+has that the branch doesn't); if `main` has diverged with commits not on the
+branch, stop and report rather than force-pushing or merging unreviewed.
+
+**Auto-chaining across modules is now the standing policy (see `CLAUDE.md` §7):**
+once an agent finishes every story in its own backlog, it starts the next dormant
+agent per `docs/RUN_ORDER.md`'s order automatically — no need to ask the user
+first. This replaced the original "user must manually dispatch every agent" rule.
+What still holds: only one agent's work is ever in flight at a time (auto-chaining
+starts the next agent only after the current one has fully finished, verified, and
+reported — never concurrently), and an agent never invokes another module's agent
+mid-story to help with its own work.
 
 ## 3. Full verification before every commit and merge
 

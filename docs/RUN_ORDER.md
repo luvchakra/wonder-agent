@@ -5,30 +5,34 @@ This is the recommended dispatch order for the 11 module agents defined in
 each module's own backlog (`docs/plan/*-BACKLOG.md`) and the ownership map
 (`docs/design/ownership-map.md`) — not an arbitrary sequence.
 
-Dispatch is by name, per `CLAUDE.md` §7: type the exact phrase below in this
-session. There is no shell command involved — the harness starts the named agent,
-which then reads `CLAUDE.md`, its own backlog, and the tail of its own audit log
-before doing anything, exactly as it would on a fresh session.
-
-**Never start more than the current wave's agents at once**, and never start an
-agent whose wave hasn't been reached yet — per `CLAUDE.md` §7, an agent must never
-auto-start another agent, and the user controls when each one begins.
+**Standing autopilot policy** (per the user's instruction — see `CLAUDE.md` §7 and
+`docs/ORCHESTRATION.md`): once an agent finishes every story in its own backlog, it
+automatically starts the next **dormant** agent below, in order, without waiting for
+the user. The user can still type an agent's name at any time to jump out of order
+or resume after a stop. Auto-chaining only ever runs one agent at a time — the next
+one starts after the current one has fully finished, verified, and reported, never
+concurrently. The only reasons to stop instead of auto-chaining: a genuine blocker,
+or a key architecture/security decision the backlog doesn't specify (the
+stop-and-report rule always wins).
 
 ## Run order
 
-| Wave | Agent | Why this position | Command to type |
+| Wave | Agent | Why this position | Status |
 |---|---|---|---|
-| 1 (done) | Foundation Agent | Everything depends on tenant/RBAC/RLS/audit — already active | *(already running — no need to re-issue; say `Run Foundation Agent` again later to pick up its deferred P0 items)* |
-| 2 | Identity Agent | Only needs Foundation; defines the canonical agent + Agent Contract (SHOULD) every later module reads | `Run Identity Agent` |
-| 2 | Integration Agent | Only needs Foundation; can build its connector framework against manual data without waiting on Identity | `Run Integration Agent` |
-| 3 | Access Agent | Needs Identity's contract + (ideally) Integration's normalized access data to compute CAN | `Run Access Agent` |
-| 3 | Runtime Agent | Needs Identity's contract + Access's CAN to run the SHOULD/CAN/DID comparison | `Run Runtime Agent` |
-| 4 | Risk Agent | Pure consumer of Identity + Access + Runtime's outputs — can't produce real findings before those exist | `Run Risk Agent` |
-| 4 | Compliance Agent | Needs Identity, Access, Runtime, and Risk (for the Risk column in certification review) | `Run Compliance Agent` |
-| 5 | Platform Agent | Only needs Foundation — independent of the domain chain, so it could technically run right after Wave 1, but is grouped here to match the original execution guide's review batches | `Run Platform Agent` |
-| 5 | Experience Agent | Composes every domain module's published contract — most screens render "not yet available" until earlier waves exist | `Run Experience Agent` |
-| 5 | Operations Agent | Reads across every domain module for audit/search/reports/notifications | `Run Operations Agent` |
-| 6 | QA Agent | Cross-module verification and the full P0 acceptance scenario — must run last, after everything it's testing exists | `Run QA Agent` |
+| 1 | Foundation Agent | Everything depends on tenant/RBAC/RLS/audit | Done (P0 core; a few items deferred — see its audit log) |
+| 2 | Identity Agent | Only needs Foundation; defines the canonical agent + Agent Contract (SHOULD) every later module reads | Done |
+| 2 | Integration Agent | Only needs Foundation; can build its connector framework against manual data without waiting on Identity | Done |
+| 3 | Access Agent | Needs Identity's contract + (ideally) Integration's normalized access data to compute CAN | Not started |
+| 3 | Runtime Agent | Needs Identity's contract + Access's CAN to run the SHOULD/CAN/DID comparison | Not started |
+| 4 | Risk Agent | Pure consumer of Identity + Access + Runtime's outputs — can't produce real findings before those exist | Not started |
+| 4 | Compliance Agent | Needs Identity, Access, Runtime, and Risk (for the Risk column in certification review) | Not started |
+| 5 | Platform Agent | Only needs Foundation — independent of the domain chain, so it could technically run right after Wave 1, but is grouped here to match the original execution guide's review batches | Not started |
+| 5 | Experience Agent | Composes every domain module's published contract — most screens render "not yet available" until earlier waves exist | Not started |
+| 5 | Operations Agent | Reads across every domain module for audit/search/reports/notifications | Not started |
+| 6 | QA Agent | Cross-module verification and the full P0 acceptance scenario — must run last, after everything it's testing exists | Not started |
+
+Update the Status column in the same commit that starts or finishes an agent's run,
+so this table stays a live, accurate picture of where the build stands.
 
 ## Notes
 
