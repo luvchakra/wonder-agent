@@ -3,10 +3,13 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getAgent } from "@/modules/agent-identity/service";
+import { getCertificationHistory } from "@/modules/certification-compliance/decisions";
 import type { Policy, PolicyEvaluationResult, PolicyRule } from "@/lib/shared/types/access-governance";
 import { toPolicy, toPolicyEvaluationResult, toPolicyRule } from "./mappers";
 import { getEffectiveAccess } from "./grants";
 import { evaluateCondition } from "./conditions";
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export async function listPolicyEvaluations(tenantId: string, agentId: string): Promise<PolicyEvaluationResult[]> {
   const supabase = await supabaseServer();
@@ -57,14 +60,30 @@ export async function evaluatePolicies(tenantId: string, agentId: string): Promi
 
   const effectiveAccess = await getEffectiveAccess(tenantId, agentId);
 
+  // agent.days_since_last_certification is now resolvable via Compliance
+  // Agent's own published contract (getCertificationHistory() — its own
+  // comment names Access/Identity/Risk as the intended consumers). Most
+  // recent decision first; an agent never certified stays unknown, never
+  // guessed as 0 or Infinity.
+  const certificationHistory = await getCertificationHistory(tenantId, agentId);
+  const daysSinceLastCertification =
+    certificationHistory.length > 0
+      ? Math.floor((Date.now() - new Date(certificationHistory[0].decidedAt).getTime()) / MS_PER_DAY)
+      : undefined;
+
   const agentFacts: Record<string, unknown> = {
     "agent.data_classification": agent.dataClassification ?? undefined,
     "agent.criticality": agent.criticality,
     "agent.environment": agent.environment,
-    // Not modeled by any module yet — deliberately left unknown rather than
-    // guessed, per ACCESS-P0-02.2's explicit instruction.
+    "agent.days_since_last_certification": daysSinceLastCertification,
+    // agent.external_communication has no owning schema concept anywhere in
+    // this codebase (no module models "this agent/application communicates
+    // externally") — deliberately left unknown rather than guessed. Building
+    // it would mean inventing a new field on either Identity's agents or
+    // Access's applications table without a product decision on what it
+    // means or which module owns it; per CLAUDE.md §3, treated as scope
+    // creep and stopped rather than guessed, see the Access Agent audit log.
     "agent.external_communication": undefined,
-    "agent.days_since_last_certification": undefined,
   };
 
   const admin = supabaseServiceRole();

@@ -4,9 +4,11 @@ import type { PolicyCondition } from "@/lib/shared/types/access-governance";
 
 /**
  * ACCESS-P0-02.2's deterministic rule interpreter. `undefined` means "this
- * field isn't known yet" (e.g. agent.external_communication or
- * agent.days_since_last_certification, which depend on modules/data that
- * don't exist yet) — treated as "cannot evaluate," never coerced to
+ * field isn't known yet" — an agent never certified leaves
+ * agent.days_since_last_certification unknown (a real absence, not "never
+ * violates"), and agent.external_communication is always unknown since no
+ * module models that concept at all (see modules/access-governance/
+ * evaluate.ts) — treated as "cannot evaluate," never coerced to
  * true/false, per the backlog's explicit "record as a known limitation,
  * don't fabricate." An LLM is never part of this path (non-negotiable #9).
  */

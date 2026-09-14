@@ -244,3 +244,59 @@ worked around) — verified via `npm run build`'s route generation plus the
 fixture-data-driven unit tests above, which is what actually caught and
 fixed the classification bug; a full end-to-end request-level check
 remains open for a future QA Agent pass.
+
+## 2026-09-14 — ACCESS-P0-02.2: `agent.days_since_last_certification` resolved
+
+**Agent:** Access Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Picked up as part of a full sweep of every module's Partial/Deferred
+items, starting from the first agent in run order.
+
+Compliance Agent's `getCertificationHistory(tenantId, agentId)`
+(`modules/certification-compliance/decisions.ts`) is a real published
+contract — its own comment explicitly names Access/Identity/Risk as
+intended consumers — returning every decided certification item for an
+agent, most recent first, each carrying `decidedAt`. `evaluatePolicies()`
+now calls it and computes `agent.days_since_last_certification` as whole
+days since the most recent decision; an agent with zero certification
+history stays `undefined` (unknown, never guessed as 0 or Infinity),
+same "cannot evaluate" semantics `evaluateCondition()` already applies to
+every other unknown fact.
+
+**Architectural note, checked deliberately, not glossed over:** this
+creates a two-file cycle in the module import graph —
+`certification-compliance/decisions.ts` already imports
+`revokeAccessGrant` from `access-governance/service.ts`, and
+`access-governance/evaluate.ts` now imports `getCertificationHistory`
+from `certification-compliance/decisions.ts`. Both call sites invoke the
+imported function only inside an `async function` body, never at module
+top level, so the cycle resolves safely under Node/Next.js ESM (no
+"cannot access before initialization" risk) — confirmed, not assumed: a
+full cold-cache `npm run build` (`.next` deleted first) completed with no
+errors. Access (CAN/policy) referencing a fact that only exists after
+Certification runs is an intentional case where the layered SHOULD → CAN
+→ DID → Risk → Certification model (CLAUDE.md §9) still needs a read-back
+edge for one ABAC condition — the PRD's own worked example
+(`agent.days_since_last_certification > 90`) treats certification
+recency as a policy input, which only Compliance's data can supply. The
+import goes through Compliance's own published contract, never its
+internals, per non-negotiable #6.
+
+**`agent.external_communication` deliberately NOT resolved** — checked
+first, not skipped: grepped the entire schema and every module's shared
+types for any "external"-facing concept and found none. This isn't a
+missing contract from an otherwise-existing module (unlike
+`days_since_last_certification` above); it would require inventing a new
+boolean field on either Identity's `agents` table or Access's own
+`applications` table, with no existing product decision on what it means
+(external network communication? data egress? a specific integration
+type?) or which module should own it. Per CLAUDE.md §3 ("if unsure
+whether something is a required extension point or genuine scope creep,
+treat it as scope creep and stop"), this stays `undefined` and open for
+the user to decide, not guessed.
+
+**Verified:** `npm run typecheck`, `npm run lint`, `npx vitest run`
+(139/139, unchanged — no existing unit test asserted the old
+always-`undefined` behavior, so nothing needed updating), `npm run
+build` with `.next` deleted first (specifically to prove the cyclic
+import resolves cleanly) — all green. `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` — no match.

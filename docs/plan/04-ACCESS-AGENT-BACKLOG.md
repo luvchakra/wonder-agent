@@ -21,7 +21,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-01.2 | Effective access computation & explainability (higher bar) | Done — critical acceptance test passed live |
 | ACCESS-P0-01.3 | Access requests (P0 minimal) | Done |
 | ACCESS-P0-02.1 | Policy schema (higher bar) | Done |
-| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Partial — `agent.external_communication` and `agent.days_since_last_certification` are always unknown pending other modules |
+| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Partial — `agent.days_since_last_certification` is now real, computed from Compliance Agent's published `getCertificationHistory()` contract (2026-09-14); `agent.external_communication` remains always unknown — no module models that concept at all (not a missing contract, a genuinely undecided new field/owner), see audit log |
 | ACCESS-P0-02.3 | Segregation of Duties (SoD) (higher bar) | Done |
 | ACCESS-P0-03 | Access Graph (graph-compatible relationships + tabular view) | Done — 2026-09-14 |
 | ACCESS-P0-04 | Contract Comparison (SHOULD vs CAN diff: approved / excessive / missing / unknown) | Done — 2026-09-14, unit-tested against the live FinanceBot fixture's exact data |
