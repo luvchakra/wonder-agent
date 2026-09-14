@@ -7,6 +7,32 @@
 should generally be the **last** one run, after the other ten modules (or as many as
 the user has chosen to build) have reached a stable state.
 
+---
+
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run QA Agent" is issued,
+which should generally be last, per `docs/RUN_ORDER.md`.
+
+| Story | Title | Status |
+|---|---|---|
+| QA-P0-01.1 | Repository & contract inventory | Not Started |
+| QA-P0-01.2 | Route map & permission matrix | Not Started |
+| QA-P0-02.1 | Full cross-tenant sweep | Not Started |
+| QA-P0-02.2 | RBAC boundary sweep | Not Started |
+| QA-P0-02.3 | Platform-admin isolation sweep | Not Started |
+| QA-P0-03.1 | The FinanceBot acceptance scenario, executed live | Not Started |
+| QA-P0-04.1 | Pipeline sweep | Not Started |
+| QA-P0-04.2 | Migration validation | Not Started |
+| QA-P0-04.3 | Responsive & performance spot-check | Not Started |
+| QA-P0-04.4 | Regression fixes only, smallest safe change | Not Started |
+
+---
+
 ## Dependencies
 
 All modules 01–10. This agent reads and tests across all of them but does not own
@@ -35,30 +61,6 @@ is verifying the security/isolation guarantees every other module claimed to
 satisfy. Do not soften a failing test to make it pass; fix the underlying module (per
 "smallest safe change," coordinating via that module's audit log) or report the gap
 to the user.
-
----
-
-## Progress Tracker
-
-Status values: **Done** (acceptance criteria met and verified), **Partial**
-(built but with a known, documented gap), **Deferred** (not started, not
-blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run QA Agent" is issued,
-which should generally be last, per `docs/RUN_ORDER.md`.
-
-| Story | Title | Status |
-|---|---|---|
-| QA-P0-01.1 | Repository & contract inventory | Not Started |
-| QA-P0-01.2 | Route map & permission matrix | Not Started |
-| QA-P0-02.1 | Full cross-tenant sweep | Not Started |
-| QA-P0-02.2 | RBAC boundary sweep | Not Started |
-| QA-P0-02.3 | Platform-admin isolation sweep | Not Started |
-| QA-P0-03.1 | The FinanceBot acceptance scenario, executed live | Not Started |
-| QA-P0-04.1 | Pipeline sweep | Not Started |
-| QA-P0-04.2 | Migration validation | Not Started |
-| QA-P0-04.3 | Responsive & performance spot-check | Not Started |
-| QA-P0-04.4 | Regression fixes only, smallest safe change | Not Started |
 
 ---
 

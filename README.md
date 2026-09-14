@@ -29,6 +29,6 @@ backlog.
 
 ## Database
 
-Supabase PostgreSQL only — see `CLAUDE.md` §13. Migrations live in
+Supabase PostgreSQL only — see `CLAUDE.md` §16. Migrations live in
 `supabase/migrations/`, applied in order; each is owned by the module named in
 its filename prefix (see `docs/design/ownership-map.md`).

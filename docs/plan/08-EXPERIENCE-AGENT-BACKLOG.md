@@ -5,6 +5,29 @@
 **Branch:** `module/experience`
 **Status:** DORMANT — do not start until the user says "Run Experience Agent"
 
+---
+
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Experience Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| EXPERIENCE-P0-01.0 | Design tokens & theming foundation (light/dark) | Not Started |
+| EXPERIENCE-P0-01.1 | Shell layout | Not Started |
+| EXPERIENCE-P0-01.2 | Responsive behavior | Not Started |
+| EXPERIENCE-P0-01.3 | Loading/empty/error states & skeleton loaders | Not Started |
+| EXPERIENCE-P0-02.1 | Overview dashboard cards | Not Started |
+| EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Not Started |
+| EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Not Started |
+
+---
+
 ## Dependencies
 
 Every domain module's published service contract
@@ -41,26 +64,35 @@ mounts into — get its route/slot contract right or every module's UI story bre
 
 ---
 
-## Progress Tracker
-
-Status values: **Done** (acceptance criteria met and verified), **Partial**
-(built but with a known, documented gap), **Deferred** (not started, not
-blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run Experience Agent" is
-issued.
-
-| Story | Title | Status |
-|---|---|---|
-| EXPERIENCE-P0-01.1 | Shell layout | Not Started |
-| EXPERIENCE-P0-01.2 | Responsive behavior | Not Started |
-| EXPERIENCE-P0-02.1 | Overview dashboard cards | Not Started |
-| EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Not Started |
-| EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Not Started |
-
----
-
 ## Epic EXPERIENCE-P0-01 — Application Shell & Navigation
+
+Every story in this epic (and every other Experience Agent story) must follow
+`CLAUDE.md` §13 (UI/UX Design Standards) — modern enterprise visual language,
+mobile/tablet/desktop responsive, light **and** dark mode from day one, no generic
+scaffolded look. Read §13 in full before starting EXPERIENCE-P0-01.0.
+
+### EXPERIENCE-P0-01.0 — Design tokens & theming foundation
+
+Before any screen is built, establish the shared design-token layer every other
+Experience story and every domain module's bare pages consume:
+
+- A single source of truth for color, spacing, radius, shadow and typography
+  tokens (CSS variables or a Tailwind theme extension), covering both a light and a
+  dark palette per `CLAUDE.md` §13 — neutrals, one accent color, and semantic
+  status colors (success/warning/critical/info) that stay WCAG AA-contrasted in
+  both modes.
+- Theme resolution: default to the visitor's `prefers-color-scheme`, with an
+  explicit light/dark/system toggle in the user menu, persisted per user (e.g. a
+  cookie or `localStorage` value read before first paint to avoid a flash of the
+  wrong theme).
+- `modules/ui/*` primitives (badges, cards, tables, side panels, buttons, inputs)
+  are built or refactored to consume these tokens exclusively — no hardcoded hex
+  colors in component code.
+- One consistent type scale and one icon set (document the choice here or in the
+  audit log) adopted across every primitive.
+
+This story blocks EXPERIENCE-P0-01.1 — the shell must be built on top of these
+tokens, not styled ad hoc and retrofitted later.
 
 ### EXPERIENCE-P0-01.1 — Shell layout
 
@@ -100,7 +132,24 @@ wholly separate layout Platform Agent owns.
 Left nav collapses to an icon rail or a drawer below a defined breakpoint (document
 the breakpoint chosen, e.g. 1024px, in this file's next revision or the audit log).
 No horizontal scroll of the page body at any width down to 375px; tables that must
-stay wide scroll within their own container.
+stay wide scroll within their own container. Verify at three breakpoints minimum —
+mobile (~375px), tablet (~768px), desktop (1280px+) — per `CLAUDE.md` §13.
+
+### EXPERIENCE-P0-01.3 — Loading/empty/error states & skeleton loaders
+
+Shared `modules/ui/*` primitives for the three states every data-backed screen
+needs, per `CLAUDE.md` §13 and §15 (Performance & Responsiveness Standards):
+
+- A skeleton-loader primitive matching each primary layout shape (card grid, table,
+  detail page) shown during initial data fetch — never a bare spinner-only page and
+  never a blank white screen.
+- An inline loading affordance for button-triggered actions (disabled state +
+  spinner) so a click always has visible feedback.
+- A designed empty state (not just an empty table) and a designed error state
+  (with a retry action where applicable) for every list/detail view.
+
+Domain modules' own bare functional pages adopt these primitives as soon as they
+exist, rather than each inventing its own loading/empty/error markup.
 
 ---
 
@@ -153,12 +202,17 @@ different structure.
 A user can navigate Overview → AI Identity → Agent → Access → Runtime →
 SHOULD/CAN/DID → Risk → Certification without broken routes, layout overlap, or
 unauthorized data exposure (verify no page ever renders another tenant's data by
-testing as Tenant A while Tenant B has records in every domain table).
+testing as Tenant A while Tenant B has records in every domain table). Repeat the
+same walkthrough in both light and dark mode, and at mobile/tablet/desktop widths,
+per `CLAUDE.md` §13 — no visual regression, no unstyled/generic fallback in either
+mode at any width.
 
 ## P1
 
-Dark mode. Saved views/filters. Bulk actions beyond single-item decisions.
-Keyboard-shortcut power-user mode.
+Saved views/filters. Bulk actions beyond single-item decisions. Keyboard-shortcut
+power-user mode.
+
+Note: dark mode is **P0**, not P1 — see EXPERIENCE-P0-01.0 and `CLAUDE.md` §13.
 
 ## DO NOT IMPLEMENT
 

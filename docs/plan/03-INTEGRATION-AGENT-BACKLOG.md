@@ -5,6 +5,33 @@
 **Branch:** `module/integration`
 **Status:** DORMANT — do not start until the user says "Run Integration Agent"
 
+---
+
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every non-"Done" row is in
+`docs/design/integration-agent-backlog-audit.md`.
+
+| Story | Title | Status |
+|---|---|---|
+| INTEGRATION-P0-01.1 | Adapter contract & capability declaration | Done |
+| INTEGRATION-P0-01.2 | Schema (higher bar on credential storage) | Done |
+| INTEGRATION-P0-01.3 | `integration_sync_jobs` | Done |
+| INTEGRATION-P0-01.4 | Normalized object storage | Done |
+| INTEGRATION-P0-02.1 | Saviynt REST adapter | Partial — built against documented conventions, not verified against a live Saviynt tenant |
+| INTEGRATION-P0-02.2 | Sync status & health surfaces | Done |
+| INTEGRATION-P0-03.1 | Configurable connector | Done — this is the connector the critical acceptance test runs against |
+| INTEGRATION-P0-03.2 | Object/field mapping UI | Done |
+| INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Partial — discovery done; tool `object_type` classification is a flagged judgment call pending Runtime Agent |
+| INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
+| INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
+
+---
+
 ## Dependencies
 
 - **Foundation Agent**: tenant context, RBAC, `encryptSecret()`/`decryptSecret()`
@@ -44,31 +71,6 @@ Foundation's tenant/RBAC/crypto primitives.
 INTEGRATION-P0-01.2 (credential storage), INTEGRATION-P0-03.* (any operation that
 could write back to a customer's IAM), and INTEGRATION-P0-04.2 (webhook signature
 verification) are higher bar.
-
----
-
-## Progress Tracker
-
-Status values: **Done** (acceptance criteria met and verified), **Partial**
-(built but with a known, documented gap), **Deferred** (not started, not
-blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
-for every non-"Done" row is in
-`docs/design/integration-agent-backlog-audit.md`.
-
-| Story | Title | Status |
-|---|---|---|
-| INTEGRATION-P0-01.1 | Adapter contract & capability declaration | Done |
-| INTEGRATION-P0-01.2 | Schema (higher bar on credential storage) | Done |
-| INTEGRATION-P0-01.3 | `integration_sync_jobs` | Done |
-| INTEGRATION-P0-01.4 | Normalized object storage | Done |
-| INTEGRATION-P0-02.1 | Saviynt REST adapter | Partial — built against documented conventions, not verified against a live Saviynt tenant |
-| INTEGRATION-P0-02.2 | Sync status & health surfaces | Done |
-| INTEGRATION-P0-03.1 | Configurable connector | Done — this is the connector the critical acceptance test runs against |
-| INTEGRATION-P0-03.2 | Object/field mapping UI | Done |
-| INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Partial — discovery done; tool `object_type` classification is a flagged judgment call pending Runtime Agent |
-| INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
-| INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 
 ---
 

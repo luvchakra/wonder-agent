@@ -5,6 +5,43 @@
 **Branch:** `module/foundation`
 **Status:** ACTIVE (this is the only agent started initially)
 
+---
+
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
+
+| Story | Title | Status |
+|---|---|---|
+| FOUNDATION-P0-01.1 | Initialize the Next.js application | Done |
+| FOUNDATION-P0-01.2 | Environment variable contract | Done |
+| FOUNDATION-P0-01.3 | Supabase client factories | Done |
+| FOUNDATION-P0-02.1 | `tenants` and `tenant_settings` | Done |
+| FOUNDATION-P0-02.2 | `users` and `tenant_memberships` | Done |
+| FOUNDATION-P0-02.3 | Roles, permissions, RBAC join tables | Done |
+| FOUNDATION-P0-02.4 | Row Level Security (higher bar) | Done |
+| FOUNDATION-P0-02.5 | `getTenantContext()` helper | Done |
+| FOUNDATION-P0-03.1 | Email/password auth | Done |
+| FOUNDATION-P0-03.2 | Tenant selection / JIT provisioning | Done |
+| FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Deferred — schema + RLS only; IdP handshake not wired |
+| FOUNDATION-P0-03.4 | MFA foundation | Deferred — not started |
+| FOUNDATION-P0-04.1 | `requirePermission()` | Done |
+| FOUNDATION-P0-04.2 | `requirePlatformAdmin()` (higher bar) | Done |
+| FOUNDATION-P0-04.3 | Role management UI (minimal) | Deferred — not started |
+| FOUNDATION-P0-05.1 | `audit_logs` + `writeAudit()` | Done |
+| FOUNDATION-P0-05.2 | Secret encryption helper (higher bar) | Done |
+| FOUNDATION-P0-05.3 | Baseline HTTP security | Deferred — not started |
+| FOUNDATION-P0-06.1 | Platform-admin identity | Done |
+| FOUNDATION-P0-06.2 | Route/middleware enforcement | Done |
+| FOUNDATION-P0-07.1 | Fixtures (higher bar) | Done |
+| FOUNDATION-P0-07.2 | Isolation tests — critical acceptance test (higher bar) | Done |
+
+---
+
 ## Dependencies
 
 None. Every other module depends on this one. Nothing in this backlog waits on
@@ -49,41 +86,6 @@ FOUNDATION-P0-02.4 (RLS policies), FOUNDATION-P0-03.* (all auth/SSO), FOUNDATION
 (secret encryption), FOUNDATION-P0-06.* (platform-admin boundary), and
 FOUNDATION-P0-07.* (tenant isolation tests) are all held to a higher bar. If the exact
 behavior isn't nailed down below, stop and ask rather than inventing an approach.
-
----
-
-## Progress Tracker
-
-Status values: **Done** (acceptance criteria met and verified), **Partial**
-(built but with a known, documented gap), **Deferred** (not started, not
-blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
-for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
-
-| Story | Title | Status |
-|---|---|---|
-| FOUNDATION-P0-01.1 | Initialize the Next.js application | Done |
-| FOUNDATION-P0-01.2 | Environment variable contract | Done |
-| FOUNDATION-P0-01.3 | Supabase client factories | Done |
-| FOUNDATION-P0-02.1 | `tenants` and `tenant_settings` | Done |
-| FOUNDATION-P0-02.2 | `users` and `tenant_memberships` | Done |
-| FOUNDATION-P0-02.3 | Roles, permissions, RBAC join tables | Done |
-| FOUNDATION-P0-02.4 | Row Level Security (higher bar) | Done |
-| FOUNDATION-P0-02.5 | `getTenantContext()` helper | Done |
-| FOUNDATION-P0-03.1 | Email/password auth | Done |
-| FOUNDATION-P0-03.2 | Tenant selection / JIT provisioning | Done |
-| FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Deferred — schema + RLS only; IdP handshake not wired |
-| FOUNDATION-P0-03.4 | MFA foundation | Deferred — not started |
-| FOUNDATION-P0-04.1 | `requirePermission()` | Done |
-| FOUNDATION-P0-04.2 | `requirePlatformAdmin()` (higher bar) | Done |
-| FOUNDATION-P0-04.3 | Role management UI (minimal) | Deferred — not started |
-| FOUNDATION-P0-05.1 | `audit_logs` + `writeAudit()` | Done |
-| FOUNDATION-P0-05.2 | Secret encryption helper (higher bar) | Done |
-| FOUNDATION-P0-05.3 | Baseline HTTP security | Deferred — not started |
-| FOUNDATION-P0-06.1 | Platform-admin identity | Done |
-| FOUNDATION-P0-06.2 | Route/middleware enforcement | Done |
-| FOUNDATION-P0-07.1 | Fixtures (higher bar) | Done |
-| FOUNDATION-P0-07.2 | Isolation tests — critical acceptance test (higher bar) | Done |
 
 ---
 

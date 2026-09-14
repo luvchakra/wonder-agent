@@ -5,6 +5,28 @@
 **Branch:** `module/operations`
 **Status:** DORMANT — do not start until the user says "Run Operations Agent"
 
+---
+
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
+agent is dormant; every story is Not Started until "Run Operations Agent" is
+issued.
+
+| Story | Title | Status |
+|---|---|---|
+| OPERATIONS-P0-01.1 | Audit log viewer | Not Started |
+| OPERATIONS-P0-01.2 | Evidence export | Not Started |
+| OPERATIONS-P0-02.1 | Schema & channels | Not Started |
+| OPERATIONS-P0-02.2 | `notify(event)` and trigger wiring | Not Started |
+| OPERATIONS-P0-03.1 | Global search (higher bar) | Not Started |
+| OPERATIONS-P0-04.1 | P0 report set | Not Started |
+
+---
+
 ## Dependencies
 
 Every domain module's data, consumed read-only via their published contracts.
@@ -36,26 +58,6 @@ Compliance's certifications, Integration's integrations).
 
 OPERATIONS-P0-03.1 (search) is higher bar — a cross-tenant leak through search would
 violate non-negotiable #4 directly.
-
----
-
-## Progress Tracker
-
-Status values: **Done** (acceptance criteria met and verified), **Partial**
-(built but with a known, documented gap), **Deferred** (not started, not
-blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run Operations Agent" is
-issued.
-
-| Story | Title | Status |
-|---|---|---|
-| OPERATIONS-P0-01.1 | Audit log viewer | Not Started |
-| OPERATIONS-P0-01.2 | Evidence export | Not Started |
-| OPERATIONS-P0-02.1 | Schema & channels | Not Started |
-| OPERATIONS-P0-02.2 | `notify(event)` and trigger wiring | Not Started |
-| OPERATIONS-P0-03.1 | Global search (higher bar) | Not Started |
-| OPERATIONS-P0-04.1 | P0 report set | Not Started |
 
 ---
 

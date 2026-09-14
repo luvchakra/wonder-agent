@@ -32,6 +32,11 @@ import { RestHttpClient, type PaginationConfig } from "./restHttpClient";
  * REST connector against a mock/test API, exactly as the backlog specifies —
  * it does not require a live Saviynt connection.
  *
+ * A later attempt to verify this connector against Saviynt's real API
+ * documentation was blocked by this sandbox's network egress policy (see
+ * docs/design/integration-agent-backlog-audit.md, "Attempted Saviynt API doc
+ * verification") — the endpoints/field names below remain unverified.
+ *
  * Config shape:
  * {
  *   baseUrl: string,

@@ -149,6 +149,12 @@ check the ownership map first.
   introduce a competing framework, ORM, state-management approach, or design system.
 - Real authorization, validation and persistence only — never fake security behavior
   with UI-only checks.
+- Any UI a module builds must follow §13 (UI/UX Design Standards) — no exceptions for
+  "just a quick admin page."
+- Any code path that touches tenant-scoped data must follow §14 (Multi-Tenant
+  Guardrails) in addition to non-negotiables #1, #2 and #4.
+- Any data-fetching or long-running operation must follow §15 (Performance &
+  Responsiveness Standards).
 
 ---
 
@@ -167,11 +173,12 @@ Each agent works one story at a time from its own backlog doc:
    re-check advisories). Build the app if UI/routes changed.
 4. **Update the module's own audit log** with a dated entry: what was built, how it
    was verified, what was deliberately left out or deferred.
-5. **Update the Progress Tracker table** at the top of the module's own backlog doc
-   (`docs/plan/NN-*-BACKLOG.md`, right before its first `## Epic` heading): set the
-   story's row to `Done`, `Partial`, or `Deferred` as appropriate. This table must
-   always reflect the true current state — never mark a row `Done` before its
-   acceptance criteria are actually met and verified.
+5. **Update the Progress Tracker table** at the very top of the module's own backlog
+   doc (`docs/plan/NN-*-BACKLOG.md`, immediately after the Agent name/Module/Branch/
+   Status header block, before `## Dependencies`): set the story's row to `Done`,
+   `Partial`, or `Deferred` as appropriate. This table must always reflect the true
+   current state — never mark a row `Done` before its acceptance criteria are
+   actually met and verified.
 6. **Commit** with a focused message scoped to the story, then push and merge per
    [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) — which includes an automatic
    fast-forward push to `main` after every commit; no need to ask first.
@@ -397,7 +404,12 @@ A feature is complete only when:
 - No secrets are exposed (browser bundle, logs, source control).
 - Audit logging is implemented for security-sensitive operations.
 - Responsive UI is verified for UI changes (desktop and mobile breakpoints, no
-  overlap/clipping).
+  overlap/clipping) and follows §13 (UI/UX Design Standards) — light and dark mode
+  both checked, no generic/unstyled scaffolding shipped as a final screen.
+- Multi-tenant guardrails (§14) are followed for any code touching tenant-scoped
+  data, on top of the base tenant-isolation check above.
+- Slow operations (§15) show a real loading/progress state and avoid sequential
+  fetch waterfalls.
 - TypeScript/lint/build checks pass where applicable.
 - The module's own audit log is updated.
 - The change is committed with a focused message, the feature branch is pushed, and
@@ -405,7 +417,170 @@ A feature is complete only when:
 
 ---
 
-## 13. Secrets & Environment
+## 13. UI/UX Design Standards
+
+WonderAgent is enterprise software that governs security-critical AI infrastructure.
+Every screen must read as a serious, premium enterprise product — never as a
+generic scaffolded CRUD app, a tutorial project, or an AI-generated placeholder UI.
+This section is binding for every module that ships UI (primarily Experience Agent,
+but also any module's own bare functional pages before Experience composes them).
+
+### Visual language
+
+- Sleek, elegant, subtle: restrained color palette (a small set of neutrals plus one
+  accent color for primary actions/brand, and semantic colors reserved strictly for
+  status — success/warning/critical/info); no rainbow of arbitrary colors, no heavy
+  drop shadows, no default browser-widget look.
+- Generous, consistent spacing on a single spacing scale (e.g. Tailwind's default
+  4px-based scale) — never ad hoc pixel values scattered per component.
+- One consistent type scale and weight system across the whole app (heading sizes,
+  body, caption, monospace for IDs/codes) — never mixed font sizes for the same
+  semantic role on different pages.
+- Subtle borders/elevation to separate content (hairline borders, low-opacity
+  shadows) rather than heavy card chrome everywhere.
+- Iconography from one consistent icon set (matching whatever Radix-compatible icon
+  library the Foundation/Experience Agent has already established) — never mixing
+  icon styles or using emoji as UI icons.
+- Data-dense views (tables, graphs) are the enterprise norm here — favor information
+  density with clear hierarchy over large marketing-style whitespace, but never let
+  density become clutter or unreadable line lengths.
+- Empty/zero-data states, loading states and error states are designed, not
+  afterthoughts — never a bare "undefined" or a blank white rectangle.
+
+### Responsiveness
+
+- Every screen must work correctly at three breakpoints at minimum: mobile (~375px),
+  tablet (~768px), and desktop (1280px+) — no horizontal scroll of the page body at
+  any width; wide tables/graphs scroll only within their own container.
+- Navigation must adapt (e.g. a collapsible rail or drawer below a documented
+  breakpoint, per EXPERIENCE-P0-01.2) rather than simply shrinking a desktop layout.
+- Touch targets on mobile/tablet must be usable (no desktop-only hover-only
+  affordances as the sole way to trigger an action).
+- Test responsiveness by actually resizing/viewing at each breakpoint before marking
+  a UI story `Done` — this is part of the Definition of Done (§12), not optional
+  polish.
+
+### Light and dark mode
+
+- Every screen must support both a light and a dark theme from the same component
+  set — never a dark-only or light-only screen, and never two divergent
+  implementations that drift out of sync.
+- Theme must be implemented via design tokens (CSS variables or a Tailwind theme
+  extension) consumed by every component — never per-component hardcoded hex colors
+  that only work in one mode.
+- Respect the user's OS/browser preference by default (`prefers-color-scheme`), with
+  an explicit manual override control persisted per user.
+- Contrast must remain accessible (WCAG AA at minimum) in both modes, especially for
+  status colors (critical/warning/success) that carry security meaning.
+
+### Consistency and componentization
+
+- All UI is built from one shared design-system layer (`modules/ui/*`, owned by
+  Experience Agent per the Ownership Map) — domain modules consume these primitives
+  (tables, cards, badges, side panels, empty states, skeleton loaders) rather than
+  hand-rolling their own per screen. A domain module's own "bare functional pages"
+  (built before Experience Agent composes the full shell) should still reuse
+  whatever shared primitives already exist rather than inventing divergent markup,
+  and should not be considered visually final — they are functional scaffolding
+  pending Experience Agent's pass per the module boundary in CLAUDE.md §2.
+- Never introduce a second component library, CSS framework, or competing
+  styling approach alongside Tailwind + Radix (Development Principles, §3).
+- Status/severity must always render with both a color AND a text/icon label —
+  never color alone (accessibility, and colorblind-safe by requirement).
+
+---
+
+## 14. Multi-Tenant Guardrails (Operational)
+
+Non-negotiables #1, #2 and #4 state the principle. This section is the concrete,
+checklist-level enforcement every module must apply — it does not loosen or replace
+those non-negotiables, it operationalizes them.
+
+- **Every new table** carrying customer data has a `tenant_id` column, a NOT NULL
+  constraint on it, RLS enabled, and at least one policy — a table is never shipped
+  RLS-disabled "temporarily."
+- **Tenant context is resolved exactly once per request**, server-side, from the
+  authenticated session's membership/JWT claims (Foundation's `getTenantContext()`),
+  and threaded explicitly through service function calls — never re-derived from a
+  route param, query string, request body, or header supplied by the client.
+- **Every query against a tenant-scoped table filters by tenant_id at the database
+  layer (RLS), not only in application code.** Application-level tenant filtering is
+  a defense-in-depth addition, never a substitute for RLS — a bug in application code
+  must never be able to leak cross-tenant rows.
+- **Service-role clients bypass RLS and are the highest-risk surface in the
+  codebase.** Any function using `supabaseServiceRole()` must manually verify the
+  tenant_id of every row it touches before acting on it, and this must be visible
+  in the code (not buried) so a reviewer can check it in seconds.
+- **No cross-tenant joins, aggregates, caches, or search indexes.** Anything that
+  precomputes or caches data across requests (in-memory caches, materialized views,
+  search indexes, embeddings for AI features) must be partitioned by tenant_id, with
+  a test proving tenant A's cache/index entry is never returned for tenant B.
+- **No tenant_id ever appears in a client-writable form field, hidden input, or
+  request body that the server trusts.** If a client-supplied payload happens to
+  include a tenant_id-shaped field, the server must ignore it and use the
+  server-resolved tenant context instead.
+- **Every module's isolation test suite proves the negative, not just the
+  positive**: not only "tenant A sees tenant A's data" but "tenant A's authenticated
+  session, exercised directly against every new table/route, sees and can mutate
+  zero rows belonging to any other tenant" — same pattern as
+  `tests/*/tenant-isolation.sql` / `financebot-scenario-and-tenant-isolation.sql`
+  established by prior modules. New tables/routes without an isolation test are not
+  `Done`.
+- **Platform Administration never becomes a backdoor around tenant isolation.**
+  Platform-admin read access to customer data (e.g. for support) must be explicit,
+  audited (non-negotiable #11), and scoped to what the support action requires —
+  never a blanket bypass exposed as a general query capability.
+- **A new integration/connector/external data source is tenant-scoped from its
+  first row.** Imported/synced external records are written with the tenant_id of
+  the integration configuration that pulled them, never inferred from the external
+  system's own data.
+
+---
+
+## 15. Performance & Responsiveness Standards
+
+WonderAgent's users are administrators making time-pressured governance and
+remediation decisions; the tool must feel fast, and must never leave a user staring
+at a frozen or ambiguous screen.
+
+- **Every operation that can take more than ~300ms must show a visible progress
+  indicator** — a skeleton loader for initial page/data loads, an inline spinner or
+  disabled-with-spinner state for button-triggered actions (form submits, sync
+  triggers, remediation actions), and a progress/streaming indicator for genuinely
+  long operations (integration syncs, bulk certification actions). A user must never
+  be left wondering whether their click registered.
+- **No sequential data-fetching waterfalls.** Independent data needed to render a
+  page (e.g. several dashboard cards from different modules) must be fetched in
+  parallel, not awaited one after another; use Next.js Server Component
+  parallelism/`Promise.all` rather than sequential `await` chains.
+- **Every list/table view over a tenant-scoped table is paginated or virtualized**
+  at the database query level (`limit`/`offset` or keyset pagination) — never fetch
+  an entire table's rows to the client and paginate only in the browser.
+- **Database access uses indexes matching real query patterns**, especially every
+  foreign key and every column used in a `where`/`order by` in a module's own
+  service functions (the pattern established by Access Agent's
+  `0031_access_indexes.sql`); check `get_advisors` for missing-index warnings before
+  marking a story `Done`.
+- **Caching is tenant-partitioned and time-bounded** — never an unbounded in-memory
+  cache that grows without eviction, and never a cache key that omits tenant_id
+  (Multi-Tenant Guardrails, §14 above, item on cross-tenant caches).
+- **Background/slow work does not block the request that triggered it** — reuse the
+  established `next/server` `after()` pattern (Integration Agent's sync jobs) for
+  fire-and-forget work rather than making a user's request wait on a full external
+  sync; the triggering response returns immediately with a job/status record the UI
+  can poll or subscribe to.
+- **Optimistic UI only for low-risk, easily-reversible actions**; any consequential
+  action gated by human approval (non-negotiable #15) always waits for and confirms
+  the real server result — never optimistically shows a grant/approval/remediation
+  as complete before the server confirms it.
+- Performance is checked, not assumed: QA Agent's responsive & performance
+  spot-check (QA-P0-04.3) is the final gate, but every module verifies its own new
+  pages/queries against this section before marking a story `Done` — this is part of
+  the Definition of Done (§12).
+
+---
+
+## 16. Secrets & Environment
 
 - Supabase project: `NEXT_PUBLIC_SUPABASE_URL` and
   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` are safe for client-side use.

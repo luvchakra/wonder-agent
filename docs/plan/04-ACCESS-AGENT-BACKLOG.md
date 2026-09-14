@@ -5,6 +5,27 @@
 **Branch:** `module/access`
 **Status:** DORMANT — do not start until the user says "Run Access Agent"
 
+---
+
+## Progress Tracker
+
+Status values: **Done** (acceptance criteria met and verified), **Partial**
+(built but with a known, documented gap), **Deferred** (not started, not
+blocking other agents), **Not Started**. Update this table in the same commit
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
+
+| Story | Title | Status |
+|---|---|---|
+| ACCESS-P0-01.1 | Canonical access schema | Done — no `access_paths` table created; see audit log |
+| ACCESS-P0-01.2 | Effective access computation & explainability (higher bar) | Done — critical acceptance test passed live |
+| ACCESS-P0-01.3 | Access requests (P0 minimal) | Done |
+| ACCESS-P0-02.1 | Policy schema (higher bar) | Done |
+| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Partial — `agent.external_communication` and `agent.days_since_last_certification` are always unknown pending other modules |
+| ACCESS-P0-02.3 | Segregation of Duties (SoD) (higher bar) | Done |
+
+---
+
 ## Dependencies
 
 - **Foundation Agent**: tenant context, RBAC, audit.
@@ -48,25 +69,6 @@ data (read-only).
 ACCESS-P0-01.* (effective access graph correctness) and ACCESS-P0-02.*
 (policy evaluation semantics) are higher bar — this is the module the FinanceBot
 CustomerDB scenario depends on most directly.
-
----
-
-## Progress Tracker
-
-Status values: **Done** (acceptance criteria met and verified), **Partial**
-(built but with a known, documented gap), **Deferred** (not started, not
-blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
-for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
-
-| Story | Title | Status |
-|---|---|---|
-| ACCESS-P0-01.1 | Canonical access schema | Done — no `access_paths` table created; see audit log |
-| ACCESS-P0-01.2 | Effective access computation & explainability (higher bar) | Done — critical acceptance test passed live |
-| ACCESS-P0-01.3 | Access requests (P0 minimal) | Done |
-| ACCESS-P0-02.1 | Policy schema (higher bar) | Done |
-| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Partial — `agent.external_communication` and `agent.days_since_last_certification` are always unknown pending other modules |
-| ACCESS-P0-02.3 | Segregation of Duties (SoD) (higher bar) | Done |
 
 ---
 

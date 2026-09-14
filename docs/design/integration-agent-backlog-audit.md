@@ -162,3 +162,41 @@ MCP-event/webhook ingestion paths are the eventual feed for Runtime Agent's
 `runtime_events` once that module exists and publishes a real hand-off
 contract — until then, ingested activity sits in `integration_objects`
 (`object_type = 'activity'`) as documented above.
+
+---
+
+## 2026-09-14 — Attempted Saviynt API doc verification (blocked, flagged not guessed)
+
+The user asked to fetch Saviynt's real REST API documentation
+(`https://documenter.getpostman.com/view/23973797/2s9Yyy8JLo`) and correct
+`modules/integrations/connectors/saviynt.ts` against it, since that connector's
+endpoint paths/field names were flagged in the entry above as built from
+general Saviynt conventions rather than a verified deployment.
+
+**Blocker, not a decision:** both `WebFetch` and a direct `curl` against
+`documenter.getpostman.com` fail — the sandbox's network egress proxy returns
+`EGRESS_BLOCKED` / a 403 on the CONNECT tunnel for that domain specifically
+(the same category of restriction already noted for `*.supabase.co` direct
+HTTP, which is why this project reaches Supabase only via the Supabase MCP
+tool). There is no MCP tool in this environment that can fetch a Postman
+documenter page, so the real API documentation could not be retrieved this
+session. Per non-negotiable #18 and the stop-and-report rule, this is recorded
+here rather than "fixed" with another round of unverified assumptions, which
+would defeat the purpose of the user's request.
+
+**No code changed as a result of this entry.** `saviynt.ts` is left exactly as
+built, with its existing docblock warning intact — correcting it against
+guesses would be strictly worse than leaving the honest "Partial, unverified"
+status in place. The Progress Tracker row for INTEGRATION-P0-02.1 stays
+`Partial` for the same reason.
+
+**Open question for the user:** to close this out for real, either (a) paste
+the relevant endpoint paths/methods, auth mechanism, pagination parameters,
+and response field names directly into the conversation so they can be
+transcribed into `saviynt.ts` and this audit log, or (b) confirm a Saviynt
+sandbox/tenant `curl`-reachable from a network this environment can access, or
+(c) accept the current documented-conventions implementation as the P0
+baseline and treat live-tenant verification as an explicit customer-onboarding
+step outside this repository's build (i.e., not something any sandbox agent
+can complete without a real Saviynt tenant regardless of documentation
+access). No code or backlog status was changed while this remains open.
