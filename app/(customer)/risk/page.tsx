@@ -31,7 +31,7 @@ export default async function RiskIndexPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-primary">Risk</h1>
+      <h1 className="text-xl font-semibold text-foreground">Risk</h1>
       <Card>
         <CardBody>
           {agents.length === 0 ? (
@@ -49,7 +49,7 @@ export default async function RiskIndexPage() {
                 {agents.map((a) => (
                   <Tr key={a.id}>
                     <Td>
-                      <Link href={`/risk/agents/${a.id}`} className="text-accent hover:underline">
+                      <Link href={`/risk/agents/${a.id}`} className="text-primary hover:underline">
                         {a.agentName}
                       </Link>
                     </Td>

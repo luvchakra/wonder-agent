@@ -22,7 +22,7 @@ export default async function RuntimeIndexPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-primary">Runtime Assurance</h1>
+      <h1 className="text-xl font-semibold text-foreground">Runtime Assurance</h1>
       <Card>
         <CardBody>
           {agents.length === 0 ? (
@@ -40,7 +40,7 @@ export default async function RuntimeIndexPage() {
                 {agents.map((a) => (
                   <Tr key={a.id}>
                     <Td>
-                      <Link href={`/runtime/agents/${a.id}`} className="text-accent hover:underline">
+                      <Link href={`/runtime/agents/${a.id}`} className="text-primary hover:underline">
                         {a.agentName}
                       </Link>
                     </Td>

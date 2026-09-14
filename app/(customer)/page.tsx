@@ -51,8 +51,8 @@ export default async function OverviewPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold text-text-primary">Overview</h1>
-        <p className="text-sm text-text-secondary">Tenant {ctx.tenantSlug}</p>
+        <h1 className="text-xl font-semibold text-foreground">Overview</h1>
+        <p className="text-sm text-muted-foreground">Tenant {ctx.tenantSlug}</p>
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -84,7 +84,7 @@ export default async function OverviewPage() {
               <ul className="space-y-2">
                 {actionQueue.map((item, i) => (
                   <li key={i}>
-                    <Link href={item.href} className="text-sm text-accent hover:underline">
+                    <Link href={item.href} className="text-sm text-primary hover:underline">
                       {item.label}
                     </Link>
                   </li>
@@ -101,7 +101,7 @@ export default async function OverviewPage() {
           <CardBody className="space-y-2">
             {openFindings.slice(0, 5).map((f) => (
               <div key={f.id} className="flex items-center justify-between gap-2 text-sm">
-                <Link href={`/risk/agents/${f.agentId}`} className="text-text-primary hover:text-accent">
+                <Link href={`/risk/agents/${f.agentId}`} className="text-foreground hover:text-primary">
                   {f.title}
                 </Link>
                 <SeverityBadge severity={f.severity} />

@@ -1,37 +1,56 @@
 import Link from "next/link";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "@/lib/utils";
 
-type Variant = "primary" | "secondary" | "destructive" | "ghost";
+/**
+ * EXPERIENCE-P0-09 (UX-P0-18). The shadcn/CVA button variant set exactly:
+ * default/outline/secondary/ghost/destructive/link — no other variant
+ * names. `default` is the primary/CTA action; destructive actions use
+ * `destructive` and should generally be visually separated from a nearby
+ * primary action (UX-P0-24 / EXPERIENCE-P0-04).
+ */
+export const buttonVariants = cva(
+  "inline-flex items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:opacity-90",
+        outline: "border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
+        secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+        destructive: "bg-destructive text-destructive-foreground hover:opacity-90",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "px-3 py-1.5",
+        sm: "px-2 py-1 text-xs",
+        lg: "px-4 py-2",
+      },
+    },
+    defaultVariants: { variant: "default", size: "default" },
+  },
+);
 
-const VARIANT_CLASSES: Record<Variant, string> = {
-  primary: "bg-accent text-accent-foreground hover:opacity-90",
-  secondary: "border border-border bg-surface text-text-primary hover:bg-surface-elevated",
-  destructive: "bg-danger text-white hover:opacity-90",
-  ghost: "text-text-secondary hover:text-text-primary hover:bg-surface-elevated",
-};
-
-const BASE = "inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none";
+type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 export function Button({
-  variant = "secondary",
-  className = "",
+  variant,
+  size,
+  className,
   ...props
-}: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
-  return <button className={`${BASE} ${VARIANT_CLASSES[variant]} ${className}`} {...props} />;
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & ButtonVariants) {
+  return <button className={cn(buttonVariants({ variant, size }), className)} {...props} />;
 }
 
 export function LinkButton({
   href,
-  variant = "secondary",
-  className = "",
+  variant,
+  size,
+  className,
   children,
-}: {
-  href: string;
-  variant?: Variant;
-  className?: string;
-  children: React.ReactNode;
-}) {
+}: { href: string; children: React.ReactNode } & ButtonVariants & { className?: string }) {
   return (
-    <Link href={href} className={`${BASE} ${VARIANT_CLASSES[variant]} ${className}`}>
+    <Link href={href} className={cn(buttonVariants({ variant, size }), className)}>
       {children}
     </Link>
   );

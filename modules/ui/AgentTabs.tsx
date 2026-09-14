@@ -31,8 +31,8 @@ export function AgentTabs({ agentId, active }: { agentId: string; active: AgentT
             aria-current={isActive ? "page" : undefined}
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               isActive
-                ? "border-accent text-accent"
-                : "border-transparent text-text-secondary hover:border-border hover:text-text-primary"
+                ? "border-primary text-primary"
+                : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"
             }`}
           >
             {tab.label}

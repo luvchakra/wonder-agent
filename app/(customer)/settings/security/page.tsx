@@ -94,15 +94,15 @@ export default function SecuritySettingsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-primary">Security — Multi-Factor Authentication</h1>
-      {error ? <p className="text-sm text-danger">{error}</p> : null}
+      <h1 className="text-xl font-semibold text-foreground">Security — Multi-Factor Authentication</h1>
+      {error ? <p className="text-sm text-destructive">{error}</p> : null}
       {message ? <p className="text-sm text-success">{message}</p> : null}
 
       <Card>
         <CardHeader title="Authenticator app (TOTP) factors" />
         <CardBody>
           {factors === null ? (
-            <p className="text-sm text-text-muted">Loading…</p>
+            <p className="text-sm text-muted-foreground">Loading…</p>
           ) : factors.length === 0 ? (
             <EmptyState title="No MFA factors enrolled" />
           ) : (
@@ -122,7 +122,7 @@ export default function SecuritySettingsPage() {
                       <Badge tone={f.status === "verified" ? "success" : "neutral"}>{f.status}</Badge>
                     </Td>
                     <Td>
-                      <button className="text-danger hover:underline" onClick={() => handleUnenroll(f.id)}>
+                      <button className="text-destructive hover:underline" onClick={() => handleUnenroll(f.id)}>
                         Remove
                       </button>
                     </Td>
@@ -141,13 +141,13 @@ export default function SecuritySettingsPage() {
             <button
               onClick={handleEnroll}
               disabled={enrolling}
-              className="rounded bg-accent px-3 py-1.5 text-sm text-accent-foreground"
+              className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground"
             >
               {enrolling ? "Starting…" : "Enroll a new authenticator app"}
             </button>
           ) : (
             <div className="space-y-3">
-              <p className="text-sm text-text-secondary">
+              <p className="text-sm text-muted-foreground">
                 Scan this QR code with your authenticator app, or enter the secret manually.
               </p>
               {qrCode ? (
@@ -158,19 +158,19 @@ export default function SecuritySettingsPage() {
                   className="h-40 w-40 border border-border bg-white p-2"
                 />
               ) : null}
-              {secret ? <p className="font-mono text-xs text-text-muted">Secret: {secret}</p> : null}
+              {secret ? <p className="font-mono text-xs text-muted-foreground">Secret: {secret}</p> : null}
               <form onSubmit={handleVerify} className="flex items-end gap-2">
-                <label className="text-sm text-text-secondary">
+                <label className="text-sm text-muted-foreground">
                   6-digit code
                   <input
                     value={code}
                     onChange={(e) => setCode(e.target.value)}
                     required
                     maxLength={6}
-                    className="mt-1 block w-32 rounded border border-border bg-surface px-2 py-1 text-text-primary"
+                    className="mt-1 block w-32 rounded border border-border bg-background px-2 py-1 text-foreground"
                   />
                 </label>
-                <button type="submit" className="rounded bg-accent px-3 py-1.5 text-sm text-accent-foreground">
+                <button type="submit" className="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground">
                   Verify
                 </button>
               </form>

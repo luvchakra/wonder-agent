@@ -40,7 +40,7 @@ export function ConfirmActionDialog({
   reasonRequired?: boolean;
   reasonLabel?: string;
   confirmLabel?: string;
-  variant?: "destructive" | "primary";
+  variant?: "destructive" | "default";
   onConfirm: (reason: string) => Promise<ConfirmActionResult>;
   /** Called after the dialog closes following a completed action. */
   onDone?: (result: ConfirmActionResult) => void;
@@ -83,7 +83,7 @@ export function ConfirmActionDialog({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 data-[state=open]:animate-in data-[state=open]:fade-in" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-surface p-4 shadow-md focus:outline-none"
+          className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover text-popover-foreground p-4 shadow-md focus:outline-none"
           onEscapeKeyDown={(e) => {
             if (busy) e.preventDefault();
           }}
@@ -91,18 +91,18 @@ export function ConfirmActionDialog({
             if (busy) e.preventDefault();
           }}
         >
-          <Dialog.Title className="text-sm font-semibold text-text-primary">{title}</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-text-secondary">{description}</Dialog.Description>
+          <Dialog.Title className="text-sm font-semibold text-popover-foreground">{title}</Dialog.Title>
+          <Dialog.Description className="mt-1 text-sm text-muted-foreground">{description}</Dialog.Description>
 
           {!result && (
             <>
               {scopePreview && (
-                <div className="mt-3 rounded-md border border-border bg-surface-elevated px-3 py-2 text-sm text-text-primary">{scopePreview}</div>
+                <div className="mt-3 rounded-md border border-border bg-muted px-3 py-2 text-sm text-popover-foreground">{scopePreview}</div>
               )}
 
               {reasonRequired && (
                 <div className="mt-3">
-                  <label htmlFor="confirm-action-reason" className="mb-1 block text-xs font-medium text-text-secondary">
+                  <label htmlFor="confirm-action-reason" className="mb-1 block text-xs font-medium text-muted-foreground">
                     {reasonLabel} (required)
                   </label>
                   <textarea
@@ -110,7 +110,7 @@ export function ConfirmActionDialog({
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     rows={3}
-                    className="w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                    className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                   />
                 </div>
               )}
@@ -137,7 +137,7 @@ function ActionResultPanel({ result, onClose }: { result: ConfirmActionResult; o
   if (result.kind === "single") {
     return (
       <div className="mt-3" role="status">
-        <p className={`text-sm font-medium ${result.success ? "text-success" : "text-danger"}`}>
+        <p className={`text-sm font-medium ${result.success ? "text-success" : "text-destructive"}`}>
           {result.success ? "Done." : `Failed${result.error ? `: ${result.error}` : "."}`}
         </p>
         <div className="mt-4 flex justify-end">
@@ -154,7 +154,7 @@ function ActionResultPanel({ result, onClose }: { result: ConfirmActionResult; o
 
   return (
     <div className="mt-3" role="status">
-      <p className="text-sm font-medium text-text-primary">
+      <p className="text-sm font-medium text-popover-foreground">
         {succeeded} of {result.results.length} succeeded{failed > 0 ? `, ${failed} failed` : ""}
       </p>
       {failed > 0 && (
@@ -162,7 +162,7 @@ function ActionResultPanel({ result, onClose }: { result: ConfirmActionResult; o
           {result.results
             .filter((r) => !r.success)
             .map((r) => (
-              <li key={r.id} className="rounded-md border border-danger/30 bg-danger/5 px-2 py-1 text-danger">
+              <li key={r.id} className="rounded-md border border-destructive/30 bg-destructive/5 px-2 py-1 text-destructive">
                 {r.label}: {r.error ?? "failed"}
               </li>
             ))}

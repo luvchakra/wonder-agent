@@ -90,7 +90,9 @@ Changing anything below requires explicit user approval.
 ### Stack
 
 - Next.js (App Router) + TypeScript + React + Tailwind CSS
-- An accessible UI component library (Radix UI primitives, styled with Tailwind)
+- An accessible UI component library (Radix UI primitives, styled with Tailwind via
+  `class-variance-authority` — the shadcn/ui component pattern — per EXPERIENCE-P0-09,
+  adopted 2026-09-14 by explicit user approval)
 - A charting library (for risk/trend dashboards) and a graph visualization library
   (for the effective-access graph)
 - Supabase PostgreSQL + Supabase Auth + PostgreSQL RLS
@@ -457,9 +459,15 @@ full before starting any UI story.** It covers (among 34 numbered sections): the
 design principles and the "would this look credible in front of a CISO?" quality bar;
 mandatory responsive behavior across large desktop/desktop/tablet/mobile with
 per-breakpoint layout guidance (not just shrinking desktop UI); mandatory light *and*
-dark mode via semantic design tokens (`background`, `surface`, `surface-elevated`,
-`border`, `text-primary/secondary/muted`, `accent`, `success`/`warning`/`danger`/
-`info`); visual language (what WonderAgent should and should not feel like); layout,
+dark mode via semantic design tokens under the Locked Product Design System's OKLCH/
+shadcn-style naming (`background`/`foreground`, `card`/`card-foreground`, `popover`/
+`popover-foreground`, `primary`/`primary-foreground`, `secondary`/`secondary-
+foreground`, `muted`/`muted-foreground`, `accent`/`accent-foreground`, `destructive`/
+`destructive-foreground`, `success`/`warning`/`info` as WonderAgent-specific
+extensions, `border`/`input`/`ring` — see EXPERIENCE-P0-09 in
+`docs/plan/08-EXPERIENCE-AGENT-BACKLOG.md`, adopted 2026-09-14 by explicit user
+approval, superseding this section's original hex-token names); visual language
+(what WonderAgent should and should not feel like); layout,
 navigation, tables, cards, forms, modals/drawers, loading/empty/error states,
 typography, accessibility, data visualization, graph visualization, security UX for
 consequential actions, and a mandatory pre-commit design-review checklist (visual,

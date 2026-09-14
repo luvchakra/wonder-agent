@@ -124,9 +124,9 @@ export function DataTable<T>({
           onChange={(e) => state.setFilter(e.target.value)}
           placeholder={filterPlaceholder}
           aria-label={filterPlaceholder}
-          className="w-full max-w-xs rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         />
-        <p className="text-xs text-text-muted">
+        <p className="text-xs text-muted-foreground">
           {totalCount === 0 ? "0 results" : `${rangeStart}-${rangeEnd} of ${totalCount}`}
         </p>
       </div>
@@ -151,7 +151,7 @@ export function DataTable<T>({
                         <button
                           type="button"
                           onClick={() => state.setSort(col.key)}
-                          className="inline-flex items-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                          className="inline-flex items-center gap-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                         >
                           {col.header}
                           {state.sortKey === col.key && <span aria-hidden>{state.sortDir === "asc" ? "▲" : "▼"}</span>}
@@ -172,7 +172,7 @@ export function DataTable<T>({
                           <button
                             type="button"
                             onClick={() => onRowClick(row)}
-                            className="text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                            className="text-left focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                           >
                             {col.render(row)}
                           </button>
@@ -195,13 +195,13 @@ export function DataTable<T>({
                   type="button"
                   onClick={() => onRowClick?.(row)}
                   disabled={!onRowClick}
-                  className="w-full rounded-lg border border-border bg-surface p-3 text-left shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent disabled:cursor-default"
+                  className="w-full rounded-lg border border-border bg-background p-3 text-left shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
                 >
                   <dl className="space-y-1">
                     {columns.map((col) => (
                       <div key={col.key} className="flex items-baseline justify-between gap-3 text-sm">
-                        <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-text-muted">{col.cardLabel ?? col.header}</dt>
-                        <dd className="text-right text-text-primary">{col.render(row)}</dd>
+                        <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{col.cardLabel ?? col.header}</dt>
+                        <dd className="text-right text-foreground">{col.render(row)}</dd>
                       </div>
                     ))}
                   </dl>
@@ -217,7 +217,7 @@ export function DataTable<T>({
           <Button variant="ghost" onClick={() => state.setPage(state.page - 1)} disabled={state.page <= 1}>
             Previous
           </Button>
-          <p className="text-xs text-text-muted">
+          <p className="text-xs text-muted-foreground">
             Page {state.page} of {totalPages}
           </p>
           <Button variant="ghost" onClick={() => state.setPage(state.page + 1)} disabled={state.page >= totalPages}>

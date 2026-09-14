@@ -61,7 +61,7 @@ export function ThemeToggle() {
           onClick={() => handleChange(opt)}
           aria-pressed={choice === opt}
           className={`rounded px-2 py-1 capitalize transition-colors ${
-            choice === opt ? "bg-accent text-accent-foreground" : "text-text-secondary hover:text-text-primary"
+            choice === opt ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
           }`}
         >
           {opt}

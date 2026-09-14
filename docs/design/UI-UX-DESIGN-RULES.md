@@ -124,20 +124,20 @@ WonderAgent MUST support:
 
 Dark mode must be designed intentionally, not created by simply inverting the light theme.
 
-Use semantic design tokens:
+Use semantic design tokens, under the Locked Product Design System's OKLCH/shadcn-
+style naming (EXPERIENCE-P0-09, adopted 2026-09-14 by explicit user approval —
+supersedes this section's original names):
 
-- background
-- surface
-- surface-elevated
-- border
-- text-primary
-- text-secondary
-- text-muted
-- accent
-- success
-- warning
-- danger
-- info
+- background / foreground
+- card / card-foreground
+- popover / popover-foreground
+- primary / primary-foreground
+- secondary / secondary-foreground
+- muted / muted-foreground
+- accent / accent-foreground
+- destructive / destructive-foreground
+- success / warning / info (WonderAgent-specific extensions; shadcn has no default)
+- border / input / ring
 
 Every component must work correctly in both themes.
 

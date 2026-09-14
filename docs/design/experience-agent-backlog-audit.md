@@ -510,3 +510,184 @@ addendum) remains open from the prior entry and was not touched or
 implicated by this dispatch — `AgentTabs` and the restyled pages use the
 existing, already-shipped token/nav system, not anything from that
 addendum.
+
+---
+
+## 2026-09-14 — EXPERIENCE-P0-09: Locked Product Design System v2, adopted
+in full by explicit user decision
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+The user asked to "run the Experience backlog and ensure all the stories
+are completed." EXPERIENCE-P0-09 was the one story genuinely blocked on a
+user decision (not a technical gap) — before touching it, the user was
+asked directly (via a single bundled question covering all four numbered
+sub-decisions from the prior entry: component-variant technology, OKLCH
+token re-key and the dark-mode question, drawer-only vs. docked-rail
+navigation, topbar/account-menu restructure) and chose **"Adopt it
+fully."** This entry is the full implementation record.
+
+**Scope of "fully":** every piece of §38 that materially conflicted with
+already-shipped work (UX-P0-13 through UX-P0-18) was implemented. One
+deliberate, disclosed exception: **dark mode was kept**, re-implemented in
+OKLCH under the new token names rather than demoted to unsupported/
+light-only. Reasoning: `CLAUDE.md` §13 makes dark mode a binding,
+independent Definition-of-Done requirement (part of the Locked
+Architecture the root contract protects), and the specific decision put to
+the user was about design-system technology/naming/navigation/topbar
+structure — not a request to repeal an unrelated non-negotiable. Silently
+dropping dark mode under the banner of "the user said adopt fully" would
+have been inferring a non-negotiable-repeal from a UI-technology question,
+which `CLAUDE.md` §1's own text (non-negotiables changeable only by
+explicit approval, not "an agent's own judgment call") argues directly
+against. If the user did intend to drop dark-mode support, that is a
+one-line follow-up instruction away and cheap to act on from here.
+
+**Built:**
+
+- **Token layer (`app/globals.css`):** every CSS custom property re-keyed
+  to `oklch()` values under shadcn/ui's own canonical naming —
+  `background`/`foreground`, `card`/`card-foreground`, `popover`/
+  `popover-foreground`, `primary`/`primary-foreground`, `secondary`/
+  `secondary-foreground`, `muted`/`muted-foreground`, `accent`/
+  `accent-foreground`, `destructive`/`destructive-foreground`, `border`/
+  `input`/`ring`, plus `success`/`warning`/`info` kept as WonderAgent-
+  specific extensions (shadcn ships no default for these — risk/status
+  severity is this product's own vocabulary, not shadcn's). Both light and
+  dark palettes fully re-derived in OKLCH, same three-way resolution
+  mechanism as before (`prefers-color-scheme` default + explicit
+  `data-theme` override, both directions). `--radius` is now a single
+  shadcn-style base value with `calc()`-derived `sm`/`md`/`lg`/`xl` steps.
+- **Component technology (`lib/utils.ts`, new):** the standard shadcn `cn()`
+  helper (`clsx` + `tailwind-merge`, both added as dependencies alongside
+  the already-present `class-variance-authority`... — correction:
+  `class-variance-authority` and `tailwind-merge` were newly added this
+  session, `clsx` was already a dependency).
+- **`modules/ui/Button.tsx`** rebuilt on `cva()` with the exact shadcn
+  variant set UX-P0-18 specifies — `default`/`outline`/`secondary`/
+  `ghost`/`destructive`/`link` — plus a `size` axis (`default`/`sm`/`lg`).
+  Checked before rewriting: every one of the 19 existing `<Button>`/
+  `<LinkButton>` call sites across the codebase already passed an explicit
+  `variant` prop (none relied on the old implicit default), and all
+  19 use `secondary`/`ghost`/`destructive` — names that are unchanged in
+  the new set — so **zero call sites needed updating** despite the
+  default variant itself changing from the old `secondary` to the new
+  `default`.
+- **`modules/ui/Badge.tsx`** rebuilt on `cva()` but keeps its own
+  `BadgeTone` vocabulary (`neutral`/`success`/`warning`/`danger`/`info`/
+  `accent`) rather than adopting shadcn's default badge variants — this is
+  WonderAgent's own risk/severity domain language (CLAUDE.md §9), not a
+  shadcn concept, so "adopt shadcn as the component *technology*" was
+  applied without discarding the product's own semantic vocabulary.
+  `danger` now maps to the `destructive` token internally.
+- **`modules/ui/Card.tsx`, `Table.tsx`, `States.tsx`** re-themed onto the
+  new tokens (`bg-card`/`text-card-foreground`, `bg-muted`, etc.), same
+  props/behavior.
+- **`modules/ui/Nav.tsx`** rewritten per UX-P0-16: the left navigation is
+  now a slide-in overlay drawer **at every width** — the previous
+  `lg:block` static desktop rail is gone entirely. A single menu-trigger
+  button renders inline wherever `<Nav>` is placed (now the topbar's left
+  group) rather than a viewport-conditional floating button. `Nav` gained
+  a `footer` slot for the account panel.
+- **`modules/ui/UserMenu.tsx` → `modules/ui/AccountPanel.tsx`** (renamed,
+  one consumer, git-mv'd): no longer a topbar `DropdownMenu` — per
+  UX-P0-17, it's now plain inline content (theme toggle, tenant switcher,
+  sign out) rendered as `<Nav>`'s `footer`, pinned to the bottom of the
+  drawer. No avatar circle (UX-P0-15).
+- **`app/(customer)/layout.tsx`** restructured: topbar left group is now
+  menu-trigger + logo + current tenant name (no separate tenant-switcher
+  control — switching lives in the drawer's `AccountPanel`); right group
+  is search + notifications only, no user avatar/menu. The page shell
+  changed from a side-by-side flex (docked nav + content) to a stacked
+  flex-column (full-width topbar, full-width content below), the correct
+  structural consequence of removing the docked rail.
+- **`modules/ui/ConfirmAction.tsx`, `Drawer.tsx`, `DataTable.tsx`,
+  `RiskTrendChart.tsx`, `ShellSearchAndNotifications.tsx`,
+  `AgentTabs.tsx`, `theme.tsx`** — every old token class name (`bg-surface`,
+  `bg-surface-elevated`, `text-text-primary/secondary/muted`, `text-danger`,
+  `bg-danger`, `outline-accent`) replaced with its new-scheme equivalent,
+  context-aware (floating panels → `bg-popover`; page-level cards →
+  `bg-card`; plain inputs/topbar buttons → `bg-background`; hover
+  highlights → `bg-accent`/`text-accent-foreground`; strong
+  active/selected indicators, which needed the *old* meaning of "accent"
+  as a brand color → `bg-primary`/`text-primary`, since the *new* `accent`
+  token means something different in shadcn's scheme, a subtle
+  hover/highlight background, not the primary brand color). `RiskTrendChart`'s
+  hardcoded hex severity colors were replaced with `var(--color-*)`
+  references into the new token set instead (works directly in Recharts'
+  SVG `fill`/`stroke` props).
+- **12 `app/(customer)/*` page files** (every file directly referencing
+  old utility classes rather than going through `modules/ui/*`) updated
+  the same way: `agents/[id]`, `access/agents/[agentId]`,
+  `risk/agents/[agentId]` (+ `FindingEvidenceDrawer.tsx`),
+  `runtime/agents/[agentId]`, `risk`, `runtime`, the dashboard (`page.tsx`),
+  `settings`, `settings/roles`, `settings/sso`, `settings/security`. One
+  real bug caught and fixed during this pass: a bulk find/replace's word-
+  boundary match briefly turned `text-accent-foreground` into
+  `text-primary-foreground` inside `settings/sso/page.tsx` while leaving
+  its paired `bg-accent` untouched, producing a broken
+  bg-accent/text-primary-foreground pairing (illegible contrast) — caught
+  by a full re-grep pass across every remaining `accent`/`primary`
+  reference before verification, not by chance.
+- **`CLAUDE.md` §2 and §13**, **`docs/design/UI-UX-DESIGN-RULES.md` §4**
+  updated to name the new token scheme in place of the original hex-token
+  names, since both documents quote the specific token names directly and
+  leaving them stale would mislead every future agent reading the binding
+  contract. (§7 Navigation and §3 Responsive Design were checked and do
+  **not** make a specific "docked desktop rail" claim, so needed no edit;
+  a full line-by-line audit of the design rules document's other ~30
+  sections for consistency was not attempted this pass.)
+
+**Verification:**
+
+- `npm run typecheck`, `npm run lint`, `npx vitest run` (139/139 passing,
+  unchanged), `npm run build` with `.next` deleted first (cold-cache
+  build, every route compiles) — all green.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match.
+- Live smoke test against a locally built production server (port 3103,
+  torn down after): every existing authenticated route (`/`, `/agents`,
+  the four agent-detail tabs, `/settings*`) still correctly 307-redirects
+  unauthenticated requests to `/sign-in` — no auth-boundary regression
+  from the rewrite.
+- **Real-browser visual verification, genuinely attempted this pass** (not
+  just asserted as a sandbox constraint): this environment ships a
+  pre-installed Chromium and a global `playwright` CLI (v1.56.1). Used it
+  to screenshot the public `/sign-in` page (the only pre-auth page, not
+  itself restyled by Experience Agent — it is Foundation Agent's bare
+  page, out of EXPERIENCE-P0-03's scope) at 1440×900 light, 1440×900 dark,
+  and 390×844 (mobile). All three confirm: the OKLCH token pipeline
+  resolves correctly end-to-end in a real browser (light = light gray
+  background/near-black text; dark = near-black background/light text,
+  matching the intended palette, not a broken/transparent render), and no
+  horizontal overflow at 390px width.
+- **Authenticated in-app screenshots were also genuinely attempted, not
+  just assumed blocked:** wrote a real Playwright script that filled and
+  submitted the `/sign-up` form (email/password) against the running
+  server. Result: `Unexpected token 'H', "Host not i"... is not valid
+  JSON` — the app server's own outbound call to Supabase Auth was
+  rejected by this sandbox's network egress policy (an HTML "Host not in
+  allowlist"-style error page returned where JSON was expected), not a
+  missing-test-user problem. This is a materially stronger, more precise
+  finding than this session's prior repeated assertion of "sandbox
+  constraint, no seeded session" — it confirms the constraint is network-
+  level and applies to the *application's own* runtime, not just this
+  agent's tooling. Recorded here so a future non-sandboxed verification
+  pass knows exactly what blocked it here and doesn't need to re-diagnose.
+
+**Not done this pass:** authenticated real-browser screenshots (blocked as
+above, not a choice); a full design-system component inventory (UX-P1-05,
+already noted as depending on this exact decision being resolved — now
+unblocked, but not built this pass); the visual-regression/responsive QA
+harness (UX-P1-06); retrofitting `ConfirmActionDialog`/`EvidenceDrawer`/
+`DataTable` onto more domain screens (EXPERIENCE-P0-04/06/08's existing,
+unchanged gaps — this dispatch re-themed every existing consumer, it did
+not add new ones); the Rogue Agent Detail worked layout and the remaining
+bare Access/Compliance/Integration list pages (EXPERIENCE-P0-03's existing
+gap, unchanged by this dispatch).
+
+**Not a decision made unilaterally beyond what was asked:** the dark-mode-
+kept deviation above is the only place this dispatch deliberately diverged
+from a literal reading of "adopt it fully," and it's disclosed with
+reasoning rather than silently done either way. Everything else in §38's
+conflicting-item list (UX-P0-13 through UX-P0-18) was implemented as
+specified.

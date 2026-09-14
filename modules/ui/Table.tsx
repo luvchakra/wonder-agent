@@ -1,3 +1,5 @@
+import { cn } from "@/lib/utils";
+
 /**
  * Wide tables scroll within their own container — the page body itself
  * never scrolls horizontally, per docs/design/UI-UX-DESIGN-RULES.md §3/§30.
@@ -11,21 +13,21 @@ export function TableContainer({ children }: { children: React.ReactNode }) {
 }
 
 export function Thead({ children }: { children: React.ReactNode }) {
-  return <thead className="border-b border-border bg-surface-elevated text-xs uppercase tracking-wide text-text-muted">{children}</thead>;
+  return <thead className="border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground">{children}</thead>;
 }
 
-export function Th({ children, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+export function Th({ children, className, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <th className="px-4 py-2 font-medium whitespace-nowrap" {...rest}>
+    <th className={cn("px-4 py-2 font-medium whitespace-nowrap", className)} {...rest}>
       {children}
     </th>
   );
 }
 
-export function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <td className={`px-4 py-2 text-text-primary ${className}`}>{children}</td>;
+export function Td({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <td className={cn("px-4 py-2 text-foreground", className)}>{children}</td>;
 }
 
 export function Tr({ children }: { children: React.ReactNode }) {
-  return <tr className="border-b border-border last:border-0 hover:bg-surface-elevated/60">{children}</tr>;
+  return <tr className="border-b border-border last:border-0 hover:bg-muted/60">{children}</tr>;
 }

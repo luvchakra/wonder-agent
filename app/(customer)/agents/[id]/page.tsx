@@ -51,8 +51,8 @@ const LIFECYCLE_TONE: Record<string, "neutral" | "success" | "warning" | "danger
 };
 
 const inputClass =
-  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
-const labelClass = "block text-sm font-medium text-text-secondary";
+  "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+const labelClass = "block text-sm font-medium text-muted-foreground";
 
 /** Agent Detail — Overview tab (Identity's own data: lifecycle, ownership,
  * contract/SHOULD, relationships, linked identities). The Access/Runtime/
@@ -85,18 +85,18 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   return (
     <div className="space-y-4">
       <p>
-        <Link href="/agents" className="text-sm text-accent hover:underline">
+        <Link href="/agents" className="text-sm text-primary hover:underline">
           ← All agents
         </Link>
       </p>
 
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
+          <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
           <Badge tone={LIFECYCLE_TONE[agent.lifecycleState] ?? "neutral"}>{agent.lifecycleState}</Badge>
           <SeverityBadge severity={agent.criticality} />
         </div>
-        <p className="mt-1 text-sm text-text-secondary">
+        <p className="mt-1 text-sm text-muted-foreground">
           {agent.agentType} · {agent.environment}
           {agent.purpose ? ` · ${agent.purpose}` : ""}
         </p>
@@ -117,12 +117,12 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             </ul>
           )}
           {lifecycleEvents.length === 0 ? (
-            <p className="text-sm text-text-muted">No lifecycle transitions recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No lifecycle transitions recorded yet.</p>
           ) : (
-            <ul className="space-y-1 text-sm text-text-secondary">
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {lifecycleEvents.map((e) => (
                 <li key={e.id}>
-                  <span className="text-text-muted">{e.createdAt}:</span> {e.fromState ?? "(none)"} → <strong className="text-text-primary">{e.toState}</strong> — {e.reason}
+                  <span className="text-muted-foreground">{e.createdAt}:</span> {e.fromState ?? "(none)"} → <strong className="text-foreground">{e.toState}</strong> — {e.reason}
                 </li>
               ))}
             </ul>
@@ -155,7 +155,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           {owners.length === 0 ? (
             <EmptyState title="No owner assigned" description="An unowned agent is a governance gap — assign at least one owner." />
           ) : (
-            <ul className="space-y-1 text-sm text-text-secondary">
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {owners.map((o) => (
                 <li key={o.id}>
                   <Badge tone="neutral">{o.ownerType}</Badge> <span className="ml-1">{o.userId}</span>
@@ -191,28 +191,28 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           {contract ? (
             <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
               <div>
-                <dt className="text-text-muted">Purpose</dt>
-                <dd className="text-text-primary">{contract.purpose}</dd>
+                <dt className="text-muted-foreground">Purpose</dt>
+                <dd className="text-foreground">{contract.purpose}</dd>
               </div>
               <div>
-                <dt className="text-text-muted">Owner summary</dt>
-                <dd className="text-text-primary">{contract.ownerSummary ?? "—"}</dd>
+                <dt className="text-muted-foreground">Owner summary</dt>
+                <dd className="text-foreground">{contract.ownerSummary ?? "—"}</dd>
               </div>
               <div>
-                <dt className="text-text-muted">Approved applications</dt>
-                <dd className="text-text-primary">{contract.approvedApplications?.join(", ") || "—"}</dd>
+                <dt className="text-muted-foreground">Approved applications</dt>
+                <dd className="text-foreground">{contract.approvedApplications?.join(", ") || "—"}</dd>
               </div>
               <div>
-                <dt className="text-text-muted">Approved data</dt>
-                <dd className="text-text-primary">{contract.approvedData?.join(", ") || "—"}</dd>
+                <dt className="text-muted-foreground">Approved data</dt>
+                <dd className="text-foreground">{contract.approvedData?.join(", ") || "—"}</dd>
               </div>
               <div>
-                <dt className="text-text-muted">Approved actions</dt>
-                <dd className="text-text-primary">{contract.approvedActions?.join(", ") || "—"}</dd>
+                <dt className="text-muted-foreground">Approved actions</dt>
+                <dd className="text-foreground">{contract.approvedActions?.join(", ") || "—"}</dd>
               </div>
               <div>
-                <dt className="text-text-muted">Prohibited data / actions</dt>
-                <dd className="text-text-primary">
+                <dt className="text-muted-foreground">Prohibited data / actions</dt>
+                <dd className="text-foreground">
                   {contract.prohibitedData?.join(", ") || "—"} / {contract.prohibitedActions?.join(", ") || "—"}
                 </dd>
               </div>
@@ -220,9 +220,9 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           ) : (
             <EmptyState title="No active contract" description="SHOULD is undefined until a contract is published — see the Risk tab for how this affects findings." />
           )}
-          <p className="text-xs text-text-muted">{contractVersions.length} version{contractVersions.length === 1 ? "" : "s"} published.</p>
+          <p className="text-xs text-muted-foreground">{contractVersions.length} version{contractVersions.length === 1 ? "" : "s"} published.</p>
           <details className="border-t border-border pt-3">
-            <summary className="cursor-pointer text-sm font-medium text-text-primary">Publish new contract version</summary>
+            <summary className="cursor-pointer text-sm font-medium text-foreground">Publish new contract version</summary>
             <form action={createContractWithId} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="sm:col-span-2">
                 <span className={labelClass}>Purpose *</span>
@@ -266,13 +266,13 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         <CardHeader title="Relationships" />
         <CardBody className="space-y-3">
           {relationships.length === 0 ? (
-            <p className="text-sm text-text-muted">No relationships recorded.</p>
+            <p className="text-sm text-muted-foreground">No relationships recorded.</p>
           ) : (
-            <ul className="space-y-1 text-sm text-text-secondary">
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {relationships.map((r) => (
                 <li key={r.id}>
                   <Badge tone="neutral">{r.relationshipType}</Badge>{" "}
-                  <Link href={`/agents/${r.relatedAgentId}`} className="text-accent hover:underline">
+                  <Link href={`/agents/${r.relatedAgentId}`} className="text-primary hover:underline">
                     {r.relatedAgentId}
                   </Link>
                 </li>
@@ -305,12 +305,12 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         <CardHeader title="Linked Identities" description="Correlated technical identities across integrated IAM/IdP systems." />
         <CardBody className="space-y-3">
           {identities.length === 0 ? (
-            <p className="text-sm text-text-muted">No linked identities.</p>
+            <p className="text-sm text-muted-foreground">No linked identities.</p>
           ) : (
-            <ul className="space-y-1 text-sm text-text-secondary">
+            <ul className="space-y-1 text-sm text-muted-foreground">
               {identities.map((i) => (
                 <li key={i.id}>
-                  <Badge tone="neutral">{i.identityType}</Badge> {i.externalReference} <span className="text-text-muted">({i.sourceSystem}, {i.confidence})</span>
+                  <Badge tone="neutral">{i.identityType}</Badge> {i.externalReference} <span className="text-muted-foreground">({i.sourceSystem}, {i.confidence})</span>
                 </li>
               ))}
             </ul>

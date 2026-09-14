@@ -63,15 +63,15 @@ export function EvidenceDrawer({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col border-l border-border bg-surface shadow-md focus:outline-none sm:max-w-lg">
+        <Dialog.Content className="fixed inset-y-0 right-0 z-50 flex h-full w-full max-w-md flex-col border-l border-border bg-popover text-popover-foreground shadow-md focus:outline-none sm:max-w-lg">
           <div className="flex items-start justify-between gap-4 border-b border-border px-4 py-3">
             <div>
-              <Dialog.Title className="text-sm font-semibold text-text-primary">{title}</Dialog.Title>
-              {description && <Dialog.Description className="mt-0.5 text-xs text-text-secondary">{description}</Dialog.Description>}
+              <Dialog.Title className="text-sm font-semibold text-popover-foreground">{title}</Dialog.Title>
+              {description && <Dialog.Description className="mt-0.5 text-xs text-muted-foreground">{description}</Dialog.Description>}
             </div>
             <Dialog.Close
               aria-label="Close evidence drawer"
-              className="rounded-md p-1 text-text-secondary hover:bg-surface-elevated hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+              className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
             >
               ✕
             </Dialog.Close>

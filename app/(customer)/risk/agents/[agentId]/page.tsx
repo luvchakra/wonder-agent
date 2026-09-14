@@ -10,8 +10,8 @@ import { FindingEvidenceTrigger, FindingEvidenceDrawer } from "./FindingEvidence
 import { Badge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
 
 const inputClass =
-  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
-const labelClass = "block text-sm font-medium text-text-secondary";
+  "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+const labelClass = "block text-sm font-medium text-muted-foreground";
 
 /** Agent Detail — Risk & Findings tab (the PRD's "Agent Risk Page" worked
  * layout). Risk Agent owns the finding lifecycle itself; Experience Agent
@@ -36,8 +36,8 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
-        <p className="mt-1 text-sm text-text-secondary">
+        <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Risk & Findings — {openCount} open finding{openCount === 1 ? "" : "s"} of {findings.length} total.
         </p>
       </div>
@@ -76,17 +76,17 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
                       <SeverityBadge severity={f.severity} />
                       <Badge tone="neutral">{f.category.replace(/_/g, " ")}</Badge>
                       <Badge tone={isTerminal ? "success" : "warning"}>{f.status.replace(/_/g, " ")}</Badge>
-                      <span className="ml-auto text-xs text-text-muted">Score {f.riskScore} · Evaluator v{f.evaluatorVersion}</span>
+                      <span className="ml-auto text-xs text-muted-foreground">Score {f.riskScore} · Evaluator v{f.evaluatorVersion}</span>
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-text-primary">{f.title}</h3>
-                    <p className="mt-1 text-sm text-text-secondary">{f.explanation}</p>
-                    <p className="mt-1 text-xs text-text-muted">Why: {f.reasons.join(", ") || "(no contributing factors)"}</p>
+                    <h3 className="mt-2 text-sm font-semibold text-foreground">{f.title}</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">{f.explanation}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Why: {f.reasons.join(", ") || "(no contributing factors)"}</p>
                     <p className="mt-2 text-sm">
-                      <span className="font-medium text-text-primary">Recommendation: </span>
-                      <span className="text-text-secondary">{f.recommendation}</span>
+                      <span className="font-medium text-foreground">Recommendation: </span>
+                      <span className="text-muted-foreground">{f.recommendation}</span>
                     </p>
                     {f.status === "false_positive" && (
-                      <p className="mt-2 text-xs text-text-muted">
+                      <p className="mt-2 text-xs text-muted-foreground">
                         Disposed as false positive{f.resolutionReason ? ` — ${f.resolutionReason}` : ""}
                         {f.falsePositiveExpiresAt ? ` (re-checked after ${f.falsePositiveExpiresAt})` : " (no expiry — stays closed until manually reopened)"}
                       </p>

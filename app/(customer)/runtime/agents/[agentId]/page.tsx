@@ -32,8 +32,8 @@ const OUTCOME_TONE: Record<ComparisonOutcomeType, BadgeTone> = {
 };
 
 const inputClass =
-  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
-const labelClass = "block text-sm font-medium text-text-secondary";
+  "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+const labelClass = "block text-sm font-medium text-muted-foreground";
 
 /** Agent Detail — Runtime (DID) tab, including the SHOULD/CAN/DID comparison
  * that is central to CLAUDE.md §9's canonical model. Runtime Agent owns the
@@ -64,8 +64,8 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
-        <p className="mt-1 text-sm text-text-secondary">Runtime Assurance — what this agent actually DID, and how it compares to SHOULD and CAN.</p>
+        <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Runtime Assurance — what this agent actually DID, and how it compares to SHOULD and CAN.</p>
       </div>
 
       <AgentTabs agentId={agentId} active="runtime" />
@@ -79,34 +79,34 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
         <CardBody className="space-y-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">SHOULD</p>
-              <p className="mt-1 text-sm text-text-primary">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SHOULD</p>
+              <p className="mt-1 text-sm text-foreground">
                 {comparison.should.map((s) => `${s.application}${s.data ? `:${s.data}` : ""}`).join(", ") || "(none)"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">CAN</p>
-              <p className="mt-1 text-sm text-text-primary">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">CAN</p>
+              <p className="mt-1 text-sm text-foreground">
                 {comparison.can.map((c) => `${c.application}${c.entitlementName ? `:${c.entitlementName}` : ""}`).join(", ") || "(none)"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">DID</p>
-              <p className="mt-1 text-sm text-text-primary">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DID</p>
+              <p className="mt-1 text-sm text-foreground">
                 {comparison.did.map((d) => `${d.application ?? "?"}${d.resource ? `:${d.resource}` : ""}`).join(", ") || "(none)"}
               </p>
             </div>
           </div>
           <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Outcomes</p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Outcomes</p>
             {comparison.outcomes.length === 0 ? (
-              <p className="mt-1 text-sm text-text-muted">No comparison outcomes yet.</p>
+              <p className="mt-1 text-sm text-muted-foreground">No comparison outcomes yet.</p>
             ) : (
               <ul className="mt-2 space-y-2">
                 {comparison.outcomes.map((o, i) => (
                   <li key={i} className="flex items-start gap-2">
                     <Badge tone={OUTCOME_TONE[o.type]}>{o.type.replace(/_/g, " ")}</Badge>
-                    <pre className="flex-1 overflow-x-auto text-xs text-text-secondary">{JSON.stringify(o.evidence, null, 2)}</pre>
+                    <pre className="flex-1 overflow-x-auto text-xs text-muted-foreground">{JSON.stringify(o.evidence, null, 2)}</pre>
                   </li>
                 ))}
               </ul>
@@ -186,7 +186,7 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
         <CardHeader title="Recent Events" />
         <CardBody>
           {eventsPage.events.length === 0 ? (
-            <p className="text-sm text-text-muted">No events yet.</p>
+            <p className="text-sm text-muted-foreground">No events yet.</p>
           ) : (
             <TableContainer>
               <Thead>

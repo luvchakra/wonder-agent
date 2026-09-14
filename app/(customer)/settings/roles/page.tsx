@@ -23,7 +23,7 @@ export default async function RolesSettingsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-text-primary">Users &amp; Roles</h1>
+      <h1 className="text-xl font-semibold text-foreground">Users &amp; Roles</h1>
 
       <Card>
         <CardHeader title="Tenant members" />
@@ -46,7 +46,7 @@ export default async function RolesSettingsPage() {
                     <Td>
                       <div className="flex flex-wrap gap-1">
                         {m.roles.length === 0 ? (
-                          <span className="text-text-muted">No roles</span>
+                          <span className="text-muted-foreground">No roles</span>
                         ) : (
                           m.roles.map((r) => (
                             <span key={r} className="inline-flex items-center gap-1">
@@ -54,7 +54,7 @@ export default async function RolesSettingsPage() {
                               <form action={removeRoleAction}>
                                 <input type="hidden" name="userId" value={m.userId} />
                                 <input type="hidden" name="role" value={r} />
-                                <button type="submit" className="text-xs text-danger hover:underline" aria-label={`Remove ${r}`}>
+                                <button type="submit" className="text-xs text-destructive hover:underline" aria-label={`Remove ${r}`}>
                                   ×
                                 </button>
                               </form>
@@ -66,14 +66,14 @@ export default async function RolesSettingsPage() {
                     <Td>
                       <form action={assignRoleAction} className="flex items-center gap-2">
                         <input type="hidden" name="userId" value={m.userId} />
-                        <select name="role" required className="rounded border border-border bg-surface px-2 py-1 text-sm text-text-primary">
+                        <select name="role" required className="rounded border border-border bg-background px-2 py-1 text-sm text-foreground">
                           {roles.map((r) => (
                             <option key={r.id} value={r.name}>
                               {r.name}
                             </option>
                           ))}
                         </select>
-                        <button type="submit" className="text-accent hover:underline text-sm">
+                        <button type="submit" className="text-primary hover:underline text-sm">
                           Assign
                         </button>
                       </form>

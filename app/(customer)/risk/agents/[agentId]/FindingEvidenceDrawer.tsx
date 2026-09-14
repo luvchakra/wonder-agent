@@ -48,19 +48,19 @@ export function FindingEvidenceDrawer() {
 
   return (
     <EvidenceDrawer open={findingId !== null} onOpenChange={(open) => !open && close()} title={showDetail?.title ?? "Finding evidence"}>
-      {findingId && !showDetail && <p className="text-sm text-text-secondary">Loading…</p>}
+      {findingId && !showDetail && <p className="text-sm text-muted-foreground">Loading…</p>}
       {showDetail && (
         <div className="space-y-3">
-          <p className="text-sm text-text-secondary">{showDetail.explanation}</p>
+          <p className="text-sm text-muted-foreground">{showDetail.explanation}</p>
           <ul className="space-y-2">
             {(showDetail.evidence ?? []).map((e) => (
-              <li key={e.id} className="rounded-md border border-border bg-surface-elevated p-2 text-sm">
+              <li key={e.id} className="rounded-md border border-border bg-muted p-2 text-sm">
                 <Badge tone="neutral">{e.evidenceType}</Badge>
-                <p className="mt-1 text-text-primary">{e.summary}</p>
-                <p className="mt-1 text-xs text-text-muted">{e.createdAt}</p>
+                <p className="mt-1 text-foreground">{e.summary}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{e.createdAt}</p>
               </li>
             ))}
-            {(showDetail.evidence ?? []).length === 0 && <p className="text-sm text-text-muted">No evidence recorded.</p>}
+            {(showDetail.evidence ?? []).length === 0 && <p className="text-sm text-muted-foreground">No evidence recorded.</p>}
           </ul>
         </div>
       )}

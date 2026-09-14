@@ -20,16 +20,16 @@ export function ShellGlobalSearch() {
         <button
           type="button"
           aria-label="Search"
-          className="flex items-center gap-2 rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-secondary hover:bg-surface-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
           <span aria-hidden>🔍</span>
-          <span className="hidden text-xs text-text-muted md:inline">Search…</span>
+          <span className="hidden text-xs text-muted-foreground md:inline">Search…</span>
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
-        <Dialog.Content className="fixed left-1/2 top-24 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-border bg-surface p-4 shadow-md focus:outline-none">
-          <Dialog.Title className="text-sm font-semibold text-text-primary">Search</Dialog.Title>
+        <Dialog.Content className="fixed left-1/2 top-24 z-50 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 rounded-lg border border-border bg-popover text-popover-foreground p-4 shadow-md focus:outline-none">
+          <Dialog.Title className="text-sm font-semibold text-popover-foreground">Search</Dialog.Title>
           <Dialog.Description className="sr-only">Global search across agents, findings and access</Dialog.Description>
           <div className="mt-3">
             <NotYetAvailable feature="Global search" />
@@ -47,14 +47,14 @@ export function ShellNotifications() {
         <button
           type="button"
           aria-label="Notifications"
-          className="relative rounded-md border border-border bg-surface p-1.5 text-text-secondary hover:bg-surface-elevated focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+          className="relative rounded-md border border-border bg-background p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
           <span aria-hidden>🔔</span>
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-72 rounded-lg border border-border bg-surface p-3 shadow-md">
-          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Notifications</p>
+        <DropdownMenu.Content align="end" sideOffset={6} className="z-50 w-72 rounded-lg border border-border bg-popover text-popover-foreground p-3 shadow-md">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Notifications</p>
           <div className="mt-2">
             <NotYetAvailable feature="Notifications" />
           </div>

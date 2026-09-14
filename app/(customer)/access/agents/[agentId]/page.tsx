@@ -29,8 +29,8 @@ const GRANT_TYPES = [
 ] as const;
 
 const inputClass =
-  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
-const labelClass = "block text-sm font-medium text-text-secondary";
+  "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
+const labelClass = "block text-sm font-medium text-muted-foreground";
 
 /** Agent Detail — Access (CAN) tab. Owned data-fetch stays Access Agent's
  * own service contract; Experience Agent only composes it — see
@@ -60,8 +60,8 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
-        <p className="mt-1 text-sm text-text-secondary">Effective access — what this agent CAN technically do, derived from IAM data.</p>
+        <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Effective access — what this agent CAN technically do, derived from IAM data.</p>
       </div>
 
       <AgentTabs agentId={agentId} active="access" />
@@ -147,16 +147,16 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
         />
         <CardBody>
           {evaluations.length === 0 ? (
-            <p className="text-sm text-text-muted">No evaluations recorded yet.</p>
+            <p className="text-sm text-muted-foreground">No evaluations recorded yet.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {evaluations.map((e) => (
                 <li key={e.id} className="border-b border-border pb-2 last:border-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-text-muted">{e.evaluatedAt}</span>
+                    <span className="text-muted-foreground">{e.evaluatedAt}</span>
                     <Badge tone={e.result === "pass" ? "success" : e.result === "violation" ? "danger" : "warning"}>{e.result}</Badge>
                   </div>
-                  <pre className="mt-1 overflow-x-auto text-xs text-text-secondary">{JSON.stringify(e.evidence, null, 2)}</pre>
+                  <pre className="mt-1 overflow-x-auto text-xs text-muted-foreground">{JSON.stringify(e.evidence, null, 2)}</pre>
                 </li>
               ))}
             </ul>

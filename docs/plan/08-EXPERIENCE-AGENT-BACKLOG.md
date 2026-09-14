@@ -17,9 +17,9 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 
 | Story | Title | Status |
 |---|---|---|
-| EXPERIENCE-P0-01.0 | Design tokens & theming foundation (light/dark) | Partial — tokens/theme toggle real and working; no authenticated real-browser visual verification performed (sandbox constraint, see audit log) |
-| EXPERIENCE-P0-01.1 | Shell layout | Done — every existing route moved under the shell; two missing index pages (`/risk`, `/runtime`) found and fixed |
-| EXPERIENCE-P0-01.2 | Responsive behavior | Partial — nav collapses below 1024px; not manually verified at all six named widths with real screenshots |
+| EXPERIENCE-P0-01.0 | Design tokens & theming foundation (light/dark) | Partial — re-keyed to OKLCH under the Locked Design System's naming (EXPERIENCE-P0-09); real-browser screenshot confirms light/dark both render correctly on the public `/sign-in` page (Playwright + system Chromium, this environment's pre-installed browser); authenticated in-app screens still unverified — a real signup attempt confirmed this sandbox's outbound network policy blocks the app's own server-side Supabase Auth calls (not just "no test user"), see audit log |
+| EXPERIENCE-P0-01.1 | Shell layout | Done — restructured per EXPERIENCE-P0-09: topbar left group (nav trigger, logo, tenant name), right group (search, notifications only, no avatar); account menu relocated into the nav drawer |
+| EXPERIENCE-P0-01.2 | Responsive behavior | Partial — nav is now a drawer at every width (EXPERIENCE-P0-09, no desktop docked rail); no horizontal overflow confirmed at 390px via real screenshot on the public page; authenticated screens at the other six named widths still unverified (sandbox network constraint, see audit log) |
 | EXPERIENCE-P0-01.3 | Loading/empty/error states & skeleton loaders | Partial — primitives built and used on new pages; not yet retrofitted into every existing domain module page |
 | EXPERIENCE-P0-02.1 | Overview dashboard cards | Done — all nine cards, real queries, parallel fetch |
 | EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Done |
@@ -29,7 +29,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-06 | Evidence Drawer & Investigation Deep Links | Partial — `EvidenceDrawer`/`useEvidenceDrawerParam` primitives built and wired to a real consumer (Risk finding evidence, deep-linkable via `?evidence=<id>`); not yet consumed by Access/Runtime/Compliance's own evidence surfaces |
 | EXPERIENCE-P0-07 | Shell Global Search & Notifications | Done — top-bar entry points built and composed into the shell; both show `NotYetAvailable` pending Operations Agent's published search/notifications contract, per this story's own scoping |
 | EXPERIENCE-P0-08 | Data Table Primitive (sort/filter/pagination/saved URL state/responsive card transform) | Partial — `DataTable`/`useTableState` primitives built (sort, filter, saved-URL-state, responsive card-transform) and wired to a real consumer (Agent Inventory); pagination/sort/filter run client-side over the already-fetched full list since `listAgents()` has no server-side pagination parameters yet (a documented stopgap, not the primitive's own limitation); not yet consumed by Access/Findings/other domain screens |
-| EXPERIENCE-P0-09 | Locked Product Design System v2 (shadcn/Radix + CVA + OKLCH tokens + drawer-only nav + restructured topbar/account menu) | **Not Started — flagged, not implemented.** Materially conflicts with already-`Done`/`Partial` EXPERIENCE-P0-01.0/01.1/01.2 (see Requirements Refresh below); requires explicit user approval before any of it is built |
+| EXPERIENCE-P0-09 | Locked Product Design System v2 (shadcn/Radix + CVA + OKLCH tokens + drawer-only nav + restructured topbar/account menu) | **Done** — adopted in full 2026-09-14 by explicit user approval (see the earlier Requirements Refresh addendum's four flagged questions, all resolved "adopt fully"): tokens re-keyed to OKLCH under shadcn's naming scheme, `Button`/`Badge` rebuilt on `class-variance-authority` with the exact default/outline/secondary/ghost/destructive/link variant set, left nav is now a drawer at every width (no desktop docked rail), topbar restructured (no avatar; tenant name in the left group), account menu relocated to the bottom of the nav drawer. One deliberate, disclosed deviation: dark mode was kept (re-implemented in OKLCH), not demoted to unsupported — see audit log for why |
 
 ---
 
@@ -400,22 +400,23 @@ use by every module built so far this session:
   `modules/ui/*`; adopting it is coupled to the UX-P0-13 technology-foundation
   question above, not separable from it.
 
-None of the above five/six items were implemented. Per `CLAUDE.md` §4's
-stop-and-report rule and non-negotiable #18 (a module never silently reworks its
-own already-shipped, widely-depended-upon surface without the ambiguity being a
-real architecture decision), this is tracked as a single new row,
-**EXPERIENCE-P0-09** (Progress Tracker above), status **Not Started — flagged,
-not implemented**, pending explicit user direction on:
+None of the above five/six items were implemented at the time this addendum was
+first written. Per `CLAUDE.md` §4's stop-and-report rule and non-negotiable #18 (a
+module never silently reworks its own already-shipped, widely-depended-upon surface
+without the ambiguity being a real architecture decision), this was tracked as a
+single new row, **EXPERIENCE-P0-09** (Progress Tracker above), pending explicit user
+direction on four numbered questions (component-variant technology; OKLCH re-key and
+the dark-mode question; drawer-only vs. docked-rail navigation; topbar/account-menu
+restructure).
 
-1. Whether to adopt shadcn/CVA as the component-variant technology (replacing the
-   hand-rolled pattern), and if so, whether that's a rip-and-replace or an
-   incremental migration.
-2. Whether to re-key the token system to OKLCH under the new naming scheme, and
-   whether dark mode is demoted from mandatory (current `CLAUDE.md` §13 / UI-UX
-   rules position) to a later release.
-3. Whether the left navigation becomes drawer-only at every width (removing the
-   desktop docked rail already shipped and in use).
-4. The topbar/account-menu restructure (UX-P0-15/17).
+**Resolved 2026-09-14, same day:** the user was asked directly (all four questions
+bundled into one decision) and chose **"Adopt it fully."** EXPERIENCE-P0-09 is now
+**Done** — see the Progress Tracker above and the audit log for the full
+implementation record. One deliberate, disclosed deviation from a literal full
+adoption: dark mode was **kept** (re-implemented in OKLCH under the new token names)
+rather than demoted to unsupported, since `CLAUDE.md` §13's dark-mode mandate is a
+separate, binding Definition-of-Done requirement the approved question did not ask
+to repeal — see the audit log entry for the full reasoning.
 
 The remaining §38 items do **not** conflict with existing work and need no new
 tracker row — they are additional acceptance detail folded into stories already
