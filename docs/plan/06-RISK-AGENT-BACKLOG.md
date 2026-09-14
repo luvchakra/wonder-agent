@@ -12,19 +12,19 @@
 Status values: **Done** (acceptance criteria met and verified), **Partial**
 (built but with a known, documented gap), **Deferred** (not started, not
 blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run Risk Agent" is
-issued. Every story in this module is higher bar (see below).
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every row is in `docs/design/risk-agent-backlog-audit.md`. Every story in
+this module is higher bar (see below).
 
 | Story | Title | Status |
 |---|---|---|
-| RISK-P0-01.1 | Schema | Not Started |
-| RISK-P0-01.2 | Detection rules, one per category | Not Started |
-| RISK-P0-01.3 | Explainability | Not Started |
-| RISK-P0-02.1 | Severity/risk score | Not Started |
-| RISK-P0-03.1 | Assignment & recommendation | Not Started |
-| RISK-P0-03.2 | Human-initiated remediation | Not Started |
-| RISK-P0-03.3 | Re-evaluation & resolution | Not Started |
+| RISK-P0-01.1 | Schema | Done |
+| RISK-P0-01.2 | Detection rules, one per category | Done |
+| RISK-P0-01.3 | Explainability | Done |
+| RISK-P0-02.1 | Severity/risk score | Partial — `agents.risk_score` persistence blocked on Identity publishing `updateAgentRiskScore()`; the score is fully computed and stored on every finding |
+| RISK-P0-03.1 | Assignment & recommendation | Done |
+| RISK-P0-03.2 | Human-initiated remediation | Partial — endpoint/UI exist and behave honestly (`wired: false`); blocked on Access Agent publishing a remediation-initiation contract |
+| RISK-P0-03.3 | Re-evaluation & resolution | Done |
 
 ---
 
