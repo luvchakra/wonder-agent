@@ -287,3 +287,53 @@ tenant" to "Partial — endpoint paths/HTTP method/pagination/auth verified
 against Saviynt's real API reference; response field names still
 unconfirmed against a live tenant" — an honest, real improvement, not a
 close-out, since response schemas remain unverified.
+
+---
+
+## 2026-09-14 — INTEGRATION-P0-05.1: Verified credential rotation
+
+**Agent:** Integration Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Auto-chained after Identity Agent's own P0 completion, per the user's
+"operate like before, focus on P0 only, continue automatically" instruction.
+This was the module's only genuinely new P0 story from the 2026-09-14
+requirements refresh.
+
+**Built:** `modules/integrations/credentials.ts`'s `setCredential()` now
+tests the *new* plaintext secret against the integration's own connector
+(`authenticate()` + `testConnection()` — the same pair
+`testIntegrationConnection()` already used) before persisting anything. A
+failed test throws `ApiError(400, 'CREDENTIAL_VERIFICATION_FAILED', ...)`
+without touching `integration_credentials` at all — the previously-stored
+encrypted secret (if any) is left byte-for-byte untouched, so a bad
+replacement can never clobber a working credential. Integration types with
+no pull connector (`webhook`, which stores a signing secret rather than an
+outbound API credential — `createConnector('webhook')` throws by design,
+see `registry.ts`) skip the verification step rather than failing
+spuriously; this is a deliberate, narrow exception, not a general escape
+hatch — every connector-backed integration type is verified.
+
+**Verified via 4 new unit tests** (`modules/integrations/credentials.test.ts`,
+mocking `./registry`, `@/lib/security/encryptSecret`, `@/lib/audit/writeAudit`
+and `@/lib/db/supabaseServer` — the first time this module mocks its own
+I/O dependencies rather than testing a pure function directly, since the
+actual acceptance criterion here *is* about call ordering/side-effect
+gating, not a pure computation): (1) a failing `testConnection()` result
+throws and neither `update()` nor `insert()` nor `writeAudit()` is ever
+called; (2) a passing result persists and audits
+`integration.credential_rotated` exactly as before; (3) an integration type
+with no connector implementation skips verification and still persists;
+(4) the first-time-set path (no prior credential) still inserts and audits
+`integration.credential_set`, unchanged.
+
+**Not verified against a real external endpoint** — this sandbox's network
+egress is blocked to non-Supabase hosts (the same constraint documented
+throughout this session), so a genuine live HTTP round-trip through
+`GenericRestConnector`/`SaviyntConnector`'s `testConnection()` could not be
+exercised; the mocked test suite above verifies the actual control-flow
+change (persist-only-on-success) directly instead, which is the part this
+story's acceptance criteria are actually about.
+
+**Verification run**: `npm run typecheck`/`lint`/`build` clean, `npx vitest
+run` — 94/94 passing (4 new). No schema change (no new migration) — this is
+a pure application-logic change to already-`Done` code, scoped exactly to
+what INTEGRATION-P0-05.1 asked for and nothing else.

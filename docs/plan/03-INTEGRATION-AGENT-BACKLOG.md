@@ -29,7 +29,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Partial — discovery done; tool `object_type` classification is a flagged judgment call pending Runtime Agent |
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
-| INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Not Started — new story, see Requirements Refresh below |
+| INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 
 ---
 
