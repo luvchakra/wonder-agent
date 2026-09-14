@@ -22,11 +22,20 @@ describe("encryptSecret / decryptSecret", () => {
   });
 
   it("rejects a tampered ciphertext", async () => {
+    // QA-P0-04.2's pipeline sweep caught this as flaky: mutating the *last*
+    // base64 character of a padded group sometimes changes no actual byte —
+    // the final sextet before "=" padding encodes some bits base64 decoding
+    // ignores, so occasionally the GCM auth tag still verified and the
+    // assertion failed intermittently. Not a security bug (GCM
+    // authentication itself works correctly; the tamper method just wasn't
+    // always a real mutation). Flipping the *first* character instead is
+    // always a complete, un-padded 3-byte group — deterministically changes
+    // real ciphertext bytes every run. See
+    // docs/design/foundation-agent-backlog-audit.md.
     const ciphertext = await encryptSecret("another-secret");
     const [iv, tag, data] = ciphertext.split(".");
-    const tampered = [iv, tag, data.slice(0, -2) + (data.at(-1) === "A" ? "B" : "A") + "="].join(
-      ".",
-    );
+    const tamperedData = (data[0] === "A" ? "B" : "A") + data.slice(1);
+    const tampered = [iv, tag, tamperedData].join(".");
     await expect(decryptSecret(tampered)).rejects.toThrow();
   });
 

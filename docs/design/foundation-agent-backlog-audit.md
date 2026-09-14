@@ -407,3 +407,47 @@ priority-tier rule (P0 first). The two `Partial` items above (03.3, 03.4)
 have a real, honestly-scoped gap (a live IdP/authenticator round-trip) that
 only a non-sandboxed environment with a real IdP/device can close — not
 something to keep re-attempting here.
+
+---
+
+## 2026-09-14 — QA-P0-04.2 finding: flaky `encryptSecret.test.ts` tamper
+test (smallest-safe-change fix, logged here per QA-P0-04.4)
+
+**Found by:** QA Agent, during its repo-wide pipeline sweep (QA-P0-04.1/
+04.2). **Fixed by:** QA Agent, as the smallest safe change in the owning
+module's own test file, logged here in Foundation's audit log per
+QA-P0-04.4's rule (QA logs a defect fix in the *owning* module's log, not
+a QA-owned file — `lib/security/encryptSecret.ts` and its test are
+Foundation-owned).
+
+**Symptom:** `lib/security/encryptSecret.test.ts`'s "rejects a tampered
+ciphertext" test failed intermittently (~25% observed rate across
+repeated `vitest run` invocations of the file alone, and occasionally in
+full-suite runs), with no code change between passing and failing runs.
+
+**Root cause:** the test tampered the *last* character of the ciphertext
+envelope's base64 `data` segment. For a base64 group that lands on a
+padding/"don't-care bits" boundary, flipping that specific character can
+leave the decoded bytes unchanged — base64 decoding ignores certain bits
+in the final sextet of a padded group — so the AES-256-GCM auth tag
+would occasionally still verify against the (actually-unchanged)
+plaintext, and the test's `.rejects.toThrow()` assertion failed. This is
+**not a security bug**: GCM authentication itself works correctly and
+does reject any actual ciphertext mutation; only this specific test's
+tamper method was occasionally a no-op on the underlying bytes.
+
+**Fix:** moved the tamper target from the last character of `data` to
+the first character. For the test's plaintext (`"another-secret"`, 15
+bytes = exactly five complete 3-byte base64 groups, no padding),
+position 0 is always part of a complete, unpadded group, so flipping it
+always changes real ciphertext bytes deterministically.
+
+**Verification:** reran the isolated test file 5 times and the full
+`npx vitest run` suite 3 times after the fix — 139/139 tests passing
+consistently every run, no further flakiness observed. No other test in
+the suite was touched.
+
+**File changed:** `lib/security/encryptSecret.test.ts` only (the single
+`it("rejects a tampered ciphertext", ...)` block) — no change to
+`lib/security/encryptSecret.ts` itself, since the encryption/decryption
+logic was never the defect.
