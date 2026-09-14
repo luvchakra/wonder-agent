@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
@@ -9,13 +8,33 @@ import {
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { createManualGrantAction, evaluateAgentAction } from "@/app/actions/access";
+import {
+  Badge,
+  Card,
+  CardHeader,
+  CardBody,
+  Button,
+  AgentTabs,
+  EmptyState,
+  TableContainer,
+  Thead,
+  Th,
+  Td,
+  Tr,
+} from "@/modules/ui";
 
 const GRANT_TYPES = [
   "direct", "inherited", "group", "role", "delegated",
   "token_scope", "oauth_scope", "api_scope", "mcp_tool_permission", "service_account_relationship",
 ] as const;
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design.
+const inputClass =
+  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
+const labelClass = "block text-sm font-medium text-text-secondary";
+
+/** Agent Detail — Access (CAN) tab. Owned data-fetch stays Access Agent's
+ * own service contract; Experience Agent only composes it — see
+ * EXPERIENCE-P0-03 and docs/design/ownership-map.md. */
 export default async function AgentAccessPage({ params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = await params;
   let ctx;
@@ -39,52 +58,111 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
   const evaluateWithId = evaluateAgentAction.bind(null, agentId);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href={`/agents/${agentId}`}>← {agent.agentName}</Link>
-      </p>
-      <h1>Effective Access (CAN)</h1>
-      <ul>
-        {effectiveAccess.map((g) => (
-          <li key={g.id}>
-            [{g.grantType}] {g.application}: {g.entitlementName}
-            {g.dataClassification ? ` (${g.dataClassification})` : ""}
-          </li>
-        ))}
-      </ul>
-      {effectiveAccess.length === 0 && <p>No effective access recorded yet.</p>}
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
+        <p className="mt-1 text-sm text-text-secondary">Effective access — what this agent CAN technically do, derived from IAM data.</p>
+      </div>
 
-      <h2>Add manual grant</h2>
-      <form action={createGrantWithId}>
-        <select name="accountId">
-          {accounts.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.externalAccountRef}
-            </option>
-          ))}
-        </select>
-        <input name="entitlementId" placeholder="entitlement id (uuid)" required />
-        <select name="grantType" defaultValue="direct">
-          {GRANT_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <button type="submit">Grant</button>
-      </form>
+      <AgentTabs agentId={agentId} active="access" />
 
-      <h2>Policy Evaluation</h2>
-      <form action={evaluateWithId}>
-        <button type="submit">Run evaluation now</button>
-      </form>
-      <ul>
-        {evaluations.map((e) => (
-          <li key={e.id}>
-            {e.evaluatedAt}: {e.result} — {JSON.stringify(e.evidence)}
-          </li>
-        ))}
-      </ul>
-    </main>
+      <Card>
+        <CardHeader title="Effective Access (CAN)" description={`${effectiveAccess.length} grant${effectiveAccess.length === 1 ? "" : "s"}`} />
+        <CardBody>
+          {effectiveAccess.length === 0 ? (
+            <EmptyState title="No effective access recorded yet" description="This agent has no grants derived from any connected system or manual entry." />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Grant type</Th>
+                  <Th>Application</Th>
+                  <Th>Entitlement</Th>
+                  <Th>Data classification</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {effectiveAccess.map((g) => (
+                  <Tr key={g.id}>
+                    <Td>
+                      <Badge tone="neutral">{g.grantType}</Badge>
+                    </Td>
+                    <Td>{g.application}</Td>
+                    <Td>{g.entitlementName}</Td>
+                    <Td>{g.dataClassification ?? "—"}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Add manual grant" />
+        <CardBody>
+          <form action={createGrantWithId} className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className={labelClass}>Account</label>
+              <select name="accountId" className={inputClass}>
+                {accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.externalAccountRef}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[12rem]">
+              <label className={labelClass}>Entitlement ID</label>
+              <input name="entitlementId" placeholder="entitlement id (uuid)" required className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Grant type</label>
+              <select name="grantType" defaultValue="direct" className={inputClass}>
+                {GRANT_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <Button type="submit" variant="secondary">
+              Grant
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title="Policy Evaluation"
+          description="Deterministic policy checks against this agent's effective access — never an LLM decision (non-negotiable #9)."
+          actions={
+            <form action={evaluateWithId}>
+              <Button type="submit" variant="secondary">
+                Run evaluation now
+              </Button>
+            </form>
+          }
+        />
+        <CardBody>
+          {evaluations.length === 0 ? (
+            <p className="text-sm text-text-muted">No evaluations recorded yet.</p>
+          ) : (
+            <ul className="space-y-2 text-sm">
+              {evaluations.map((e) => (
+                <li key={e.id} className="border-b border-border pb-2 last:border-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-text-muted">{e.evaluatedAt}</span>
+                    <Badge tone={e.result === "pass" ? "success" : e.result === "violation" ? "danger" : "warning"}>{e.result}</Badge>
+                  </div>
+                  <pre className="mt-1 overflow-x-auto text-xs text-text-secondary">{JSON.stringify(e.evidence, null, 2)}</pre>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

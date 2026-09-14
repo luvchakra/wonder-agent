@@ -1,13 +1,44 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listRuntimeEvents, getDid, compareShouldCanDid } from "@/modules/runtime-assurance/service";
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import type { ComparisonOutcomeType } from "@/lib/shared/types/runtime";
 import { submitRuntimeEventAction } from "@/app/actions/runtime";
+import {
+  Badge,
+  type BadgeTone,
+  Card,
+  CardHeader,
+  CardBody,
+  Button,
+  AgentTabs,
+  EmptyState,
+  TableContainer,
+  Thead,
+  Th,
+  Td,
+  Tr,
+} from "@/modules/ui";
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design,
-// per docs/design/UI-UX-DESIGN-RULES.md. This page is functional scaffolding.
+const OUTCOME_TONE: Record<ComparisonOutcomeType, BadgeTone> = {
+  healthy: "success",
+  excessive_access: "danger",
+  unexpected_capability: "danger",
+  behavioral_violation: "danger",
+  insufficient_access: "warning",
+  unused_capability: "warning",
+  unscored_unknown: "neutral",
+};
+
+const inputClass =
+  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
+const labelClass = "block text-sm font-medium text-text-secondary";
+
+/** Agent Detail — Runtime (DID) tab, including the SHOULD/CAN/DID comparison
+ * that is central to CLAUDE.md §9's canonical model. Runtime Agent owns the
+ * comparison logic itself; Experience Agent only composes it — see
+ * EXPERIENCE-P0-03. */
 export default async function AgentRuntimePage({ params }: { params: Promise<{ agentId: string }> }) {
   const { agentId } = await params;
   let ctx;
@@ -28,62 +59,164 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
   ]);
 
   const submitWithId = submitRuntimeEventAction.bind(null, agentId);
+  const overallHealthy = comparison.outcomes.length > 0 && comparison.outcomes.every((o) => o.type === "healthy");
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href={`/agents/${agentId}`}>← {agent.agentName}</Link>
-      </p>
-      <h1>Runtime Assurance</h1>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
+        <p className="mt-1 text-sm text-text-secondary">Runtime Assurance — what this agent actually DID, and how it compares to SHOULD and CAN.</p>
+      </div>
 
-      <h2>DID — Observed Activity (last 90 days)</h2>
-      <ul>
-        {did.tuples.map((t, i) => (
-          <li key={i}>
-            {t.application ?? "?"} / {t.resource ?? "?"} — {t.action}
-            {t.dataClassification ? ` (${t.dataClassification})` : ""} × {t.eventCount}
-          </li>
-        ))}
-      </ul>
-      {did.tuples.length === 0 && <p>No runtime activity recorded yet.</p>}
+      <AgentTabs agentId={agentId} active="runtime" />
 
-      <h2>SHOULD vs CAN vs DID</h2>
-      <p>SHOULD: {comparison.should.map((s) => `${s.application}${s.data ? `:${s.data}` : ""}`).join(", ") || "(none)"}</p>
-      <p>CAN: {comparison.can.map((c) => `${c.application}${c.entitlementName ? `:${c.entitlementName}` : ""}`).join(", ") || "(none)"}</p>
-      <p>DID: {comparison.did.map((d) => `${d.application ?? "?"}${d.resource ? `:${d.resource}` : ""}`).join(", ") || "(none)"}</p>
-      <h3>Outcomes</h3>
-      <ul>
-        {comparison.outcomes.map((o, i) => (
-          <li key={i}>
-            <strong>{o.type}</strong> — {JSON.stringify(o.evidence)}
-          </li>
-        ))}
-      </ul>
+      <Card>
+        <CardHeader
+          title="SHOULD vs CAN vs DID"
+          description="The canonical comparison: approved purpose vs. technical capability vs. observed behavior (CLAUDE.md §9)."
+          actions={comparison.shouldUnknown ? <Badge tone="warning">SHOULD undefined</Badge> : <Badge tone={overallHealthy ? "success" : "danger"}>{overallHealthy ? "Healthy" : "Deviation detected"}</Badge>}
+        />
+        <CardBody className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">SHOULD</p>
+              <p className="mt-1 text-sm text-text-primary">
+                {comparison.should.map((s) => `${s.application}${s.data ? `:${s.data}` : ""}`).join(", ") || "(none)"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">CAN</p>
+              <p className="mt-1 text-sm text-text-primary">
+                {comparison.can.map((c) => `${c.application}${c.entitlementName ? `:${c.entitlementName}` : ""}`).join(", ") || "(none)"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">DID</p>
+              <p className="mt-1 text-sm text-text-primary">
+                {comparison.did.map((d) => `${d.application ?? "?"}${d.resource ? `:${d.resource}` : ""}`).join(", ") || "(none)"}
+              </p>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Outcomes</p>
+            {comparison.outcomes.length === 0 ? (
+              <p className="mt-1 text-sm text-text-muted">No comparison outcomes yet.</p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {comparison.outcomes.map((o, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <Badge tone={OUTCOME_TONE[o.type]}>{o.type.replace(/_/g, " ")}</Badge>
+                    <pre className="flex-1 overflow-x-auto text-xs text-text-secondary">{JSON.stringify(o.evidence, null, 2)}</pre>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </CardBody>
+      </Card>
 
-      <h2>Submit test runtime event</h2>
-      <form action={submitWithId}>
-        <select name="source" defaultValue="rest">
-          <option value="mcp">mcp</option>
-          <option value="rest">rest</option>
-          <option value="webhook">webhook</option>
-        </select>
-        <input name="application" placeholder="application (e.g. Snowflake)" />
-        <input name="resource" placeholder="resource (e.g. CustomerDB)" />
-        <input name="action" placeholder="action (e.g. read)" defaultValue="read" />
-        <input name="dataClassification" placeholder="data classification (e.g. PII)" />
-        <button type="submit">Submit event</button>
-      </form>
+      <Card>
+        <CardHeader title="DID — Observed Activity" description="Aggregated runtime activity, last 90 days." />
+        <CardBody>
+          {did.tuples.length === 0 ? (
+            <EmptyState title="No runtime activity recorded yet" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Application</Th>
+                  <Th>Resource</Th>
+                  <Th>Action</Th>
+                  <Th>Data classification</Th>
+                  <Th>Count</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {did.tuples.map((t, i) => (
+                  <Tr key={i}>
+                    <Td>{t.application ?? "?"}</Td>
+                    <Td>{t.resource ?? "?"}</Td>
+                    <Td>{t.action}</Td>
+                    <Td>{t.dataClassification ?? "—"}</Td>
+                    <Td>{t.eventCount}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
 
-      <h2>Recent Events</h2>
-      <ul>
-        {eventsPage.events.map((e) => (
-          <li key={e.id}>
-            {e.eventTime} [{e.source}] {e.application ?? "?"}/{e.resource ?? "?"} — {e.action}
-            {e.dataClassification ? ` (${e.dataClassification})` : ""}
-          </li>
-        ))}
-      </ul>
-      {eventsPage.events.length === 0 && <p>No events yet.</p>}
-    </main>
+      <Card>
+        <CardHeader title="Submit test runtime event" description="For demonstration/testing only — production events arrive via MCP/REST/webhook ingestion." />
+        <CardBody>
+          <form action={submitWithId} className="flex flex-wrap items-end gap-2">
+            <div>
+              <label className={labelClass}>Source</label>
+              <select name="source" defaultValue="rest" className={inputClass}>
+                <option value="mcp">mcp</option>
+                <option value="rest">rest</option>
+                <option value="webhook">webhook</option>
+              </select>
+            </div>
+            <div>
+              <label className={labelClass}>Application</label>
+              <input name="application" placeholder="e.g. Snowflake" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Resource</label>
+              <input name="resource" placeholder="e.g. CustomerDB" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Action</label>
+              <input name="action" placeholder="e.g. read" defaultValue="read" className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Data classification</label>
+              <input name="dataClassification" placeholder="e.g. PII" className={inputClass} />
+            </div>
+            <Button type="submit" variant="secondary">
+              Submit event
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Recent Events" />
+        <CardBody>
+          {eventsPage.events.length === 0 ? (
+            <p className="text-sm text-text-muted">No events yet.</p>
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Time</Th>
+                  <Th>Source</Th>
+                  <Th>Application / Resource</Th>
+                  <Th>Action</Th>
+                  <Th>Data classification</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {eventsPage.events.map((e) => (
+                  <Tr key={e.id}>
+                    <Td>{e.eventTime}</Td>
+                    <Td>
+                      <Badge tone="neutral">{e.source}</Badge>
+                    </Td>
+                    <Td>
+                      {e.application ?? "?"}/{e.resource ?? "?"}
+                    </Td>
+                    <Td>{e.action}</Td>
+                    <Td>{e.dataClassification ?? "—"}</Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

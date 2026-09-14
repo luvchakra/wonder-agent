@@ -18,6 +18,7 @@ import {
   linkIdentityAction,
   transitionLifecycleAction,
 } from "@/app/actions/agents";
+import { Badge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
 
 const LIFECYCLE_STATES = [
   "DISCOVERED",
@@ -36,8 +37,27 @@ const OWNER_TYPES = ["business_owner", "technical_owner", "iam_owner", "applicat
 const RELATIONSHIP_TYPES = ["delegates_to", "depends_on", "shares_credential_with", "orchestrates"] as const;
 const IDENTITY_TYPES = ["service_account", "human_delegate", "oauth_client", "workload_identity", "api_key", "mcp_server"] as const;
 
-// Bare functional detail screen — Experience Agent (Module 08) owns the
-// tabbed layout described in the PRD; this page proves the data/actions work.
+const LIFECYCLE_TONE: Record<string, "neutral" | "success" | "warning" | "danger" | "info"> = {
+  ACTIVE: "success",
+  DISCOVERED: "neutral",
+  REGISTERED: "neutral",
+  ASSESSED: "info",
+  APPROVED: "info",
+  PROVISIONED: "info",
+  CERTIFICATION_DUE: "warning",
+  RESTRICTED: "warning",
+  SUSPENDED: "danger",
+  RETIRED: "neutral",
+};
+
+const inputClass =
+  "block w-full rounded-md border border-border bg-surface px-2 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent";
+const labelClass = "block text-sm font-medium text-text-secondary";
+
+/** Agent Detail — Overview tab (Identity's own data: lifecycle, ownership,
+ * contract/SHOULD, relationships, linked identities). The Access/Runtime/
+ * Risk tabs are their owning module's own routes, composed here only via
+ * AgentTabs — see EXPERIENCE-P0-03. */
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const ctx = await requirePermission("agent.read");
@@ -63,154 +83,263 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const linkIdentityWithId = linkIdentityAction.bind(null, id);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
+    <div className="space-y-4">
       <p>
-        <Link href="/agents">← All agents</Link>
+        <Link href="/agents" className="text-sm text-accent hover:underline">
+          ← All agents
+        </Link>
       </p>
-      <h1>
-        {agent.agentName} <small>({agent.lifecycleState})</small>
-      </h1>
-      <p>
-        Type: {agent.agentType} · Criticality: {agent.criticality} · Environment: {agent.environment}
-      </p>
-      <p>Purpose: {agent.purpose ?? <em>not set</em>}</p>
 
-      <section>
-        <h2>Lifecycle</h2>
-        {ownershipIssues.length > 0 && (
-          <ul>
-            {ownershipIssues.map((issue, i) => (
-              <li key={i}>{JSON.stringify(issue)}</li>
-            ))}
-          </ul>
-        )}
-        <ul>
-          {lifecycleEvents.map((e) => (
-            <li key={e.id}>
-              {e.createdAt}: {e.fromState ?? "(none)"} → {e.toState} — {e.reason}
-            </li>
-          ))}
-        </ul>
-        <form action={transitionWithId}>
-          <select name="toState" defaultValue={LIFECYCLE_STATES[0]}>
-            {LIFECYCLE_STATES.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-          <input name="reason" placeholder="reason" required />
-          <button type="submit">Transition</button>
-        </form>
-      </section>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold text-text-primary">{agent.agentName}</h1>
+          <Badge tone={LIFECYCLE_TONE[agent.lifecycleState] ?? "neutral"}>{agent.lifecycleState}</Badge>
+          <SeverityBadge severity={agent.criticality} />
+        </div>
+        <p className="mt-1 text-sm text-text-secondary">
+          {agent.agentType} · {agent.environment}
+          {agent.purpose ? ` · ${agent.purpose}` : ""}
+        </p>
+      </div>
 
-      <section>
-        <h2>Owners</h2>
-        <ul>
-          {owners.map((o) => (
-            <li key={o.id}>
-              {o.ownerType}: {o.userId}
-            </li>
-          ))}
-        </ul>
-        <form action={assignOwnerWithId}>
-          <select name="ownerType" defaultValue={OWNER_TYPES[0]}>
-            {OWNER_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <input name="userId" placeholder="user id (uuid)" required />
-          <button type="submit">Assign owner</button>
-        </form>
-      </section>
+      <AgentTabs agentId={id} active="overview" />
 
-      <section>
-        <h2>Agent Contract (SHOULD)</h2>
-        {contract ? (
-          <pre>{JSON.stringify(contract, null, 2)}</pre>
-        ) : (
-          <p>No active contract.</p>
-        )}
-        <p>Versions: {contractVersions.length}</p>
-        <form action={createContractWithId}>
-          <label>
-            Purpose *
-            <input name="purpose" required style={{ display: "block", width: "100%" }} />
-          </label>
-          <label>
-            Owner summary
-            <input name="ownerSummary" style={{ display: "block", width: "100%" }} />
-          </label>
-          <label>
-            Approved applications (comma-separated)
-            <input name="approvedApplications" style={{ display: "block", width: "100%" }} />
-          </label>
-          <label>
-            Approved data (comma-separated)
-            <input name="approvedData" style={{ display: "block", width: "100%" }} />
-          </label>
-          <label>
-            Prohibited data (comma-separated)
-            <input name="prohibitedData" style={{ display: "block", width: "100%" }} />
-          </label>
-          <label>
-            Approved actions (comma-separated)
-            <input name="approvedActions" style={{ display: "block", width: "100%" }} />
-          </label>
-          <label>
-            Prohibited actions (comma-separated)
-            <input name="prohibitedActions" style={{ display: "block", width: "100%" }} />
-          </label>
-          <button type="submit">Publish new contract version</button>
-        </form>
-      </section>
+      <Card>
+        <CardHeader title="Lifecycle" description="State transition history and pending ownership issues." />
+        <CardBody className="space-y-3">
+          {ownershipIssues.length > 0 && (
+            <ul className="space-y-1">
+              {ownershipIssues.map((issue, i) => (
+                <li key={i}>
+                  <Badge tone="warning">{JSON.stringify(issue)}</Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+          {lifecycleEvents.length === 0 ? (
+            <p className="text-sm text-text-muted">No lifecycle transitions recorded yet.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-text-secondary">
+              {lifecycleEvents.map((e) => (
+                <li key={e.id}>
+                  <span className="text-text-muted">{e.createdAt}:</span> {e.fromState ?? "(none)"} → <strong className="text-text-primary">{e.toState}</strong> — {e.reason}
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={transitionWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <div>
+              <label className={labelClass}>New state</label>
+              <select name="toState" defaultValue={LIFECYCLE_STATES[0]} className={inputClass}>
+                {LIFECYCLE_STATES.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[12rem]">
+              <label className={labelClass}>Reason</label>
+              <input name="reason" placeholder="reason" required className={inputClass} />
+            </div>
+            <Button type="submit" variant="secondary">
+              Transition
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
 
-      <section>
-        <h2>Relationships</h2>
-        <ul>
-          {relationships.map((r) => (
-            <li key={r.id}>
-              {r.relationshipType} → {r.relatedAgentId}
-            </li>
-          ))}
-        </ul>
-        <form action={addRelationshipWithId}>
-          <select name="relationshipType" defaultValue={RELATIONSHIP_TYPES[0]}>
-            {RELATIONSHIP_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <input name="relatedAgentId" placeholder="related agent id (uuid)" required />
-          <button type="submit">Add relationship</button>
-        </form>
-      </section>
+      <Card>
+        <CardHeader title="Owners" description="Accountable humans for this agent, per non-negotiable #11." />
+        <CardBody className="space-y-3">
+          {owners.length === 0 ? (
+            <EmptyState title="No owner assigned" description="An unowned agent is a governance gap — assign at least one owner." />
+          ) : (
+            <ul className="space-y-1 text-sm text-text-secondary">
+              {owners.map((o) => (
+                <li key={o.id}>
+                  <Badge tone="neutral">{o.ownerType}</Badge> <span className="ml-1">{o.userId}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={assignOwnerWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <div>
+              <label className={labelClass}>Owner type</label>
+              <select name="ownerType" defaultValue={OWNER_TYPES[0]} className={inputClass}>
+                {OWNER_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[12rem]">
+              <label className={labelClass}>User ID</label>
+              <input name="userId" placeholder="user id (uuid)" required className={inputClass} />
+            </div>
+            <Button type="submit" variant="secondary">
+              Assign owner
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
 
-      <section>
-        <h2>Linked Identities</h2>
-        <ul>
-          {identities.map((i) => (
-            <li key={i.id}>
-              {i.identityType}: {i.externalReference} ({i.sourceSystem}, {i.confidence})
-            </li>
-          ))}
-        </ul>
-        <form action={linkIdentityWithId}>
-          <select name="identityType" defaultValue={IDENTITY_TYPES[0]}>
-            {IDENTITY_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <input name="externalReference" placeholder="external reference" required />
-          <input name="sourceSystem" placeholder="source system" defaultValue="manual" />
-          <button type="submit">Link identity</button>
-        </form>
-      </section>
-    </main>
+      <Card>
+        <CardHeader title="Agent Contract (SHOULD)" description="Approved purpose, applications, data and actions — the contract SHOULD is measured against." />
+        <CardBody className="space-y-3">
+          {contract ? (
+            <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+              <div>
+                <dt className="text-text-muted">Purpose</dt>
+                <dd className="text-text-primary">{contract.purpose}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">Owner summary</dt>
+                <dd className="text-text-primary">{contract.ownerSummary ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">Approved applications</dt>
+                <dd className="text-text-primary">{contract.approvedApplications?.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">Approved data</dt>
+                <dd className="text-text-primary">{contract.approvedData?.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">Approved actions</dt>
+                <dd className="text-text-primary">{contract.approvedActions?.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-text-muted">Prohibited data / actions</dt>
+                <dd className="text-text-primary">
+                  {contract.prohibitedData?.join(", ") || "—"} / {contract.prohibitedActions?.join(", ") || "—"}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <EmptyState title="No active contract" description="SHOULD is undefined until a contract is published — see the Risk tab for how this affects findings." />
+          )}
+          <p className="text-xs text-text-muted">{contractVersions.length} version{contractVersions.length === 1 ? "" : "s"} published.</p>
+          <details className="border-t border-border pt-3">
+            <summary className="cursor-pointer text-sm font-medium text-text-primary">Publish new contract version</summary>
+            <form action={createContractWithId} className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="sm:col-span-2">
+                <span className={labelClass}>Purpose *</span>
+                <input name="purpose" required className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Owner summary</span>
+                <input name="ownerSummary" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Approved applications (comma-separated)</span>
+                <input name="approvedApplications" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Approved data (comma-separated)</span>
+                <input name="approvedData" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Prohibited data (comma-separated)</span>
+                <input name="prohibitedData" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Approved actions (comma-separated)</span>
+                <input name="approvedActions" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Prohibited actions (comma-separated)</span>
+                <input name="prohibitedActions" className={inputClass} />
+              </label>
+              <div className="sm:col-span-2">
+                <Button type="submit" variant="secondary">
+                  Publish new contract version
+                </Button>
+              </div>
+            </form>
+          </details>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Relationships" />
+        <CardBody className="space-y-3">
+          {relationships.length === 0 ? (
+            <p className="text-sm text-text-muted">No relationships recorded.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-text-secondary">
+              {relationships.map((r) => (
+                <li key={r.id}>
+                  <Badge tone="neutral">{r.relationshipType}</Badge>{" "}
+                  <Link href={`/agents/${r.relatedAgentId}`} className="text-accent hover:underline">
+                    {r.relatedAgentId}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={addRelationshipWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <div>
+              <label className={labelClass}>Type</label>
+              <select name="relationshipType" defaultValue={RELATIONSHIP_TYPES[0]} className={inputClass}>
+                {RELATIONSHIP_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[12rem]">
+              <label className={labelClass}>Related agent ID</label>
+              <input name="relatedAgentId" placeholder="related agent id (uuid)" required className={inputClass} />
+            </div>
+            <Button type="submit" variant="secondary">
+              Add relationship
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Linked Identities" description="Correlated technical identities across integrated IAM/IdP systems." />
+        <CardBody className="space-y-3">
+          {identities.length === 0 ? (
+            <p className="text-sm text-text-muted">No linked identities.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-text-secondary">
+              {identities.map((i) => (
+                <li key={i.id}>
+                  <Badge tone="neutral">{i.identityType}</Badge> {i.externalReference} <span className="text-text-muted">({i.sourceSystem}, {i.confidence})</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={linkIdentityWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <div>
+              <label className={labelClass}>Type</label>
+              <select name="identityType" defaultValue={IDENTITY_TYPES[0]} className={inputClass}>
+                {IDENTITY_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex-1 min-w-[10rem]">
+              <label className={labelClass}>External reference</label>
+              <input name="externalReference" placeholder="external reference" required className={inputClass} />
+            </div>
+            <div>
+              <label className={labelClass}>Source system</label>
+              <input name="sourceSystem" placeholder="source system" defaultValue="manual" className={inputClass} />
+            </div>
+            <Button type="submit" variant="secondary">
+              Link identity
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

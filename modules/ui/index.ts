@@ -14,3 +14,4 @@ export { ConfirmActionDialog, type ConfirmActionResult, type BulkActionItemResul
 export { EvidenceDrawer, useEvidenceDrawerParam } from "./Drawer";
 export { ShellGlobalSearch, ShellNotifications } from "./ShellSearchAndNotifications";
 export { DataTable, useTableState, useClientFilteredRows, type DataTableColumn, type TableState, type SortDir } from "./DataTable";
+export { AgentTabs, type AgentTabKey } from "./AgentTabs";

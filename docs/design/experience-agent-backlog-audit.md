@@ -424,4 +424,89 @@ is the only file modified in this entry.
 new addendum section. Until answered, this module continues operating
 on its existing, already-shipped shell/token/navigation implementation
 for any further work.
-work should consume from here on, per CLAUDE.md §13.
+
+---
+
+## 2026-09-14 — EXPERIENCE-P0-03: the Agent Detail worked layout (Overview/
+Access/Runtime/Risk tabs)
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+Picked up the single largest documented gap in EXPERIENCE-P0-03: the PRD's
+specific worked layouts for Agent Detail and the Agent Risk Page. Four
+separate routes already existed as real, functional, but visually bare
+pages, each owned by its own domain module's data contract per
+`docs/design/ownership-map.md` — `/agents/:id` (Identity), `/access/agents/
+:id` (Access), `/runtime/agents/:id` (Runtime), `/risk/agents/:id` (Risk).
+Rather than merging four separately-permissioned, separately-owned routes
+into one giant page (which would duplicate a large amount of interactive
+form logic and break each route's own Suspense/perf boundary), built a new
+shared `modules/ui/AgentTabs.tsx` primitive — a styled sub-navigation bar
+(real `<Link>`s with `aria-current="page"`, not an ARIA tablist, since this
+is full-page navigation across separately-owned routes, not client-side
+tab-panel switching) that appears identically on all four pages, turning
+them into one coherent Agent Detail experience without changing any
+route's ownership or data-fetching.
+
+**Built:**
+
+- `modules/ui/AgentTabs.tsx` (new, exported from `modules/ui/index.ts`) —
+  Overview / Access (CAN) / Runtime (DID) / Risk & Findings tabs.
+- `app/(customer)/agents/[id]/page.tsx` restyled: header with lifecycle-
+  state and criticality badges (`Badge`/`SeverityBadge`), `AgentTabs`, and
+  every existing section (Lifecycle, Owners, Contract/SHOULD, Relationships,
+  Linked Identities) rebuilt on `Card`/`CardHeader`/`CardBody` with real
+  form styling — same server actions, same data, no behavior change.
+- `app/(customer)/access/agents/[agentId]/page.tsx` restyled onto
+  `Card`/`TableContainer`/`Badge` — effective access is now a real table,
+  policy evaluation results show a pass/violation/exempted badge (the real
+  `PolicyEvaluationResult` union, not a guessed pass/fail one).
+- `app/(customer)/runtime/agents/[agentId]/page.tsx` restyled — the
+  SHOULD/CAN/DID comparison (CLAUDE.md §9's canonical model) is now the
+  page's lead card with an explicit Healthy/Deviation/SHOULD-undefined
+  badge and a tone-mapped badge per `ComparisonOutcomeType` (danger for
+  excessive_access/unexpected_capability/behavioral_violation, warning for
+  insufficient_access/unused_capability, neutral for unscored_unknown, per
+  RUNTIME-P0-14's own "never silently scored" rule); DID activity and
+  recent events are now real tables.
+- `app/(customer)/risk/agents/[agentId]/page.tsx` restyled onto
+  `Card`/`SeverityBadge` — each finding is now a card with severity/
+  category/status badges up front; the existing `ConfirmActionDialog`
+  (`RemediateFindingButton`) and `EvidenceDrawer`
+  (`FindingEvidenceDrawer`/`FindingEvidenceTrigger`) consumers from the
+  earlier EXPERIENCE-P0-04/06 dispatch were left untouched (already real
+  primitives) and are now visually integrated rather than sitting inside
+  unstyled `<section>` markup.
+
+No domain module's service function, API route, server action, or data
+shape was touched — every change is presentation-layer only inside
+`app/(customer)/*` page files and one new `modules/ui/*` primitive,
+consistent with this module's "owns UI composition, not data" scope.
+
+**Verification:** `npm run typecheck`, `npm run lint`, `npx vitest run`
+(139/139 passing, unchanged — no test touches page components), `npm run
+build` with `.next` deleted first (cold-cache build, all four routes
+compile) — all green. `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` —
+no match. Live smoke test against a locally built production server (port
+3102, torn down after): all four restyled routes correctly 307-redirect
+unauthenticated requests to `/sign-in` — no regression in the auth
+boundary from the rewrite.
+
+**Not done this pass** (same category of gap as before, not new):
+authenticated real-browser visual verification (light/dark mode, all seven
+named breakpoints) — same sandbox constraint recorded against
+EXPERIENCE-P0-01.0/01.2 throughout this session, not re-litigated here.
+The Rogue Agent Detail worked layout (PRD §37) is a distinct view from the
+four tabs built here (a rogue-specific investigation surface, not just the
+Risk tab) and was not attempted this pass. Access/Compliance/Integration/
+Foundation's own list and settings pages (`/access`, `/compliance/
+campaigns`, `/integrations`, `/settings/*`) remain bare and unrestyled —
+EXPERIENCE-P0-03's Progress Tracker note now reflects exactly this
+narrower remaining scope rather than the previous, broader "every other
+domain module's existing bare page" description.
+
+**Open questions:** none new. EXPERIENCE-P0-09 (the `08_UI_UX.md` §38
+addendum) remains open from the prior entry and was not touched or
+implicated by this dispatch — `AgentTabs` and the restyled pages use the
+existing, already-shipped token/nav system, not anything from that
+addendum.
