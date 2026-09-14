@@ -4,14 +4,13 @@ This is how development runs across the 11 module agents. It applies to every ag
 in every session, regardless of which module it owns. `CLAUDE.md` governs *what* can
 be built; this document governs *how* work moves from a story to merged code.
 
-**Flagged, not adopted (2026-09-14):** the user's updated master requirements package
-includes a `00_MODULAR_EXECUTION_GUIDE.md` whose "Mandatory execution model" states a
-different process — "Only the agent explicitly activated by the user may start work.
-Agents must never launch another agent automatically" — than the auto-chain policy in
-§2 below. This document's own auto-chain policy remains in force unless and until the
-user explicitly says otherwise; the conflict is recorded here rather than silently
-resolved either way, since it changes how every future session behaves, not just one
-story's content.
+**Resolved (2026-09-14):** the user's updated master requirements package includes a
+`00_MODULAR_EXECUTION_GUIDE.md` whose "Mandatory execution model" states a different
+process — "Only the agent explicitly activated by the user may start work. Agents
+must never launch another agent automatically" — than the auto-chain policy in §2
+below. The user has explicitly confirmed: operate as before, no change to this
+policy. The auto-chain/autopilot model in §2 remains the standing policy in full;
+the execution guide's alternate process model is not adopted.
 
 ## 1. One agent per module, isolated
 
