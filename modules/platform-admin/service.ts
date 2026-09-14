@@ -14,3 +14,15 @@ export { isFeatureEnabled, listFlagCatalog, listTenantFlagOverrides, setFeatureF
 export { grantPlatformAdmin, revokePlatformAdmin, listPlatformAdmins } from "./admins";
 export { getBranding, updateBranding, type UpdateBrandingInput } from "./branding";
 export { getPlatformHealth } from "./health";
+export { checkUsageLimit, getUsageSummary, classifyUsage, type UsageResource, type UsageCheck } from "./usage";
+export { updateFeatureFlagDefault } from "./featureFlags";
+export { listConfigVersions, rollbackConfigVersion, type ConfigType, type ConfigVersion } from "./configRollback";
+export {
+  createAnnouncement,
+  listAnnouncements,
+  getActiveAnnouncements,
+  type CreateAnnouncementInput,
+  type PlatformAnnouncement,
+  type AnnouncementScope,
+  type AnnouncementType,
+} from "./announcements";

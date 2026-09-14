@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { listTenants, getSubscription } from "@/modules/platform-admin/service";
 import {
   createTenantAction,
@@ -68,6 +69,7 @@ export default async function PlatformTenantsPage() {
                   )}
                 </td>
                 <td>
+                  <Link href={`/platform-admin/tenants/${tenant.tenantId}/usage`}>Usage</Link>{" "}
                   <form action={suspendWithId} style={{ display: "inline" }}>
                     <button type="submit" disabled={tenant.status === "suspended"}>
                       Suspend

@@ -223,3 +223,161 @@ flag-gated feature — none of the shipped modules (Foundation through
 Compliance) call it yet, since none of their stories asked for flag-gating;
 wiring it into their routes, if wanted, is a follow-up story for whichever
 module owns each gated feature, not something to retrofit here.
+
+---
+
+## 2026-09-14 — PLATFORM-P0-05.1, PLATFORM-P0-05.3, PLATFORM-P0-05.4 (2026-09-14 requirements refresh; PLATFORM-P0-05.2 deferred)
+
+**Agent:** Platform Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Per the user's explicit "continue automatically" instruction, picked up
+the four Not Started rows the requirements-refresh pass added to this
+backlog's Progress Tracker, auto-chained from Experience Agent.
+
+**Built:**
+
+- **PLATFORM-P0-05.1 — Usage & Limits.** New `modules/platform-admin/
+  usage.ts`: `checkUsageLimit(tenantId, resource)` (the story's own named
+  contract, mirroring `isFeatureEnabled()`'s shape) measures actual usage
+  against `subscriptions`' existing limit columns for four resources —
+  `users` (active `tenant_memberships`), `agents`, `integrations`,
+  `runtime_events_per_month` (counted from the start of the current UTC
+  month) — and classifies the result as `ok`/`soft_warning`/`hard_block`/
+  `unlimited` (no subscription row). Thresholds (soft warning at 90% of
+  the limit, hard block at 100%+) are a documented business decision, not
+  an architecture one, same framing PLATFORM-P0-02.1's own
+  `PLAN_DEFAULTS` used — extracted into a pure `classifyUsage(current,
+  limit)` function so the banding logic itself is unit-tested in
+  isolation from the DB queries. `getUsageSummary(tenantId)` returns all
+  four resources' status at once for the platform-admin UI surface (new
+  `/platform-admin/tenants/:id/usage` page, linked from the tenants
+  list). No cross-tenant aggregation anywhere — every query is scoped to
+  the one `tenantId` passed in, per CLAUDE.md §14. **Not measured**:
+  storage and AI-consumption usage — no module in this build tracks
+  either yet (flagged, not silently assumed, same treatment Risk Agent
+  gave its own unmeasured severity factors). **Not wired**: no other
+  module's create path calls `checkUsageLimit()` yet — publishing the
+  contract is this story's job; wiring each module's own create path is
+  that module's, exactly the same situation `isFeatureEnabled()` is
+  already in per the prior entry above.
+- **PLATFORM-P0-05.3 — Global Configuration Versioning.** New
+  `platform_config_versions` table (migration `0047`) records every write
+  to branding or a feature flag's platform-wide default, with
+  `old_value`/`new_value`/`actor_id`/`created_at`. New `modules/
+  platform-admin/configVersions.ts` (`recordConfigVersion`,
+  `listConfigVersions`, `getConfigVersion` — leaf-level, no dependency on
+  `branding.ts`/`featureFlags.ts`, to avoid a circular import) and
+  `modules/platform-admin/configRollback.ts` (`rollbackConfigVersion`,
+  which sits *above* `branding.ts`/`featureFlags.ts` in the import graph
+  specifically so it can call back into their real `updateBranding()`/
+  `updateFeatureFlagDefault()` update functions — reapplying a prior
+  version's `oldValue` through the same validation/versioning/audit path
+  the original change went through, never a raw table write, so a
+  rollback is itself versioned and audited exactly like any other config
+  change). `updateBranding()` (already `Done`, PLATFORM-P0-03.1) now
+  calls `recordConfigVersion()` in addition to its existing
+  `writePlatformAudit()` call — both are kept, per the story's own
+  acceptance criterion that `platform_audit_logs` "continues to record
+  before/after as it already does for branding changes." New
+  `updateFeatureFlagDefault()` (`featureFlags.ts`) — no path existed
+  before this story to change `platform_feature_flags.default_enabled`
+  at all, only per-tenant overrides; adding it is what makes the catalog
+  default itself change-controlled rather than a one-time migration-0038
+  seed. Both the branding page and the features page gained a version-
+  history list with a "roll back to before this change" button.
+- **PLATFORM-P0-05.4 — Maintenance Mode & Platform Announcements
+  (Platform-side).** New `platform_announcements` table (migration
+  `0047`: `scope` global/tenant, `type` maintenance/notice, `starts_at`/
+  `ends_at`, `created_by`) and `modules/platform-admin/announcements.ts`:
+  `createAnnouncement()` (audited), `listAnnouncements()` (admin
+  surface), and `getActiveAnnouncements(tenantId)` — the published read
+  contract this story's own cross-module note calls for: Platform Agent
+  owns the admin-side data model and management UI (new
+  `/platform-admin/announcements` page); rendering a notice inside
+  customer-facing UI is Experience Agent's ownership per the existing
+  UI-ownership split in the ownership map, so this module never reaches
+  into `app/(customer)/*` itself (non-negotiable #6/#18) — it only
+  publishes the read contract for Experience Agent to consume once
+  dispatched again. Added both new tables to
+  `docs/design/ownership-map.md` directly (owned outright by Platform
+  Agent, same as every other new table this session added by its own
+  owning module — not treated as requiring a separate user sign-off
+  cycle, since neither table duplicates or reaches into another module's
+  concept).
+- **PLATFORM-P0-05.2 — AI Provider Configuration — deliberately NOT
+  built this session.** Unlike PLATFORM-P0-05.4's ownership-map flag
+  (purely mechanical, resolved directly per the paragraph above), this
+  story's own text leaves genuinely open questions with real security
+  stakes: which AI providers to support, what "allowed capabilities"
+  means, what a budget-control model looks like — none of which the
+  backlog's acceptance criteria actually specify beyond generic words.
+  Guessing at these (e.g. hardcoding a specific provider list, inventing
+  a budget semantics) would be exactly the kind of unspecified
+  architecture/security decision CLAUDE.md §4's stop-and-report rule
+  exists for, especially given credentials are involved
+  (non-negotiable #10). Recorded here as an open question for the user
+  rather than guessed; Progress Tracker marked `Deferred`, not
+  `Not Started`, to distinguish "stopped on purpose" from "not reached
+  yet."
+
+**Verification run:**
+- `npm run typecheck`, `npm run lint`, `npm run build` — all clean. New
+  routes/pages confirmed present in the build output:
+  `/api/platform/v1/tenants/[id]/usage`, `/api/platform/v1/announcements`,
+  `/api/platform/v1/config-versions`, `/api/platform/v1/config-versions/
+  [id]/rollback`, `/platform-admin/tenants/[tenantId]/usage`,
+  `/platform-admin/announcements`.
+- `npx vitest run` — 132/132 passing across 21 files. New:
+  `usage.test.ts` covers `classifyUsage()`'s three bands at each boundary
+  plus the zero-limit edge case (always `hard_block`, even at zero usage
+  — there's no room at all).
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match.
+- Live-verified against the dev Supabase project (Supabase MCP, project
+  `ekgyjwoenteadaaqakmd`), after applying migration `0047`: a customer-
+  authenticated session (FinanceBot's Tenant A5 fixture user) sees zero
+  rows in both new tables and cannot forge an `INSERT` into
+  `platform_announcements` (both rejected — no client-facing policy at
+  all, same vendor-only-boundary pattern as every other `platform_*`
+  table). Replicated `getActiveAnnouncements()`'s exact query against
+  four throwaway announcements (a global active notice, a B5-only
+  tenant-scoped one, an already-expired one, and a future-scheduled one)
+  and confirmed only the still-active global notice is returned for
+  Tenant A5 — the tenant-scoped-to-a-different-tenant, expired, and
+  not-yet-started rows are all correctly excluded. Confirmed the real
+  agent count for Tenant A5 (1, FinanceBot itself) against a throwaway
+  `max_agents: 1` subscription row, matching `classifyUsage(1, 1)`'s
+  unit-tested `hard_block` result. Confirmed `platform_config_versions`
+  accepts both config types (`branding` with a null `config_key`,
+  `feature_flag_default` with a real flag key) per its check constraint.
+  All throwaway rows cleaned up. `get_advisors` (security) re-checked
+  after the migration — the only new findings are the expected
+  `rls_enabled_no_policy` INFO entries for the two new tables (by design,
+  same as every other `platform_*` table), nothing beyond that.
+
+**Not started this session / still open:**
+- PLATFORM-P0-05.2 (AI Provider Configuration) — deferred, open question
+  recorded above for the user.
+- PLATFORM-P0-05.4's Experience Agent half (rendering active
+  announcements in the customer shell) — not built; `getActiveAnnouncements()`
+  is published and ready for Experience Agent to consume next time it
+  runs.
+- `checkUsageLimit()` is not yet called by any other module's create
+  path — same situation as `isFeatureEnabled()`, a follow-up for
+  whichever module owns each gated create action.
+- Every item already open from the prior entry (PLATFORM-P0-02.2's
+  tenant-suspension-enforcement note, PLATFORM-P0-04.2's deferred
+  support-access story) is unchanged and carries forward; the
+  tenant-suspension gap this module originally surfaced was resolved by
+  Foundation Agent the same day via migration `0039` (see Foundation's
+  own audit log and `docs/RUN_ORDER.md`), but this module's own Progress
+  Tracker row for PLATFORM-P0-02.2 is left as this module last verified
+  it, per each module owning only its own tracker entries.
+
+**Dependencies consumed:** everything from the prior entry — no new
+dependency on another module's file.
+
+**Published this session:** `checkUsageLimit()`, `getUsageSummary()`,
+`classifyUsage()`, `updateFeatureFlagDefault()`, `listConfigVersions()`,
+`rollbackConfigVersion()`, `createAnnouncement()`, `listAnnouncements()`,
+`getActiveAnnouncements()` (all exported from `modules/platform-admin/
+service.ts`) — `getActiveAnnouncements()` most relevant to Experience
+Agent next time it runs.

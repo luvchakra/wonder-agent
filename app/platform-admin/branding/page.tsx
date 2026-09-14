@@ -1,11 +1,12 @@
-import { getBranding } from "@/modules/platform-admin/service";
-import { updateBrandingAction } from "@/app/actions/platform";
+import { getBranding, listConfigVersions } from "@/modules/platform-admin/service";
+import { updateBrandingAction, rollbackConfigVersionAction } from "@/app/actions/platform";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";
 
 export default async function PlatformBrandingPage() {
-  const branding = await getBranding();
+  const [branding, versions] = await Promise.all([getBranding(), listConfigVersions("branding", null)]);
+  const rollbackWithPath = rollbackConfigVersionAction.bind(null, "/platform-admin/branding");
 
   return (
     <main>
@@ -30,6 +31,20 @@ export default async function PlatformBrandingPage() {
         </p>
         <button type="submit">Save</button>
       </form>
+
+      <h2>Version history (PLATFORM-P0-05.3)</h2>
+      {versions.length === 0 && <p>No changes recorded yet.</p>}
+      <ul>
+        {versions.map((v) => (
+          <li key={v.id} style={{ marginBottom: "0.5rem" }}>
+            {v.createdAt} — <code>{JSON.stringify(v.newValue)}</code>
+            <form action={rollbackWithPath} style={{ display: "inline", marginLeft: "0.5rem" }}>
+              <input type="hidden" name="versionId" value={v.id} />
+              <button type="submit">Roll back to before this change</button>
+            </form>
+          </li>
+        ))}
+      </ul>
     </main>
   );
 }

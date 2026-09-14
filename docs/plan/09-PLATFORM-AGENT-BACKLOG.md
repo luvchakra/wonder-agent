@@ -26,10 +26,10 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-03.2 | Platform health surface | Done |
 | PLATFORM-P0-04.1 | `platform_audit_logs` | Done |
 | PLATFORM-P0-04.2 | Support access (higher bar) | Deferred — no time-bound/audited support-access infrastructure exists; the backlog explicitly forbids shipping an unbounded shortcut, so nothing was built |
-| PLATFORM-P0-05.1 | Usage & Limits tracking/enforcement | Not Started — new story, see Requirements Refresh below |
-| PLATFORM-P0-05.2 | AI Provider Configuration | Not Started — new story, see Requirements Refresh below |
-| PLATFORM-P0-05.3 | Global Configuration Versioning | Not Started — new story, see Requirements Refresh below |
-| PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Not Started — new story, see Requirements Refresh below |
+| PLATFORM-P0-05.1 | Usage & Limits tracking/enforcement | Done — `checkUsageLimit()`/`getUsageSummary()` published; not yet called by any other module's create path (same as `isFeatureEnabled()` itself) |
+| PLATFORM-P0-05.2 | AI Provider Configuration | Deferred — genuine open product/architecture question (which providers, what capability/budget model), not a mechanical ownership-map gap; stopped and recorded rather than guessed, per CLAUDE.md §4's stop-and-report rule |
+| PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
+| PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Partial — Platform-side schema/management/`getActiveAnnouncements()` read contract done; Experience Agent's customer-facing rendering of active announcements is not built (cross-module, Experience Agent's own ownership) |
 
 ---
 

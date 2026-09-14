@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { PlatformBranding } from "@/lib/shared/types/platform";
 import { toPlatformBranding } from "./mappers";
 import { writePlatformAudit } from "./auditLog";
+import { recordConfigVersion } from "./configVersions";
 
 export type UpdateBrandingInput = Partial<{
   productName: string;
@@ -44,6 +45,9 @@ export async function updateBranding(actorId: string, input: UpdateBrandingInput
     .single();
   if (error || !data) throw new ApiError(500, "UPDATE_FAILED", error?.message ?? "Failed to update branding");
 
+  // PLATFORM-P0-05.3 — structured, diffable version history, distinct
+  // from (and in addition to) the general platform_audit_logs entry below.
+  await recordConfigVersion(actorId, "branding", null, previous ? toPlatformBranding(previous) : null, toPlatformBranding(data));
   await writePlatformAudit({ actorId, action: "platform.branding_updated", oldValue: previous, newValue: input, result: "success" });
   return toPlatformBranding(data);
 }

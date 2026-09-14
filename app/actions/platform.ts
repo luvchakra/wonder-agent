@@ -4,13 +4,18 @@ import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import {
   activateTenant,
+  createAnnouncement,
   createSubscription,
   createTenant,
   decommissionTenant,
   grantPlatformAdmin,
+  rollbackConfigVersion,
   setFeatureFlag,
   suspendTenant,
   updateBranding,
+  updateFeatureFlagDefault,
+  type AnnouncementScope,
+  type AnnouncementType,
 } from "@/modules/platform-admin/service";
 import type { SubscriptionPlan, TenantEnvironment } from "@/lib/shared/types/platform";
 
@@ -69,4 +74,30 @@ export async function grantPlatformAdminAction(formData: FormData) {
   const { userId } = await requirePlatformAdmin();
   await grantPlatformAdmin(userId, String(formData.get("targetUserId") ?? ""));
   revalidatePath("/platform-admin/admins");
+}
+
+export async function updateFeatureFlagDefaultAction(formData: FormData) {
+  const { userId } = await requirePlatformAdmin();
+  await updateFeatureFlagDefault(userId, String(formData.get("flagKey") ?? ""), formData.get("defaultEnabled") === "true");
+  revalidatePath("/platform-admin/features");
+}
+
+export async function rollbackConfigVersionAction(returnPath: string, formData: FormData) {
+  const { userId } = await requirePlatformAdmin();
+  await rollbackConfigVersion(userId, String(formData.get("versionId") ?? ""));
+  revalidatePath(returnPath);
+}
+
+export async function createAnnouncementAction(formData: FormData) {
+  const { userId } = await requirePlatformAdmin();
+  const scope = (formData.get("scope") as AnnouncementScope) || "global";
+  await createAnnouncement(userId, {
+    scope,
+    tenantId: scope === "tenant" ? String(formData.get("tenantId") ?? "") || undefined : undefined,
+    type: (formData.get("type") as AnnouncementType) || "notice",
+    title: String(formData.get("title") ?? ""),
+    body: String(formData.get("body") ?? ""),
+    endsAt: String(formData.get("endsAt") ?? "") || undefined,
+  });
+  revalidatePath("/platform-admin/announcements");
 }

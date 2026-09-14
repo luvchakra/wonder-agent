@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { FeatureFlag } from "@/lib/shared/types/platform";
 import { toFeatureFlag } from "./mappers";
 import { writePlatformAudit } from "./auditLog";
+import { recordConfigVersion } from "./configVersions";
 
 /**
  * Published contract (docs/plan/09-PLATFORM-AGENT-BACKLOG.md): every other
@@ -54,4 +55,26 @@ export async function setFeatureFlag(actorId: string, tenantId: string, flagKey:
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
 
   await writePlatformAudit({ actorId, tenantId, action: "platform.feature_flag_changed", newValue: { flagKey, enabled }, result: "success" });
+}
+
+/**
+ * PLATFORM-P0-05.3 — versions the platform-wide *default* for a flag
+ * (`platform_feature_flags.default_enabled`), distinct from a per-tenant
+ * override above. No such update path existed before this story; adding
+ * it is what makes the catalog's default value itself change-controlled
+ * rather than a one-time seed from migration 0038.
+ */
+export async function updateFeatureFlagDefault(actorId: string, flagKey: string, defaultEnabled: boolean): Promise<FeatureFlag> {
+  const supabase = supabaseServiceRole();
+  const { data: previous, error: fetchError } = await supabase.from("platform_feature_flags").select().eq("key", flagKey).maybeSingle();
+  if (fetchError) throw new ApiError(500, "QUERY_FAILED", fetchError.message);
+  if (!previous) throw new ApiError(404, "FLAG_NOT_FOUND");
+
+  const { data, error } = await supabase.from("platform_feature_flags").update({ default_enabled: defaultEnabled }).eq("key", flagKey).select().single();
+  if (error || !data) throw new ApiError(500, "UPDATE_FAILED", error?.message ?? "Failed to update flag default");
+
+  await recordConfigVersion(actorId, "feature_flag_default", flagKey, { defaultEnabled: previous.default_enabled }, { defaultEnabled });
+  await writePlatformAudit({ actorId, action: "platform.feature_flag_default_changed", oldValue: { flagKey, defaultEnabled: previous.default_enabled }, newValue: { flagKey, defaultEnabled }, result: "success" });
+
+  return toFeatureFlag(data);
 }

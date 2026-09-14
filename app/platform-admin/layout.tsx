@@ -7,6 +7,7 @@ const NAV = [
   { href: "/platform-admin/tenants", label: "Tenants" },
   { href: "/platform-admin/features", label: "Feature Flags" },
   { href: "/platform-admin/branding", label: "Global Configuration" },
+  { href: "/platform-admin/announcements", label: "Announcements" },
   { href: "/platform-admin/health", label: "Platform Health" },
   { href: "/platform-admin/admins", label: "Platform Admins" },
 ];
