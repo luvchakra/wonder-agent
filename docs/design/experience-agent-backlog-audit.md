@@ -987,3 +987,109 @@ excluded (already server-paginated, converting it would regress §15); a
 few smaller lists remain on plain `Table`, reasonable at their current
 size. Neither story is rounded up to `Done` — both gaps left are now
 specific and small, not broad.
+
+---
+
+## 2026-09-14 — Round-2 requirements re-check against the re-uploaded
+`08_UI_UX.md`: four real gaps found via file-level codebase verification
+
+**Agent:** Experience Agent (documentation/planning only — no application code
+touched this pass, per the user's explicit instruction). **Branch:**
+`claude/wonderagent-setup-lasmly`.
+
+The user re-uploaded the module-08 requirements document a third time and asked
+for a fresh, thorough re-check against the current backlog, this time explicitly
+instructing a codebase sanity-check before accepting or rejecting any item as
+"missing."
+
+**Step 1 — established what's actually new in the text.** Diffed the re-uploaded
+doc's structure (§5, §6, §33-37, Expanded Requirements UX-P0-01 through UX-P2-03,
+"Design guardrails" — 447 lines) against what the two prior Requirements Refresh
+sections in `docs/plan/08-EXPERIENCE-AGENT-BACKLOG.md` already reconciled. Result:
+this upload is content-identical to the *first* refresh's source document — it does
+not include §38 "Locked Product Design System," which was a separate, later upload
+already fully reconciled as the EXPERIENCE-P0-09 addendum. So there is no new
+*textual* PRD content in this specific upload.
+
+**Step 2 — did the deeper check the task asked for anyway.** Rather than stop at
+"nothing textually new," opened the actual page files for every screen/worked-layout
+the doc names as P0, instead of trusting the Progress Tracker's prose descriptions
+of what EXPERIENCE-P0-03 built. This is the check this backlog's own prior entries
+had been skipping — prior reconciliation passes matched doc *text* (screen names,
+tab lists) against tracker *prose*, not against the rendered page's actual JSX.
+Found four real, specific requirements the doc names that are not built, despite
+living under an area the tracker marks `Done`:
+
+1. **Tenant Selection / Onboarding (§34 screen #2).** `app/onboarding/page.tsx`
+   exists and works but is raw unstyled scaffolding (inline `style={}`, no
+   `modules/ui/*` primitives, no theming) — never restyled by Experience Agent.
+   Confirmed via direct file read.
+2. **Effective Access Graph Visualization (§34 screen #6; CLAUDE.md §2's stack
+   requirement for "a graph visualization library").** `reactflow` is a
+   `package.json` dependency (confirmed present) but a repo-wide grep confirms zero
+   imports of it anywhere — no graph view exists. The Access tab
+   (`app/(customer)/access/agents/[agentId]/page.tsx`) is a flat table only, even
+   though Access Agent's backend graph endpoint
+   (`GET /api/v1/access/agents/:id/graph`, `modules/access-governance/graph.ts`)
+   is fully built and ready to consume.
+3. **Agent Detail header fields & primary action bar (§35 worked layout).**
+   Grepped for the exact header field labels the PRD specifies ("Business Owner,"
+   "Technical Owner," "IAM Identity," "Last Activity," "Next Certification") —
+   zero matches anywhere in `app/`. Read
+   `app/(customer)/agents/[id]/page.tsx` directly: the header only renders
+   lifecycle/criticality badges and type/environment/purpose text; the six named
+   primary actions (Certify Access, Restrict, Suspend, Request Change, Investigate,
+   View Access Graph) don't exist as a header action bar — only a generic
+   lifecycle-transition dropdown buried in a "Lifecycle" card.
+4. **Rogue Agent Detail action set (§37 worked layout).** Read
+   `app/(customer)/risk/rogue/[agentId]/page.tsx` directly: it is investigation-only
+   (why-flagged findings, SHOULD/CAN/DID deviation, ownership) with zero action
+   affordances — none of the six PRD-specified actions (Create remediation,
+   Restrict agent, Suspend agent, Assign owner, Create exception, Mark false
+   positive) are present on this page, even though the underlying capabilities
+   substantially exist elsewhere in the product (lifecycle transitions, finding
+   status transitions, `RemediateFindingButton`, a policy-exception concept in
+   Access/Risk).
+
+**Why these weren't caught in the two prior refreshes:** both prior passes
+reconciled the doc's screen/tab *names* against what the tracker's prose said was
+built, and both explicitly note doing a "checked `modules/ui/`/`app/(customer)/`"
+pass — but that check was aimed at detecting whether a *primitive* existed
+(`Table.tsx` vs. a real data-table; a confirm-dialog primitive vs. none), not at
+opening each specific PRD-named screen file and checking it field-by-field or
+action-by-action against the PRD's literal worked layout. "Login" was the one
+screen explicitly checked this way before (and correctly excused as Foundation's
+out-of-scope bare page); "Tenant selection" was never given the same individual
+check and silently inherited that same excuse incorrectly. §35 and §37's *content*
+(tabs, categories) was checked; their *action bars* were not.
+
+**Added to the backlog** (`docs/plan/08-EXPERIENCE-AGENT-BACKLOG.md`): four new
+Progress Tracker rows, all `Not Started`, all P0 (each is either explicitly under
+the doc's own "## P0 Screens" heading or is acceptance detail for a worked layout
+this backlog's own EXPERIENCE-P0-03 text already treats as P0):
+
+- **EXPERIENCE-P0-10** — Tenant Selection / Onboarding Screen
+- **EXPERIENCE-P0-11** — Effective Access Graph Visualization
+- **EXPERIENCE-P0-12** — Agent Detail Header Fields & Primary Action Bar
+- **EXPERIENCE-P0-13** — Rogue Agent Detail Action Set
+
+Plus a new dated "Requirements Refresh — 2026-09-14 (round 2, expanded doc)"
+section explaining the above in the backlog file itself. **No existing row's status
+was changed** — EXPERIENCE-P0-03, -04, -06, -09 and every other `Done`/`Partial` row
+is untouched, per the user's explicit instruction; these are net-new rows for
+specifically-scoped gaps, following this backlog's own established precedent (e.g.
+EXPERIENCE-P0-07 was split out as its own story rather than reopening `Done`
+EXPERIENCE-P0-01.1 for the same reason). Each new story's description notes it must
+reuse existing `modules/ui/*` primitives (and, for P0-11, the already-declared
+`reactflow` dependency) per CLAUDE.md §13 — none require a new component pattern or
+library.
+
+**Verification:** documentation-only pass — no `npm`/build/test commands run, per
+the task's explicit instruction. Verification here consisted of: `wc -l`/`diff`/
+`grep` comparison of the re-uploaded doc against the backlog's existing refresh
+sections (confirmed no new PRD text), and direct `Read`/`Grep` of the four affected
+page files plus `package.json` (confirmed `reactflow` unused) and a repo-wide grep
+for the §35 header field labels (confirmed absent) before writing any new row —
+every claim above is evidence-backed, not inferred from the doc alone.
+
+**No other module's backlog or any application code was touched.**

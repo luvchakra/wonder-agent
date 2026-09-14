@@ -30,6 +30,10 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-07 | Shell Global Search & Notifications | Done — `ShellGlobalSearch`/`ShellNotifications` now genuinely compose Operations Agent's real `/api/v1/search` and `/api/v1/notifications` endpoints (debounced live search, unread-count badge, mark-as-read) — corrects an earlier overclaim in this same row that described this as done while the components still rendered `NotYetAvailable`, see audit log |
 | EXPERIENCE-P0-08 | Data Table Primitive (sort/filter/pagination/saved URL state/responsive card transform) | Partial — `DataTable`/`useTableState`, plus `SimpleDataTable`, now consumed by eight real screens (Agent Inventory, Access Applications, Policies, the Risk index's agent/finding-count table, Integrations, Access Requests, Compliance Campaign Items); pagination/sort/filter still run client-side over the already-fetched full list since the underlying `list*()` contracts have no server-side pagination parameters yet (a documented stopgap, not the primitive's own limitation); Audit intentionally kept on the plain `Table` primitive since it already has real server-side cursor pagination (`listAuditLogs`) — converting it to `SimpleDataTable`'s client-side model would be a §15 regression, not an improvement; a few smaller lists remain on plain `Table`, reasonable for their current size |
 | EXPERIENCE-P0-09 | Locked Product Design System v2 (shadcn/Radix + CVA + OKLCH tokens + drawer-only nav + restructured topbar/account menu) | **Done** — adopted in full 2026-09-14 by explicit user approval (see the earlier Requirements Refresh addendum's four flagged questions, all resolved "adopt fully"): tokens re-keyed to OKLCH under shadcn's naming scheme, `Button`/`Badge` rebuilt on `class-variance-authority` with the exact default/outline/secondary/ghost/destructive/link variant set, left nav is now a drawer at every width (no desktop docked rail), topbar restructured (no avatar; tenant name in the left group), account menu relocated to the bottom of the nav drawer. One deliberate, disclosed deviation: dark mode was kept (re-implemented in OKLCH), not demoted to unsupported — see audit log for why |
+| EXPERIENCE-P0-10 | Tenant Selection / Onboarding Screen (PRD §34 screen #2) | Not Started — `app/onboarding/page.tsx` (Foundation Agent's bare functional page, tenant-list selection + create-organization form) exists and is functionally wired to `app/actions/tenant.ts`, but is unstyled generic scaffolding (raw inline `style={{...}}`, plain `<h1>`/`<ul>`/`<button>`, no `modules/ui/*` primitives, no design tokens, no light/dark handling) — never composed by Experience Agent, unlike every other bare page already restyled this session. No existing story names it; EXPERIENCE-P0-03's screen list omits both "Login" (explicitly checked and left as Foundation's out-of-scope bare page, see audit log) and "Tenant selection" (never checked until this pass) |
+| EXPERIENCE-P0-11 | Effective Access Graph Visualization (PRD §34 screen #6; CLAUDE.md §2 stack: "a graph visualization library (for the effective-access graph)") | Not Started — `reactflow` (`^11.11.4`) is a declared `package.json` dependency but is not imported or rendered anywhere in the codebase (verified by repo-wide grep); Access Agent's graph data contract (`GET /api/v1/access/agents/:id/graph`, `modules/access-governance/graph.ts`) exists and is fully backend-ready, but `app/(customer)/access/agents/[agentId]/page.tsx` (the Access/CAN tab) only renders a flat table of grants — no node/edge graph view exists anywhere. EXPERIENCE-P0-03's epic text names "Access graph" in passing but no acceptance criterion or built screen actually delivers it, despite EXPERIENCE-P0-03 being marked `Done` |
+| EXPERIENCE-P0-12 | Agent Detail Header Fields & Primary Action Bar (PRD §35 worked layout) | Not Started — `app/(customer)/agents/[id]/page.tsx`'s header shows only lifecycle/criticality badges and agent type/environment/purpose text; none of §35's specified header fields (Business Owner, Technical Owner, IAM Identity, Last Activity, Next Certification — verified absent by repo-wide grep) or its primary action bar (Certify Access, Restrict, Suspend, Request Change, Investigate, View Access Graph — today only a generic lifecycle-transition dropdown+form buried in a "Lifecycle" card) are built. CLAUDE.md §13 and this backlog's own EXPERIENCE-P0-03 text require following §35's exact worked layout, "not inventing a different structure" |
+| EXPERIENCE-P0-13 | Rogue Agent Detail Action Set (PRD §37 worked layout) | Not Started — `app/(customer)/risk/rogue/[agentId]/page.tsx` (built under EXPERIENCE-P0-03) is investigation-only: why-flagged findings, SHOULD/CAN/DID deviation, ownership — with zero action affordances. §37 specifies six actions (Create remediation, Restrict agent, Suspend agent, Assign owner, Create exception, Mark false positive); the underlying capabilities substantially exist elsewhere (lifecycle transition to RESTRICTED/SUSPENDED on the Agent Overview tab, `transitionFindingStatusAction`/`RemediateFindingButton` on the general Risk tab, a policy-exception concept in `modules/access-governance/policies.ts`/`modules/risk/findings.ts`) but are not surfaced on this specific PRD-specified worked layout. Reuse `ConfirmActionDialog` (EXPERIENCE-P0-04) for the destructive ones per CLAUDE.md §13 — no new confirmation pattern |
 
 ---
 
@@ -445,6 +449,82 @@ tracked above:
 No ownership-map or database-table change is implied by any of §38 — it is entirely
 presentation-layer scope within `modules/ui/*`, consistent with this module's
 "owns no database tables" position elsewhere in this file.
+
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded the module-08 requirements document (`08_UI_UX.md`) a third
+time and asked for a fresh, thorough re-check. First established what this specific
+upload actually contains: byte-for-byte the same PRD §5, §6, §33-37 and Expanded
+Requirements (UX-P0-01 through UX-P2-03, "Design guardrails") content as the
+original refresh above — it does **not** include §38 "Locked Product Design
+System" (already reconciled separately as the addendum above / EXPERIENCE-P0-09).
+So no new *textual* requirements exist in this upload beyond what the two prior
+refreshes already reconciled.
+
+What this pass instead surfaced is real: per this module's own instructions to
+sanity-check the doc's claims against the actual codebase (not just against prior
+paperwork) before declaring something covered, four requirements that the doc
+explicitly specifies — and that the existing Progress Tracker's language implied
+were satisfied by an already-`Done` EXPERIENCE-P0-03 — turned out, on inspection of
+`app/(customer)/*` and `modules/ui/*`, not to be actually built. Each is a specific,
+named PRD requirement (a numbered P0 screen or an exact worked layout CLAUDE.md §13
+requires be followed, "not invented differently"), not a vague gap, and none of them
+had a tracked row anywhere in this backlog before now — they were never caught
+because prior reconciliation passes matched the doc's *text* (screen names, tab
+lists) against the Progress Tracker's *prose descriptions* of what was built, without
+opening the actual page files to confirm the described widget/action/graph was
+literally present. This pass did that file-level check instead, per this task's
+explicit instruction, and found:
+
+- **EXPERIENCE-P0-10 — Tenant Selection / Onboarding Screen.** PRD §34 lists
+  "Tenant selection" as P0 screen #2. `app/onboarding/page.tsx` is a real,
+  functionally-wired screen (Foundation Agent's bare page) but was never restyled
+  onto the design system — still raw inline `style={}` and generic HTML. Missed
+  before because EXPERIENCE-P0-01.0's audit-log entry explicitly checked and
+  excused "Login" as Foundation's out-of-scope bare page, and "Tenant selection"
+  was never separately checked and silently fell into the same (incorrect)
+  assumption.
+- **EXPERIENCE-P0-11 — Effective Access Graph Visualization.** PRD §34 screen #6
+  and CLAUDE.md §2's locked stack both call for a graph visualization library for
+  the effective-access graph. `reactflow` is a declared dependency but is never
+  imported or rendered anywhere; the Access tab is a flat table. Missed before
+  because EXPERIENCE-P0-03's epic text mentions "Access graph" in the same breath
+  as "Effective access" as if one screen, and only the table half was ever built.
+- **EXPERIENCE-P0-12 — Agent Detail Header Fields & Primary Action Bar.** PRD §35's
+  worked layout (header fields, six primary actions) is specific and was already
+  flagged in this backlog as something to build "directly, not invent a different
+  structure" — but the actual header only shows lifecycle/criticality badges, and
+  the six named actions don't exist as a header action bar. Missed before because
+  EXPERIENCE-P0-03 was marked `Done` based on the tab structure being correct,
+  without a field-by-field check against §35's exact spec.
+- **EXPERIENCE-P0-13 — Rogue Agent Detail Action Set.** PRD §37's worked layout
+  specifies six actions; the built `/risk/rogue/:agentId` page is investigation-only
+  with zero action affordances. Missed before for the same reason as P0-12 — the
+  page's *structure* (why-flagged, deviation, ownership) matched the PRD's content
+  spec closely enough to read as complete, but the *actions* half of the same
+  worked layout was never checked against the actual rendered page.
+
+All four are added to the Progress Tracker above as `Not Started`, each with the
+specific file-level evidence for why it isn't done. None reopen or downgrade
+EXPERIENCE-P0-03 (still `Done`) or any other existing row — per this backlog's own
+established pattern (e.g. EXPERIENCE-P0-07 was split out as its own new story
+rather than reopening the `Done` EXPERIENCE-P0-01.1), a specifically-scoped gap in a
+PRD worked layout gets its own new row instead. All four are P0: each is either
+explicitly listed under the doc's own "## P0 Screens" heading (§34) or is acceptance
+detail for a worked layout this backlog's own EXPERIENCE-P0-03 text already treats
+as P0 ("specified in enough detail... to build directly") — not a judgment call
+toward P1/P2 under CLAUDE.md §3's "when unsure, treat as scope creep" guidance,
+since there is no real ambiguity here about tier. Any UI built for these four
+stories must reuse existing `modules/ui/*` primitives (`Card`, `Badge`,
+`ConfirmActionDialog`, `DataTable`, etc.) per CLAUDE.md §13 — none of them require a
+new component pattern; EXPERIENCE-P0-11 specifically should use the already-declared
+`reactflow` dependency rather than introducing a second graph library.
+
+No ownership-map change is needed: all four are presentation-layer composition over
+already-published contracts (Foundation's tenant actions for P0-10, Access Agent's
+existing graph endpoint for P0-11, Identity's existing lifecycle/ownership contract
+for P0-12, Risk's existing finding/remediation contract plus Access's exception
+concept for P0-13) — no new table, route, or shared type.
 
 ## P1
 
