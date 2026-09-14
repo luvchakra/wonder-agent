@@ -110,9 +110,9 @@ consume and persist into their own tables.
 | `/api/v1/agents`, `/api/v1/agents/:id` | IA |
 | `/api/v1/integrations` | INT |
 | `/api/v1/access`, `/api/v1/policies` | AA |
-| `/api/v1/runtime/events` | RA |
-| `/api/v1/findings` | RiskA |
-| `/api/v1/certifications` | CA |
+| `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |
+| `/api/v1/findings`, `/api/v1/risk` | RiskA |
+| `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 
