@@ -1,9 +1,11 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listCampaignItems, getCampaignMetrics } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DecisionForm } from "./DecisionForm";
+import { EvidenceTrigger, EvidenceDrawerClient } from "./EvidenceDrawerClient";
 import { Card, CardBody, Badge, SeverityBadge, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
 export default async function CampaignItemsPage({ params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +33,10 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
         </p>
       </div>
 
+      <Suspense fallback={null}>
+        <EvidenceDrawerClient items={items} />
+      </Suspense>
+
       <Card>
         <CardBody>
           {items.length === 0 ? (
@@ -44,6 +50,7 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
                   <Th>Usage</Th>
                   <Th>Recommendation</Th>
                   <Th>Status</Th>
+                  <Th>Evidence</Th>
                   <Th>Decision</Th>
                 </tr>
               </Thead>
@@ -68,6 +75,9 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
                     </Td>
                     <Td>
                       <Badge tone={item.status === "pending" ? "warning" : "success"}>{item.status}</Badge>
+                    </Td>
+                    <Td>
+                      <EvidenceTrigger itemId={item.id} />
                     </Td>
                     <Td>
                       {item.status === "pending" && item.reviewerId !== ctx.userId && (

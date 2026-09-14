@@ -691,3 +691,176 @@ from a literal reading of "adopt it fully," and it's disclosed with
 reasoning rather than silently done either way. Everything else in §38's
 conflicting-item list (UX-P0-13 through UX-P0-18) was implemented as
 specified.
+
+---
+
+## 2026-09-14 — "Keep going till all Experience backlog stories are
+complete": bare-page rollout, Action Safety/Evidence Drawer retrofits, a
+real contrast audit, and the Rogue Agent Detail layout
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+The user asked to keep going until every Experience story is `Done`.
+Worked through every remaining documented gap in priority order: the
+17 still-bare pages (EXPERIENCE-P0-03), the shell search/notifications
+overclaim, Action Safety retrofits (EXPERIENCE-P0-04), a real contrast
+audit and fixes (EXPERIENCE-P0-05), Evidence Drawer retrofits
+(EXPERIENCE-P0-06), further `DataTable` rollout (EXPERIENCE-P0-08), and
+the PRD §37 Rogue Agent Detail worked layout (the last piece of
+EXPERIENCE-P0-03). This entry covers three commits worth of work in this
+same dispatch (`6744f85`, the evidence/contrast/rogue-agent commit that
+follows, and this entry covering both).
+
+**Every remaining bare page restyled (EXPERIENCE-P0-03):** all 17 pages
+found by a repo-wide grep for pages not using `Card`/`DataTable`/
+`TableContainer` — Access (applications list, requests), Policies (list,
+detail), Compliance campaigns (list, detail), Integrations (list, new,
+detail), Audit, Search, Reports (list, detail), Settings/notifications,
+and Identity's Agents new/discovery/duplicates screens. A repo-wide
+re-grep after the pass confirms zero bare pages remain under
+`app/(customer)/*`.
+
+**New shared primitives to support the rollout:**
+- `modules/ui/Field.tsx` (`TextField`/`SelectField`/`TextareaField`) — one
+  consistent labeled-input treatment instead of every page hand-rolling
+  its own `inputClass`/`labelClass` strings, which is what every prior
+  bare page had been doing independently.
+- `modules/ui/DataTable.tsx` gained `SimpleDataTable`, generalizing the
+  client-side sort/filter/paginate-over-an-already-fetched-list pattern
+  `AgentsTable` established, now also consumed by Access's Applications
+  table and the Policies table.
+- `app/(customer)/loading.tsx`/`error.tsx` — Next.js App Router segment-
+  level fallbacks so every route under the shell gets a real skeleton
+  (`DetailSkeleton`) and a designed, retry-able error state
+  (`ErrorState` + a `reset()`-bound retry button) for free, closing
+  EXPERIENCE-P0-01.3's "not retrofitted everywhere" gap systemically
+  rather than page-by-page.
+
+**Action Safety retrofits (EXPERIENCE-P0-04), each wired to an existing
+API route rather than a bare form-submit button:**
+- Identity's duplicate-registration merge (`MergeDuplicateButton.tsx`) —
+  discards a pending registration permanently, now confirmed via
+  `ConfirmActionDialog` against `PATCH /api/v1/agents/duplicates/:id`.
+- Compliance's certification "revoke" decision (`DecisionForm.tsx`) — the
+  one decision type that really calls `revokeAccessGrant()` per
+  Compliance's own audit log; every other decision (approve/modify/
+  delegate/request_information) submits directly since they carry no
+  equivalent irreversible consequence. Wired to the existing
+  `POST /api/v1/compliance/items/:id/decisions` route.
+
+**Evidence Drawer retrofits (EXPERIENCE-P0-06), each namespaced
+(`useEvidenceDrawerParam(paramName)`) so more than one drawer can coexist
+on a page without URL-param collisions:**
+- Access — `AccessPathEvidenceDrawer.tsx`, composing Access Agent's
+  `explainAccessPath()` via the existing `GET /api/v1/access/agents/:id/
+  explain?resource=` route, deep-linkable via `?path=Application:
+  Entitlement`.
+- Runtime — `RuntimeEventEvidenceDrawer.tsx`, showing the full event
+  record (source, outcome, tool, raw payload) for an already-loaded event
+  row — no extra fetch needed since the events list is already fully
+  loaded server-side; deep-linkable via `?event=<id>`.
+- Compliance — `EvidenceDrawerClient.tsx` in the campaign detail page,
+  showing the point-in-time `CertificationSnapshot` (COMPLIANCE-P0-03)
+  a reviewer actually saw — agent contract version, access grant, policy
+  evaluations at capture time — again from already-loaded data, deep-
+  linkable via `?snapshot=<itemId>`.
+
+**Corrected an overclaim (EXPERIENCE-P0-07):** the Progress Tracker
+previously described `ShellGlobalSearch`/`ShellNotifications` as
+"now compose Operations Agent's real `/api/v1/search` and
+`/api/v1/notifications` endpoints," but the actual component code still
+rendered the `NotYetAvailable` placeholder from before Operations Agent
+existed — the doc update had outpaced the implementation. Fixed for real
+this pass: `ShellGlobalSearch` is a debounced live search against
+`/api/v1/search`, `ShellNotifications` fetches `/api/v1/notifications` on
+open and calls `POST /api/v1/notifications/:id/read` on click, with an
+unread-count badge on the bell icon.
+
+**A real, computed WCAG contrast audit (EXPERIENCE-P0-05)** — not another
+spot-check: `scripts/contrast-check.mjs` (new, committed to the repo for
+reuse) implements the OKLCH→linear-sRGB→relative-luminance pipeline and
+the WCAG contrast-ratio formula directly (no external library), and
+checks every token pair actually used as text-on-background or
+component-boundary-on-background across both themes. Found two real,
+specific failures and fixed both in `app/globals.css`:
+1. `success`/`warning` used as direct text-on-background (e.g. status
+   messages) fell short of 4.5:1 in light mode (4.33:1 and 3.89:1
+   respectively) — darkened both (`success` L 0.55→0.5, `warning` L
+   0.6→0.55) to 5.28:1/4.78:1.
+2. `input` (form-field border, a genuine WCAG 1.4.11 component-boundary
+   case, distinct from `border`'s decorative card/table-divider use)
+   was sharing `border`'s very subtle value (1.29:1/1.36:1 contrast) in
+   both themes — split it into its own token and raised it to 3.48:1
+   (light) / 3.30:1 (dark), both clearing the 3:1 component-boundary
+   threshold. `border` itself was deliberately left as-is: WCAG 1.4.11
+   doesn't require 3:1 for a purely decorative divider where the region
+   is still distinguishable by background/spacing, which is the case for
+   every card and table row in this codebase.
+Every text pair now passes; re-verified via a real-browser screenshot of
+the public `/sign-in` page after the change (light and dark) confirming
+no visual regression, and the full pipeline (typecheck/lint/139 tests/
+cold-cache build) stayed green throughout.
+
+**The Rogue Agent Detail worked layout (PRD §37, EXPERIENCE-P0-03's last
+open item):** built as `/risk/rogue` (an index of agents with open
+rogue-category findings) and `/risk/rogue/:agentId` (the dedicated
+investigation view) — deliberately distinct from the general per-agent
+Risk tab (`/risk/agents/:id`), per the backlog's own framing of it as "a
+rogue-specific investigation surface, not just the Risk tab." Leads with
+*why* the agent is flagged (its rogue-category findings specifically),
+the SHOULD/CAN/DID deviation behind them, and the ownership/
+accountability chain — rather than a flat list of every finding of every
+category. The rogue-category partition (`behavioral_deviation`,
+`identity_anomaly`, `ownership_violation`, `lifecycle_violation`, as
+distinct from the four access-violation categories) is not invented for
+this screen — it's the exact same partition Operations Agent's
+`generateRogueAgentReport()` already uses (`modules/operations/
+reports.ts`), kept in sync rather than defining a second, possibly-
+inconsistent notion of "rogue" for the UI.
+
+**Verification (full pipeline run after every sub-batch, not just once at
+the end):** `npm run typecheck`, `npm run lint`, `npx vitest run`
+(139/139 passing throughout — no test touches page components), `npm run
+build` with `.next` deleted first — all green at each checkpoint.
+`grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match, checked
+after each build. Live smoke tests against locally built production
+servers (torn down after each): every new/changed route (17 restyled
+pages, the two new Rogue Agent routes) correctly 307-redirects
+unauthenticated requests to `/sign-in` — no auth-boundary regression
+anywhere in this large a change set. Two real bugs were caught and fixed
+during this pass by the verification discipline itself, not luck: a
+`react-hooks/set-state-in-effect` lint error in `ShellGlobalSearch`
+(fixed by deriving `displayResults` from render state instead of
+resetting it synchronously in the effect) and the same class of bug in
+`AccessPathEvidenceDrawer` (fixed by tracking `attemptedRef` instead of a
+separate `loading` boolean set synchronously).
+
+**Still not `Done` after this pass, honestly:**
+- **EXPERIENCE-P0-01.0/01.2** — authenticated real-browser visual
+  verification remains blocked. This is not a re-assertion of the same
+  claim as before: this pass got a precise, empirical confirmation (a
+  real Playwright-driven sign-up attempt against the running app,
+  documented in the prior entry) that this sandbox's network egress
+  policy — confirmed directly via the agent proxy's own error message,
+  "connect_rejected... organization policy," when curl was pointed at
+  the Supabase project host — blocks the application's own server-side
+  Supabase Auth calls. No further attempt was made to route around an
+  explicit organizational network policy.
+- **EXPERIENCE-P0-04** — Action Safety now covers four real destructive
+  actions across three modules, not every destructive action on every
+  domain screen (e.g. Platform Agent's own tenant lifecycle actions,
+  which are a separate authorization boundary Experience Agent doesn't
+  compose per non-negotiable #3). Bulk-action reporting's per-item result
+  panel still has no real bulk endpoint to prove itself against — none
+  exists in this codebase yet.
+- **EXPERIENCE-P0-08** — `DataTable`/`SimpleDataTable` now has five real
+  consumers (Agent Inventory, Applications, Policies, plus the two
+  existing ones); Findings, Access Requests, Integrations, Compliance
+  Items and Audit still use the plain `Table` primitive. All of these
+  are smaller/less frequently very-large lists where a plain table is a
+  reasonable choice, but a literal "DataTable is the standard for every
+  list screen" reading of the story isn't fully satisfied.
+
+**Open questions:** none new. EXPERIENCE-P0-09's dark-mode-kept deviation
+from the prior entry remains the only outstanding disclosed decision
+point.

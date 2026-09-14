@@ -33,6 +33,7 @@ const NAV_GROUPS: NavGroup[] = [
     href: "/risk",
     children: [
       { label: "Risk Findings", href: "/risk" },
+      { label: "Rogue Agents", href: "/risk/rogue" },
       { label: "Certifications", href: "/compliance/campaigns" },
     ],
   },

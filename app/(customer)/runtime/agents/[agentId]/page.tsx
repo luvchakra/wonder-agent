@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listRuntimeEvents, getDid, compareShouldCanDid } from "@/modules/runtime-assurance/service";
@@ -19,7 +20,10 @@ import {
   Th,
   Td,
   Tr,
+  SelectField,
+  TextField,
 } from "@/modules/ui";
+import { RuntimeEventEvidenceTrigger, RuntimeEventEvidenceDrawer } from "./RuntimeEventEvidenceDrawer";
 
 const OUTCOME_TONE: Record<ComparisonOutcomeType, BadgeTone> = {
   healthy: "success",
@@ -30,10 +34,6 @@ const OUTCOME_TONE: Record<ComparisonOutcomeType, BadgeTone> = {
   unused_capability: "warning",
   unscored_unknown: "neutral",
 };
-
-const inputClass =
-  "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
-const labelClass = "block text-sm font-medium text-muted-foreground";
 
 /** Agent Detail — Runtime (DID) tab, including the SHOULD/CAN/DID comparison
  * that is central to CLAUDE.md §9's canonical model. Runtime Agent owns the
@@ -69,6 +69,10 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
       </div>
 
       <AgentTabs agentId={agentId} active="runtime" />
+
+      <Suspense fallback={null}>
+        <RuntimeEventEvidenceDrawer events={eventsPage.events} />
+      </Suspense>
 
       <Card>
         <CardHeader
@@ -151,30 +155,15 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
         <CardHeader title="Submit test runtime event" description="For demonstration/testing only — production events arrive via MCP/REST/webhook ingestion." />
         <CardBody>
           <form action={submitWithId} className="flex flex-wrap items-end gap-2">
-            <div>
-              <label className={labelClass}>Source</label>
-              <select name="source" defaultValue="rest" className={inputClass}>
-                <option value="mcp">mcp</option>
-                <option value="rest">rest</option>
-                <option value="webhook">webhook</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Application</label>
-              <input name="application" placeholder="e.g. Snowflake" className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Resource</label>
-              <input name="resource" placeholder="e.g. CustomerDB" className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Action</label>
-              <input name="action" placeholder="e.g. read" defaultValue="read" className={inputClass} />
-            </div>
-            <div>
-              <label className={labelClass}>Data classification</label>
-              <input name="dataClassification" placeholder="e.g. PII" className={inputClass} />
-            </div>
+            <SelectField label="Source" name="source" defaultValue="rest">
+              <option value="mcp">mcp</option>
+              <option value="rest">rest</option>
+              <option value="webhook">webhook</option>
+            </SelectField>
+            <TextField label="Application" name="application" placeholder="e.g. Snowflake" />
+            <TextField label="Resource" name="resource" placeholder="e.g. CustomerDB" />
+            <TextField label="Action" name="action" placeholder="e.g. read" defaultValue="read" />
+            <TextField label="Data classification" name="dataClassification" placeholder="e.g. PII" />
             <Button type="submit" variant="secondary">
               Submit event
             </Button>
@@ -196,6 +185,7 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
                   <Th>Application / Resource</Th>
                   <Th>Action</Th>
                   <Th>Data classification</Th>
+                  <Th>Evidence</Th>
                 </tr>
               </Thead>
               <tbody>
@@ -210,6 +200,9 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
                     </Td>
                     <Td>{e.action}</Td>
                     <Td>{e.dataClassification ?? "—"}</Td>
+                    <Td>
+                      <RuntimeEventEvidenceTrigger eventId={e.id} />
+                    </Td>
                   </Tr>
                 ))}
               </tbody>

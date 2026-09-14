@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
@@ -21,16 +22,15 @@ import {
   Th,
   Td,
   Tr,
+  SelectField,
+  TextField,
 } from "@/modules/ui";
+import { AccessPathEvidenceTrigger, AccessPathEvidenceDrawer } from "./AccessPathEvidenceDrawer";
 
 const GRANT_TYPES = [
   "direct", "inherited", "group", "role", "delegated",
   "token_scope", "oauth_scope", "api_scope", "mcp_tool_permission", "service_account_relationship",
 ] as const;
-
-const inputClass =
-  "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
-const labelClass = "block text-sm font-medium text-muted-foreground";
 
 /** Agent Detail — Access (CAN) tab. Owned data-fetch stays Access Agent's
  * own service contract; Experience Agent only composes it — see
@@ -66,6 +66,10 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
 
       <AgentTabs agentId={agentId} active="access" />
 
+      <Suspense fallback={null}>
+        <AccessPathEvidenceDrawer agentId={agentId} />
+      </Suspense>
+
       <Card>
         <CardHeader title="Effective Access (CAN)" description={`${effectiveAccess.length} grant${effectiveAccess.length === 1 ? "" : "s"}`} />
         <CardBody>
@@ -79,6 +83,7 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
                   <Th>Application</Th>
                   <Th>Entitlement</Th>
                   <Th>Data classification</Th>
+                  <Th>Evidence</Th>
                 </tr>
               </Thead>
               <tbody>
@@ -90,6 +95,11 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
                     <Td>{g.application}</Td>
                     <Td>{g.entitlementName}</Td>
                     <Td>{g.dataClassification ?? "—"}</Td>
+                    <Td>
+                      <Suspense fallback={null}>
+                        <AccessPathEvidenceTrigger resourceRef={`${g.application}:${g.entitlementName}`} />
+                      </Suspense>
+                    </Td>
                   </Tr>
                 ))}
               </tbody>
@@ -102,30 +112,23 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
         <CardHeader title="Add manual grant" />
         <CardBody>
           <form action={createGrantWithId} className="flex flex-wrap items-end gap-2">
-            <div>
-              <label className={labelClass}>Account</label>
-              <select name="accountId" className={inputClass}>
-                {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.externalAccountRef}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField label="Account" name="accountId">
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.externalAccountRef}
+                </option>
+              ))}
+            </SelectField>
             <div className="flex-1 min-w-[12rem]">
-              <label className={labelClass}>Entitlement ID</label>
-              <input name="entitlementId" placeholder="entitlement id (uuid)" required className={inputClass} />
+              <TextField label="Entitlement ID" name="entitlementId" placeholder="entitlement id (uuid)" required />
             </div>
-            <div>
-              <label className={labelClass}>Grant type</label>
-              <select name="grantType" defaultValue="direct" className={inputClass}>
-                {GRANT_TYPES.map((t) => (
-                  <option key={t} value={t}>
-                    {t}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectField label="Grant type" name="grantType" defaultValue="direct">
+              {GRANT_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </SelectField>
             <Button type="submit" variant="secondary">
               Grant
             </Button>
