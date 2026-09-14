@@ -26,6 +26,7 @@ import {
   TextField,
 } from "@/modules/ui";
 import { AccessPathEvidenceTrigger, AccessPathEvidenceDrawer } from "./AccessPathEvidenceDrawer";
+import { RevokeGrantButton } from "./RevokeGrantButton";
 
 const GRANT_TYPES = [
   "direct", "inherited", "group", "role", "delegated",
@@ -84,6 +85,7 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
                   <Th>Entitlement</Th>
                   <Th>Data classification</Th>
                   <Th>Evidence</Th>
+                  <Th>Actions</Th>
                 </tr>
               </Thead>
               <tbody>
@@ -99,6 +101,9 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
                       <Suspense fallback={null}>
                         <AccessPathEvidenceTrigger resourceRef={`${g.application}:${g.entitlementName}`} />
                       </Suspense>
+                    </Td>
+                    <Td>
+                      <RevokeGrantButton grantId={g.id} application={g.application ?? "this application"} entitlementName={g.entitlementName ?? "this entitlement"} />
                     </Td>
                   </Tr>
                 ))}

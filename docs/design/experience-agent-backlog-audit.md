@@ -916,3 +916,74 @@ authenticated real-browser verification (this sandbox's network egress
 policy, confirmed empirically this session — see the entry above) — and
 these two, EXPERIENCE-P0-04/08, which are now down to a small, explicitly
 named remainder rather than a broad gap.
+
+## 2026-09-14 — Access grant revocation confirmation; Access Requests and
+Compliance Campaign Items converted to `DataTable`
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+Continuing the same push on EXPERIENCE-P0-04/08's remaining named gaps.
+Investigated two candidate destructive actions before building anything:
+`grep`-checked for a `DELETE` handler on `app/api/v1/sso/[id]/route.ts`
+and for a `deleteSso`/`removeSso` server action anywhere in `lib/auth/`
+or `app/actions/` — neither exists. SSO connection deletion is not an
+implemented feature in this codebase at all; building the underlying
+capability would be Foundation Agent's scope (owns `lib/auth/sso.ts` and
+its API routes), not something Experience Agent should retrofit a
+confirmation dialog onto. Correctly out of scope, not a gap.
+
+By contrast, `app/api/v1/access/grants/[id]/route.ts` has a real,
+already-implemented `DELETE` handler calling `revokeAccessGrant()`
+(`access.manage` permission), with no UI trigger anywhere — the Access
+agent-detail page's effective-access table was read-only.
+
+- **EXPERIENCE-P0-04** — `RevokeGrantButton.tsx` (new, under
+  `app/(customer)/access/agents/[agentId]/`) wraps the existing
+  `DELETE /api/v1/access/grants/:id` route with `ConfirmActionDialog`,
+  following the exact `MergeDuplicateButton`/`RemoveRoleButton` pattern.
+  Added as a new "Actions" column on the effective-access table in
+  `app/(customer)/access/agents/[agentId]/page.tsx`. The manual-grant
+  form and "Run evaluation" button on this same page have always been
+  visible to any `access.read` user with real enforcement happening
+  server-side in the action/route (`access.manage`) — this button
+  follows that same pre-existing, established convention rather than
+  introducing a new one.
+- **EXPERIENCE-P0-08** — `AccessRequestsTable.tsx` (new) converts
+  `app/(customer)/access/requests/page.tsx` from the plain `Table`
+  primitive to `SimpleDataTable`, keeping the existing per-row
+  approve/reject/mark-fulfilled forms as a column `render`.
+  `CampaignItemsTable.tsx` (new) does the same for
+  `app/(customer)/compliance/campaigns/[id]/page.tsx`, keeping the
+  existing evidence-drawer trigger and reviewer-gated `DecisionForm` as
+  column `render`s (the reviewer gate — `reviewerId !== currentUserId`
+  — is passed in as a `currentUserId` prop from the server-rendered
+  page, since that check depends on the authenticated user's identity).
+  Deliberately did **not** convert `app/(customer)/audit/page.tsx`:
+  unlike every other list screen still on plain `Table`, Audit already
+  has real server-side cursor pagination (`listAuditLogs` with a
+  `cursor` param) — converting it to `SimpleDataTable`'s client-side
+  sort/filter/paginate-over-the-full-list model would be a regression
+  against CLAUDE.md §15 (fetch the whole table, paginate only in the
+  browser), not an improvement. Audit is correctly excluded from this
+  story's remaining scope, not an oversight.
+
+Verified: `npm run typecheck`, `npm run lint`, `npx vitest run`
+(139/139, unchanged), `npm run build` with `.next` deleted first — all
+green. `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match.
+Live smoke test against `npm run start`: `/access/agents/:id`,
+`/access/requests`, `/compliance/campaigns/:id`, `/integrations`, `/risk`
+all correctly 307-redirect an unauthenticated request to `/sign-in`;
+server process confirmed torn down afterward.
+
+**Updated honest state of both stories** (Progress Tracker rows updated
+in the same commit): EXPERIENCE-P0-04 now has six real
+`ConfirmActionDialog` consumers across four modules, with the two most
+plausible remaining candidates checked (SSO deletion: out of scope,
+doesn't exist; access-grant revocation: now wired) — the only remaining
+named gap is bulk-action reporting, which still has no real bulk
+endpoint anywhere in the product to wire it to. EXPERIENCE-P0-08 now has
+eight real `DataTable`/`SimpleDataTable` consumers; Audit is intentionally
+excluded (already server-paginated, converting it would regress §15); a
+few smaller lists remain on plain `Table`, reasonable at their current
+size. Neither story is rounded up to `Done` — both gaps left are now
+specific and small, not broad.

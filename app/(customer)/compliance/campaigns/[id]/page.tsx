@@ -4,9 +4,9 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listCampaignItems, getCampaignMetrics } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { DecisionForm } from "./DecisionForm";
-import { EvidenceTrigger, EvidenceDrawerClient } from "./EvidenceDrawerClient";
-import { Card, CardBody, Badge, SeverityBadge, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
+import { CampaignItemsTable } from "./CampaignItemsTable";
+import { EvidenceDrawerClient } from "./EvidenceDrawerClient";
+import { Card, CardBody, EmptyState } from "@/modules/ui";
 
 export default async function CampaignItemsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: campaignId } = await params;
@@ -42,53 +42,7 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
           {items.length === 0 ? (
             <EmptyState title="No items in this campaign" />
           ) : (
-            <TableContainer>
-              <Thead>
-                <tr>
-                  <Th>Agent</Th>
-                  <Th>Risk</Th>
-                  <Th>Usage</Th>
-                  <Th>Recommendation</Th>
-                  <Th>Status</Th>
-                  <Th>Evidence</Th>
-                  <Th>Decision</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {items.map((item) => (
-                  <Tr key={item.id}>
-                    <Td>
-                      <Link href={`/agents/${item.agentId}`} className="text-primary hover:underline">
-                        {item.agentId}
-                      </Link>
-                    </Td>
-                    <Td>{item.riskAtReview ? <SeverityBadge severity={item.riskAtReview} /> : "—"}</Td>
-                    <Td>{item.usageAtReview ?? "—"}</Td>
-                    <Td>
-                      {item.recommendation ? (
-                        <Badge tone={item.recommendation === "remove" ? "danger" : item.recommendation === "review" ? "warning" : "success"}>
-                          {item.recommendation}
-                        </Badge>
-                      ) : (
-                        "—"
-                      )}
-                    </Td>
-                    <Td>
-                      <Badge tone={item.status === "pending" ? "warning" : "success"}>{item.status}</Badge>
-                    </Td>
-                    <Td>
-                      <EvidenceTrigger itemId={item.id} />
-                    </Td>
-                    <Td>
-                      {item.status === "pending" && item.reviewerId !== ctx.userId && (
-                        <span className="text-xs text-muted-foreground">Assigned reviewer only</span>
-                      )}
-                      {item.status === "pending" && item.reviewerId === ctx.userId && <DecisionForm itemId={item.id} />}
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </TableContainer>
+            <CampaignItemsTable items={items} currentUserId={ctx.userId} />
           )}
         </CardBody>
       </Card>
