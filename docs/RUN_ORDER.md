@@ -22,7 +22,7 @@ stop-and-report rule always wins).
 | 1 | Foundation Agent | Everything depends on tenant/RBAC/RLS/audit | Done (P0 core; a few items deferred — see its audit log) |
 | 2 | Identity Agent | Only needs Foundation; defines the canonical agent + Agent Contract (SHOULD) every later module reads | Done |
 | 2 | Integration Agent | Only needs Foundation; can build its connector framework against manual data without waiting on Identity | Done |
-| 3 | Access Agent | Needs Identity's contract + (ideally) Integration's normalized access data to compute CAN | Not started |
+| 3 | Access Agent | Needs Identity's contract + (ideally) Integration's normalized access data to compute CAN | Done |
 | 3 | Runtime Agent | Needs Identity's contract + Access's CAN to run the SHOULD/CAN/DID comparison | Not started |
 | 4 | Risk Agent | Pure consumer of Identity + Access + Runtime's outputs — can't produce real findings before those exist | Not started |
 | 4 | Compliance Agent | Needs Identity, Access, Runtime, and Risk (for the Risk column in certification review) | Not started |
