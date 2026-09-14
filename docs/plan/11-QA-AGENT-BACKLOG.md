@@ -40,6 +40,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-12 | Security scanning | Partial — live advisor scan run, one real finding fixed (security-definer over-grant); `npm audit` now run (prod + full scope), 0 vulnerabilities either way; no static-analysis pass beyond ESLint, `auth_leaked_password_protection` still disabled (dashboard-only setting, flagged for follow-up) |
 | QA-P0-13 | Failure recovery (retry/idempotency) | Partial — dedupe-key idempotency unit-tested; no end-to-end forced-failure-and-retry test built |
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
+| QA-P1-07 | Release record completeness standard | Not Started — `INTEGRATION_STATUS.md` does not currently record a commit/version identifier for the release snapshot, nor does it give an explicit P1/P2 status summary alongside its existing P0 detail |
 
 ---
 
@@ -355,6 +356,12 @@ changed here.
 - **QA-P1-06 — Security Penetration Readiness.** Prepare endpoint inventory,
   threat model, authorization matrix, test accounts, and evidence for
   external security testing.
+- **QA-P1-07 — Release Record Completeness Standard.** The release record
+  (`INTEGRATION_STATUS.md`) must explicitly carry a commit/version identifier
+  for the snapshot it describes, and an explicit P0/P1/P2 status summary
+  (not just P0 story-level detail), in addition to the migration status, test
+  summary, known limitations, connector compatibility and security findings
+  it already records — see Requirements Refresh (round 2) below.
 
 ## P2 (strategic, after P0/P1 proven)
 
@@ -366,6 +373,94 @@ changed here.
 - **QA-P2-03 — Capacity Forecasting.** Track growth of tenants, agents,
   access edges, runtime events, and audit records, and recommend scaling
   thresholds.
+
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded this module's requirements doc
+(`11_INTEGRATION_QA_HARDENING.md`) in a newer/expanded form. Read in full
+against the current backlog, `INTEGRATION_STATUS.md`, and both existing
+audit-log entries (per this refresh's own dispatch instructions) to check for
+anything not already reflected. The doc's structure is: a header/Purpose/
+Engineering-rules block, the full original master PRD (§46–§55, matching
+`CLAUDE.md` §9–§16 and this backlog's own Purpose/Ownership Boundary/Release
+Gate content almost verbatim — no new scope there), then the same
+"Expanded Requirements" flat list (`QA-P0-01`–`QA-P0-15`, `QA-P1-01`–`06`,
+`QA-P2-01`–`03`) already fully reconciled by the first Requirements Refresh
+pass above (mapped to `QA-P0-05`–`QA-P0-14`, or marked "already covered", or
+copied verbatim into this file's own `## P1`/`## P2` sections) — re-checked
+item by item this pass and confirmed still accurate, including specific
+checks that were not obviously already covered:
+
+- **"RPC" as a tenant-isolation surface** (doc's `QA-P0-03`, already mapped
+  to `QA-P0-02.1`): grepped the whole codebase for `.rpc(` — only
+  `create_tenant_with_owner` (an already-audited, intentionally
+  `authenticated`-executable tenant-provisioning function) and the MCP
+  connector's own JSON-RPC client method (a different, unrelated meaning of
+  "RPC" — an outbound protocol call, not a Supabase database RPC). No
+  untested Supabase RPC surface exists.
+- **"Caches" as a tenant-isolation surface** (same story): grepped for
+  cache/memoization patterns across `lib/`, `modules/`, `app/` — no
+  in-memory or persisted cache exists anywhere in the codebase; reports and
+  computed views are explicitly built and commented "never cached"
+  (`modules/operations/reports.ts`, `app/(customer)/reports/page.tsx`).
+  Nothing to isolation-test because the feature doesn't exist — not a gap.
+- **"Secure headers checks"** (doc's `QA-P0-11`, mapped to `QA-P0-12`):
+  confirmed `next.config.ts` (FOUNDATION-P0-05.3) sets
+  `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+  `Permissions-Policy` and a `Content-Security-Policy` on every route. This
+  wasn't itself called out in `INTEGRATION_STATUS.md` §7's `QA-P0-12`
+  write-up, but it's a sub-detail of that already-`Partial` story (security
+  scanning), not a new requirement — no new row added for it.
+
+### QA-P1-07 — Release record completeness standard (source: doc's unlabeled
+closing "Final release evidence" paragraph)
+
+The one genuinely new item found this pass. After its `QA-P2-03` entry, the
+doc adds a closing paragraph not present anywhere in the already-reconciled
+flat list: *"The release record must include commit/version, migration
+status, test summary, known limitations, connector compatibility and
+security findings and explicit P0/P1/P2 status. Never mark a release
+'production ready' when a mandatory P0 gate fails."* The "never mark
+production ready" half is already covered by this backlog's own Release
+Gate section. The rest names a specific checklist for what the release
+record itself (`INTEGRATION_STATUS.md`, QA-owned per "Owned entities") must
+contain — checked field by field against the current document:
+
+| Required field | Present in `INTEGRATION_STATUS.md` today? |
+|---|---|
+| Migration status | Yes — §5 (QA-P0-04.2) |
+| Test summary | Yes — §5 (QA-P0-04.1, 139/139) |
+| Known limitations | Yes — throughout |
+| Connector compatibility | Partially — §1's table notes Saviynt/MCP status inline; no dedicated section (the dedicated compatibility matrix is already tracked separately as `QA-P1-04`, not duplicated here) |
+| Security findings | Yes — §5/§7 |
+| Explicit P0 status | Yes — extensively, this is most of the document |
+| **Commit/version identifier** | **No — not present anywhere in the document** |
+| **Explicit P1/P2 status** | **No — the document only ever states P0 story status; P1/P2 items exist in each module's own backlog but the release record itself never summarizes where the platform stands against them** |
+
+This was not caught by the first Requirements Refresh pass because that
+pass's own summary of the doc's "Expanded Requirements" section stopped at
+`QA-P2-03` — the closing paragraph sits outside the numbered list it was
+reconciling and is easy to read past. It is real, scoped entirely to a file
+QA already owns, and requires no new database table, route, or shared type.
+Added to the Progress Tracker above as `QA-P1-07`, status Not Started, and to
+`## P1` below. Classified P1 (enterprise readiness / release-process rigor)
+rather than P0: it is a documentation-completeness requirement on the
+release record's own contents, not itself a security or isolation gate: per
+`CLAUDE.md` §3, "when genuinely unsure, prefer P1/P2 over P0."
+
+### No other new items found
+
+Every other requirement in the doc — including its full master-PRD
+background sections (§46–§55) — is either already tracked by name in this
+backlog (directly, via the first Requirements Refresh's mapping, or via
+`INTEGRATION_STATUS.md`), or restates `CLAUDE.md`'s own binding sections
+(§9 core model, §10 boundaries, §11 acceptance scenario, §12 Definition of
+Done) without adding scope. None of this round's re-checks (RPC, caches,
+secure headers, above) turned up a feature or test surface that doesn't
+already exist or isn't already an accurately-tracked gap. The task's
+"known existing tracked gaps" list (pagination, FinanceBot step 7,
+`QA-P0-06`–`14` partial coverage, sandbox-only constraints) was not touched
+or re-added.
 
 ## DO NOT IMPLEMENT
 

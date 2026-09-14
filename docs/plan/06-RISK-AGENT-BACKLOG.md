@@ -29,6 +29,7 @@ this module is higher bar (see below).
 | RISK-P0-02.2 | Configurable severity weights & INFO tier | Done |
 | RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Done |
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
+| RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Not Started |
 
 ---
 
@@ -404,6 +405,109 @@ this repository's standing autopilot/auto-chain policy in `CLAUDE.md` §7 and
 requirement, and is called out to the user separately rather than silently
 changed here.
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded the Risk module requirements doc at
+`06_RISK_ROGUE_DETECTION.md` for a fresh, thorough re-check, since the
+upload was described as a newer/expanded version of the doc reconciled in
+the round-1 refresh above. Read the full re-uploaded doc end to end and
+compared it, section by section, against everything already tracked above
+(the original Epics, the round-1 refresh, and the existing `## P1`/`## P2`
+lists) — including sanity-checking against `modules/risk/scoring.ts`,
+`modules/risk/findings.ts`, `modules/risk/rules.ts`,
+`lib/shared/types/risk.ts` and the `risk_findings`/`risk_severity_weights`
+migrations (`0034`, `0044`, `0045`) rather than assuming.
+
+**Finding: the re-uploaded doc's own content — its story-ID list
+(`RISK-P0-01`..`RISK-P0-10`, `RISK-P1-01`..`RISK-P1-04`,
+`RISK-P2-01`..`RISK-P2-03`) and headings — is identical to what round 1
+already reconciled against; no new or renumbered story IDs, and no
+additional P0/P1/P2 items appear in this pass's upload.** Round 1's
+per-story reconciliation (the "Already covered, no new tracker row
+needed" list, plus `RISK-P0-01.4`/`RISK-P0-02.2`/`RISK-P0-03.4`/
+`RISK-P0-03.5` it added) still holds and is not reopened here.
+
+One genuine gap survived round 1's story-ID-level reconciliation, because
+round 1 matched `RISK-P0-01` ("Deterministic Risk Model") to
+`RISK-P0-02.1` (Done) at the story-ID level without diffing the *specific
+factor list* underneath it against the doc's separate, more detailed
+"# 15. Risk Engine" narrative section (part of the doc's raw
+"Original Master PRD Requirements" quote, not the numbered
+`RISK-P0-XX` list, which is likely why it was missed both times). That
+section enumerates 13 risk-score factors: privilege level, data
+sensitivity, production access, destructive capability, external
+communication, owner status, certification status, **credential status**,
+policy violation, runtime anomaly, identity anomaly, **attack path**, and
+business criticality. Checked `DEFAULT_SEVERITY_WEIGHTS` in
+`modules/risk/scoring.ts` directly: it implements exactly 8 factors
+(production environment access, sensitive data, external communication,
+certification overdue, active policy violation, runtime/behavioral
+anomaly, business criticality, missing/invalid ownership) — confirmed via
+`grep` across `modules/risk/` and `lib/shared/types/risk.ts` that
+**privilege level, destructive capability, credential status and attack
+path never appear anywhere in the implementation or in any prior audit
+entry**. This is a genuine, previously-uncaught gap between the doc and
+the tracked backlog — added below as `RISK-P1-05`.
+
+### RISK-P1-05 — Additional Deterministic Risk Factors
+
+Extend the `RISK-P0-02.1`/`RISK-P0-02.2` weighted-factor model with four
+factors the doc's "# 15. Risk Engine" section names but the current
+factor table omits:
+
+- **Privilege level** — the entitlement's own privilege tier (e.g.
+  admin/superuser vs. standard scoped role), distinct from environment
+  (`production access`) or ownership.
+- **Destructive capability** — whether the effective access includes a
+  destructive verb (delete/purge/overwrite) on a resource, distinct from
+  merely touching sensitive data or production.
+- **Credential status** — health of the credential/secret backing the
+  agent's access (expired, weak, shared, overdue for rotation), distinct
+  from `identity_anomaly` (which is about the *runtime event's identity
+  not matching what's on file*, not the credential's own hygiene).
+- **Attack path** — whether the agent sits on a graph path to a
+  higher-value/blast-radius resource; related to but not identical to
+  `RISK-P2-02` (Graph Risk Propagation, which models *downstream* impact
+  of a compromised identity) — here the concern is scoring the agent's
+  *own* current exposure via its position in the access graph, not
+  simulating propagation from it. Depends on Access Agent's effective-
+  access graph, same as `RISK-P2-02`.
+
+Classified **P1** (enterprise readiness), not P0: the P0 central
+acceptance scenario (FinanceBot/CustomerDB) already lands correctly at
+`critical` using the existing 8 factors plus the explicit
+prohibited-data override, without any of these four — none of them is a
+required extension point for that scenario, and CLAUDE.md §3 directs
+treating an unclear P0/P1 call as scope creep and preferring P1/P2. Two
+of the four (`destructive capability`, `attack path`) also depend on data
+Access Agent's effective-access model would need to expose (a
+destructive-verb flag on entitlements; graph position) that isn't
+confirmed to exist yet as a published contract — record that dependency
+when this story is picked up rather than inventing Access Agent's
+representation of it. Acceptance, when implemented: each new factor gets
+its own named weight in `DEFAULT_SEVERITY_WEIGHTS`/
+`risk_severity_weights` (reusing the existing configurable-weight
+machinery from `RISK-P0-02.2` — no new config mechanism), contributes 0
+until its data source is actually available (same documented pattern
+already used for `external communication capability` and
+`certification overdue`), and does not change any already-`Done` scoring
+outcome for the FinanceBot scenario.
+
+**Not flagged as ML/LLM-based:** none of these four factors, nor anything
+else in the re-uploaded doc, describes machine-learning- or LLM-based
+anomaly detection — the doc's factor list and its "LLMs may explain
+findings but MUST NOT be the sole authority for access/risk decisions"
+line are consistent with non-negotiable #9 and with this backlog's
+existing AI usage boundary. No flag needed on that front this round.
+
+No other genuinely new requirement, story, or acceptance-criterion detail
+was found in this pass — everything else in the re-uploaded doc (the
+rogue categories, the evidence-pack shape, explainability, deduplication,
+false-positive handling, the finding lifecycle states, the recommendation
+engine, re-evaluation, and the `RISK-P1-01`..`RISK-P2-03` list) was
+already reflected, at matching or finer granularity, in the Epics above
+and in the round-1 refresh.
+
 ## P1
 
 Statistical/ML-free-but-more-sophisticated behavioral baselining. Attack-path
@@ -423,6 +527,11 @@ non-negotiable #15 — do not build this speculatively).
   supports the correlation — distinct from the existing "attack-path scoring"
   line above, which is about access-path traversal rather than signal
   correlation.
+- **RISK-P1-05 — Additional Deterministic Risk Factors.** Extend the
+  `RISK-P0-02.1`/`RISK-P0-02.2` weighted factor model with privilege level,
+  destructive capability, credential status and attack path — see the
+  "Requirements Refresh — 2026-09-14 (round 2, expanded doc)" section above
+  for the full detail and dependency notes.
 
 ## P2 (strategic, after P0/P1 proven)
 

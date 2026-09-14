@@ -195,3 +195,95 @@ step 7 and the sandbox-only constraints are unchanged and unchangeable
 from this environment. Not claiming a release-gate pass this dispatch —
 recording concrete, verified progress against two specific named items
 instead.
+
+## 2026-09-14 — Third dispatch: documentation-only re-check against the
+expanded requirements doc (round 2), no application/test code touched
+
+**Agent:** QA Agent. Documentation/planning pass only, per this dispatch's
+explicit scope: read the newly re-uploaded, expanded
+`11_INTEGRATION_QA_HARDENING.md` in full, re-checked it against the current
+`docs/plan/11-QA-AGENT-BACKLOG.md` (including its existing Requirements
+Refresh section), `INTEGRATION_STATUS.md`, and this audit log's own two
+prior entries, to find anything genuinely new that the first Requirements
+Refresh pass missed. No migration, service code, route, or test file was
+touched; the verification pipeline (typecheck/lint/test/build) was not run,
+per this dispatch's explicit instruction.
+
+**Finding: the doc is almost entirely already reconciled.** The uploaded
+doc's structure is a header/Purpose/Engineering-rules block, the full
+original master PRD (§46–§55 — P0/P1 feature lists, the P0 acceptance
+scenario, development order, Claude Code operating instructions, Definition
+of Done, Non-Goals, final product definition, implementation guardrails,
+first commercial wedge, final-pass procedure, release gate), and then the
+same "Expanded Requirements" flat list (`QA-P0-01`–`QA-P0-15`,
+`QA-P1-01`–`06`, `QA-P2-01`–`03`) the first Requirements Refresh pass already
+fully reconciled (mapped to `QA-P0-05`–`QA-P0-14`, marked "already covered,"
+or copied verbatim into this backlog's own `## P1`/`## P2` sections). The
+master-PRD sections restate `CLAUDE.md` §9–§16 almost verbatim and add no
+new scope.
+
+**Three specific re-checks performed before concluding "no gap," rather than
+trusting the first pass's mapping claims at face value:**
+
+1. Doc's `QA-P0-03` (Tenant Isolation Suite) names "RPC" and "caches" as
+   surfaces distinct from what `QA-P0-02.1`'s own text enumerates. Grepped
+   the whole codebase for `.rpc(` — only `create_tenant_with_owner`
+   (already audited, intentionally `authenticated`-executable) and the MCP
+   connector's own outbound JSON-RPC client method (an unrelated meaning of
+   "RPC"). Grepped for cache/memoization patterns — none exist anywhere;
+   reports and computed views are explicitly built and commented "never
+   cached." Both surfaces are genuinely non-issues: nothing exists to leak
+   cross-tenant data through, not an untested gap.
+2. Doc's `QA-P0-11` (Security Scanning) names "secure headers checks."
+   Confirmed `next.config.ts` (FOUNDATION-P0-05.3) sets
+   `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
+   `Permissions-Policy`, and a `Content-Security-Policy` repo-wide. This
+   detail wasn't itself named in `INTEGRATION_STATUS.md` §7's `QA-P0-12`
+   write-up, but it is a sub-detail of that already-tracked `Partial` story,
+   not a new requirement — no new row added for it.
+3. Diffed the doc's full "Expanded Requirements" wording against every
+   corresponding backlog story's own wording line by line (not just ID
+   matching) — no material wording differences found; the first pass's
+   reconciliation is accurate, not just superficially ID-matched.
+
+**One genuinely new item found and added: `QA-P1-07` — Release record
+completeness standard.** After the doc's `QA-P2-03` entry sits an unlabeled
+closing paragraph the first Requirements Refresh pass's own summary
+(which explicitly stopped at "`QA-P2-03`") read past: *"The release record
+must include commit/version, migration status, test summary, known
+limitations, connector compatibility and security findings and explicit
+P0/P1/P2 status."* Checked each named field against the current
+`INTEGRATION_STATUS.md` directly: migration status, test summary, known
+limitations, and security findings are all present; connector compatibility
+is present inline (the dedicated matrix is already tracked as `QA-P1-04`,
+not duplicated); but **no commit/version identifier appears anywhere in the
+document, and it never gives an explicit P1/P2 status summary** — only
+exhaustive P0 detail. This is real, scoped entirely to a file QA already
+owns (`INTEGRATION_STATUS.md`), requires no new table/route/type, and was
+missed by the first pass for an identifiable reason (it sits outside the
+numbered list that pass was reconciling). Classified `P1` per `CLAUDE.md`
+§3's "when genuinely unsure, prefer P1/P2 over P0" — it is a
+documentation-completeness requirement on the release record's own
+contents, not itself a security/isolation gate. Added as a new Progress
+Tracker row (status: Not Started), a new bullet in `## P1`, and a full
+"Requirements Refresh — 2026-09-14 (round 2, expanded doc)" section in
+`docs/plan/11-QA-AGENT-BACKLOG.md` documenting the reasoning above.
+
+**Explicitly not touched:** no row already `Done`/`Partial` was reopened or
+changed; `INTEGRATION_STATUS.md` itself was read but not edited (its
+release-gate conclusion is a live-verification artifact, out of scope for
+this documentation-only pass, per this dispatch's own instruction); no other
+module's backlog, ownership map, or application code was touched; none of
+this task's named "known existing tracked gaps" (pagination, FinanceBot step
+7, `QA-P0-06`–`14` partial coverage, sandbox-only constraints) were
+re-added.
+
+**Verification:** documentation cross-referencing only (`grep`/`diff`
+against the doc, the backlog, `INTEGRATION_STATUS.md`, both prior audit
+entries, and `next.config.ts`) — no build/test/typecheck/lint run, per this
+dispatch's explicit scope.
+
+**Open questions for the user:** none new. The doc's "Modular Execution
+Guide" process-model note already flagged in the first Requirements Refresh
+(manual-dispatch-only vs. this repo's standing autopilot policy) remains
+open and unchanged by this pass.

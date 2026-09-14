@@ -315,3 +315,93 @@ above — Risk Agent does not own or otherwise modify Compliance's module).
 `.falsePositiveExpiresAt`; `risk_severity_weights` (not yet exposed as a
 published read/write contract beyond `modules/risk/config.ts` itself — no
 other module needs tenant severity-weight overrides today).
+
+---
+
+## 2026-09-14 — Requirements re-check, round 2 (re-uploaded expanded doc), documentation-only
+
+**Agent:** Risk Agent. Documentation-only pass, per the user's explicit
+request: no application code, migrations, or tests touched. Re-checked
+the module against a re-uploaded copy of the requirements doc
+(`06_RISK_ROGUE_DETECTION.md`), described as a newer/expanded version of
+the doc already reconciled in the `2026-09-14 requirements refresh` entry
+above.
+
+**Method:** read the full re-uploaded doc end to end; read the full
+current `docs/plan/06-RISK-AGENT-BACKLOG.md` (Progress Tracker, all
+Epics, the existing round-1 Requirements Refresh section, `## P1`/`## P2`
+lists); skimmed this audit log's prior entries; and — before treating
+anything as missing — checked it against the actual implementation
+(`modules/risk/scoring.ts`, `modules/risk/rules.ts`,
+`modules/risk/findings.ts`, `lib/shared/types/risk.ts`, and migrations
+`0034`/`0044`/`0045`) rather than trusting the backlog's prose alone.
+Confirmed, for example, that migration `0044`'s `risk_findings` status
+check constraint genuinely carries the expanded lifecycle states
+(`acknowledged`/`investigating`/`mitigated`/`exception`/`false_positive`)
+the round-1 refresh claims as `Done` — the prior pass's "Done" markings
+hold up.
+
+**Finding: the re-uploaded doc is, story-ID-for-story-ID, the same
+document already reconciled in round 1** — its "Expanded Requirements —
+Risk & Rogue Detection P0/P1/P2" section lists exactly
+`RISK-P0-01`..`RISK-P0-10`, `RISK-P1-01`..`RISK-P1-04`,
+`RISK-P2-01`..`RISK-P2-03`, with no new or renumbered items and no
+different wording under any of those headings versus what round 1 already
+worked through line by line (its "Already covered" list, plus the four
+stories it added: `RISK-P0-01.4`, `RISK-P0-02.2`, `RISK-P0-03.4`,
+`RISK-P0-03.5`). None of that is reopened, downgraded, or re-added here —
+per the task's constraint, and because doing so would misrepresent
+already-verified `Done` work.
+
+**One genuine gap did survive round 1**, not because the doc changed but
+because round 1's reconciliation matched `RISK-P0-01` to `RISK-P0-02.1`
+at the story-ID level without diffing the doc's separate, more detailed
+"# 15. Risk Engine" narrative section (part of the doc's raw PRD quote,
+not the numbered `RISK-P0-XX` list) against the actual factor table in
+`scoring.ts`. That narrative section names 13 risk-score factors;
+`DEFAULT_SEVERITY_WEIGHTS` in `modules/risk/scoring.ts` implements 8.
+Confirmed via `grep` across `modules/risk/` and
+`lib/shared/types/risk.ts` that **privilege level, destructive
+capability, credential status, and attack path** never appear anywhere in
+the implementation, in the backlog's own factor table, or in any prior
+audit entry (including the "still open" list of known factor gaps in the
+entry directly above, which only calls out `external communication
+capability` and `certification overdue` as always-zero — not these four,
+which are entirely absent from the model rather than present-but-zeroed).
+
+**Added:** `RISK-P1-05 — Additional Deterministic Risk Factors` to the
+Progress Tracker (`Not Started`) and to the backlog's `## P1` list, plus a
+new `## Requirements Refresh — 2026-09-14 (round 2, expanded doc)` section
+in `docs/plan/06-RISK-AGENT-BACKLOG.md` explaining the gap, listing the
+four missing factors with their distinctions from existing categories
+(e.g. credential status vs. `identity_anomaly`; attack path vs.
+`RISK-P2-02` graph propagation), and giving its acceptance criteria.
+Classified **P1**, not P0: the central FinanceBot acceptance scenario
+already reaches `critical` on the existing 8 factors plus the explicit
+prohibited-data override without any of the four, so per CLAUDE.md §3
+("when genuinely unsure, prefer P1/P2 over P0") this is enterprise-
+readiness factor coverage, not an MVP release blocker. Not flagged as
+ML/LLM-based per non-negotiable #9 — all four are deterministic,
+rule-evaluable facts (entitlement metadata, credential record state,
+graph position), not statistical/ML predictions; nothing else in the
+re-uploaded doc resembles ML/LLM-based anomaly detection either (its
+"LLMs may explain findings but MUST NOT be the sole authority" line
+matches the backlog's existing AI usage boundary verbatim).
+
+**Everything else in the re-uploaded doc was already reflected** in the
+current backlog at matching or finer granularity — rogue categories,
+evidence-pack shape (including evaluator version), explainability,
+deduplication, false-positive handling with reason/expiry, the expanded
+finding-lifecycle states, the recommendation engine, re-evaluation, and
+the `RISK-P1-01`..`RISK-P2-03` list (including the still-open
+`RISK-P1-03` ownership-map flag and the still-open process-model note
+from round 1, neither of which changed in this pass). No other rows were
+added, no existing row's status was changed, and no other module's
+backlog or the ownership map was touched.
+
+**Not started / open questions:** none newly introduced this pass beyond
+`RISK-P1-05` itself, which is `Not Started` and — per its own acceptance
+notes — depends on Access Agent eventually exposing entitlement-level
+destructive-verb and graph-position data before two of its four factors
+can trigger on anything other than 0; that dependency should be recorded
+at pickup time rather than assumed now.
