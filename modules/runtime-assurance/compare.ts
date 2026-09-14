@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAgentContract } from "@/modules/agent-identity/service";
-import { getEffectiveAccess } from "@/modules/access-governance/service";
+import { getEffectiveAccess, getEffectiveAccessAsOf } from "@/modules/access-governance/service";
 import type { CanEntry, ComparisonOutcome, DidEntry, ShouldCanDidComparison, ShouldEntry } from "@/lib/shared/types/runtime";
 import { getDid } from "./did";
 
@@ -69,11 +69,20 @@ function isCanExercisedInDid(did: DidEntry[], can: CanEntry): boolean {
  * DO NOT IMPLEMENT (per the backlog): severity assignment, finding
  * creation, or notification — that is Risk Agent's job, consuming this
  * comparison as evidence.
+ *
+ * RUNTIME-P0-13. `asOf` resolves CAN as of that point in time instead of
+ * "right now," via Access Agent's published `getEffectiveAccessAsOf()` —
+ * closing the historical-accuracy gap this story's own backlog entry
+ * flagged: re-scoring an old event against today's (possibly
+ * already-revoked) entitlements can silently erase a genuine historical
+ * `excessive_access` finding. Omitting `asOf` preserves the exact previous
+ * behavior (current access), so every existing caller and test is
+ * unaffected.
  */
-export async function compareShouldCanDid(tenantId: string, agentId: string): Promise<ShouldCanDidComparison> {
+export async function compareShouldCanDid(tenantId: string, agentId: string, asOf?: string): Promise<ShouldCanDidComparison> {
   const [contract, canGrants, did] = await Promise.all([
     getAgentContract(agentId),
-    getEffectiveAccess(tenantId, agentId),
+    asOf ? getEffectiveAccessAsOf(tenantId, agentId, asOf) : getEffectiveAccess(tenantId, agentId),
     getDid(tenantId, agentId),
   ]);
 

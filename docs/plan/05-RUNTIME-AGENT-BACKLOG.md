@@ -24,7 +24,7 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-02.2 | Comparison engine (higher bar) | Done |
 | RUNTIME-P0-11 | Ingestion Hardening — replay protection & event quarantine | Done — 2026-09-14, live RLS-verified |
 | RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
-| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Deferred — blocked on Access Agent publishing a point-in-time effective-access contract, which does not exist yet; not built unilaterally per non-negotiable #18, see Requirements Refresh below and the audit log |
+| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Partial — 2026-09-14: Access Agent's dependency now resolved (`getEffectiveAccessAsOf()`); `compareShouldCanDid(tenantId, agentId, asOf?)` can resolve CAN as of a given timestamp, unit-tested; no existing caller passes a real `asOf` yet (Risk Agent's own judgment call to adopt), see audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
 
 ---

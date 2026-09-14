@@ -247,3 +247,54 @@ accepted-exception set, `runtime_event_quarantine` correctly not flagged
 (has a select policy). Live-verified via Supabase MCP against the
 FinanceBot fixture tenants: `runtime_event_quarantine` enforces tenant
 isolation on reads and rejects direct client inserts.
+
+## 2026-09-14 — RUNTIME-P0-13: Point-in-Time CAN Resolution & Historical Accuracy
+
+**Agent:** Runtime Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Picked up as part of a full sweep of every module's Partial/Deferred
+items, starting from the first agent in run order. This story was
+`Deferred`, blocked on a dependency note asking Access Agent to publish a
+point-in-time effective-access contract — resolved (see Access Agent's
+own audit log): `getEffectiveAccessAsOf(tenantId, agentId, asOf)` now
+exists, backed by `access_grants`' existing `granted_at`/`revoked_at`
+soft-delete columns (no schema change needed — the historical data was
+always there).
+
+`compareShouldCanDid(tenantId, agentId, asOf?)` gained an optional third
+parameter. Omitted, behavior is byte-identical to before (calls
+`getEffectiveAccess()`, same as every existing caller/test). Passed, it
+calls `getEffectiveAccessAsOf()` instead, resolving CAN as of that
+timestamp rather than today — so re-scoring a 90-day-old event no longer
+silently loses a genuine historical `excessive_access` finding just
+because the entitlement has since been revoked, per the story's own
+acceptance criterion.
+
+**Deliberately not done in this pass:** wiring `asOf` into any existing
+caller (`modules/risk/rules.ts`'s finding generation, the `/api/v1/
+runtime/agents/:id/compare` route, or either customer-facing page). The
+acceptance criterion is that the *capability* exists ("compareShouldCanDid
+(or a new time-scoped variant) can resolve CAN as of a given timestamp"),
+which it now does; deciding *when* Risk Agent's own finding-generation
+flow should re-evaluate against a specific historical timestamp (e.g.
+each finding's originating event time) is that module's own judgment
+call, not something to retrofit unilaterally into Risk's files per
+non-negotiable #18. Left as an available capability for Risk Agent (or a
+future dispatch of it) to adopt.
+
+**Verified:** two new unit tests in `compare.test.ts` — omitting `asOf`
+calls `getEffectiveAccess()` and never `getEffectiveAccessAsOf()`;
+passing `asOf` calls `getEffectiveAccessAsOf()` with the exact tenant/
+agent/timestamp and never `getEffectiveAccess()`, and a grant only
+present in the point-in-time result (simulating one already revoked
+today) still produces the `excessive_access` outcome. Full pipeline:
+`npm run typecheck`, `npm run lint`, `npx vitest run` (141/141, up from
+139 — the 2 new tests, every prior test unchanged and still green),
+`npm run build` with `.next` deleted first, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
+
+RUNTIME-P0-13 moves from `Deferred` to `Partial` (not `Done`) — the core
+comparison capability is real and tested, but nothing in this codebase
+calls it with a real `asOf` value yet (no consumer wiring, per above), so
+the story's full acceptance criterion ("re-running an evaluation... does
+not retroactively erase evidence") isn't yet demonstrated end-to-end
+against a real finding.

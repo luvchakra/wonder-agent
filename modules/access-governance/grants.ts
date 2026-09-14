@@ -27,6 +27,26 @@ type EffectiveAccessRow = {
  * granted (revoked_at is null) entitlement, annotated with grant_type.
  */
 export async function getEffectiveAccess(tenantId: string, agentId: string): Promise<AccessGrant[]> {
+  return queryEffectiveAccess(tenantId, agentId, null);
+}
+
+/**
+ * RUNTIME-P0-13's published dependency: effective access AS OF a specific
+ * point in time, not "right now." `revokeAccessGrant()` (this file) always
+ * soft-deletes via `revoked_at`, never hard-deletes a row, so the historical
+ * data this needs already exists in `access_grants` — a grant was in force
+ * at `asOf` iff `granted_at <= asOf and (revoked_at is null or revoked_at >
+ * asOf)`. This lets Runtime Agent re-score an old event against the
+ * entitlements that were actually in force when it happened, instead of
+ * today's (already-possibly-revoked) entitlements — see this module's own
+ * audit log for the full resolution of the dependency note Runtime Agent's
+ * backlog recorded.
+ */
+export async function getEffectiveAccessAsOf(tenantId: string, agentId: string, asOf: string): Promise<AccessGrant[]> {
+  return queryEffectiveAccess(tenantId, agentId, asOf);
+}
+
+async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: string | null): Promise<AccessGrant[]> {
   const supabase = await supabaseServer();
   const { data: accounts, error: accountsError } = await supabase
     .from("accounts")
@@ -37,12 +57,13 @@ export async function getEffectiveAccess(tenantId: string, agentId: string): Pro
   const accountIds = (accounts ?? []).map((a: { id: string }) => a.id);
   if (accountIds.length === 0) return [];
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("access_grants")
     .select("*, accounts(external_account_ref, application_id), entitlements(name, data_classification, applications(name))")
-    .in("account_id", accountIds)
-    .is("revoked_at", null)
-    .returns<EffectiveAccessRow[]>();
+    .in("account_id", accountIds);
+  query = asOf === null ? query.is("revoked_at", null) : query.lte("granted_at", asOf).or(`revoked_at.is.null,revoked_at.gt.${asOf}`);
+
+  const { data, error } = await query.returns<EffectiveAccessRow[]>();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
 
   return (data ?? []).map((row) => ({

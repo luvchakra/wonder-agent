@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 const mockGetAgentContract = vi.fn();
 const mockGetEffectiveAccess = vi.fn();
+const mockGetEffectiveAccessAsOf = vi.fn();
 const mockGetDid = vi.fn();
 
 vi.mock("@/modules/agent-identity/service", () => ({
@@ -10,6 +11,7 @@ vi.mock("@/modules/agent-identity/service", () => ({
 }));
 vi.mock("@/modules/access-governance/service", () => ({
   getEffectiveAccess: (...args: unknown[]) => mockGetEffectiveAccess(...args),
+  getEffectiveAccessAsOf: (...args: unknown[]) => mockGetEffectiveAccessAsOf(...args),
 }));
 vi.mock("./did", () => ({
   getDid: (...args: unknown[]) => mockGetDid(...args),
@@ -193,5 +195,41 @@ describe("compareShouldCanDid — RUNTIME-P0-02.2, the central acceptance scenar
     ]);
     expect(result.outcomes.some((o) => o.type === "behavioral_violation")).toBe(false);
     expect(result.outcomes.some((o) => o.type === "unexpected_capability")).toBe(false);
+  });
+
+  it("RUNTIME-P0-13: omitting asOf uses current effective access, never the point-in-time variant", async () => {
+    mockGetAgentContract.mockResolvedValue({ purpose: "x", approvedApplications: [], approvedData: [] });
+    mockGetEffectiveAccess.mockResolvedValue([]);
+    mockGetDid.mockResolvedValue({ agentId: "agent-7", windowStart: "x", windowEnd: "y", tuples: [] });
+
+    await compareShouldCanDid("tenant-a", "agent-7");
+
+    expect(mockGetEffectiveAccess).toHaveBeenCalledWith("tenant-a", "agent-7");
+    expect(mockGetEffectiveAccessAsOf).not.toHaveBeenCalled();
+  });
+
+  it("RUNTIME-P0-13: passing asOf resolves CAN as of that timestamp — an entitlement already revoked today still produces the historical excessive_access finding", async () => {
+    mockGetAgentContract.mockResolvedValue({
+      purpose: "Financial reporting automation",
+      approvedApplications: ["SAP"],
+      approvedData: ["financial reporting"],
+    });
+    // The grant that was in force AT THE EVENT TIME (90 days ago) — Snowflake
+    // CustomerDB was still active then, even though it has since been revoked
+    // and getEffectiveAccess() (current state) would no longer return it.
+    mockGetEffectiveAccessAsOf.mockResolvedValue([
+      { id: "grant-historical", application: "Snowflake", entitlementName: "CustomerDB_READ", dataClassification: "pii" },
+    ]);
+    mockGetDid.mockResolvedValue({ agentId: "agent-8", windowStart: "x", windowEnd: "y", tuples: [] });
+
+    const asOf = "2026-06-14T00:00:00Z";
+    const result = await compareShouldCanDid("tenant-a", "agent-8", asOf);
+
+    expect(mockGetEffectiveAccessAsOf).toHaveBeenCalledWith("tenant-a", "agent-8", asOf);
+    expect(mockGetEffectiveAccess).not.toHaveBeenCalled();
+    expect(result.outcomes).toContainEqual({
+      type: "excessive_access",
+      evidence: { grantId: "grant-historical", application: "Snowflake", entitlementName: "CustomerDB_READ", dataClassification: "pii" },
+    });
   });
 });

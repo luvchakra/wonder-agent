@@ -300,3 +300,30 @@ always-`undefined` behavior, so nothing needed updating), `npm run
 build` with `.next` deleted first (specifically to prove the cyclic
 import resolves cleanly) — all green. `grep -rl
 SUPABASE_SERVICE_ROLE_KEY .next/static` — no match.
+
+## 2026-09-14 — RUNTIME-P0-13's dependency note resolved: `getEffectiveAccessAsOf()`
+
+**Agent:** Access Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Runtime Agent's own backlog explicitly recorded a dependency note asking
+Access Agent to publish a point-in-time effective-access contract, per
+non-negotiable #18 ("if Access Agent's backlog does not already plan
+this, that should be raised with the user rather than guessed at"). No
+guessing was needed: `access_grants` already carries `granted_at`/
+`revoked_at`, and `revokeAccessGrant()` (this module) has always
+soft-deleted via `revoked_at`, never hard-deleted a row — the historical
+data already exists, it just had no read contract over it.
+
+Added `getEffectiveAccessAsOf(tenantId, agentId, asOf)` to
+`modules/access-governance/grants.ts` (exported from `service.ts`),
+sharing its row-mapping logic with the existing `getEffectiveAccess()`
+via a new private `queryEffectiveAccess()` helper — same shape, same
+`AccessGrant[]` return type, differing only in the WHERE clause: `revoked_at
+is null` for "now" vs. `granted_at <= asOf and (revoked_at is null or
+revoked_at > asOf)` for a specific point in time. `getEffectiveAccess()`
+itself is unchanged behavior (delegates to the same helper with `asOf =
+null`).
+
+**Verified:** `npm run typecheck`, `npm run lint`, `npx vitest run`
+(141/141 — see Runtime Agent's own audit log for the 2 new tests this
+enabled there), `npm run build` with `.next` deleted first, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
