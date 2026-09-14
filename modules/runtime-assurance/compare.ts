@@ -80,10 +80,18 @@ export async function compareShouldCanDid(tenantId: string, agentId: string): Pr
   const should: ShouldEntry[] = contract
     ? contract.approvedApplications.flatMap((application): ShouldEntry[] =>
         contract.approvedData.length > 0
-          ? contract.approvedData.map((data): ShouldEntry => ({ application, data }))
-          : [{ application, data: null }],
+          ? contract.approvedData.map(
+              (data): ShouldEntry => ({ application, data, actions: contract.approvedActions, tools: [] }),
+            )
+          : [{ application, data: null, actions: contract.approvedActions, tools: [] }],
       )
     : [];
+
+  // RUNTIME-P0-12 — SHOULD is "unknown" (not well-formed), distinct from a
+  // genuinely empty-but-valid contract, when there is no active contract at
+  // all or its purpose is unset/blank. A caller must check this flag
+  // explicitly rather than infer it from should.length === 0.
+  const shouldUnknown = !contract || !contract.purpose || !contract.purpose.trim();
 
   const can: CanEntry[] = canGrants.map((g) => ({
     application: g.application ?? "",
@@ -124,6 +132,17 @@ export async function compareShouldCanDid(tenantId: string, agentId: string): Pr
     }
   }
   for (const d of didEntries) {
+    // RUNTIME-P0-14 — a DID tuple with no resolvable application (unknown
+    // resource) must never be silently scored as either a real violation
+    // or as compliant; it gets its own distinct outcome instead of falling
+    // into unexpected_capability/behavioral_violation below.
+    if (d.application === null) {
+      outcomes.push({
+        type: "unscored_unknown",
+        evidence: { eventId: d.eventId, resource: d.resource, dataClassification: d.dataClassification, reason: "unresolved_application" },
+      });
+      continue;
+    }
     if (!isDidCoveredByCan(can, d)) {
       outcomes.push({
         type: "unexpected_capability",
@@ -132,6 +151,7 @@ export async function compareShouldCanDid(tenantId: string, agentId: string): Pr
     }
   }
   for (const d of didEntries) {
+    if (d.application === null) continue; // already scored unscored_unknown above
     if (!isDidCoveredByShould(should, d)) {
       outcomes.push({
         type: "behavioral_violation",
@@ -139,9 +159,13 @@ export async function compareShouldCanDid(tenantId: string, agentId: string): Pr
       });
     }
   }
-  if (outcomes.length === 0 && (should.length > 0 || can.length > 0 || didEntries.length > 0)) {
+  if (
+    !shouldUnknown &&
+    outcomes.length === 0 &&
+    (should.length > 0 || can.length > 0 || didEntries.length > 0)
+  ) {
     outcomes.push({ type: "healthy", evidence: {} });
   }
 
-  return { agentId, should, can, did: didEntries, outcomes, evaluatedAt: new Date().toISOString() };
+  return { agentId, should, can, did: didEntries, outcomes, evaluatedAt: new Date().toISOString(), shouldUnknown };
 }

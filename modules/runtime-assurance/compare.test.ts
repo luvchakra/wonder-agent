@@ -72,6 +72,7 @@ describe("compareShouldCanDid — RUNTIME-P0-02.2, the central acceptance scenar
 
   it("reports healthy when SHOULD, CAN and DID fully align", async () => {
     mockGetAgentContract.mockResolvedValue({
+      purpose: "Financial reporting automation",
       approvedApplications: ["Snowflake"],
       approvedData: ["financial reporting"],
     });
@@ -111,5 +112,86 @@ describe("compareShouldCanDid — RUNTIME-P0-02.2, the central acceptance scenar
     expect(first.should).toEqual(second.should);
     expect(first.can).toEqual(second.can);
     expect(first.did).toEqual(second.did);
+  });
+
+  it("RUNTIME-P0-12: flags shouldUnknown when the contract has no purpose set, and never reports healthy in that state", async () => {
+    mockGetAgentContract.mockResolvedValue({
+      purpose: "",
+      approvedApplications: ["SAP"],
+      approvedData: ["financial reporting"],
+    });
+    mockGetEffectiveAccess.mockResolvedValue([
+      { id: "g1", application: "SAP", entitlementName: "SAP_READ", dataClassification: "financial" },
+    ]);
+    mockGetDid.mockResolvedValue({ agentId: "agent-4", windowStart: "x", windowEnd: "y", tuples: [] });
+
+    const result = await compareShouldCanDid("tenant-a", "agent-4");
+    expect(result.shouldUnknown).toBe(true);
+    expect(result.outcomes.some((o) => o.type === "healthy")).toBe(false);
+  });
+
+  it("RUNTIME-P0-12: shouldUnknown is false and healthy is reachable when the contract has a real purpose", async () => {
+    mockGetAgentContract.mockResolvedValue({
+      purpose: "Financial reporting automation",
+      approvedApplications: ["SAP"],
+      approvedData: ["financial reporting"],
+    });
+    mockGetEffectiveAccess.mockResolvedValue([
+      { id: "g1", application: "SAP", entitlementName: "SAP_READ", dataClassification: "financial" },
+    ]);
+    mockGetDid.mockResolvedValue({
+      agentId: "agent-5",
+      windowStart: "x",
+      windowEnd: "y",
+      tuples: [
+        {
+          application: "SAP",
+          resource: "GL",
+          action: "read",
+          dataClassification: "financial",
+          firstSeenAt: "t",
+          lastSeenAt: "t",
+          eventCount: 1,
+          sampleEventId: "event-5",
+        },
+      ],
+    });
+
+    const result = await compareShouldCanDid("tenant-a", "agent-5");
+    expect(result.shouldUnknown).toBe(false);
+    expect(result.outcomes).toEqual([{ type: "healthy", evidence: {} }]);
+  });
+
+  it("RUNTIME-P0-14: a DID tuple with no resolvable application is reported as unscored_unknown, never as a violation", async () => {
+    mockGetAgentContract.mockResolvedValue({
+      purpose: "Financial reporting automation",
+      approvedApplications: [],
+      approvedData: [],
+    });
+    mockGetEffectiveAccess.mockResolvedValue([]);
+    mockGetDid.mockResolvedValue({
+      agentId: "agent-6",
+      windowStart: "x",
+      windowEnd: "y",
+      tuples: [
+        {
+          application: null,
+          resource: null,
+          action: "read",
+          dataClassification: null,
+          firstSeenAt: "t",
+          lastSeenAt: "t",
+          eventCount: 1,
+          sampleEventId: "event-6",
+        },
+      ],
+    });
+
+    const result = await compareShouldCanDid("tenant-a", "agent-6");
+    expect(result.outcomes).toEqual([
+      { type: "unscored_unknown", evidence: { eventId: "event-6", resource: null, dataClassification: null, reason: "unresolved_application" } },
+    ]);
+    expect(result.outcomes.some((o) => o.type === "behavioral_violation")).toBe(false);
+    expect(result.outcomes.some((o) => o.type === "unexpected_capability")).toBe(false);
   });
 });

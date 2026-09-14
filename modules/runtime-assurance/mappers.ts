@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { RuntimeEvent, RuntimeResource, RuntimeTool } from "@/lib/shared/types/runtime";
+import type { RuntimeEvent, RuntimeEventQuarantineEntry, RuntimeResource, RuntimeTool } from "@/lib/shared/types/runtime";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- mapping raw Supabase rows */
 
@@ -47,5 +47,19 @@ export function toRuntimeResource(row: any): RuntimeResource {
     dataClassification: row.data_classification,
     firstSeenAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at,
+  };
+}
+
+export function toRuntimeEventQuarantineEntry(row: any): RuntimeEventQuarantineEntry {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    agentId: row.agent_id,
+    reason: row.reason,
+    source: row.source,
+    action: row.action,
+    submittedEventTime: row.submitted_event_time,
+    attemptedDedupeKey: row.attempted_dedupe_key,
+    receivedAt: row.received_at,
   };
 }

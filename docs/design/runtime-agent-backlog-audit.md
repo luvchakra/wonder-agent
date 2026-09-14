@@ -141,3 +141,109 @@ in run order): `compareShouldCanDid()`'s `outcomes` array is the
 reproducible evidence bundle Risk Agent turns into findings with an
 assigned severity — Runtime Agent deliberately never assigns severity or
 creates a finding itself, per its own DO-NOT-IMPLEMENT list.
+
+---
+
+## 2026-09-14 — RUNTIME-P0-11 (Ingestion Hardening), RUNTIME-P0-12 (SHOULD Normalization), RUNTIME-P0-13 (blocked), RUNTIME-P0-14 (Data Quality)
+
+**Agent:** Runtime Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Auto-chained after Access Agent's own P0 completion, per the user's
+"operate like before, focus on P0 only, continue automatically"
+instruction. Three of this module's four new requirements-refresh stories
+were built; the fourth is a genuine cross-module dependency gap, recorded
+below rather than guessed at.
+
+### RUNTIME-P0-11 — Ingestion Hardening: Replay Protection & Event Quarantine
+
+New table `runtime_event_quarantine` (migration `0043`), evidentiary RLS
+treatment (client SELECT only, service-role writes via the new
+`modules/runtime-assurance/quarantine.ts`) — stores only safe fields
+(source/action/submitted event time/attempted dedupe key), never the full
+raw payload, so a malicious/misbehaving submitter can't use quarantine
+itself as a place to stash sensitive data for later exfiltration via a
+read. Replay protection, distinct from RUNTIME-P0-01.2's idempotency: a new
+`isWithinReplayWindow()` (unit-tested, 6 cases) bounds a submitted
+`eventTime` to within 5 minutes future / 30 days past of the server clock —
+`ingestRuntimeEvent()` now checks this before inserting, throwing
+`REPLAY_WINDOW_VIOLATION`. `POST /api/v1/runtime/events` quarantines both
+shape-invalid submissions and replay-window violations before returning
+400/422 (previously: a bare 400, nothing persisted). New route:
+`GET /api/v1/runtime/quarantine`.
+
+**Scoping note, not silently assumed:** ingestion is already gated by an
+authenticated session (`requirePermission('runtime.ingest')`, documented in
+the route's own prior comment as a deliberate choice not to invent a
+second machine-to-machine credential mechanism when Integration Agent owns
+that infrastructure). Real HTTP replay of a captured request therefore
+already requires the victim's session, further narrowed by this session's
+own new idle/absolute session-expiry enforcement (Foundation
+FOUNDATION-P0-09). The eventTime-window check adds a second, independent
+layer on top of that rather than replacing it.
+
+### RUNTIME-P0-12 — SHOULD Normalization Model (unknown-safe)
+
+`ShouldEntry` now carries `actions`/`tools` (populated from the contract's
+`approvedActions`; `tools` seeded empty — no tool-approval concept exists
+on `agent_contracts` yet, so it's schema-ready, not silently invented) and
+`ShouldCanDidComparison` gained `shouldUnknown: boolean` — true when there
+is no active contract or its `purpose` is unset/blank. `healthy` can now
+only be reported when `shouldUnknown` is false — an ambiguous SHOULD must
+never be silently read as "compliant." 4 new unit tests (2 new + fixed 1
+existing "healthy" fixture that had no `purpose` field, which would now
+correctly count as `shouldUnknown` — a real gap in the old fixture, not a
+false failure).
+
+### RUNTIME-P0-13 — Point-in-Time CAN Resolution & Historical Accuracy — DEFERRED, blocked
+
+Per the backlog's own dependency note: this story requires Access Agent to
+publish a point-in-time effective-access contract ("what was CAN as of
+timestamp T"), which does not exist. Verified directly against Access
+Agent's 2026-09-14 session (which ran immediately before this one and
+published `getAccessGraph()`/`compareAccessToContract()`) — neither is
+point-in-time; `getEffectiveAccess()` remains current-state-only. Per
+CLAUDE.md non-negotiable #18, Runtime Agent does not invent this contract
+inside Access Agent's owned tables/module. **Recorded as an explicit open
+question for the user / a future Access Agent run**: Access Agent would
+need either (a) a `valid_from`/`valid_to` history on `access_grants`
+populated at revoke-time (an additive schema change to an Access-owned
+table), or (b) a way to reconstruct point-in-time state from
+`audit_logs`/`policy_evaluations` history — Runtime Agent has not decided
+between these for Access Agent, since that is an Access Agent architecture
+decision, not Runtime Agent's to make. Tracker marked `Deferred`, not
+skipped silently.
+
+### RUNTIME-P0-14 — Runtime Data Quality Tracking
+
+New `modules/runtime-assurance/dataQuality.ts` —
+`getDataQualityMetrics(tenantId, agentId?, windowMs?)`, a real aggregate
+query (not a new stored table — "queryable" is satisfied by the query
+itself; documented as a deliberate scoping choice, not an oversight) over
+`runtime_events` counting `missingIdentityCount` (`identity_id is null`)
+and `unknownResourceCount` (`application is null or resource is null`).
+**Live-verified** (Supabase MCP) against the real FinanceBot fixture's
+actual `runtime_events` row: raw SQL with the identical filter logic
+returned `{total: 1, missing_identity: 1, unknown_resource: 0}`, matching
+what the function's PostgREST-built filters compute. New route:
+`GET /api/v1/runtime/data-quality`.
+
+Also closes part of the new doc's "unknown must not silently become
+compliant" requirement inside the comparison engine itself: a DID tuple
+with no resolvable `application` (RUNTIME-P0-14's "unknown resource" case,
+observed at compare-time rather than only at the aggregate-metrics level)
+now produces a new `unscored_unknown` outcome instead of being scored as
+`unexpected_capability`/`behavioral_violation` — previously, an
+unattributable event was miscounted as a real behavioral violation, which
+is exactly the "unknown treated as non-compliant" failure mode the new doc
+warns against (the mirror-image bug of "unknown treated as compliant").
+Unit-tested (1 new case) in `compare.test.ts`.
+
+**Verification run**: `npm run typecheck`/`lint`/`build` clean (new routes:
+`/api/v1/runtime/quarantine`, `/api/v1/runtime/data-quality`), `npx vitest
+run` — 115/115 passing (16 new: 6 `isWithinReplayWindow` + 4
+`compareShouldCanDid` shouldUnknown/unscored_unknown cases + fixed 1
+existing fixture, net +9 in compare.test.ts, +6 in events.test.ts).
+`get_advisors(security)` re-checked after migration `0043` — identical
+accepted-exception set, `runtime_event_quarantine` correctly not flagged
+(has a select policy). Live-verified via Supabase MCP against the
+FinanceBot fixture tenants: `runtime_event_quarantine` enforces tenant
+isolation on reads and rejects direct client inserts.

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { ingestRuntimeEvent, listRuntimeEvents } from "@/modules/runtime-assurance/service";
+import { ingestRuntimeEvent, listRuntimeEvents, quarantineEvent } from "@/modules/runtime-assurance/service";
 import { errorResponse } from "@/modules/runtime-assurance/http";
+import { ApiError } from "@/lib/shared/types/foundation";
 import type { RuntimeEventInput, RuntimeEventSource } from "@/lib/shared/types/runtime";
 
 const VALID_SOURCES: RuntimeEventSource[] = ["mcp", "rest", "webhook"];
@@ -50,20 +51,19 @@ export async function POST(request: NextRequest) {
     const ctx = await requirePermission("runtime.ingest");
     const body = await request.json();
 
-    if (!body.agentId || typeof body.agentId !== "string") {
-      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: "agentId is required" } }, { status: 400 });
-    }
-    if (!body.eventTime || typeof body.eventTime !== "string") {
-      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: "eventTime is required" } }, { status: 400 });
-    }
-    if (!VALID_SOURCES.includes(body.source)) {
-      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: "source must be one of mcp, rest, webhook" } }, { status: 400 });
-    }
-    if (!body.action || typeof body.action !== "string") {
-      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: "action is required" } }, { status: 400 });
-    }
-    if (typeof body.success !== "boolean") {
-      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: "success (boolean) is required" } }, { status: 400 });
+    // RUNTIME-P0-11 — a shape-invalid submission is quarantined (a safe,
+    // queryable record) rather than silently dropped with a bare 400, so
+    // an administrator can investigate a misbehaving source.
+    const shapeError = validateShape(body);
+    if (shapeError) {
+      await quarantineEvent(ctx.tenantId!, shapeError, {
+        agentId: typeof body.agentId === "string" ? body.agentId : null,
+        source: typeof body.source === "string" ? body.source : null,
+        action: typeof body.action === "string" ? body.action : null,
+        submittedEventTime: typeof body.eventTime === "string" ? body.eventTime : null,
+        attemptedDedupeKey: typeof body.dedupeKey === "string" ? body.dedupeKey : null,
+      });
+      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: shapeError } }, { status: 400 });
     }
 
     const input: RuntimeEventInput = {
@@ -82,9 +82,31 @@ export async function POST(request: NextRequest) {
       dedupeKey: body.dedupeKey,
     };
 
-    const { event, deduped } = await ingestRuntimeEvent(ctx.tenantId!, ctx.userId, input);
-    return NextResponse.json({ ok: true, data: event, deduped });
+    try {
+      const { event, deduped } = await ingestRuntimeEvent(ctx.tenantId!, ctx.userId, input);
+      return NextResponse.json({ ok: true, data: event, deduped });
+    } catch (err) {
+      if (err instanceof ApiError && err.code === "REPLAY_WINDOW_VIOLATION") {
+        await quarantineEvent(ctx.tenantId!, err.code, {
+          agentId: input.agentId,
+          source: input.source,
+          action: input.action,
+          submittedEventTime: input.eventTime,
+          attemptedDedupeKey: input.dedupeKey ?? null,
+        });
+      }
+      throw err;
+    }
   } catch (err) {
     return errorResponse(err);
   }
+}
+
+function validateShape(body: Record<string, unknown>): string | null {
+  if (!body.agentId || typeof body.agentId !== "string") return "agentId is required";
+  if (!body.eventTime || typeof body.eventTime !== "string") return "eventTime is required";
+  if (!VALID_SOURCES.includes(body.source as RuntimeEventSource)) return "source must be one of mcp, rest, webhook";
+  if (!body.action || typeof body.action !== "string") return "action is required";
+  if (typeof body.success !== "boolean") return "success (boolean) is required";
+  return null;
 }

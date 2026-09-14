@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { computeDedupeKey } from "./events";
+import { computeDedupeKey, isWithinReplayWindow, REPLAY_WINDOW_MAX_FUTURE_MS, REPLAY_WINDOW_MAX_PAST_MS } from "./events";
 import type { RuntimeEventInput } from "@/lib/shared/types/runtime";
 
 describe("computeDedupeKey — RUNTIME-P0-01.2", () => {
@@ -32,5 +32,33 @@ describe("computeDedupeKey — RUNTIME-P0-01.2", () => {
     const a = computeDedupeKey({ ...base, tool: "a", application: "" });
     const b = computeDedupeKey({ ...base, tool: "", application: "a" });
     expect(a).not.toBe(b);
+  });
+});
+
+describe("isWithinReplayWindow — RUNTIME-P0-11", () => {
+  const now = Date.parse("2026-09-14T12:00:00Z");
+
+  it("accepts an event timestamped at exactly now", () => {
+    expect(isWithinReplayWindow(new Date(now).toISOString(), now)).toBe(true);
+  });
+
+  it("accepts an event just inside the future clock-skew allowance", () => {
+    expect(isWithinReplayWindow(new Date(now + REPLAY_WINDOW_MAX_FUTURE_MS - 1).toISOString(), now)).toBe(true);
+  });
+
+  it("rejects an event beyond the future clock-skew allowance", () => {
+    expect(isWithinReplayWindow(new Date(now + REPLAY_WINDOW_MAX_FUTURE_MS + 1000).toISOString(), now)).toBe(false);
+  });
+
+  it("accepts an event just inside the past replay window", () => {
+    expect(isWithinReplayWindow(new Date(now - REPLAY_WINDOW_MAX_PAST_MS + 1).toISOString(), now)).toBe(true);
+  });
+
+  it("rejects an event older than the past replay window", () => {
+    expect(isWithinReplayWindow(new Date(now - REPLAY_WINDOW_MAX_PAST_MS - 1000).toISOString(), now)).toBe(false);
+  });
+
+  it("rejects an unparseable timestamp", () => {
+    expect(isWithinReplayWindow("not-a-date", now)).toBe(false);
   });
 });

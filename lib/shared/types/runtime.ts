@@ -68,6 +68,19 @@ export type RuntimeResource = {
   lastSeenAt: string;
 };
 
+// RUNTIME-P0-11 — Ingestion Hardening: Replay Protection & Event Quarantine.
+export type RuntimeEventQuarantineEntry = {
+  id: string;
+  tenantId: string;
+  agentId: string | null;
+  reason: string;
+  source: string | null;
+  action: string | null;
+  submittedEventTime: string | null;
+  attemptedDedupeKey: string | null;
+  receivedAt: string;
+};
+
 export type RuntimeEventFilter = {
   agentId?: string;
   from?: string;
@@ -101,10 +114,35 @@ export type DidSummary = {
   tuples: DidTuple[];
 };
 
-/** SHOULD, reduced from the active Agent Contract to the comparison shape. */
+/**
+ * RUNTIME-P0-14 — Runtime Data Quality Tracking. Computed on demand over
+ * runtime_events (not a separate stored table — "queryable" is satisfied by
+ * a real aggregate query, not necessarily a materialized one; see the
+ * Runtime Agent audit log for this documented scoping decision).
+ */
+export type RuntimeDataQualityMetrics = {
+  tenantId: string;
+  agentId: string | null;
+  windowStart: string;
+  windowEnd: string;
+  totalEvents: number;
+  missingIdentityCount: number;
+  unknownResourceCount: number;
+};
+
+/**
+ * SHOULD, reduced from the active Agent Contract to the comparison shape.
+ * RUNTIME-P0-12 — normalized toward the new requirements doc's fuller
+ * vocabulary (tools/actions, not only application/data) so
+ * compareShouldCanDid can be extended onto those dimensions without another
+ * schema change; P0 populates them from the contract's existing
+ * approvedActions field but does not yet compare on them.
+ */
 export type ShouldEntry = {
   application: string;
   data: string | null;
+  actions?: string[];
+  tools?: string[];
 };
 
 /** CAN, reduced from getEffectiveAccess() to the comparison shape. */
@@ -129,7 +167,11 @@ export type ComparisonOutcomeType =
   | "insufficient_access"
   | "unused_capability"
   | "unexpected_capability"
-  | "behavioral_violation";
+  | "behavioral_violation"
+  /** RUNTIME-P0-14 — a DID tuple with no resolvable application (unknown
+   * resource/identity) must never be silently scored as either compliant
+   * or a violation; it is surfaced as its own, distinct outcome instead. */
+  | "unscored_unknown";
 
 export type ComparisonOutcome = {
   type: ComparisonOutcomeType;
@@ -144,4 +186,13 @@ export type ShouldCanDidComparison = {
   did: DidEntry[];
   outcomes: ComparisonOutcome[];
   evaluatedAt: string;
+  /**
+   * RUNTIME-P0-12 — true when the agent's active contract is missing or has
+   * an unset/ambiguous purpose, meaning SHOULD itself is not well-formed.
+   * Never silently treated as either "fully permitted" (should=[]) or
+   * "fully denied" — a caller (Risk Agent) must check this explicitly
+   * rather than infer it from should.length === 0, which could also mean a
+   * genuinely empty, well-formed contract.
+   */
+  shouldUnknown: boolean;
 };

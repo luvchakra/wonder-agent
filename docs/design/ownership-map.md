@@ -68,8 +68,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `agent_duplicate_candidates` | IA | IDENTITY-P0-04 (duplicate detection/merge review) — migration `0041`, built 2026-09-14 |
 | `agent_attestations` | IA | Planned — IDENTITY-P1-02 (attestation), not yet implemented |
 | `integration_exports` | INT | Planned — INTEGRATION-P1-05 (SIEM export delivery/retry status), not yet implemented |
-| `runtime_event_quarantine` | RA | Planned — RUNTIME-P0-11 (ingestion hardening: replay protection/quarantine), not yet implemented; exact name TBD when built |
-| `runtime_data_quality` | RA | Planned — RUNTIME-P0-14 (data-quality tracking: missing identity/unknown resource/unsupported action), not yet implemented; exact name TBD when built |
+| `runtime_event_quarantine` | RA | RUNTIME-P0-11 (ingestion hardening: replay protection/quarantine) — migration `0043`, built 2026-09-14 |
 | `risk_campaigns` / `risk_campaign_items` | RiskA | Planned — RISK-P1-03 (risk campaigns), not yet implemented |
 | `platform_ai_provider_configs` | PA | Planned — PLATFORM-P0-05.2 (AI provider configuration), not yet implemented |
 | `platform_announcements` | PA | Planned — PLATFORM-P0-05.4 (maintenance mode/platform announcements); Experience Agent will need a read-only contract to render these in the customer shell once built |

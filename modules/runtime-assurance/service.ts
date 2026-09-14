@@ -7,6 +7,8 @@ import "server-only";
  * directly.
  */
 
-export { ingestRuntimeEvent, listRuntimeEvents, computeDedupeKey } from "./events";
+export { ingestRuntimeEvent, listRuntimeEvents, computeDedupeKey, isWithinReplayWindow } from "./events";
 export { getDid } from "./did";
 export { compareShouldCanDid } from "./compare";
+export { quarantineEvent, listQuarantinedEvents } from "./quarantine";
+export { getDataQualityMetrics } from "./dataQuality";

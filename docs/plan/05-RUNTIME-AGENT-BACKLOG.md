@@ -22,10 +22,10 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-01.3 | Timeline queries | Done |
 | RUNTIME-P0-02.1 | DID aggregation (higher bar) | Done |
 | RUNTIME-P0-02.2 | Comparison engine (higher bar) | Done |
-| RUNTIME-P0-11 | Ingestion Hardening — replay protection & event quarantine | Not Started — new story, see Requirements Refresh below |
-| RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Not Started — new story, see Requirements Refresh below |
-| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Not Started — new story, see Requirements Refresh below |
-| RUNTIME-P0-14 | Runtime Data Quality Tracking | Not Started — new story, see Requirements Refresh below |
+| RUNTIME-P0-11 | Ingestion Hardening — replay protection & event quarantine | Done — 2026-09-14, live RLS-verified |
+| RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
+| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Deferred — blocked on Access Agent publishing a point-in-time effective-access contract, which does not exist yet; not built unilaterally per non-negotiable #18, see Requirements Refresh below and the audit log |
+| RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
 
 ---
 
