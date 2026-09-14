@@ -24,6 +24,8 @@ export function toRiskFinding(row: any): RiskFinding {
     correlationId: row.correlation_id,
     createdAt: row.created_at,
     resolvedAt: row.resolved_at,
+    evaluatorVersion: row.evaluator_version,
+    falsePositiveExpiresAt: row.false_positive_expires_at,
   };
 }
 

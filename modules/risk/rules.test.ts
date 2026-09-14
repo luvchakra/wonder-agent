@@ -32,6 +32,9 @@ vi.mock("@/modules/runtime-assurance/service", () => ({
 vi.mock("./findings", () => ({
   createOrUpdateFinding: (...a: unknown[]) => mockCreateOrUpdateFinding(...a),
 }));
+vi.mock("./config", () => ({
+  getSeverityWeights: vi.fn().mockResolvedValue({}),
+}));
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: vi.fn() }));
 
 import { evaluateAgentRisk } from "./rules";

@@ -20,7 +20,11 @@ export type LaunchCampaignInput = {
   reviewerId: string;
 };
 
-const SEVERITY_RANK: Record<RiskSeverity, number> = { low: 0, medium: 1, high: 2, critical: 3 };
+// RISK-P0-02.2 added an `info` tier below `low` to RiskSeverity (Risk Agent's
+// published contract); ranked below `low` here so this already-Done
+// COMPLIANCE-P0-01.2 recommendation rule's behavior is unchanged for every
+// pre-existing severity value.
+const SEVERITY_RANK: Record<RiskSeverity, number> = { info: -1, low: 0, medium: 1, high: 2, critical: 3 };
 
 /**
  * COMPLIANCE-P0-01.2's exact rule: "remove if usage_at_review = 'never'

@@ -6,10 +6,20 @@ import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtim
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { EvidenceType, RiskFactor, RiskFinding, RogueCategory } from "@/lib/shared/types/risk";
-import { applyProhibitedDataOverride, computeSeverity } from "./scoring";
+import { applyProhibitedDataOverride, computeSeverity, resolveWeight } from "./scoring";
 import { createOrUpdateFinding } from "./findings";
+import { getSeverityWeights } from "./config";
 
 const SENSITIVE_KEYWORDS = ["pii", "financial", "confidential"];
+
+/**
+ * RISK-P0-01.4 — bump this whenever the deterministic detection logic in
+ * this file materially changes, so a finding's evidence pack can show
+ * exactly which version of the rule produced it. Existing rows backfill to
+ * 1 via the column default (migration 0044) rather than a separate data
+ * migration, per the story's own documented allowance.
+ */
+export const EVALUATOR_VERSION = 1;
 
 /**
  * Same case-insensitive-substring vocabulary bridge Runtime Agent's own
@@ -51,7 +61,7 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const agent = await getAgent(tenantId, agentId);
   if (!agent) throw new ApiError(404, "AGENT_NOT_FOUND");
 
-  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage] = await Promise.all([
+  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage, weights] = await Promise.all([
     getAgentContract(agentId),
     compareShouldCanDid(tenantId, agentId),
     getOwnershipIssues(tenantId, agentId, agent.criticality),
@@ -60,6 +70,7 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     listLifecycleEvents(tenantId, agentId),
     getDid(tenantId, agentId),
     listRuntimeEvents(tenantId, { agentId, limit: 200 }),
+    getSeverityWeights(tenantId),
   ]);
 
   const approvedApplications = contract?.approvedApplications ?? [];
@@ -231,15 +242,19 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const sensitiveInvolved = did.tuples.some((t) => isSensitiveClassification(t.dataClassification)) || comparison.can.some((c) => isSensitiveClassification(c.dataClassification));
   const behavioralOrIdentityAnomalyPresent = remainingBehavioral.length > 0 || anomalousEvents.length > 0;
 
+  // RISK-P0-02.2 — weights come from this tenant's configured overrides
+  // (falling back to the deterministic defaults), never hard-coded
+  // literals, so an admin can tune scoring without a code change.
+  const w = (name: string) => resolveWeight(name, weights);
   const factors: RiskFactor[] = [
-    { name: "Production environment access", weight: 20, triggered: agent.environment === "production" && comparison.can.length > 0 },
-    { name: "Sensitive data (PII/financial/confidential) involved", weight: 25, triggered: sensitiveInvolved },
-    { name: "External communication capability", weight: 15, triggered: false }, // not modeled by any module yet
-    { name: "Certification overdue", weight: 15, triggered: false }, // Compliance Agent doesn't exist yet
-    { name: "Active policy violation", weight: 15, triggered: policyEvaluations.some((e) => e.result === "violation") },
-    { name: "Runtime/behavioral anomaly present", weight: 10, triggered: behavioralOrIdentityAnomalyPresent },
-    { name: "Business criticality high/critical", weight: 10, triggered: agent.criticality === "high" || agent.criticality === "critical" },
-    { name: "Missing or invalid ownership", weight: 10, triggered: ownershipIssues.length > 0 },
+    { name: "Production environment access", weight: w("Production environment access"), triggered: agent.environment === "production" && comparison.can.length > 0 },
+    { name: "Sensitive data (PII/financial/confidential) involved", weight: w("Sensitive data (PII/financial/confidential) involved"), triggered: sensitiveInvolved },
+    { name: "External communication capability", weight: w("External communication capability"), triggered: false }, // not modeled by any module yet
+    { name: "Certification overdue", weight: w("Certification overdue"), triggered: false }, // Compliance Agent doesn't exist yet
+    { name: "Active policy violation", weight: w("Active policy violation"), triggered: policyEvaluations.some((e) => e.result === "violation") },
+    { name: "Runtime/behavioral anomaly present", weight: w("Runtime/behavioral anomaly present"), triggered: behavioralOrIdentityAnomalyPresent },
+    { name: "Business criticality high/critical", weight: w("Business criticality high/critical"), triggered: agent.criticality === "high" || agent.criticality === "critical" },
+    { name: "Missing or invalid ownership", weight: w("Missing or invalid ownership"), triggered: ownershipIssues.length > 0 },
   ];
   const base = computeSeverity(factors);
 
@@ -252,7 +267,15 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
       tenantId,
       agentId,
       trigger.category,
-      { severity, riskScore: base.riskScore, reasons, title: trigger.title, explanation: trigger.explanation, recommendation: trigger.recommendation },
+      {
+        severity,
+        riskScore: base.riskScore,
+        reasons,
+        title: trigger.title,
+        explanation: trigger.explanation,
+        recommendation: trigger.recommendation,
+        evaluatorVersion: EVALUATOR_VERSION,
+      },
       trigger.evidence,
     );
     results.push(finding);

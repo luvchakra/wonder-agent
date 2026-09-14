@@ -15,9 +15,23 @@ export type RogueCategory =
   | "ownership_violation"
   | "lifecycle_violation";
 
-export type RiskSeverity = "low" | "medium" | "high" | "critical";
+export type RiskSeverity = "info" | "low" | "medium" | "high" | "critical";
 
-export type FindingStatus = "open" | "assigned" | "remediation_in_progress" | "resolved" | "false_positive";
+/**
+ * RISK-P0-03.4 — `remediation_in_progress` maps onto the requirements
+ * package's REMEDIATION_PENDING in meaning; kept unrenamed to avoid an
+ * unnecessary breaking change to an already-Done contract.
+ */
+export type FindingStatus =
+  | "open"
+  | "acknowledged"
+  | "investigating"
+  | "assigned"
+  | "remediation_in_progress"
+  | "mitigated"
+  | "resolved"
+  | "false_positive"
+  | "exception";
 
 export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event";
 
@@ -30,7 +44,7 @@ export type RiskEvidence = {
   createdAt: string;
 };
 
-export type ResolutionType = "verified_fixed" | "accepted_risk";
+export type ResolutionType = "verified_fixed" | "accepted_risk" | "false_positive";
 
 export type RiskFinding = {
   id: string;
@@ -51,6 +65,10 @@ export type RiskFinding = {
   correlationId: string;
   createdAt: string;
   resolvedAt: string | null;
+  /** RISK-P0-01.4 — which version of the deterministic rule engine produced this finding. */
+  evaluatorVersion: number;
+  /** RISK-P0-03.5 — set only when status is false_positive and a re-check expiry was chosen. */
+  falsePositiveExpiresAt: string | null;
   evidence?: RiskEvidence[];
 };
 

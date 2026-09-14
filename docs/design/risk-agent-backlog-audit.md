@@ -171,3 +171,147 @@ order per Wave 4): `getFindings()`/`getFinding()` are the evidence
 certification review surfaces read; `resolveFinding()`'s re-evaluation
 pattern is the "close the loop" mechanic the PRD's central scenario
 describes.
+
+---
+
+## 2026-09-14 — RISK-P0-01.4, RISK-P0-02.2, RISK-P0-03.4, RISK-P0-03.5 (2026-09-14 requirements refresh)
+
+**Agent:** Risk Agent · **Branch:** `claude/wonderagent-setup-lasmly`. Per
+the user's explicit "continue automatically" instruction, picked up the
+four Not Started rows the requirements-refresh pass added to this
+backlog's Progress Tracker.
+
+**Built:**
+
+- **RISK-P0-01.4** — `evaluator_version` column on `risk_findings`
+  (migration `0044`, `not null default 1` so existing rows backfill to the
+  documented baseline without a data migration). `modules/risk/rules.ts`
+  now exports `EVALUATOR_VERSION = 1` and passes it through to both the
+  create and update paths of `createOrUpdateFinding()`
+  (`modules/risk/findings.ts`) — a re-triggered finding's `evaluator_version`
+  is refreshed to whatever version produced the latest evidence, not frozen
+  at first-creation.
+- **RISK-P0-02.2** — `info` added as a severity tier below `low`
+  (`RiskSeverity`, `computeSeverity()`'s bands: `<10` info, `10-24` low,
+  `25-49` medium, `50-74` high, `75+` critical — additive to the existing
+  check constraint, migration `0044`). The per-factor weight table moved
+  out of `scoring.ts`'s literals into `DEFAULT_SEVERITY_WEIGHTS` (still the
+  product-wide default) plus a new `risk_severity_weights` table
+  (tenant_id, factor_name, weight, updated_by/at — evidentiary-config RLS:
+  client SELECT + INSERT/UPDATE, same division of labor as Access Agent's
+  `policies`/`policy_versions` — RLS enforces tenant isolation only,
+  `requirePermission('risk.manage')` enforces the admin-only authorization
+  at the app layer). `modules/risk/config.ts`'s `getSeverityWeights()`
+  merges a tenant's override rows onto the defaults;
+  `resolveWeight(factorName, overrides)` (`scoring.ts`) is what
+  `rules.ts`'s factor-building now calls instead of inlining a literal
+  weight. `setSeverityWeight()` writes an audited
+  `risk.severity_weight_changed` event on every change. Never delegated to
+  an LLM, per non-negotiable #9 — a weight change is a deterministic,
+  audited, admin-gated config write.
+- **RISK-P0-03.4** — `FindingStatus` extended with `acknowledged`,
+  `investigating`, `mitigated`, `exception` (additive check constraint,
+  migration `0044`); `remediation_in_progress` kept its existing column
+  value unchanged (it already maps onto the new doc's
+  `REMEDIATION_PENDING` in meaning — not renamed, avoiding an unnecessary
+  breaking change to an already-`Done` contract, per the story's own
+  instruction). New `transitionFindingStatus()`
+  (`modules/risk/findings.ts`) moves a finding into one of those four
+  states, writes an audited `risk.finding_status_changed` event
+  (`fromStatus`/`toStatus` in metadata), and explicitly refuses to move a
+  finding already in a terminal disposition (`resolved`/`false_positive`)
+  — reopening a false positive is `createOrUpdateFinding()`'s job via its
+  expiry check, not this generic transition. Exposed via
+  `POST /api/v1/findings/:id/status` and the bare page's new "Update
+  status" form.
+- **RISK-P0-03.5** — `resolveFinding()` gained a `false_positive`
+  resolution `type`: requires a non-empty `reason` (same check already
+  applied to `accepted_risk`), accepts an optional `expiresAt` (validated
+  as a real future timestamp, stored on the new `false_positive_expires_at`
+  column), and sets `status = 'false_positive'` rather than `'resolved'` so
+  the two dispositions stay distinguishable. `risk_evidence` rows are never
+  touched by this path — `resolveFinding()` only ever updates the
+  `risk_findings` row itself, so original evidence is preserved exactly as
+  the story requires. Reopening reuses the RISK-P0-03.3 re-evaluation
+  machinery rather than a second scheduler this codebase has no job-runner
+  for: `createOrUpdateFinding()`'s existing-finding lookup now also matches
+  a `false_positive` finding whose `false_positive_expires_at` has passed,
+  and when it does, the next detection pass that re-triggers that
+  category clears the disposition back to `open` and writes an audited
+  `risk.finding_reopened_after_false_positive_expiry` event. A
+  `false_positive` with no expiry (or a still-future one) is never
+  reopened automatically — confirmed by live SQL below, not just inferred
+  from reading the query.
+- Migration `0045` — a follow-up caught by live verification, not by
+  reading the code: `risk_findings_resolution_type_check` (defined
+  alongside `resolution_type` back in the original RISK-P0-03.3 migration,
+  before this session) only allowed `verified_fixed`/`accepted_risk` and
+  rejected the new `false_positive` value migration `0044` didn't touch.
+  Additive fix, applied immediately after being caught, per CLAUDE.md §13.
+- **Cross-module mechanical fix, not scope creep**: `RiskSeverity` gaining
+  `info` broke `modules/certification-compliance/campaigns.ts`'s
+  `SEVERITY_RANK: Record<RiskSeverity, number>` (a `tsc` compile error, not
+  a design choice) — added `info: -1`, ranked below `low`, so every
+  already-`Done` `computeRecommendation()` outcome for
+  low/medium/high/critical is provably unchanged (backward compatibility
+  requirement, non-negotiable #13); no other line in that file was
+  touched, per non-negotiable #18.
+
+**Verification run:**
+- `npm run typecheck`, `npm run lint`, `npm run build` — all clean (the
+  `campaigns.ts` fix above was required to get a clean typecheck and is
+  the only other module's file touched this story).
+- `npx vitest run` — 119/119 passing across 19 files. New:
+  `scoring.test.ts` gained an `info`-tier boundary case and three
+  `resolveWeight()` cases (default fallback, tenant override precedence,
+  unknown-factor-resolves-to-0). `rules.test.ts` needed a new
+  `vi.mock("./config", ...)` (returning `{}`, i.e. "no overrides" — so its
+  existing assertions about specific scores stay valid) since
+  `evaluateAgentRisk` now calls `getSeverityWeights()`, which itself calls
+  `supabaseServer()` and fails outside a request scope when unmocked — a
+  real fixture gap the new config call exposed, not a regression.
+- Live-verified against the dev Supabase project (Supabase MCP,
+  project `ekgyjwoenteadaaqakmd`), after applying migrations `0044` and
+  `0045`: `risk_severity_weights` tenant isolation both directions
+  (Tenant A5 reads its own override; Tenant B5's authenticated session
+  sees 0 rows for A5's tenant; a same-tenant-mismatched client `UPDATE`
+  affects 0 rows; a forged client `INSERT` into A5's tenant is rejected)
+  against the FinanceBot fixture tenants (A5
+  `aaaaaaaa-5000-0000-0000-000000000001` /
+  B5 `bbbbbbbb-5000-0000-0000-000000000002`). Separately inserted and
+  cleaned up throwaway `risk_findings` rows to prove: every new check
+  constraint value (`info` severity; `acknowledged`/`investigating`/
+  `mitigated`/`exception`/`false_positive` status; `false_positive`
+  resolution_type) is accepted by the schema; the exact `.or(...)`
+  reopen-eligibility filter `createOrUpdateFinding()` uses matches a
+  `false_positive` row whose `false_positive_expires_at` is in the past
+  (1 row) and does not match one whose expiry is still in the future or
+  null (0 rows in both cases); a `risk_evidence` row attached to a finding
+  survives a `false_positive` disposition update untouched. `get_advisors`
+  (security) re-checked after both migrations — no new findings beyond the
+  same pre-existing accepted set every prior module already reviewed.
+
+**Not started this session / still open (unchanged from the prior entry):**
+- `agents.risk_score` denormalized persistence — still blocked on Identity
+  publishing `updateAgentRiskScore()`.
+- RISK-P0-03.2's remediation hand-off — still blocked on Access Agent
+  publishing a remediation-initiation contract.
+- The "external communication capability" and "certification overdue"
+  severity factors still always contribute 0 (no module models the former;
+  Compliance Agent, source of the latter, is chained next but hadn't run
+  yet when this story was built) — now configurable in weight via
+  `risk_severity_weights` like every other factor, but still structurally
+  unable to ever trigger until those sources exist. Not a new gap, just
+  now visible in the weights table rather than only in `scoring.ts`.
+
+**Dependencies consumed:** unchanged from the prior entry, plus
+`modules/certification-compliance/campaigns.ts`'s `RiskSeverity` usage
+(read-only type reference, fixed for compile-compatibility as described
+above — Risk Agent does not own or otherwise modify Compliance's module).
+
+**Published this session:** `transitionFindingStatus()` and the
+`false_positive`/`expiresAt` extension to `resolveFinding()`
+(`modules/risk/service.ts`); `RiskFinding.evaluatorVersion` and
+`.falsePositiveExpiresAt`; `risk_severity_weights` (not yet exposed as a
+published read/write contract beyond `modules/risk/config.ts` itself — no
+other module needs tenant severity-weight overrides today).

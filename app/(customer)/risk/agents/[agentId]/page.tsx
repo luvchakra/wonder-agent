@@ -4,7 +4,13 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getFindings } from "@/modules/risk/service";
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { evaluateAgentRiskAction, assignFindingAction, remediateFindingAction, resolveFindingAction } from "@/app/actions/risk";
+import {
+  evaluateAgentRiskAction,
+  assignFindingAction,
+  remediateFindingAction,
+  resolveFindingAction,
+  transitionFindingStatusAction,
+} from "@/app/actions/risk";
 
 // Bare functional screen — Experience Agent (Module 08) owns visual design,
 // per docs/design/UI-UX-DESIGN-RULES.md. This page is functional scaffolding.
@@ -41,19 +47,27 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
         const assignWithIds = assignFindingAction.bind(null, agentId, f.id);
         const remediateWithIds = remediateFindingAction.bind(null, agentId, f.id);
         const resolveWithIds = resolveFindingAction.bind(null, agentId, f.id);
+        const transitionWithIds = transitionFindingStatusAction.bind(null, agentId, f.id);
+        const isTerminal = f.status === "resolved" || f.status === "false_positive";
         return (
           <section key={f.id} style={{ border: "1px solid #ccc", margin: "1rem 0", padding: "1rem" }}>
             <h2>
               [{f.severity.toUpperCase()}] {f.title}
             </h2>
             <p>
-              Category: {f.category} · Status: {f.status} · Score: {f.riskScore}
+              Category: {f.category} · Status: {f.status} · Score: {f.riskScore} · Evaluator v{f.evaluatorVersion}
             </p>
             <p>Why: {f.reasons.join(", ") || "(no contributing factors)"}</p>
             <p>{f.explanation}</p>
             <p>
               <strong>Recommendation:</strong> {f.recommendation}
             </p>
+            {f.status === "false_positive" && (
+              <p>
+                Disposed as false positive{f.resolutionReason ? ` — ${f.resolutionReason}` : ""}
+                {f.falsePositiveExpiresAt ? ` (re-checked after ${f.falsePositiveExpiresAt})` : " (no expiry — stays closed until manually reopened)"}
+              </p>
+            )}
 
             {f.status === "open" && (
               <form action={assignWithIds}>
@@ -68,13 +82,27 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
               </form>
             )}
 
-            {f.status !== "resolved" && (
+            {!isTerminal && (
+              <form action={transitionWithIds}>
+                <select name="status" defaultValue="acknowledged">
+                  <option value="acknowledged">acknowledged</option>
+                  <option value="investigating">investigating</option>
+                  <option value="mitigated">mitigated</option>
+                  <option value="exception">exception</option>
+                </select>
+                <button type="submit">Update status</button>
+              </form>
+            )}
+
+            {!isTerminal && (
               <form action={resolveWithIds}>
                 <select name="resolutionType" defaultValue="verified_fixed">
                   <option value="verified_fixed">verified_fixed</option>
                   <option value="accepted_risk">accepted_risk</option>
+                  <option value="false_positive">false_positive</option>
                 </select>
-                <input name="reason" placeholder="reason (required for accepted_risk)" />
+                <input name="reason" placeholder="reason (required for accepted_risk / false_positive)" />
+                <input name="expiresAt" type="datetime-local" placeholder="re-check after (false_positive only)" />
                 <button type="submit">Resolve</button>
               </form>
             )}

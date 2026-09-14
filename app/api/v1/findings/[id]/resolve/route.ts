@@ -18,8 +18,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const { id } = await params;
     const body = await request.json();
     const type = body.type as ResolutionType;
-    if (type !== "verified_fixed" && type !== "accepted_risk") {
-      return NextResponse.json({ ok: false, error: { code: "INVALID_INPUT", message: "type must be verified_fixed or accepted_risk" } }, { status: 400 });
+    if (type !== "verified_fixed" && type !== "accepted_risk" && type !== "false_positive") {
+      return NextResponse.json(
+        { ok: false, error: { code: "INVALID_INPUT", message: "type must be verified_fixed, accepted_risk, or false_positive" } },
+        { status: 400 },
+      );
     }
 
     const existing = await getFinding(ctx.tenantId!, id);
@@ -35,6 +38,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       type,
       reason: typeof body.reason === "string" ? body.reason : undefined,
       stillTriggered,
+      expiresAt: typeof body.expiresAt === "string" ? body.expiresAt : undefined,
     });
     return NextResponse.json({ ok: true, data: finding });
   } catch (err) {

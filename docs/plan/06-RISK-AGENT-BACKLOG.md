@@ -25,10 +25,10 @@ this module is higher bar (see below).
 | RISK-P0-03.1 | Assignment & recommendation | Done |
 | RISK-P0-03.2 | Human-initiated remediation | Partial — endpoint/UI exist and behave honestly (`wired: false`); blocked on Access Agent publishing a remediation-initiation contract |
 | RISK-P0-03.3 | Re-evaluation & resolution | Done |
-| RISK-P0-01.4 | Evaluator version on evidence pack | Not Started |
-| RISK-P0-02.2 | Configurable severity weights & INFO tier | Not Started |
-| RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Not Started |
-| RISK-P0-03.5 | False positive disposition with reason & expiry | Not Started |
+| RISK-P0-01.4 | Evaluator version on evidence pack | Done |
+| RISK-P0-02.2 | Configurable severity weights & INFO tier | Done |
+| RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Done |
+| RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
 
 ---
 

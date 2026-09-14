@@ -2,8 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { assignFinding, evaluateAgentRisk, remediateFinding, resolveFinding, getFinding } from "@/modules/risk/service";
-import type { ResolutionType } from "@/lib/shared/types/risk";
+import { assignFinding, evaluateAgentRisk, remediateFinding, resolveFinding, transitionFindingStatus, getFinding } from "@/modules/risk/service";
+import type { FindingStatus, ResolutionType } from "@/lib/shared/types/risk";
 
 export async function evaluateAgentRiskAction(agentId: string) {
   const ctx = await requirePermission("risk.manage");
@@ -38,6 +38,14 @@ export async function resolveFindingAction(agentId: string, findingId: string, f
     type,
     reason: String(formData.get("reason") ?? "") || undefined,
     stillTriggered,
+    expiresAt: String(formData.get("expiresAt") ?? "") || undefined,
   });
+  redirect(`/risk/agents/${agentId}`);
+}
+
+export async function transitionFindingStatusAction(agentId: string, findingId: string, formData: FormData) {
+  const ctx = await requirePermission("risk.manage");
+  const status = formData.get("status") as FindingStatus;
+  await transitionFindingStatus(ctx.tenantId!, ctx.userId, findingId, status);
   redirect(`/risk/agents/${agentId}`);
 }

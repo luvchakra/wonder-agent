@@ -45,6 +45,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `runtime_resources` | RA | Resource inventory observed at runtime |
 | `risk_findings` | RiskA | Findings (rogue/policy/risk) |
 | `risk_evidence` | RiskA | Evidence records backing a finding |
+| `risk_severity_weights` | RiskA | Tenant-configurable severity-factor weight overrides (RISK-P0-02.2) |
 | `certification_campaigns` | CA | Certification campaign definitions |
 | `certification_items` | CA | Individual access items under review in a campaign |
 | `certification_decisions` | CA | Reviewer decisions (approve/revoke/modify/delegate/request info) |

@@ -6,5 +6,5 @@ import "server-only";
  * file only — never query risk_findings/risk_evidence directly.
  */
 
-export { getFindings, getFinding, assignFinding, remediateFinding, resolveFinding } from "./findings";
+export { getFindings, getFinding, assignFinding, remediateFinding, resolveFinding, transitionFindingStatus } from "./findings";
 export { evaluateAgentRisk } from "./rules";
