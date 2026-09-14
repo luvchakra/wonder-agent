@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { AgentsTable } from "./AgentsTable";
 
-// Bare functional list — Experience Agent (Module 08) owns visual design.
+// EXPERIENCE-P0-08 — first real consumer of the shared DataTable primitive.
+// Full visual pass for this screen (EXPERIENCE-P0-03) is still a separate,
+// larger, already-flagged story — this only replaces the raw <table>.
 export default async function AgentsPage() {
   let ctx;
   try {
@@ -26,32 +29,7 @@ export default async function AgentsPage() {
         {" · "}
         <Link href="/agents/discovery">Discovery inbox</Link>
       </p>
-      {agents.length === 0 ? (
-        <p>No agents registered yet.</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-              <th>Name</th>
-              <th>Type</th>
-              <th>Lifecycle</th>
-              <th>Criticality</th>
-            </tr>
-          </thead>
-          <tbody>
-            {agents.map((a) => (
-              <tr key={a.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td>
-                  <Link href={`/agents/${a.id}`}>{a.agentName}</Link>
-                </td>
-                <td>{a.agentType}</td>
-                <td>{a.lifecycleState}</td>
-                <td>{a.criticality}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+      <AgentsTable agents={agents} />
       <p>
         <Link href="/">← Back</Link>
       </p>

@@ -5,6 +5,7 @@ import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { Nav, type NavGroup } from "@/modules/ui/Nav";
 import { UserMenu } from "@/modules/ui/UserMenu";
+import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 
 const NAV_GROUPS: NavGroup[] = [
   { label: "Overview", href: "/" },
@@ -77,6 +78,14 @@ export default async function CustomerLayout({ children }: { children: React.Rea
 
   return (
     <div className="flex min-h-screen">
+      {/* EXPERIENCE-P0-05 — skip-link for keyboard/screen-reader users to
+          bypass the nav and jump straight to page content. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-3 focus:top-3 focus:z-[60] focus:rounded-md focus:bg-accent focus:px-3 focus:py-2 focus:text-sm focus:text-accent-foreground"
+      >
+        Skip to content
+      </a>
       <Nav groups={NAV_GROUPS} />
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="flex items-center justify-between gap-4 border-b border-border bg-surface px-4 py-3 lg:px-6">
@@ -86,9 +95,13 @@ export default async function CustomerLayout({ children }: { children: React.Rea
             </Link>
             <span className="hidden text-xs text-text-muted sm:inline">/ {ctx.tenantSlug}</span>
           </div>
-          <UserMenu email={user.email ?? ""} tenants={tenantOptions} onSelectTenant={selectTenantAction} onSignOut={signOutAction} />
+          <div className="flex items-center gap-2">
+            <ShellGlobalSearch />
+            <ShellNotifications />
+            <UserMenu email={user.email ?? ""} tenants={tenantOptions} onSelectTenant={selectTenantAction} onSignOut={signOutAction} />
+          </div>
         </header>
-        <main className="flex-1 bg-background px-4 py-6 lg:px-6">
+        <main id="main-content" className="flex-1 bg-background px-4 py-6 lg:px-6">
           <div className="mx-auto max-w-6xl">{children}</div>
         </main>
       </div>

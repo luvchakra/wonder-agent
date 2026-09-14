@@ -1,16 +1,13 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getFindings } from "@/modules/risk/service";
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import {
-  evaluateAgentRiskAction,
-  assignFindingAction,
-  remediateFindingAction,
-  resolveFindingAction,
-  transitionFindingStatusAction,
-} from "@/app/actions/risk";
+import { evaluateAgentRiskAction, assignFindingAction, resolveFindingAction, transitionFindingStatusAction } from "@/app/actions/risk";
+import { RemediateFindingButton } from "./RemediateFindingButton";
+import { FindingEvidenceTrigger, FindingEvidenceDrawer } from "./FindingEvidenceDrawer";
 
 // Bare functional screen — Experience Agent (Module 08) owns visual design,
 // per docs/design/UI-UX-DESIGN-RULES.md. This page is functional scaffolding.
@@ -43,9 +40,12 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
 
       {findings.length === 0 && <p>No findings recorded for this agent.</p>}
 
+      <Suspense fallback={null}>
+        <FindingEvidenceDrawer />
+      </Suspense>
+
       {findings.map((f) => {
         const assignWithIds = assignFindingAction.bind(null, agentId, f.id);
-        const remediateWithIds = remediateFindingAction.bind(null, agentId, f.id);
         const resolveWithIds = resolveFindingAction.bind(null, agentId, f.id);
         const transitionWithIds = transitionFindingStatusAction.bind(null, agentId, f.id);
         const isTerminal = f.status === "resolved" || f.status === "false_positive";
@@ -76,11 +76,11 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
               </form>
             )}
 
-            {(f.status === "open" || f.status === "assigned") && (
-              <form action={remediateWithIds}>
-                <button type="submit">Request remediation</button>
-              </form>
-            )}
+            {(f.status === "open" || f.status === "assigned") && <RemediateFindingButton findingId={f.id} findingTitle={f.title} />}
+
+            <Suspense fallback={null}>
+              <FindingEvidenceTrigger findingId={f.id} />
+            </Suspense>
 
             {!isTerminal && (
               <form action={transitionWithIds}>

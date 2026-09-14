@@ -14,8 +14,12 @@ export function Thead({ children }: { children: React.ReactNode }) {
   return <thead className="border-b border-border bg-surface-elevated text-xs uppercase tracking-wide text-text-muted">{children}</thead>;
 }
 
-export function Th({ children }: { children: React.ReactNode }) {
-  return <th className="px-4 py-2 font-medium whitespace-nowrap">{children}</th>;
+export function Th({ children, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+  return (
+    <th className="px-4 py-2 font-medium whitespace-nowrap" {...rest}>
+      {children}
+    </th>
+  );
 }
 
 export function Td({ children, className = "" }: { children: React.ReactNode; className?: string }) {

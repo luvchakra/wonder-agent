@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 
 export type NavGroup = {
   label: string;
@@ -29,7 +30,8 @@ export function Nav({ groups }: { groups: NavGroup[] }) {
           <Link
             href={group.href}
             onClick={() => setOpen(false)}
-            className={`block rounded-md px-2 py-1.5 font-medium ${
+            aria-current={isActive(group.href) ? "page" : undefined}
+            className={`block rounded-md px-2 py-1.5 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
               isActive(group.href) ? "bg-accent/10 text-accent" : "text-text-primary hover:bg-surface-elevated"
             }`}
           >
@@ -42,7 +44,8 @@ export function Nav({ groups }: { groups: NavGroup[] }) {
                   <Link
                     href={child.href}
                     onClick={() => setOpen(false)}
-                    className={`block rounded-md px-2 py-1 text-xs ${
+                    aria-current={isActive(child.href) ? "page" : undefined}
+                    className={`block rounded-md px-2 py-1 text-xs focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent ${
                       isActive(child.href) ? "text-accent" : "text-text-secondary hover:text-text-primary"
                     }`}
                   >
@@ -63,19 +66,27 @@ export function Nav({ groups }: { groups: NavGroup[] }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Open navigation"
-        className="fixed left-3 top-3 z-40 rounded-md border border-border bg-surface p-2 shadow-sm lg:hidden"
+        className="fixed left-3 top-3 z-40 rounded-md border border-border bg-surface p-2 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent lg:hidden"
       >
         <span aria-hidden>☰</span>
       </button>
 
-      <nav className="hidden w-60 shrink-0 border-r border-border bg-surface lg:block">{list}</nav>
+      <nav aria-label="Main" className="hidden w-60 shrink-0 border-r border-border bg-surface lg:block">
+        {list}
+      </nav>
 
-      {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button aria-label="Close navigation" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
-          <nav className="absolute left-0 top-0 h-full w-64 bg-surface shadow-md">{list}</nav>
-        </div>
-      )}
+      {/* EXPERIENCE-P0-05 — Radix Dialog gives the mobile nav drawer a real
+          focus trap, Escape-to-close and aria-modal for free, instead of the
+          plain overlay div this previously was. */}
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 lg:hidden" />
+          <Dialog.Content className="fixed inset-y-0 left-0 z-50 h-full w-64 bg-surface shadow-md focus:outline-none lg:hidden" aria-label="Main navigation">
+            <Dialog.Title className="sr-only">Navigation</Dialog.Title>
+            {list}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </>
   );
 }

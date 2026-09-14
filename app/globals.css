@@ -97,3 +97,17 @@ body {
 * {
   border-color: var(--color-border);
 }
+
+/*
+ * EXPERIENCE-P0-05 — Accessibility Foundation. A visible, consistent focus
+ * indicator for every keyboard-focusable element, using :focus-visible so
+ * it only appears for keyboard/AT users (not on every mouse click) — per
+ * docs/design/UI-UX-DESIGN-RULES.md's accessibility section. Individual
+ * components may also set their own focus-visible outline classes
+ * (Tailwind's `focus-visible:outline`) for a tighter fit; this is the
+ * catch-all so nothing is ever left with no visible focus state.
+ */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

@@ -24,11 +24,11 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-02.1 | Overview dashboard cards | Done — all nine cards, real queries, parallel fetch |
 | EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Done |
 | EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Partial — only new Risk/Runtime index pages built; every other domain module's existing bare page is unrestyled and the PRD's specific worked layouts (Agent Detail/Risk/Rogue) are not implemented — substantial remaining work, see audit log |
-| EXPERIENCE-P0-04 | Action Safety (confirmation, scope preview, bulk-action reporting) | Not Started — new story, see Requirements Refresh below |
-| EXPERIENCE-P0-05 | Accessibility Foundation (keyboard nav, focus management, ARIA, contrast) | Not Started — new story, see Requirements Refresh below |
-| EXPERIENCE-P0-06 | Evidence Drawer & Investigation Deep Links | Not Started — new story, see Requirements Refresh below |
-| EXPERIENCE-P0-07 | Shell Global Search & Notifications | Not Started — new story, see Requirements Refresh below |
-| EXPERIENCE-P0-08 | Data Table Primitive (sort/filter/pagination/saved URL state/responsive card transform) | Not Started — new story, see Requirements Refresh below |
+| EXPERIENCE-P0-04 | Action Safety (confirmation, scope preview, bulk-action reporting) | Partial — `ConfirmActionDialog` primitive built and wired to a real consumer (Risk's remediate action); not yet retrofitted onto every other destructive action across domain screens, and bulk-action reporting's per-item result panel is built but not proven against a real bulk endpoint (none exists yet) |
+| EXPERIENCE-P0-05 | Accessibility Foundation (keyboard nav, focus management, ARIA, contrast) | Partial — global focus-visible styles, skip-link, `aria-current`, accessible dialog/drawer patterns (via Radix) applied across `modules/ui/*` and the mobile nav; WCAG AA contrast spot-checked, not exhaustively audited with a contrast-ratio tool; not retrofitted onto every existing bare domain page |
+| EXPERIENCE-P0-06 | Evidence Drawer & Investigation Deep Links | Partial — `EvidenceDrawer`/`useEvidenceDrawerParam` primitives built and wired to a real consumer (Risk finding evidence, deep-linkable via `?evidence=<id>`); not yet consumed by Access/Runtime/Compliance's own evidence surfaces |
+| EXPERIENCE-P0-07 | Shell Global Search & Notifications | Done — top-bar entry points built and composed into the shell; both show `NotYetAvailable` pending Operations Agent's published search/notifications contract, per this story's own scoping |
+| EXPERIENCE-P0-08 | Data Table Primitive (sort/filter/pagination/saved URL state/responsive card transform) | Partial — `DataTable`/`useTableState` primitives built (sort, filter, saved-URL-state, responsive card-transform) and wired to a real consumer (Agent Inventory); pagination/sort/filter run client-side over the already-fetched full list since `listAgents()` has no server-side pagination parameters yet (a documented stopgap, not the primitive's own limitation); not yet consumed by Access/Findings/other domain screens |
 
 ---
 
