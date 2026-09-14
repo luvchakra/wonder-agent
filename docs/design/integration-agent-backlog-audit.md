@@ -368,3 +368,62 @@ INTEGRATION-P0-04.1 moves to `Done` in the Progress Tracker.
 INTEGRATION-P0-02.1 (Saviynt REST adapter) remains `Partial` — its
 response-field-name verification is blocked on a live Saviynt tenant this
 sandbox has no access to and no way to simulate faithfully; unchanged.
+
+---
+
+## 2026-09-14 — Round 2 reconciliation against re-uploaded requirements doc (no changes made)
+
+**Agent:** Integration Agent (documentation-only pass). The user re-uploaded
+`03_INTEGRATIONS.md` (at
+`/root/.claude/uploads/7af02f4f-be08-5f91-b0d5-fc0907e4645c/8727e764-03_INTEGRATIONS.md`)
+framed as an updated/expanded version of the requirements package already
+reconciled once in the "Requirements Refresh — 2026-09-14" section of this
+module's backlog, and asked for a fresh, thorough re-check against it in case
+it contained additional detail, new stories, or refined acceptance criteria.
+
+**Method:** read the full 310-line uploaded document end to end, read the
+full current backlog (`docs/plan/03-INTEGRATION-AGENT-BACKLOG.md`) including
+its Progress Tracker and existing Requirements Refresh section, and sanity-
+checked `modules/integrations/` and `supabase/migrations/0019`-`0025` against
+what both documents describe as built. Then compared the uploaded document's
+content section-by-section against the backlog:
+
+- Its "Original Master PRD Requirements" sections (§21 Integration
+  Architecture, §22 Integration Framework, §23 Saviynt Connector — P0, §24
+  Generic REST Connector — P0, §25 MCP Integration — P0) and "Claude Code
+  Execution Plan" are word-for-word identical to the master-PRD text the
+  original `INTEGRATION-P0-01` through `P0-04` epics were already built
+  from.
+- Its "Expanded Requirements — Integration Hub P0/P1/P2" section contains
+  exactly `INTEG-P0-01` through `INTEG-P0-11`, `INTEG-P1-01` through
+  `INTEG-P1-05`, and `INTEG-P2-01` through `INTEG-P2-03` — 19 items, with
+  wording identical to what the existing "Requirements Refresh — 2026-09-14"
+  section below already enumerates and reconciles item-by-item (including
+  the one genuinely new item that pass already caught and closed out,
+  `INTEG-P0-10` → `INTEGRATION-P0-05.1`, `Done`, and the SIEM-export
+  ownership-map flag for `INTEG-P1-05` that pass already raised for the
+  user).
+- No section, story ID, requirement, or acceptance-criterion text appears in
+  this upload that is not already present, in substantively the same words,
+  somewhere in the current backlog (either as an original epic story or in
+  the existing Requirements Refresh section).
+
+**Finding: nothing genuinely new.** This upload is, content-for-content, the
+same requirements package already reconciled on 2026-09-14, not an expanded
+successor to it — there is no additional detail, no new story, and no
+refined acceptance criterion to add. Per the task's own instruction not to
+fabricate gaps to appear thorough, **no new Progress Tracker row was added,
+no "round 2" refresh section was written, and no other part of the backlog
+was edited.** The existing Progress Tracker statuses (including the
+`Partial` row for `INTEGRATION-P0-02.1` and every `Done` row) are left
+exactly as they were.
+
+**Codebase sanity check (per step 3 of the task):** `modules/integrations/`
+(17 files: `connector.ts`, `credentials.ts`, `syncJobs.ts`, `webhooks.ts`,
+`mcpEvents.ts`, `mcpTools.ts`, connectors/, etc.) and
+`supabase/migrations/0019`-`0025` (`integration_types`, `integrations`,
+`integration_credentials`, `integration_sync_jobs`, `integration_objects`,
+`integration_mappings`, `integration_indexes`) match exactly what the
+Progress Tracker and this audit log already describe as built — nothing
+undocumented was found that would change any row's status, which is moot
+here since no new rows were added.

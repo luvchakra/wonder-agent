@@ -327,3 +327,73 @@ null`).
 (141/141 — see Runtime Agent's own audit log for the 2 new tests this
 enabled there), `npm run build` with `.next` deleted first, `grep -rl
 SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
+
+## 2026-09-14 — Round-2 requirements re-check (expanded doc re-upload): no new content found
+
+**Agent:** Access Agent (documentation-only pass, no code/migration/test
+changes). Requested re-check of this module's backlog against a freshly
+re-uploaded copy of the module requirements doc
+(`04_ACCESS_GOVERNANCE.md`), on the premise that it might be a newer/
+expanded version containing detail not present at the time of the first
+2026-09-14 refresh (see "Requirements Refresh — 2026-09-14" in
+`docs/plan/04-ACCESS-AGENT-BACKLOG.md`).
+
+**Method, not assumption:** rather than trust the "newer/expanded" framing
+at face value, the re-uploaded doc was diffed line-for-line against (a)
+the "Original Master PRD Requirements" text already embedded verbatim in
+the backlog (sections 11/18/19/28 — Effective Access Graph, Policy
+Management, Policy Evaluation, Segregation of Duties) and (b) the
+"Expanded Requirements — Access Governance P0/P1/P2" list
+(`ACCESS-P0-01` through `ACCESS-P2-03`) that the existing "Requirements
+Refresh — 2026-09-14" section already reconciled item-by-item.
+
+**Finding: no genuinely new requirement, story, or acceptance criterion.**
+The re-uploaded doc's substantive content — sections 11/18/19/28 and the
+full `ACCESS-P0-01`..`ACCESS-P2-03` expanded list — is textually identical
+(confirmed via `diff`, not skimming) to what the first 2026-09-14 refresh
+already reconciled: every ID from `ACCESS-P0-01` through `ACCESS-P2-03` in
+the re-uploaded doc is either (a) already mapped onto a `Done` epic story
+in the "Already covered, no new tracker row needed" list, (b) already
+added as its own tracker row (`ACCESS-P0-03`, `ACCESS-P0-04`,
+`ACCESS-P0-05` — all now `Done` per the Progress Tracker, consistent with
+this file's own entries above for those stories, plus the follow-on
+`getEffectiveAccessAsOf()` entry), or (c) already named by ID in the `##
+P1`/`## P2` sections (`ACCESS-P1-02`, `ACCESS-P1-03`, `ACCESS-P1-04`,
+`ACCESS-P2-01`, `ACCESS-P2-02`, `ACCESS-P2-03`) or described in the P1
+section's lead prose (`ACCESS-P1-01` — access simulation — present as "what
+would happen if we changed policy X", just not ID-tagged there). The doc's
+own front matter (Purpose, Shared Product Contract, Engineering rules,
+Module Ownership Boundary, Dependencies, Definition of Done) is the same
+standalone-execution-brief boilerplate already reflected in the backlog's
+own header/Dependencies/Definition-of-Done sections and CLAUDE.md itself —
+process scaffolding, not a product requirement.
+
+One sub-word-level difference was noted and deliberately **not** turned
+into a new row: the doc's `ACCESS-P1-02` (Advanced ABAC) example attribute
+list includes "owner" (`environment, data classification, geography, time,
+owner and agent type`), while the backlog's existing P1 paraphrase omits
+it. This is an example attribute inside an already-tracked story
+(`ACCESS-P1-02` already exists), not a new story or a materially different
+acceptance criterion — noted here rather than silently dropped, but not
+promoted to a tracker row per the task's "do not re-add anything already
+tracked, even if worded slightly differently" instruction.
+
+**No Progress Tracker changes made** (no row added, no existing row's
+status touched) and **no new dated "round 2" reconciliation narrative was
+needed beyond a short pointer**, since there was nothing to reconcile — see
+the short "Requirements Refresh — 2026-09-14 (round 2, expanded doc)"
+section added at the bottom of `docs/plan/04-ACCESS-AGENT-BACKLOG.md`
+recording this same conclusion for anyone reading the backlog directly.
+
+**Codebase sanity-check (per the task's step 3):** confirmed live in
+`modules/access-governance/` and `supabase/migrations/` that
+`ACCESS-P0-03`/`ACCESS-P0-04`/`ACCESS-P0-05` are in fact implemented
+(`graph.ts`, `comparison.ts`, migration `0042_access_policy_versioning.sql`)
+and the Progress Tracker already correctly shows them `Done` — no
+tracker/reality mismatch found for those. `getEffectiveAccessAsOf()`
+(`grants.ts`, recorded above under the 2026-09-14 RUNTIME-P0-13 entry) is
+also live but is a dependency-contract addition rather than its own
+`ACCESS-P#-xx` story, consistent with how it was previously logged.
+
+No code, migration, or test files were changed in this pass — documentation
+only, per the task's explicit scope.

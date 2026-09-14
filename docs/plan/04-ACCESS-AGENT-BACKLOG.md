@@ -416,6 +416,43 @@ per `docs/design/ownership-map.md`) computed over already-AA-owned tables, and
 ACCESS-P0-05 only adds columns/a history table to `policies`/`policy_evaluations`
 (already AA-owned tables), not a new table needing a map entry.
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded the module requirements doc (`04_ACCESS_GOVERNANCE.md`) a
+second time on the same day, described as a newer/expanded version, and asked for a
+fresh, thorough re-check in case it contained additional detail, new stories, or
+refined acceptance criteria beyond the round-1 refresh directly above.
+
+**Finding: nothing new.** The re-uploaded doc was diffed line-for-line (not
+skimmed) against both the "Original Master PRD Requirements" text embedded verbatim
+above (sections 11/18/19/28) and the "Expanded Requirements — Access Governance
+P0/P1/P2" list (`ACCESS-P0-01` through `ACCESS-P2-03`) that the round-1 refresh
+already reconciled. The content is textually identical to what round 1 already
+worked through: every ID in the re-uploaded doc's expanded list is already either
+(a) mapped onto a `Done` epic story in the "Already covered, no new tracker row
+needed" list above, (b) already its own tracker row (`ACCESS-P0-03`/`ACCESS-P0-04`/
+`ACCESS-P0-05`, all `Done`), or (c) already named by ID under `## P1`/`## P2` below
+(`ACCESS-P1-02`, `ACCESS-P1-03`, `ACCESS-P1-04`, `ACCESS-P2-01`, `ACCESS-P2-02`,
+`ACCESS-P2-03`) or present in the `## P1` section's lead prose (`ACCESS-P1-01` —
+access simulation). The doc's front matter (Purpose, Shared Product Contract,
+Engineering rules, Ownership Boundary, Dependencies, Definition of Done) is the
+same standalone-execution-brief boilerplate already reflected in this backlog's own
+header/Dependencies/Definition-of-Done sections and in `CLAUDE.md` — process
+scaffolding, not a product requirement.
+
+One wording-level nuance was noted, not promoted to a new row: the re-uploaded
+doc's `ACCESS-P1-02` (Advanced ABAC) attribute list includes "owner"
+(`environment, data classification, geography, time, owner and agent type`) where
+this backlog's existing P1 paraphrase omits it — an example attribute inside an
+already-tracked story, not a new story.
+
+**No Progress Tracker rows added and no existing row's status changed.** A
+codebase sanity-check (`modules/access-governance/graph.ts`, `comparison.ts`,
+`supabase/migrations/0042_access_policy_versioning.sql`) confirmed the tracker's
+existing `Done` marks for `ACCESS-P0-03`/`ACCESS-P0-04`/`ACCESS-P0-05` are accurate,
+not stale. Full detail in `docs/design/access-agent-backlog-audit.md`'s matching
+2026-09-14 "Round-2 requirements re-check" entry.
+
 **Not a decision made unilaterally:** the new requirements package's "Modular
 Execution Guide" (`00_MODULAR_EXECUTION_GUIDE.md`) also states a different *process*
 model ("Only the agent explicitly activated by the user may start work. Agents must

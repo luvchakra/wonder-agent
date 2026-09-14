@@ -214,3 +214,77 @@ published, no modification to any other module's file.
 Identity, Integration) to call once picked up; `search()` and
 `getActiveAnnouncements()`-style composition for Experience Agent's shell
 search/notifications entry points.
+
+---
+
+## 2026-09-14 — Round 2 requirements re-check against re-uploaded expanded doc
+
+**Agent:** Operations Agent (documentation-only pass — no code, migrations
+or tests touched). The user re-uploaded the module requirements document
+(`10_AUDIT_REPORTING_OPERATIONS.md`, at
+`/root/.claude/uploads/7af02f4f-be08-5f91-b0d5-fc0907e4645c/3964c18a-10_AUDIT_REPORTING_OPERATIONS.md`)
+and asked for a fresh, thorough re-check against this newer/expanded copy,
+in case it contained stories or acceptance criteria the prior
+"Requirements Refresh — 2026-09-14" pass (recorded above) missed.
+
+**Finding: nothing new.** Read the uploaded document in full (260 lines)
+and compared it section-by-section against the current
+`docs/plan/10-OPERATIONS-AGENT-BACKLOG.md` (Progress Tracker, epics, and
+both the original and prior-round Requirements Refresh sections) and this
+audit log. Every item in the doc's "Expanded Requirements" list
+(`OPS-P0-01` through `OPS-P0-10`, `OPS-P1-01` through `OPS-P1-05`,
+`OPS-P2-01` through `OPS-P2-03`) was already represented — either by name
+in the existing "Already covered, no new row needed" list, or by an
+existing tracked row (`OPS-P0-04`→`OPERATIONS-P0-05.1`,
+`OPS-P0-06`→`OPERATIONS-P0-04.2`, `OPS-P0-09`→`OPERATIONS-P0-03.2`,
+`OPS-P0-10`→`OPERATIONS-P0-06.1`, all four already in the Progress
+Tracker from the prior pass) or by the existing `## P1`/`## P2` sections
+(Scheduled Reports, SIEM/ITSM Notifications, Alert Routing, Advanced
+Search, Operational Dashboards, Analytics Store, Advanced Retention,
+Executive Reporting Automation). The Original Master PRD sections (§29-32)
+and the Claude Code Execution Plan/critical-acceptance-test text in the
+uploaded doc are unchanged from what this file's backlog already reflects.
+
+The one piece of doc text not previously quoted verbatim — the closing
+"Notification safety" note (never place credentials/tokens/raw sensitive
+payloads in notification text; link to authorized evidence views instead)
+— is a constraint on the already-tracked `OPERATIONS-P0-02.2`, not a new
+capability. It is already covered in substance by `CLAUDE.md`
+non-negotiable #10 and this module's own "never expose secrets... to the
+browser" engineering rule. Spot-checked
+`modules/operations/notifications.ts`: no credential/token/secret field is
+referenced when constructing a notification's `title`/`body`, consistent
+with the safety note. Recorded as a standing constraint on
+`OPERATIONS-P0-02.2` in the backlog's new round-2 refresh section rather
+than as a new Progress Tracker row (same treatment the first-pass refresh
+gave the "runtime events" search-object-type addition on
+`OPERATIONS-P0-03.1`).
+
+Also skimmed `modules/operations/*.ts` and `supabase/migrations/0048_*`
+(this module's only migration) to sanity-check that nothing the doc
+describes was quietly already built without the backlog reflecting it —
+found nothing inconsistent with what the Progress Tracker and this log
+already state.
+
+**Added to the backlog:** one new section, "## Requirements Refresh —
+2026-09-14 (round 2, expanded doc)", at the bottom of
+`docs/plan/10-OPERATIONS-AGENT-BACKLOG.md`, documenting this reconciliation
+and its "no new stories" conclusion with the item-by-item mapping above.
+
+**Not added:** any Progress Tracker rows. No row's status was changed.
+The four known partial gaps this task was told not to re-add (email
+channel not wired, `notify()` not yet called by producing modules, search
+covering 6 of 9 object types, no dedicated job-status customer page)
+remain exactly as already tracked and were not restated as new findings.
+
+**Open question for the user:** none raised by this pass. The
+already-open items from the first pass (email provider selection,
+producing-module `notify()` wiring, and Identity/Access publishing
+tenant-wide list contracts for identity/owner/entitlement search) remain
+open exactly as recorded above and are unaffected by this round's
+re-check. Note: `docs/design/ownership-map.md` already lists
+`notification_preferences` (OA, `OPERATIONS-P0-05.1`, migration `0048`) —
+the first-pass refresh's own note flagging that table "for the user to
+add" reads as stale against the current ownership map and this log's own
+"Built" section, which both confirm it was already added; not re-flagged
+here.

@@ -381,3 +381,59 @@ dependency on another module's file.
 `getActiveAnnouncements()` (all exported from `modules/platform-admin/
 service.ts`) — `getActiveAnnouncements()` most relevant to Experience
 Agent next time it runs.
+
+---
+
+## 2026-09-14 — Round-2 requirements re-check (expanded doc, no changes)
+
+**Agent:** Platform Agent (documentation-only pass, no application code
+touched, per this task's explicit constraints — no migrations, no tests,
+no build/lint/typecheck run).
+
+**Task:** the user re-uploaded a second copy of this module's requirements
+document, framed as an updated/expanded version of the doc already
+reconciled earlier the same day (see the "Requirements Refresh —
+2026-09-14" entries above), and asked for a fresh, thorough re-check in
+case it contained additional detail, new stories, or refined acceptance
+criteria.
+
+**Method:** read the full new document (281 lines) end to end; read the
+full current backlog (`docs/plan/09-PLATFORM-AGENT-BACKLOG.md`), including
+its Progress Tracker and its existing "Requirements Refresh — 2026-09-14"
+section; read this audit log in full; and spot-checked the actual codebase
+(`modules/platform-admin/*.ts`, `app/platform-admin/**`,
+`supabase/migrations/0038_platform_admin.sql` and
+`0047_platform_usage_config_versioning_announcements.sql`,
+`docs/design/ownership-map.md`'s Platform-Agent rows) to confirm the
+backlog's own record of what's built still matches reality before treating
+anything as "missing."
+
+**Finding: no genuinely new requirement, story, or acceptance criterion.**
+Direct comparison shows the newly uploaded document is content-equivalent
+to the smaller doc already reconciled earlier today — same "Original
+Master PRD Requirements" text (Platform Administration Console §4,
+Platform Admin UI §38) verbatim, and the same 11 P0 / 6 P1 / 3 P2 expanded-
+requirements items (PLATFORM-P0-01 through PLATFORM-P0-11, PLATFORM-P1-01
+through PLATFORM-P1-06, PLATFORM-P2-01 through PLATFORM-P2-03), same
+numbering, same titles, same body wording. Nothing in it falls outside
+what the existing backlog (including the P0-05.1–.4 stories added by the
+first pass, and the pre-existing P1/P2 sections) already captures. The
+codebase check confirmed the backlog's own status claims still hold —
+`usage.ts`, `configVersions.ts`, `configRollback.ts`, and
+`announcements.ts` exist exactly as described, `platform_config_versions`/
+`platform_announcements` are already in the ownership map, and no
+AI-provider-config table or module file exists anywhere (consistent with
+PLATFORM-P0-05.2 remaining a deliberately deferred open question — not
+re-flagged as newly missing, per this task's explicit instruction).
+
+**Action taken:** added a "## Requirements Refresh — 2026-09-14 (round 2,
+expanded doc)" section to the backlog documenting this finding and the
+evidence for it, in place of the tracker-row additions the task
+anticipated might be needed. **No Progress Tracker row was added, and no
+existing row's status was changed** — PLATFORM-P0-02.2 (`Partial`),
+PLATFORM-P0-04.2 (`Deferred`), and PLATFORM-P0-05.2 (`Deferred`) all stand
+exactly as the prior pass left them. Also re-confirmed non-negotiable #3
+(Platform Administration as a strictly separate vendor-only boundary) is
+not blurred anywhere in the new document — nothing to flag on that front
+either. This entry documents a genuine "nothing new" outcome rather than
+manufacturing a gap to appear thorough.

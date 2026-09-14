@@ -357,6 +357,88 @@ autopilot/auto-chain policy in `CLAUDE.md` §7 and `docs/ORCHESTRATION.md` §2. 
 a meta/process question, not a product requirement, and is called out to the user
 separately rather than silently changed here.
 
+## Requirements Refresh — 2026-09-14 (round 2, expanded doc)
+
+The user re-uploaded a second copy of this module's requirements doc
+(`09_PLATFORM_ADMIN.md`, this time at
+`/root/.claude/uploads/7af02f4f-be08-5f91-b0d5-fc0907e4645c/29e2bf3e-09_PLATFORM_ADMIN.md`),
+described as an updated/expanded version superseding the smaller one already
+reconciled in the "Requirements Refresh — 2026-09-14" section above. Read in
+full (281 lines) and compared section-by-section against both this backlog
+(including the section above) and the live codebase
+(`modules/platform-admin/*`, `app/platform-admin/*`,
+`supabase/migrations/0038_platform_admin.sql` and
+`0047_platform_usage_config_versioning_announcements.sql`,
+`docs/design/ownership-map.md`, `docs/design/platform-agent-backlog-audit.md`).
+
+**Finding: this document is content-equivalent to the one already
+reconciled — no genuinely new requirement, story, or acceptance criterion
+was found, so no new Progress Tracker rows were added.**
+
+Evidence for that conclusion (not asserted on faith):
+
+- Its "Original Master PRD Requirements" section (`# 4. Platform
+  Administration Console`, `# 38. Platform Admin UI`, the Claude Code
+  Execution Plan and Critical acceptance test) is verbatim identical to the
+  text already carried in this backlog's own "Original Master PRD
+  Requirements" section above — including the full Tenant Management field
+  list, the four subscription plans, the full ten-item plan-configuration
+  list (max users/agents/integrations/runtime events/audit retention plus
+  certification/policy/API/MCP limits — this list was already present in
+  the backlog's own copied PRD text before this pass, so it is not new; the
+  fact that `subscriptions` doesn't yet have dedicated columns for
+  certification/policy/API/MCP limits is a pre-existing implementation gap
+  from the *original* PRD text, not something this expanded doc introduces
+  — already implicitly covered by PLATFORM-P0-02.1/03's "define in data"
+  framing and not re-flagged here to avoid manufacturing a duplicate story
+  for text that was already in scope).
+- Its "Expanded Requirements — Vendor Platform Administration P0/P1/P2"
+  section contains exactly the same 11 P0 items (PLATFORM-P0-01 through
+  PLATFORM-P0-11), 6 P1 items (PLATFORM-P1-01 through PLATFORM-P1-06), and
+  3 P2 items (PLATFORM-P2-01 through PLATFORM-P2-03) — same numbering, same
+  titles, same body text word-for-word — as the doc already reconciled in
+  the section above (verified by direct comparison of the quoted text in
+  that section, e.g. PLATFORM-P0-04 "Usage & Limits", PLATFORM-P0-06 "AI
+  Provider Configuration", PLATFORM-P0-09 "Global Configuration
+  Versioning", PLATFORM-P0-11 "Maintenance/Announcements" — all present
+  here with identical wording).
+- The Platform Admin UI navigation list (`Platform Overview, Tenants,
+  Subscriptions, Feature Flags, Global Configuration, Integration Catalog,
+  Usage, Platform Health, Support Access, Platform Audit`) is unchanged —
+  no new nav item (e.g. no "Announcements" or "Config Versions" entry was
+  added in this version), consistent with the doc being the same source
+  rather than a genuinely later draft.
+- A codebase check (not just a doc-vs-doc diff) confirms the four stories
+  the first pass already added (PLATFORM-P0-05.1 Usage & Limits,
+  PLATFORM-P0-05.2 AI Provider Configuration, PLATFORM-P0-05.3 Global
+  Configuration Versioning, PLATFORM-P0-05.4 Maintenance Mode &
+  Announcements) remain the correct and complete set: `usage.ts`,
+  `configVersions.ts`/`configRollback.ts`, and `announcements.ts` exist
+  under `modules/platform-admin/` (migration `0047`) exactly matching what
+  those four rows already describe, `platform_config_versions` and
+  `platform_announcements` are both already listed in
+  `docs/design/ownership-map.md` as Platform-Agent-owned, and no
+  `platform_ai_provider_configs`-shaped table or AI-provider-config module
+  file exists anywhere in the repo — consistent with PLATFORM-P0-05.2
+  remaining a deliberately deferred open question, not silently dropped or
+  silently implemented.
+- Confirmed non-negotiable #3 (Platform Administration is a strictly
+  separate vendor-only boundary) is not blurred anywhere in this document:
+  every capability described (tenant management, subscriptions, feature
+  flags, branding, health, audit, usage/limits, AI provider config, config
+  versioning, maintenance/announcements, support tools, billing, release
+  management, platform API administration, regional control planes,
+  customer-managed keys, advanced operator roles) is scoped to
+  vendor-operator access only, and the doc repeats the "customer admins
+  must receive a hard authorization denial, not a hidden-only UI" framing
+  already implemented by PLATFORM-P0-01.1 — nothing in this pass requires
+  flagging on that front.
+
+**No Progress Tracker rows added or changed in this pass.** No status on
+any existing row was touched (PLATFORM-P0-02.2's `Partial` note,
+PLATFORM-P0-04.2's `Deferred` note, and PLATFORM-P0-05.2's `Deferred` note
+all stand exactly as the prior pass left them).
+
 ## P1
 
 Usage-based billing integration. Per-tenant SLAs. Scoped, audited support-access
