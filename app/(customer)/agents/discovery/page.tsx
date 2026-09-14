@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { buildDiscoveryInbox } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { DiscoveryCategory } from "@/lib/shared/types/agent-identity";
+import { Card, CardHeader, CardBody, Badge, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
 const CATEGORY_LABEL: Record<DiscoveryCategory, string> = {
   new: "New — not yet registered",
@@ -11,9 +12,14 @@ const CATEGORY_LABEL: Record<DiscoveryCategory, string> = {
   orphaned_identity: "Orphaned — no live owning agent",
 };
 
-// IDENTITY-P0-05 — bare functional discovery inbox reconciling Integration
-// Agent's imported identity objects against Identity's own agents/
-// agent_identities. Experience Agent (Module 08) owns visual design.
+const CATEGORY_TONE: Record<DiscoveryCategory, "neutral" | "warning" | "danger"> = {
+  new: "neutral",
+  likely_duplicate: "warning",
+  orphaned_identity: "danger",
+};
+
+// IDENTITY-P0-05 — reconciles Integration Agent's imported identity objects
+// against Identity's own agents/agent_identities.
 export default async function DiscoveryInboxPage() {
   let ctx;
   try {
@@ -26,47 +32,63 @@ export default async function DiscoveryInboxPage() {
   const entries = await buildDiscoveryInbox(ctx.tenantId!);
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Discovery inbox</h1>
-      <p>
-        Identities observed through configured integrations, reconciled against
-        already-registered agents. Nothing here is fabricated — an empty list means
-        either no integrations are configured yet, or every discovered identity is
-        already correlated to a live agent.
-      </p>
-      {entries.length === 0 ? (
-        <p>Nothing to review.</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-              <th>Name</th>
-              <th>Source</th>
-              <th>Category</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map((e) => (
-              <tr key={`${e.integrationId}-${e.externalId}`} style={{ borderBottom: "1px solid #eee" }}>
-                <td>{e.displayName}</td>
-                <td>{e.sourceSystem}</td>
-                <td>{CATEGORY_LABEL[e.category]}</td>
-                <td>
-                  {e.category === "likely_duplicate" && e.likelyDuplicateOfAgentId ? (
-                    <Link href={`/agents/${e.likelyDuplicateOfAgentId}`}>View matched agent</Link>
-                  ) : e.category === "new" ? (
-                    <Link href="/agents/new">Register</Link>
-                  ) : null}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <p>
-        <Link href="/agents">← Back to agents</Link>
-      </p>
-    </main>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Discovery inbox</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Identities observed through configured integrations, reconciled against already-registered agents. Nothing here is
+          fabricated — an empty list means either no integrations are configured yet, or every discovered identity is already
+          correlated to a live agent.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader title="Discovered identities" description={`${entries.length} entr${entries.length === 1 ? "y" : "ies"}`} />
+        <CardBody>
+          {entries.length === 0 ? (
+            <EmptyState title="Nothing to review" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Name</Th>
+                  <Th>Source</Th>
+                  <Th>Category</Th>
+                  <Th>Action</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {entries.map((e) => (
+                  <Tr key={`${e.integrationId}-${e.externalId}`}>
+                    <Td>{e.displayName}</Td>
+                    <Td>{e.sourceSystem}</Td>
+                    <Td>
+                      <Badge tone={CATEGORY_TONE[e.category]}>{CATEGORY_LABEL[e.category]}</Badge>
+                    </Td>
+                    <Td>
+                      {e.category === "likely_duplicate" && e.likelyDuplicateOfAgentId ? (
+                        <Link href={`/agents/${e.likelyDuplicateOfAgentId}`} className="text-primary hover:underline">
+                          View matched agent
+                        </Link>
+                      ) : e.category === "new" ? (
+                        <Link href="/agents/new" className="text-primary hover:underline">
+                          Register
+                        </Link>
+                      ) : (
+                        "—"
+                      )}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
+
+      <Link href="/agents" className="text-sm text-primary hover:underline">
+        ← Back to agents
+      </Link>
+    </div>
   );
 }

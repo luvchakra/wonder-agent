@@ -4,8 +4,9 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listApplications } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { createApplicationAction } from "@/app/actions/access";
+import { ApplicationsTable } from "./ApplicationsTable";
+import { Card, CardHeader, CardBody, Button, TextField } from "@/modules/ui";
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design.
 export default async function AccessPage() {
   let ctx;
   try {
@@ -17,27 +18,37 @@ export default async function AccessPage() {
   const applications = await listApplications(ctx.tenantId!);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Applications</h1>
-      <p>
-        <Link href="/access/requests">View access requests →</Link>
-      </p>
-      <ul>
-        {applications.map((a) => (
-          <li key={a.id}>
-            {a.name} {a.category ? `(${a.category})` : ""}
-          </li>
-        ))}
-      </ul>
-      <h2>Add an application</h2>
-      <form action={createApplicationAction}>
-        <input name="name" placeholder="Application name" required />
-        <input name="category" placeholder="category (optional)" />
-        <button type="submit">Add</button>
-      </form>
-      <p>
-        <Link href="/agents">← AI Agents</Link>
-      </p>
-    </main>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-foreground">Applications</h1>
+        <Link href="/access/requests" className="text-sm text-primary hover:underline">
+          View access requests →
+        </Link>
+      </div>
+
+      <Card>
+        <CardHeader title="Applications" description={`${applications.length} registered`} />
+        <CardBody>
+          <ApplicationsTable applications={applications} />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Add an application" />
+        <CardBody>
+          <form action={createApplicationAction} className="flex flex-wrap items-end gap-2">
+            <TextField label="Application name" name="name" required />
+            <TextField label="Category" name="category" placeholder="optional" />
+            <Button type="submit" variant="secondary">
+              Add
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+
+      <Link href="/agents" className="text-sm text-primary hover:underline">
+        ← AI Agents
+      </Link>
+    </div>
   );
 }

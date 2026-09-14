@@ -13,5 +13,6 @@ export { RiskTrendChart } from "./RiskTrendChart";
 export { ConfirmActionDialog, type ConfirmActionResult, type BulkActionItemResult } from "./ConfirmAction";
 export { EvidenceDrawer, useEvidenceDrawerParam } from "./Drawer";
 export { ShellGlobalSearch, ShellNotifications } from "./ShellSearchAndNotifications";
-export { DataTable, useTableState, useClientFilteredRows, type DataTableColumn, type TableState, type SortDir } from "./DataTable";
+export { DataTable, useTableState, useClientFilteredRows, SimpleDataTable, type DataTableColumn, type TableState, type SortDir } from "./DataTable";
 export { AgentTabs, type AgentTabKey } from "./AgentTabs";
+export { Field, TextField, TextareaField, SelectField, fieldInputClass, fieldLabelClass } from "./Field";

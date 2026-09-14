@@ -1,14 +1,14 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listPolicies } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { createPolicyAction } from "@/app/actions/access";
+import { PoliciesTable } from "./PoliciesTable";
+import { Card, CardHeader, CardBody, Button, TextField, SelectField } from "@/modules/ui";
 
 const CATEGORIES = ["identity", "access", "runtime", "agent", "lifecycle"] as const;
 const ACTIONS = ["flag", "restrict", "block"] as const;
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design.
 export default async function PoliciesPage() {
   let ctx;
   try {
@@ -20,36 +20,41 @@ export default async function PoliciesPage() {
   const policies = await listPolicies(ctx.tenantId!);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Policies</h1>
-      <ul>
-        {policies.map((p) => (
-          <li key={p.id}>
-            <Link href={`/policies/${p.id}`}>
-              {p.name} [{p.policyCategory}] — {p.severity}/{p.action} — {p.status}
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <h2>Create a policy</h2>
-      <form action={createPolicyAction}>
-        <input name="name" placeholder="Policy name" required />
-        <select name="policyCategory">
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-        <select name="action">
-          {ACTIONS.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
-        <button type="submit">Create</button>
-      </form>
-    </main>
+    <div className="space-y-4">
+      <h1 className="text-xl font-semibold text-foreground">Policies</h1>
+
+      <Card>
+        <CardHeader title="Policies" description={`${policies.length} defined`} />
+        <CardBody>
+          <PoliciesTable policies={policies} />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Create a policy" />
+        <CardBody>
+          <form action={createPolicyAction} className="flex flex-wrap items-end gap-2">
+            <TextField label="Policy name" name="name" required />
+            <SelectField label="Category" name="policyCategory">
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </SelectField>
+            <SelectField label="Action" name="action">
+              {ACTIONS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </SelectField>
+            <Button type="submit" variant="secondary">
+              Create
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

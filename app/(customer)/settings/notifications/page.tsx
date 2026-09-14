@@ -3,14 +3,13 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listNotificationPreferences } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { MANDATORY_NOTIFICATION_TYPES } from "@/lib/shared/types/operations";
+import { Card, CardHeader, CardBody, Badge, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
-// OPERATIONS-P0-05.1. Bare functional screen — Experience Agent (Module 08)
-// owns visual design. All seven P0 notification types are mandatory in
+// OPERATIONS-P0-05.1. All seven P0 notification types are mandatory in
 // this build (no optional P0 type exists yet), so every row here is shown
 // as locked-on rather than a togglable preference — setNotificationPreference()
-// (modules/operations/service.ts) already rejects an attempt to disable
-// one; the toggle UI itself has nothing to wire to until an optional
-// notification type exists (P1).
+// already rejects an attempt to disable one; the toggle UI itself has
+// nothing to wire to until an optional notification type exists (P1).
 export default async function NotificationPreferencesPage() {
   let ctx;
   try {
@@ -24,34 +23,42 @@ export default async function NotificationPreferencesPage() {
   const byType = new Map(preferences.map((p) => [p.type, p]));
 
   return (
-    <main style={{ maxWidth: 700, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Notification Preferences</h1>
-      <p>Certification, risk and security notifications are mandatory and cannot be turned off.</p>
-      <table border={1} cellPadding={6}>
-        <thead>
-          <tr>
-            <th>Type</th>
-            <th>In-app</th>
-            <th>Email</th>
-          </tr>
-        </thead>
-        <tbody>
-          {MANDATORY_NOTIFICATION_TYPES.map((type) => {
-            const pref = byType.get(type);
-            return (
-              <tr key={type}>
-                <td>{type}</td>
-                <td>
-                  <input type="checkbox" checked={pref?.inAppEnabled ?? true} disabled title="Mandatory — cannot be disabled" />
-                </td>
-                <td>
-                  <input type="checkbox" checked={pref?.emailEnabled ?? true} disabled title="Mandatory — cannot be disabled" />
-                </td>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Notification Preferences</h1>
+        <p className="mt-1 text-sm text-muted-foreground">Certification, risk and security notifications are mandatory and cannot be turned off.</p>
+      </div>
+
+      <Card>
+        <CardHeader title="Notification types" />
+        <CardBody>
+          <TableContainer>
+            <Thead>
+              <tr>
+                <Th>Type</Th>
+                <Th>In-app</Th>
+                <Th>Email</Th>
               </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </main>
+            </Thead>
+            <tbody>
+              {MANDATORY_NOTIFICATION_TYPES.map((type) => {
+                const pref = byType.get(type);
+                return (
+                  <Tr key={type}>
+                    <Td>{type.replace(/_/g, " ")}</Td>
+                    <Td>
+                      <Badge tone={pref?.inAppEnabled ?? true ? "success" : "neutral"}>{pref?.inAppEnabled ?? true ? "On" : "Off"} (mandatory)</Badge>
+                    </Td>
+                    <Td>
+                      <Badge tone={pref?.emailEnabled ?? true ? "success" : "neutral"}>{pref?.emailEnabled ?? true ? "On" : "Off"} (mandatory)</Badge>
+                    </Td>
+                  </Tr>
+                );
+              })}
+            </tbody>
+          </TableContainer>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

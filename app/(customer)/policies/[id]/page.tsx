@@ -4,10 +4,10 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getPolicy, listPolicyExceptions, listPolicyRules } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { addPolicyRuleAction } from "@/app/actions/access";
+import { Badge, SeverityBadge, Card, CardHeader, CardBody, Button, EmptyState, TextField, SelectField } from "@/modules/ui";
 
 const RULE_TYPES = ["rbac", "abac", "resource", "time"] as const;
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design.
 export default async function PolicyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   try {
@@ -24,51 +24,69 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
   const addRuleWithId = addPolicyRuleAction.bind(null, id);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href="/policies">← All policies</Link>
-      </p>
-      <h1>
-        {policy.name} <small>({policy.status})</small>
-      </h1>
-      <p>
-        Category: {policy.policyCategory} · Severity: {policy.severity} · Action: {policy.action}
-      </p>
+    <div className="space-y-4">
+      <Link href="/policies" className="text-sm text-primary hover:underline">
+        ← All policies
+      </Link>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold text-foreground">{policy.name}</h1>
+          <Badge tone={policy.status === "active" ? "success" : "neutral"}>{policy.status}</Badge>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Category: {policy.policyCategory} · Severity: <SeverityBadge severity={policy.severity} /> · Action: {policy.action}
+        </p>
+      </div>
 
-      <h2>Rules</h2>
-      <ul>
-        {rules.map((r) => (
-          <li key={r.id}>
-            [{r.ruleType}] <code>{JSON.stringify(r.condition)}</code>
-          </li>
-        ))}
-      </ul>
-      <form action={addRuleWithId}>
-        <select name="ruleType">
-          {RULE_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <input
-          name="condition"
-          placeholder='{"field":"agent.criticality","op":"eq","value":"high"}'
-          style={{ width: "60%" }}
-          required
-        />
-        <button type="submit">Add rule</button>
-      </form>
+      <Card>
+        <CardHeader title="Rules" description={`${rules.length} rule${rules.length === 1 ? "" : "s"}`} />
+        <CardBody className="space-y-3">
+          {rules.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No rules defined.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {rules.map((r) => (
+                <li key={r.id}>
+                  <Badge tone="neutral">{r.ruleType}</Badge> <code className="text-xs text-foreground">{JSON.stringify(r.condition)}</code>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={addRuleWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <SelectField label="Rule type" name="ruleType">
+              {RULE_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </SelectField>
+            <div className="flex-1 min-w-[16rem]">
+              <TextField label="Condition (JSON)" name="condition" placeholder='{"field":"agent.criticality","op":"eq","value":"high"}' required />
+            </div>
+            <Button type="submit" variant="secondary">
+              Add rule
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
 
-      <h2>Exceptions</h2>
-      <ul>
-        {exceptions.map((e) => (
-          <li key={e.id}>
-            {e.reason} {e.agentId ? `(agent ${e.agentId})` : "(tenant-wide)"}
-            {e.expiresAt ? ` — expires ${e.expiresAt}` : ""}
-          </li>
-        ))}
-      </ul>
-    </main>
+      <Card>
+        <CardHeader title="Exceptions" description={`${exceptions.length} exception${exceptions.length === 1 ? "" : "s"}`} />
+        <CardBody>
+          {exceptions.length === 0 ? (
+            <EmptyState title="No exceptions granted" />
+          ) : (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {exceptions.map((e) => (
+                <li key={e.id}>
+                  {e.reason} <span className="text-muted-foreground">{e.agentId ? `(agent ${e.agentId})` : "(tenant-wide)"}</span>
+                  {e.expiresAt ? ` — expires ${e.expiresAt}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

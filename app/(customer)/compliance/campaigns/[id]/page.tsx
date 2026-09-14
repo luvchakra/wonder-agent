@@ -3,10 +3,9 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listCampaignItems, getCampaignMetrics } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { recordDecisionAction } from "@/app/actions/compliance";
+import { DecisionForm } from "./DecisionForm";
+import { Card, CardBody, Badge, SeverityBadge, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design,
-// per docs/design/UI-UX-DESIGN-RULES.md. This page is functional scaffolding.
 export default async function CampaignItemsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: campaignId } = await params;
   let ctx;
@@ -20,63 +19,69 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
   const [items, metrics] = await Promise.all([listCampaignItems(ctx.tenantId!, campaignId), getCampaignMetrics(ctx.tenantId!, campaignId)]);
 
   return (
-    <main style={{ maxWidth: 900, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href="/compliance/campaigns">← Campaigns</Link>
-      </p>
-      <h1>Certification Items</h1>
-      <p>
-        {metrics.totalItems} total · {metrics.pendingItems} pending · {metrics.decidedItems} decided ·{" "}
-        {metrics.overdueItems} overdue · {metrics.escalatedItems} escalated
-      </p>
+    <div className="space-y-4">
+      <Link href="/compliance/campaigns" className="text-sm text-primary hover:underline">
+        ← Campaigns
+      </Link>
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Certification Items</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {metrics.totalItems} total · {metrics.pendingItems} pending · {metrics.decidedItems} decided · {metrics.overdueItems} overdue ·{" "}
+          {metrics.escalatedItems} escalated
+        </p>
+      </div>
 
-      <table border={1} cellPadding={6}>
-        <thead>
-          <tr>
-            <th>Agent</th>
-            <th>Risk</th>
-            <th>Usage</th>
-            <th>Recommendation</th>
-            <th>Status</th>
-            <th>Decision</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => {
-            const decideWithIds = recordDecisionAction.bind(null, campaignId, item.id);
-            return (
-              <tr key={item.id}>
-                <td>{item.agentId}</td>
-                <td>{item.riskAtReview ?? "—"}</td>
-                <td>{item.usageAtReview ?? "—"}</td>
-                <td>{item.recommendation ?? "—"}</td>
-                <td>{item.status}</td>
-                <td>
-                  {item.status === "pending" && item.reviewerId !== ctx.userId && <em>Assigned reviewer only</em>}
-                  {item.status === "pending" && item.reviewerId === ctx.userId && (
-                    <form action={decideWithIds}>
-                      <select name="decision" defaultValue="approve">
-                        <option value="approve">approve</option>
-                        <option value="revoke">revoke</option>
-                        <option value="modify">modify</option>
-                        <option value="delegate">delegate</option>
-                        <option value="request_information">request_information</option>
-                      </select>
-                      <input name="justification" placeholder="justification" required />
-                      <input name="delegateToUserId" placeholder="delegate to (uuid, if delegate)" />
-                      <label>
-                        <input name="overrideSoD" type="checkbox" /> Override SoD (approve only, if you own this agent)
-                      </label>
-                      <button type="submit">Submit</button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      {items.length === 0 && <p>No items in this campaign.</p>}
-    </main>
+      <Card>
+        <CardBody>
+          {items.length === 0 ? (
+            <EmptyState title="No items in this campaign" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Agent</Th>
+                  <Th>Risk</Th>
+                  <Th>Usage</Th>
+                  <Th>Recommendation</Th>
+                  <Th>Status</Th>
+                  <Th>Decision</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {items.map((item) => (
+                  <Tr key={item.id}>
+                    <Td>
+                      <Link href={`/agents/${item.agentId}`} className="text-primary hover:underline">
+                        {item.agentId}
+                      </Link>
+                    </Td>
+                    <Td>{item.riskAtReview ? <SeverityBadge severity={item.riskAtReview} /> : "—"}</Td>
+                    <Td>{item.usageAtReview ?? "—"}</Td>
+                    <Td>
+                      {item.recommendation ? (
+                        <Badge tone={item.recommendation === "remove" ? "danger" : item.recommendation === "review" ? "warning" : "success"}>
+                          {item.recommendation}
+                        </Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </Td>
+                    <Td>
+                      <Badge tone={item.status === "pending" ? "warning" : "success"}>{item.status}</Badge>
+                    </Td>
+                    <Td>
+                      {item.status === "pending" && item.reviewerId !== ctx.userId && (
+                        <span className="text-xs text-muted-foreground">Assigned reviewer only</span>
+                      )}
+                      {item.status === "pending" && item.reviewerId === ctx.userId && <DecisionForm itemId={item.id} />}
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

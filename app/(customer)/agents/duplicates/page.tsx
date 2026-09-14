@@ -3,10 +3,12 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listDuplicateCandidates } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { confirmDistinctAction, mergeDuplicateCandidateAction } from "@/app/actions/agents";
+import { confirmDistinctAction } from "@/app/actions/agents";
+import { MergeDuplicateButton } from "./MergeDuplicateButton";
+import { Card, CardHeader, CardBody, Button, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
-// IDENTITY-P0-04 — bare functional review inbox. Experience Agent (Module
-// 08) owns visual design.
+// IDENTITY-P0-04 — review inbox for pending registrations that matched an
+// existing agent above the duplicate-match threshold.
 export default async function DuplicateCandidatesPage() {
   let ctx;
   try {
@@ -19,54 +21,69 @@ export default async function DuplicateCandidatesPage() {
   const candidates = await listDuplicateCandidates(ctx.tenantId!, "pending");
 
   return (
-    <main style={{ maxWidth: 800, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Duplicate registration review</h1>
-      <p>
-        A pending registration matched an existing agent above the duplicate-match
-        threshold. Confirm they really are the same agent (merge — the pending
-        registration is discarded) or that they are genuinely distinct (confirm —
-        registration completes now).
-      </p>
-      {candidates.length === 0 ? (
-        <p>No pending duplicate candidates.</p>
-      ) : (
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-              <th>Candidate name</th>
-              <th>Matched agent</th>
-              <th>Score</th>
-              <th>Matched on</th>
-              <th>Decision</th>
-            </tr>
-          </thead>
-          <tbody>
-            {candidates.map((c) => (
-              <tr key={c.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td>{String((c.candidateData as { agentName?: string }).agentName ?? "(unknown)")}</td>
-                <td>
-                  <Link href={`/agents/${c.matchedAgentId}`}>{c.matchedAgentId}</Link>
-                </td>
-                <td>{c.matchScore}</td>
-                <td>{c.matchedKeys.join(", ")}</td>
-                <td>
-                  <form action={mergeDuplicateCandidateAction} style={{ display: "inline" }}>
-                    <input type="hidden" name="candidateId" value={c.id} />
-                    <button type="submit">Merge (same agent)</button>
-                  </form>{" "}
-                  <form action={confirmDistinctAction} style={{ display: "inline" }}>
-                    <input type="hidden" name="candidateId" value={c.id} />
-                    <button type="submit">Confirm distinct</button>
-                  </form>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
-      <p>
-        <Link href="/agents">← Back to agents</Link>
-      </p>
-    </main>
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-xl font-semibold text-foreground">Duplicate registration review</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A pending registration matched an existing agent above the duplicate-match threshold. Confirm they really are the
+          same agent (merge — the pending registration is discarded) or that they are genuinely distinct (confirm —
+          registration completes now).
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader title="Pending candidates" description={`${candidates.length} pending`} />
+        <CardBody>
+          {candidates.length === 0 ? (
+            <EmptyState title="No pending duplicate candidates" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Candidate name</Th>
+                  <Th>Matched agent</Th>
+                  <Th>Score</Th>
+                  <Th>Matched on</Th>
+                  <Th>Decision</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {candidates.map((c) => {
+                  const candidateName = String((c.candidateData as { agentName?: string }).agentName ?? "(unknown)");
+                  const confirmDistinctWithId = confirmDistinctAction.bind(null);
+                  return (
+                    <Tr key={c.id}>
+                      <Td>{candidateName}</Td>
+                      <Td>
+                        <Link href={`/agents/${c.matchedAgentId}`} className="text-primary hover:underline">
+                          {c.matchedAgentId}
+                        </Link>
+                      </Td>
+                      <Td>{c.matchScore}</Td>
+                      <Td>{c.matchedKeys.join(", ")}</Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          <MergeDuplicateButton candidateId={c.id} candidateName={candidateName} />
+                          <form action={confirmDistinctWithId}>
+                            <input type="hidden" name="candidateId" value={c.id} />
+                            <Button type="submit" variant="secondary" size="sm">
+                              Confirm distinct
+                            </Button>
+                          </form>
+                        </div>
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
+
+      <Link href="/agents" className="text-sm text-primary hover:underline">
+        ← Back to agents
+      </Link>
+    </div>
   );
 }

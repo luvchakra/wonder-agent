@@ -237,3 +237,69 @@ export function useClientFilteredRows<T>(rows: T[], filter: string, getSearchabl
     return rows.filter((r) => getSearchableText(r).toLowerCase().includes(needle));
   }, [rows, filter, getSearchableText]);
 }
+
+/**
+ * EXPERIENCE-P0-08 rollout helper — the same client-side sort/filter/
+ * paginate-over-an-already-fetched-list pattern `AgentsTable` established,
+ * generalized so each new list screen only supplies its columns and a
+ * `getSearchableText`/`getSortValue` pair rather than re-deriving the
+ * filter/sort/slice boilerplate per page. Still a documented stopgap per
+ * CLAUDE.md §15 (client-side over the full list) wherever the underlying
+ * `list*()` contract has no server-side pagination yet — same caveat as
+ * `AgentsTable`'s own comment, not a new limitation.
+ */
+export function SimpleDataTable<T>({
+  rows,
+  columns,
+  getRowId,
+  getSearchableText,
+  getSortValue,
+  paramPrefix,
+  defaultSortKey,
+  emptyTitle,
+  emptyDescription,
+  filterPlaceholder = "Filter…",
+  onRowClick,
+}: {
+  rows: T[];
+  columns: DataTableColumn<T>[];
+  getRowId: (row: T) => string;
+  getSearchableText: (row: T) => string;
+  getSortValue?: (row: T, key: string) => string | number;
+  paramPrefix: string;
+  defaultSortKey?: string;
+  emptyTitle: string;
+  emptyDescription?: string;
+  filterPlaceholder?: string;
+  onRowClick?: (row: T) => void;
+}) {
+  const state = useTableState(paramPrefix, { sortKey: defaultSortKey ?? null, pageSize: 25 });
+  const filtered = useClientFilteredRows(rows, state.filter, getSearchableText);
+
+  const sorted = useMemo(() => {
+    if (!state.sortKey || !getSortValue) return filtered;
+    const dir = state.sortDir === "asc" ? 1 : -1;
+    return [...filtered].sort((a, b) => {
+      const av = getSortValue(a, state.sortKey!);
+      const bv = getSortValue(b, state.sortKey!);
+      if (typeof av === "number" && typeof bv === "number") return (av - bv) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+  }, [filtered, state.sortKey, state.sortDir, getSortValue]);
+
+  const pageRows = sorted.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
+
+  return (
+    <DataTable
+      columns={columns}
+      rows={pageRows}
+      getRowId={getRowId}
+      totalCount={sorted.length}
+      state={state}
+      emptyTitle={emptyTitle}
+      emptyDescription={emptyDescription}
+      filterPlaceholder={filterPlaceholder}
+      onRowClick={onRowClick}
+    />
+  );
+}

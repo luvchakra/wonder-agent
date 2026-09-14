@@ -9,12 +9,18 @@ import {
   triggerSyncAction,
 } from "@/app/actions/integrations";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { Card, CardHeader, CardBody, Badge, Button, EmptyState, TextField, SelectField, type BadgeTone } from "@/modules/ui";
 
 const AUTH_TYPES = ["oauth2", "api_key", "basic", "bearer", "mtls"] as const;
 
-// Bare functional detail screen — Experience Agent (Module 08) owns visual
-// design; Platform Agent's future integration catalog UI may also compose
-// this data differently. This page proves the data/actions work end to end.
+const JOB_STATUS_TONE: Record<string, BadgeTone> = {
+  queued: "neutral",
+  running: "info",
+  succeeded: "success",
+  failed: "danger",
+  partial: "warning",
+};
+
 export default async function IntegrationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   let ctx;
@@ -36,77 +42,118 @@ export default async function IntegrationDetailPage({ params }: { params: Promis
   const createMappingWithId = createMappingAction.bind(null, id);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href="/integrations">← All integrations</Link>
-      </p>
-      <h1>
-        {integration.name} <small>({integration.status})</small>
-      </h1>
-      <p>
-        Type: {integration.integrationTypeId} · Has credentials: {integration.hasCredentials ? "yes" : "no"} ·
-        Last sync: {integration.lastSyncAt ?? "never"}
-      </p>
+    <div className="space-y-4">
+      <Link href="/integrations" className="text-sm text-primary hover:underline">
+        ← All integrations
+      </Link>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-xl font-semibold text-foreground">{integration.name}</h1>
+          <Badge tone={integration.status === "connected" ? "success" : integration.status === "error" ? "danger" : "neutral"}>{integration.status}</Badge>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Type: {integration.integrationTypeId} · Has credentials: {integration.hasCredentials ? "yes" : "no"} · Last sync:{" "}
+          {integration.lastSyncAt ?? "never"}
+        </p>
+      </div>
 
-      <section>
-        <h2>Credential</h2>
-        <form action={setCredentialWithId}>
-          <select name="authType" defaultValue={AUTH_TYPES[3]}>
-            {AUTH_TYPES.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-          <input name="secret" type="password" placeholder="secret / token" required />
-          <button type="submit">Save credential</button>
-        </form>
-      </section>
+      <Card>
+        <CardHeader title="Credential" />
+        <CardBody>
+          <form action={setCredentialWithId} className="flex flex-wrap items-end gap-2">
+            <SelectField label="Auth type" name="authType" defaultValue={AUTH_TYPES[3]}>
+              {AUTH_TYPES.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </SelectField>
+            <div className="flex-1 min-w-[12rem]">
+              <TextField label="Secret / token" name="secret" type="password" required />
+            </div>
+            <Button type="submit" variant="secondary">
+              Save credential
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
 
-      <section>
-        <h2>Connection</h2>
-        <form action={testConnectionWithId}>
-          <button type="submit">Test connection</button>
-        </form>
-      </section>
+      <Card>
+        <CardHeader
+          title="Connection"
+          actions={
+            <form action={testConnectionWithId}>
+              <Button type="submit" variant="secondary">
+                Test connection
+              </Button>
+            </form>
+          }
+        />
+        <CardBody>
+          <p className="text-sm text-muted-foreground">Verifies the saved credential can reach the configured base URL.</p>
+        </CardBody>
+      </Card>
 
-      <section>
-        <h2>Sync jobs</h2>
-        <form action={triggerSyncWithId}>
-          <button type="submit">Run sync now</button>
-        </form>
-        <ul>
-          {jobs.map((j) => (
-            <li key={j.id}>
-              {j.createdAt}: {j.status} — processed {j.recordsProcessed}, failed {j.recordsFailed}
-              {j.errors.length > 0 ? ` (${j.errors.length} error(s))` : ""}
-            </li>
-          ))}
-        </ul>
-      </section>
+      <Card>
+        <CardHeader
+          title="Sync jobs"
+          actions={
+            <form action={triggerSyncWithId}>
+              <Button type="submit" variant="secondary">
+                Run sync now
+              </Button>
+            </form>
+          }
+        />
+        <CardBody>
+          {jobs.length === 0 ? (
+            <EmptyState title="No sync jobs yet" />
+          ) : (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {jobs.map((j) => (
+                <li key={j.id} className="flex items-center gap-2">
+                  <Badge tone={JOB_STATUS_TONE[j.status] ?? "neutral"}>{j.status}</Badge>
+                  <span>
+                    {j.createdAt}: processed {j.recordsProcessed}, failed {j.recordsFailed}
+                    {j.errors.length > 0 ? ` (${j.errors.length} error(s))` : ""}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
 
-      <section>
-        <h2>Field mappings</h2>
-        <ul>
-          {mappings.map((m) => (
-            <li key={m.id}>
-              [{m.objectType}] {m.sourceField} → {m.targetField}
-            </li>
-          ))}
-        </ul>
-        <form action={createMappingWithId}>
-          <select name="objectType">
-            <option value="identity">identity</option>
-            <option value="account">account</option>
-            <option value="application">application</option>
-            <option value="entitlement">entitlement</option>
-            <option value="access_grant">access_grant</option>
-          </select>
-          <input name="sourceField" placeholder="source field (dot path)" required />
-          <input name="targetField" placeholder="target field" required />
-          <button type="submit">Add mapping</button>
-        </form>
-      </section>
-    </main>
+      <Card>
+        <CardHeader title="Field mappings" />
+        <CardBody className="space-y-3">
+          {mappings.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No mappings defined.</p>
+          ) : (
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {mappings.map((m) => (
+                <li key={m.id}>
+                  <Badge tone="neutral">{m.objectType}</Badge> <span className="text-foreground">{m.sourceField}</span> → <span className="text-foreground">{m.targetField}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <form action={createMappingWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
+            <SelectField label="Object type" name="objectType">
+              <option value="identity">identity</option>
+              <option value="account">account</option>
+              <option value="application">application</option>
+              <option value="entitlement">entitlement</option>
+              <option value="access_grant">access_grant</option>
+            </SelectField>
+            <TextField label="Source field" name="sourceField" placeholder="dot path" required />
+            <TextField label="Target field" name="targetField" required />
+            <Button type="submit" variant="secondary">
+              Add mapping
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

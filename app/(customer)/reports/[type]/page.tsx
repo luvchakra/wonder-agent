@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { generateReport } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { ReportType } from "@/lib/shared/types/operations";
+import { Card, CardHeader, CardBody, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
 const VALID_TYPES: ReportType[] = [
   "agent_inventory",
@@ -16,7 +17,6 @@ const VALID_TYPES: ReportType[] = [
   "policy_compliance",
 ];
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design.
 export default async function ReportDetailPage({ params }: { params: Promise<{ type: string }> }) {
   const { type } = await params;
   let ctx;
@@ -32,45 +32,55 @@ export default async function ReportDetailPage({ params }: { params: Promise<{ t
   const fieldKeys = report.rows.length > 0 ? Object.keys(report.rows[0]!.fields) : [];
 
   return (
-    <main style={{ maxWidth: 1000, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href="/reports">← Reports</Link>
-      </p>
-      <h1>{type}</h1>
-      <p>
-        Generated at {report.generatedAt} · {report.recordCount} records ·{" "}
-        <a href={`/api/v1/reports/${type}/export?format=csv`}>Export CSV</a>
-      </p>
+    <div className="space-y-4">
+      <Link href="/reports" className="text-sm text-primary hover:underline">
+        ← Reports
+      </Link>
+      <div>
+        <h1 className="text-xl font-semibold capitalize text-foreground">{type.replace(/_/g, " ")}</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Generated at {report.generatedAt} · {report.recordCount} records ·{" "}
+          <a href={`/api/v1/reports/${type}/export?format=csv`} className="text-primary hover:underline">
+            Export CSV
+          </a>
+        </p>
+      </div>
 
-      <table border={1} cellPadding={6}>
-        <thead>
-          <tr>
-            {fieldKeys.map((k) => (
-              <th key={k}>{k}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {report.rows.map((row) => (
-            <tr key={row.id}>
-              {fieldKeys.map((k) => (
-                <td key={k}>
-                  {k === fieldKeys[0] ? (
-                    <Link href={row.href}>{String(row.fields[k] ?? "")}</Link>
-                  ) : (
-                    String(row.fields[k] ?? "")
-                  )}
-                </td>
-              ))}
-            </tr>
-          ))}
-          {report.rows.length === 0 && (
-            <tr>
-              <td colSpan={Math.max(fieldKeys.length, 1)}>No records.</td>
-            </tr>
+      <Card>
+        <CardHeader title="Records" description={`${report.recordCount} total`} />
+        <CardBody>
+          {report.rows.length === 0 ? (
+            <EmptyState title="No records" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  {fieldKeys.map((k) => (
+                    <Th key={k}>{k}</Th>
+                  ))}
+                </tr>
+              </Thead>
+              <tbody>
+                {report.rows.map((row) => (
+                  <Tr key={row.id}>
+                    {fieldKeys.map((k) => (
+                      <Td key={k}>
+                        {k === fieldKeys[0] ? (
+                          <Link href={row.href} className="text-primary hover:underline">
+                            {String(row.fields[k] ?? "")}
+                          </Link>
+                        ) : (
+                          String(row.fields[k] ?? "")
+                        )}
+                      </Td>
+                    ))}
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
           )}
-        </tbody>
-      </table>
-    </main>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

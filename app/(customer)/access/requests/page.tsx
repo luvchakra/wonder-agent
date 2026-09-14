@@ -4,8 +4,15 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAccessRequests } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { decideAccessRequestAction } from "@/app/actions/access";
+import { Card, CardHeader, CardBody, Button, Badge, EmptyState, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design.
+const STATUS_TONE: Record<string, "neutral" | "success" | "warning" | "danger"> = {
+  pending: "warning",
+  approved: "success",
+  rejected: "danger",
+  fulfilled: "neutral",
+};
+
 export default async function AccessRequestsPage() {
   let ctx;
   try {
@@ -17,52 +24,68 @@ export default async function AccessRequestsPage() {
   const requests = await listAccessRequests(ctx.tenantId!);
 
   return (
-    <main style={{ maxWidth: 720, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <p>
-        <Link href="/access">← Applications</Link>
-      </p>
-      <h1>Access Requests</h1>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-            <th>Agent</th>
-            <th>Justification</th>
-            <th>Status</th>
-            <th>Decide</th>
-          </tr>
-        </thead>
-        <tbody>
-          {requests.map((r) => {
-            const decideWithId = decideAccessRequestAction.bind(null, r.id);
-            return (
-              <tr key={r.id} style={{ borderBottom: "1px solid #eee" }}>
-                <td>{r.agentId}</td>
-                <td>{r.justification}</td>
-                <td>{r.status}</td>
-                <td>
-                  {r.status === "pending" && (
-                    <form action={decideWithId} style={{ display: "inline" }}>
-                      <button type="submit" name="decision" value="approved">
-                        Approve
-                      </button>
-                      <button type="submit" name="decision" value="rejected">
-                        Reject
-                      </button>
-                    </form>
-                  )}
-                  {r.status === "approved" && (
-                    <form action={decideWithId} style={{ display: "inline" }}>
-                      <button type="submit" name="decision" value="fulfilled">
-                        Mark fulfilled
-                      </button>
-                    </form>
-                  )}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </main>
+    <div className="space-y-4">
+      <Link href="/access" className="text-sm text-primary hover:underline">
+        ← Applications
+      </Link>
+      <h1 className="text-xl font-semibold text-foreground">Access Requests</h1>
+
+      <Card>
+        <CardHeader title="Requests" description={`${requests.length} total`} />
+        <CardBody>
+          {requests.length === 0 ? (
+            <EmptyState title="No access requests yet" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Agent</Th>
+                  <Th>Justification</Th>
+                  <Th>Status</Th>
+                  <Th>Decide</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {requests.map((r) => {
+                  const decideWithId = decideAccessRequestAction.bind(null, r.id);
+                  return (
+                    <Tr key={r.id}>
+                      <Td>
+                        <Link href={`/agents/${r.agentId}`} className="text-primary hover:underline">
+                          {r.agentId}
+                        </Link>
+                      </Td>
+                      <Td>{r.justification}</Td>
+                      <Td>
+                        <Badge tone={STATUS_TONE[r.status] ?? "neutral"}>{r.status}</Badge>
+                      </Td>
+                      <Td>
+                        {r.status === "pending" && (
+                          <form action={decideWithId} className="flex gap-2">
+                            <Button type="submit" name="decision" value="approved" size="sm">
+                              Approve
+                            </Button>
+                            <Button type="submit" name="decision" value="rejected" variant="destructive" size="sm">
+                              Reject
+                            </Button>
+                          </form>
+                        )}
+                        {r.status === "approved" && (
+                          <form action={decideWithId}>
+                            <Button type="submit" name="decision" value="fulfilled" variant="secondary" size="sm">
+                              Mark fulfilled
+                            </Button>
+                          </form>
+                        )}
+                      </Td>
+                    </Tr>
+                  );
+                })}
+              </tbody>
+            </TableContainer>
+          )}
+        </CardBody>
+      </Card>
+    </div>
   );
 }

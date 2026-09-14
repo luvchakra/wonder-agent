@@ -3,9 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAuditLogs } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { Card, CardBody, Badge, Button, EmptyState, TextField, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
 
-// Bare functional screen — Experience Agent (Module 08) owns visual design,
-// per docs/design/UI-UX-DESIGN-RULES.md. This page is functional scaffolding.
 export default async function AuditPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const params = await searchParams;
   let ctx;
@@ -23,67 +22,79 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
   );
 
   return (
-    <main style={{ maxWidth: 1000, margin: "2rem auto", fontFamily: "sans-serif" }}>
-      <h1>Audit Trail</h1>
-      <p>
-        <a href="/api/v1/audit/export?format=csv">Export CSV</a>
-      </p>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h1 className="text-xl font-semibold text-foreground">Audit Trail</h1>
+        <a href="/api/v1/audit/export?format=csv" className="text-sm text-primary hover:underline">
+          Export CSV
+        </a>
+      </div>
 
-      <form method="get" style={{ marginBottom: "1rem" }}>
-        <input name="objectType" placeholder="object type" defaultValue={params.objectType ?? ""} />
-        <input name="action" placeholder="action" defaultValue={params.action ?? ""} />
-        <input name="actorId" placeholder="actor id (uuid)" defaultValue={params.actorId ?? ""} />
-        <input name="from" type="datetime-local" defaultValue={params.from ?? ""} />
-        <input name="to" type="datetime-local" defaultValue={params.to ?? ""} />
-        <button type="submit">Filter</button>
-      </form>
+      <Card>
+        <CardBody>
+          <form method="get" className="flex flex-wrap items-end gap-2">
+            <TextField label="Object type" name="objectType" defaultValue={params.objectType ?? ""} />
+            <TextField label="Action" name="action" defaultValue={params.action ?? ""} />
+            <TextField label="Actor ID" name="actorId" defaultValue={params.actorId ?? ""} />
+            <TextField label="From" name="from" type="datetime-local" defaultValue={params.from ?? ""} />
+            <TextField label="To" name="to" type="datetime-local" defaultValue={params.to ?? ""} />
+            <Button type="submit" variant="secondary">
+              Filter
+            </Button>
+          </form>
+        </CardBody>
+      </Card>
 
-      <table border={1} cellPadding={6}>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Actor</th>
-            <th>Action</th>
-            <th>Object</th>
-            <th>Outcome</th>
-          </tr>
-        </thead>
-        <tbody>
-          {page.entries.map((e) => (
-            <tr key={e.id}>
-              <td>{e.createdAt}</td>
-              <td>
-                {e.actorType}
-                {e.actorId ? `:${e.actorId}` : ""}
-              </td>
-              <td>{e.action}</td>
-              <td>
-                {e.objectType}:{e.objectId}
-              </td>
-              <td>{e.outcome}</td>
-            </tr>
-          ))}
-          {page.entries.length === 0 && (
-            <tr>
-              <td colSpan={5}>No audit entries match this filter.</td>
-            </tr>
+      <Card>
+        <CardBody>
+          {page.entries.length === 0 ? (
+            <EmptyState title="No audit entries match this filter" />
+          ) : (
+            <TableContainer>
+              <Thead>
+                <tr>
+                  <Th>Time</Th>
+                  <Th>Actor</Th>
+                  <Th>Action</Th>
+                  <Th>Object</Th>
+                  <Th>Outcome</Th>
+                </tr>
+              </Thead>
+              <tbody>
+                {page.entries.map((e) => (
+                  <Tr key={e.id}>
+                    <Td>{e.createdAt}</Td>
+                    <Td>
+                      {e.actorType}
+                      {e.actorId ? `:${e.actorId}` : ""}
+                    </Td>
+                    <Td>{e.action}</Td>
+                    <Td>
+                      {e.objectType}:{e.objectId}
+                    </Td>
+                    <Td>
+                      <Badge tone={e.outcome === "success" ? "success" : "danger"}>{e.outcome}</Badge>
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </TableContainer>
           )}
-        </tbody>
-      </table>
+        </CardBody>
+      </Card>
 
       {page.nextCursor && (
-        <p>
-          <Link
-            href={`/audit?${new URLSearchParams(
-              Object.fromEntries(
-                Object.entries({ ...params, cursor: page.nextCursor }).filter((entry): entry is [string, string] => entry[1] !== undefined),
-              ),
-            ).toString()}`}
-          >
-            Next page →
-          </Link>
-        </p>
+        <Link
+          href={`/audit?${new URLSearchParams(
+            Object.fromEntries(
+              Object.entries({ ...params, cursor: page.nextCursor }).filter((entry): entry is [string, string] => entry[1] !== undefined),
+            ),
+          ).toString()}`}
+          className="text-sm text-primary hover:underline"
+        >
+          Next page →
+        </Link>
       )}
-    </main>
+    </div>
   );
 }
