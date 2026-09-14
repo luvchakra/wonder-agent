@@ -19,13 +19,13 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 |---|---|---|
 | IDENTITY-P0-01.1 | `agents` table and registration | Done |
 | IDENTITY-P0-01.2 | Agent identity correlation (`agent_identities`) | Done |
-| IDENTITY-P0-01.3 | Agent discovery inbox | Partial — always returns empty pending Integration Agent's contract |
+| IDENTITY-P0-01.3 | Agent discovery inbox | Done — 2026-09-14: superseded by `buildDiscoveryInbox()` (IDENTITY-P0-05), now reading Integration Agent's published contract |
 | IDENTITY-P0-02.1 | Lifecycle state machine (higher bar) | Done |
 | IDENTITY-P0-02.2 | Ownership & accountability | Done |
 | IDENTITY-P0-02.3 | Agent relationships | Done |
 | IDENTITY-P0-03.1 | `agent_contracts` (higher bar) | Done |
-| IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Not Started |
-| IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Not Started |
+| IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Done — 2026-09-14, live RLS-verified |
+| IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists |
 
 ---
 

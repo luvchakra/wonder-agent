@@ -7,6 +7,7 @@ import type {
   AgentLifecycleEvent,
   AgentOwner,
   AgentRelationship,
+  DuplicateCandidate,
 } from "@/lib/shared/types/agent-identity";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- mapping raw Supabase rows */
@@ -112,6 +113,22 @@ export function toAgentRelationship(row: any): AgentRelationship {
     agentId: row.agent_id,
     relatedAgentId: row.related_agent_id,
     relationshipType: row.relationship_type,
+    createdAt: row.created_at,
+  };
+}
+
+export function toDuplicateCandidate(row: any): DuplicateCandidate {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    matchedAgentId: row.matched_agent_id,
+    candidateData: row.candidate_data,
+    matchScore: Number(row.match_score),
+    matchedKeys: row.matched_keys,
+    status: row.status,
+    createdBy: row.created_by,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
     createdAt: row.created_at,
   };
 }

@@ -147,3 +147,38 @@ export type AgentFilter = {
   status?: "discovered_unregistered";
   lifecycleState?: AgentLifecycleState;
 };
+
+// IDENTITY-P0-04 — Duplicate Detection & Merge/Review Workflow.
+export type DuplicateCandidateStatus = "pending" | "merged" | "confirmed_distinct";
+
+export type DuplicateCandidate = {
+  id: string;
+  tenantId: string;
+  matchedAgentId: string;
+  candidateData: Record<string, unknown>;
+  matchScore: number;
+  matchedKeys: string[];
+  status: DuplicateCandidateStatus;
+  createdBy: string | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
+
+export type CreateAgentResult =
+  | { kind: "created"; agent: Agent }
+  | { kind: "duplicate_candidate"; candidate: DuplicateCandidate };
+
+// IDENTITY-P0-05 — Discovery Reconciliation & Orphaned Identity Detection.
+export type DiscoveryCategory = "new" | "likely_duplicate" | "orphaned_identity";
+
+export type DiscoveryInboxEntry = {
+  externalId: string;
+  integrationId: string;
+  sourceSystem: string;
+  displayName: string;
+  category: DiscoveryCategory;
+  /** Present only when category is "likely_duplicate". */
+  likelyDuplicateOfAgentId?: string;
+  raw: Record<string, unknown>;
+};

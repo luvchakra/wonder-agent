@@ -25,8 +25,13 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await requirePermission("agent.create");
     const body = await request.json();
-    const agent = await createAgent(ctx.tenantId!, ctx.userId, body);
-    return NextResponse.json({ ok: true, data: agent }, { status: 201 });
+    const result = await createAgent(ctx.tenantId!, ctx.userId, body);
+    if (result.kind === "duplicate_candidate") {
+      // 202 Accepted: the request was understood but registration is
+      // pending human review (IDENTITY-P0-04) rather than complete.
+      return NextResponse.json({ ok: true, data: result }, { status: 202 });
+    }
+    return NextResponse.json({ ok: true, data: result.agent }, { status: 201 });
   } catch (err) {
     return errorResponse(err);
   }

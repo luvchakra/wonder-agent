@@ -25,3 +25,11 @@ export {
 export { assignOwner, removeOwner, listOwners, getOwnershipIssues } from "./owners";
 export { linkAgentIdentity, listAgentIdentities } from "./identities";
 export { addRelationship, listRelationships, removeRelationship } from "./relationships";
+export {
+  listDuplicateCandidates,
+  mergeDuplicateCandidate,
+  confirmDistinctAndRegister,
+  computeDuplicateScore,
+  DUPLICATE_MATCH_THRESHOLD,
+} from "./duplicates";
+export { buildDiscoveryInbox } from "./discovery";

@@ -153,3 +153,110 @@ SAP/Snowflake contract, walk it through
 transition history) is buildable end-to-end today via the API routes above,
 but has not been run as a scripted scenario in this session — worth doing
 either now or as part of a future QA Agent pass.
+
+---
+
+## 2026-09-14 — IDENTITY-P0-04 (duplicate detection) and IDENTITY-P0-05 (discovery reconciliation)
+
+**Agent:** Identity Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Auto-chained after Foundation Agent's own P0 completion, per the user's
+"operate like before, focus on P0 only, continue automatically" instruction.
+Picked up the two new P0 stories the 2026-09-14 requirements refresh added.
+
+### IDENTITY-P0-04 — Duplicate Detection & Merge/Review Workflow
+
+New table `agent_duplicate_candidates` (migration `0041`), RLS-treated as
+evidentiary/computed data — client SELECT only, all writes via
+`supabaseServiceRole()` in the new `modules/agent-identity/duplicates.ts`
+(same pattern as `risk_findings`/`certification_decisions`). Deterministic,
+no-LLM scoring (`computeDuplicateScore()`, unit-tested — 5 cases): a
+`source_system` + `source_object_id` match scores 1.0 (decisive — the same
+external system reporting the same object twice); a case-insensitive
+`agent_name` match alone scores 0.6 (weaker evidence, since two distinct
+agents can share a display name); anything else scores 0.
+`DUPLICATE_MATCH_THRESHOLD = 0.6`.
+
+`createAgent()` (`modules/agent-identity/agents.ts`) now runs this check
+before ever inserting an `agents` row; the original insert logic was
+extracted into `createAgentRow()` so both the normal path and a reviewer's
+"confirm distinct" decision share one implementation. On a match, the
+pending registration is diverted into a duplicate-candidate record instead
+of being inserted — `createAgent()`'s return type changed from `Agent` to a
+`CreateAgentResult` discriminated union (`{kind: 'created', agent}` |
+`{kind: 'duplicate_candidate', candidate}`); updated both call sites
+(`POST /api/v1/agents` — now returns 202 for the duplicate-candidate case,
+201 unchanged for the created case; `createAgentAction` — redirects to the
+new `/agents/duplicates` review page instead of `/agents/:id`). A reviewer
+can merge (mark `merged` — the pending registration is discarded, and since
+it was never inserted as a real `agents` row, the existing survivor's own
+lifecycle/audit history is untouched by construction rather than by an
+explicit two-row merge) or confirm-as-distinct (`confirmDistinctAndRegister()`
+completes the deferred registration now). Both actions audited via
+`writeAudit()`. New bare page `/agents/duplicates` plus
+`/api/v1/agents/duplicates` (GET) and `/api/v1/agents/duplicates/:id`
+(PATCH `{decision: 'merge'|'confirm_distinct'}`).
+
+**Verified live** (Supabase MCP, FinanceBot fixture tenants
+`aaaaaaaa-5000-.../bbbbbbbb-5000-...`): Tenant A5's user sees only its own
+duplicate-candidate row, Tenant B5's user sees zero; a direct client INSERT
+is rejected, a direct client UPDATE affects 0 rows (same select-only +
+service-role-write proof pattern used throughout this session).
+
+### IDENTITY-P0-05 — Discovery Reconciliation & Orphaned Identity Detection
+
+New `modules/agent-identity/discovery.ts` — `buildDiscoveryInbox(tenantId)`
+reads Integration Agent's now-published contract
+(`listIntegrations`/`getNormalizedObjects` from
+`modules/integrations/service.ts`) for `identity`-typed normalized objects,
+and reconciles each one against `agents`/`agent_identities`:
+- Already correlated (an `agent_identities` row exists for that external
+  reference, source-keyed as `<integrationId>::<externalId>`) → not shown at
+  all (fully resolved).
+- Not yet correlated, but scores ≥ the same `computeDuplicateScore()`
+  threshold against an existing agent → `likely_duplicate`, with the
+  matched agent's id.
+- Not yet correlated and no score match → `new`.
+- An existing `agent_identities` link whose owning agent is retired or
+  missing → `orphaned_identity` (a separate pass over `agent_identities`,
+  independent of whether any integration is currently configured).
+
+This directly resolves IDENTITY-P0-01.3's long-standing "always returns
+empty pending Integration Agent's contract" limitation — that dependency was
+real when 01.3 was first built (Integration Agent hadn't been dispatched
+yet); it has since published exactly the contract 01.3's own Dependencies
+section anticipated ("once Integration publishes normalized identity/account
+import data, Identity may correlate an `agent_identities` row to it"), so
+implementing 05 on top of it also completes 01.3 rather than leaving a
+second, parallel "discovery" concept. `listAgents()`'s original
+`filter.status === 'discovered_unregistered'` branch is left returning `[]`
+verbatim for any existing caller of that exact shape (no caller exists
+today — grepped to confirm), rather than being repointed at a
+differently-shaped `DiscoveryInboxEntry[]` under the same filter contract.
+New bare page `/agents/discovery` plus `/api/v1/agents/discovery-inbox`
+(GET). Correctly returns `[]` when a tenant has zero configured
+integrations, per the same "never fabricate data" rule 01.3 already
+followed.
+
+**Not verified against a real integration's live data** (no configured,
+credentialed integration exists in this session's fixtures) — the
+type-checked composition against Integration Agent's published, already-
+tested `listIntegrations`/`getNormalizedObjects` functions, plus this
+story's own reconciliation logic being a straightforward function of that
+already-typed data, was judged sufficient without fabricating a live
+integration fixture solely to exercise this one path; flagged rather than
+silently assumed.
+
+**Full verification run**: `npm run typecheck`, `npm run lint`, `npm run
+build` (new routes present: `/agents/duplicates`, `/agents/discovery`,
+`/api/v1/agents/duplicates`, `/api/v1/agents/duplicates/[id]`,
+`/api/v1/agents/discovery-inbox`), `npx vitest run` — 90/90 passing (5 new:
+`computeDuplicateScore`'s decisive/weak/zero-score/mismatched-source/
+missing-source-id cases). `get_advisors(security)` re-checked after
+migration `0041` — identical accepted-exception set, `agent_duplicate_candidates`
+correctly not flagged (it has a select policy, unlike the intentional
+zero-policy tables).
+
+**Dependencies consumed:** Foundation's usual set, plus — for the first time
+in this module — Integration Agent's published `listIntegrations()`/
+`getNormalizedObjects()` contract (read-only, exactly as published, no
+reaching into `integration_objects`/`integrations` directly).

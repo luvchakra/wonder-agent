@@ -65,7 +65,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `feature_flags` | PA | Per-tenant feature flag state |
 | `subscriptions` | PA | Per-tenant plan/subscription record |
 | `platform_audit_logs` | PA | Platform-admin action audit (separate from tenant `audit_logs`) |
-| `agent_duplicate_candidates` | IA | Planned — IDENTITY-P0-04 (duplicate detection/merge review), not yet implemented |
+| `agent_duplicate_candidates` | IA | IDENTITY-P0-04 (duplicate detection/merge review) — migration `0041`, built 2026-09-14 |
 | `agent_attestations` | IA | Planned — IDENTITY-P1-02 (attestation), not yet implemented |
 | `integration_exports` | INT | Planned — INTEGRATION-P1-05 (SIEM export delivery/retry status), not yet implemented |
 | `runtime_event_quarantine` | RA | Planned — RUNTIME-P0-11 (ingestion hardening: replay protection/quarantine), not yet implemented; exact name TBD when built |

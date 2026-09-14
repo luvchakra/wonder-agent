@@ -5,9 +5,11 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
   addRelationship,
   assignOwner,
+  confirmDistinctAndRegister,
   createAgent,
   createContractVersion,
   linkAgentIdentity,
+  mergeDuplicateCandidate,
   transitionAgentLifecycle,
 } from "@/modules/agent-identity/service";
 import type {
@@ -21,7 +23,7 @@ import type {
 
 export async function createAgentAction(formData: FormData) {
   const ctx = await requirePermission("agent.create");
-  const agent = await createAgent(ctx.tenantId!, ctx.userId, {
+  const result = await createAgent(ctx.tenantId!, ctx.userId, {
     agentName: String(formData.get("agentName") ?? ""),
     agentType: String(formData.get("agentType") ?? ""),
     purpose: String(formData.get("purpose") ?? "") || undefined,
@@ -33,6 +35,25 @@ export async function createAgentAction(formData: FormData) {
     criticality: (formData.get("criticality") as AgentCriticality) || undefined,
     dataClassification: String(formData.get("dataClassification") ?? "") || undefined,
   });
+  // IDENTITY-P0-04 — a likely-duplicate registration is diverted to the
+  // review inbox instead of completing immediately.
+  if (result.kind === "duplicate_candidate") {
+    redirect(`/agents/duplicates?highlight=${result.candidate.id}`);
+  }
+  redirect(`/agents/${result.agent.id}`);
+}
+
+export async function mergeDuplicateCandidateAction(formData: FormData) {
+  const ctx = await requirePermission("agent.create");
+  const candidateId = String(formData.get("candidateId") ?? "");
+  await mergeDuplicateCandidate(ctx.tenantId!, ctx.userId, candidateId);
+  redirect("/agents/duplicates");
+}
+
+export async function confirmDistinctAction(formData: FormData) {
+  const ctx = await requirePermission("agent.create");
+  const candidateId = String(formData.get("candidateId") ?? "");
+  const agent = await confirmDistinctAndRegister(ctx.tenantId!, ctx.userId, candidateId);
   redirect(`/agents/${agent.id}`);
 }
 

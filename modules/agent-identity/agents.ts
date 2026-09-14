@@ -3,7 +3,13 @@ import "server-only";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import type { Agent, AgentCriticality, AgentEnvironment, AgentFilter } from "@/lib/shared/types/agent-identity";
+import type {
+  Agent,
+  AgentCriticality,
+  AgentEnvironment,
+  AgentFilter,
+  CreateAgentResult,
+} from "@/lib/shared/types/agent-identity";
 import { toAgent } from "./mappers";
 import { maybeMarkCertificationDue } from "./lifecycle";
 
@@ -26,20 +32,54 @@ export type CreateAgentInput = {
 };
 
 /**
- * IDENTITY-P0-01.1. Runs as the calling user via supabaseServer() — RLS's
- * `with check (tenant_id in (select current_tenant_ids()))` on `agents`
- * (see supabase/migrations/0012_identity_agents.sql) is the tenant-isolation
- * backstop; agent.create permission is enforced by the caller via
- * requirePermission() before this is invoked.
+ * IDENTITY-P0-04 — runs the duplicate-candidate check before ever inserting
+ * a new `agents` row. If an existing agent scores at/above the match
+ * threshold, the registration is diverted into a reviewable duplicate
+ * candidate instead of silently creating a second record for the same
+ * real-world agent; the caller (API route / server action) must present
+ * that outcome to the user rather than assuming a new agent was created.
  */
 export async function createAgent(
   tenantId: string,
   actorId: string,
   input: CreateAgentInput,
-): Promise<Agent> {
+): Promise<CreateAgentResult> {
   if (!input.agentName.trim()) throw new ApiError(400, "INVALID_INPUT", "agentName is required");
   if (!input.agentType.trim()) throw new ApiError(400, "INVALID_INPUT", "agentType is required");
 
+  const { findDuplicateCandidate, createDuplicateCandidate } = await import("./duplicates");
+  const match = await findDuplicateCandidate(tenantId, input);
+  if (match) {
+    const candidate = await createDuplicateCandidate(
+      tenantId,
+      actorId,
+      match.agent.id,
+      input,
+      match.score,
+      match.matchedKeys,
+    );
+    return { kind: "duplicate_candidate", candidate };
+  }
+
+  const agent = await createAgentRow(tenantId, actorId, input);
+  return { kind: "created", agent };
+}
+
+/**
+ * The actual `agents` insert, extracted so both the normal registration
+ * path above and `confirmDistinctAndRegister()` (a reviewer overriding a
+ * duplicate-candidate finding) share one insert implementation. Runs as the
+ * calling user via supabaseServer() — RLS's `with check (tenant_id in
+ * (select current_tenant_ids()))` on `agents` (see
+ * supabase/migrations/0012_identity_agents.sql) is the tenant-isolation
+ * backstop; `agent.create` permission is enforced by the caller via
+ * requirePermission() before this is invoked.
+ */
+export async function createAgentRow(
+  tenantId: string,
+  actorId: string,
+  input: CreateAgentInput,
+): Promise<Agent> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("agents")
@@ -105,11 +145,14 @@ export async function getAgent(tenantId: string, agentId: string): Promise<Agent
 
 /**
  * Lists agents in the caller's tenant. `filter.status ===
- * "discovered_unregistered"` is IDENTITY-P0-01.3's discovery inbox — it is a
- * read-through over Integration Agent's contract, which does not exist yet
- * (Integration Agent has not been dispatched), so it always returns an empty
- * list for now rather than inventing that module's data shape. See the
- * Identity Agent audit log.
+ * "discovered_unregistered"` was IDENTITY-P0-01.3's original discovery-inbox
+ * filter, kept returning an empty `Agent[]` here for backward compatibility
+ * with any existing caller of this exact shape — but the real, reconciled
+ * discovery inbox (three categories: new/likely-duplicate/orphaned, a
+ * different shape than `Agent[]`) is now `buildDiscoveryInbox()`
+ * (IDENTITY-P0-05, ./discovery.ts), reading through Integration Agent's now-
+ * published `getNormalizedObjects()` contract. See the Identity Agent audit
+ * log's 2026-09-14 entry.
  */
 export async function listAgents(tenantId: string, filter?: AgentFilter): Promise<Agent[]> {
   if (filter?.status === "discovered_unregistered") {

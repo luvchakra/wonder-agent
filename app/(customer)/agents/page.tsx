@@ -21,6 +21,10 @@ export default async function AgentsPage() {
       <h1>AI Agents</h1>
       <p>
         <Link href="/agents/new">+ Register a new agent</Link>
+        {" · "}
+        <Link href="/agents/duplicates">Duplicate review</Link>
+        {" · "}
+        <Link href="/agents/discovery">Discovery inbox</Link>
       </p>
       {agents.length === 0 ? (
         <p>No agents registered yet.</p>
