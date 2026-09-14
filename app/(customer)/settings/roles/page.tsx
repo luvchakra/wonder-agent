@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAssignableRoles, listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { assignRoleAction, removeRoleAction } from "@/app/actions/roles";
+import { assignRoleAction } from "@/app/actions/roles";
 import { Card, CardBody, CardHeader, TableContainer, Thead, Th, Tr, Td, EmptyState, Badge } from "@/modules/ui";
+import { RemoveRoleButton } from "./RemoveRoleButton";
 
 // FOUNDATION-P0-04.3 — bare functional admin page, gated by `role.manage`.
 export default async function RolesSettingsPage() {
@@ -51,13 +52,7 @@ export default async function RolesSettingsPage() {
                           m.roles.map((r) => (
                             <span key={r} className="inline-flex items-center gap-1">
                               <Badge tone="accent">{r}</Badge>
-                              <form action={removeRoleAction}>
-                                <input type="hidden" name="userId" value={m.userId} />
-                                <input type="hidden" name="role" value={r} />
-                                <button type="submit" className="text-xs text-destructive hover:underline" aria-label={`Remove ${r}`}>
-                                  ×
-                                </button>
-                              </form>
+                              <RemoveRoleButton userId={m.userId} role={r} />
                             </span>
                           ))
                         )}

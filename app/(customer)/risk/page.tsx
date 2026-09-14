@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardBody, SeverityBadge, TableContainer, Thead, Th, Tr, Td, EmptyState } from "@/modules/ui";
+import { Card, CardBody } from "@/modules/ui";
+import { RiskAgentsTable } from "./RiskAgentsTable";
 
 // Composition-only index over Identity's agents + Risk's findings, per
 // EXPERIENCE-P0-03 — Risk Agent owns /risk/agents/:id itself; this list
@@ -29,37 +29,19 @@ export default async function RiskIndexPage() {
     if (!current || rank[f.severity] > rank[current]) worstSeverityByAgent.set(f.agentId, f.severity);
   }
 
+  const rows = agents.map((a) => ({
+    id: a.id,
+    agentName: a.agentName,
+    openFindings: findingCountByAgent.get(a.id) ?? 0,
+    worstSeverity: worstSeverityByAgent.get(a.id) ?? null,
+  }));
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-foreground">Risk</h1>
       <Card>
         <CardBody>
-          {agents.length === 0 ? (
-            <EmptyState title="No agents registered yet" />
-          ) : (
-            <TableContainer>
-              <Thead>
-                <tr>
-                  <Th>Agent</Th>
-                  <Th>Open findings</Th>
-                  <Th>Worst severity</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {agents.map((a) => (
-                  <Tr key={a.id}>
-                    <Td>
-                      <Link href={`/risk/agents/${a.id}`} className="text-primary hover:underline">
-                        {a.agentName}
-                      </Link>
-                    </Td>
-                    <Td>{findingCountByAgent.get(a.id) ?? 0}</Td>
-                    <Td>{worstSeverityByAgent.get(a.id) ? <SeverityBadge severity={worstSeverityByAgent.get(a.id)!} /> : "—"}</Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </TableContainer>
-          )}
+          <RiskAgentsTable rows={rows} />
         </CardBody>
       </Card>
     </div>

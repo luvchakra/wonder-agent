@@ -864,3 +864,55 @@ separate `loading` boolean set synchronously).
 **Open questions:** none new. EXPERIENCE-P0-09's dark-mode-kept deviation
 from the prior entry remains the only outstanding disclosed decision
 point.
+
+---
+
+## 2026-09-14 — One more increment: role-removal confirmation, three
+more real `DataTable` consumers
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+A final push on the two stories still carrying a real, named gap after
+the previous entry:
+
+- **EXPERIENCE-P0-04** — `RemoveRoleButton.tsx` wraps Foundation's
+  `removeRoleAction` (removing a role can lock someone out of the
+  tenant) with `ConfirmActionDialog`, called directly as a Server Action
+  from the Client Component rather than via a new API route — legitimate
+  Next.js usage, and avoids Experience Agent creating a new
+  Foundation-owned REST endpoint just to satisfy its own primitive's
+  fetch-based calling convention. Safe here specifically because
+  `removeRoleAction` only calls `revalidatePath()`, not `redirect()` —
+  unlike the compliance decision flow earlier this session, there's no
+  `NEXT_REDIRECT`-digest risk to work around.
+- **EXPERIENCE-P0-08** — `RiskAgentsTable.tsx` and `IntegrationsTable.tsx`
+  (new) convert the Risk index and Integrations index from the plain
+  `Table` primitive to `SimpleDataTable`, following the same pattern
+  `ApplicationsTable`/`PoliciesTable` established.
+
+Verified: `npm run typecheck`, `npm run lint`, `npx vitest run`
+(139/139), `npm run build` with `.next` deleted first — all green.
+`grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match. Live smoke
+test confirms `/risk`, `/integrations`, `/settings/roles` still correctly
+redirect unauthenticated requests.
+
+**Honest final state of this dispatch's two remaining-`Partial` stories**
+(both genuinely improved, neither claimed as fully `Done`): EXPERIENCE-
+P0-04 now has five real consumers across four modules rather than a
+literal audit of every destructive action in the product (bulk-action
+reporting still has no real bulk endpoint to test against; a few
+narrower actions like direct access-grant revocation remain unconfirmed).
+EXPERIENCE-P0-08 now has six real `DataTable`/`SimpleDataTable`
+consumers; three more list screens (Access Requests, Compliance Items,
+Audit) still use the plain `Table` primitive, a reasonable choice at
+their current size but not literally every list screen in the product.
+Both are recorded exactly this way in the Progress Tracker rather than
+rounded up to `Done`.
+
+**Everything else in the Experience backlog is now `Done`** except the
+two items that are blocked by something outside this module's control
+rather than remaining implementation work: EXPERIENCE-P0-01.0/01.2's
+authenticated real-browser verification (this sandbox's network egress
+policy, confirmed empirically this session — see the entry above) — and
+these two, EXPERIENCE-P0-04/08, which are now down to a small, explicitly
+named remainder rather than a broad gap.
