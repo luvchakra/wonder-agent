@@ -332,3 +332,96 @@ published, no changes to any Risk Agent file).
 `DataTable`, `useTableState`, `useClientFilteredRows` (all exported from
 `modules/ui/index.ts`) — the shared primitives every other module's UI
 work should consume from here on, per CLAUDE.md §13.
+
+---
+
+## 2026-09-14 — Backlog reconciliation: `08_UI_UX.md` §38 Locked Design
+System addendum (no code changed)
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+The user separately uploaded a more detailed module-08 requirements
+document (`08_UI_UX.md`) and asked for the backlog to be updated. This
+entry documents that reconciliation; no implementation work was done —
+`docs/plan/08-EXPERIENCE-AGENT-BACKLOG.md` was the only file touched.
+
+**What was found:** the uploaded document's early sections (§5, §6,
+§33-37, UX-P0-01 through UX-P0-12, UX-P1-01 through 04, UX-P2-01 through
+03) are content-identical to what was already reconciled into the
+backlog's existing "Requirements Refresh — 2026-09-14" section earlier
+in this build. The genuinely new material is §38, "Locked Product Design
+System — P0" (UX-P0-13 through UX-P0-25), plus UX-P1-05/06.
+
+**Why this wasn't implemented directly:** §38 specifies a concrete,
+opinionated redesign of the shell/token/navigation/button layer itself —
+not new acceptance detail for screens this module already owns, but a
+different technology and structure for work already `Done`/`Partial`
+and load-bearing across every module built this session:
+
+- shadcn/ui-on-Radix + `class-variance-authority` as the component-variant
+  technology (vs. the hand-rolled `modules/ui/*` pattern already shipped);
+- OKLCH color tokens under a different semantic naming scheme, with dark
+  mode demoted from mandatory to optional for the current release (vs.
+  the already-shipped `background`/`surface`/`surface-elevated`/`border`/
+  `text-primary/secondary/muted`/`accent`/`success`/`warning`/`danger`/
+  `info` tokens, consumed via Tailwind classes across dozens of files
+  from every module, with both light and dark mode already implemented
+  per `CLAUDE.md` §13's mandatory requirement);
+- a topbar restructure (no avatar; tenant switcher moved into the left
+  group) and an account-menu relocation (bottom-left of the nav drawer,
+  different item list) vs. the already-`Done`, already-mounted
+  EXPERIENCE-P0-01.1 shell every route renders inside today;
+- **left navigation required to be a slide-in overlay drawer at every
+  width, never a permanently docked rail** — this directly contradicts
+  EXPERIENCE-P0-01.2's already-shipped desktop-docked-rail behavior and
+  is the highest-impact single conflict, since it changes the navigation
+  model for the entire product;
+- a narrower, differently-named button-variant set (default/outline/
+  secondary/ghost/destructive/link), coupled to the shadcn/CVA question
+  above.
+
+Per `CLAUDE.md` §4's stop-and-report rule and non-negotiable #18 (a
+module must not silently rework its own already-shipped, widely-
+depended-upon surface without the ambiguity being a real architecture
+decision — reworking it now would touch every consumer across every
+module built this session, and downgrading dark mode would regress
+`CLAUDE.md` §13), this was **flagged, not implemented**: a single new
+Progress Tracker row, `EXPERIENCE-P0-09` ("Locked Product Design System
+v2"), status "Not Started — flagged, not implemented," with the specific
+open questions listed in the backlog's new "Requirements Refresh —
+2026-09-14 (Locked Design System addendum)" section (component-variant
+technology choice and migration strategy; OKLCH re-key and dark-mode
+mandate; drawer-only vs. docked-rail navigation; topbar/account-menu
+restructure).
+
+**What needed no new row:** UX-P0-19 (page composition), UX-P0-21
+(status/risk never color-only), UX-P0-23 (dashboard card affordance) and
+UX-P0-24 (destructive-action separation) are already-required behavior
+folded into EXPERIENCE-P0-03/04/05's existing acceptance bar. UX-P0-20
+(sortable/filterable/paginated tables) is essentially already satisfied
+by this session's `DataTable` primitive (EXPERIENCE-P0-08, `Partial`).
+UX-P0-22 (inline-editable rows) was added as acceptance detail on
+EXPERIENCE-P0-08/03 rather than a new story. UX-P1-05 (component
+inventory) and UX-P1-06 (visual regression/responsive QA harness) were
+appended to the existing P1 list, with UX-P1-05 noted as depending on
+EXPERIENCE-P0-09 being resolved first (cataloging a component set that
+may still change is wasted work).
+
+**Also fixed in this pass:** the backlog's existing "Requirements
+Refresh — 2026-09-14" prose for EXPERIENCE-P0-04 through 08 still read
+"Not started" from when those rows were first proposed, even though the
+Progress Tracker table (and this audit log's prior entries) already show
+them `Partial`/`Done` from actual work completed earlier this session.
+Updated each story's prose to match the Progress Tracker so the document
+is internally consistent.
+
+**Not a code change:** no `modules/ui/*`, `app/(customer)/*`, or
+migration file was touched. `docs/plan/08-EXPERIENCE-AGENT-BACKLOG.md`
+is the only file modified in this entry.
+
+**Open question for the user:** whether and how to adopt `08_UI_UX.md`
+§38 (EXPERIENCE-P0-09) — see the four numbered questions in the backlog's
+new addendum section. Until answered, this module continues operating
+on its existing, already-shipped shell/token/navigation implementation
+for any further work.
+work should consume from here on, per CLAUDE.md §13.

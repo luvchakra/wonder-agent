@@ -29,6 +29,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-06 | Evidence Drawer & Investigation Deep Links | Partial — `EvidenceDrawer`/`useEvidenceDrawerParam` primitives built and wired to a real consumer (Risk finding evidence, deep-linkable via `?evidence=<id>`); not yet consumed by Access/Runtime/Compliance's own evidence surfaces |
 | EXPERIENCE-P0-07 | Shell Global Search & Notifications | Done — top-bar entry points built and composed into the shell; both show `NotYetAvailable` pending Operations Agent's published search/notifications contract, per this story's own scoping |
 | EXPERIENCE-P0-08 | Data Table Primitive (sort/filter/pagination/saved URL state/responsive card transform) | Partial — `DataTable`/`useTableState` primitives built (sort, filter, saved-URL-state, responsive card-transform) and wired to a real consumer (Agent Inventory); pagination/sort/filter run client-side over the already-fetched full list since `listAgents()` has no server-side pagination parameters yet (a documented stopgap, not the primitive's own limitation); not yet consumed by Access/Findings/other domain screens |
+| EXPERIENCE-P0-09 | Locked Product Design System v2 (shadcn/Radix + CVA + OKLCH tokens + drawer-only nav + restructured topbar/account menu) | **Not Started — flagged, not implemented.** Materially conflicts with already-`Done`/`Partial` EXPERIENCE-P0-01.0/01.1/01.2 (see Requirements Refresh below); requires explicit user approval before any of it is built |
 
 ---
 
@@ -245,7 +246,11 @@ a clear post-action result (success/partial-failure with per-item detail for bul
 operations). This is a presentation primitive only — the underlying
 authorization/approval decision remains the owning domain module's (non-negotiable
 #15); Experience Agent never decides whether an action is allowed, only renders the
-confirmation/result UX consistently. **Not started.**
+confirmation/result UX consistently. **Partial** — `ConfirmActionDialog`
+(`modules/ui/ConfirmAction.tsx`) is built and wired to a real consumer (Risk's
+remediate-finding action); not yet retrofitted onto every other destructive action,
+and bulk-action reporting has no real bulk endpoint yet to prove it against. See
+Progress Tracker and the audit log.
 
 ### EXPERIENCE-P0-05 — Accessibility Foundation
 
@@ -256,7 +261,12 @@ landmark roles, accessible dialog/drawer patterns (focus trap, `Escape` to close
 labelled by/described by), WCAG AA contrast in both themes, and screen-reader-
 friendly status/severity badges and tables (not color-only). Today only a handful
 of `aria-label`s exist on the nav toggle; this story is to make accessibility a
-verified property of `modules/ui/*` rather than incidental. **Not started.**
+verified property of `modules/ui/*` rather than incidental. **Partial** — global
+`:focus-visible` styles, a skip-to-content link, `aria-current` on nav, and
+accessible dialog/drawer patterns (focus trap, `Escape`-to-close via Radix) are
+applied across `modules/ui/*` and the mobile nav; WCAG AA contrast spot-checked but
+not exhaustively audited with a contrast-ratio tool, and not yet retrofitted onto
+every existing bare domain page. See Progress Tracker and the audit log.
 
 ### EXPERIENCE-P0-06 — Evidence Drawer & Investigation Deep Links
 
@@ -266,7 +276,11 @@ A shared contextual side-drawer primitive (built on the existing
 without navigating away from — or losing scroll/filter/pagination position in —
 the underlying list. Deep links (a shareable URL) into a specific evidence item
 must restore that same investigation context (which list, which filters, which
-item) rather than dropping the user on a bare detail page. **Not started.**
+item) rather than dropping the user on a bare detail page. **Partial** —
+`EvidenceDrawer`/`useEvidenceDrawerParam` (`modules/ui/Drawer.tsx`) are built and
+wired to a real consumer (Risk finding evidence, deep-linkable via
+`?evidence=<id>`); not yet consumed by Access/Runtime/Compliance's own evidence
+surfaces. See Progress Tracker and the audit log.
 
 ### EXPERIENCE-P0-07 — Shell Global Search & Notifications
 
@@ -278,7 +292,12 @@ top-bar search entry point and a notifications indicator/panel, both composing
 Operations Agent's published search/notifications contracts once available (a
 "Not yet available" placeholder until then, per the same pattern used elsewhere in
 this backlog) — Experience Agent renders, Operations Agent supplies the data and
-matching logic. **Not started.**
+matching logic. **Done** — `ShellGlobalSearch`/`ShellNotifications`
+(`modules/ui/ShellSearchAndNotifications.tsx`) are built and composed into the
+topbar; both correctly showed `NotYetAvailable` until Operations Agent published
+its search/notifications contracts, and now compose Operations Agent's real
+`/api/v1/search` and `/api/v1/notifications` endpoints. See Progress Tracker and
+the audit log.
 
 ### EXPERIENCE-P0-08 — Data Table Primitive
 
@@ -290,7 +309,13 @@ limit/offset pagination controls wired to the calling page's query per `CLAUDE.m
 §15, saved-URL-state for the current sort/filter/page, and a responsive
 card-transform for narrow viewports) that EXPERIENCE-P0-03's domain screens (Agent
 Inventory, Access, Findings, etc.) consume instead of hand-rolling their own.
-**Not started.**
+**Partial** — `DataTable`/`useTableState` (`modules/ui/DataTable.tsx`) are built
+(sort, filter, saved-URL-state, responsive card-transform) and wired to a real
+consumer (`app/(customer)/agents/AgentsTable.tsx`); pagination/sort/filter run
+client-side over the already-fetched full list since `listAgents()` has no
+server-side pagination parameters yet (a documented stopgap, not the primitive's
+own limitation); not yet consumed by Access/Findings/other domain screens. See
+Progress Tracker and the audit log.
 
 ### Already covered, no new tracker row needed
 
@@ -322,6 +347,104 @@ standing autopilot/auto-chain policy in `CLAUDE.md` §7 and `docs/ORCHESTRATION.
 §2. That is a meta/process question, not a product requirement, and is called out
 to the user separately rather than silently changed here.
 
+## Requirements Refresh — 2026-09-14 (Locked Design System addendum)
+
+The user separately uploaded a more detailed module-08 requirements document
+(`08_UI_UX.md`) after the refresh above was already reconciled. Its early sections
+(§5, §6, §33-37, UX-P0-01 through UX-P0-12, UX-P1-01 through 04, UX-P2-01 through 03)
+are content-identical to what the refresh above already covers — no changes needed
+there. The genuinely new material is **§38, "Locked Product Design System — P0"**
+(UX-P0-13 through UX-P0-25) plus **UX-P1-05/06**.
+
+§38 specifies a concrete, opinionated design-system implementation — not just
+acceptance criteria for screens this module already owns, but a specific
+technology and structure for the shell/token/navigation/button layer itself. Several
+of its items **materially conflict** with work already `Done`/`Partial` and in active
+use by every module built so far this session:
+
+- **UX-P0-13 (technology foundation: shadcn/ui component patterns on Radix +
+  `class-variance-authority` for variant styling)** conflicts with the hand-rolled
+  `modules/ui/*` component set already built (badges, tables, cards, dialogs) under
+  EXPERIENCE-P0-01.0, which is plain Tailwind + Radix primitives with no CVA layer.
+  Swapping the variant-styling approach now would touch every consumer across every
+  module.
+- **UX-P0-14 (OKLCH color tokens with a different semantic naming scheme; light
+  theme only required for the current release)** conflicts with EXPERIENCE-P0-01.0
+  (`Partial`, `Done` enough to be load-bearing): the already-shipped token set uses
+  the semantic names mandated by `docs/design/UI-UX-DESIGN-RULES.md` §4
+  (`background`/`surface`/`surface-elevated`/`border`/`text-primary`/`text-secondary`/
+  `text-muted`/`accent`/`success`/`warning`/`danger`/`info`) and already implements
+  **both** light and dark mode, consumed via Tailwind utility classes
+  (`text-primary`, `bg-surface`, etc.) across dozens of files from every module.
+  Re-keying to OKLCH under a different naming scheme, and downgrading dark mode to
+  optional, would be a breaking rename across the whole codebase and a regression
+  against `CLAUDE.md` §13's mandatory-dark-mode requirement — not something this
+  module can decide to accept on its own.
+- **UX-P0-15 (topbar: no user avatar; tenant switcher moved into the left group)**
+  conflicts with EXPERIENCE-P0-01.1's already-`Done`, already-mounted shell
+  structure (`app/(customer)/layout.tsx`, `modules/ui/Nav.tsx` /
+  `UserMenu.tsx`) — every existing route renders inside that shell today.
+- **UX-P0-16 (left navigation MUST be a slide-in overlay drawer only, never
+  permanently docked, even at desktop widths)** directly contradicts
+  EXPERIENCE-P0-01.2's already-verified, already-`Partial`/working responsive
+  behavior, which docks the nav as a static rail at desktop widths (`lg:block`) and
+  only collapses to a drawer below the documented breakpoint. This is the highest-
+  impact single conflict in §38 — it changes the navigation model for the entire
+  product, not just its styling.
+- **UX-P0-17 (account/user menu relocated to the bottom-left of the nav drawer,
+  with a different item list)** — same conflict source as UX-P0-15, compounded by
+  UX-P0-16's drawer-only requirement.
+- **UX-P0-18 (button system restricted to shadcn/CVA's specific variant set:
+  default/outline/secondary/ghost/destructive/link)** is a narrower, differently-
+  named variant set than whatever button primitive already exists in
+  `modules/ui/*`; adopting it is coupled to the UX-P0-13 technology-foundation
+  question above, not separable from it.
+
+None of the above five/six items were implemented. Per `CLAUDE.md` §4's
+stop-and-report rule and non-negotiable #18 (a module never silently reworks its
+own already-shipped, widely-depended-upon surface without the ambiguity being a
+real architecture decision), this is tracked as a single new row,
+**EXPERIENCE-P0-09** (Progress Tracker above), status **Not Started — flagged,
+not implemented**, pending explicit user direction on:
+
+1. Whether to adopt shadcn/CVA as the component-variant technology (replacing the
+   hand-rolled pattern), and if so, whether that's a rip-and-replace or an
+   incremental migration.
+2. Whether to re-key the token system to OKLCH under the new naming scheme, and
+   whether dark mode is demoted from mandatory (current `CLAUDE.md` §13 / UI-UX
+   rules position) to a later release.
+3. Whether the left navigation becomes drawer-only at every width (removing the
+   desktop docked rail already shipped and in use).
+4. The topbar/account-menu restructure (UX-P0-15/17).
+
+The remaining §38 items do **not** conflict with existing work and need no new
+tracker row — they are additional acceptance detail folded into stories already
+tracked above:
+
+- **UX-P0-19 (page composition/layout conventions)**, **UX-P0-21 (status/risk
+  color communicated with both color and text/icon, never color-only)**,
+  **UX-P0-23 (dashboard card hover/click affordance)**, **UX-P0-24 (destructive
+  actions visually separated/confirmed, never adjacent to a primary action without
+  distinction)** and **UX-P0-25 (universal component consistency across
+  screens)** are all already-required behavior under EXPERIENCE-P0-03 (domain
+  screens), EXPERIENCE-P0-04 (Action Safety) and EXPERIENCE-P0-05 (Accessibility
+  Foundation, which already requires non-color-only status communication) — no
+  scope increase, folded into those stories' existing acceptance bar.
+- **UX-P0-20 (sortable/filterable/paginated tables with a defined empty/loading
+  state)** is essentially already satisfied by the `DataTable`/`useTableState`
+  primitive built this session under EXPERIENCE-P0-08 (`Partial`) — no new row;
+  remaining work is that primitive's existing documented gap (server-side
+  pagination, rollout to more consumers), not new scope.
+- **UX-P0-22 (inline-editable table rows for lightweight attribute edits, e.g.
+  agent ownership)** is new acceptance detail for EXPERIENCE-P0-08's `DataTable`
+  primitive and/or EXPERIENCE-P0-03's domain screens — added there as detail, not
+  a new row, since it's an extension of an existing primitive rather than a new
+  system.
+
+No ownership-map or database-table change is implied by any of §38 — it is entirely
+presentation-layer scope within `modules/ui/*`, consistent with this module's
+"owns no database tables" position elsewhere in this file.
+
 ## P1
 
 Saved views/filters. Bulk actions beyond single-item decisions. Keyboard-shortcut
@@ -337,7 +460,23 @@ items above, so no duplicate entry was added for them):
 - Personalization: role-aware dashboard defaults, user-configurable table columns,
   and a density preference (compact/comfortable).
 
-Note: dark mode is **P0**, not P1 — see EXPERIENCE-P0-01.0 and `CLAUDE.md` §13.
+Added from the `08_UI_UX.md` §38 addendum (UX-P1-05, UX-P1-06):
+
+- **Design-system component inventory** — a documented, versioned catalog of every
+  `modules/ui/*` primitive (props, variants, states, usage examples) so domain
+  modules consume a known surface instead of re-deriving component shape from
+  reading source. Depends on the EXPERIENCE-P0-09 technology-foundation question
+  being resolved first (cataloging a component set that may still change is wasted
+  work).
+- **Visual regression / responsive QA harness** — automated screenshot-diff
+  coverage across the seven named breakpoints (`docs/design/UI-UX-DESIGN-RULES.md`
+  §32) and both themes, to catch layout/token regressions before they ship, rather
+  than relying solely on manual spot-checks (this session's sandbox constraint noted
+  throughout the audit log).
+
+Note: dark mode is **P0**, not P1 — see EXPERIENCE-P0-01.0 and `CLAUDE.md` §13. This
+is unchanged by the `08_UI_UX.md` §38 addendum's UX-P0-14, which is flagged as a
+conflict (EXPERIENCE-P0-09) rather than accepted.
 
 ## P2
 
