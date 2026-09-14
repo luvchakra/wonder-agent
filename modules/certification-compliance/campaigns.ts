@@ -3,13 +3,14 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { listAgents } from "@/modules/agent-identity/service";
-import { getEffectiveAccess } from "@/modules/access-governance/service";
+import { getAgentContract, listAgents } from "@/modules/agent-identity/service";
+import { getEffectiveAccess, listPolicyEvaluations } from "@/modules/access-governance/service";
 import { getFindings } from "@/modules/risk/service";
 import { getDid } from "@/modules/runtime-assurance/service";
-import type { CampaignCadence, CampaignScopeType, CertificationCampaign, CertificationItem } from "@/lib/shared/types/compliance";
+import type { CampaignCadence, CampaignScopeType, CampaignMetrics, CertificationCampaign, CertificationItem } from "@/lib/shared/types/compliance";
 import type { RiskSeverity } from "@/lib/shared/types/risk";
 import { toCertificationCampaign, toCertificationItem } from "./mappers";
+import { computeUsageForApplication, computeWorstSeverity, shapeCertificationSnapshot } from "./snapshot";
 
 export type LaunchCampaignInput = {
   name: string;
@@ -75,21 +76,25 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
 
     const svc = supabaseServiceRole();
     for (const agent of matching) {
-      const [effectiveAccess, findings, did] = await Promise.all([
+      const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
+        getAgentContract(agent.id),
         getEffectiveAccess(tenantId, agent.id),
+        listPolicyEvaluations(tenantId, agent.id),
         getFindings(tenantId, { agentId: agent.id, status: "open" }),
         getDid(tenantId, agent.id),
       ]);
 
-      const worstFinding = findings.reduce<RiskSeverity | null>((worst, f) => {
-        if (!worst || SEVERITY_RANK[f.severity] > SEVERITY_RANK[worst]) return f.severity;
-        return worst;
-      }, null);
+      const worstFinding = computeWorstSeverity(findings);
 
       for (const grant of effectiveAccess) {
-        const usedResources = new Set(did.tuples.filter((t) => t.application === grant.application).map((t) => t.resource ?? t.application));
-        const usageAtReview: "used" | "never" | "unknown" = did.tuples.length === 0 && findings.length === 0 ? "unknown" : usedResources.size > 0 ? "used" : "never";
+        const usageAtReview = computeUsageForApplication(did.tuples, findings.length > 0, grant.application);
         const recommendation = computeRecommendation(worstFinding, usageAtReview);
+        // COMPLIANCE-P0-03 — snapshot everything the reviewer will see at
+        // the moment this item is populated (contract/policy versions,
+        // this specific grant, risk/usage) so a decision made later can be
+        // reproduced exactly, even if the live contract/policy has since
+        // changed.
+        const snapshot = shapeCertificationSnapshot({ contract, grant, policyEvaluations, riskAtReview: worstFinding, usageAtReview });
 
         const { error: itemError } = await svc.from("certification_items").insert({
           tenant_id: tenantId,
@@ -101,6 +106,7 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
           usage_at_review: usageAtReview,
           recommendation,
           due_date: input.dueDate ?? null,
+          snapshot,
         });
         if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
       }
@@ -138,4 +144,23 @@ export async function listCampaignItems(tenantId: string, campaignId: string): P
     .order("created_at", { ascending: false });
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toCertificationItem);
+}
+
+/**
+ * COMPLIANCE-P0-05 — "a campaign's summary reports its count of overdue/
+ * escalated items." `overdueItems` counts every still-pending item whose
+ * due_date has passed, whether or not it has been escalated yet;
+ * `escalatedItems` counts items `escalateOverdueItems()` (escalation.ts)
+ * has already processed.
+ */
+export async function getCampaignMetrics(tenantId: string, campaignId: string): Promise<CampaignMetrics> {
+  const items = await listCampaignItems(tenantId, campaignId);
+  const now = Date.now();
+  return {
+    totalItems: items.length,
+    pendingItems: items.filter((i) => i.status === "pending").length,
+    decidedItems: items.filter((i) => i.status === "decided").length,
+    overdueItems: items.filter((i) => i.status === "pending" && i.dueDate && new Date(i.dueDate).getTime() < now).length,
+    escalatedItems: items.filter((i) => i.escalatedAt !== null).length,
+  };
 }

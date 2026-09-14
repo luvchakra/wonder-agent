@@ -13,6 +13,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       decision: body.decision as DecisionType,
       justification: String(body.justification ?? ""),
       delegateToUserId: body.delegateToUserId,
+      overrideSoD: body.overrideSoD === true,
     });
     return NextResponse.json({ ok: true, data: decision });
   } catch (err) {

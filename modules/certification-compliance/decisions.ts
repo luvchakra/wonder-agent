@@ -4,14 +4,23 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { revokeAccessGrant } from "@/modules/access-governance/service";
+import { listOwners } from "@/modules/agent-identity/service";
 import type { CertificationDecision, CertificationItemDetail, DecisionType } from "@/lib/shared/types/compliance";
 import { toCertificationDecision, toCertificationItem } from "./mappers";
+import { buildFreshSnapshot } from "./snapshot";
 
 export type RecordDecisionInput = {
   decision: DecisionType;
   justification: string;
   /** required for 'delegate' */
   delegateToUserId?: string;
+  /**
+   * COMPLIANCE-P0-04 — required to `approve` when the caller is one of the
+   * agent's owners (a self-certification SoD conflict); ignored otherwise.
+   * Its use is always audited as its own event, distinct from the decision
+   * itself.
+   */
+  overrideSoD?: boolean;
 };
 
 /**
@@ -36,6 +45,63 @@ export async function recordDecision(
   if (itemError) throw new ApiError(500, "QUERY_FAILED", itemError.message);
   if (!itemRow) throw new ApiError(404, "ITEM_NOT_FOUND");
   const item = toCertificationItem(itemRow);
+
+  // COMPLIANCE-P0-04 — only the item's current reviewer (or an explicitly
+  // delegated one — 'delegate' reassigns reviewer_id, so this same check
+  // already covers that case) may record a decision on it.
+  if (item.reviewerId !== actorId) {
+    await writeAudit({
+      tenantId,
+      actorId,
+      actorType: "user",
+      action: "compliance.decision_rejected_not_reviewer",
+      objectType: "certification_item",
+      objectId: itemId,
+      outcome: "failure",
+      metadata: { reviewerId: item.reviewerId },
+    });
+    throw new ApiError(403, "NOT_ASSIGNED_REVIEWER", "Only the item's assigned reviewer may record a decision on it");
+  }
+
+  // COMPLIANCE-P0-04 — Segregation of Duties: a reviewer must not approve
+  // (certify) an agent whose access they themselves own. Scoped to
+  // 'approve' — the decision that actually affirms the access as correct —
+  // rather than every decision type, since revoke/modify/delegate/
+  // request_information don't carry the same self-serving-bias risk.
+  if (input.decision === "approve") {
+    const owners = await listOwners(tenantId, item.agentId);
+    const reviewerIsOwner = owners.some((o) => o.userId === actorId);
+    if (reviewerIsOwner && !input.overrideSoD) {
+      await writeAudit({
+        tenantId,
+        actorId,
+        actorType: "user",
+        action: "compliance.sod_conflict_blocked",
+        objectType: "certification_item",
+        objectId: itemId,
+        outcome: "failure",
+        metadata: { reason: "Reviewer is an owner of this agent; self-certification requires an explicit SoD override." },
+      });
+      throw new ApiError(409, "SOD_CONFLICT", "You are an owner of this agent and cannot approve its own certification without an explicit override");
+    }
+    if (reviewerIsOwner && input.overrideSoD) {
+      await writeAudit({
+        tenantId,
+        actorId,
+        actorType: "user",
+        action: "compliance.sod_override_used",
+        objectType: "certification_item",
+        objectId: itemId,
+        outcome: "success",
+        metadata: { reason: "Reviewer is an owner of this agent; approved with an explicit SoD override." },
+      });
+    }
+  }
+
+  // COMPLIANCE-P0-03 — a fresh snapshot at the moment of decision, which
+  // may differ from the item's population-time snapshot if the agent's
+  // contract or policies changed in between.
+  const snapshot = await buildFreshSnapshot(tenantId, item.agentId, item.accessGrantId);
 
   let remediationId: string | null = null;
 
@@ -88,6 +154,7 @@ export async function recordDecision(
       justification: input.justification,
       decided_by: actorId,
       remediation_id: remediationId,
+      snapshot,
     })
     .select()
     .single();

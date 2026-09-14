@@ -7,7 +7,7 @@ import "server-only";
  * control_mappings/etc. directly.
  */
 
-export { launchCampaign, listCampaigns, listCampaignItems, type LaunchCampaignInput } from "./campaigns";
+export { launchCampaign, listCampaigns, listCampaignItems, getCampaignMetrics, type LaunchCampaignInput } from "./campaigns";
 export {
   recordDecision,
   listDecisionsForItem,
@@ -24,3 +24,5 @@ export {
   addControlEvidence,
   recomputeStaleControlMappings,
 } from "./controls";
+export { escalateOverdueItems } from "./escalation";
+export { exportCampaignEvidence } from "./export";

@@ -27,6 +27,29 @@ export type UsageAtReview = "used" | "never" | "unknown";
 export type Recommendation = "keep" | "review" | "remove";
 export type ItemStatus = "pending" | "decided";
 
+/**
+ * COMPLIANCE-P0-03 — a point-in-time snapshot of everything a reviewer saw:
+ * agent contract version, the specific access grant, the policy version(s)
+ * it was evaluated against, and risk/usage at that moment. Captured once at
+ * item population time (`CertificationItem.snapshot`) and again, freshly,
+ * at decision time (`CertificationDecision.snapshot`) — the two can differ
+ * if the agent's contract or policies changed in between.
+ */
+export type CertificationSnapshot = {
+  capturedAt: string;
+  agentContractId: string | null;
+  agentContractVersion: number | null;
+  accessGrant: {
+    id: string;
+    application?: string;
+    entitlementName?: string;
+    dataClassification?: string | null;
+  } | null;
+  policyEvaluations: { policyId: string; policyVersion: number; result: string }[];
+  riskAtReview: string | null;
+  usageAtReview: UsageAtReview | null;
+};
+
 export type CertificationItem = {
   id: string;
   tenantId: string;
@@ -40,6 +63,20 @@ export type CertificationItem = {
   status: ItemStatus;
   dueDate: string | null;
   createdAt: string;
+  /** COMPLIANCE-P0-03. Null only for items created before this story shipped. */
+  snapshot: CertificationSnapshot | null;
+  /** COMPLIANCE-P0-05. Set once an overdue item has been escalated. */
+  escalatedAt: string | null;
+  escalatedTo: string | null;
+};
+
+/** COMPLIANCE-P0-05 — a campaign's review-progress and overdue/escalation counts. */
+export type CampaignMetrics = {
+  totalItems: number;
+  pendingItems: number;
+  decidedItems: number;
+  overdueItems: number;
+  escalatedItems: number;
 };
 
 export type DecisionType = "approve" | "revoke" | "modify" | "delegate" | "request_information";
@@ -52,6 +89,8 @@ export type CertificationDecision = {
   decidedBy: string;
   decidedAt: string;
   remediationId: string | null;
+  /** COMPLIANCE-P0-03 — a fresh snapshot captured at the moment of this decision. */
+  snapshot: CertificationSnapshot | null;
 };
 
 export type ControlFramework = {
@@ -92,4 +131,18 @@ export type ControlEvidence = {
 /** The certification detail panel's full data contract (COMPLIANCE-P0-01.4). */
 export type CertificationItemDetail = CertificationItem & {
   decisions: CertificationDecision[];
+};
+
+/**
+ * COMPLIANCE-P0-06 — the assembled evidence bundle for a completed campaign.
+ * `contentHash` is a SHA-256 over the canonical JSON of everything else in
+ * this object (campaign/items/decisions), so any post-export tampering with
+ * a saved copy is detectable by recomputing the hash.
+ */
+export type EvidenceExportPackage = {
+  campaign: CertificationCampaign;
+  items: (CertificationItem & { decisions: CertificationDecision[] })[];
+  exportedAt: string;
+  exportedBy: string;
+  contentHash: string;
 };

@@ -41,6 +41,9 @@ export function toCertificationItem(row: any): CertificationItem {
     status: row.status,
     dueDate: row.due_date,
     createdAt: row.created_at,
+    snapshot: row.snapshot ?? null,
+    escalatedAt: row.escalated_at ?? null,
+    escalatedTo: row.escalated_to ?? null,
   };
 }
 
@@ -53,6 +56,7 @@ export function toCertificationDecision(row: any): CertificationDecision {
     decidedBy: row.decided_by,
     decidedAt: row.decided_at,
     remediationId: row.remediation_id,
+    snapshot: row.snapshot ?? null,
   };
 }
 

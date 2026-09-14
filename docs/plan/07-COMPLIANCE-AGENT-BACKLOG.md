@@ -23,10 +23,10 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-01.4 | Certification detail panel data | Done |
 | COMPLIANCE-P0-02.1 | Schema (higher bar) | Done |
 | COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Partial — status computed from evidence recency only; live policy-violation state not checked, blocked on Access/Risk publishing a policy-scoped violation query |
-| COMPLIANCE-P0-03 | Evidence snapshot (contract/policy versions) | Not Started |
-| COMPLIANCE-P0-04 | Reviewer authorization & Segregation of Duties | Not Started |
-| COMPLIANCE-P0-05 | Escalation of overdue certification items | Not Started |
-| COMPLIANCE-P0-06 | Tamper-evident evidence export package | Not Started |
+| COMPLIANCE-P0-03 | Evidence snapshot (contract/policy versions) | Done |
+| COMPLIANCE-P0-04 | Reviewer authorization & Segregation of Duties | Done |
+| COMPLIANCE-P0-05 | Escalation of overdue certification items | Partial — no scheduler exists in this codebase yet, so `escalateOverdueItems()` is exposed as an operator/API-triggered sweep rather than an automatic cron; the escalation logic, recording and audit trail themselves are fully implemented and verified |
+| COMPLIANCE-P0-06 | Tamper-evident evidence export package | Partial — evidence assembly + SHA-256 integrity marker + audited export event are implemented; the actual export file/delivery mechanism is intentionally not built, per this story's own ownership-map flag to the user (Operations Agent overlap, undecided) |
 
 ---
 

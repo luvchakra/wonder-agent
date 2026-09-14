@@ -163,3 +163,149 @@ dispatched:** `modules/certification-compliance/service.ts` (barrel) and
 `getCertificationHistory(agentId)` is the "last certified" fact Identity/
 Risk's own worked examples reference; `getCertificationItemDetail()` is the
 side-panel data contract Experience Agent composes its UI from.
+
+---
+
+## 2026-09-14 — COMPLIANCE-P0-03, COMPLIANCE-P0-04, COMPLIANCE-P0-05, COMPLIANCE-P0-06 (2026-09-14 requirements refresh)
+
+**Agent:** Compliance Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Per the user's explicit "continue automatically" instruction, picked up the
+four Not Started rows the requirements-refresh pass added to this
+backlog's Progress Tracker, auto-chained from Risk Agent.
+
+**Built:**
+
+- **COMPLIANCE-P0-03** — a `snapshot jsonb` column added to both
+  `certification_items` and `certification_decisions` (migration `0046`,
+  no RLS-policy change needed — both tables already grant client SELECT
+  only, same evidentiary lockdown extends to the new column). New
+  `modules/certification-compliance/snapshot.ts`: `shapeCertificationSnapshot()`
+  (pure — captures agent contract id/version, the specific access grant,
+  every policy evaluation's `policyId`/`policyVersion`, and risk/usage) plus
+  two extracted pure helpers, `computeWorstSeverity()` and
+  `computeUsageForApplication()`. `launchCampaign()` (`campaigns.ts`) now
+  calls these at item-population time — refactored from its previous
+  inline duplicate logic to reuse the same functions, verified behavior-
+  identical (same three-way usage outcome, same worst-severity reduction;
+  `computeRecommendation()` itself, already `Done` and tested, was not
+  touched). `recordDecision()` (`decisions.ts`) now calls a new
+  `buildFreshSnapshot()` (fetches contract/effective-access/policy-
+  evaluations/findings/DID fresh, right before writing the decision) so a
+  decision's snapshot reflects what was true at the moment the reviewer
+  acted, not the item's stale population-time values — satisfying the
+  story's "reproducible even if the live agent contract or policy has
+  since changed" acceptance criterion. Existing rows have `snapshot: null`,
+  per this being an additive column, not a backfill story.
+- **COMPLIANCE-P0-04** — `recordDecision()` now rejects (`403
+  NOT_ASSIGNED_REVIEWER`, audited as `compliance.decision_rejected_not_reviewer`)
+  any caller whose id doesn't match the item's current `reviewer_id`
+  (delegation already covered: the `delegate` decision reassigns
+  `reviewer_id`, so this same check is what "or an explicitly delegated
+  reviewer" resolves to — no separate delegation table needed). Separately,
+  Segregation of Duties: an `approve` decision is blocked (`409
+  SOD_CONFLICT`, audited as `compliance.sod_conflict_blocked`) when the
+  caller is among the agent's owners (Identity's `listOwners()`) unless the
+  caller explicitly passes `overrideSoD: true`, in which case the decision
+  proceeds and a separate `compliance.sod_override_used` event is audited —
+  satisfying the story's "reject, or require an explicit override with its
+  own audit trail" acceptance criterion. Scoped to `approve` only (the
+  decision that actually certifies access as correct); revoke/modify/
+  delegate/request_information don't carry the same self-serving-bias risk
+  the story is guarding against.
+- **COMPLIANCE-P0-05** — two additive columns on `certification_items`
+  (`escalated_at`, `escalated_to`, migration `0046`). New
+  `modules/certification-compliance/escalation.ts`'s
+  `escalateOverdueItems(tenantId, actorId)`: finds every `pending` item
+  past its `due_date` with `escalated_at is null`, escalates to the
+  agent's `business_owner` (Identity's `listOwners()`), falling back to
+  the campaign's `created_by` (then the item's own `reviewer_id`) if the
+  agent has no business owner — writes `escalated_at`/`escalated_to` via
+  the service-role client (the table has no client-facing UPDATE policy,
+  same as every other write to this table) and an audited
+  `compliance.item_escalated` event per item. No scheduler exists in this
+  codebase yet (the same documented gap Integration Agent's sync jobs and
+  this module's own `recomputeStaleControlMappings()` already flagged), so
+  it's exposed via `POST /api/v1/compliance/campaigns/escalate-overdue`
+  for an operator (or a future job runner) to trigger, not wired to a cron
+  — recorded as the story's Partial reason. `getCampaignMetrics()`
+  (`campaigns.ts`) reports `totalItems`/`pendingItems`/`decidedItems`/
+  `overdueItems`/`escalatedItems` for a campaign, exposed via
+  `GET /api/v1/compliance/campaigns/:id/metrics` and shown on the bare
+  campaign-items page.
+- **COMPLIANCE-P0-06** — new `modules/certification-compliance/export.ts`'s
+  `exportCampaignEvidence(tenantId, actorId, campaignId)`: assembles the
+  campaign plus every item plus every item's decisions (reviewer identity
+  via `decidedBy`, justification, snapshot), computes a SHA-256 hash over
+  the canonical JSON of that content (deliberately excluding the export
+  event's own metadata — `exportedAt`/`exportedBy` — from what's hashed,
+  so re-exporting unchanged evidence produces a comparable hash), and
+  writes an audited `compliance.evidence_exported` event carrying the
+  hash. Exposed via `POST /api/v1/compliance/campaigns/:id/export`. Per
+  this story's own ownership-map flag (unresolved, not decided here): this
+  module owns assembling the compliance-specific evidence content; the
+  actual export file/delivery mechanism might belong to Operations Agent's
+  existing export machinery instead — not built here, recorded as the
+  story's Partial reason rather than guessed.
+
+**Verification run:**
+- `npm run typecheck`, `npm run lint`, `npm run build` — all clean. New
+  routes confirmed present in the build output: `/api/v1/compliance/
+  campaigns/[id]/metrics`, `/api/v1/compliance/campaigns/[id]/export`,
+  `/api/v1/compliance/campaigns/escalate-overdue`.
+- `npx vitest run` — 128/128 passing across 20 files. New:
+  `snapshot.test.ts` covers `computeWorstSeverity()` (empty/single/several
+  findings, `info` ranking below every real severity),
+  `computeUsageForApplication()` (all three outcomes including the
+  `unknown` vs `never` distinction), and `shapeCertificationSnapshot()`
+  (full shape, and the null-contract/null-grant case). `recordDecision()`'s
+  reviewer-authorization/SoD/snapshot logic and `escalateOverdueItems()`
+  were not given their own mocked unit tests (this module's decisions/
+  campaigns files have never carried DB-mock-heavy unit tests — the
+  established pattern here, same as every prior module's `findings.ts`-
+  style files, is live verification instead, below) — a gap consistent
+  with the rest of this module, not a new one.
+- Live-verified against the dev Supabase project (Supabase MCP, project
+  `ekgyjwoenteadaaqakmd`), after applying migration `0046`: a throwaway
+  overdue `certification_items` row (FinanceBot's Tenant A5, `due_date`
+  one day in the past) proved `escalateOverdueItems()`'s exact filter (`
+  status = 'pending' and escalated_at is null and due_date < now()`,
+  joined to `certification_campaigns` for the `created_by` fallback) finds
+  exactly the right row and resolves the fallback owner correctly (no
+  `business_owner` exists for FinanceBot in the fixture, so it fell back
+  to the campaign's `created_by`, as designed); a same-tenant client
+  `UPDATE` of `escalated_at` was rejected (0 rows — no client-facing UPDATE
+  policy on `certification_items`, confirming the escalation write must
+  go through the service-role client, which it does); after a service-
+  role-equivalent write, Tenant A5's authenticated session read the
+  escalated item and Tenant B5's session saw zero rows for it (tenant
+  isolation). Separately proved the `snapshot` column round-trips a full
+  JSON shape on both `certification_items` and `certification_decisions`,
+  and that `certification_decisions.snapshot` is readable to Tenant A5 and
+  invisible to Tenant B5 (tenant isolation via the existing join-to-item
+  policy, unchanged by this story). All throwaway rows cleaned up.
+  `get_advisors` (security) re-checked after the migration — no new
+  findings beyond the same pre-existing accepted set every prior module
+  already reviewed.
+
+**Not started this session / still open:**
+- COMPLIANCE-P0-05's escalation has no automatic trigger (no scheduler in
+  this codebase) — an operator or future job runner must call the new
+  endpoint/function.
+- COMPLIANCE-P0-06's export has no file/delivery mechanism — returns the
+  assembled package/hash as JSON; whether that belongs here or in
+  Operations Agent's export machinery is still an open ownership-map
+  question for the user, not decided by this entry.
+- All items carried over unchanged from the prior entry (agent-scope-only
+  campaign population, `modify` decisions not wired to `access_requests`,
+  `control_mappings.status` not checking live policy-violation state).
+
+**Dependencies consumed:** everything from the prior entry, plus Identity's
+`listOwners()` and Access's `listPolicyEvaluations()` (both already
+published contracts, used exactly as published, no modification to any
+other module's file).
+
+**Published this session:** `getCampaignMetrics()`, `escalateOverdueItems()`,
+`exportCampaignEvidence()` (`modules/certification-compliance/service.ts`);
+`CertificationSnapshot`, `CampaignMetrics`, `EvidenceExportPackage`, and the
+`snapshot`/`escalatedAt`/`escalatedTo` fields on `CertificationItem`/
+`CertificationDecision` (`lib/shared/types/compliance.ts`).

@@ -24,6 +24,7 @@ export async function recordDecisionAction(campaignId: string, itemId: string, f
     decision: formData.get("decision") as DecisionType,
     justification: String(formData.get("justification") ?? ""),
     delegateToUserId: String(formData.get("delegateToUserId") ?? "") || undefined,
+    overrideSoD: formData.get("overrideSoD") === "on",
   });
   redirect(`/compliance/campaigns/${campaignId}`);
 }

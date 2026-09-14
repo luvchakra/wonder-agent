@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listCampaignItems } from "@/modules/certification-compliance/service";
+import { listCampaignItems, getCampaignMetrics } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { recordDecisionAction } from "@/app/actions/compliance";
 
@@ -17,7 +17,7 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
     throw err;
   }
 
-  const items = await listCampaignItems(ctx.tenantId!, campaignId);
+  const [items, metrics] = await Promise.all([listCampaignItems(ctx.tenantId!, campaignId), getCampaignMetrics(ctx.tenantId!, campaignId)]);
 
   return (
     <main style={{ maxWidth: 900, margin: "2rem auto", fontFamily: "sans-serif" }}>
@@ -25,6 +25,10 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
         <Link href="/compliance/campaigns">← Campaigns</Link>
       </p>
       <h1>Certification Items</h1>
+      <p>
+        {metrics.totalItems} total · {metrics.pendingItems} pending · {metrics.decidedItems} decided ·{" "}
+        {metrics.overdueItems} overdue · {metrics.escalatedItems} escalated
+      </p>
 
       <table border={1} cellPadding={6}>
         <thead>
@@ -48,7 +52,8 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
                 <td>{item.recommendation ?? "—"}</td>
                 <td>{item.status}</td>
                 <td>
-                  {item.status === "pending" && (
+                  {item.status === "pending" && item.reviewerId !== ctx.userId && <em>Assigned reviewer only</em>}
+                  {item.status === "pending" && item.reviewerId === ctx.userId && (
                     <form action={decideWithIds}>
                       <select name="decision" defaultValue="approve">
                         <option value="approve">approve</option>
@@ -59,6 +64,9 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
                       </select>
                       <input name="justification" placeholder="justification" required />
                       <input name="delegateToUserId" placeholder="delegate to (uuid, if delegate)" />
+                      <label>
+                        <input name="overrideSoD" type="checkbox" /> Override SoD (approve only, if you own this agent)
+                      </label>
                       <button type="submit">Submit</button>
                     </form>
                   )}
