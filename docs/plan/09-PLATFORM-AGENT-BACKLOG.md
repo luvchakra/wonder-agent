@@ -12,21 +12,20 @@
 Status values: **Done** (acceptance criteria met and verified), **Partial**
 (built but with a known, documented gap), **Deferred** (not started, not
 blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run Platform Agent" is
-issued.
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every row is in `docs/design/platform-agent-backlog-audit.md`.
 
 | Story | Title | Status |
 |---|---|---|
-| PLATFORM-P0-01.1 | Route isolation (higher bar) | Not Started |
-| PLATFORM-P0-01.2 | Seeding & bootstrap | Not Started |
-| PLATFORM-P0-02.1 | Schema | Not Started |
-| PLATFORM-P0-02.2 | Tenant lifecycle actions | Not Started |
-| PLATFORM-P0-02.3 | Feature flags | Not Started |
-| PLATFORM-P0-03.1 | Global branding | Not Started |
-| PLATFORM-P0-03.2 | Platform health surface | Not Started |
-| PLATFORM-P0-04.1 | `platform_audit_logs` | Not Started |
-| PLATFORM-P0-04.2 | Support access (higher bar) | Not Started |
+| PLATFORM-P0-01.1 | Route isolation (higher bar) | Done |
+| PLATFORM-P0-01.2 | Seeding & bootstrap | Done |
+| PLATFORM-P0-02.1 | Schema | Done |
+| PLATFORM-P0-02.2 | Tenant lifecycle actions | Partial — status changes correctly, but a CRITICAL cross-module finding means suspension does not yet block data access (Foundation's `current_tenant_ids()` gap) — see audit log |
+| PLATFORM-P0-02.3 | Feature flags | Done |
+| PLATFORM-P0-03.1 | Global branding | Done |
+| PLATFORM-P0-03.2 | Platform health surface | Done |
+| PLATFORM-P0-04.1 | `platform_audit_logs` | Done |
+| PLATFORM-P0-04.2 | Support access (higher bar) | Deferred — no time-bound/audited support-access infrastructure exists; the backlog explicitly forbids shipping an unbounded shortcut, so nothing was built |
 
 ---
 

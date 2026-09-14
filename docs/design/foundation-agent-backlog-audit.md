@@ -144,3 +144,43 @@ UI (03.4), role-management UI (04.3), baseline security headers/rate
 limiting (05.3). None of these block Identity/Integration/Access/etc. from
 starting, since the schema, RLS, RBAC guards, tenant context, audit writer,
 and secret encryption they all depend on are in place and tested.
+
+---
+
+## 2026-09-14 — CRITICAL gap flagged by Platform Agent: `current_tenant_ids()` doesn't check `tenants.status`
+
+Platform Agent's own run (docs/design/platform-agent-backlog-audit.md, same
+date) discovered and verified live that `current_tenant_ids()` (this
+file's own `0004_foundation_rls.sql`) filters only on
+`tenant_memberships.status = 'active'` and never checks `tenants.status` —
+so every RLS policy in the entire system that relies on it (every module
+built so far) continues granting full access to a tenant's active members
+even after that tenant is suspended. `tenants.status` becomes a label with
+no enforcement effect. Platform Agent did not patch this itself (correctly,
+per non-negotiable #14/#18 — this is Foundation's shared authentication-
+model function, not Platform Agent's to change), and recorded a proposed,
+minimal, additive fix in its own audit log:
+
+```sql
+create or replace function current_tenant_ids()
+returns setof uuid
+language sql stable security definer set search_path = public
+as $$
+  select tm.tenant_id from tenant_memberships tm
+  join tenants t on t.id = tm.tenant_id
+  where tm.user_id = auth.uid() and tm.status = 'active' and t.status = 'active';
+$$;
+```
+
+**Not applied yet** — left as an explicit open question for the user
+(per the stop-and-report rule) rather than guessed past, since a change to
+this function has system-wide blast radius (every module's RLS policies
+call it) and deserves a dedicated Foundation Agent verification pass across
+every other module's own tenant-isolation tests once applied, not a
+same-turn patch made while building Platform Agent's console. Whoever runs
+Foundation Agent next should apply this fix and re-run
+`tests/foundation/tenant-isolation.sql` plus spot-check one or two other
+modules' isolation scripts against a suspended-tenant fixture (a case none
+of them tested, since every existing isolation test only ever checks
+cross-tenant access between two *active* tenants, never a suspended
+tenant's own members).
