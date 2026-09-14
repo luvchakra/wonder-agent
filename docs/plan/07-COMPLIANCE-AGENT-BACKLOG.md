@@ -12,18 +12,17 @@
 Status values: **Done** (acceptance criteria met and verified), **Partial**
 (built but with a known, documented gap), **Deferred** (not started, not
 blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run Compliance Agent" is
-issued.
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 
 | Story | Title | Status |
 |---|---|---|
-| COMPLIANCE-P0-01.1 | Schema | Not Started |
-| COMPLIANCE-P0-01.2 | Campaign launch & item population | Not Started |
-| COMPLIANCE-P0-01.3 | Reviewer decision flow | Not Started |
-| COMPLIANCE-P0-01.4 | Certification detail panel data | Not Started |
-| COMPLIANCE-P0-02.1 | Schema (higher bar) | Not Started |
-| COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Not Started |
+| COMPLIANCE-P0-01.1 | Schema | Done |
+| COMPLIANCE-P0-01.2 | Campaign launch & item population | Partial — only `scope_type: 'agent'` (criticality-filtered) has real population logic; the other four scope types are schema-ready but unimplemented pending a concrete spec |
+| COMPLIANCE-P0-01.3 | Reviewer decision flow | Partial — approve/revoke/delegate/request_information fully work (revoke really calls `revokeAccessGrant()`); modify doesn't create an `access_requests` row, blocked on Access Agent publishing a distinct request type |
+| COMPLIANCE-P0-01.4 | Certification detail panel data | Done |
+| COMPLIANCE-P0-02.1 | Schema (higher bar) | Done |
+| COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Partial — status computed from evidence recency only; live policy-violation state not checked, blocked on Access/Risk publishing a policy-scoped violation query |
 
 ---
 

@@ -25,7 +25,7 @@ stop-and-report rule always wins).
 | 3 | Access Agent | Needs Identity's contract + (ideally) Integration's normalized access data to compute CAN | Done |
 | 3 | Runtime Agent | Needs Identity's contract + Access's CAN to run the SHOULD/CAN/DID comparison | Done |
 | 4 | Risk Agent | Pure consumer of Identity + Access + Runtime's outputs — can't produce real findings before those exist | Done (two sub-pieces Partial pending Identity/Access publishing new contracts — see its audit log) |
-| 4 | Compliance Agent | Needs Identity, Access, Runtime, and Risk (for the Risk column in certification review) | Not started |
+| 4 | Compliance Agent | Needs Identity, Access, Runtime, and Risk (for the Risk column in certification review) | Done (three sub-pieces Partial pending Access/Risk publishing new contracts, or an unspecified scope — see its audit log) |
 | 5 | Platform Agent | Only needs Foundation — independent of the domain chain, so it could technically run right after Wave 1, but is grouped here to match the original execution guide's review batches | Not started |
 | 5 | Experience Agent | Composes every domain module's published contract — most screens render "not yet available" until earlier waves exist | Not started |
 | 5 | Operations Agent | Reads across every domain module for audit/search/reports/notifications | Not started |
