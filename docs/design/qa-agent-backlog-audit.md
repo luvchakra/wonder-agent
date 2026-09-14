@@ -111,3 +111,87 @@ by the pagination gap, FinanceBot step 7, the QA-P0-06–14 partial epics, and t
 already-accepted sandbox constraints, each named and owned rather than silent. This
 is the last module in `docs/RUN_ORDER.md` — with this dispatch, the full run order
 has been exercised at least once; no further module remains to auto-chain into.
+
+## 2026-09-14 — Second dispatch: dependency vulnerability scan, Operations
+isolation fixture
+
+**Agent:** QA Agent · **Branch:** `claude/wonderagent-setup-lasmly`. Picked
+up after Experience Agent's own follow-on dispatch closed its remaining
+named gaps; this session closes two of QA's own previously-recorded
+release-gate items rather than re-opening the full P0 backlog.
+
+**QA-P0-12 (security scanning):** ran `npm audit` at both `--omit=dev`
+(production-only) and full scope (including dev dependencies) — **0
+vulnerabilities** either way. Closes the "dependency vulnerability
+scanning... not run" half of this story's previously-recorded gap. The
+other half (a static-analysis pass beyond ESLint, and
+`auth_leaked_password_protection` — a Supabase Auth dashboard-only toggle)
+remains open, unchanged.
+
+**QA-P0-02.1 (full cross-tenant sweep):** built `tests/operations/
+tenant-isolation.sql` (new), closing the specific gap this backlog's own
+audit already named — no `tests/**` fixture existed for Operations
+Agent's newest tables (`notifications`, `notification_preferences`,
+`reports`). Before building anything, re-checked
+`platform_config_versions`/`platform_announcements` (the other two tables
+named in that same gap) directly against `pg_policies`, not just the
+earlier advisor-level "11 tables, RLS enabled, no policies" count — both
+have genuinely zero policies for any role. Correctly excluded them from
+this fixture: a "does tenant A's session see only tenant A's rows"
+property has nothing to test on a table no customer session can read at
+all; that absence is itself what one of the fixture's own checks proves
+directly for `platform_config_versions`.
+
+The new fixture (Tenant A6/B6, a fresh pair distinct from every existing
+fixture ID range) proves, run live via the Supabase MCP `execute_sql`
+tool against project `ekgyjwoenteadaaqakmd` (same tool used throughout
+this session for direct DB verification — this sandbox's plain network
+egress cannot reach Supabase directly, a hard constraint confirmed
+empirically earlier this session, distinct from this MCP tool's own
+separate/privileged channel):
+
+- Tenant A6's authenticated session sees exactly its own direct
+  notification, its own tenant-wide broadcast notification (`user_id
+  is null`), its own notification preferences row, and its own saved
+  report — never Tenant B6's rows, whether queried by list or by direct
+  lookup (`B6_notification_by_pk_row_count` → 0).
+- Attempting to mark another tenant's notification as read affects 0
+  rows (RLS silently filters the `UPDATE` target, doesn't throw — same
+  "check row_count, not just absence of an exception" lesson this
+  session's earlier fixtures already established).
+- A direct client-side `INSERT` into `notifications` (bypassing the
+  real app's only writer, `notify()`, which uses the service-role
+  client) is rejected by RLS — no client-facing insert policy exists
+  on this table by design.
+
+All results matched the fixture's own documented expected values exactly
+on first live run. Fixtures cleaned up afterward (this A6/B6 pair is not
+a shared "central scenario" fixture reused across modules, unlike the
+FinanceBot aaaaaaaa-5000-.../bbbbbbbb-5000-... pair, so there was no
+reason to leave it seeded). `get_advisors(security)` re-run clean
+afterward — no new finding introduced, same three already-accepted
+exceptions as every prior pass (11 vendor-only RLS-enabled-no-policy
+tables, the two intentional `SECURITY DEFINER` grants, the dashboard-only
+leaked-password-protection setting).
+
+**Verification:** `npm audit` (both scopes, above); live SQL fixture
+insert → verify → cleanup cycle against the dev Supabase project, all
+three phases executed and all results matched expectations;
+`get_advisors(security)` re-run post-fixture, clean.
+
+**Updated `docs/RUN_ORDER.md`:** the Experience Agent row was also
+refreshed in this same session window (not a QA action, but recorded
+here since it happened in this dispatch's timeframe) — it had gone stale,
+still describing Experience Agent's pre-Locked-Design-System-v2 state
+from an earlier pass, and now reflects the actual current 9-of-12-`Done`
+state with the three remaining `Partial` rows' real, narrow causes.
+
+**Release Gate — still not a clean pass**, for the same reasons named in
+`INTEGRATION_STATUS.md` §8, now with two of the four blocking categories
+partially narrowed rather than eliminated: the pagination gap (§5) and
+the QA-P0-06–14 extended epics (§7, apart from QA-P0-12's now-closed
+`npm audit` sub-item) are unchanged from the first dispatch; FinanceBot
+step 7 and the sandbox-only constraints are unchanged and unchangeable
+from this environment. Not claiming a release-gate pass this dispatch —
+recording concrete, verified progress against two specific named items
+instead.

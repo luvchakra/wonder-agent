@@ -22,7 +22,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 |---|---|---|
 | QA-P0-01.1 | Repository & contract inventory | Done — `INTEGRATION_STATUS.md` §1, cross-referenced from every module's own Progress Tracker/audit log |
 | QA-P0-01.2 | Route map & permission matrix | Done — `INTEGRATION_STATUS.md` §2; found and fixed a stale route-prefix drift in `docs/design/ownership-map.md` (Compliance/Runtime/Risk) |
-| QA-P0-02.1 | Full cross-tenant sweep | Partial — DB/API/search/reports/jobs layers all verified live; no dedicated `tests/**` isolation fixture yet for Operations'/Platform's newest tables (proven only by RLS-policy-existence check, see `INTEGRATION_STATUS.md` §3) |
+| QA-P0-02.1 | Full cross-tenant sweep | Partial — DB/API/search/reports/jobs layers all verified live; `tests/operations/tenant-isolation.sql` (new) closes the named gap for Operations' `notifications`/`notification_preferences`/`reports`, run live and passing; `platform_config_versions`/`platform_announcements` confirmed to have zero client-facing policies at all (no customer-session isolation test needed — no customer session can read them), see `INTEGRATION_STATUS.md` §3 |
 | QA-P0-02.2 | RBAC boundary sweep | Partial — orphaned-permission check clean (0 found); negative-permission proof is generic (the shared gate function itself), not per-permission-key enumerated; SSO JIT mapping unit-tested, real IdP round-trip unverified (sandbox) |
 | QA-P0-02.3 | Platform-admin isolation sweep | Done — live smoke test against every current `/platform-admin/*` page and `/api/platform/v1/*` route, all correctly denied unauthenticated |
 | QA-P0-03.1 | The FinanceBot acceptance scenario, executed live | Partial — 6 of 8 steps pass live against the real fixture; step 6 (remediation) honestly partial and step 7 (simulated removal + re-evaluation) not exercised end-to-end this pass, both for reasons already recorded in Risk Agent's own audit log — see `INTEGRATION_STATUS.md` §4 |
@@ -37,7 +37,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-09 | SHOULD/CAN/DID reproducibility | Done — `compare.test.ts` directly asserts identical repeated output and evaluator-version stability |
 | QA-P0-10 | Risk regression suite | Partial — 1 positive + 1 negative test exist, covering 3 of 8 categories; the full 5-kind × 8-category matrix is not built (deferred to Risk Agent's own further work, not duplicated here per non-negotiable #18) |
 | QA-P0-11 | Certification regression | Partial — reviewer authorization/SoD live-verified, snapshot reproduction unit-tested; no dedicated escalation regression test or fast self-review unit test |
-| QA-P0-12 | Security scanning | Partial — live advisor scan run, one real finding fixed (security-definer over-grant); no dependency-vulnerability scan run, `auth_leaked_password_protection` still disabled (dashboard-only setting, flagged for follow-up) |
+| QA-P0-12 | Security scanning | Partial — live advisor scan run, one real finding fixed (security-definer over-grant); `npm audit` now run (prod + full scope), 0 vulnerabilities either way; no static-analysis pass beyond ESLint, `auth_leaked_password_protection` still disabled (dashboard-only setting, flagged for follow-up) |
 | QA-P0-13 | Failure recovery (retry/idempotency) | Partial — dedupe-key idempotency unit-tested; no end-to-end forced-failure-and-retry test built |
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
 

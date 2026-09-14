@@ -107,13 +107,22 @@ because it read ambiguously on a first pass.
   modules' tables (each already run and passed during that module's own build this
   session, per its audit log) — not re-executed this pass (they are one-shot
   fixture-insert scripts, not idempotent re-run assertions; re-running risks primary
-  key conflicts against already-seeded data rather than adding new proof). No
-  equivalent fixture script exists yet for Operations' or Platform's own new tables
-  from this session (`notifications`, `notification_preferences`, `reports`,
-  `platform_config_versions`, `platform_announcements`) — **gap**: these are proven
-  only by the RLS-policy-existence check above plus each module's own live
-  RLS-verification during its build (per their audit logs), not by a dedicated
-  `tests/**` isolation fixture. Recorded as an open item, not fabricated as done.
+  key conflicts against already-seeded data rather than adding new proof).
+  **Gap closed in the second QA dispatch (2026-09-14):** `tests/operations/
+  tenant-isolation.sql` (new) proves `notifications`/`notification_preferences`/
+  `reports` — Tenant A6's session sees its own direct + broadcast notifications,
+  its own preferences, its own reports, and zero of Tenant B6's rows (by list or
+  by direct lookup); a same-tenant cross-user notification update affects 0 rows;
+  a direct client-side `notifications` insert is rejected (no insert policy).
+  Run live via the Supabase MCP `execute_sql` tool against project
+  `ekgyjwoenteadaaqakmd` (this sandbox's plain network egress can't reach
+  Supabase directly, so this separate/privileged channel was used, same as every
+  other module's own live verification this session); fixtures cleaned up
+  afterward. `platform_config_versions`/`platform_announcements` were checked
+  directly against `pg_policies` (not just the earlier advisor-level count) and
+  confirmed to have zero policies for any role — correctly excluded from this
+  fixture rather than given a customer-session isolation test they don't need,
+  since no customer session can read either table at all.
 
 ### QA-P0-02.2 — RBAC boundary sweep
 
@@ -267,7 +276,7 @@ rather than built from scratch in this single pass:
 | QA-P0-09 — SHOULD/CAN/DID reproducibility | **Done.** `modules/runtime-assurance/compare.test.ts` directly asserts this: "is reproducible: calling twice with the same stored data yields identical outcomes," plus explicit `shouldUnknown`/evaluator-version-stability coverage (RUNTIME-P0-12). |
 | QA-P0-10 — Risk regression suite | **Partial.** `modules/risk/rules.test.ts` has one positive test (3 of 8 categories fire together: `sensitive_data_violation`, `excessive_access`, `behavioral_deviation`) and one negative test (no restriction below critical). The full 5-test-kind × 8-category matrix this story specifies (40 cases) does not exist — building it responsibly requires deep familiarity with each category's own trigger conditions that only Risk Agent's own further work should author, per non-negotiable #18 (QA does not become a second implementation pass for another module's detection logic). |
 | QA-P0-11 — Certification regression | **Partial.** `modules/certification-compliance/decisions.ts` has the reviewer-authorization and SoD self-certification checks live-coded and RLS-verified per Compliance's own audit log; `campaigns.test.ts`/`snapshot.test.ts` cover snapshot reproduction. **Not covered:** a dedicated overdue-escalation regression test (escalation itself has no scheduler yet, §1) and an explicit self-review-restriction unit test (currently proven only via the live RLS/SoD check, not a fast unit test). |
-| QA-P0-12 — Security scanning | **Partial.** `get_advisors(security)`/`get_advisors(performance)` run this pass (§4) — one real, live security finding found and fixed (over-permissive `SECURITY DEFINER` EXECUTE grants). Bundle-secret-leak check re-run and passing. **Not done:** dependency vulnerability scanning (`npm audit` or equivalent) and a static-analysis pass beyond ESLint's existing ruleset were not run this pass — no tool for either was invoked, and `auth_leaked_password_protection` (HaveIBeenPwned check) remains disabled at the Supabase Auth project-settings level; this is a one-click dashboard toggle outside what a SQL migration can set, flagged here as a concrete follow-up for whoever holds the Supabase project's dashboard access. |
+| QA-P0-12 — Security scanning | **Partial.** `get_advisors(security)`/`get_advisors(performance)` run this pass (§4) — one real, live security finding found and fixed (over-permissive `SECURITY DEFINER` EXECUTE grants). Bundle-secret-leak check re-run and passing. `npm audit` (both prod-only and full, including dev deps) run in the second QA dispatch (2026-09-14) — **0 vulnerabilities** at either scope. **Still not done:** a static-analysis pass beyond ESLint's existing ruleset, and `auth_leaked_password_protection` (HaveIBeenPwned check) remains disabled at the Supabase Auth project-settings level; this is a one-click dashboard toggle outside what a SQL migration can set, flagged here as a concrete follow-up for whoever holds the Supabase project's dashboard access. |
 | QA-P0-13 — Failure recovery | **Partial.** `modules/runtime-assurance/events.test.ts`'s `computeDedupeKey` tests prove idempotency *at the dedupe-key level* (same payload → same key, any field change → different key) — the core mechanism retry-safety depends on. A dedicated test that forces a mid-sync connector failure, retries, and asserts unchanged row/finding counts end-to-end was not built this pass. |
 | QA-P0-14 — Observability sweep | **Partial.** Every `integration_sync_jobs`/`runtime_events` row already carries tenant context, timestamps and a status field by schema (confirmed via `information_schema.columns` inspection); correlation-ID and safe-error-classification presence was not checked field-by-field against every async operation type this pass — a full checklist run was judged lower priority than the concrete defects found and fixed above, given this session's remaining budget. |
 
