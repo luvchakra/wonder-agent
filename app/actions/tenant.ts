@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
+import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
 
 function slugify(name: string): string {
   return (
@@ -87,5 +88,10 @@ export async function signOutAction() {
   await supabase.auth.signOut();
   const cookieStore = await cookies();
   cookieStore.delete(TENANT_COOKIE_NAME);
+  // FOUNDATION-P0-09 — logout invalidation must also clear the session-
+  // security cookies, not just the Supabase session itself, so a stale
+  // last-seen/started-at value can't outlive the session it was stamped for.
+  cookieStore.delete(SESSION_STARTED_COOKIE);
+  cookieStore.delete(SESSION_LAST_SEEN_COOKIE);
   redirect("/sign-in");
 }

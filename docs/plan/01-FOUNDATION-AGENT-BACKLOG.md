@@ -27,21 +27,21 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-02.5 | `getTenantContext()` helper | Done |
 | FOUNDATION-P0-03.1 | Email/password auth | Done |
 | FOUNDATION-P0-03.2 | Tenant selection / JIT provisioning | Done |
-| FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Deferred — schema + RLS only; IdP handshake not wired |
-| FOUNDATION-P0-03.4 | MFA foundation | Deferred — not started |
+| FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Partial — 2026-09-14: full CRUD service/API/admin UI, domain-based sign-in routing, auth callback + JIT provisioning, live RLS-verified; real end-to-end IdP handshake still unverified (needs a real IdP + Supabase-project-level SSO provider registration), see audit log |
+| FOUNDATION-P0-03.4 | MFA foundation | Partial — 2026-09-14: Supabase Auth TOTP enroll/verify/unenroll wired at `/settings/security`; real enrollment against a physical authenticator app not verified in this sandbox, see audit log |
 | FOUNDATION-P0-04.1 | `requirePermission()` | Done |
 | FOUNDATION-P0-04.2 | `requirePlatformAdmin()` (higher bar) | Done |
-| FOUNDATION-P0-04.3 | Role management UI (minimal) | Deferred — not started |
+| FOUNDATION-P0-04.3 | Role management UI (minimal) | Done — 2026-09-14: `/settings/roles`, live RLS-verified |
 | FOUNDATION-P0-05.1 | `audit_logs` + `writeAudit()` | Done |
 | FOUNDATION-P0-05.2 | Secret encryption helper (higher bar) | Done |
-| FOUNDATION-P0-05.3 | Baseline HTTP security | Deferred — not started |
+| FOUNDATION-P0-05.3 | Baseline HTTP security | Done — 2026-09-14: CSP/security headers in `next.config.ts`; sign-in/sign-up routed through rate-limited server actions (migration `0040`), live-verified |
 | FOUNDATION-P0-06.1 | Platform-admin identity | Done |
 | FOUNDATION-P0-06.2 | Route/middleware enforcement | Done |
 | FOUNDATION-P0-07.1 | Fixtures (higher bar) | Done |
 | FOUNDATION-P0-07.2 | Isolation tests — critical acceptance test (higher bar) | Done |
-| FOUNDATION-P0-08 | Job Security primitive (tenant-scoped, idempotent background jobs) | Not Started — new story, see Requirements Refresh below |
-| FOUNDATION-P0-09 | Session Security (idle/absolute expiry, fixation protection) | Not Started — new story, see Requirements Refresh below |
-| FOUNDATION-P0-11 | Input/Output Safety (shared validation/encoding utility) | Not Started — new story, see Requirements Refresh below |
+| FOUNDATION-P0-08 | Job Security primitive (tenant-scoped, idempotent background jobs) | Done — 2026-09-14: `lib/jobs/tenantScopedJob.ts` published, unit-tested; not yet adopted by Integration Agent's existing sync-job code (recommended, not done unilaterally — non-negotiable #18), see audit log |
+| FOUNDATION-P0-09 | Session Security (idle/absolute expiry, fixation protection) | Done — 2026-09-14: idle/absolute timeout enforced in `proxy.ts`, unit-tested; fixation mitigated by Supabase issuing a fresh session per sign-in |
+| FOUNDATION-P0-11 | Input/Output Safety (shared validation/encoding utility) | Done — 2026-09-14: `lib/security/validate.ts` published, unit-tested, adopted by the new SSO route |
 | FOUNDATION-P0-12 | Database Migration Discipline (explicit policy) | Done — already followed as informal practice every module this session; now written down explicitly, see Requirements Refresh below |
 | FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
 

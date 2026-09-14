@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
+import { signUpAction } from "@/app/actions/auth";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -11,15 +11,16 @@ export default function SignUpPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // FOUNDATION-P0-05.3 — routed through a server action so a per-email/
+  // per-IP rate limit can be enforced before Supabase Auth is called.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
-    const supabase = supabaseBrowser();
-    const { error } = await supabase.auth.signUp({ email, password });
+    const result = await signUpAction(email, password);
     setSubmitting(false);
-    if (error) {
-      setError(error.message);
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
     router.push("/onboarding");

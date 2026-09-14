@@ -210,3 +210,81 @@ select * from check_results order by check_name;
 -- ============================================================
 -- delete from tenants where id in ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002');
 -- delete from auth.users where id in ('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002');
+
+-- ============================================================
+-- 7. sso_connections tenant isolation (FOUNDATION-P0-03.3, added
+--    2026-09-14). Verified live against the aaaaaaaa-5000-.../
+--    bbbbbbbb-5000-... FinanceBot fixtures (section 1's original
+--    aaaaaaaa-0000-... fixture had already been cleaned up between
+--    sessions by this point — see the 2026-09-14 audit log entries for
+--    the exact run log). A fixture row
+--    ('fixture-tenant-a5-test.example', tenant aaaaaaaa-5000-...) was left
+--    in place for reuse by future runs of this section.
+-- ============================================================
+-- create temporary table check_results (check_name text, result text);
+-- grant insert, select on check_results to authenticated;
+--
+-- do $$
+-- begin
+--   perform set_config('request.jwt.claims', '{"sub":"11111111-5000-0000-0000-000000000001","role":"authenticated"}', true);
+--   set local role authenticated;
+--   insert into check_results select 'A5_user_sees_own_connection', count(*)::text from sso_connections where domain = 'fixture-tenant-a5-test.example';
+--   reset role;
+-- end $$;
+--
+-- do $$
+-- begin
+--   perform set_config('request.jwt.claims', '{"sub":"22222222-5000-0000-0000-000000000002","role":"authenticated"}', true);
+--   set local role authenticated;
+--   insert into check_results select 'B5_user_sees_A5_connection(should_be_0)', count(*)::text from sso_connections where domain = 'fixture-tenant-a5-test.example';
+--   reset role;
+-- end $$;
+--
+-- do $$
+-- begin
+--   perform set_config('request.jwt.claims', '{"sub":"11111111-5000-0000-0000-000000000001","role":"authenticated"}', true);
+--   set local role authenticated;
+--   begin
+--     insert into sso_connections (tenant_id, protocol, domain, idp_metadata) values ('aaaaaaaa-5000-0000-0000-000000000001','saml','forged.example','{}'::jsonb);
+--     insert into check_results values ('A5_user_client_insert_rejected', 'UNEXPECTEDLY_SUCCEEDED');
+--   exception when insufficient_privilege then
+--     insert into check_results values ('A5_user_client_insert_rejected', 'REJECTED_AS_EXPECTED');
+--   end;
+--   reset role;
+-- end $$;
+--
+-- do $$
+-- declare
+--   affected int;
+-- begin
+--   perform set_config('request.jwt.claims', '{"sub":"11111111-5000-0000-0000-000000000001","role":"authenticated"}', true);
+--   set local role authenticated;
+--   begin
+--     update sso_connections set status = 'disabled' where domain = 'fixture-tenant-a5-test.example';
+--     get diagnostics affected = row_count;
+--     insert into check_results values ('A5_user_client_update_row_count(should_be_0)', affected::text);
+--   exception when insufficient_privilege then
+--     insert into check_results values ('A5_user_client_update_row_count(should_be_0)', 'REJECTED_WITH_EXCEPTION');
+--   end;
+--   reset role;
+-- end $$;
+--
+-- select * from check_results;
+--
+-- Expected/actual (verified 2026-09-14): A5_user_sees_own_connection=1,
+-- B5_user_sees_A5_connection=0, A5_user_client_insert_rejected=
+-- REJECTED_AS_EXPECTED, A5_user_client_update_row_count=0 (no update
+-- policy exists at all for authenticated — RLS silently filters rather
+-- than throwing, same lesson Compliance Agent's audit log recorded: check
+-- row_count, not just absence of an exception).
+--
+-- NOT verified live (documented limitation, not a fabrication): an actual
+-- end-to-end SAML/OIDC redirect against a real IdP, and the JIT
+-- membership-provisioning code path (lib/auth/sso.ts
+-- provisionSsoMembership()) end-to-end via a real SSO sign-in. Both
+-- require a real identity provider and a Supabase-project-level SSO
+-- provider registration (an Enterprise/Pro-tier, dashboard/CLI setup step)
+-- that does not exist on this environment's connected project — this
+-- matches the backlog's own stop-and-report allowance for this story.
+-- The deterministic role-mapping logic (resolveJitRole()) that IS
+-- reachable without a real IdP is unit-tested in lib/auth/sso.test.ts.

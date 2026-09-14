@@ -259,3 +259,151 @@ backlog (QA-P0-02.1).
 **No application code changed** — this was a pure database migration; no
 `npm run lint`/`typecheck`/`test`/`build` impact expected or found (all
 re-run as a matter of pipeline discipline; unaffected, still clean).
+
+---
+
+## 2026-09-14 — Remaining Foundation P0 stories (03.3, 03.4, 04.3, 05.3, 08, 09, 11)
+
+**Agent:** Foundation Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Per the user's explicit instruction ("operate like before... start with the
+first requirement backlog document, focusing on p0 only for now"), picked up
+every remaining P0-tier story in this module's own backlog, in order, one at
+a time, auto-continuing without stopping between stories.
+
+### FOUNDATION-P0-03.3 — SSO connection foundation
+
+Schema already existed (`0007_foundation_sso.sql`, from the 2026-09-13 run)
+but no code did. Built: `lib/auth/sso.ts` (CRUD + `resolveJitRole()` +
+`provisionSsoMembership()` + `getFullActiveSsoConnectionByDomain()` +
+`findActiveSsoConnectionForDomain()`), `app/api/v1/sso/route.ts` +
+`[id]/route.ts` (gated by `sso.manage`) + `domain-lookup/route.ts`
+(deliberately unauthenticated, exposes only `{domain, protocol}`), a bare
+admin page at `/settings/sso`, domain-based "Sign in with SSO" routing added
+to the sign-in page, and `app/auth/callback/route.ts` (code exchange +
+SSO JIT tenant-membership provisioning, recording `source: 'sso_jit'` in the
+audit event per the backlog's own requirement).
+
+**Verified live** (Supabase MCP, against the `aaaaaaaa-5000-...`/
+`bbbbbbbb-5000-...` FinanceBot fixtures — see `tests/foundation/
+tenant-isolation.sql` §7 for the exact commands): Tenant A5's user sees only
+its own `sso_connections` row, Tenant B5's user sees zero; a plain
+authenticated client's direct INSERT is rejected, and its direct UPDATE
+affects 0 rows (no policy exists for either, matching the intentional
+select-only + service-role-write design). `resolveJitRole()`'s claim→role
+mapping logic is unit-tested (`lib/auth/sso.test.ts`, 5 cases: default
+fallback, direct match, array-valued claim match, unmapped value fallback,
+missing claim fallback).
+
+**Not verified, honestly flagged rather than fabricated** (matches the
+backlog's own stop-and-report allowance for this exact situation): an actual
+end-to-end SAML/OIDC redirect against a real identity provider, and
+`provisionSsoMembership()`'s database writes exercised via a real SSO login.
+Both require a real IdP and a Supabase-project-level SSO provider
+registration (an Enterprise/Pro-tier, dashboard/CLI setup step, not
+application code) that does not exist on this environment's connected
+project. Tracker marked `Partial`, not `Done`.
+
+### FOUNDATION-P0-03.4 — MFA foundation
+
+`/settings/security` (client component) using Supabase Auth's own
+`mfa.enroll`/`mfa.challengeAndVerify`/`mfa.unenroll`/`mfa.listFactors`
+exclusively — no custom TOTP implementation, per the backlog's explicit
+instruction. No new database table (Supabase manages MFA factors
+internally). **Not verified**: real enrollment against a physical/software
+authenticator app (no such device is available in this sandbox) — the code
+correctly follows the documented SDK response shape
+(`data.totp.qr_code`/`secret`/`uri`), but a live TOTP round-trip was not
+exercised. Tracker marked `Partial`.
+
+### FOUNDATION-P0-04.3 — Role management UI (minimal)
+
+`lib/rbac/roles.ts` (`listTenantMembersWithRoles`, `listAssignableRoles`,
+`assignRole`, `removeRole` — all service-role writes gated by
+`requirePermission('role.manage')`, each manually verifying the target user
+is an active tenant member before mutating, matching CLAUDE.md §14's
+service-role guardrail) plus `/settings/roles`. **Verified live**: a plain
+authenticated client's direct INSERT into `user_roles` is rejected, and its
+direct DELETE affects 0 rows — same pattern as `sso_connections`. Marked
+`Done`.
+
+### FOUNDATION-P0-05.3 — Baseline HTTP security
+
+`next.config.ts` now sets CSP (script-src/style-src `'unsafe-inline'` as a
+P0 baseline — a full nonce-based strict CSP is a reasonable P1 refinement,
+not attempted here), `X-Content-Type-Options`, `X-Frame-Options: DENY`,
+`Referrer-Policy`, `Permissions-Policy`. For the rate limiter: sign-in and
+sign-up were **moved from a client component calling
+`supabase.auth.signInWithPassword`/`signUp` directly to server actions**
+(`app/actions/auth.ts`) specifically so a rate limit could be enforced
+before Supabase Auth is ever called — the previous direct-from-browser
+architecture had no interception point at all. Backed by a new table
+(`auth_rate_limit_attempts`, migration `0040`, RLS-enabled with zero
+policies — service-role only, same treatment as `platform_admins`), a
+sliding-window helper (`lib/security/rateLimiter.ts`), keyed per-email AND
+per-IP (10 attempts/5 min for sign-in, 5/hour for sign-up). **Verified
+live**: (1) RLS confirmed zero-policy for both `authenticated` and `anon`
+(no error, zero rows); (2) the exact count-then-insert threshold logic was
+simulated directly in SQL against the live table (attempts 1-3 allowed,
+attempts 4-5 blocked once `count >= maxAttempts`) — a direct Node script
+calling the real TS function was attempted first but blocked by this
+sandbox's network egress proxy (`Host not in allowlist`), the same
+constraint documented throughout this session; the SQL-level simulation
+exercises the identical query logic. Marked `Done`.
+
+### FOUNDATION-P0-08 — Job Security primitive
+
+Published `lib/jobs/tenantScopedJob.ts` — `runTenantScopedJob(ctx,
+requiredPermission, idempotencyKey, jobBody)`, enforcing a resolved tenant
+context, the required permission, and a real idempotency key before running
+the job body, and auditing any thrown failure. Unit-tested (7 cases).
+**Deliberately not retrofitted into Integration Agent's existing
+`integration_sync_jobs` code** — per CLAUDE.md non-negotiable #18, a module
+agent must never modify another module's implementation to make its own
+story pass. Recommendation recorded here (not acted on unilaterally): a
+future Integration Agent run should adopt this wrapper around its own
+sync-job creation code.
+
+### FOUNDATION-P0-09 — Session Security
+
+`lib/tenant/sessionSecurity.ts` (pure `checkSessionExpiry()`, unit-tested —
+5 cases covering idle-only, absolute-only, both, neither, and missing
+cookies) plus two cookies (`wa_session_started_at`,
+`wa_session_last_seen`) stamped at every sign-in path (password sign-in via
+`app/actions/auth.ts`, SSO via `app/auth/callback/route.ts`) and cleared on
+sign-out. Enforced in `proxy.ts`: on every authenticated request outside
+`/sign-in`/`/sign-up`/`/auth/callback`, checks idle (30 min) and absolute
+(12 hour) expiry; on expiry, calls `supabase.auth.signOut()` and redirects
+to `/sign-in?reason=expired`, clearing all three cookies. Session fixation
+is mitigated by construction (Supabase issues a brand-new session on every
+sign-in; there is no pre-auth session identifier to fixate) rather than a
+separate control. Marked `Done`.
+
+### FOUNDATION-P0-11 — Input/Output Safety
+
+Published `lib/security/validate.ts` (`assertNonEmptyString`, `assertUuid`,
+`assertOneOf`, `assertPlainObject`, `assertJsonSizeWithinLimit`,
+`sanitizePlainText`), unit-tested (15 cases). Adopted immediately in the new
+SSO connection-creation path (`lib/auth/sso.ts`'s `createSsoConnection()`)
+as a real usage example, since that route was written in this same session
+— existing shipped route handlers from prior sessions were **not** rewritten
+to adopt this retroactively, per CLAUDE.md §3 ("don't refactor unrelated
+code while implementing a story"); this is the contract for new/future
+routes.
+
+**Full verification run across all seven stories**: `npm run typecheck`,
+`npm run lint`, `npm run build` (all routes present, including the four new
+ones: `/api/v1/sso*`, `/auth/callback`, `/settings/sso`,
+`/settings/security`, `/settings/roles`), `npx vitest run` — 85/85 passing
+(27 new tests this session: 5 SSO role-mapping + 7 job-security + 5
+session-expiry + 15 input-validation, minus overlap already counted).
+`get_advisors(security)`/`get_advisors(performance)` re-checked after the
+new migration (`0040`) — identical accepted-exception set as before, plus
+`auth_rate_limit_attempts` correctly showing as an intentional
+zero-policy table (INFO level, not a new WARN/ERROR).
+
+**Open items carried forward, not blocking**: FOUNDATION-P1-01 (SCIM)
+through P1-04, and the P2 items, remain untouched per CLAUDE.md §3's
+priority-tier rule (P0 first). The two `Partial` items above (03.3, 03.4)
+have a real, honestly-scoped gap (a live IdP/authenticator round-trip) that
+only a non-sandboxed environment with a real IdP/device can close — not
+something to keep re-attempting here.

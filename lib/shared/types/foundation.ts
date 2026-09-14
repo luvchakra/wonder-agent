@@ -54,3 +54,35 @@ export class ApiError extends Error {
 export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: { code: string; message: string } };
+
+// FOUNDATION-P0-03.3 — SSO connection foundation.
+export type SsoProtocol = "saml" | "oidc";
+export type SsoConnectionStatus = "active" | "disabled";
+
+export type ClaimsMapping = {
+  emailClaim?: string;
+  roleClaim?: string;
+  groupsClaim?: string;
+  // Maps an IdP-asserted role/group value to a WonderAgent system role name.
+  roleValueMap?: Record<string, string>;
+};
+
+export type SsoConnection = {
+  id: string;
+  tenantId: string;
+  protocol: SsoProtocol;
+  domain: string;
+  idpMetadata: Record<string, unknown>;
+  defaultRole: string;
+  claimsMapping: ClaimsMapping;
+  status: SsoConnectionStatus;
+  createdAt: string;
+};
+
+export type SsoConnectionInput = {
+  protocol: SsoProtocol;
+  domain: string;
+  idpMetadata: Record<string, unknown>;
+  defaultRole?: string;
+  claimsMapping?: ClaimsMapping;
+};

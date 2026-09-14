@@ -19,7 +19,7 @@ stop-and-report rule always wins).
 
 | Wave | Agent | Why this position | Status |
 |---|---|---|---|
-| 1 | Foundation Agent | Everything depends on tenant/RBAC/RLS/audit | Done (P0 core; a few items deferred — see its audit log) |
+| 1 | Foundation Agent | Everything depends on tenant/RBAC/RLS/audit | Done (all P0 stories complete as of 2026-09-14, including the requirements-refresh additions — SSO/MFA marked Partial pending a real IdP/authenticator device this sandbox can't provide; see its audit log) |
 | 2 | Identity Agent | Only needs Foundation; defines the canonical agent + Agent Contract (SHOULD) every later module reads | Done |
 | 2 | Integration Agent | Only needs Foundation; can build its connector framework against manual data without waiting on Identity | Done |
 | 3 | Access Agent | Needs Identity's contract + (ideally) Integration's normalized access data to compute CAN | Done |
@@ -69,7 +69,12 @@ the releases above (see `CLAUDE.md` §3 "Priority tiers").
   building against manual/stub data rather than blocking — it records the gap in
   its own audit log rather than stalling or inventing the missing module's
   architecture (`CLAUDE.md` §7).
-- Foundation Agent's first run deferred some P0 items (SSO handshake, MFA
-  enrollment UI, role-management UI, baseline security headers/rate limiting) —
-  see `docs/design/foundation-agent-backlog-audit.md`. None of them block Wave 2+;
-  pick them up later with `Run Foundation Agent`.
+- Foundation Agent's first run (2026-09-13) deferred several P0 items; a
+  2026-09-14 run picked all of them up (SSO connection foundation, MFA, role
+  management UI, baseline security headers/rate limiting) plus the three new
+  P0 stories the requirements refresh added (job security, session security,
+  input/output safety). SSO and MFA remain `Partial` — the deterministic code
+  paths are built and verified, but a real end-to-end IdP handshake and a
+  real authenticator-app enrollment need a non-sandboxed environment to
+  finish verifying; see `docs/design/foundation-agent-backlog-audit.md`.
+  None of this blocks Wave 2+.
