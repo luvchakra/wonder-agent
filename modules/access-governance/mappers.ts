@@ -10,6 +10,7 @@ import type {
   PolicyEvaluationResult,
   PolicyException,
   PolicyRule,
+  PolicyVersionRecord,
 } from "@/lib/shared/types/access-governance";
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- mapping raw Supabase rows */
@@ -93,6 +94,19 @@ export function toPolicy(row: any): Policy {
     effectiveDate: row.effective_date,
     expiryDate: row.expiry_date,
     status: row.status,
+    version: row.version ?? 1,
+    priority: row.priority ?? 0,
+  };
+}
+
+export function toPolicyVersionRecord(row: any): PolicyVersionRecord {
+  return {
+    id: row.id,
+    policyId: row.policy_id,
+    version: row.version,
+    snapshot: row.snapshot ?? {},
+    changedBy: row.changed_by,
+    changedAt: row.changed_at,
   };
 }
 
@@ -127,5 +141,6 @@ export function toPolicyEvaluationResult(row: any): PolicyEvaluationResult {
     result: row.result,
     evidence: row.evidence ?? {},
     evaluatedAt: row.evaluated_at,
+    policyVersion: row.policy_version ?? 1,
   };
 }

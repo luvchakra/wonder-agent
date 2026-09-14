@@ -14,6 +14,8 @@ export {
   createPolicy,
   listPolicies,
   getPolicy,
+  updatePolicy,
+  listPolicyVersions,
   addPolicyRule,
   listPolicyRules,
   addPolicyException,
@@ -22,3 +24,5 @@ export {
 } from "./policies";
 export { evaluatePolicies, listPolicyEvaluations } from "./evaluate";
 export { checkSoD, type SoDCheckResult } from "./sod";
+export { getAccessGraph } from "./graph";
+export { compareAccessToContract } from "./comparison";

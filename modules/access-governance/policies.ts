@@ -1,6 +1,7 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
+import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
   Policy,
@@ -11,8 +12,10 @@ import type {
   PolicyRule,
   PolicyRuleType,
   PolicySeverity,
+  PolicyVersionRecord,
+  UpdatePolicyInput,
 } from "@/lib/shared/types/access-governance";
-import { toPolicy, toPolicyException, toPolicyRule } from "./mappers";
+import { toPolicy, toPolicyException, toPolicyRule, toPolicyVersionRecord } from "./mappers";
 
 export type CreatePolicyInput = {
   name: string;
@@ -60,6 +63,75 @@ export async function getPolicy(policyId: string): Promise<Policy | null> {
   const { data, error } = await supabase.from("policies").select().eq("id", policyId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return data ? toPolicy(data) : null;
+}
+
+/**
+ * ACCESS-P0-05. Runs as the calling user — `policies` already grants a
+ * client-facing UPDATE policy (migration 0029), so this is a normal RLS
+ * write like createPolicy(), not a service-role path. Snapshots the row's
+ * full prior state into `policy_versions` before applying the patch, and
+ * bumps `version`. `policy_versions` insert also runs as the calling user
+ * (client-facing INSERT policy, migration 0042) — it is append-only by
+ * construction (no UPDATE/DELETE policy exists on that table at all), so
+ * a client can add history but never rewrite or erase it.
+ */
+export async function updatePolicy(
+  tenantId: string,
+  actorId: string,
+  policyId: string,
+  patch: UpdatePolicyInput,
+): Promise<Policy> {
+  const current = await getPolicy(policyId);
+  if (!current || current.tenantId !== tenantId) throw new ApiError(404, "POLICY_NOT_FOUND");
+
+  const supabase = await supabaseServer();
+
+  const { error: versionError } = await supabase.from("policy_versions").insert({
+    policy_id: policyId,
+    version: current.version,
+    snapshot: current,
+    changed_by: actorId,
+  });
+  if (versionError) throw new ApiError(500, "CREATE_FAILED", versionError.message);
+
+  const update: Record<string, unknown> = { version: current.version + 1 };
+  if (patch.name !== undefined) update.name = patch.name;
+  if (patch.description !== undefined) update.description = patch.description;
+  if (patch.scope !== undefined) update.scope = patch.scope;
+  if (patch.severity !== undefined) update.severity = patch.severity;
+  if (patch.action !== undefined) update.action = patch.action;
+  if (patch.exceptionProcess !== undefined) update.exception_process = patch.exceptionProcess;
+  if (patch.ownerId !== undefined) update.owner_id = patch.ownerId;
+  if (patch.expiryDate !== undefined) update.expiry_date = patch.expiryDate;
+  if (patch.status !== undefined) update.status = patch.status;
+  if (patch.priority !== undefined) update.priority = patch.priority;
+
+  const { data, error } = await supabase.from("policies").update(update).eq("id", policyId).select().single();
+  if (error || !data) throw new ApiError(500, "UPDATE_FAILED", error?.message ?? "Failed to update policy");
+
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "policy.updated",
+    objectType: "policy",
+    objectId: policyId,
+    outcome: "success",
+    metadata: { fromVersion: current.version, toVersion: current.version + 1, changedFields: Object.keys(patch) },
+  });
+
+  return toPolicy(data);
+}
+
+export async function listPolicyVersions(policyId: string): Promise<PolicyVersionRecord[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("policy_versions")
+    .select()
+    .eq("policy_id", policyId)
+    .order("version", { ascending: false });
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map(toPolicyVersionRecord);
 }
 
 export async function addPolicyRule(

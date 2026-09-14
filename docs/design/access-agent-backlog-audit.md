@@ -144,3 +144,103 @@ detection both need; `evaluatePolicies()`'s output (`policy_evaluations`
 rows) is the evidence Risk Agent turns into findings — Access Agent
 deliberately never assigns a severity or creates a finding itself, per
 its own DO-NOT-IMPLEMENT list.
+
+---
+
+## 2026-09-14 — ACCESS-P0-03 (Access Graph), ACCESS-P0-04 (Contract Comparison), ACCESS-P0-05 (Policy Versioning)
+
+**Agent:** Access Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Auto-chained after Integration Agent's own P0 completion, per the user's
+"operate like before, focus on P0 only, continue automatically"
+instruction. All three of this module's new requirements-refresh stories.
+
+### ACCESS-P0-03 — Access Graph
+
+`modules/access-governance/graph.ts` — `getAccessGraph(tenantId, agentId)`.
+A pure *view* over `getEffectiveAccess()`'s already-canonical data plus a
+fresh accounts/applications query for node construction — no new table,
+reaffirming ACCESS-P0-01.1's original decision not to materialize
+`access_paths`. Returns `{nodes, edges, rows}`: nodes typed
+agent/account/entitlement/application; edges carry the real `GrantType`
+(direct/inherited/group/role/delegated/token_scope/oauth_scope/api_scope/
+mcp_tool_permission/service_account_relationship) plus `has_account`/
+`belongs_to` structural edges; `rows` is the same flat `AccessGrant[]`
+`getEffectiveAccess()` already returns, for non-graph consumers. New route:
+`GET /api/v1/access/agents/:agentId/graph`.
+
+### ACCESS-P0-04 — Contract Comparison (also covers ACCESS-P0-10)
+
+`modules/access-governance/comparison.ts` —
+`compareAccessToContract(tenantId, agentId)`, classifying every effective-
+access row as `approved`/`excessive`/`missing`/`unknown` against Identity's
+active Agent Contract, each row carrying `sourceIntegrationId`, the
+`explainAccessPath()` chain, `lastSyncedAt` and `agentContractId`
+(ACCESS-P0-10's traceability requirement, folded in as the new doc's own
+Requirements Refresh section instructed). Distinct from `evaluatePolicies()`
+(rule-based, not a raw diff) and from Runtime Agent's future
+`compareShouldCanDid()` (adds DID; this function never touches runtime
+data). Access Agent still never writes a `risk_findings` row itself.
+
+**A real correctness issue caught before committing, not after:** the
+first implementation classified purely at the *application* level (any
+grant on an approved application → `approved`). Manually tracing it against
+the live FinanceBot fixture's actual data (queried via Supabase MCP —
+`approvedApplications: ["SAP","Snowflake"]`, `approvedData: ["financial
+reporting"]`, and real grants `Financial_Reporting_READ` (financial),
+`CustomerDB_READ` (pii), `SAP_READ` (financial)) showed this would call
+`CustomerDB_READ` "approved" — exactly backwards from CLAUDE.md §11's
+central acceptance scenario ("SHOULD = financial data only, CAN = financial
+data + CustomerDB", i.e. CustomerDB is supposed to be the *excessive* one).
+Fixed by making approval data-classification-scoped, not merely
+application-scoped: an entitlement is `approved` only if its application is
+approved **and** (the contract declares no `approvedData` restriction at
+all, or the entitlement's `data_classification` overlaps at least one
+`approvedData` term via the same substring heuristic Runtime Agent's
+`classificationsCompatible()` uses, reimplemented independently here since
+that function isn't published via `modules/runtime-assurance/service.ts` —
+flagged, not silently assumed identical). The classification logic was
+extracted into a pure, exported `classifyAccessGrant()` specifically so
+this exact fixture scenario could be unit-tested directly
+(`comparison.test.ts`) rather than only exercised indirectly.
+
+### ACCESS-P0-05 — Policy Versioning, Priority & Change History
+
+Migration `0042`: `policies.version`/`policies.priority` (both `not null
+default`), an append-only `policy_versions` history table (client-facing
+SELECT+INSERT only — no UPDATE/DELETE policy at all, so history can be
+added but never rewritten, live-verified), and
+`policy_evaluations.policy_version`. New `updatePolicy()` (`policies.ts`)
+snapshots the full prior row into `policy_versions` before applying a
+patch and bumps `version`; runs as the calling user (not service-role) —
+`policies` already had a client-facing UPDATE policy from
+ACCESS-P0-02.1, so this is a normal RLS write, not a new privileged path.
+`evaluatePolicies()` now stamps `policy_version: policy.version` on every
+inserted `policy_evaluations` row, closing part of ACCESS-P0-02.2's
+`Partial` reproducibility gap (a stored evaluation is now traceable to the
+exact rule-set version that produced it) — ACCESS-P0-02.2 itself is left
+`Partial` as before, since this alone doesn't close every gap that story
+documented. New routes: `PATCH /api/v1/policies/:id`,
+`GET /api/v1/policies/:id/versions`.
+
+**Verified live** (Supabase MCP, FinanceBot fixture tenants): created a
+throwaway policy in Tenant A5, ran the exact `updatePolicy()` write
+sequence (insert into `policy_versions`, then update `policies` with
+`version = 2`) as the Tenant A5 authenticated user — succeeded; Tenant A5
+sees its own version history (1 row), Tenant B5 sees zero; a direct client
+UPDATE against `policy_versions` (attempting to tamper with history)
+affects 0 rows, since no UPDATE policy exists. Cleaned up the throwaway
+policy afterward (cascade-deleted its version row).
+
+**Verification run**: `npm run typecheck`/`lint`/`build` clean, `npx
+vitest run` — 106/106 passing (17 new: 5 `classificationsOverlap` +
+7 `classifyAccessGrant` including the exact fixture-reproducing case).
+`get_advisors(security)` re-checked after migration `0042` — identical
+accepted-exception set, no new WARN/ERROR.
+
+**Not done, flagged rather than silently assumed**: `getAccessGraph()`/
+`compareAccessToContract()` were not exercised through a live authenticated
+HTTP request (same real-browser-session constraint this whole session has
+worked around) — verified via `npm run build`'s route generation plus the
+fixture-data-driven unit tests above, which is what actually caught and
+fixed the classification bug; a full end-to-end request-level check
+remains open for a future QA Agent pass.

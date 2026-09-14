@@ -114,7 +114,35 @@ export type Policy = {
   effectiveDate: string;
   expiryDate: string | null;
   status: PolicyStatus;
+  /** ACCESS-P0-05 — incremented on every updatePolicy() call. */
+  version: number;
+  /** ACCESS-P0-05 — higher priority policies take precedence in a future
+   * conflict-resolution story; P0 only stores and surfaces the value. */
+  priority: number;
 };
+
+/** ACCESS-P0-05 — append-only snapshot of a policy's prior state. */
+export type PolicyVersionRecord = {
+  id: string;
+  policyId: string;
+  version: number;
+  snapshot: Record<string, unknown>;
+  changedBy: string | null;
+  changedAt: string;
+};
+
+export type UpdatePolicyInput = Partial<{
+  name: string;
+  description: string | null;
+  scope: Record<string, unknown>;
+  severity: PolicySeverity;
+  action: PolicyAction;
+  exceptionProcess: string | null;
+  ownerId: string | null;
+  expiryDate: string | null;
+  status: PolicyStatus;
+  priority: number;
+}>;
 
 export type PolicyRuleType = "rbac" | "abac" | "resource" | "time";
 
@@ -155,4 +183,49 @@ export type PolicyEvaluationResult = {
   result: "pass" | "violation" | "exempted";
   evidence: Record<string, unknown>;
   evaluatedAt: string;
+  /** ACCESS-P0-05/06 — the policy's version at evaluation time, so a stored
+   * evaluation is reproducible against the exact rule set that produced it. */
+  policyVersion: number;
+};
+
+// ACCESS-P0-03 — Access Graph.
+export type AccessGraphNodeType = "agent" | "account" | "entitlement" | "application";
+
+export type AccessGraphNode = {
+  id: string;
+  type: AccessGraphNodeType;
+  label: string;
+  data?: Record<string, unknown>;
+};
+
+export type AccessGraphEdge = {
+  source: string;
+  target: string;
+  relation: GrantType | "has_account" | "belongs_to";
+};
+
+export type AccessGraph = {
+  agentId: string;
+  nodes: AccessGraphNode[];
+  edges: AccessGraphEdge[];
+  /** Flat/tabular equivalent for non-graph UI consumers. */
+  rows: AccessGrant[];
+};
+
+// ACCESS-P0-04 — Contract Comparison (SHOULD vs CAN), also covers
+// ACCESS-P0-10 (Access Change Traceability).
+export type ContractComparisonClassification = "approved" | "excessive" | "missing" | "unknown";
+
+export type ContractComparisonRow = {
+  classification: ContractComparisonClassification;
+  application: string | null;
+  entitlement: string | null;
+  dataClassification: string | null;
+  sourceIntegrationId: string | null;
+  /** Best-effort "as of" timestamp for this row's underlying grant — the
+   * grant's own grantedAt, since no per-grant sync timestamp is tracked
+   * yet (see the Access Agent audit log for this documented simplification). */
+  lastSyncedAt: string | null;
+  path: AccessPathStep[] | null;
+  agentContractId: string;
 };

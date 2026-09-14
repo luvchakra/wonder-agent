@@ -94,7 +94,17 @@ export async function evaluatePolicies(tenantId: string, agentId: string): Promi
 
     const { data: inserted, error: insertError } = await admin
       .from("policy_evaluations")
-      .insert({ tenant_id: tenantId, policy_id: policy.id, agent_id: agentId, result, evidence })
+      .insert({
+        tenant_id: tenantId,
+        policy_id: policy.id,
+        agent_id: agentId,
+        result,
+        evidence,
+        // ACCESS-P0-05/06 — the policy's version at evaluation time, so a
+        // stored evaluation is reproducible against the exact rule set
+        // that produced it.
+        policy_version: policy.version,
+      })
       .select()
       .single();
     if (insertError || !inserted) {
