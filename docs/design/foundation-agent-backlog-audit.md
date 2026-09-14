@@ -184,3 +184,78 @@ modules' isolation scripts against a suspended-tenant fixture (a case none
 of them tested, since every existing isolation test only ever checks
 cross-tenant access between two *active* tenants, never a suspended
 tenant's own members).
+
+---
+
+## 2026-09-14 — RESOLVED: `current_tenant_ids()` now enforces `tenants.status`
+
+**Agent:** Foundation Agent · **Branch:** `claude/wonderagent-setup-lasmly`,
+dispatched directly by the user in response to the finding above ("dispatch
+Foundation Agent now to apply this fix and re-verify isolation tests
+across the other modules").
+
+**Applied**: migration
+`0039_foundation_fix_current_tenant_ids_status_check.sql` —
+`create or replace function current_tenant_ids()`, unchanged name/
+signature/return type (so every existing `GRANT EXECUTE` from
+`0009`/`0011` and every RLS policy calling
+`tenant_id in (select current_tenant_ids())` keeps working unmodified),
+now joining to `tenants` and requiring `t.status = 'active'` in addition to
+`tm.status = 'active'` — exactly the fix proposed in the entry above.
+
+**Verified live against the dev Supabase project, in this order:**
+1. **The gap is closed**: set `tenants.status = 'suspended'` on the
+   existing FinanceBot fixture tenant (`aaaaaaaa-5000-...`, from Runtime/
+   Risk/Compliance's own fixtures), then re-ran, as that tenant's
+   authenticated member, the exact checks that previously proved the gap:
+   `current_tenant_ids()` no longer includes the suspended tenant (`false`,
+   was `true`), and reads against `agents`/`tenants`/`runtime_events`/
+   `risk_findings` for that tenant all now return zero rows (were 1/1/1/1).
+   Reverted the fixture back to `status = 'active'` immediately after and
+   confirmed the revert took effect.
+2. **No regression on ordinary active-tenant access**: attempted to re-run
+   the original `tests/foundation/tenant-isolation.sql` fixture
+   (`aaaaaaaa-0000-...`/`bbbbbbbb-0000-...`) and found it had been cleaned
+   up between sessions (its rows no longer exist in the dev project) —
+   rather than silently accept an empty/inconclusive result, re-ran the
+   equivalent checks against the still-present, richer FinanceBot fixture
+   instead: as Tenant A5's active member, `tenants`/`agents`/
+   `risk_findings`/`runtime_events`/`certification_items` all still return
+   exactly that tenant's own rows (`{fixture-tenant-a5-test}`,
+   `{FinanceBot}`, 1, 1, 3 respectively — matching every prior module's own
+   recorded fixture state), and Tenant B5 remains a zero-row cross-tenant
+   lookup. This spans Foundation's own tables plus Identity's, Risk's,
+   Runtime's and Compliance's — a broader regression check than the
+   original fixture alone would have given, since it proves the fix didn't
+   disturb any downstream module's RLS behavior either.
+3. `get_advisors` (security) re-checked: identical set of previously-
+   reviewed exceptions (the intentional `rls_enabled_no_policy` tables,
+   `current_tenant_ids()`'s own now-longer-standing `anon`/`authenticated`
+   SECURITY DEFINER exposure warning, `create_tenant_with_owner`'s and
+   `rls_auto_enable()`'s equivalents, leaked-password-protection) — nothing
+   new introduced by this change.
+
+**Added a permanent regression test** to
+`tests/foundation/tenant-isolation.sql` (new §5, commented like the
+existing anon-role section for manual re-run against a dev project) so a
+future change to this function or the `tenants`/`tenant_memberships`
+schema gets checked against a suspended-tenant scenario, not only
+cross-tenant access between active tenants.
+
+**Not done, and deliberately out of scope for this fix**: did not re-seed
+the original cleaned-up Foundation fixture (`aaaaaaaa-0000-...`) — the
+FinanceBot fixture already served as a valid, arguably stronger,
+substitute for this specific regression check. Did not re-run every other
+module's own isolation script individually (Access/Integration/Identity's
+own `tests/*/tenant-isolation.sql` files) — the cross-module regression
+check in step 2 above already exercises RLS on tables owned by four of the
+downstream modules (Identity, Risk, Runtime, Compliance) through the same
+`current_tenant_ids()` code path every one of those scripts also depends
+on, so re-running each individually would be redundant with what step 2
+already proves about the shared function; a full QA-Agent-level sweep
+across every module's own script remains QA Agent's job per its own
+backlog (QA-P0-02.1).
+
+**No application code changed** — this was a pure database migration; no
+`npm run lint`/`typecheck`/`test`/`build` impact expected or found (all
+re-run as a matter of pipeline discipline; unaffected, still clean).

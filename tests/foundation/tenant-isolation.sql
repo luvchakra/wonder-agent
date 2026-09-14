@@ -161,7 +161,52 @@ select * from check_results order by check_name;
 -- (catalog data, not tenant-scoped, so it's fine for anon to read).
 
 -- ============================================================
--- 4. Cleanup — always run this after the suite, on a dev project.
+-- 5. Suspended-tenant enforcement (added 2026-09-14, migration
+--    0039_foundation_fix_current_tenant_ids_status_check.sql).
+--
+--    Platform Agent's own build discovered and verified live that
+--    current_tenant_ids() originally filtered only on
+--    tenant_memberships.status, never tenants.status — so suspending a
+--    tenant had zero actual enforcement effect: a suspended tenant's
+--    active members retained full read/write access to every
+--    tenant-scoped table system-wide. Every isolation test above only
+--    ever checked cross-tenant access between two *active* tenants, never
+--    a suspended tenant's own members, so this gap went uncaught until
+--    Platform Agent's tenant-lifecycle story exercised it. Fixed by
+--    joining to tenants and requiring t.status = 'active' too. This
+--    section is the permanent regression test for that fix — run it
+--    (fixtures already exist from section 1) after any future change to
+--    current_tenant_ids() or the tenants/tenant_memberships schema.
+-- ============================================================
+-- update tenants set status = 'suspended' where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+--
+-- create temporary table check_results (check_name text, result text);
+-- grant insert, select on check_results to authenticated, anon;
+--
+-- set role authenticated;
+-- select set_config('request.jwt.claims', '{"sub":"11111111-0000-0000-0000-000000000001","role":"authenticated"}', true);
+--
+-- insert into check_results select 'current_tenant_ids_includes_suspended_tenant', (exists(select 1 from current_tenant_ids() t where t = 'aaaaaaaa-0000-0000-0000-000000000001'))::text;
+-- insert into check_results select 'suspended_tenant_row_visible', count(*)::text from tenants where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+-- insert into check_results select 'suspended_tenant_memberships_visible', count(*)::text from tenant_memberships where tenant_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+--
+-- reset role;
+--
+-- -- Always revert — a fixture must never be left suspended.
+-- update tenants set status = 'active' where id = 'aaaaaaaa-0000-0000-0000-000000000001';
+--
+-- select * from check_results order by check_name;
+--
+-- Expected: current_tenant_ids_includes_suspended_tenant -> false;
+-- suspended_tenant_row_visible / suspended_tenant_memberships_visible -> 0.
+-- Verified live on 2026-09-14 (against the aaaaaaaa-5000-... FinanceBot
+-- fixture, since the original aaaaaaaa-0000-... fixture from section 1 had
+-- already been cleaned up between sessions by the time this fix landed —
+-- see docs/design/foundation-agent-backlog-audit.md for the exact run
+-- log and results).
+
+-- ============================================================
+-- 6. Cleanup — always run this after the suite, on a dev project.
 -- ============================================================
 -- delete from tenants where id in ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002');
 -- delete from auth.users where id in ('11111111-0000-0000-0000-000000000001', '22222222-0000-0000-0000-000000000002');

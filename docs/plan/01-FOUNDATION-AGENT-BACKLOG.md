@@ -23,7 +23,7 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-02.1 | `tenants` and `tenant_settings` | Done |
 | FOUNDATION-P0-02.2 | `users` and `tenant_memberships` | Done |
 | FOUNDATION-P0-02.3 | Roles, permissions, RBAC join tables | Done |
-| FOUNDATION-P0-02.4 | Row Level Security (higher bar) | Done |
+| FOUNDATION-P0-02.4 | Row Level Security (higher bar) | Done — `current_tenant_ids()` patched 2026-09-14 (migration `0039`) to also check `tenants.status`, closing a gap Platform Agent's tenant-suspension story surfaced; see audit log |
 | FOUNDATION-P0-02.5 | `getTenantContext()` helper | Done |
 | FOUNDATION-P0-03.1 | Email/password auth | Done |
 | FOUNDATION-P0-03.2 | Tenant selection / JIT provisioning | Done |
