@@ -420,73 +420,44 @@ A feature is complete only when:
 ## 13. UI/UX Design Standards
 
 WonderAgent is enterprise software that governs security-critical AI infrastructure.
-Every screen must read as a serious, premium enterprise product — never as a
-generic scaffolded CRUD app, a tutorial project, or an AI-generated placeholder UI.
-This section is binding for every module that ships UI (primarily Experience Agent,
-but also any module's own bare functional pages before Experience composes them).
+Every screen must read as a serious, premium enterprise security product — never as
+a generic scaffolded CRUD app, a dashboard-kit template, a consumer AI chatbot, or an
+AI-generated placeholder UI. This section is binding for every module that ships UI
+(primarily Experience Agent, but also any module's own bare functional pages before
+Experience composes them).
 
-### Visual language
+**The full, binding rule set is
+[`docs/design/UI-UX-DESIGN-RULES.md`](docs/design/UI-UX-DESIGN-RULES.md) — read it in
+full before starting any UI story.** It covers (among 34 numbered sections): the core
+design principles and the "would this look credible in front of a CISO?" quality bar;
+mandatory responsive behavior across large desktop/desktop/tablet/mobile with
+per-breakpoint layout guidance (not just shrinking desktop UI); mandatory light *and*
+dark mode via semantic design tokens (`background`, `surface`, `surface-elevated`,
+`border`, `text-primary/secondary/muted`, `accent`, `success`/`warning`/`danger`/
+`info`); visual language (what WonderAgent should and should not feel like); layout,
+navigation, tables, cards, forms, modals/drawers, loading/empty/error states,
+typography, accessibility, data visualization, graph visualization, security UX for
+consequential actions, and a mandatory pre-commit design-review checklist (visual,
+responsive at seven named widths, both themes, every interaction state, realistic
+data, security). Its §10 "Agent Detail Experience" and §11 "SHOULD vs CAN vs DID" are
+specific to WonderAgent's canonical model (§9 above) and must be followed exactly,
+not reinterpreted per module.
 
-- Sleek, elegant, subtle: restrained color palette (a small set of neutrals plus one
-  accent color for primary actions/brand, and semantic colors reserved strictly for
-  status — success/warning/critical/info); no rainbow of arbitrary colors, no heavy
-  drop shadows, no default browser-widget look.
-- Generous, consistent spacing on a single spacing scale (e.g. Tailwind's default
-  4px-based scale) — never ad hoc pixel values scattered per component.
-- One consistent type scale and weight system across the whole app (heading sizes,
-  body, caption, monospace for IDs/codes) — never mixed font sizes for the same
-  semantic role on different pages.
-- Subtle borders/elevation to separate content (hairline borders, low-opacity
-  shadows) rather than heavy card chrome everywhere.
-- Iconography from one consistent icon set (matching whatever Radix-compatible icon
-  library the Foundation/Experience Agent has already established) — never mixing
-  icon styles or using emoji as UI icons.
-- Data-dense views (tables, graphs) are the enterprise norm here — favor information
-  density with clear hierarchy over large marketing-style whitespace, but never let
-  density become clutter or unreadable line lengths.
-- Empty/zero-data states, loading states and error states are designed, not
-  afterthoughts — never a bare "undefined" or a blank white rectangle.
+That document is the source of truth for UI/UX; do not duplicate or restate its
+specifics here in a way that could drift out of sync with it. Three points from it
+are elevated here because they gate the Definition of Done (§12):
 
-### Responsiveness
-
-- Every screen must work correctly at three breakpoints at minimum: mobile (~375px),
-  tablet (~768px), and desktop (1280px+) — no horizontal scroll of the page body at
-  any width; wide tables/graphs scroll only within their own container.
-- Navigation must adapt (e.g. a collapsible rail or drawer below a documented
-  breakpoint, per EXPERIENCE-P0-01.2) rather than simply shrinking a desktop layout.
-- Touch targets on mobile/tablet must be usable (no desktop-only hover-only
-  affordances as the sole way to trigger an action).
-- Test responsiveness by actually resizing/viewing at each breakpoint before marking
-  a UI story `Done` — this is part of the Definition of Done (§12), not optional
-  polish.
-
-### Light and dark mode
-
-- Every screen must support both a light and a dark theme from the same component
-  set — never a dark-only or light-only screen, and never two divergent
-  implementations that drift out of sync.
-- Theme must be implemented via design tokens (CSS variables or a Tailwind theme
-  extension) consumed by every component — never per-component hardcoded hex colors
-  that only work in one mode.
-- Respect the user's OS/browser preference by default (`prefers-color-scheme`), with
-  an explicit manual override control persisted per user.
-- Contrast must remain accessible (WCAG AA at minimum) in both modes, especially for
-  status colors (critical/warning/success) that carry security meaning.
-
-### Consistency and componentization
-
+- Every UI story must pass that document's §32 Design Review checklist (visual,
+  responsive, themes, interaction, data, security) before being marked `Done`.
 - All UI is built from one shared design-system layer (`modules/ui/*`, owned by
   Experience Agent per the Ownership Map) — domain modules consume these primitives
-  (tables, cards, badges, side panels, empty states, skeleton loaders) rather than
-  hand-rolling their own per screen. A domain module's own "bare functional pages"
-  (built before Experience Agent composes the full shell) should still reuse
-  whatever shared primitives already exist rather than inventing divergent markup,
-  and should not be considered visually final — they are functional scaffolding
-  pending Experience Agent's pass per the module boundary in CLAUDE.md §2.
-- Never introduce a second component library, CSS framework, or competing
-  styling approach alongside Tailwind + Radix (Development Principles, §3).
-- Status/severity must always render with both a color AND a text/icon label —
-  never color alone (accessibility, and colorblind-safe by requirement).
+  rather than hand-rolling their own per screen. A domain module's own "bare
+  functional pages" (built before Experience Agent composes the full shell) should
+  still reuse whatever shared primitives already exist and are not considered
+  visually final — they are functional scaffolding pending Experience Agent's pass
+  per the module boundary in CLAUDE.md §2.
+- Never introduce a second component library, CSS framework, or competing styling
+  approach alongside Tailwind + Radix (Development Principles, §3).
 
 ---
 

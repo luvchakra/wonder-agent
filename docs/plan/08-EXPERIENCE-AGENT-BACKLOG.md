@@ -67,29 +67,36 @@ mounts into — get its route/slot contract right or every module's UI story bre
 ## Epic EXPERIENCE-P0-01 — Application Shell & Navigation
 
 Every story in this epic (and every other Experience Agent story) must follow
-`CLAUDE.md` §13 (UI/UX Design Standards) — modern enterprise visual language,
-mobile/tablet/desktop responsive, light **and** dark mode from day one, no generic
-scaffolded look. Read §13 in full before starting EXPERIENCE-P0-01.0.
+`docs/design/UI-UX-DESIGN-RULES.md` in full (referenced from `CLAUDE.md` §13) —
+the enterprise-grade quality bar (§2 of that doc: "would this look credible in
+front of a CISO?"), mandatory desktop/tablet/mobile responsiveness (§3), mandatory
+light **and** dark mode via semantic tokens (§4), and the pre-commit design-review
+checklist (§32). Read it in full before starting EXPERIENCE-P0-01.0.
 
 ### EXPERIENCE-P0-01.0 — Design tokens & theming foundation
 
 Before any screen is built, establish the shared design-token layer every other
-Experience story and every domain module's bare pages consume:
+Experience story and every domain module's bare pages consume, per
+`docs/design/UI-UX-DESIGN-RULES.md` §4:
 
 - A single source of truth for color, spacing, radius, shadow and typography
   tokens (CSS variables or a Tailwind theme extension), covering both a light and a
-  dark palette per `CLAUDE.md` §13 — neutrals, one accent color, and semantic
-  status colors (success/warning/critical/info) that stay WCAG AA-contrasted in
-  both modes.
+  dark palette, using the semantic token names that document specifies —
+  `background`, `surface`, `surface-elevated`, `border`, `text-primary`,
+  `text-secondary`, `text-muted`, `accent`, `success`, `warning`, `danger`, `info`
+  — each WCAG AA-contrasted in both modes. Dark mode is designed intentionally
+  (sophisticated neutral surfaces, not pure black), not produced by inverting light
+  mode.
 - Theme resolution: default to the visitor's `prefers-color-scheme`, with an
   explicit light/dark/system toggle in the user menu, persisted per user (e.g. a
   cookie or `localStorage` value read before first paint to avoid a flash of the
   wrong theme).
 - `modules/ui/*` primitives (badges, cards, tables, side panels, buttons, inputs)
   are built or refactored to consume these tokens exclusively — no hardcoded hex
-  colors in component code.
-- One consistent type scale and one icon set (document the choice here or in the
-  audit log) adopted across every primitive.
+  colors in component code. Verify hover/selected/disabled states and badges in
+  both themes, not just the default static appearance.
+- One consistent, restrained type scale and one icon set (document the choice here
+  or in the audit log) adopted across every primitive.
 
 This story blocks EXPERIENCE-P0-01.1 — the shell must be built on top of these
 tokens, not styled ad hoc and retrofitted later.
@@ -132,8 +139,9 @@ wholly separate layout Platform Agent owns.
 Left nav collapses to an icon rail or a drawer below a defined breakpoint (document
 the breakpoint chosen, e.g. 1024px, in this file's next revision or the audit log).
 No horizontal scroll of the page body at any width down to 375px; tables that must
-stay wide scroll within their own container. Verify at three breakpoints minimum —
-mobile (~375px), tablet (~768px), desktop (1280px+) — per `CLAUDE.md` §13.
+stay wide scroll within their own container. Verify at the widths named in
+`docs/design/UI-UX-DESIGN-RULES.md` §32: 1440px, 1280px, 1024px, 768px, 390px,
+375px.
 
 ### EXPERIENCE-P0-01.3 — Loading/empty/error states & skeleton loaders
 
