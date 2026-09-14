@@ -12,19 +12,18 @@
 Status values: **Done** (acceptance criteria met and verified), **Partial**
 (built but with a known, documented gap), **Deferred** (not started, not
 blocking other agents), **Not Started**. Update this table in the same commit
-that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. This
-agent is dormant; every story is Not Started until "Run Experience Agent" is
-issued.
+that finishes, defers, or picks back up a story — see `CLAUDE.md` §4. Detail
+for every row is in `docs/design/experience-agent-backlog-audit.md`.
 
 | Story | Title | Status |
 |---|---|---|
-| EXPERIENCE-P0-01.0 | Design tokens & theming foundation (light/dark) | Not Started |
-| EXPERIENCE-P0-01.1 | Shell layout | Not Started |
-| EXPERIENCE-P0-01.2 | Responsive behavior | Not Started |
-| EXPERIENCE-P0-01.3 | Loading/empty/error states & skeleton loaders | Not Started |
-| EXPERIENCE-P0-02.1 | Overview dashboard cards | Not Started |
-| EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Not Started |
-| EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Not Started |
+| EXPERIENCE-P0-01.0 | Design tokens & theming foundation (light/dark) | Partial — tokens/theme toggle real and working; no authenticated real-browser visual verification performed (sandbox constraint, see audit log) |
+| EXPERIENCE-P0-01.1 | Shell layout | Done — every existing route moved under the shell; two missing index pages (`/risk`, `/runtime`) found and fixed |
+| EXPERIENCE-P0-01.2 | Responsive behavior | Partial — nav collapses below 1024px; not manually verified at all six named widths with real screenshots |
+| EXPERIENCE-P0-01.3 | Loading/empty/error states & skeleton loaders | Partial — primitives built and used on new pages; not yet retrofitted into every existing domain module page |
+| EXPERIENCE-P0-02.1 | Overview dashboard cards | Done — all nine cards, real queries, parallel fetch |
+| EXPERIENCE-P0-02.2 | Risk trend charts & action queue | Done |
+| EXPERIENCE-P0-03 | Domain Screens (Agent/Access/Runtime/Rogue/Certification/etc.) | Partial — only new Risk/Runtime index pages built; every other domain module's existing bare page is unrestyled and the PRD's specific worked layouts (Agent Detail/Risk/Rogue) are not implemented — substantial remaining work, see audit log |
 
 ---
 

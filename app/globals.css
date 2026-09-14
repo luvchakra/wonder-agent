@@ -1,26 +1,99 @@
 @import "tailwindcss";
 
+/*
+ * EXPERIENCE-P0-01.0. Semantic design tokens, per
+ * docs/design/UI-UX-DESIGN-RULES.md §4 — light palette on :root, dark
+ * palette applied both via prefers-color-scheme (system default) and via
+ * [data-theme="dark"] (explicit user override, set by ThemeToggle).
+ * Sophisticated neutral surfaces, not pure black/white extremes.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-background: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+  --color-border: #e2e4e9;
+  --color-text-primary: #14161a;
+  --color-text-secondary: #4b5262;
+  --color-text-muted: #8890a0;
+  --color-accent: #3454d1;
+  --color-accent-foreground: #ffffff;
+  --color-success: #1a8754;
+  --color-warning: #b0730a;
+  --color-danger: #c93b3b;
+  --color-info: #3172c9;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  --shadow-sm: 0 1px 2px rgba(20, 22, 26, 0.06);
+  --shadow-md: 0 4px 12px rgba(20, 22, 26, 0.08);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-background: #0f1115;
+    --color-surface: #171a21;
+    --color-surface-elevated: #1e222b;
+    --color-border: #2b3040;
+    --color-text-primary: #eef0f4;
+    --color-text-secondary: #a8afc0;
+    --color-text-muted: #6b7284;
+    --color-accent: #6d8bff;
+    --color-accent-foreground: #0f1115;
+    --color-success: #33c481;
+    --color-warning: #e0a83f;
+    --color-danger: #f0685f;
+    --color-info: #5aa2f0;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-background: #0f1115;
+  --color-surface: #171a21;
+  --color-surface-elevated: #1e222b;
+  --color-border: #2b3040;
+  --color-text-primary: #eef0f4;
+  --color-text-secondary: #a8afc0;
+  --color-text-muted: #6b7284;
+  --color-accent: #6d8bff;
+  --color-accent-foreground: #0f1115;
+  --color-success: #33c481;
+  --color-warning: #e0a83f;
+  --color-danger: #f0685f;
+  --color-info: #5aa2f0;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-border: var(--color-border);
+  --color-text-primary: var(--color-text-primary);
+  --color-text-secondary: var(--color-text-secondary);
+  --color-text-muted: var(--color-text-muted);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-danger: var(--color-danger);
+  --color-info: var(--color-info);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background: var(--color-background);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+* {
+  border-color: var(--color-border);
 }
