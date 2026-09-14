@@ -26,7 +26,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-02.2 | Sync status & health surfaces | Done |
 | INTEGRATION-P0-03.1 | Configurable connector | Done — this is the connector the critical acceptance test runs against |
 | INTEGRATION-P0-03.2 | Object/field mapping UI | Done |
-| INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Partial — discovery done; tool `object_type` classification is a flagged judgment call pending Runtime Agent |
+| INTEGRATION-P0-04.1 | MCP server registration & tool discovery | Done — 2026-09-14: `object_type` classification question resolved now that Runtime Agent's `runtime_tools` model exists — confirmed to be a genuinely different concept (DID-only, populated solely from observed runtime events) from MCP discovery-time data, so `entitlement` remains the correct classification; see audit log |
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |

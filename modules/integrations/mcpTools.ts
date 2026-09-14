@@ -11,9 +11,14 @@ import type { IntegrationObject } from "@/lib/shared/types/integrations";
  * INTEGRATION-P0-04.1. Discovers an MCP server's declared tools and
  * persists them as integration_objects (object_type 'entitlement' — closest
  * fit among the existing enum values for "a capability the agent may be
- * granted," pending Runtime Agent's own runtime_tools model; recorded as an
- * open question in the Integration Agent audit log rather than guessed at
- * silently, per the backlog's own instruction).
+ * granted"). This question was originally left flagged pending Runtime
+ * Agent's own runtime_tools model; now that it exists
+ * (modules/runtime-assurance/events.ts), it's confirmed to be a different
+ * concept entirely — runtime_tools is populated only from observed runtime
+ * events (DID: a tool the agent actually invoked), never from a
+ * capability-discovery step, so it was never the right destination for
+ * pre-usage MCP discovery data. 'entitlement' remains the correct
+ * classification; see the Integration Agent audit log for the resolution.
  *
  * Tool -> agent association is deliberately NOT implemented here: per this
  * module's "consumes Identity Agent's agents list read-only; does not

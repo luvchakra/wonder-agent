@@ -337,3 +337,34 @@ story's acceptance criteria are actually about.
 run` — 94/94 passing (4 new). No schema change (no new migration) — this is
 a pure application-logic change to already-`Done` code, scoped exactly to
 what INTEGRATION-P0-05.1 asked for and nothing else.
+
+## 2026-09-14 — INTEGRATION-P0-04.1: MCP tool object_type question resolved
+
+**Agent:** Integration Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Picked up as part of a full sweep of every module's Partial/Deferred items,
+starting from the first agent in run order.
+
+INTEGRATION-P0-04.1's original flag ("object_type classification is a
+flagged judgment call pending Runtime Agent") is now resolvable: Runtime
+Agent's `runtime_tools` table exists (`supabase/migrations/0032_runtime_events.sql`).
+Inspected its actual write path
+(`modules/runtime-assurance/events.ts` — the `input.tool` branch of
+`ingestRuntimeEvent()`): a `runtime_tools` row is only ever upserted from
+an *observed runtime event* (DID — a tool the agent actually invoked at
+runtime), never from a capability-discovery step. This confirms
+`runtime_tools` was never the right shape for `discoverMcpTools()`'s data
+(tools an MCP server *declares*, before any agent has invoked them) — the
+two are genuinely different concepts (available capability vs. observed
+usage), not the same thing modeled two ways. `object_type = 'entitlement'`
+on `integration_objects` remains the correct classification and needs no
+change. Updated the comment in `modules/integrations/mcpTools.ts` to
+record this resolution in place of the old "pending Runtime Agent" note.
+
+**Verified:** `npm run typecheck`, `npm run lint`, `npx vitest run`
+(139/139, unchanged) — comment-only change, no behavior change, so no
+migration or new test was needed.
+
+INTEGRATION-P0-04.1 moves to `Done` in the Progress Tracker.
+INTEGRATION-P0-02.1 (Saviynt REST adapter) remains `Partial` — its
+response-field-name verification is blocked on a live Saviynt tenant this
+sandbox has no access to and no way to simulate faithfully; unchanged.
