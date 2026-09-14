@@ -200,3 +200,90 @@ baseline and treat live-tenant verification as an explicit customer-onboarding
 step outside this repository's build (i.e., not something any sandbox agent
 can complete without a real Saviynt tenant regardless of documentation
 access). No code or backlog status was changed while this remains open.
+
+---
+
+## 2026-09-14 — Saviynt connector corrected against the real API reference (option (a) above)
+
+The user pasted the actual "Saviynt Enterprise Identity Cloud API Reference
+v24.2" product documentation directly into the conversation, resolving the
+blocker above (option (a): paste the relevant details). This is a real,
+substantive correction, not a re-guess — the reference document confirms
+concrete request shapes, though it does not show response body schemas
+anywhere (it is a Postman collection export — request examples only).
+
+**Corrected, with verification:**
+- **Endpoint paths** (all confirmed real, under `/ECM/api/v5/`): `getUser`
+  (identities), `getAccounts` (accounts), `getEntitlements` (entitlements),
+  `getSecuritySystems` (policies, see caveat below). **One path was
+  actually wrong and is now fixed**: `applications` was
+  `/ECM/api/v5/getApplications`, which does not exist in Saviynt's real API
+  — the correct endpoint is `getEndpoints` (Saviynt's own term for what
+  WonderAgent calls an "application" is "Endpoint," a child of a "Security
+  System"). `access` (account-entitlement associations) now uses
+  `getEntDetailsforUsers`, a real, paginated, flat user+account+entitlement
+  endpoint — the connector previously invented a nonexistent
+  `getAccountEntitlements` path.
+- **Pagination mechanism — the single biggest correction**: every Saviynt
+  list endpoint is a `POST` request with `max`/`offset` pagination
+  parameters inside the JSON request body, not `GET` with query-string
+  pagination as the connector previously assumed (and as
+  `RestHttpClient.fetchAllPages()` only supports). Added
+  `RestHttpClient.post()` and `RestHttpClient.postAllPages()`
+  (`modules/integrations/connectors/restHttpClient.ts`) as new, additive
+  methods — `fetchAllPages()`/`get()` are unchanged, so the Generic REST
+  connector (which the module's own critical acceptance test actually
+  exercises) is unaffected. `SaviyntConnector` now calls `postAllPages()`
+  exclusively.
+- **Auth flow confirmed**: `POST /ECM/api/login` with
+  `{"username","password"}` returns a token; every other call sends
+  `Authorization: Bearer <token>` — this matches the connector's existing
+  `authType: "bearer"` choice exactly, so no change was needed there. The
+  connector still does not perform the username/password exchange itself
+  (consistent with every other connector never handling raw end-user
+  credentials); `secret` is expected to already be a valid token, stored
+  via Integration's existing `encryptSecret()` credential path.
+- **Field-name guesses improved, not just re-asserted**: the reference
+  document's own worked request-body examples repeatedly show the same
+  object shapes as literal JSON (e.g. `getChildEntitlements`'s example body
+  contains `{"endpointkey":"1","endpointname":"AWS",...}`), and Saviynt's
+  documented filter/query-parameter names for each object type are
+  consistent throughout (`entitlement_value`/`entitlementtype` for
+  entitlements, not the previous guess of `entitlementname`; `name` for an
+  account's own name field, not `accountname` — that term is actually only
+  used as a request parameter in provisioning calls, not the object's own
+  field). Updated all six `import*()` methods' field-normalization
+  fallback chains accordingly.
+
+**Still flagged, honestly, not resolved by this pass**: the reference is a
+request-shape document; it never shows a response body anywhere. The field
+names above are now grounded in the platform's own consistent naming
+convention (a real improvement over generic REST-API guessing) but remain
+unconfirmed against an actual tenant's JSON response, including the
+response envelope itself (Saviynt commonly wraps list results under a named
+key — `dataPath` is deliberately left unset/top-level in the connector
+until that key is confirmed, rather than guessing one). Saviynt's core
+Identity Administration API also has no generic "list of governance
+policies" endpoint — `getSecuritySystems` remains the closest real,
+confirmed, paginated list-all endpoint used for `importPolicies()`, not an
+exact conceptual match; the reference's actual Segregation-of-Duties
+ruleset/violation APIs (§8.0) and per-target-system "technical rules" APIs
+are better conceptual fits but have distinct, purpose-specific shapes that
+don't map cleanly onto `NormalizedPolicy` — left as a dedicated future
+story rather than forced into this shape.
+
+**Verification:** `npm run lint`/`typecheck`/`build` clean; `npm run test`
+53/53 passing (two new `restHttpClient.test.ts` cases proving
+`postAllPages()` sends `max`/`offset` in the POST body, merges a caller-
+supplied base body, includes the Bearer/Content-Type headers, and stops on
+a short page). No live Saviynt tenant exists to test against in this
+sandbox, so end-to-end confirmation still requires a real tenant — this
+pass is a documentation-grounded correction of previously-invented
+mechanics, not a live-tenant proof.
+
+**Progress Tracker updated**: INTEGRATION-P0-02.1 moves from "Partial —
+built against documented conventions, not verified against a live Saviynt
+tenant" to "Partial — endpoint paths/HTTP method/pagination/auth verified
+against Saviynt's real API reference; response field names still
+unconfirmed against a live tenant" — an honest, real improvement, not a
+close-out, since response schemas remain unverified.

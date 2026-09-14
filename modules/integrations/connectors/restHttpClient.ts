@@ -64,6 +64,16 @@ export class RestHttpClient {
     return fetch(url, { headers: this.authHeaders() });
   }
 
+  async post(path: string, body: Record<string, unknown>): Promise<Response> {
+    await this.throttle();
+    const url = new URL(path, this.baseUrl);
+    return fetch(url, {
+      method: "POST",
+      headers: { ...this.authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  }
+
   private extractPath(body: unknown, dotPath?: string): unknown {
     if (!dotPath) return body;
     return dotPath.split(".").reduce<unknown>((acc, key) => {
@@ -122,6 +132,41 @@ export class RestHttpClient {
       const next = cursorPath ? this.extractPath(body, cursorPath) : undefined;
       if (!next || typeof next !== "string") break;
       cursor = next;
+    }
+    return results;
+  }
+
+  /**
+   * Saviynt's Enterprise Identity Cloud list APIs (getUser, getAccounts,
+   * getEntitlements, getEndpoints, getSecuritySystems, getEntDetailsforUsers
+   * — verified against Saviynt Enterprise Identity Cloud API Reference
+   * v24.2) are POST endpoints that take their filter/pagination parameters
+   * (`max`/`offset`) in a JSON request body, not GET with query-string
+   * pagination — a materially different mechanism than the offset/cursor
+   * GET pagination above, which Generic REST connectors use. This method is
+   * additive; it does not change `get()`/`fetchAllPages()`'s existing
+   * GET-based contract that Generic REST still relies on.
+   */
+  async postAllPages(
+    endpointPath: string,
+    baseBody: Record<string, unknown>,
+    options: { pageParam?: string; sizeParam?: string; pageSize?: number; dataPath?: string } = {},
+  ): Promise<Record<string, unknown>[]> {
+    const pageParam = options.pageParam ?? "offset";
+    const sizeParam = options.sizeParam ?? "max";
+    const pageSize = options.pageSize ?? 100;
+    const dataPath = options.dataPath;
+    const results: Record<string, unknown>[] = [];
+
+    let offset = 0;
+    for (;;) {
+      const res = await this.post(endpointPath, { ...baseBody, [pageParam]: offset, [sizeParam]: pageSize });
+      if (!res.ok) throw new Error(`POST ${endpointPath} failed: HTTP ${res.status}`);
+      const data = this.extractPath(await res.json(), dataPath);
+      const items = Array.isArray(data) ? (data as Record<string, unknown>[]) : [];
+      results.push(...items);
+      if (items.length < pageSize) break;
+      offset += pageSize;
     }
     return results;
   }

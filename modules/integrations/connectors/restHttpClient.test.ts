@@ -100,4 +100,42 @@ describe("RestHttpClient", () => {
     const client = new RestHttpClient("https://api.example.test", "bearer", "t", {}, "x-api-key", 1000);
     await expect(client.fetchAllPages("/things")).rejects.toThrow("HTTP 500");
   });
+
+  it("postAllPages POSTs max/offset in the JSON body and stops on a short page (Saviynt's real pagination mechanism)", async () => {
+    const pages = [
+      Array.from({ length: 2 }, (_, i) => ({ id: `a${i}` })),
+      [{ id: "b0" }], // short page — stop here
+    ];
+    let call = 0;
+    const fetchMock = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
+      const body = JSON.parse(init.body as string);
+      expect(body).toMatchObject({ offset: call * 2, max: 2 });
+      const page = pages[call];
+      call += 1;
+      return Promise.resolve(jsonResponse(page));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new RestHttpClient("https://api.example.test", "bearer", "tok", {}, "x-api-key", 1000);
+    const records = await client.postAllPages("/ECM/api/v5/getUser", {}, { pageSize: 2 });
+
+    expect(records).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [, firstInit] = fetchMock.mock.calls[0];
+    expect(firstInit.method).toBe("POST");
+    expect(firstInit.headers.Authorization).toBe("Bearer tok");
+    expect(firstInit.headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("postAllPages merges baseBody with pagination params on every page", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new RestHttpClient("https://api.example.test", "bearer", "tok", {}, "x-api-key", 1000);
+    await client.postAllPages("/ECM/api/v5/getAccounts", { advsearchcriteria: { status: "ACTIVE" } });
+
+    const [, init] = fetchMock.mock.calls[0];
+    const body = JSON.parse(init.body as string);
+    expect(body).toMatchObject({ advsearchcriteria: { status: "ACTIVE" }, offset: 0, max: 100 });
+  });
 });

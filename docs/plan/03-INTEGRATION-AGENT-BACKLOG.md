@@ -22,7 +22,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-01.2 | Schema (higher bar on credential storage) | Done |
 | INTEGRATION-P0-01.3 | `integration_sync_jobs` | Done |
 | INTEGRATION-P0-01.4 | Normalized object storage | Done |
-| INTEGRATION-P0-02.1 | Saviynt REST adapter | Partial — built against documented conventions, not verified against a live Saviynt tenant |
+| INTEGRATION-P0-02.1 | Saviynt REST adapter | Partial — endpoint paths/HTTP method/pagination/auth verified against Saviynt's real API reference; response field names still unconfirmed against a live tenant |
 | INTEGRATION-P0-02.2 | Sync status & health surfaces | Done |
 | INTEGRATION-P0-03.1 | Configurable connector | Done — this is the connector the critical acceptance test runs against |
 | INTEGRATION-P0-03.2 | Object/field mapping UI | Done |

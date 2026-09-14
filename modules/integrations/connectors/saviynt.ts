@@ -10,40 +10,81 @@ import type {
   NormalizedIdentity,
   NormalizedPolicy,
 } from "@/lib/shared/types/integrations";
-import { RestHttpClient, type PaginationConfig } from "./restHttpClient";
+import { RestHttpClient } from "./restHttpClient";
 
 /**
  * INTEGRATION-P0-02.1. READ-ONLY in P0 — createAccessRequest/removeAccess/
  * importActivity are deliberately absent from capabilities (P1).
  *
- * IMPORTANT, flagged rather than silently assumed: Saviynt's REST API shape
- * (exact endpoint paths, field names, and auth flow) varies by deployment
- * and API version. This connector is built against Saviynt's commonly
- * documented conventions (a bearer-token-authenticated, paginated REST API
- * with configurable endpoint paths per object type) using the same
- * mechanics as the Generic REST connector, but its endpoint paths and field
- * mappings below are defaults, not a verified integration against a live
- * Saviynt tenant — this sandbox has no Saviynt instance to test against.
- * Before production use against a real customer tenant, confirm the actual
- * endpoint paths and response field names for that tenant's Saviynt version
- * and adjust `config.endpoints`/the field-normalization functions below
- * accordingly. This module's critical acceptance test
- * (docs/plan/03-INTEGRATION-AGENT-BACKLOG.md) is satisfied via the Generic
- * REST connector against a mock/test API, exactly as the backlog specifies —
- * it does not require a live Saviynt connection.
+ * Verified against the user-provided "Saviynt Enterprise Identity Cloud API
+ * Reference v24.2" (the real product documentation — an earlier attempt to
+ * fetch it from documenter.getpostman.com was blocked by this sandbox's
+ * egress policy; see docs/design/integration-agent-backlog-audit.md,
+ * "Attempted Saviynt API doc verification" and the follow-up entry once
+ * the user pasted the reference directly). This resolved the endpoint
+ * paths, HTTP method, and pagination mechanism below — all previously
+ * unverified guesses.
  *
- * A later attempt to verify this connector against Saviynt's real API
- * documentation was blocked by this sandbox's network egress policy (see
- * docs/design/integration-agent-backlog-audit.md, "Attempted Saviynt API doc
- * verification") — the endpoints/field names below remain unverified.
+ * What the reference confirms:
+ * - Base URL pattern: `{{url}}/ECM/{{path}}/apiName`, where `{{path}}` is
+ *   `api/v5` for SSM 5.2+ (used here) or `api` for older versions.
+ * - Auth: `POST {{url}}/ECM/api/login` with `{"username","password"}` in
+ *   the body returns a Token; every other call sends
+ *   `Authorization: Bearer <token>` — matches this connector's existing
+ *   `authType: "bearer"` choice, so `secret` is expected to already be a
+ *   valid Saviynt API token obtained/refreshed out of band (via that login
+ *   call or `POST /ECM/oauth/access_token`) and stored the same way every
+ *   other connector's credential is stored (Integration Agent's
+ *   `encryptSecret()`) — this connector does not itself perform the
+ *   username/password exchange, consistent with every other connector in
+ *   this module never handling raw end-user credentials directly.
+ * - **The list endpoints are `POST` requests with `max`/`offset` pagination
+ *   parameters in the JSON request body — not `GET` with query-string
+ *   pagination.** This was the single biggest correction: the connector
+ *   previously used `RestHttpClient.fetchAllPages()` (GET-only). It now
+ *   uses the new `RestHttpClient.postAllPages()` (added alongside this fix)
+ *   instead.
+ * - Real, confirmed endpoint paths (all under `/ECM/api/v5/`): `getUser`
+ *   (identities), `getAccounts` (accounts), `getEndpoints` (applications —
+ *   Saviynt's own term for what WonderAgent calls an "application" is
+ *   "Endpoint," a child of a "Security System"), `getEntitlements`
+ *   (entitlements), `getEntDetailsforUsers` (a flat, paginated
+ *   user+account+entitlement response — used for "access," since it is the
+ *   one bulk, paginated endpoint that returns account-entitlement
+ *   associations without requiring a specific username up front, unlike
+ *   `getAccessDetailsForUser` which mandates one).
+ * - **Flagged, not silently assumed**: Saviynt's core Identity
+ *   Administration API (this reference's scope) has no generic "list of
+ *   governance policies" endpoint — its closest concepts are Segregation-
+ *   of-Duties rulesets/violations (`8.0 Segregation of Duties` in the
+ *   reference) and per-target-system "technical rules," both with
+ *   different, purpose-specific shapes, not a flat named-policy list.
+ *   `getSecuritySystems` (a real, paginated, list-all endpoint) is kept as
+ *   the closest working analog — a named top-level system boundary — since
+ *   it is a real, confirmed endpoint rather than an invented one; mapping
+ *   Saviynt's actual SOD rulesets into `NormalizedPolicy` is a better fit
+ *   left for a dedicated future story once that's actually needed.
+ * - **What remains unverified**: this reference documents request shapes
+ *   (it is a Postman collection export) but does not show response body
+ *   schemas anywhere. The field names below (`username`, `name` for an
+ *   account, `entitlement_value`/`entitlementtype` for an entitlement,
+ *   `endpointname`/`endpointkey` for an endpoint, `systemname` for a
+ *   security system) are inferred from the field names Saviynt's own
+ *   request/filter parameters and object-literal examples use consistently
+ *   throughout the reference (e.g. `getChildEntitlements`'s worked example
+ *   body literally contains `{"endpointkey":"1","endpointname":"AWS",...}`
+ *   as an object shape) — a much better-grounded inference than the
+ *   previous "commonly documented REST conventions" guess, but still not a
+ *   confirmed live response payload. Confirm against an actual tenant
+ *   response before production use.
  *
  * Config shape:
  * {
  *   baseUrl: string,
  *   endpoints?: { identities?, accounts?, applications?, entitlements?, access?, policies?: string },
- *   pagination?: PaginationConfig,   // default: offset style, dataPath 'results'
+ *   pageSize?: number,   // default 100, per getEntDetailsforUsers' documented default
  * }
- * secret: a Saviynt API bearer token.
+ * secret: a Saviynt API bearer token (see auth note above).
  */
 export class SaviyntConnector implements ConnectorAdapter {
   readonly capabilities: ConnectorCapabilities = {
@@ -64,19 +105,13 @@ export class SaviyntConnector implements ConnectorAdapter {
   private static readonly DEFAULT_ENDPOINTS: Record<string, string> = {
     identities: "/ECM/api/v5/getUser",
     accounts: "/ECM/api/v5/getAccounts",
-    applications: "/ECM/api/v5/getApplications",
+    applications: "/ECM/api/v5/getEndpoints",
     entitlements: "/ECM/api/v5/getEntitlements",
-    access: "/ECM/api/v5/getAccountEntitlements",
+    access: "/ECM/api/v5/getEntDetailsforUsers",
     policies: "/ECM/api/v5/getSecuritySystems",
   };
 
-  private static readonly DEFAULT_PAGINATION: PaginationConfig = {
-    style: "offset",
-    pageParam: "page",
-    sizeParam: "max",
-    pageSize: 100,
-    dataPath: "results",
-  };
+  private static readonly DEFAULT_PAGE_SIZE = 100;
 
   async authenticate(config: ConnectorConfig, secret: string | null): Promise<void> {
     if (!config.baseUrl || typeof config.baseUrl !== "string") {
@@ -88,7 +123,7 @@ export class SaviyntConnector implements ConnectorAdapter {
 
   async testConnection(): Promise<{ ok: boolean; message?: string }> {
     try {
-      const res = await this.client.get(this.endpoint("applications"));
+      const res = await this.client.post(this.endpoint("policies"), { max: 1, offset: 0 });
       return res.ok ? { ok: true } : { ok: false, message: `HTTP ${res.status}` };
     } catch (err) {
       return { ok: false, message: err instanceof Error ? err.message : "Unknown error" };
@@ -104,22 +139,30 @@ export class SaviyntConnector implements ConnectorAdapter {
     return endpoints[key];
   }
 
-  private pagination(): PaginationConfig {
-    return (this.config.pagination as PaginationConfig | undefined) ?? SaviyntConnector.DEFAULT_PAGINATION;
+  private pageSize(): number {
+    return (this.config.pageSize as number | undefined) ?? SaviyntConnector.DEFAULT_PAGE_SIZE;
   }
 
-  private async fetchAll(key: string): Promise<Record<string, unknown>[]> {
-    return this.client.fetchAllPages(this.endpoint(key), this.pagination());
+  /**
+   * Every list endpoint here is POST + `max`/`offset` in the body, per the
+   * verified reference — see this class's docblock. `dataPath` is left
+   * unset (top-level array) since the actual response envelope key is one
+   * of the still-unverified details noted above; adjust once confirmed
+   * against a live tenant (Saviynt commonly wraps list responses in a
+   * named key rather than a bare array — expect to set this).
+   */
+  private async fetchAll(key: string, extraBody: Record<string, unknown> = {}): Promise<Record<string, unknown>[]> {
+    return this.client.postAllPages(this.endpoint(key), extraBody, { pageSize: this.pageSize() });
   }
 
   async importIdentities(): Promise<ImportedRecord<NormalizedIdentity>[]> {
     const raw = await this.fetchAll("identities");
     return raw.map((r) => ({
-      externalId: String(r.username ?? r.accountname ?? r.id),
+      externalId: String(r.username ?? r.id),
       raw: r,
       normalized: {
-        externalId: String(r.username ?? r.accountname ?? r.id),
-        displayName: (r.displayname as string) ?? (r.fullname as string),
+        externalId: String(r.username ?? r.id),
+        displayName: (r.displayname as string) ?? (r.firstname && r.lastname ? `${r.firstname} ${r.lastname}` : undefined),
         email: r.email as string | undefined,
         identityType: "service_account",
       },
@@ -129,11 +172,11 @@ export class SaviyntConnector implements ConnectorAdapter {
   async importAccounts(): Promise<ImportedRecord<NormalizedAccount>[]> {
     const raw = await this.fetchAll("accounts");
     return raw.map((r) => ({
-      externalId: String(r.accountname ?? r.name ?? r.id),
+      externalId: String(r.name ?? r.accountID ?? r.id),
       raw: r,
       normalized: {
-        externalId: String(r.accountname ?? r.name ?? r.id),
-        application: String(r.endpointname ?? r.application ?? ""),
+        externalId: String(r.name ?? r.accountID ?? r.id),
+        application: String(r.endpoint ?? r.endpointname ?? ""),
         owner: r.accountowner as string | undefined,
         entitlements: Array.isArray(r.entitlements)
           ? (r.entitlements as unknown[]).map((e) => String(e))
@@ -145,12 +188,12 @@ export class SaviyntConnector implements ConnectorAdapter {
   async importApplications(): Promise<ImportedRecord<NormalizedApplication>[]> {
     const raw = await this.fetchAll("applications");
     return raw.map((r) => ({
-      externalId: String(r.endpointkey ?? r.id),
+      externalId: String(r.endpointkey ?? r.endpointname ?? r.id),
       raw: r,
       normalized: {
-        externalId: String(r.endpointkey ?? r.id),
-        name: String(r.endpointname ?? r.displayname ?? r.name ?? ""),
-        category: r.applicationtype as string | undefined,
+        externalId: String(r.endpointkey ?? r.endpointname ?? r.id),
+        name: String(r.endpointname ?? r.displayName ?? ""),
+        category: (r.connectionType as string) ?? undefined,
       },
     }));
   }
@@ -158,12 +201,12 @@ export class SaviyntConnector implements ConnectorAdapter {
   async importEntitlements(): Promise<ImportedRecord<NormalizedEntitlement>[]> {
     const raw = await this.fetchAll("entitlements");
     return raw.map((r) => ({
-      externalId: String(r.entitlementname ?? r.id),
+      externalId: String(r.entitlement_valuekey ?? r.entitlementID ?? r.entitlement_value ?? r.id),
       raw: r,
       normalized: {
-        externalId: String(r.entitlementname ?? r.id),
-        application: String(r.endpointname ?? r.application ?? ""),
-        name: String(r.entitlementname ?? r.displayname ?? ""),
+        externalId: String(r.entitlement_valuekey ?? r.entitlementID ?? r.entitlement_value ?? r.id),
+        application: String(r.endpoint ?? r.endpointname ?? ""),
+        name: String(r.entitlement_value ?? r.displayname ?? ""),
         dataClassification: r.dataclassification as string | undefined,
         privilegeLevel: (r.privilegelevel as "standard" | "elevated" | "admin") ?? "standard",
       },
@@ -173,12 +216,12 @@ export class SaviyntConnector implements ConnectorAdapter {
   async importAccess(): Promise<ImportedRecord<NormalizedAccessGrant>[]> {
     const raw = await this.fetchAll("access");
     return raw.map((r, i) => ({
-      externalId: String(r.id ?? `${r.accountname}-${r.entitlementname}-${i}`),
+      externalId: String(r.id ?? `${r.username ?? r.accountname}-${r.entitlement_value ?? r.entitlementname}-${i}`),
       raw: r,
       normalized: {
-        externalId: String(r.id ?? `${r.accountname}-${r.entitlementname}-${i}`),
-        accountExternalId: String(r.accountname ?? ""),
-        entitlementExternalId: String(r.entitlementname ?? ""),
+        externalId: String(r.id ?? `${r.username ?? r.accountname}-${r.entitlement_value ?? r.entitlementname}-${i}`),
+        accountExternalId: String(r.accountname ?? r.username ?? ""),
+        entitlementExternalId: String(r.entitlement_value ?? r.entitlementname ?? ""),
         grantType: (r.assignmenttype as string) ?? "direct",
       },
     }));
@@ -187,11 +230,11 @@ export class SaviyntConnector implements ConnectorAdapter {
   async importPolicies(): Promise<ImportedRecord<NormalizedPolicy>[]> {
     const raw = await this.fetchAll("policies");
     return raw.map((r) => ({
-      externalId: String(r.id ?? r.securitysystemname),
+      externalId: String(r.systemname ?? r.id),
       raw: r,
       normalized: {
-        externalId: String(r.id ?? r.securitysystemname),
-        name: String(r.securitysystemname ?? r.name ?? ""),
+        externalId: String(r.systemname ?? r.id),
+        name: String(r.systemname ?? r.name ?? ""),
         description: r.description as string | undefined,
       },
     }));
