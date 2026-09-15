@@ -1,9 +1,10 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardBody } from "@/modules/ui";
+import { Card, CardBody, LinkButton } from "@/modules/ui";
 import { RiskAgentsTable } from "./RiskAgentsTable";
 
 // Composition-only index over Identity's agents + Risk's findings, per
@@ -38,7 +39,24 @@ export default async function RiskIndexPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-foreground">Risk</h1>
+      <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
+        <Link href="/" className="hover:text-foreground hover:underline">
+          Overview
+        </Link>
+        <span aria-hidden> / </span>
+        <span className="text-foreground">Risk &amp; Compliance</span>
+      </nav>
+
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">Risk</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Agents with open risk findings, worst severity first.</p>
+        </div>
+        <LinkButton href="/risk/rogue" variant="outline" size="sm">
+          Rogue agents
+        </LinkButton>
+      </div>
+
       <Card>
         <CardBody>
           <RiskAgentsTable rows={rows} />

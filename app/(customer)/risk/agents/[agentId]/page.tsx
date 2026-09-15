@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { evaluateAgentRiskAction, assignFindingAction, resolveFindingAction, transitionFindingStatusAction } from "@/app/actions/risk";
 import { RemediateFindingButton } from "./RemediateFindingButton";
 import { FindingEvidenceTrigger, FindingEvidenceDrawer } from "./FindingEvidenceDrawer";
-import { Badge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
+import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
 
 const inputClass =
   "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
@@ -75,7 +75,7 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
                     <div className="flex flex-wrap items-center gap-2">
                       <SeverityBadge severity={f.severity} />
                       <Badge tone="neutral">{f.category.replace(/_/g, " ")}</Badge>
-                      <Badge tone={isTerminal ? "success" : "warning"}>{f.status.replace(/_/g, " ")}</Badge>
+                      <StatusBadge tone={isTerminal ? "success" : "warning"}>{f.status.replace(/_/g, " ")}</StatusBadge>
                       <span className="ml-auto text-xs text-muted-foreground">Score {f.riskScore} · Evaluator v{f.evaluatorVersion}</span>
                     </div>
                     <h3 className="mt-2 text-sm font-semibold text-foreground">{f.title}</h3>
