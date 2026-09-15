@@ -17,10 +17,10 @@ export default async function OnboardingPage() {
 
   // Only auto-redirect a brand-new user with no memberships at all yet
   // (nothing to choose or switch between). A user who already has a
-  // tenant and navigates here explicitly — the "Create new tenant" link
-  // in the topbar's workspace switcher — is here on purpose, to create
-  // an *additional* tenant, so this must not bounce them straight back
-  // to "/" before they can reach the create-organization form below.
+  // tenant and navigates here explicitly — the "Create new organization"
+  // link in the topbar's workspace switcher — is here on purpose, to
+  // create an *additional* tenant, so this must not bounce them straight
+  // back to "/" before they can reach the create-organization form below.
   const ctx = await getTenantContext();
 
   const { data: memberships } = await supabase
@@ -44,7 +44,7 @@ export default async function OnboardingPage() {
 
       {memberships && memberships.length > 0 && (
         <Card>
-          <CardHeader title="Select a tenant" description="Switch to one of your existing organizations." />
+          <CardHeader title="Select an organization" description="Switch to one of your existing organizations." />
           <CardBody className="space-y-1">
             {memberships.map((m) => (
               <form action={selectTenantAction} key={m.tenant_id}>
@@ -65,7 +65,7 @@ export default async function OnboardingPage() {
       )}
 
       <Card>
-        <CardHeader title="Create a new tenant" description="Sets up a fresh, isolated organization you'll own as Tenant Super Admin." />
+        <CardHeader title="Create a new organization" description="Sets up a fresh, isolated organization you'll own as Tenant Super Admin." />
         <CardBody>
           <form action={createTenantAction} className="space-y-3">
             <TextField label="Organization name" name="name" required placeholder="Acme Corp" />

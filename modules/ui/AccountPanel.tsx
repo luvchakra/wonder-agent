@@ -1,5 +1,6 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import { ChevronsUpDown, LogOut, Shield, SunMoon, User } from "lucide-react";
@@ -15,14 +16,15 @@ export type TenantOption = { id: string; name: string; slug: string; current: bo
  * a compact avatar+name(+chevron) trigger row (no email until expanded),
  * opening upward into a name/email header, a divider, one icon+label row
  * per destination, and Log Out last as a plain row (not styled red —
- * WonderArk's own Log Out is a ghost button, not a destructive one).
- * Tenant switching now lives in the topbar (WorkspaceSwitcher) and the
- * drawer's own "Tenants" section (Nav.tsx), matching WonderArk's split
- * between BusinessSwitcher and AppSidebar's Businesses list — not
- * repeated a third time here. Menu contents otherwise stay scoped to
- * WonderAgent's real surfaces (Settings, Appearance, admin console) —
- * WonderArk's Usage/Billing items are that app's own domain, not carried
- * over into a screen that doesn't have them.
+ * WonderArk's own Log Out is a ghost button, not a destructive one), and
+ * invoked directly via onSelect/useTransition rather than a nested
+ * `<form>` (see WorkspaceSwitcher's comment for why that pattern silently
+ * drops the submission). Organization switching lives only in the
+ * topbar's WorkspaceSwitcher now — not repeated here. Menu contents
+ * otherwise stay scoped to WonderAgent's real surfaces (Settings,
+ * Appearance, admin console) — WonderArk's Usage/Billing items are that
+ * app's own domain, not carried over into a screen that doesn't have
+ * them.
  */
 export function AccountPanel({
   email,
@@ -36,6 +38,7 @@ export function AccountPanel({
   onSignOut: (formData: FormData) => void | Promise<void>;
 }) {
   const name = displayName?.trim() || email;
+  const [, startTransition] = useTransition();
 
   return (
     <div className="border-t border-sidebar-border">
@@ -92,14 +95,13 @@ export function AccountPanel({
 
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
 
-            <form action={onSignOut}>
-              <DropdownMenu.Item asChild>
-                <button type="submit" className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-left text-sm outline-none hover:bg-accent focus-visible:bg-accent">
-                  <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
-                  Log Out
-                </button>
-              </DropdownMenu.Item>
-            </form>
+            <DropdownMenu.Item
+              onSelect={() => startTransition(() => void onSignOut(new FormData()))}
+              className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent"
+            >
+              <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
+              Log Out
+            </DropdownMenu.Item>
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
