@@ -2,8 +2,24 @@
 
 import { useMemo } from "react";
 import Link from "next/link";
-import { Badge } from "@/modules/ui/Badge";
+import { StatusBadge, SeverityBadge, type BadgeTone } from "@/modules/ui/Badge";
 import { DataTable, useTableState, type DataTableColumn } from "@/modules/ui/DataTable";
+
+// Same mapping as app/(customer)/agents/[id]/page.tsx's LIFECYCLE_TONE —
+// kept in sync manually since it's a small, list-vs-detail presentational
+// choice, not a shared domain contract.
+const LIFECYCLE_TONE: Record<string, BadgeTone> = {
+  ACTIVE: "success",
+  DISCOVERED: "neutral",
+  REGISTERED: "neutral",
+  ASSESSED: "info",
+  APPROVED: "info",
+  PROVISIONED: "info",
+  CERTIFICATION_DUE: "warning",
+  RESTRICTED: "warning",
+  SUSPENDED: "danger",
+  RETIRED: "neutral",
+};
 
 type AgentRow = {
   id: string;
@@ -44,15 +60,24 @@ export function AgentsTable({ agents }: { agents: AgentRow[] }) {
   const pageRows = sorted.slice((state.page - 1) * state.pageSize, state.page * state.pageSize);
 
   const columns: DataTableColumn<AgentRow>[] = [
-    { key: "agentName", header: "Name", sortable: true, render: (a) => <Link href={`/agents/${a.id}`}>{a.agentName}</Link> },
-    { key: "agentType", header: "Type", sortable: true, render: (a) => a.agentType },
-    { key: "lifecycleState", header: "Lifecycle", sortable: true, render: (a) => <Badge tone="info">{a.lifecycleState}</Badge> },
     {
-      key: "criticality",
-      header: "Criticality",
+      key: "agentName",
+      header: "Name",
       sortable: true,
-      render: (a) => <Badge tone={a.criticality === "critical" || a.criticality === "high" ? "danger" : "neutral"}>{a.criticality}</Badge>,
+      render: (a) => (
+        <Link href={`/agents/${a.id}`} className="text-primary hover:underline">
+          {a.agentName}
+        </Link>
+      ),
     },
+    { key: "agentType", header: "Type", sortable: true, render: (a) => a.agentType },
+    {
+      key: "lifecycleState",
+      header: "Lifecycle",
+      sortable: true,
+      render: (a) => <StatusBadge tone={LIFECYCLE_TONE[a.lifecycleState] ?? "neutral"}>{a.lifecycleState}</StatusBadge>,
+    },
+    { key: "criticality", header: "Criticality", sortable: true, render: (a) => <SeverityBadge severity={a.criticality} /> },
   ];
 
   return (
