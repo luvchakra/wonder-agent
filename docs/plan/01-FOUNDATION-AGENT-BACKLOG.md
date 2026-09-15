@@ -45,6 +45,7 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-12 | Database Migration Discipline (explicit policy) | Done — already followed as informal practice every module this session; now written down explicitly, see Requirements Refresh below |
 | FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
 | FOUNDATION-P1-05 | CSRF protection verification & hardening for state-changing `/api/v1/*` routes | Not Started — baseline mitigation exists (`sameSite: "lax"` on every WonderAgent-set cookie: `app/auth/callback/route.ts`, `app/actions/auth.ts`, `app/actions/tenant.ts`) but is not yet verified/documented as covering all 50 state-changing routes under `app/api/**`, and Supabase Auth's own session-cookie `SameSite` setting has not been confirmed; see Requirements Refresh (round 2) below |
+| FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Not Started — 2026-09-15, user decided "start now, read-only summaries only"; see Requirements Refresh below |
 
 ---
 
@@ -792,6 +793,24 @@ AI-Assisted Investigation (open decision, see the reconciliation doc) ever
 needs an external LLM provider credential, it would use Foundation's
 existing `encryptSecret()` pattern rather than inventing a new one — not a
 new story, just a constraint recorded for whichever module picks that up.
+
+### FOUNDATION-P0-16 — `lib/ai/` shared summarization primitive (decision resolved 2026-09-15, later same day)
+
+The user answered via `AskUserQuestion`: **start now, read-only summaries
+only** — Experience Agent UI (`EXPERIENCE-P0-14`, that module's own
+backlog) plus a new shared `lib/ai/` primitive here, matching how
+`lib/audit/writeAudit()` is a Foundation-owned primitive every module
+calls. **Hard boundary, enforced in code, not just documented:** the
+primitive only ever *summarizes already-computed data* (a finding, an
+evidence bundle, a SHOULD/CAN/DID comparison) that the calling module
+passes in — it never queries a database itself, never has write access to
+anything, and its output is always rendered as advisory text, never as a
+value a deterministic decision (authorization, risk score, policy
+evaluation, remediation) reads back (non-negotiable #9). Needs an explicit
+provider/credential decision (which LLM API, stored via the existing
+`encryptSecret()` pattern, server-only, never in client code — non-
+negotiable #10) before the first real call; stub/interface can be built
+without one. **Not started.**
 
 ## DO NOT IMPLEMENT (out of scope for this module, ever)
 

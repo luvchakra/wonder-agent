@@ -27,6 +27,9 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-04 | Reviewer authorization & Segregation of Duties | Done |
 | COMPLIANCE-P0-05 | Escalation of overdue certification items | Partial — no scheduler exists in this codebase yet, so `escalateOverdueItems()` is exposed as an operator/API-triggered sweep rather than an automatic cron; the escalation logic, recording and audit trail themselves are fully implemented and verified |
 | COMPLIANCE-P0-06 | Tamper-evident evidence export package | Partial — evidence assembly + SHA-256 integrity marker + audited export event are implemented; the actual export file/delivery mechanism is intentionally not built, per this story's own ownership-map flag to the user (Operations Agent overlap, undecided) |
+| COMPLIANCE-P0-07 | Governance Posture (composite score, distinct from risk) | Not Started — 2026-09-15, user decided Compliance-owned; see Requirements Refresh below |
+| COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Not Started — 2026-09-15, promoted from Identity's P1-tier concept, user decided Compliance-owned/broad scope |
+| COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Not Started — 2026-09-15, user decided Compliance assembles + Operations exports; see OPERATIONS-P0-07 |
 
 ---
 
@@ -458,7 +461,49 @@ recorded centrally, not claimed unilaterally here:
   including attestation/exception data) raises the stakes on that decision
   without resolving it.
 
-No Progress Tracker rows added or changed.
+### Decisions resolved (2026-09-15, later same day)
+
+The user answered all four via `AskUserQuestion`; three land on this
+module. Added as new Progress Tracker rows above.
+
+#### COMPLIANCE-P0-07 — Governance Posture
+
+A composite score across Identity/Ownership/Purpose/Access/Action
+authority/Certification/Runtime monitoring/Human oversight/Policy
+compliance/Lifecycle/Compliance controls/Evidence completeness, resulting
+in `GOVERNED` / `PARTIALLY_GOVERNED` / `NON_COMPLIANT` /
+`EXCEPTION_APPROVED` / `SUSPENDED`, explicitly distinct from Risk Agent's
+risk score (never conflated with it). A read-model computed from existing
+published contracts (Identity's agent/contract/lifecycle/owner facts,
+Access's effective access and contract comparison, this module's own
+certification/control-mapping status, Risk's finding severity) — no new
+table duplicating another module's data; deterministic and explainable
+(non-negotiable #9), with a documented reason per dimension, not a single
+opaque number. **Not started.**
+
+#### COMPLIANCE-P0-08 — Governance Attestation (broad)
+
+Promoted to P0 per the user's decision (Identity's own narrower
+`IDENTITY-P1-02` stays P1 and unchanged — this is the broader concept).
+Fields per the governance doc's P0-13: agent, policy/requirements,
+checklist, approver, approval timestamp, validity, decision, comments,
+evidence references. New Compliance-owned table (e.g.
+`governance_attestations`) — tenant-scoped, RLS, `writeAudit()` on every
+decision. Needs an ownership-map entry when built. **Not started.**
+
+#### COMPLIANCE-P0-09 — Governance Evidence Pack assembly
+
+Per-agent evidence bundle: identity, owners, purpose/lifecycle, IAM
+identity, effective access, SHOULD/CAN/DID, policies, risk findings,
+certifications, attestations (`COMPLIANCE-P0-08`), exceptions
+(`ACCESS-P0-07`, once broadened), control mappings, runtime evidence,
+remediation, audit events — assembled by calling every relevant module's
+already-published read contract, never by querying another module's
+tables directly (non-negotiable #6). File generation/delivery
+(PDF/CSV/JSON) is Operations Agent's `OPERATIONS-P0-07`, not built here —
+this story ends at producing the assembled, structured bundle Operations
+consumes. Extends, not replaces, this module's existing `COMPLIANCE-P0-06`
+evidence-snapshot work. **Not started.**
 
 ## DO NOT IMPLEMENT
 

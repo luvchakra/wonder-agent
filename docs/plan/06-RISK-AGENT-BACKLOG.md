@@ -30,6 +30,7 @@ this module is higher bar (see below).
 | RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Done |
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
 | RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Not Started |
+| RISK-P0-04 | Governance Drift detection | Not Started — 2026-09-15, user decided Risk Agent owns this; see Requirements Refresh below |
 
 ---
 
@@ -559,6 +560,22 @@ distinct from any single existing finding category) and two new finding
 category *names* ("expired approval," "governance control gap") that only
 become meaningful once Governance Posture/Attestation/Exceptions (P0-12/
 13/14) exist elsewhere first. Nothing added to this backlog's own tracker.
+
+### RISK-P0-04 — Governance Drift detection (decision resolved 2026-09-15, later same day)
+
+The user answered the open ownership question via `AskUserQuestion`:
+**Governance Drift → Risk Agent.** New deterministic finding category
+(`governance_drift`, alongside the existing categories) detecting material
+post-approval changes: purpose changed, owner changed, IAM identity
+changed, access expanded, new tool/data source, new action capability,
+autonomy increased (once `IDENTITY-P0-07` exists), runtime behavior
+changed. Built from cross-module diffs against the last-known-good
+snapshot (mirroring how `RISK-P0-01.2`'s existing categories already diff
+current state against the contract) — reuses `risk_findings`/
+`risk_evidence`, no new table. Each detected drift should be able to
+trigger Compliance's re-certification path once that trigger exists
+(`CERT-P1-01`, currently P1 — do not build the trigger wiring itself
+ahead of that). **Not started.**
 
 ## DO NOT IMPLEMENT
 

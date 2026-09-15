@@ -76,6 +76,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `platform_ai_provider_configs` | PA | Planned — PLATFORM-P0-05.2 (AI provider configuration), not yet implemented |
 | `platform_announcements` | PA | Planned — PLATFORM-P0-05.4 (maintenance mode/platform announcements); Experience Agent will need a read-only contract to render these in the customer shell once built |
 | `notification_preferences` | OA | OPERATIONS-P0-05.1 (notification preferences) — migration `0048`, built 2026-09-14 |
+| `governance_attestations` | CA | Planned — COMPLIANCE-P0-08 (broad Governance Attestation, resolved 2026-09-15), not yet implemented |
 
 ### Pending ownership/architecture decisions (2026-09-14 requirements refresh — not resolved, flagged for the user)
 
@@ -95,51 +96,47 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
   Not yet requested of Access Agent — record here so it isn't invented unreviewed by
   Runtime Agent when this story is picked up.
 
-### Pending ownership/architecture decisions (2026-09-15 governance requirements reconciliation — not resolved, flagged for the user)
+### Governance requirements decisions (2026-09-15 — resolved same day via `AskUserQuestion`)
 
 Full detail and section-by-section mapping in
 [`docs/design/governance-requirements-reconciliation-2026-09-15.md`](governance-requirements-reconciliation-2026-09-15.md).
-None of these were assigned to a module unilaterally:
+The user answered every open question from that pass; recorded here as the
+now-current ownership assignments (each also detailed in its owning
+module's own `## Requirements Refresh — 2026-09-15` section):
 
-- **Human Oversight / Autonomy Model** — no module owns an agent
-  autonomy-level (0-4) concept yet; it's the root dependency for the
-  contract's autonomy field, the SHOULD-vs-CAN autonomy comparison row, and
-  a 4-state (allowed / allowed-with-approval / restricted / prohibited)
-  action-governance model. Likely Identity Agent (contract field) +
-  Access Agent (policy enforcement), but not decided.
-- **Governance Readiness Policy** — a "is this agent production-ready" gate
-  (risk assessment done, access review complete, human oversight policy,
-  runtime monitoring configured, certification schedule set) reads across
-  Identity/Access/Compliance data; unclear whether it's a new Identity
-  Agent lifecycle precondition, a new Access Agent policy type, or its own
-  concept.
-- **Governance Posture** — a composite governed/partially-governed/
-  non-compliant/exception-approved/suspended score, explicitly distinct
-  from Risk Agent's risk score. No existing module owns this; candidates
-  are Compliance Agent, Identity Agent, or a new concept. The largest
-  single open item from the 2026-09-15 reconciliation.
-- **Governance Attestation** — priority conflict (Identity's own
-  `IDENTITY-P1-02` is P1; the new doc asks for P0) plus an ownership
-  question (Identity's narrow self-attestation vs. a broader
-  approver/decision/evidence shape closer to Compliance's
-  `certification_decisions`).
-- **Governance Exceptions consolidation** — three candidate "exception"
-  concepts now exist in different documents (Access's `policy_exceptions`,
-  Compliance's planned `CERT-P1-04`, and this doc's generic governance
-  exception); needs the user to pick one canonical model rather than three
-  modules each owning a slightly different one.
-- **Governance Drift** — no module computes cross-module drift
-  (purpose/owner/access/autonomy/runtime changes) as one signal today.
-  Candidates: Risk Agent (detection specialist) or Identity Agent (owns
-  change history).
-- **Governance Evidence Pack** — escalates, not duplicates, the existing
-  Compliance-vs-Operations evidence-export ownership question above; the
-  new doc's per-agent evidence-pack scope is a superset of both and now
-  explicitly includes attestation/exception data that doesn't exist yet.
-- **AI-Assisted Investigation** — nothing in the codebase touches an LLM
-  API today; needs a provider/data-boundary/ownership decision (likely
-  Experience Agent for the UI plus a new shared `lib/ai/` read-only
-  primitive) before any module builds toward it.
+- **Human Oversight / Autonomy Model → Identity Agent** (new
+  `agent_contracts` fields: autonomy level, allowed tools, human-approval
+  requirement, required monitoring — `IDENTITY-P0-07`) **+ Access Agent**
+  (enforces the resulting 4-state action-governance model —
+  `ACCESS-P0-06`).
+- **Governance Readiness Policy** — not separately decided; folds into
+  whichever of the above actually ships (Identity's contract fields +
+  Access's enforcement), not a distinct concept after all.
+- **Governance Posture → Compliance Agent** (`COMPLIANCE-P0-07`) — a
+  read-model computed from every other module's published contract, not a
+  duplicated table; explicitly distinct from Risk Agent's risk score.
+- **Governance Attestation → Compliance Agent, promoted to P0, broad scope**
+  (`COMPLIANCE-P0-08`, new `governance_attestations` table — added to §1
+  below). Identity Agent's own narrower `IDENTITY-P1-02` self-attestation
+  concept is unchanged and still P1 — two different, both-legitimate
+  attestation concepts now exist; do not merge them without asking again.
+- **Governance Exceptions → Access Agent's `policy_exceptions`, broadened**
+  (`ACCESS-P0-07`) to be the canonical exception model for any governance
+  requirement, not just access policy. Compliance Agent's planned
+  `CERT-P1-04` will reference this table rather than introduce its own.
+- **Governance Drift → Risk Agent** (`RISK-P0-04`, a new `governance_drift`
+  finding category in the existing `risk_findings`/`risk_evidence` — no new
+  table).
+- **Governance Evidence Pack → Compliance assembles, Operations exports**
+  (`COMPLIANCE-P0-09` produces the structured per-agent bundle by calling
+  every relevant module's contract; `OPERATIONS-P0-07` turns it into a
+  downloadable PDF/CSV/JSON file, reusing `OPERATIONS-P0-01.2`'s existing
+  export mechanism).
+- **AI-Assisted Investigation → start now, read-only summaries only.**
+  Foundation Agent owns a new shared `lib/ai/` primitive (`FOUNDATION-P0-16`
+  — read-only, advisory-only, never a decision input, matching how
+  `lib/audit/writeAudit()` is a Foundation-owned cross-module primitive);
+  Experience Agent owns the UI surface (`EXPERIENCE-P0-14`).
 
 `agent-identity` (IA) and `access-governance` (AA) are deliberately separate: IA owns
 *who the agent is*; AA owns *what it can reach*. Integration (INT) owns the raw

@@ -26,6 +26,8 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-03 | Access Graph (graph-compatible relationships + tabular view) | Done — 2026-09-14 |
 | ACCESS-P0-04 | Contract Comparison (SHOULD vs CAN diff: approved / excessive / missing / unknown) | Done — 2026-09-14, unit-tested against the live FinanceBot fixture's exact data |
 | ACCESS-P0-05 | Policy Versioning, Priority & Change History (extends ACCESS-P0-02.1) | Done — 2026-09-14, live RLS-verified |
+| ACCESS-P0-06 | Action governance enforcement (4-state model, uses Identity's autonomy fields) | Not Started — 2026-09-15, depends on IDENTITY-P0-07 landing first |
+| ACCESS-P0-07 | Broaden `policy_exceptions` into the canonical governance-exception model | Not Started — 2026-09-15, user decision; see Requirements Refresh below |
 
 ---
 
@@ -513,6 +515,39 @@ this module's existing schema and are recorded there, not decided here:
   enforced by this module's policy engine (`ACCESS-P0-02.1`/`02.2`,
   `Done`), but depends on the Human Oversight/autonomy-level ownership
   decision landing first — not scoped as a story until that's answered.
+
+### Decisions resolved (2026-09-15, later same day)
+
+The user answered both open questions via `AskUserQuestion`:
+
+- **Autonomy model → Identity + Access.** Identity Agent adds the
+  autonomy-level/allowed-tools/human-approval fields to `agent_contracts`
+  (`IDENTITY-P0-07`). This module enforces the resulting 4-state action
+  model — added as **`ACCESS-P0-06`** above, blocked on `IDENTITY-P0-07`
+  landing first (needs the fields to read).
+- **Governance Exceptions → broaden `policy_exceptions`.** The user chose
+  making this module's existing, already-`Done` `policy_exceptions` table
+  the canonical exception model for any governance requirement, not just
+  access policy — added as **`ACCESS-P0-07`** above. Compliance Agent's
+  planned control-mapping exception story (`CERT-P1-04`) will reference
+  this table instead of introducing its own; not this module's call to
+  make for Compliance's backlog, recorded there instead.
+
+### ACCESS-P0-07 — Broaden `policy_exceptions` (governance exception model)
+
+`policy_exceptions` currently ties an exception to a `policy_id`. To serve
+as the canonical governance-exception model, it needs to support
+exceptions to things that aren't Access policies too (e.g. a missing
+attestation, a certification gap, a control-mapping gap once Compliance's
+own stories reference it). **Objective:** generalize the exception's
+target reference (e.g. a `scope_type` + `scope_id` pair, or a nullable
+`policy_id` alongside a more general reference) while keeping every
+existing access-policy exception working unchanged; keep the existing
+fields (reason, business justification, approver, start/expiry date,
+compensating control, residual risk, status per the governance doc's P0-14
+field list — cross-check against the current schema and add whatever's
+missing). Must not become a second, competing model — this *is* the
+canonical one now. **Not started.**
 
 ## DO NOT IMPLEMENT
 

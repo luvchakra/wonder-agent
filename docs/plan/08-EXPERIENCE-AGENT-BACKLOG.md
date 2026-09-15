@@ -35,6 +35,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-11 | Effective Access Graph Visualization (PRD §34 screen #6; CLAUDE.md §2 stack: "a graph visualization library (for the effective-access graph)") | Not Started — `reactflow` (`^11.11.4`) is a declared `package.json` dependency but is not imported or rendered anywhere in the codebase (verified by repo-wide grep); Access Agent's graph data contract (`GET /api/v1/access/agents/:id/graph`, `modules/access-governance/graph.ts`) exists and is fully backend-ready, but `app/(customer)/access/agents/[agentId]/page.tsx` (the Access/CAN tab) only renders a flat table of grants — no node/edge graph view exists anywhere. EXPERIENCE-P0-03's epic text names "Access graph" in passing but no acceptance criterion or built screen actually delivers it, despite EXPERIENCE-P0-03 being marked `Done` |
 | EXPERIENCE-P0-12 | Agent Detail Header Fields & Primary Action Bar (PRD §35 worked layout) | Not Started — `app/(customer)/agents/[id]/page.tsx`'s header shows only lifecycle/criticality badges and agent type/environment/purpose text; none of §35's specified header fields (Business Owner, Technical Owner, IAM Identity, Last Activity, Next Certification — verified absent by repo-wide grep) or its primary action bar (Certify Access, Restrict, Suspend, Request Change, Investigate, View Access Graph — today only a generic lifecycle-transition dropdown+form buried in a "Lifecycle" card) are built. CLAUDE.md §13 and this backlog's own EXPERIENCE-P0-03 text require following §35's exact worked layout, "not inventing a different structure" |
 | EXPERIENCE-P0-13 | Rogue Agent Detail Action Set (PRD §37 worked layout) | Not Started — `app/(customer)/risk/rogue/[agentId]/page.tsx` (built under EXPERIENCE-P0-03) is investigation-only: why-flagged findings, SHOULD/CAN/DID deviation, ownership — with zero action affordances. §37 specifies six actions (Create remediation, Restrict agent, Suspend agent, Assign owner, Create exception, Mark false positive); the underlying capabilities substantially exist elsewhere (lifecycle transition to RESTRICTED/SUSPENDED on the Agent Overview tab, `transitionFindingStatusAction`/`RemediateFindingButton` on the general Risk tab, a policy-exception concept in `modules/access-governance/policies.ts`/`modules/risk/findings.ts`) but are not surfaced on this specific PRD-specified worked layout. Reuse `ConfirmActionDialog` (EXPERIENCE-P0-04) for the destructive ones per CLAUDE.md §13 — no new confirmation pattern |
+| EXPERIENCE-P0-14 | AI-Assisted Investigation UI (read-only summaries) | Not Started — 2026-09-15, user decided "start now, read-only summaries only"; see Requirements Refresh below |
 
 ---
 
@@ -590,6 +591,20 @@ module's own `EXPERIENCE-P0-10` through `-13` (Not Started) already cover
 the concrete, buildable-today UI gaps; the governance-tab expansion is a
 forward pointer for once those upstream concepts land, not new scope to
 build blind against.
+
+### EXPERIENCE-P0-14 — AI-Assisted Investigation UI (decision resolved 2026-09-15, later same day)
+
+The user answered via `AskUserQuestion`: **start now, read-only summaries
+only.** Surfaces Foundation Agent's new `lib/ai/` primitive
+(`FOUNDATION-P0-16`) as a UI affordance — e.g. a "Summarize" action on a
+finding, an evidence bundle, or a SHOULD/CAN/DID comparison, rendering the
+returned text clearly labeled as AI-generated/advisory (never presented as
+a fact or a decision) and always next to, never instead of, the
+authoritative structured data it summarizes. No natural-language query box
+across the whole app yet (that's the existing, correctly-P1
+`UX-P1` search item) — this is the narrower "summarize what I'm already
+looking at" affordance the resolved decision scoped. Blocked on
+`FOUNDATION-P0-16` existing first. **Not started.**
 
 ## DO NOT IMPLEMENT
 

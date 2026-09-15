@@ -28,6 +28,7 @@ issued.
 | OPERATIONS-P0-04.2 | Report traceability (linked records + data freshness) | Done |
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Partial — `getJobStatusSummary()` and `GET /api/v1/jobs/status` built; no dedicated customer-facing page this session (scope cut, flagged) |
+| OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Not Started — 2026-09-15, user decided Compliance assembles + Operations exports; see Requirements Refresh below |
 
 ---
 
@@ -347,6 +348,22 @@ ownership question (`ownership-map.md`) — the new doc's per-agent scope is
 broader than this module's current `OPERATIONS-P0-01.2` evidence export
 and explicitly asks for a PDF format alongside CSV/JSON, not yet confirmed
 as built. Not scoped as a story until the ownership question is answered.
+
+### OPERATIONS-P0-07 — Governance Evidence Pack export (decision resolved 2026-09-15, later same day)
+
+The user answered via `AskUserQuestion`: **Compliance assembles, Operations
+exports.** Compliance Agent's `COMPLIANCE-P0-09` produces the assembled,
+structured per-agent evidence bundle (identity/access/SHOULD-CAN-DID/risk/
+certification/attestation/exception/control-mapping/runtime/remediation/
+audit); this module's job is turning that structured bundle into a
+downloadable PDF/CSV/JSON file, reusing `OPERATIONS-P0-01.2`'s existing
+evidence-export mechanism/pattern rather than building a second exporter.
+Compliance calls this module's export function with its assembled bundle —
+Operations never reaches into Compliance's (or any other module's) tables
+directly (non-negotiable #6). Confirm whether a PDF renderer already
+exists anywhere in this codebase before assuming one does (currently
+believed not to — no PDF library appears in any module's dependencies).
+**Not started.**
 
 ## DO NOT IMPLEMENT
 

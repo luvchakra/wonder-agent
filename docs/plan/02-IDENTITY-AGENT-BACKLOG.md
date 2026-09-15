@@ -27,6 +27,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Done — 2026-09-14, live RLS-verified |
 | IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
 | IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Done — 2026-09-15, unit-tested |
+| IDENTITY-P0-07 | Contract autonomy/oversight fields (autonomy level, allowed tools, human approval requirements, required monitoring) | Not Started — 2026-09-15, user decided "Identity + Access" for the autonomy model (Identity owns the field, Access enforces it); see the Requirements Refresh section below |
 
 ---
 
@@ -587,15 +588,43 @@ owner. Small, additive, Identity-owned — bundle into whichever future story
 next touches `agent_owners`' schema rather than opening a standalone row
 for one enum value.
 
-### Cross-cutting items not resolved here
+### Decisions now resolved (2026-09-15, later same day)
 
-The new doc's P0-03 (autonomy level, allowed-tools list, human-approval
-requirements on `agent_contracts`) and P0-13 (Governance Attestation,
-already `IDENTITY-P1-02` here but requested at P0 by the new doc, and
-possibly a different shape/owner) both depend on open architecture
-decisions recorded in `docs/design/ownership-map.md`'s "Pending
-ownership/architecture decisions (2026-09-15...)" section — not built or
-re-tiered here without the user's answer.
+The user answered the open cross-module questions via `AskUserQuestion`.
+Relevant to this module:
+
+- **Autonomy model → Identity + Access.** `agent_contracts` gains the
+  autonomy-level/allowed-tools/human-approval/required-monitoring fields
+  (this module, `IDENTITY-P0-07`, added above); Access Agent's policy
+  engine enforces the resulting 4-state action model
+  (`ACCESS-P0-06`, see that module's own backlog).
+- **Governance Attestation → promoted to P0, Compliance-owned, broad
+  scope.** This module's own `IDENTITY-P1-02` (narrow self-attestation)
+  stays exactly as scoped and P1-tiered — the user's chosen option was the
+  *broader*, Compliance-owned attestation concept (approver/decision/
+  evidence-reference shape), not a re-tier of this module's existing item.
+  See `COMPLIANCE-P0-08` in that module's backlog. No change to this
+  module's own P1 list.
+- **Governance Drift → Risk Agent.** No change here; see Risk Agent's
+  backlog.
+- **Governance Exceptions → broaden Access's `policy_exceptions`.** No
+  change here.
+
+### IDENTITY-P0-07 — Contract Autonomy & Oversight Fields
+
+Extend `agent_contracts` (`IDENTITY-P0-03.1`, already `Done`) with the
+fields the governance requirements doc's P0-03 names that the schema
+doesn't carry today: `autonomy_level` (0-4, per the doc's Human Oversight
+levels), a distinct `allowed_tools` list (separate from
+`approved_applications`), a structured `human_approval_required` field
+(not just the existing binary approved/prohibited action lists), and
+`required_monitoring`. Acceptance criteria: new contract versions can set
+these fields; existing contracts default to a safe/conservative value
+(lowest autonomy, no implicit tool access) rather than silently
+unrestricted; `createContractVersion()` validates `autonomy_level` is in
+range; audited like every other contract field change. Also add
+`escalation_owner` to `AgentOwnerType` (the governance doc's P0-05,
+previously noted as a minor gap). **Not started.**
 
 ## DO NOT IMPLEMENT
 
