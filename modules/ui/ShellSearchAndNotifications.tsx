@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Bell, Search } from "lucide-react";
 import { EmptyState } from "./States";
 import { Badge } from "./Badge";
 
@@ -63,7 +64,7 @@ export function ShellGlobalSearch() {
           aria-label="Search"
           className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span aria-hidden>🔍</span>
+          <Search className="size-4" aria-hidden="true" />
           <span className="hidden text-xs text-muted-foreground md:inline">Search…</span>
         </button>
       </Dialog.Trigger>
@@ -148,9 +149,9 @@ export function ShellNotifications() {
         <button
           type="button"
           aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
-          className="relative rounded-md border border-border bg-background p-1.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          className="relative flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span aria-hidden>🔔</span>
+          <Bell className="size-5" aria-hidden="true" />
           {unreadCount > 0 && (
             <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-destructive-foreground">
               {unreadCount}

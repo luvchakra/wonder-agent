@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
@@ -7,6 +6,7 @@ import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { Nav, type NavGroup } from "@/modules/ui/Nav";
 import { AccountPanel } from "@/modules/ui/AccountPanel";
 import { WorkspaceSwitcher } from "@/modules/ui/WorkspaceSwitcher";
+import { Logo } from "@/modules/ui/Logo";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 
 const NAV_GROUPS: NavGroup[] = [
@@ -123,9 +123,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
             search and notifications — no user avatar in the topbar. */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Nav groups={NAV_GROUPS} tenants={tenantOptions} onSelectTenant={selectTenantAction} footer={<AccountPanel email={user.email ?? ""} displayName={profile?.display_name ?? null} isPlatformAdmin={isAdmin} onSignOut={signOutAction} />} />
-          <Link href="/" className="shrink-0 text-sm font-semibold text-foreground">
-            WonderAgent
-          </Link>
+          <Logo />
           <WorkspaceSwitcher tenants={tenantOptions} onSelectTenant={selectTenantAction} />
         </div>
         <div className="flex items-center gap-2">
