@@ -56,15 +56,30 @@ export default async function OverviewPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-        <StatCard label="Total AI Agents" value={agents.length} />
-        <StatCard label="Active" value={agents.filter((a) => a.lifecycleState === "ACTIVE").length} />
-        <StatCard label="Unowned" value={unownedCount} tone={unownedCount > 0 ? "warning" : "neutral"} />
-        <StatCard label="Certification Overdue" value={overdueCertifications.length} tone={overdueCertifications.length > 0 ? "warning" : "neutral"} />
-        <StatCard label="High Risk" value={bySeverity.high} tone={bySeverity.high > 0 ? "warning" : "neutral"} />
-        <StatCard label="Critical Risk" value={bySeverity.critical} tone={bySeverity.critical > 0 ? "danger" : "neutral"} />
-        <StatCard label="Policy/Access Violations" value={openFindings.length} tone={openFindings.length > 0 ? "warning" : "neutral"} />
-        <StatCard label="Rogue / Restricted Agents" value={restrictedAgents.length} tone={restrictedAgents.length > 0 ? "danger" : "neutral"} />
-        <StatCard label="Excessive Access" value={excessiveAccessAgents} tone={excessiveAccessAgents > 0 ? "warning" : "neutral"} />
+        <StatCard label="Total AI Agents" value={agents.length} href="/agents" />
+        <StatCard label="Active" value={agents.filter((a) => a.lifecycleState === "ACTIVE").length} href="/agents" />
+        <StatCard label="Unowned" value={unownedCount} tone={unownedCount > 0 ? "warning" : "neutral"} href="/agents" />
+        <StatCard
+          label="Certification Overdue"
+          value={overdueCertifications.length}
+          tone={overdueCertifications.length > 0 ? "warning" : "neutral"}
+          href="/compliance/campaigns"
+        />
+        <StatCard label="High Risk" value={bySeverity.high} tone={bySeverity.high > 0 ? "warning" : "neutral"} href="/risk" />
+        <StatCard label="Critical Risk" value={bySeverity.critical} tone={bySeverity.critical > 0 ? "danger" : "neutral"} href="/risk" />
+        <StatCard
+          label="Policy/Access Violations"
+          value={openFindings.length}
+          tone={openFindings.length > 0 ? "warning" : "neutral"}
+          href="/risk"
+        />
+        <StatCard
+          label="Rogue / Restricted Agents"
+          value={restrictedAgents.length}
+          tone={restrictedAgents.length > 0 ? "danger" : "neutral"}
+          href="/risk/rogue"
+        />
+        <StatCard label="Excessive Access" value={excessiveAccessAgents} tone={excessiveAccessAgents > 0 ? "warning" : "neutral"} href="/risk" />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,13 +29,48 @@ export function CardBody({ children, className }: { children: React.ReactNode; c
   return <div className={cn("px-4 py-3", className)}>{children}</div>;
 }
 
-/** A single KPI number card for the dashboard (PRD §6). */
-export function StatCard({ label, value, tone = "neutral" }: { label: string; value: string | number; tone?: "neutral" | "warning" | "danger" }) {
+/**
+ * A single KPI number card for the dashboard (PRD §6). `href`, when
+ * given, makes the card a link with a small arrow affordance per
+ * 12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md §36's explicit acceptance
+ * criterion ("Clickable cards must have a small arrow affordance").
+ */
+export function StatCard({
+  label,
+  value,
+  tone = "neutral",
+  href,
+}: {
+  label: string;
+  value: string | number;
+  tone?: "neutral" | "warning" | "danger";
+  href?: string;
+}) {
   const valueClass = tone === "danger" ? "text-destructive" : tone === "warning" ? "text-warning" : "text-card-foreground";
-  return (
-    <Card className="p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+  const content = (
+    <>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        {href && (
+          <span aria-hidden className="text-muted-foreground">
+            →
+          </span>
+        )}
+      </div>
       <p className={cn("mt-1 text-2xl font-semibold", valueClass)}>{value}</p>
-    </Card>
+    </>
   );
+
+  if (href) {
+    return (
+      <Link
+        href={href}
+        className="block rounded-xl border border-border/60 bg-card p-4 text-card-foreground shadow-md transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return <Card className="p-4">{content}</Card>;
 }
