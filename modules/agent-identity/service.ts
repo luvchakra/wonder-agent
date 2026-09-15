@@ -30,6 +30,7 @@ export {
   mergeDuplicateCandidate,
   confirmDistinctAndRegister,
   computeDuplicateScore,
+  recordDiscoveryDecision,
   DUPLICATE_MATCH_THRESHOLD,
 } from "./duplicates";
-export { buildDiscoveryInbox } from "./discovery";
+export { buildDiscoveryInbox, getDiscoveryCandidate } from "./discovery";

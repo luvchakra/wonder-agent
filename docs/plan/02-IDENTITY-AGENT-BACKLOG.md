@@ -25,7 +25,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-02.3 | Agent relationships | Done |
 | IDENTITY-P0-03.1 | `agent_contracts` (higher bar) | Done |
 | IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Done — 2026-09-14, live RLS-verified |
-| IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists |
+| IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
 
 ---
 

@@ -149,16 +149,23 @@ export type AgentFilter = {
 };
 
 // IDENTITY-P0-04 — Duplicate Detection & Merge/Review Workflow.
-export type DuplicateCandidateStatus = "pending" | "merged" | "confirmed_distinct";
+// "ignored"/"linked" statuses were added for the Agent Discovery extension —
+// see DiscoveryDecisionType below; this remains one table/type, not a
+// parallel discovery-decision model.
+export type DuplicateCandidateStatus = "pending" | "merged" | "confirmed_distinct" | "ignored" | "linked";
+export type DuplicateCandidateDecisionType = "duplicate_review" | "ignored" | "linked";
 
 export type DuplicateCandidate = {
   id: string;
   tenantId: string;
-  matchedAgentId: string;
+  matchedAgentId: string | null;
   candidateData: Record<string, unknown>;
   matchScore: number;
   matchedKeys: string[];
   status: DuplicateCandidateStatus;
+  decisionType: DuplicateCandidateDecisionType;
+  sourceSystem: string | null;
+  sourceObjectId: string | null;
   createdBy: string | null;
   reviewedBy: string | null;
   reviewedAt: string | null;
@@ -172,13 +179,66 @@ export type CreateAgentResult =
 // IDENTITY-P0-05 — Discovery Reconciliation & Orphaned Identity Detection.
 export type DiscoveryCategory = "new" | "likely_duplicate" | "orphaned_identity";
 
+/**
+ * Fully Functional Agent Discovery (2026-09-15 extension of IDENTITY-P0-05).
+ * Deterministic (non-negotiable #9 — never LLM-decided) AI-agent detection
+ * classification. Every entry that isn't NON_AGENT is evidence-backed via
+ * `DetectionSignal[]` on `DiscoveryInboxEntry.signals`.
+ */
+export type DetectionClassification =
+  | "CONFIRMED_AGENT"
+  | "PROBABLE_AGENT"
+  | "POSSIBLE_AGENT"
+  | "NON_AGENT"
+  | "UNKNOWN";
+
+export type ConfidenceLevel = "HIGH" | "MEDIUM" | "LOW";
+export type EvidenceStrength = "strong" | "medium" | "weak";
+
+export type DetectionSignal = {
+  signal: string;
+  source: string;
+  observedValue: string;
+  strength: EvidenceStrength;
+  scoreContribution: number;
+};
+
+/**
+ * Best-effort, honestly-scoped change signal: full field-level
+ * UPDATED/OWNER_CHANGED/IDENTITY_CHANGED detection would require persisting
+ * a prior snapshot per source object, which neither Identity nor Integration
+ * currently stores (see the Identity Agent audit log's 2026-09-15 entry for
+ * why that isn't added here). "STALE" is genuinely derivable today, from
+ * Integration's own `integration_sync_jobs` history: the object wasn't
+ * returned by the most recent completed sync of its source.
+ */
+export type DiscoveryChangeType = "NEW" | "STALE";
+
+export type DiscoveryCandidateStatus = "open" | "ignored" | "linked";
+export type DiscoveryDecisionType = "ignored" | "linked";
+
 export type DiscoveryInboxEntry = {
   externalId: string;
   integrationId: string;
+  integrationName: string;
   sourceSystem: string;
   displayName: string;
+  identityType: AgentIdentityType;
+  owner: string | null;
+  application: string | null;
   category: DiscoveryCategory;
   /** Present only when category is "likely_duplicate". */
   likelyDuplicateOfAgentId?: string;
+  duplicateMatchScore?: number;
+  duplicateMatchedKeys?: string[];
+  classification: DetectionClassification;
+  confidenceScore: number;
+  confidenceLevel: ConfidenceLevel;
+  signals: DetectionSignal[];
+  changeType: DiscoveryChangeType;
+  candidateStatus: DiscoveryCandidateStatus;
+  /** Set when candidateStatus is "linked" — the agent this was correlated to. */
+  linkedAgentId?: string;
+  lastSeenAt: string;
   raw: Record<string, unknown>;
 };

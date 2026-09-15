@@ -3,7 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import type { Agent, DuplicateCandidate } from "@/lib/shared/types/agent-identity";
+import type { Agent, AgentIdentityType, DuplicateCandidate } from "@/lib/shared/types/agent-identity";
 import { toAgent, toDuplicateCandidate } from "./mappers";
 import type { CreateAgentInput } from "./agents";
 
@@ -210,4 +210,108 @@ export async function confirmDistinctAndRegister(
   });
 
   return agent;
+}
+
+/**
+ * Agent Discovery — a reviewer's direct decision on a Discovery Inbox
+ * candidate (spec §15's IGNORE / LINK_EXISTING), recorded in this same
+ * table per the discovery spec's own Codebase-Fit gate ("existing
+ * duplicate-candidate workflow is reused for P0 review") rather than a new
+ * discovery_records table. `sourceSystem`/`sourceObjectId` are the
+ * integration id + external id pair `buildDiscoveryInbox()` already keys
+ * candidates by, so a repeated discovery run can recognize "already
+ * decided" idempotently (spec §37).
+ *
+ * "linked" additionally performs the real correlation via Identity's own
+ * `linkAgentIdentity()` — this is not a second, fake link concept; it is
+ * the same `agent_identities` row a manual "Link identity" action on the
+ * agent detail page would create.
+ */
+export async function recordDiscoveryDecision(
+  tenantId: string,
+  actorId: string,
+  input: {
+    sourceSystem: string;
+    sourceObjectId: string;
+    displayName: string;
+    decisionType: "ignored" | "linked";
+    matchedAgentId?: string;
+    identityType?: AgentIdentityType;
+  },
+): Promise<DuplicateCandidate> {
+  if (input.decisionType === "linked" && !input.matchedAgentId) {
+    throw new ApiError(400, "INVALID_INPUT", "matchedAgentId is required to link a candidate to an existing agent");
+  }
+
+  const supabase = supabaseServiceRole();
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabase
+    .from("agent_duplicate_candidates")
+    .insert({
+      tenant_id: tenantId,
+      matched_agent_id: input.matchedAgentId ?? null,
+      candidate_data: { agentName: input.displayName, sourceSystem: input.sourceSystem, sourceObjectId: input.sourceObjectId },
+      match_score: 0,
+      matched_keys: [],
+      status: input.decisionType,
+      decision_type: input.decisionType,
+      source_system: input.sourceSystem,
+      source_object_id: input.sourceObjectId,
+      created_by: actorId,
+      reviewed_by: actorId,
+      reviewed_at: nowIso,
+    })
+    .select()
+    .single();
+  if (error || !data) {
+    throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to record discovery decision");
+  }
+
+  if (input.decisionType === "linked" && input.matchedAgentId) {
+    const { linkAgentIdentity } = await import("./identities");
+    await linkAgentIdentity(
+      tenantId,
+      input.matchedAgentId,
+      input.identityType ?? "service_account",
+      input.sourceObjectId,
+      input.sourceSystem,
+    );
+  }
+
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: input.decisionType === "ignored" ? "agent.discovery_candidate_ignored" : "agent.discovery_candidate_linked",
+    objectType: "discovery_candidate",
+    objectId: `${input.sourceSystem}::${input.sourceObjectId}`,
+    outcome: "success",
+    metadata: { matchedAgentId: input.matchedAgentId, displayName: input.displayName },
+  });
+
+  return toDuplicateCandidate(data);
+}
+
+/**
+ * Every ignore/link decision recorded so far, keyed by `sourceSystem::
+ * sourceObjectId` so `buildDiscoveryInbox()` can look them up per candidate
+ * in one query rather than one round trip per row.
+ */
+export async function listDiscoveryDecisions(tenantId: string): Promise<Map<string, DuplicateCandidate>> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("agent_duplicate_candidates")
+    .select()
+    // Belt-and-suspenders: RLS already scopes this to the caller's tenant.
+    .eq("tenant_id", tenantId)
+    .in("decision_type", ["ignored", "linked"]);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+
+  const map = new Map<string, DuplicateCandidate>();
+  for (const row of data ?? []) {
+    if (row.source_system && row.source_object_id) {
+      map.set(`${row.source_system}::${row.source_object_id}`, toDuplicateCandidate(row));
+    }
+  }
+  return map;
 }

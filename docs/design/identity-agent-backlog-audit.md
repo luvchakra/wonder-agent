@@ -317,3 +317,183 @@ this module's scope is concerned, it may be worth confirming with the user
 whether the re-upload was expected to carry different content, in case the
 intended "expanded" document was not the one actually attached at this
 path.
+
+---
+
+## 2026-09-15 — Fully Functional Agent Discovery (extension of IDENTITY-P0-05)
+
+**Agent:** Identity Agent.
+
+**Task:** the user supplied a new, large (55-section) requirements
+document, "WonderAgent — Fully Functional Agent Discovery," explicitly
+framed by its own §0 "Codebase Alignment" section as an *extension* of the
+existing `buildDiscoveryInbox()` reconciliation inbox, not a greenfield
+rebuild — with an explicit list of forbidden new P0 tables
+(`discovery_sources`, `discovery_jobs`, `discovery_records`,
+`discovery_evidence`, `agent_discovery_history`, `agent_correlations`) and a
+55-item "Codebase-Fit Acceptance Gate." Asked to "implement."
+
+**Built:**
+- `modules/agent-identity/detection.ts` (+`detection.test.ts`, 6 cases) — a
+  deterministic, rule-based, fully explainable AI-agent detection/confidence
+  scorer (never an LLM/ML call — non-negotiable #9 and the spec's own "no
+  new fuzzy/ML correlation engine in P0" gate item). Scores named signals
+  (AI-runtime/MCP source category, AI-platform identifier fields, AI
+  platform metadata fields, naming pattern, service-identity type, metadata
+  tags/description, tool/relationship association) against the object's
+  `normalized`/`raw` payload already published through Integration Agent's
+  contract, and returns `DetectionClassification`
+  (`CONFIRMED_AGENT`/`PROBABLE_AGENT`/`POSSIBLE_AGENT`/`NON_AGENT`/`UNKNOWN`)
+  + a 0-100 confidence score/level + the full evidence list.
+- `lib/shared/types/agent-identity.ts` — added `DetectionClassification`,
+  `ConfidenceLevel`, `EvidenceStrength`, `DetectionSignal`,
+  `DiscoveryChangeType` (`NEW`/`STALE` — see the honest scope note below),
+  `DiscoveryCandidateStatus`, `DiscoveryDecisionType`; extended
+  `DiscoveryInboxEntry` with all of the above plus `integrationName`,
+  `identityType`, `owner`, `application`, `duplicateMatchScore`,
+  `duplicateMatchedKeys`, `candidateStatus`, `linkedAgentId`, `lastSeenAt`.
+  The three original categories (`new`/`likely_duplicate`/
+  `orphaned_identity`) are unchanged.
+- `supabase/migrations/0051_identity_discovery_candidate_decisions.sql` —
+  extends the *existing* `agent_duplicate_candidates` table (built for
+  IDENTITY-P0-04) rather than adding a new table: `matched_agent_id` is now
+  nullable (an "ignore" decision has none), plus new `source_system` /
+  `source_object_id` / `decision_type` columns and a widened `status` check
+  (`+ 'ignored', 'linked'`). This is the mechanism the spec's own gate item
+  "existing duplicate-candidate workflow is reused for P0 review" calls
+  for. Applied directly to the live Supabase project via the Supabase MCP
+  tool (`apply_migration`) and confirmed with `get_advisors(security)` —
+  identical accepted-exception set as before, no new findings.
+- `modules/agent-identity/duplicates.ts` — added `recordDiscoveryDecision()`
+  (ignore/link, service-role write with the same manual-tenant-check
+  pattern as the rest of this file; "link" also calls the existing
+  `linkAgentIdentity()` — the real correlation, not a second concept) and
+  `listDiscoveryDecisions()` (batch lookup keyed by
+  `sourceSystem::sourceObjectId` for `buildDiscoveryInbox()`).
+- `modules/agent-identity/discovery.ts` — `buildDiscoveryInbox()` rewritten
+  to enrich every entry with the detection/confidence/evidence above, plus:
+  - **Change/removal safety (spec §27/§28)**: a `changeType` of `STALE`
+    when the source object's `importedAt` predates the integration's most
+    recent *completed* sync job (`listSyncJobs()`), i.e. it wasn't returned
+    by the latest discovery run — derived entirely from Integration
+    Agent's own `integration_sync_jobs` history, no new table. A failed
+    sync never marks anything removed (nothing here infers removal from a
+    `failed` job — only from a `succeeded`/`partial` one that legitimately
+    didn't return the object).
+  - **Candidate status**: `open`/`ignored`/`linked`, from
+    `listDiscoveryDecisions()`.
+  - Still consumes Integration Agent's contract only
+    (`listIntegrations`/`listIntegrationTypes`/`getNormalizedObjects`/
+    `listSyncJobs`) — never queries `integration_objects` directly.
+  - Added `getDiscoveryCandidate(tenantId, integrationId, externalId)` —
+    calls `buildDiscoveryInbox()` itself rather than a second query path,
+    so the detail page can never disagree with the inbox list.
+- `app/actions/agents.ts` — `registerDiscoveryCandidateAction()`,
+  `ignoreDiscoveryCandidateAction()`, `linkDiscoveryCandidateAction()`.
+  Registration reuses the *existing* pipeline end to end: `createAgent()`
+  (whose own IDENTITY-P0-04 duplicate check still applies — a discovery
+  registration that collides with an already-registered agent is diverted
+  to `/agents/duplicates` exactly like a manual one), `linkAgentIdentity()`
+  for source evidence, `assignOwner()` for business/technical owners, then
+  the *existing* `DISCOVERED -> REGISTERED` transition
+  (`transitionAgentLifecycle`) whose prerequisites (purpose, source_system,
+  active business_owner + technical_owner —
+  `lifecycle.ts`'s `validateTransition()`) were already exactly what the
+  spec asks for; no second registration state machine was written. If an
+  owner wasn't supplied, the transition's `PRECONDITION_FAILED` is caught
+  and swallowed — the agent stays `DISCOVERED` and the existing
+  `getOwnershipIssues()` surfacing on the agent detail page makes the
+  missing owner visible (AC-007), rather than failing registration outright
+  or inventing a second "missing owner" UI.
+- `app/api/v1/agents/discovery/decision/route.ts` — POST endpoint wrapping
+  `recordDiscoveryDecision()` for the one client component that needs a
+  `fetch()` round trip (the Ignore confirm dialog); every other write goes
+  through a server action, matching this codebase's established split.
+- UI: `app/(customer)/agents/discovery/page.tsx` rebuilt into an
+  operational inbox (spec §17-19) — metric cards (New/High Confidence/Needs
+  Review/Potential Duplicates/Recently Changed/Discovery Errors, all
+  query-string-linkable), query-string-driven tabs
+  (All/New/Needs Review/Potential Duplicates/Recently Changed/Ignored), a
+  Sources panel listing configured integrations with a real "Discover Now"
+  button per source (`triggerSyncAction` — the *existing* Integration sync
+  job endpoint, `POST /api/v1/integrations/:id/sync` → `after()` → real
+  connector work; not a second discovery job system), and the candidate
+  list via `DiscoveryCandidatesTable.tsx` (built on the shared
+  `SimpleDataTable` primitive — search/sort/pagination/responsive
+  card-transform for free, same pattern `AgentsTable`/`IntegrationsTable`
+  already establish). Candidate Review at
+  `app/(customer)/agents/discovery/[integrationId]/[externalId]/page.tsx`
+  (spec §21-22, §41-42): Identity, Detection Evidence (every signal with
+  source/observed value/strength/score), Source Evidence (raw payload,
+  collapsible), Correlation (for `likely_duplicate` entries — reuses
+  `computeDuplicateScore`'s existing output, no new scoring), a "Link to
+  existing agent" form, a Register form (name/type/purpose/environment/
+  identity type/business+technical owner, with the spec's exact "does not
+  grant or revoke IAM access" notice), and `IgnoreCandidateButton.tsx`
+  (the established `ConfirmActionDialog` + fetch pattern from
+  `MergeDuplicateButton`).
+
+**Deliberately scoped down / deferred (flagged, not silently dropped):**
+- **Field-level change detection** (`UPDATED`/`OWNER_CHANGED`/
+  `IDENTITY_CHANGED` from spec §26) needs a prior-snapshot/fingerprint
+  history per source object, which neither Identity nor Integration
+  persists today (`integration_objects` is upserted in place with no
+  history retained). Adding that would mean either a new Identity-owned
+  history table (the spec's own forbidden-table list rules out the closest
+  fit, `agent_discovery_history`, for this exact purpose) or an Integration
+  Agent schema/behavior change (crosses module ownership — rule #18: record
+  and stop, don't silently modify another module's table). Neither was
+  done; `DiscoveryChangeType` is honestly scoped to `NEW`/`STALE` only,
+  where `STALE` *is* genuinely derivable today (see above). Flagging this
+  as the one open cross-module question from the spec's §55 gate item "Any
+  required cross-module contract change is documented and explicitly
+  approved" — a real fix needs either Identity Agent's own new table (user
+  approval to add one despite the spec's list) or Integration Agent
+  publishing a change-history contract.
+- **Bulk operations** (spec §39, P0: bulk ignore / bulk owner assignment):
+  not built this pass — every action here is single-candidate. Flagged as
+  a follow-up within this same extension, not a new story.
+- **Event-driven discovery, cloud AI platform discovery, owner
+  suggestions, agent-to-agent relationship discovery** — all explicitly P1
+  in the spec's own §3 scope split; correctly not built.
+- **MCP/runtime cross-source signal fusion** (spec §9's "runtime signals":
+  tool invocation counts, resource access) is not scanned as a distinct
+  detection input beyond "is this integration's category `mcp`/
+  `ai_runtime`" — richer fusion (e.g. reading `activity` objects for a
+  given identity) is a natural next increment, not started.
+- **Registration Dialog's owner/business fields use a raw user-id text
+  input**, matching the exact idiom already established by
+  `assignOwnerAction`'s own form on the agent detail page (no user-picker
+  component exists anywhere in this codebase yet) — not a new gap
+  introduced here.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint .` clean (fixed one
+`react/no-unescaped-entities` and one now-real `no-unused-vars` — the
+latter fixed by adding an explicit `tenant_id` filter to
+`listDiscoveryDecisions()`, belt-and-suspenders alongside RLS, matching
+`listIntegrations()`'s own documented pattern, rather than suppressing the
+warning); `npx vitest run` — 147/147 passing (6 new:
+`classifyAgentSignal`'s NON_AGENT/UNKNOWN/weak-service-account/
+strong-confirmed/medium-probable/score-cap cases); `npm run build` succeeds
+and lists every new route (`/agents/discovery/[integrationId]/[externalId]`,
+`/api/v1/agents/discovery/decision`) alongside the unchanged existing ones.
+Migration applied to the live dev Supabase project; `get_advisors(security)`
+re-checked — no new findings, same accepted-exception set as before.
+
+**Codebase-Fit Acceptance Gate (spec §55) — self-check:** no
+`discovery_jobs`/`discovery_sources` table introduced; no direct
+`integration_objects` query from Identity; integration data consumed only
+through `modules/integrations/service.ts`; discovery runs use the existing
+`integration_sync_jobs`/`triggerSyncAction`/`runSyncJob` path; `/agents/
+discovery` remains functional and its `buildDiscoveryInbox()` categories
+are preserved, not replaced; `agents`/`agent_identities` remain canonical;
+the existing duplicate-candidate workflow (`agent_duplicate_candidates`) is
+reused, not duplicated; no ML/fuzzy correlation engine added; registration
+uses the existing `createAgent`/`linkAgentIdentity`/`assignOwner`/
+`transitionAgentLifecycle` services; ownership prerequisites are the
+pre-existing ones in `lifecycle.ts`; audit uses `writeAudit()` throughout;
+tenant/RBAC checks reuse `requirePermission()` (`agent.read`/`agent.create`)
+and RLS; integration credentials were never touched by any new code path;
+no other module's implementation was modified (Integration Agent's files
+are unchanged) — the one documented cross-module gap is the change-history
+question above, recorded rather than silently worked around.

@@ -55,9 +55,13 @@ export default async function DuplicateCandidatesPage() {
                     <Tr key={c.id}>
                       <Td>{candidateName}</Td>
                       <Td>
-                        <Link href={`/agents/${c.matchedAgentId}`} className="text-primary hover:underline">
-                          {c.matchedAgentId}
-                        </Link>
+                        {c.matchedAgentId ? (
+                          <Link href={`/agents/${c.matchedAgentId}`} className="text-primary hover:underline">
+                            {c.matchedAgentId}
+                          </Link>
+                        ) : (
+                          "—"
+                        )}
                       </Td>
                       <Td>{c.matchScore}</Td>
                       <Td>{c.matchedKeys.join(", ")}</Td>
