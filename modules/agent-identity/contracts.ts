@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
   AgentContract,
+  AutonomyLevel,
   CertificationFrequency,
   MaximumRisk,
 } from "@/lib/shared/types/agent-identity";
@@ -20,6 +21,14 @@ export type ContractInput = {
   prohibitedActions?: string[];
   certificationFrequency?: CertificationFrequency;
   maximumRisk?: MaximumRisk;
+  // IDENTITY-P0-07 — Human Oversight / Autonomy Model fields. Every field
+  // defaults to the most conservative value (see createContractVersion())
+  // rather than silently unrestricted.
+  autonomyLevel?: AutonomyLevel;
+  allowedTools?: string[];
+  actionsRequiringApproval?: string[];
+  requiredMonitoring?: string;
+  requiredComplianceControls?: string[];
 };
 
 /**
@@ -72,6 +81,9 @@ export async function createContractVersion(
   if (!input.purpose.trim()) {
     throw new ApiError(400, "INVALID_INPUT", "purpose is required");
   }
+  if (input.autonomyLevel !== undefined && (input.autonomyLevel < 0 || input.autonomyLevel > 4)) {
+    throw new ApiError(400, "INVALID_INPUT", "autonomyLevel must be between 0 and 4");
+  }
 
   const supabase = supabaseServiceRole();
 
@@ -120,6 +132,13 @@ export async function createContractVersion(
       maximum_risk: input.maximumRisk ?? "medium",
       status: "active",
       version: nextVersion,
+      // Conservative-by-default (IDENTITY-P0-07): lowest autonomy, no
+      // implicit tool access, nothing pre-approved-without-review.
+      autonomy_level: input.autonomyLevel ?? 0,
+      allowed_tools: input.allowedTools ?? [],
+      actions_requiring_approval: input.actionsRequiringApproval ?? [],
+      required_monitoring: input.requiredMonitoring ?? null,
+      required_compliance_controls: input.requiredComplianceControls ?? [],
     })
     .select()
     .single();

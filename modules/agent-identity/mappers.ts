@@ -63,6 +63,11 @@ export function toAgentContract(row: any): AgentContract {
     version: row.version,
     createdAt: row.created_at,
     supersededAt: row.superseded_at,
+    autonomyLevel: (row.autonomy_level ?? 0) as AgentContract["autonomyLevel"],
+    allowedTools: row.allowed_tools ?? [],
+    actionsRequiringApproval: row.actions_requiring_approval ?? [],
+    requiredMonitoring: row.required_monitoring ?? null,
+    requiredComplianceControls: row.required_compliance_controls ?? [],
   };
 }
 

@@ -91,6 +91,8 @@ export async function createContractAction(agentId: string, formData: FormData) 
       .map((s) => s.trim())
       .filter(Boolean);
 
+  const autonomyLevelRaw = String(formData.get("autonomyLevel") ?? "");
+
   await createContractVersion(ctx.tenantId!, agentId, ctx.userId, {
     purpose: String(formData.get("purpose") ?? ""),
     ownerSummary: String(formData.get("ownerSummary") ?? "") || undefined,
@@ -99,6 +101,11 @@ export async function createContractAction(agentId: string, formData: FormData) 
     prohibitedData: listField("prohibitedData"),
     approvedActions: listField("approvedActions"),
     prohibitedActions: listField("prohibitedActions"),
+    autonomyLevel: autonomyLevelRaw ? (Number(autonomyLevelRaw) as 0 | 1 | 2 | 3 | 4) : undefined,
+    allowedTools: listField("allowedTools"),
+    actionsRequiringApproval: listField("actionsRequiringApproval"),
+    requiredMonitoring: String(formData.get("requiredMonitoring") ?? "") || undefined,
+    requiredComplianceControls: listField("requiredComplianceControls"),
   });
   redirect(`/agents/${agentId}`);
 }

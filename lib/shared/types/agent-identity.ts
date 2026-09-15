@@ -76,7 +76,8 @@ export type AgentOwnerType =
   | "technical_owner"
   | "iam_owner"
   | "application_owner"
-  | "data_owner";
+  | "data_owner"
+  | "escalation_owner";
 
 export type AgentOwner = {
   id: string;
@@ -109,6 +110,14 @@ export type AgentLifecycleEvent = {
 export type CertificationFrequency = "monthly" | "quarterly" | "semiannual" | "annual";
 export type MaximumRisk = "low" | "medium" | "high";
 
+/**
+ * Human Oversight / Autonomy Model (governance requirements reconciliation,
+ * 2026-09-15). 0=human performs action, 1=agent recommends, 2=agent acts
+ * with human approval, 3=agent acts autonomously within defined limits,
+ * 4=high autonomy with continuous controls.
+ */
+export type AutonomyLevel = 0 | 1 | 2 | 3 | 4;
+
 export type AgentContract = {
   id: string;
   tenantId: string;
@@ -126,6 +135,12 @@ export type AgentContract = {
   version: number;
   createdAt: string;
   supersededAt: string | null;
+  // IDENTITY-P0-07 — autonomy/oversight fields.
+  autonomyLevel: AutonomyLevel;
+  allowedTools: string[];
+  actionsRequiringApproval: string[];
+  requiredMonitoring: string | null;
+  requiredComplianceControls: string[];
 };
 
 export type AgentRelationshipType =

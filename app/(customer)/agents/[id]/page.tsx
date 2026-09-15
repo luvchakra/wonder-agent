@@ -33,7 +33,14 @@ const LIFECYCLE_STATES = [
   "RETIRED",
 ] as const;
 
-const OWNER_TYPES = ["business_owner", "technical_owner", "iam_owner", "application_owner", "data_owner"] as const;
+const OWNER_TYPES = ["business_owner", "technical_owner", "iam_owner", "application_owner", "data_owner", "escalation_owner"] as const;
+const AUTONOMY_LEVELS = [
+  { value: 0, label: "0 — Human performs action" },
+  { value: 1, label: "1 — Agent recommends" },
+  { value: 2, label: "2 — Agent acts with human approval" },
+  { value: 3, label: "3 — Agent acts autonomously within defined limits" },
+  { value: 4, label: "4 — High autonomy with continuous controls" },
+] as const;
 const RELATIONSHIP_TYPES = ["delegates_to", "depends_on", "shares_credential_with", "orchestrates"] as const;
 const IDENTITY_TYPES = ["service_account", "human_delegate", "oauth_client", "workload_identity", "api_key", "mcp_server"] as const;
 
@@ -216,6 +223,26 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                   {contract.prohibitedData?.join(", ") || "—"} / {contract.prohibitedActions?.join(", ") || "—"}
                 </dd>
               </div>
+              <div>
+                <dt className="text-muted-foreground">Autonomy level</dt>
+                <dd className="text-foreground">{AUTONOMY_LEVELS[contract.autonomyLevel]?.label ?? contract.autonomyLevel}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Allowed tools</dt>
+                <dd className="text-foreground">{contract.allowedTools?.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Actions requiring human approval</dt>
+                <dd className="text-foreground">{contract.actionsRequiringApproval?.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Required monitoring</dt>
+                <dd className="text-foreground">{contract.requiredMonitoring ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Required compliance controls</dt>
+                <dd className="text-foreground">{contract.requiredComplianceControls?.join(", ") || "—"}</dd>
+              </div>
             </dl>
           ) : (
             <EmptyState title="No active contract" description="SHOULD is undefined until a contract is published — see the Risk tab for how this affects findings." />
@@ -251,6 +278,32 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               <label>
                 <span className={labelClass}>Prohibited actions (comma-separated)</span>
                 <input name="prohibitedActions" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Autonomy level</span>
+                <select name="autonomyLevel" defaultValue="0" className={inputClass}>
+                  {AUTONOMY_LEVELS.map((l) => (
+                    <option key={l.value} value={l.value}>
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span className={labelClass}>Allowed tools (comma-separated)</span>
+                <input name="allowedTools" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Actions requiring human approval (comma-separated)</span>
+                <input name="actionsRequiringApproval" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Required monitoring</span>
+                <input name="requiredMonitoring" className={inputClass} />
+              </label>
+              <label className="sm:col-span-2">
+                <span className={labelClass}>Required compliance controls (comma-separated)</span>
+                <input name="requiredComplianceControls" className={inputClass} />
               </label>
               <div className="sm:col-span-2">
                 <Button type="submit" variant="secondary">

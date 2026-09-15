@@ -563,3 +563,48 @@ transitions are structurally allowed, and `SUSPENDED → ACTIVE` directly is
 still correctly rejected); `npm run build` succeeds. No migration needed —
 `agents.lifecycle_state`'s CHECK constraint already permits every state
 this touches.
+
+---
+
+## 2026-09-15 — IDENTITY-P0-07: Contract Autonomy & Oversight Fields (built)
+
+**Agent:** Identity Agent.
+
+**Task:** continuing "start on p0 items" now that the user resolved the
+autonomy-model ownership question (Identity + Access) via `AskUserQuestion`.
+
+**Built:** migration `0052_identity_contract_autonomy_oversight.sql` adds
+`autonomy_level` (int, 0-4, CHECK-constrained), `allowed_tools` (text[]),
+`actions_requiring_approval` (text[]), `required_monitoring` (text,
+nullable), `required_compliance_controls` (text[]) to `agent_contracts`.
+Every new column defaults to the most conservative value (autonomy 0, empty
+tool/approval/control lists) so every pre-existing contract row stays
+conservative until a human explicitly widens it via a new version —
+consistent with this module's existing "never silently unrestricted"
+posture. `lib/shared/types/agent-identity.ts` gained `AutonomyLevel` (a
+literal `0|1|2|3|4` union, not a bare `number`) and the five new
+`AgentContract` fields; `AgentOwnerType` gained `escalation_owner`
+(governance doc's P0-05, previously a noted-but-unscoped gap).
+`contracts.ts`'s `createContractVersion()` validates `autonomyLevel` is in
+range (400 `INVALID_INPUT` otherwise) and persists all five fields with the
+same conservative defaults as the migration. `mappers.ts`'s
+`toAgentContract()` updated. UI: the agent detail page's contract display
+and "Publish new contract version" form both gained the five new
+fields/inputs (autonomy-level select with the five governance-doc labels,
+three comma-separated list inputs, one free-text field), and `OWNER_TYPES`
+gained `escalation_owner` in the owner-assignment form — same idiom as
+every other field on that page, no new UI pattern introduced.
+
+**Deliberately not built here:** enforcement of the 4-state action model
+(allowed/allowed-with-approval/restricted/prohibited) against these new
+fields is Access Agent's `ACCESS-P0-06`, not this story — Identity only
+publishes the SHOULD-side data.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint .` clean; `npx vitest
+run` — 148/148 passing (unchanged — no new pure-function surface to unit
+test; `createContractVersion()` is a DB-touching function without an
+existing mock-Supabase test pattern in this module, matching every other
+service-role write function here); `npm run build` succeeds. Migration
+applied to the live dev Supabase project via the Supabase MCP tool;
+`get_advisors(security)` re-checked — no new findings, same accepted-
+exception set as before.
