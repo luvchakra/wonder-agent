@@ -78,14 +78,18 @@ export type DataTableColumn<T> = {
 };
 
 /**
- * EXPERIENCE-P0-08. A shared sortable/filterable/paginated table with a
- * responsive card-transform below `sm` — the table itself is hidden and
- * each row renders as a labelled key/value card instead, per
- * docs/design/UI-UX-DESIGN-RULES.md's per-breakpoint layout guidance
- * (never just a shrunk desktop table). Domain screens (Agent Inventory,
- * Access, Findings, etc.) pass their own columns/rows; pagination/sort/
- * filter state comes from `useTableState()` above, and totalCount/loading
- * come from the calling page's own server-side query.
+ * EXPERIENCE-P0-08, UX-P0-07/08 (12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md
+ * §10-11). A shared sortable/filterable/paginated table with a responsive
+ * card-transform below `md` — the table itself is hidden and each row
+ * renders as a labelled key/value card instead, per docs/design/UI-UX-
+ * DESIGN-RULES.md's per-breakpoint layout guidance (never just a shrunk
+ * desktop table, never horizontal scroll for critical data). Domain
+ * screens (Agent Inventory, Access, Findings, etc.) pass their own
+ * columns/rows; pagination/sort/filter state comes from `useTableState()`
+ * above, and totalCount/loading come from the calling page's own
+ * server-side query. Row selection/bulk actions/column visibility/density
+ * are not yet implemented — flagged as open UX-008 scope, not silently
+ * dropped.
  */
 export function DataTable<T>({
   columns,
@@ -137,8 +141,8 @@ export function DataTable<T>({
         <EmptyState title={emptyTitle} description={emptyDescription} />
       ) : (
         <>
-          {/* Desktop/tablet: real table, sm+ only. */}
-          <div className="hidden sm:block">
+          {/* Desktop/tablet: real table, md+ only. */}
+          <div className="hidden md:block">
             <TableContainer>
               <Thead>
                 <tr>
@@ -187,8 +191,8 @@ export function DataTable<T>({
             </TableContainer>
           </div>
 
-          {/* Narrow viewports: card-transform, below sm only. */}
-          <ul className="space-y-2 sm:hidden">
+          {/* Narrow viewports: card-transform, below md only. */}
+          <ul className="space-y-2 md:hidden">
             {rows.map((row) => (
               <li key={getRowId(row)}>
                 <button

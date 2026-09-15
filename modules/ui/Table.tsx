@@ -3,10 +3,12 @@ import { cn } from "@/lib/utils";
 /**
  * Wide tables scroll within their own container — the page body itself
  * never scrolls horizontally, per docs/design/UI-UX-DESIGN-RULES.md §3/§30.
+ * `rounded-2xl border` per 12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md §10's
+ * explicit grouped-list container pattern.
  */
 export function TableContainer({ children }: { children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-2xl border border-border">
       <table className="w-full min-w-full text-left text-sm">{children}</table>
     </div>
   );

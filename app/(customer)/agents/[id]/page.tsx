@@ -18,7 +18,7 @@ import {
   linkIdentityAction,
   transitionLifecycleAction,
 } from "@/app/actions/agents";
-import { Badge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
+import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
 
 const LIFECYCLE_STATES = [
   "DISCOVERED",
@@ -93,7 +93,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
-          <Badge tone={LIFECYCLE_TONE[agent.lifecycleState] ?? "neutral"}>{agent.lifecycleState}</Badge>
+          <StatusBadge tone={LIFECYCLE_TONE[agent.lifecycleState] ?? "neutral"}>{agent.lifecycleState}</StatusBadge>
           <SeverityBadge severity={agent.criticality} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">

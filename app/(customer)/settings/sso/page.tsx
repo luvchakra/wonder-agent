@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listSsoConnections } from "@/lib/auth/sso";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { createSsoConnectionAction, setSsoConnectionStatusAction } from "@/app/actions/sso";
-import { Card, CardBody, CardHeader, TableContainer, Thead, Th, Tr, Td, EmptyState, Badge } from "@/modules/ui";
+import { Card, CardBody, CardHeader, TableContainer, Thead, Th, Tr, Td, EmptyState, StatusBadge } from "@/modules/ui";
 
 // FOUNDATION-P0-03.3 — bare functional admin page, gated by `sso.manage`.
 // Not styled to the full UI-UX-DESIGN-RULES standard yet — Experience Agent
@@ -55,7 +55,7 @@ export default async function SsoSettingsPage() {
                     <Td>{c.protocol.toUpperCase()}</Td>
                     <Td>{c.defaultRole}</Td>
                     <Td>
-                      <Badge tone={c.status === "active" ? "success" : "neutral"}>{c.status}</Badge>
+                      <StatusBadge tone={c.status === "active" ? "success" : "neutral"}>{c.status}</StatusBadge>
                     </Td>
                     <Td>
                       <form action={setSsoConnectionStatusAction}>

@@ -44,3 +44,28 @@ const SEVERITY_TONE: Record<string, BadgeTone> = {
 export function SeverityBadge({ severity }: { severity: string }) {
   return <Badge tone={SEVERITY_TONE[severity] ?? "neutral"}>{severity}</Badge>;
 }
+
+const TONE_GLYPH: Record<BadgeTone, string> = {
+  neutral: "●",
+  success: "✓",
+  warning: "▲",
+  danger: "✕",
+  info: "●",
+  accent: "●",
+};
+
+/**
+ * UX-010 (12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md §12) — lifecycle/
+ * operational status indicator: icon + text + color together, never color
+ * alone (e.g. `● ACTIVE`, `▲ WARNING`, `✕ SUSPENDED`, `✓ COMPLIANT`).
+ * Distinct from SeverityBadge (risk severity, text + color only per the
+ * doc's own risk example — no icon glyph there).
+ */
+export function StatusBadge({ tone, children }: { tone: BadgeTone; children: React.ReactNode }) {
+  return (
+    <Badge tone={tone}>
+      <span aria-hidden>{TONE_GLYPH[tone]}</span>
+      {children}
+    </Badge>
+  );
+}

@@ -3,14 +3,17 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 
 /**
- * EXPERIENCE-P0-09 (UX-P0-18). The shadcn/CVA button variant set exactly:
+ * EXPERIENCE-P0-09 (UX-P0-18), UX-P0-06 (12_ADVANCED_PRODUCT_UX_
+ * REQUIREMENTS.md §9). The shadcn/CVA button variant set exactly:
  * default/outline/secondary/ghost/destructive/link — no other variant
  * names. `default` is the primary/CTA action; destructive actions use
  * `destructive` and should generally be visually separated from a nearby
- * primary action (UX-P0-24 / EXPERIENCE-P0-04).
+ * primary action (UX-P0-24 / EXPERIENCE-P0-04). Sizes are the doc's exact
+ * heights (sm: h-8, default: h-9, lg: h-10) plus a square `icon` size for
+ * icon-only buttons (e.g. table-row `...` menus).
  */
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors disabled:opacity-50 disabled:pointer-events-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
   {
     variants: {
       variant: {
@@ -22,9 +25,10 @@ export const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {
-        default: "px-3 py-1.5",
-        sm: "px-2 py-1 text-xs",
-        lg: "px-4 py-2",
+        default: "h-9 px-3",
+        sm: "h-8 px-2.5 text-xs",
+        lg: "h-10 px-4",
+        icon: "h-9 w-9 p-0",
       },
     },
     defaultVariants: { variant: "default", size: "default" },
