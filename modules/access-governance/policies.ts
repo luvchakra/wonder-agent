@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
@@ -9,6 +9,7 @@ import type {
   PolicyCategory,
   PolicyCondition,
   PolicyException,
+  PolicyExceptionScopeType,
   PolicyRule,
   PolicyRuleType,
   PolicySeverity,
@@ -156,21 +157,85 @@ export async function listPolicyRules(policyId: string): Promise<PolicyRule[]> {
   return (data ?? []).map(toPolicyRule);
 }
 
+export type GovernanceExceptionInput = {
+  reason: string;
+  agentId?: string;
+  expiresAt?: string;
+  businessJustification?: string;
+  compensatingControl?: string;
+  residualRisk?: "low" | "medium" | "high" | "critical";
+};
+
+/**
+ * ACCESS-P0-07: `policy_exceptions` is now the canonical governance
+ * exception model, not scoped to access policy alone (governance
+ * requirements reconciliation, 2026-09-15). This helper stays the
+ * policy-scoped entry point (`scopeType: "policy"`, `policyId` required) —
+ * existing callers only need to start passing `tenantId`.
+ */
 export async function addPolicyException(
+  tenantId: string,
   policyId: string,
   approvedBy: string,
-  reason: string,
-  agentId?: string,
-  expiresAt?: string,
+  input: GovernanceExceptionInput,
 ): Promise<PolicyException> {
-  if (!reason.trim()) throw new ApiError(400, "INVALID_INPUT", "reason is required");
+  return createGovernanceException(tenantId, approvedBy, {
+    scopeType: "policy",
+    policyId,
+    ...input,
+  });
+}
+
+/**
+ * The general entry point any module can use once it has a real exception
+ * to record against something other than an access policy (e.g.
+ * Compliance's planned control-mapping exceptions) — a `scopeId` pointing
+ * at the target row instead of `policyId`. Every exception still requires
+ * an approver today (`approvedBy`), matching P0's "minimal, manually-
+ * approved" scope — the full async request/approval workflow is
+ * `ACCESS-P1-04`, not this function.
+ */
+export async function createGovernanceException(
+  tenantId: string,
+  approvedBy: string,
+  input: GovernanceExceptionInput & { scopeType: PolicyExceptionScopeType; policyId?: string; scopeId?: string },
+): Promise<PolicyException> {
+  if (!input.reason.trim()) throw new ApiError(400, "INVALID_INPUT", "reason is required");
+  if (input.scopeType === "policy" && !input.policyId) {
+    throw new ApiError(400, "INVALID_INPUT", "policyId is required when scopeType is 'policy'");
+  }
+
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("policy_exceptions")
-    .insert({ policy_id: policyId, agent_id: agentId ?? null, reason, approved_by: approvedBy, expires_at: expiresAt ?? null })
+    .insert({
+      tenant_id: tenantId,
+      scope_type: input.scopeType,
+      policy_id: input.policyId ?? null,
+      scope_id: input.scopeId ?? null,
+      agent_id: input.agentId ?? null,
+      reason: input.reason,
+      business_justification: input.businessJustification ?? null,
+      approved_by: approvedBy,
+      compensating_control: input.compensatingControl ?? null,
+      residual_risk: input.residualRisk ?? null,
+      expires_at: input.expiresAt ?? null,
+    })
     .select()
     .single();
-  if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to add policy exception");
+  if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to add governance exception");
+
+  await writeAudit({
+    tenantId,
+    actorId: approvedBy,
+    actorType: "user",
+    action: "governance_exception.created",
+    objectType: "policy_exception",
+    objectId: data.id,
+    outcome: "success",
+    metadata: { scopeType: input.scopeType, policyId: input.policyId, scopeId: input.scopeId, agentId: input.agentId },
+  });
+
   return toPolicyException(data);
 }
 
@@ -179,4 +244,54 @@ export async function listPolicyExceptions(policyId: string): Promise<PolicyExce
   const { data, error } = await supabase.from("policy_exceptions").select().eq("policy_id", policyId);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyException);
+}
+
+export async function listGovernanceExceptions(
+  tenantId: string,
+  filter?: { scopeType?: PolicyExceptionScopeType; scopeId?: string; agentId?: string },
+): Promise<PolicyException[]> {
+  const supabase = await supabaseServer();
+  let query = supabase.from("policy_exceptions").select().eq("tenant_id", tenantId);
+  if (filter?.scopeType) query = query.eq("scope_type", filter.scopeType);
+  if (filter?.scopeId) query = query.eq("scope_id", filter.scopeId);
+  if (filter?.agentId) query = query.eq("agent_id", filter.agentId);
+  const { data, error } = await query.order("created_at", { ascending: false });
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map(toPolicyException);
+}
+
+/**
+ * No client UPDATE policy exists on `policy_exceptions` (migration `0053`
+ * removed it entirely) — revocation is integrity-sensitive the same way a
+ * lifecycle transition is, so it runs via the service-role client with an
+ * explicit tenant check, not a client-facing update.
+ */
+export async function revokeException(tenantId: string, actorId: string, exceptionId: string): Promise<void> {
+  const supabase = supabaseServiceRole();
+  const { data: existing, error: fetchError } = await supabase
+    .from("policy_exceptions")
+    .select("id, status")
+    .eq("id", exceptionId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (fetchError) throw new ApiError(500, "QUERY_FAILED", fetchError.message);
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Exception not found");
+  if (existing.status === "revoked") throw new ApiError(409, "ALREADY_REVOKED", "Exception already revoked");
+
+  const { error } = await supabase
+    .from("policy_exceptions")
+    .update({ status: "revoked" })
+    .eq("id", exceptionId)
+    .eq("tenant_id", tenantId);
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "governance_exception.revoked",
+    objectType: "policy_exception",
+    objectId: exceptionId,
+    outcome: "success",
+  });
 }

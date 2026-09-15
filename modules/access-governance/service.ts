@@ -20,7 +20,11 @@ export {
   listPolicyRules,
   addPolicyException,
   listPolicyExceptions,
+  createGovernanceException,
+  listGovernanceExceptions,
+  revokeException,
   type CreatePolicyInput,
+  type GovernanceExceptionInput,
 } from "./policies";
 export { evaluatePolicies, listPolicyEvaluations } from "./evaluate";
 export { checkSoD, type SoDCheckResult } from "./sod";

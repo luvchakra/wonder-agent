@@ -19,7 +19,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const ctx = await requirePermission("policy.update");
     const { id } = await params;
     const body = await request.json();
-    const exception = await addPolicyException(id, ctx.userId, body.reason, body.agentId, body.expiresAt);
+    const exception = await addPolicyException(ctx.tenantId!, id, ctx.userId, {
+      reason: body.reason,
+      agentId: body.agentId,
+      expiresAt: body.expiresAt,
+      businessJustification: body.businessJustification,
+      compensatingControl: body.compensatingControl,
+      residualRisk: body.residualRisk,
+    });
     return NextResponse.json({ ok: true, data: exception }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

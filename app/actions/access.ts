@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
+  addPolicyException,
   addPolicyRule,
   createApplication,
   createEntitlement,
@@ -10,6 +11,7 @@ import {
   createPolicy,
   decideAccessRequest,
   evaluatePolicies,
+  revokeException,
 } from "@/modules/access-governance/service";
 import type {
   AccessRequestStatus,
@@ -74,5 +76,26 @@ export async function addPolicyRuleAction(policyId: string, formData: FormData) 
   await requirePermission("policy.update");
   const condition = JSON.parse(String(formData.get("condition") ?? "{}"));
   await addPolicyRule(policyId, formData.get("ruleType") as PolicyRuleType, condition);
+  redirect(`/policies/${policyId}`);
+}
+
+// ACCESS-P0-07 — policy_exceptions is now the canonical governance
+// exception model; this action stays the policy-scoped entry point.
+export async function addPolicyExceptionAction(policyId: string, formData: FormData) {
+  const ctx = await requirePermission("policy.update");
+  await addPolicyException(ctx.tenantId!, policyId, ctx.userId, {
+    reason: String(formData.get("reason") ?? ""),
+    agentId: String(formData.get("agentId") ?? "") || undefined,
+    expiresAt: String(formData.get("expiresAt") ?? "") || undefined,
+    businessJustification: String(formData.get("businessJustification") ?? "") || undefined,
+    compensatingControl: String(formData.get("compensatingControl") ?? "") || undefined,
+    residualRisk: (formData.get("residualRisk") as "low" | "medium" | "high" | "critical" | null) || undefined,
+  });
+  redirect(`/policies/${policyId}`);
+}
+
+export async function revokeExceptionAction(policyId: string, exceptionId: string) {
+  const ctx = await requirePermission("policy.update");
+  await revokeException(ctx.tenantId!, ctx.userId, exceptionId);
   redirect(`/policies/${policyId}`);
 }

@@ -123,10 +123,18 @@ export function toPolicyRule(row: any): PolicyRule {
 export function toPolicyException(row: any): PolicyException {
   return {
     id: row.id,
+    tenantId: row.tenant_id,
     policyId: row.policy_id,
+    scopeType: row.scope_type ?? "policy",
+    scopeId: row.scope_id ?? null,
     agentId: row.agent_id,
     reason: row.reason,
+    businessJustification: row.business_justification ?? null,
     approvedBy: row.approved_by,
+    compensatingControl: row.compensating_control ?? null,
+    residualRisk: row.residual_risk ?? null,
+    status: row.status ?? "active",
+    startDate: row.start_date ?? row.created_at,
     expiresAt: row.expires_at,
     createdAt: row.created_at,
   };

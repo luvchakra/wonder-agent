@@ -397,3 +397,58 @@ also live but is a dependency-contract addition rather than its own
 
 No code, migration, or test files were changed in this pass — documentation
 only, per the task's explicit scope.
+
+---
+
+## 2026-09-15 — ACCESS-P0-07: Broaden `policy_exceptions` (built)
+
+**Agent:** Access Agent.
+
+**Task:** continuing "start on p0 items" now that the user resolved the
+Governance Exceptions consolidation question via `AskUserQuestion`
+("broaden Access's `policy_exceptions`").
+
+**Built:** migration `0053_access_governance_exception_model.sql`. Added a
+real `tenant_id` column (backfilled from the joined `policies` row, then
+set `NOT NULL`) since exceptions no longer always reference a policy —
+isolation previously depended entirely on a join through
+`policies.tenant_id`, which can't work for a `scope_type` other than
+`'policy'`. Made `policy_id` nullable, added `scope_type` (`policy` /
+`attestation` / `certification` / `control_mapping` /
+`contract_requirement`) + `scope_id`, `business_justification`,
+`compensating_control`, `residual_risk`, `status` (`active`/`revoked`),
+`start_date`. A CHECK constraint (`scope_type <> 'policy' or policy_id is
+not null`) keeps the existing policy-scoped path's data integrity. RLS
+policies rebuilt on `tenant_id` directly (simpler and correct for
+non-policy scopes) — still no client UPDATE policy; revocation is a new
+service-role function (`revokeException()`) with a manual tenant check,
+matching this codebase's pattern for every other integrity-sensitive
+write.
+
+`modules/access-governance/policies.ts`: `addPolicyException()` now takes
+`tenantId` and a structured input object (existing callers updated, not
+left broken); new `createGovernanceException()` (the general, any-scope-
+type entry point other modules will call once they have a real exception
+to record — e.g. Compliance's planned `CERT-P1-04`), `listGovernanceExceptions()`
+(filterable by scope), and `revokeException()`. `lib/shared/types/access-
+governance.ts`'s `PolicyException` gained every new field.
+`app/api/v1/policies/[id]/exceptions/route.ts` and a new
+`addPolicyExceptionAction`/`revokeExceptionAction` pair in
+`app/actions/access.ts` wired through. UI: the policy detail page's
+Exceptions card now shows status/residual-risk/justification/compensating-
+control and a real "Add exception"/"Revoke" flow (previously read-only
+display with no add form at all — this closes that gap too, not just the
+schema).
+
+**Deliberately not built here:** the full async request/approval/expiry/
+renewal workflow remains `ACCESS-P1-04`, correctly un-promoted — every
+exception here still requires an approver at creation time (P0's existing
+"minimal, manually-approved" scope, unchanged). Compliance Agent's own
+`CERT-P1-04` story (referencing this table) is that module's to build, not
+started here.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint .` clean; `npx vitest
+run` — 148/148 passing (unchanged, no new pure-function surface); `npm run
+build` succeeds. Migration applied to the live dev Supabase project via the
+Supabase MCP tool; `get_advisors(security)` re-checked — no new findings,
+same accepted-exception set as before.

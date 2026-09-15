@@ -165,12 +165,33 @@ export type PolicyRule = {
   createdAt: string;
 };
 
+// ACCESS-P0-07 — the canonical governance-exception model, not scoped to
+// access policy alone (governance requirements reconciliation, 2026-09-15).
+export type PolicyExceptionScopeType =
+  | "policy"
+  | "attestation"
+  | "certification"
+  | "control_mapping"
+  | "contract_requirement";
+
+export type PolicyExceptionStatus = "active" | "revoked";
+
 export type PolicyException = {
   id: string;
-  policyId: string;
+  tenantId: string;
+  /** Only set when scopeType === "policy"; null for other scope types. */
+  policyId: string | null;
+  scopeType: PolicyExceptionScopeType;
+  /** The target row's id when scopeType !== "policy" (e.g. an attestation id). */
+  scopeId: string | null;
   agentId: string | null;
   reason: string;
+  businessJustification: string | null;
   approvedBy: string;
+  compensatingControl: string | null;
+  residualRisk: "low" | "medium" | "high" | "critical" | null;
+  status: PolicyExceptionStatus;
+  startDate: string;
   expiresAt: string | null;
   createdAt: string;
 };

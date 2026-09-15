@@ -3,10 +3,11 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getPolicy, listPolicyExceptions, listPolicyRules } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { addPolicyRuleAction } from "@/app/actions/access";
-import { Badge, SeverityBadge, Card, CardHeader, CardBody, Button, EmptyState, TextField, SelectField } from "@/modules/ui";
+import { addPolicyRuleAction, addPolicyExceptionAction, revokeExceptionAction } from "@/app/actions/access";
+import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, EmptyState, TextField, SelectField } from "@/modules/ui";
 
 const RULE_TYPES = ["rbac", "abac", "resource", "time"] as const;
+const RESIDUAL_RISKS = ["low", "medium", "high", "critical"] as const;
 
 export default async function PolicyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,6 +23,7 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
 
   const [rules, exceptions] = await Promise.all([listPolicyRules(id), listPolicyExceptions(id)]);
   const addRuleWithId = addPolicyRuleAction.bind(null, id);
+  const addExceptionWithId = addPolicyExceptionAction.bind(null, id);
 
   return (
     <div className="space-y-4">
@@ -71,20 +73,65 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
       </Card>
 
       <Card>
-        <CardHeader title="Exceptions" description={`${exceptions.length} exception${exceptions.length === 1 ? "" : "s"}`} />
-        <CardBody>
+        <CardHeader
+          title="Exceptions"
+          description={`${exceptions.length} exception${exceptions.length === 1 ? "" : "s"} — the canonical governance exception model (ACCESS-P0-07)`}
+        />
+        <CardBody className="space-y-3">
           {exceptions.length === 0 ? (
             <EmptyState title="No exceptions granted" />
           ) : (
-            <ul className="space-y-1 text-sm text-muted-foreground">
-              {exceptions.map((e) => (
-                <li key={e.id}>
-                  {e.reason} <span className="text-muted-foreground">{e.agentId ? `(agent ${e.agentId})` : "(tenant-wide)"}</span>
-                  {e.expiresAt ? ` — expires ${e.expiresAt}` : ""}
-                </li>
-              ))}
+            <ul className="space-y-2">
+              {exceptions.map((e) => {
+                const revokeWithIds = revokeExceptionAction.bind(null, id, e.id);
+                const isExpired = !!e.expiresAt && new Date(e.expiresAt) < new Date();
+                return (
+                  <li key={e.id} className="rounded-md border border-border p-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge tone={e.status === "revoked" ? "neutral" : isExpired ? "warning" : "success"}>
+                        {e.status === "revoked" ? "revoked" : isExpired ? "expired" : "active"}
+                      </StatusBadge>
+                      {e.residualRisk && <SeverityBadge severity={e.residualRisk} />}
+                      <span className="text-muted-foreground">{e.agentId ? `agent ${e.agentId}` : "tenant-wide"}</span>
+                      {e.expiresAt && <span className="text-xs text-muted-foreground">expires {e.expiresAt}</span>}
+                    </div>
+                    <p className="mt-1 text-foreground">{e.reason}</p>
+                    {e.businessJustification && <p className="mt-1 text-xs text-muted-foreground">Justification: {e.businessJustification}</p>}
+                    {e.compensatingControl && <p className="text-xs text-muted-foreground">Compensating control: {e.compensatingControl}</p>}
+                    {e.status !== "revoked" && (
+                      <form action={revokeWithIds} className="mt-2">
+                        <Button type="submit" variant="destructive" size="sm">
+                          Revoke
+                        </Button>
+                      </form>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
+          <form action={addExceptionWithId} className="grid grid-cols-1 gap-3 border-t border-border pt-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <TextField label="Reason" name="reason" required />
+            </div>
+            <TextField label="Agent ID (blank = tenant-wide)" name="agentId" placeholder="agent id (uuid)" />
+            <TextField label="Expires at" name="expiresAt" type="datetime-local" />
+            <TextField label="Business justification" name="businessJustification" />
+            <TextField label="Compensating control" name="compensatingControl" />
+            <SelectField label="Residual risk" name="residualRisk" defaultValue="">
+              <option value="">—</option>
+              {RESIDUAL_RISKS.map((r) => (
+                <option key={r} value={r}>
+                  {r}
+                </option>
+              ))}
+            </SelectField>
+            <div className="sm:col-span-2">
+              <Button type="submit" variant="secondary">
+                Add exception
+              </Button>
+            </div>
+          </form>
         </CardBody>
       </Card>
     </div>
