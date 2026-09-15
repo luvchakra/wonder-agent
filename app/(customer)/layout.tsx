@@ -68,6 +68,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const ctx = await getTenantContext();
   if (!ctx.tenantId) redirect("/onboarding");
 
+  const { data: profile } = await supabase.from("users").select("display_name").eq("id", user.id).maybeSingle<{ display_name: string | null }>();
+
   // Tenant-switcher list: the user's own active memberships, RLS-scoped —
   // read directly here (display-only, not a mutation) since Foundation
   // publishes getTenantContext() for the *current* tenant but not a
@@ -104,7 +106,13 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           <Nav
             groups={NAV_GROUPS}
             footer={
-              <AccountPanel email={user.email ?? ""} tenants={tenantOptions} onSelectTenant={selectTenantAction} onSignOut={signOutAction} />
+              <AccountPanel
+                email={user.email ?? ""}
+                displayName={profile?.display_name ?? null}
+                tenants={tenantOptions}
+                onSelectTenant={selectTenantAction}
+                onSignOut={signOutAction}
+              />
             }
           />
           <Link href="/" className="text-sm font-semibold text-foreground">

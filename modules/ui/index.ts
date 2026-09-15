@@ -9,6 +9,7 @@ export { Button, LinkButton } from "./Button";
 export { TableContainer, Thead, Th, Td, Tr } from "./Table";
 export { EmptyState, ErrorState, NotYetAvailable, CardGridSkeleton, TableSkeleton, DetailSkeleton } from "./States";
 export { ThemeToggle, ThemeFlashGuard } from "./theme";
+export { Avatar } from "./Avatar";
 export { RiskTrendChart } from "./RiskTrendChart";
 export { ConfirmActionDialog, type ConfirmActionResult, type BulkActionItemResult } from "./ConfirmAction";
 export { EvidenceDrawer, useEvidenceDrawerParam } from "./Drawer";
