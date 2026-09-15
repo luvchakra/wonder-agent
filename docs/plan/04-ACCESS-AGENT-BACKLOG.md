@@ -26,7 +26,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-03 | Access Graph (graph-compatible relationships + tabular view) | Done — 2026-09-14 |
 | ACCESS-P0-04 | Contract Comparison (SHOULD vs CAN diff: approved / excessive / missing / unknown) | Done — 2026-09-14, unit-tested against the live FinanceBot fixture's exact data |
 | ACCESS-P0-05 | Policy Versioning, Priority & Change History (extends ACCESS-P0-02.1) | Done — 2026-09-14, live RLS-verified |
-| ACCESS-P0-06 | Action governance enforcement (4-state model, uses Identity's autonomy fields) | Not Started — 2026-09-15, depends on IDENTITY-P0-07 landing first |
+| ACCESS-P0-06 | Action governance enforcement (4-state model, uses Identity's autonomy fields) | Done — 2026-09-15, unit-tested, no migration needed |
 | ACCESS-P0-07 | Broaden `policy_exceptions` into the canonical governance-exception model | Done — 2026-09-15, migration `0053`, live-applied |
 
 ---

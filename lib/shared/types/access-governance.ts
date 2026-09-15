@@ -6,6 +6,17 @@
  * access_grants/policies/etc. directly.
  */
 
+// ACCESS-P0-06 — Action Governance's 4-state model (governance requirements
+// reconciliation, 2026-09-15), enforced against Identity's IDENTITY-P0-07
+// contract fields. Deterministic classification, never an LLM decision
+// (non-negotiable #9).
+export type ActionGovernanceState = "allowed" | "allowed_with_approval" | "restricted" | "prohibited";
+
+export type ActionGovernanceResult = {
+  action: string;
+  state: ActionGovernanceState;
+};
+
 export type Application = {
   id: string;
   tenantId: string;

@@ -30,3 +30,4 @@ export { evaluatePolicies, listPolicyEvaluations } from "./evaluate";
 export { checkSoD, type SoDCheckResult } from "./sod";
 export { getAccessGraph } from "./graph";
 export { compareAccessToContract } from "./comparison";
+export { classifyAction, classifyActionsForAgent } from "./actionGovernance";

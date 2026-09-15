@@ -452,3 +452,43 @@ run` — 148/148 passing (unchanged, no new pure-function surface); `npm run
 build` succeeds. Migration applied to the live dev Supabase project via the
 Supabase MCP tool; `get_advisors(security)` re-checked — no new findings,
 same accepted-exception set as before.
+
+---
+
+## 2026-09-15 — ACCESS-P0-06: Action Governance 4-state enforcement (built)
+
+**Agent:** Access Agent.
+
+**Task:** the Access-half of the resolved Human Oversight / Autonomy Model
+decision ("Identity + Access"), now that `IDENTITY-P0-07` (the contract
+fields this reads) is built.
+
+**Built:** `modules/access-governance/actionGovernance.ts` — a pure,
+deterministic `classifyAction(contract, action)` (prohibited beats
+requires-approval beats approved; anything the contract never mentions
+defaults to `restricted`, never silently `allowed` — an unmentioned action
+was never authorized) and `classifyActionsForAgent(agentId, actions?)`,
+which fetches the agent's active contract and classifies either a supplied
+action list or, when omitted, every action the contract itself names.
+`lib/shared/types/access-governance.ts` gained `ActionGovernanceState`
+(`allowed`/`allowed_with_approval`/`restricted`/`prohibited`) and
+`ActionGovernanceResult`. Exposed via `GET /api/v1/access/agents/:agentId/
+action-governance?actions=a,b,c`. No migration needed — reads
+`IDENTITY-P0-07`'s already-shipped `agent_contracts` columns only, through
+Identity's published `getAgentContract()` contract (never queries
+`agent_contracts` directly — non-negotiable #6).
+
+**Deliberately not built here:** this is classification, not enforcement in
+the "block the call" sense — the governance requirements doc itself scopes
+"full real-time enforcement gateway" to P1, and this codebase has no
+runtime interception point to enforce against yet (Product Boundary #6:
+WonderAgent is not a PAM/enforcement gateway). No UI was added either —
+`ACCESS-P0-04`'s own `compareAccessToContract()` API (built 2026-09-14) has
+the same characteristic (API-complete, no consuming UI page yet); Experience
+Agent owns surfacing both, not this story.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint .` clean; `npx vitest
+run` — 154/154 passing (6 new: allowed/allowed-with-approval/prohibited/
+default-restricted/case-insensitivity/prohibited-beats-approved-when-
+contradictory); `npm run build` succeeds. No migration, no advisory
+re-check needed (no schema touched).
