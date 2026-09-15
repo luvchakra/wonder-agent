@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, Menu, X } from "lucide-react";
+import { Check, ChevronRight, Menu, X } from "lucide-react";
 import { NavIcon } from "./NavIcon";
 import type { TenantOption } from "./AccountPanel";
 
@@ -47,6 +47,21 @@ export function Nav({
 
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
+  // Sub-menus are collapsed by default; a group only starts expanded when
+  // the current page is inside it, so the active section's still visible
+  // on load. From there, only the arrow button opens/closes a group — the
+  // label itself always navigates, it never toggles.
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(groups.filter((g) => g.children?.some((c) => isActive(c.href))).map((g) => g.href)),
+  );
+  const toggleExpanded = (href: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(href)) next.delete(href);
+      else next.add(href);
+      return next;
+    });
+
   return (
     <>
       <button
@@ -82,22 +97,35 @@ export function Nav({
             <nav aria-label="Main" className="flex flex-col py-1">
               {groups.map((group) => {
                 const active = isActive(group.href);
+                const hasChildren = !!group.children?.length;
+                const isOpen = expanded.has(group.href);
                 return (
                   <div key={group.href}>
-                    <Link
-                      href={group.href}
-                      onClick={() => setOpen(false)}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex items-center gap-2.5 px-3 py-2.5 font-medium hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring ${
-                        active ? "bg-sidebar-accent" : ""
-                      }`}
-                    >
-                      <NavIcon name={group.icon} className="size-4 shrink-0 text-muted-foreground" />
-                      {group.label}
-                    </Link>
-                    {group.children && (
+                    <div className={`flex items-center hover:bg-sidebar-accent ${active ? "bg-sidebar-accent" : ""}`}>
+                      <Link
+                        href={group.href}
+                        onClick={() => setOpen(false)}
+                        aria-current={active ? "page" : undefined}
+                        className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 font-medium focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                      >
+                        <NavIcon name={group.icon} className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="truncate">{group.label}</span>
+                      </Link>
+                      {hasChildren && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpanded(group.href)}
+                          aria-label={isOpen ? `Collapse ${group.label}` : `Expand ${group.label}`}
+                          aria-expanded={isOpen}
+                          className="flex shrink-0 items-center justify-center self-stretch px-3 text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+                        >
+                          <ChevronRight className={`size-4 transition-transform ${isOpen ? "rotate-90" : ""}`} aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                    {hasChildren && isOpen && (
                       <div className="ml-3 border-l border-sidebar-border pl-6">
-                        {group.children.map((child) => (
+                        {group.children!.map((child) => (
                           <Link
                             key={child.href}
                             href={child.href}
