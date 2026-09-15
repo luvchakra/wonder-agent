@@ -21,12 +21,14 @@ export function AccountPanel({
   email,
   displayName,
   tenants,
+  isPlatformAdmin,
   onSelectTenant,
   onSignOut,
 }: {
   email: string;
   displayName?: string | null;
   tenants: TenantOption[];
+  isPlatformAdmin?: boolean;
   onSelectTenant: (formData: FormData) => void | Promise<void>;
   onSignOut: (formData: FormData) => void | Promise<void>;
 }) {
@@ -83,6 +85,17 @@ export function AccountPanel({
               <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Appearance</p>
               <ThemeToggle />
             </div>
+
+            {isPlatformAdmin && (
+              <DropdownMenu.Item asChild>
+                <Link
+                  href="/platform-admin"
+                  className="mt-1 block cursor-pointer rounded-md px-2 py-1.5 text-sm text-popover-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent"
+                >
+                  Admin console
+                </Link>
+              </DropdownMenu.Item>
+            )}
 
             {tenants.length > 1 && (
               <>

@@ -2,21 +2,25 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
+import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { Nav, type NavGroup } from "@/modules/ui/Nav";
 import { AccountPanel } from "@/modules/ui/AccountPanel";
+import { WorkspaceSwitcher } from "@/modules/ui/WorkspaceSwitcher";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 
 const NAV_GROUPS: NavGroup[] = [
-  { label: "Overview", href: "/" },
+  { label: "Overview", href: "/", icon: "◧" },
   {
     label: "AI Identity",
     href: "/agents",
+    icon: "◈",
     children: [{ label: "Agents", href: "/agents" }],
   },
   {
     label: "Access Governance",
     href: "/access",
+    icon: "◇",
     children: [
       { label: "Effective Access", href: "/access" },
       { label: "Access Requests", href: "/access/requests" },
@@ -26,11 +30,13 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Runtime Assurance",
     href: "/runtime",
+    icon: "◎",
     children: [{ label: "Activity & SHOULD/CAN/DID", href: "/runtime" }],
   },
   {
     label: "Risk & Compliance",
     href: "/risk",
+    icon: "▲",
     children: [
       { label: "Risk Findings", href: "/risk" },
       { label: "Rogue Agents", href: "/risk/rogue" },
@@ -40,24 +46,30 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Integrations",
     href: "/integrations",
+    icon: "⬡",
     children: [{ label: "Connected Systems", href: "/integrations" }],
   },
-  { label: "Search", href: "/search" },
+  { label: "Search", href: "/search", icon: "🔍" },
   {
     label: "Audit & Reports",
     href: "/reports",
+    icon: "▤",
     children: [
       { label: "Reports", href: "/reports" },
       { label: "Audit Trail", href: "/audit" },
     ],
   },
-  { label: "Administration", href: "/settings" },
+  { label: "Administration", href: "/settings", icon: "⚙" },
 ];
 
 // EXPERIENCE-P0-01.1. The one shared customer-facing shell every domain
 // module's pages mount into (app/(customer)/* — a Next.js route group, so
-// URLs are unaffected). Platform Admin is never referenced here, in any
-// state, for any role — CLAUDE.md non-negotiable #3.
+// URLs are unaffected). The customer layout never grants or checks
+// Platform Administration access itself — CLAUDE.md non-negotiable #3 —
+// it only asks the separate, service-role-backed isPlatformAdmin() gate
+// (lib/rbac/requirePlatformAdmin.ts) whether to *show* the account menu's
+// "Admin console" link (UX-004), matching the same never-a-customer-role
+// check /platform-admin's own routes already enforce.
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   const supabase = await supabaseServer();
   const {
@@ -68,17 +80,21 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const ctx = await getTenantContext();
   if (!ctx.tenantId) redirect("/onboarding");
 
-  const { data: profile } = await supabase.from("users").select("display_name").eq("id", user.id).maybeSingle<{ display_name: string | null }>();
-
-  // Tenant-switcher list: the user's own active memberships, RLS-scoped —
-  // read directly here (display-only, not a mutation) since Foundation
-  // publishes getTenantContext() for the *current* tenant but not a
-  // "list all my memberships" contract; flagged in the audit log.
-  const { data: memberships } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id, tenants(name, slug)")
-    .eq("status", "active")
-    .returns<{ tenant_id: string; tenants: { name: string; slug: string } | null }[]>();
+  // Independent reads, fetched in parallel (CLAUDE.md §15 — no sequential
+  // waterfalls for a page's independent data).
+  const [{ data: profile }, { data: memberships }, isAdmin] = await Promise.all([
+    supabase.from("users").select("display_name").eq("id", user.id).maybeSingle<{ display_name: string | null }>(),
+    // Tenant-switcher list: the user's own active memberships, RLS-scoped —
+    // read directly here (display-only, not a mutation) since Foundation
+    // publishes getTenantContext() for the *current* tenant but not a
+    // "list all my memberships" contract; flagged in the audit log.
+    supabase
+      .from("tenant_memberships")
+      .select("tenant_id, tenants(name, slug)")
+      .eq("status", "active")
+      .returns<{ tenant_id: string; tenants: { name: string; slug: string } | null }[]>(),
+    isPlatformAdmin(),
+  ]);
 
   const tenantOptions = (memberships ?? []).map((m) => ({
     id: m.tenant_id,
@@ -97,19 +113,22 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       >
         Skip to content
       </a>
-      <header className="flex items-center justify-between gap-4 border-b border-border bg-background px-4 py-3 lg:px-6">
-        {/* EXPERIENCE-P0-09 (UX-P0-15) — left group: nav trigger, logo, and
-            the current tenant (a switcher lives in the nav drawer's
+      <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-background px-4 lg:px-6">
+        {/* EXPERIENCE-P0-09 (UX-P0-15), UX-P0-02/03 — left group: nav
+            trigger, logo, and the current tenant (a full switcher lives at
+            the top of the nav drawer — WorkspaceSwitcher — and again in
             AccountPanel, not a separate topbar control). Right group:
             search and notifications only — no user avatar. */}
         <div className="flex items-center gap-3">
           <Nav
             groups={NAV_GROUPS}
+            topSwitcher={<WorkspaceSwitcher tenants={tenantOptions} onSelectTenant={selectTenantAction} />}
             footer={
               <AccountPanel
                 email={user.email ?? ""}
                 displayName={profile?.display_name ?? null}
                 tenants={tenantOptions}
+                isPlatformAdmin={isAdmin}
                 onSelectTenant={selectTenantAction}
                 onSignOut={signOutAction}
               />
