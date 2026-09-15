@@ -117,12 +117,13 @@ export default async function CustomerLayout({ children }: { children: React.Rea
         {/* UX-P0-02/03 (12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md), ported
             structurally from WonderArk's AppTopbar (packages/core/src/
             components/shell/app-topbar.tsx, luvchakra/founder-collab): nav
-            trigger + logo + workspace switcher grouped on the left; the nav
-            drawer's own "Tenants" section (Nav.tsx) and AccountPanel handle
-            the rest — no tenant slug text duplicated here. Right group:
-            search and notifications — no user avatar in the topbar. */}
+            trigger + logo + workspace switcher grouped on the left. The
+            drawer's own bottom content is AccountPanel only — no tenant
+            list duplicated there, the topbar's WorkspaceSwitcher is the
+            only tenant-switching surface. Right group: search and
+            notifications — no user avatar in the topbar. */}
         <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Nav groups={NAV_GROUPS} tenants={tenantOptions} onSelectTenant={selectTenantAction} footer={<AccountPanel email={user.email ?? ""} displayName={profile?.display_name ?? null} isPlatformAdmin={isAdmin} onSignOut={signOutAction} />} />
+          <Nav groups={NAV_GROUPS} footer={<AccountPanel email={user.email ?? ""} displayName={profile?.display_name ?? null} isPlatformAdmin={isAdmin} onSignOut={signOutAction} />} />
           <Logo />
           <WorkspaceSwitcher tenants={tenantOptions} onSelectTenant={selectTenantAction} />
         </div>

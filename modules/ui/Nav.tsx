@@ -4,9 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Check, ChevronRight, Menu, X } from "lucide-react";
+import { ChevronRight, Menu, X } from "lucide-react";
 import { NavIcon } from "./NavIcon";
-import type { TenantOption } from "./AccountPanel";
 
 export type NavGroup = {
   label: string;
@@ -18,28 +17,27 @@ export type NavGroup = {
 /**
  * EXPERIENCE-P0-09 (UX-P0-16), restructured to match WonderArk's actual
  * shell (packages/core/src/components/shell/app-sidebar.tsx +
- * sidebar-toggle.tsx in luvchakra/founder-collab — the platform's own
- * sibling product and the literal source of record, not a screenshot
- * approximation): the drawer sits *below* the topbar (`top-14 bottom-0`,
- * scrim starts at `top-14` too) so the topbar stays visible/usable while
- * open, rather than a full-viewport modal. Built on Radix Dialog rather
- * than WonderArk's bare conditional div — same visual result, but keeps
- * Radix's focus-trap/aria-modal for free (Rule 8, accessibility is
- * mandatory) instead of regressing to WonderArk's hand-rolled Escape/
- * backdrop listeners. A "Tenants" section (WonderArk's "Businesses")
- * sits between the nav groups and the account panel; the primary
- * tenant switcher itself lives in the topbar (WorkspaceSwitcher),
- * matching WonderArk's BusinessSwitcher placement, not here.
+ * sidebar-toggle.tsx in luvchakra/founder-collab): the drawer sits
+ * *below* the topbar (`top-14 bottom-0`, scrim starts at `top-14` too)
+ * so the topbar stays visible/usable while open, rather than a
+ * full-viewport modal. Built on Radix Dialog rather than WonderArk's
+ * bare conditional div — same visual result, but keeps Radix's
+ * focus-trap/aria-modal for free (Rule 8, accessibility is mandatory).
+ *
+ * Only the nav-groups region scrolls (`flex-1 overflow-y-auto`) — the
+ * header and the account panel (`footer`) are `shrink-0` siblings
+ * outside that scroll container, so the account panel stays pinned to
+ * the bottom of the drawer regardless of how long the nav list gets or
+ * how far it's scrolled, instead of scrolling away with it. No separate
+ * tenant list lives here anymore either — the topbar's WorkspaceSwitcher
+ * is the only tenant-switching surface now, so the account panel is the
+ * drawer's sole bottom content.
  */
 export function Nav({
   groups,
-  tenants,
-  onSelectTenant,
   footer,
 }: {
   groups: NavGroup[];
-  tenants?: TenantOption[];
-  onSelectTenant?: (formData: FormData) => void | Promise<void>;
   footer?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -78,11 +76,11 @@ export function Nav({
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 top-14 z-30 bg-black/50" />
           <Dialog.Content
-            className="fixed top-14 bottom-0 left-0 z-40 flex w-64 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl focus:outline-none"
+            className="fixed top-14 bottom-0 left-0 z-40 flex w-64 shrink-0 flex-col overflow-hidden border-r border-sidebar-border bg-sidebar text-sidebar-foreground shadow-2xl focus:outline-none"
             aria-label="Main navigation"
           >
             <Dialog.Title className="sr-only">Navigation</Dialog.Title>
-            <div className="flex items-center justify-between px-3 py-2.5">
+            <div className="flex shrink-0 items-center justify-between px-3 py-2.5">
               <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Menu</span>
               <Dialog.Close
                 aria-label="Close sidebar"
@@ -92,9 +90,9 @@ export function Nav({
               </Dialog.Close>
             </div>
 
-            <div className="border-t border-sidebar-border" />
+            <div className="shrink-0 border-t border-sidebar-border" />
 
-            <nav aria-label="Main" className="flex flex-col py-1">
+            <nav aria-label="Main" className="flex flex-1 flex-col overflow-y-auto py-1">
               {groups.map((group) => {
                 const active = isActive(group.href);
                 const hasChildren = !!group.children?.length;
@@ -145,32 +143,7 @@ export function Nav({
               })}
             </nav>
 
-            {tenants && tenants.length > 0 && (
-              <>
-                <div className="px-3 pt-3 pb-1.5">
-                  <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Tenants</span>
-                </div>
-                <div className="flex flex-col divide-y divide-sidebar-border border-t border-sidebar-border">
-                  {tenants.map((t) => (
-                    <form action={onSelectTenant} key={t.id}>
-                      <input type="hidden" name="tenantId" value={t.id} />
-                      <button
-                        type="submit"
-                        onClick={() => setOpen(false)}
-                        className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left hover:bg-sidebar-accent ${
-                          t.current ? "bg-sidebar-accent font-medium" : ""
-                        }`}
-                      >
-                        <span className="min-w-0 flex-1 truncate">{t.name}</span>
-                        {t.current && <Check className="size-3.5 shrink-0 text-primary" aria-hidden="true" />}
-                      </button>
-                    </form>
-                  ))}
-                </div>
-              </>
-            )}
-
-            <div className="mt-auto flex flex-col">{footer}</div>
+            <div className="shrink-0">{footer}</div>
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
