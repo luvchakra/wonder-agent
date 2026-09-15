@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
+import { Check } from "lucide-react";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { createTenantAction, selectTenantAction } from "@/app/actions/tenant";
+import { Card, CardHeader, CardBody, Button, TextField } from "@/modules/ui";
 
 export default async function OnboardingPage() {
   const supabase = await supabaseServer();
@@ -13,10 +15,13 @@ export default async function OnboardingPage() {
     redirect("/sign-in");
   }
 
+  // Only auto-redirect a brand-new user with no memberships at all yet
+  // (nothing to choose or switch between). A user who already has a
+  // tenant and navigates here explicitly — the "Create new tenant" link
+  // in the topbar's workspace switcher — is here on purpose, to create
+  // an *additional* tenant, so this must not bounce them straight back
+  // to "/" before they can reach the create-organization form below.
   const ctx = await getTenantContext();
-  if (ctx.tenantId) {
-    redirect("/");
-  }
 
   const { data: memberships } = await supabase
     .from("tenant_memberships")
@@ -24,34 +29,50 @@ export default async function OnboardingPage() {
     .eq("status", "active")
     .returns<{ tenant_id: string; tenants: { name: string } | null }[]>();
 
+  if (ctx.tenantId && (!memberships || memberships.length === 0)) {
+    // Tenant context resolved but the membership list didn't — treat as
+    // transient/inconsistent rather than trusting a stale redirect.
+    redirect("/");
+  }
+
   return (
-    <main style={{ maxWidth: 420, margin: "4rem auto", fontFamily: "sans-serif" }}>
-      <h1>WonderAgent</h1>
+    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4 py-12">
+      <div className="text-center">
+        <h1 className="text-xl font-semibold text-foreground">WonderAgent</h1>
+        <p className="mt-1 text-sm text-muted-foreground">AI Identity Governance &amp; Runtime Assurance</p>
+      </div>
 
-      {memberships && memberships.length > 0 ? (
-        <>
-          <h2>Select an organization</h2>
-          <ul style={{ listStyle: "none", padding: 0 }}>
+      {memberships && memberships.length > 0 && (
+        <Card>
+          <CardHeader title="Select a tenant" description="Switch to one of your existing organizations." />
+          <CardBody className="space-y-1">
             {memberships.map((m) => (
-              <li key={m.tenant_id} style={{ marginBottom: 8 }}>
-                <form action={selectTenantAction}>
-                  <input type="hidden" name="tenantId" value={m.tenant_id} />
-                  <button type="submit">{m.tenants?.name ?? m.tenant_id}</button>
-                </form>
-              </li>
+              <form action={selectTenantAction} key={m.tenant_id}>
+                <input type="hidden" name="tenantId" value={m.tenant_id} />
+                <button
+                  type="submit"
+                  className={`flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-accent hover:text-accent-foreground ${
+                    m.tenant_id === ctx.tenantId ? "bg-primary/10 font-medium text-primary" : "text-foreground"
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{m.tenants?.name ?? m.tenant_id}</span>
+                  {m.tenant_id === ctx.tenantId && <Check className="size-4 shrink-0" aria-hidden="true" />}
+                </button>
+              </form>
             ))}
-          </ul>
-        </>
-      ) : null}
+          </CardBody>
+        </Card>
+      )}
 
-      <h2>Create a new organization</h2>
-      <form action={createTenantAction}>
-        <label>
-          Organization name
-          <input name="name" required style={{ display: "block", width: "100%", marginBottom: 12 }} />
-        </label>
-        <button type="submit">Create organization</button>
-      </form>
-    </main>
+      <Card>
+        <CardHeader title="Create a new tenant" description="Sets up a fresh, isolated organization you'll own as Tenant Super Admin." />
+        <CardBody>
+          <form action={createTenantAction} className="space-y-3">
+            <TextField label="Organization name" name="name" required placeholder="Acme Corp" />
+            <Button type="submit">Create organization</Button>
+          </form>
+        </CardBody>
+      </Card>
+    </div>
   );
 }

@@ -1,16 +1,23 @@
 "use client";
 
+import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import { Check, ChevronDown, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { TenantOption } from "./AccountPanel";
 
 /**
- * UX-004 (12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md §6) — "All Workspaces"
- * entry pinned to the top of the nav drawer, above the nav groups. Reuses
- * the same tenant-membership data/action AccountPanel's "Switch tenant"
- * section already wires up (Foundation's tenant_memberships, via
- * app/(customer)/layout.tsx) rather than inventing a second data source —
- * this is WonderAgent's real multi-tenant switcher, not a fabricated
- * "workspace" concept.
+ * Topbar tenant switcher — ported structurally from WonderArk's
+ * BusinessSwitcher (packages/core/src/components/shell/
+ * business-switcher.tsx, luvchakra/founder-collab): a plain text+chevron
+ * trigger next to the logo (not a bordered pill), a DropdownMenu listing
+ * every tenant with a check mark on the current one, and a "Create new"
+ * item always last, separated by a divider. Reuses the same tenant-
+ * membership data/action AccountPanel's own tenant list wires up — not a
+ * fabricated second data source. "Create new" links to /onboarding
+ * (WonderAgent's real tenant-creation flow) rather than inventing a
+ * modal WonderArk's own onCreateBusiness callback has no WonderAgent
+ * equivalent for yet.
  */
 export function WorkspaceSwitcher({
   tenants,
@@ -26,43 +33,51 @@ export function WorkspaceSwitcher({
       <DropdownMenu.Trigger asChild>
         <button
           type="button"
-          className="flex w-full items-center gap-2 rounded-md border border-sidebar-border bg-background px-2 py-1.5 text-left text-sm hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <span aria-hidden className="text-base leading-none">
-            ▦
-          </span>
-          <span className="min-w-0 flex-1 truncate font-medium">All Workspaces</span>
-          {tenants.length > 1 && <span aria-hidden className="text-muted-foreground">⌄</span>}
+          <span className="truncate">{current?.name ?? "Select tenant"}</span>
+          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </button>
       </DropdownMenu.Trigger>
-
-      {tenants.length > 1 && (
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            align="start"
-            sideOffset={6}
-            className="z-[60] w-64 rounded-lg border border-border bg-popover p-1.5 text-popover-foreground shadow-md"
-          >
-            <p className="px-2 py-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">Switch workspace</p>
-            {tenants.map((t) => (
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content
+          align="start"
+          sideOffset={6}
+          className="z-[60] w-64 rounded-md border border-border bg-popover p-1 text-sm text-popover-foreground shadow-lg"
+        >
+          {tenants.length === 0 ? (
+            <p className="px-2 py-1.5 text-sm text-muted-foreground">No tenants yet.</p>
+          ) : (
+            tenants.map((t) => (
               <form action={onSelectTenant} key={t.id}>
                 <input type="hidden" name="tenantId" value={t.id} />
                 <DropdownMenu.Item asChild>
                   <button
                     type="submit"
-                    className={`w-full rounded-md px-2 py-1.5 text-left text-sm ${
-                      t.current ? "bg-primary/10 text-primary" : "text-popover-foreground hover:bg-accent hover:text-accent-foreground"
-                    }`}
+                    className={cn(
+                      "flex w-full items-center justify-between gap-2 rounded-sm px-3 py-2 text-left hover:bg-accent",
+                      t.current && "font-medium",
+                    )}
                   >
-                    {t.name}
+                    <span className="min-w-0 flex-1 truncate">{t.name}</span>
+                    {t.current && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
                   </button>
                 </DropdownMenu.Item>
               </form>
-            ))}
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      )}
-      {current && tenants.length <= 1 && <span className="sr-only">Current workspace: {current.name}</span>}
+            ))
+          )}
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+          <DropdownMenu.Item asChild>
+            <Link
+              href="/onboarding"
+              className="flex items-center gap-2 rounded-sm px-3 py-2 text-primary outline-none hover:bg-accent focus-visible:bg-accent"
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Create new tenant
+            </Link>
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
 }

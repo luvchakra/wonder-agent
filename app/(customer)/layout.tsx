@@ -10,17 +10,17 @@ import { WorkspaceSwitcher } from "@/modules/ui/WorkspaceSwitcher";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 
 const NAV_GROUPS: NavGroup[] = [
-  { label: "Overview", href: "/", icon: "◧" },
+  { label: "Overview", href: "/", icon: "LayoutDashboard" },
   {
     label: "AI Identity",
     href: "/agents",
-    icon: "◈",
+    icon: "Bot",
     children: [{ label: "Agents", href: "/agents" }],
   },
   {
     label: "Access Governance",
     href: "/access",
-    icon: "◇",
+    icon: "ShieldCheck",
     children: [
       { label: "Effective Access", href: "/access" },
       { label: "Access Requests", href: "/access/requests" },
@@ -30,13 +30,13 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Runtime Assurance",
     href: "/runtime",
-    icon: "◎",
+    icon: "Activity",
     children: [{ label: "Activity & SHOULD/CAN/DID", href: "/runtime" }],
   },
   {
     label: "Risk & Compliance",
     href: "/risk",
-    icon: "▲",
+    icon: "ShieldAlert",
     children: [
       { label: "Risk Findings", href: "/risk" },
       { label: "Rogue Agents", href: "/risk/rogue" },
@@ -46,20 +46,20 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Integrations",
     href: "/integrations",
-    icon: "⬡",
+    icon: "Plug",
     children: [{ label: "Connected Systems", href: "/integrations" }],
   },
-  { label: "Search", href: "/search", icon: "🔍" },
+  { label: "Search", href: "/search", icon: "Search" },
   {
     label: "Audit & Reports",
     href: "/reports",
-    icon: "▤",
+    icon: "ClipboardList",
     children: [
       { label: "Reports", href: "/reports" },
       { label: "Audit Trail", href: "/audit" },
     ],
   },
-  { label: "Administration", href: "/settings", icon: "⚙" },
+  { label: "Administration", href: "/settings", icon: "Settings" },
 ];
 
 // EXPERIENCE-P0-01.1. The one shared customer-facing shell every domain
@@ -113,31 +113,20 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       >
         Skip to content
       </a>
-      <header className="flex h-14 items-center justify-between gap-4 border-b border-border bg-background px-4 lg:px-6">
-        {/* EXPERIENCE-P0-09 (UX-P0-15), UX-P0-02/03 — left group: nav
-            trigger, logo, and the current tenant (a full switcher lives at
-            the top of the nav drawer — WorkspaceSwitcher — and again in
-            AccountPanel, not a separate topbar control). Right group:
-            search and notifications only — no user avatar. */}
-        <div className="flex items-center gap-3">
-          <Nav
-            groups={NAV_GROUPS}
-            topSwitcher={<WorkspaceSwitcher tenants={tenantOptions} onSelectTenant={selectTenantAction} />}
-            footer={
-              <AccountPanel
-                email={user.email ?? ""}
-                displayName={profile?.display_name ?? null}
-                tenants={tenantOptions}
-                isPlatformAdmin={isAdmin}
-                onSelectTenant={selectTenantAction}
-                onSignOut={signOutAction}
-              />
-            }
-          />
-          <Link href="/" className="text-sm font-semibold text-foreground">
+      <header className="relative z-50 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-background px-4 sm:gap-4 sm:px-6">
+        {/* UX-P0-02/03 (12_ADVANCED_PRODUCT_UX_REQUIREMENTS.md), ported
+            structurally from WonderArk's AppTopbar (packages/core/src/
+            components/shell/app-topbar.tsx, luvchakra/founder-collab): nav
+            trigger + logo + workspace switcher grouped on the left; the nav
+            drawer's own "Tenants" section (Nav.tsx) and AccountPanel handle
+            the rest — no tenant slug text duplicated here. Right group:
+            search and notifications — no user avatar in the topbar. */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Nav groups={NAV_GROUPS} tenants={tenantOptions} onSelectTenant={selectTenantAction} footer={<AccountPanel email={user.email ?? ""} displayName={profile?.display_name ?? null} isPlatformAdmin={isAdmin} onSignOut={signOutAction} />} />
+          <Link href="/" className="shrink-0 text-sm font-semibold text-foreground">
             WonderAgent
           </Link>
-          <span className="hidden text-xs text-muted-foreground sm:inline">/ {ctx.tenantSlug}</span>
+          <WorkspaceSwitcher tenants={tenantOptions} onSelectTenant={selectTenantAction} />
         </div>
         <div className="flex items-center gap-2">
           <ShellGlobalSearch />
