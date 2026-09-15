@@ -24,8 +24,15 @@ const NORMAL_TRANSITIONS: Partial<Record<AgentLifecycleState, AgentLifecycleStat
   PROVISIONED: ["ACTIVE"],
   ACTIVE: ["CERTIFICATION_DUE", "RESTRICTED"],
   CERTIFICATION_DUE: ["ACTIVE"],
-  RESTRICTED: ["SUSPENDED"],
-  SUSPENDED: ["RETIRED"],
+  // IDENTITY-P0-06 — controlled restoration path (2026-09-15 governance
+  // requirements reconciliation, P0-20's "support controlled restoration").
+  // Restoration is deliberately staged rather than a direct SUSPENDED ->
+  // ACTIVE jump: SUSPENDED -> RESTRICTED first (back under active
+  // monitoring/restriction), then RESTRICTED -> ACTIVE once the restriction
+  // is lifted — mirroring how the agent got restricted in the first place
+  // (ACTIVE -> RESTRICTED -> SUSPENDED) rather than inventing a shortcut.
+  RESTRICTED: ["SUSPENDED", "ACTIVE"],
+  SUSPENDED: ["RESTRICTED", "RETIRED"],
 };
 
 const EMERGENCY_SUSPEND_ROLES = ["SECURITY_ADMIN", "TENANT_SUPER_ADMIN"];
@@ -95,6 +102,24 @@ async function validateTransition(
         412,
         "PRECONDITION_FAILED",
         `Emergency suspension requires one of: ${EMERGENCY_SUSPEND_ROLES.join(", ")}`,
+      );
+    }
+    return;
+  }
+
+  // IDENTITY-P0-06 — both legs of the restoration path require the same
+  // elevated roles already gating the RESTRICTED -> SUSPENDED direction,
+  // since reversing a suspension/restriction is at least as sensitive as
+  // imposing one.
+  if (
+    (fromState === "SUSPENDED" && toState === "RESTRICTED") ||
+    (fromState === "RESTRICTED" && toState === "ACTIVE")
+  ) {
+    if (actor.actorType === "user" && !hasAnyRole(actor, RESTRICTED_TO_SUSPENDED_ROLES)) {
+      throw new ApiError(
+        412,
+        "PRECONDITION_FAILED",
+        `${fromState} -> ${toState} (restoration) requires one of: ${RESTRICTED_TO_SUSPENDED_ROLES.join(", ")}`,
       );
     }
     return;

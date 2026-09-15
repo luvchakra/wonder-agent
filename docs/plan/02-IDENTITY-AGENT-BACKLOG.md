@@ -26,7 +26,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-03.1 | `agent_contracts` (higher bar) | Done |
 | IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Done — 2026-09-14, live RLS-verified |
 | IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
-| IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Not Started — 2026-09-15 governance requirements reconciliation; see below |
+| IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Done — 2026-09-15, unit-tested |
 
 ---
 
@@ -567,13 +567,17 @@ The new doc's P0-20 ("Emergency Suspension / Kill Switch") requires
 is no path back to `RESTRICTED` or `ACTIVE`. Everything else P0-20 asks for
 (authorized-human-only, permission-controlled, mandatory reason, full audit
 event, marking the agent `SUSPENDED`) is already built and unaffected by
-this gap. **Objective:** add a role-gated `SUSPENDED → RESTRICTED` (or
-`→ ACTIVE`, pending the user's preference on whether restoration must pass
-back through a restricted state first) transition, gated by the same class
-of elevated role already used for `RESTRICTED → SUSPENDED`
-(`RESTRICTED_TO_SUSPENDED_ROLES`), with its own mandatory reason and audit
-event — reusing `transitionAgentLifecycle()`, not a second state-change
-path. **Not started.**
+this gap. **Built 2026-09-15.** Restoration is staged rather than a direct
+`SUSPENDED → ACTIVE` jump, mirroring how an agent gets restricted in the
+first place: `SUSPENDED → RESTRICTED → ACTIVE`. Both legs are gated by the
+same elevated roles already used for `RESTRICTED → SUSPENDED`
+(`RESTRICTED_TO_SUSPENDED_ROLES`), reuse the existing mandatory-reason +
+`writeAudit()` path inside `transitionAgentLifecycle()` (no second
+state-change code path), and are unit-tested in `lifecycle.test.ts`. No UI
+change was needed — the agent detail page's lifecycle-transition form
+already offers every `AgentLifecycleState` as a destination, so the new
+transitions became selectable automatically once the state machine allowed
+them.
 
 ### Minor, unnumbered gap noted (not a new story)
 

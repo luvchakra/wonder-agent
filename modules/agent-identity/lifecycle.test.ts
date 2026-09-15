@@ -28,6 +28,13 @@ describe("isStructurallyAllowedTransition — IDENTITY-P0-02.1 transition table"
     expect(isStructurallyAllowedTransition("SUSPENDED", "RETIRED")).toBe(true);
   });
 
+  it("IDENTITY-P0-06: allows the staged restoration path (SUSPENDED -> RESTRICTED -> ACTIVE)", () => {
+    expect(isStructurallyAllowedTransition("SUSPENDED", "RESTRICTED")).toBe(true);
+    expect(isStructurallyAllowedTransition("RESTRICTED", "ACTIVE")).toBe(true);
+    // Still no direct shortcut from SUSPENDED straight back to ACTIVE.
+    expect(isStructurallyAllowedTransition("SUSPENDED", "ACTIVE")).toBe(false);
+  });
+
   it("allows the 'any state -> SUSPENDED' emergency wildcard, except from RETIRED", () => {
     for (const from of ALL_STATES) {
       const expected = from !== "RETIRED";

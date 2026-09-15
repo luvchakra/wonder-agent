@@ -523,3 +523,43 @@ row. Two cross-cutting items (contract-schema autonomy/tools/approval
 fields; Governance Attestation's P0-vs-P1 tier and possible Compliance
 ownership) depend on open decisions recorded centrally and were
 deliberately not built or re-tiered unilaterally.
+
+---
+
+## 2026-09-15 — IDENTITY-P0-06: Suspension Restoration Path (built)
+
+**Agent:** Identity Agent.
+
+**Task:** the user said "start on p0 items" after the governance
+reconciliation pass above. `IDENTITY-P0-06` was the one concrete,
+unambiguous, no-decision-required item from that pass, so it was built
+first while the larger cross-cutting items stay open pending the user's
+architecture calls.
+
+**Built:** `modules/agent-identity/lifecycle.ts`'s `NORMAL_TRANSITIONS`
+gained `RESTRICTED: ["SUSPENDED", "ACTIVE"]` and
+`SUSPENDED: ["RESTRICTED", "RETIRED"]` — a staged restoration path
+(`SUSPENDED → RESTRICTED → ACTIVE`) rather than a direct
+`SUSPENDED → ACTIVE` shortcut, mirroring the path an agent takes *into*
+suspension (`ACTIVE → RESTRICTED → SUSPENDED`). This was a judgment call
+(the backlog's own refresh entry flagged "pending the user's preference on
+whether restoration must pass back through a restricted state first") —
+made explicitly rather than left blocking, since it's a reversible,
+easily-changed implementation detail, not an architecture decision in
+CLAUDE.md's sense. `validateTransition()` gates both new legs behind the
+same `RESTRICTED_TO_SUSPENDED_ROLES` (`SECURITY_ADMIN`/`IAM_ADMIN`/
+`TENANT_SUPER_ADMIN`) already used for `RESTRICTED → SUSPENDED`, on the
+reasoning that reversing a suspension/restriction is at least as sensitive
+as imposing one. No new code path: both transitions run through the
+existing `transitionAgentLifecycle()` (mandatory reason, `writeAudit()`,
+`agent_lifecycle_events` row) exactly like every other transition. No UI
+change needed — `app/(customer)/agents/[id]/page.tsx`'s lifecycle-
+transition form already lists every `AgentLifecycleState` as a selectable
+destination.
+
+**Verified:** `npx tsc --noEmit` clean; `npx eslint .` clean; `npx vitest
+run` — 148/148 passing (2 new cases in `lifecycle.test.ts`: the new
+transitions are structurally allowed, and `SUSPENDED → ACTIVE` directly is
+still correctly rejected); `npm run build` succeeds. No migration needed —
+`agents.lifecycle_state`'s CHECK constraint already permits every state
+this touches.
