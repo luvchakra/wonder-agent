@@ -777,6 +777,22 @@ the doc and was not added as a story for that reason. No existing `Done` or
   customer-managed encryption options where architecture permits
   (FOUNDATION-P2-02).
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. No new
+Foundation-owned story found — Foundation's existing primitives
+(`requirePermission()`, `writeAudit()`, `encryptSecret()`/secret handling,
+RLS/tenant context) are exactly what every new cross-cutting concept in
+that document (Governance Posture, Attestation, Exceptions, Drift,
+AI-Assisted Investigation) would build on once ownership is decided —
+nothing for Foundation to build itself yet. One forward note: if
+AI-Assisted Investigation (open decision, see the reconciliation doc) ever
+needs an external LLM provider credential, it would use Foundation's
+existing `encryptSecret()` pattern rather than inventing a new one — not a
+new story, just a constraint recorded for whichever module picks that up.
+
 ## DO NOT IMPLEMENT (out of scope for this module, ever)
 
 - Any AI-agent domain concept (`agents`, lifecycle, contracts) — Identity Agent.

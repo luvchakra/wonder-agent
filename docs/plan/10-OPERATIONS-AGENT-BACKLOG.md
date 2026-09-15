@@ -335,6 +335,19 @@ From the requirements refresh above — strategic, after P0/P1 proven:
   posture reports with trend analysis, linking to authoritative evidence
   rather than restating it.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. No new
+Operations-owned story added. One open, undecided item names Operations as
+a candidate owner: **Governance Evidence Pack** (P0-19) escalates, not
+duplicates, the already-open Compliance-vs-Operations evidence-export
+ownership question (`ownership-map.md`) — the new doc's per-agent scope is
+broader than this module's current `OPERATIONS-P0-01.2` evidence export
+and explicitly asks for a PDF format alongside CSV/JSON, not yet confirmed
+as built. Not scoped as a story until the ownership question is answered.
+
 ## DO NOT IMPLEMENT
 
 - Any domain business logic — Operations only reads, aggregates and presents.

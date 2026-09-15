@@ -497,3 +497,29 @@ and RLS; integration credentials were never touched by any new code path;
 no other module's implementation was modified (Integration Agent's files
 are unchanged) — the one documented cross-module gap is the change-history
 question above, recorded rather than silently worked around.
+
+---
+
+## 2026-09-15 — Governance Requirements Reconciliation (documentation/planning pass only)
+
+**Agent:** Identity Agent (documentation/planning pass only — no
+application code, migrations or tests touched).
+
+**Task:** the user supplied a new "Updated P0/P1 Governance Requirements"
+document spanning all 11 modules and, via `AskUserQuestion`, chose to
+reconcile it into the backlogs before any implementation rather than build
+against it directly. Full cross-module mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`.
+
+**Finding:** one genuine, unambiguous, Identity-owned gap, found by direct
+inspection of `lifecycle.ts` rather than backlog text: `SUSPENDED` only
+transitions to `RETIRED` — there is no restoration path, so the new doc's
+"support controlled restoration" (P0-20) requirement cannot be met today.
+Added as new Progress Tracker row **IDENTITY-P0-06** (Not Started) with a
+full objective/acceptance note in the backlog's own new "Requirements
+Refresh — 2026-09-15" section. One minor additive schema gap
+(`AgentOwnerType` has no `escalation_owner`) noted but not given its own
+row. Two cross-cutting items (contract-schema autonomy/tools/approval
+fields; Governance Attestation's P0-vs-P1 tier and possible Compliance
+ownership) depend on open decisions recorded centrally and were
+deliberately not built or re-tiered unilaterally.

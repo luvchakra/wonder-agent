@@ -462,6 +462,21 @@ already exist or isn't already an accurately-tracked gap. The task's
 `QA-P0-06`–`14` partial coverage, sandbox-only constraints) was not touched
 or re-added.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. This
+was a documentation/planning reconciliation only — no code changed except
+Identity Agent's own small Agent Discovery extension earlier the same day
+(already covered by that module's own audit trail) and one new,
+`Not Started` Identity tracker row (`IDENTITY-P0-06`, suspension
+restoration path). Nothing new exists yet for QA Agent to test; the
+document's larger open items (Governance Posture, Attestation, Exceptions,
+Drift, Evidence Pack, AI-Assisted Investigation) are unresolved ownership/
+architecture questions, not buildable stories, so no new acceptance
+criteria were added here. Revisit once any of those land.
+
 ## DO NOT IMPLEMENT
 
 - New product features of any kind — this module fixes and verifies, it does not

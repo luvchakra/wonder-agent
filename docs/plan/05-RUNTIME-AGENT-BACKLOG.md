@@ -459,6 +459,17 @@ baselining).
 - **RUNTIME-P2-03 — Runtime Replay.** Let investigators reconstruct an
   historical session exactly from immutable evidence alone.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. Its
+P0-08 ("Runtime Assurance / DID," minimum semantic event fields) reads
+near-identically to what this module's own 2026-09-14 round-2 refresh
+already reconciled ("nothing new," confirmed against a live codebase
+check) — trusted rather than re-derived in this pass. No new Runtime-owned
+story added.
+
 ## DO NOT IMPLEMENT
 
 - Any risk severity, finding, or remediation recommendation (Risk Agent).

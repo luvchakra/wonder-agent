@@ -546,6 +546,20 @@ non-negotiable #15 — do not build this speculatively).
   capability — advisory only, same human-approval boundary as
   `RISK-P0-09`'s recommendation engine.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. Its
+existing detection categories (P0-16) already match this module's rogue-
+detection set nearly one-for-one — no new row there. Two open, undecided
+items name Risk Agent as a candidate owner, recorded centrally rather than
+claimed here: **Governance Drift** (P0-15 — a cross-module change signal
+distinct from any single existing finding category) and two new finding
+category *names* ("expired approval," "governance control gap") that only
+become meaningful once Governance Posture/Attestation/Exceptions (P0-12/
+13/14) exist elsewhere first. Nothing added to this backlog's own tracker.
+
 ## DO NOT IMPLEMENT
 
 - Any UI (Experience Agent).

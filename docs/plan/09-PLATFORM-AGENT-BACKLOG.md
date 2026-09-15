@@ -477,6 +477,18 @@ existed for this module.
   security, release and platform-owner responsibilities within the platform-admin
   boundary, without creating any customer-role escalation path.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. No new
+Platform-owned story found. One connection noted, not a new gap: the
+document's P0-22 "AI-Assisted Investigation" (open ownership decision) is
+the first concrete use case that would need `PLATFORM-P0-05.2` (AI Provider
+Configuration), already `Deferred` here as a genuine open product/
+architecture question. Not re-opened or re-scoped unilaterally — still
+waiting on the same answer it was waiting on before.
+
 ## DO NOT IMPLEMENT
 
 - Any customer-facing domain logic (agents, access, risk, etc.) — Platform Agent

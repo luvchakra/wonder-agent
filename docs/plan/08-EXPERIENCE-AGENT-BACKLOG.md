@@ -575,6 +575,22 @@ UX-P2-03) — strategic scope, not to be built ahead of P0/P1:
   rogue-trend/coverage/remediation-outcome view for executive stakeholders, without
   losing the ability to drill down into evidence.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. Its
+P0-24 ("Customer Governance UX") expands the Governance Dashboard's metric
+set and the Agent Detail tab list (adding Governance/Certifications/
+Policies/Compliance/Findings tabs beyond today's four-tab `AgentTabs`) —
+but every one of those surfaces reads data from a concept that doesn't
+exist yet (Governance Posture, Attestation, Exceptions, Drift — all open
+decisions, see the reconciliation doc). Not added as a new row: this
+module's own `EXPERIENCE-P0-10` through `-13` (Not Started) already cover
+the concrete, buildable-today UI gaps; the governance-tab expansion is a
+forward pointer for once those upstream concepts land, not new scope to
+build blind against.
+
 ## DO NOT IMPLEMENT
 
 - Any business logic, authorization decision, or data mutation beyond calling an

@@ -26,6 +26,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-03.1 | `agent_contracts` (higher bar) | Done |
 | IDENTITY-P0-04 | Duplicate detection & merge/review workflow | Done — 2026-09-14, live RLS-verified |
 | IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
+| IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Not Started — 2026-09-15 governance requirements reconciliation; see below |
 
 ---
 
@@ -548,6 +549,49 @@ changed, because there was nothing genuinely new to add. This is reported
 explicitly rather than fabricating a gap to appear thorough — see the
 corresponding 2026-09-14 (round 2) entry in
 `docs/design/identity-agent-backlog-audit.md`.
+
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules and asked for it to be reconciled into the backlogs
+before any implementation. Full section-by-section mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`; only
+this module's own findings are recorded here.
+
+### IDENTITY-P0-06 — Suspension Restoration Path
+
+The new doc's P0-20 ("Emergency Suspension / Kill Switch") requires
+"support controlled restoration" after a suspension. Direct inspection of
+`modules/agent-identity/lifecycle.ts`'s `NORMAL_TRANSITIONS` table found
+`SUSPENDED: ["RETIRED"]` is the *only* transition out of `SUSPENDED` — there
+is no path back to `RESTRICTED` or `ACTIVE`. Everything else P0-20 asks for
+(authorized-human-only, permission-controlled, mandatory reason, full audit
+event, marking the agent `SUSPENDED`) is already built and unaffected by
+this gap. **Objective:** add a role-gated `SUSPENDED → RESTRICTED` (or
+`→ ACTIVE`, pending the user's preference on whether restoration must pass
+back through a restricted state first) transition, gated by the same class
+of elevated role already used for `RESTRICTED → SUSPENDED`
+(`RESTRICTED_TO_SUSPENDED_ROLES`), with its own mandatory reason and audit
+event — reusing `transitionAgentLifecycle()`, not a second state-change
+path. **Not started.**
+
+### Minor, unnumbered gap noted (not a new story)
+
+`AgentOwnerType` has no `escalation_owner` value, which the new doc's P0-05
+("Ownership & Accountability") lists alongside business/technical/IAM
+owner. Small, additive, Identity-owned — bundle into whichever future story
+next touches `agent_owners`' schema rather than opening a standalone row
+for one enum value.
+
+### Cross-cutting items not resolved here
+
+The new doc's P0-03 (autonomy level, allowed-tools list, human-approval
+requirements on `agent_contracts`) and P0-13 (Governance Attestation,
+already `IDENTITY-P1-02` here but requested at P0 by the new doc, and
+possibly a different shape/owner) both depend on open architecture
+decisions recorded in `docs/design/ownership-map.md`'s "Pending
+ownership/architecture decisions (2026-09-15...)" section — not built or
+re-tiered here without the user's answer.
 
 ## DO NOT IMPLEMENT
 

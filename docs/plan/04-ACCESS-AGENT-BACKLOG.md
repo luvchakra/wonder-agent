@@ -494,6 +494,26 @@ Added from the 2026-09-14 requirements refresh:
   is removed?" across certification, risk and runtime behavior — builds on
   ACCESS-P1-01 (Access Simulation).
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. No new
+Access-owned story added, but two open cross-module items directly touch
+this module's existing schema and are recorded there, not decided here:
+
+- **Governance Exceptions consolidation** — the new doc's generic
+  "Governance Exceptions" concept is a third candidate alongside this
+  module's own `policy_exceptions` (P0 schema, `ACCESS-P1-04` for the full
+  workflow) and Compliance Agent's planned `CERT-P1-04`. If the user picks
+  `policy_exceptions` as the canonical model, `ACCESS-P1-04`'s scope would
+  broaden — not assumed or built here.
+- **Action Governance's 4-state model** (P0-09: allowed / allowed-with-
+  approval / restricted / prohibited, per action) would most naturally be
+  enforced by this module's policy engine (`ACCESS-P0-02.1`/`02.2`,
+  `Done`), but depends on the Human Oversight/autonomy-level ownership
+  decision landing first — not scoped as a story until that's answered.
+
 ## DO NOT IMPLEMENT
 
 - Risk scoring or `risk_findings` — Risk Agent consumes `evaluatePolicies()` output;

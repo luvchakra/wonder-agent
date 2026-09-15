@@ -455,6 +455,17 @@ durable job queue if the P0 approach proves insufficient.
 - Documented connector adapter SDK, contract tests and a connector
   certification process (`INTEG-P2-03`).
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. No new
+Integration-owned story found — the document's P0-23 explicitly asks to
+reuse this module's existing adapter contract, which is already the case
+everywhere else in the backlog. `INTEGRATION-P0-05.1` (verified credential
+rotation, flagged in the 2026-09-14 refresh) remains the one open,
+`Not started` item; not duplicated here.
+
 ## DO NOT IMPLEMENT
 
 - Writing into `agents`, `agent_contracts`, `applications`, `entitlements`, or any

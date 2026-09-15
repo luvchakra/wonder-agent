@@ -95,6 +95,52 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
   Not yet requested of Access Agent — record here so it isn't invented unreviewed by
   Runtime Agent when this story is picked up.
 
+### Pending ownership/architecture decisions (2026-09-15 governance requirements reconciliation — not resolved, flagged for the user)
+
+Full detail and section-by-section mapping in
+[`docs/design/governance-requirements-reconciliation-2026-09-15.md`](governance-requirements-reconciliation-2026-09-15.md).
+None of these were assigned to a module unilaterally:
+
+- **Human Oversight / Autonomy Model** — no module owns an agent
+  autonomy-level (0-4) concept yet; it's the root dependency for the
+  contract's autonomy field, the SHOULD-vs-CAN autonomy comparison row, and
+  a 4-state (allowed / allowed-with-approval / restricted / prohibited)
+  action-governance model. Likely Identity Agent (contract field) +
+  Access Agent (policy enforcement), but not decided.
+- **Governance Readiness Policy** — a "is this agent production-ready" gate
+  (risk assessment done, access review complete, human oversight policy,
+  runtime monitoring configured, certification schedule set) reads across
+  Identity/Access/Compliance data; unclear whether it's a new Identity
+  Agent lifecycle precondition, a new Access Agent policy type, or its own
+  concept.
+- **Governance Posture** — a composite governed/partially-governed/
+  non-compliant/exception-approved/suspended score, explicitly distinct
+  from Risk Agent's risk score. No existing module owns this; candidates
+  are Compliance Agent, Identity Agent, or a new concept. The largest
+  single open item from the 2026-09-15 reconciliation.
+- **Governance Attestation** — priority conflict (Identity's own
+  `IDENTITY-P1-02` is P1; the new doc asks for P0) plus an ownership
+  question (Identity's narrow self-attestation vs. a broader
+  approver/decision/evidence shape closer to Compliance's
+  `certification_decisions`).
+- **Governance Exceptions consolidation** — three candidate "exception"
+  concepts now exist in different documents (Access's `policy_exceptions`,
+  Compliance's planned `CERT-P1-04`, and this doc's generic governance
+  exception); needs the user to pick one canonical model rather than three
+  modules each owning a slightly different one.
+- **Governance Drift** — no module computes cross-module drift
+  (purpose/owner/access/autonomy/runtime changes) as one signal today.
+  Candidates: Risk Agent (detection specialist) or Identity Agent (owns
+  change history).
+- **Governance Evidence Pack** — escalates, not duplicates, the existing
+  Compliance-vs-Operations evidence-export ownership question above; the
+  new doc's per-agent evidence-pack scope is a superset of both and now
+  explicitly includes attestation/exception data that doesn't exist yet.
+- **AI-Assisted Investigation** — nothing in the codebase touches an LLM
+  API today; needs a provider/data-boundary/ownership decision (likely
+  Experience Agent for the UI plus a new shared `lib/ai/` read-only
+  primitive) before any module builds toward it.
+
 `agent-identity` (IA) and `access-governance` (AA) are deliberately separate: IA owns
 *who the agent is*; AA owns *what it can reach*. Integration (INT) owns the raw
 imported objects and the mapping layer that correlates them into IA's/AA's canonical

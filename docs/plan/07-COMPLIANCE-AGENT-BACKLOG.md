@@ -431,6 +431,35 @@ items:
   ownership-map flag above; the authorization boundary for this needs a
   decision before it is scoped.
 
+## Requirements Refresh — 2026-09-15 (governance requirements doc)
+
+The user supplied a new "Updated P0/P1 Governance Requirements" document
+spanning all 11 modules; full mapping is in
+`docs/design/governance-requirements-reconciliation-2026-09-15.md`. This
+module's existing P0 stories (campaign/review/decision flow, control
+mapping, evidence snapshot) already cover that document's P0-17/P0-18.
+Four open, undecided items name Compliance Agent as a candidate owner —
+recorded centrally, not claimed unilaterally here:
+
+- **Governance Posture** (P0-12) — the single largest open item across the
+  whole reconciliation; Compliance is one candidate owner (closest existing
+  aggregation concept) but not decided.
+- **Governance Attestation** (P0-13) — a priority conflict with Identity's
+  existing `IDENTITY-P1-02`, plus a possible ownership question since its
+  broader approver/decision/evidence shape reads closer to this module's
+  `certification_decisions` than Identity's narrower self-attestation.
+- **Governance Exceptions consolidation** (P0-14) — this module's own
+  planned `CERT-P1-04` is one of three candidate "exception" concepts
+  (alongside Access's `policy_exceptions` and the new doc's generic one);
+  needs the user to pick one canonical model.
+- **Governance Evidence Pack** (P0-19) — escalates, not duplicates, the
+  already-open Compliance-vs-Operations evidence-export ownership question
+  (`ownership-map.md`); the new doc's broader per-agent scope (now
+  including attestation/exception data) raises the stakes on that decision
+  without resolving it.
+
+No Progress Tracker rows added or changed.
+
 ## DO NOT IMPLEMENT
 
 - Risk scoring itself (Risk Agent) — Compliance only reads and snapshots it.
