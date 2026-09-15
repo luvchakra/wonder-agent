@@ -1,7 +1,15 @@
 import { cn } from "@/lib/utils";
 
+/**
+ * EXPERIENCE-P0-09.1 — rounded-xl + shadow-md (was rounded-lg + shadow-sm)
+ * to read as a softer, shadow-elevated white card on the reskinned light
+ * background, per the reference screenshots' visual language; the border
+ * stays (now border/60) as a defense-in-depth boundary for users/contexts
+ * where shadow alone isn't a reliable enough cue (prefers-contrast, printed
+ * output), not as the card's primary visual definition anymore.
+ */
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("rounded-lg border border-border bg-card text-card-foreground shadow-sm", className)}>{children}</div>;
+  return <div className={cn("rounded-xl border border-border/60 bg-card text-card-foreground shadow-md", className)}>{children}</div>;
 }
 
 export function CardHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {

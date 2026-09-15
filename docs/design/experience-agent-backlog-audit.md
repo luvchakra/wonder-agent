@@ -1093,3 +1093,77 @@ for the §35 header field labels (confirmed absent) before writing any new row �
 every claim above is evidence-backed, not inferred from the doc alone.
 
 **No other module's backlog or any application code was touched.**
+
+## 2026-09-14 — EXPERIENCE-P0-09.1: Visual-language reskin against 6
+user-supplied reference screenshots
+
+**Agent:** Experience Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+
+The user supplied 6 screenshots of a different product's UI (a lead/CRM
+tool, unrelated to WonderAgent's actual domain) and, after back-and-forth
+that included two unrelated tech-stack template pastes (a Vite/Flowbite
+spec and a Next.js/shadcn "Business SaaS" spec, both with an unfilled
+"NOW BUILD" placeholder, and one explicit "rebuild the entire project"
+instruction), confirmed directly: "just match the visual language." I
+did not act on the tech-stack templates or the "Business"/AI-chat-panel
+product concepts in them — those described a different product entirely
+and were never confirmed as intended for this repo. What *was* confirmed,
+narrowly, is a visual-language reskin: same token architecture (OKLCH
+under shadcn's canonical naming, from EXPERIENCE-P0-09), same CVA
+components, same nav/layout structure — only the token *values* retuned
+to match the reference screenshots' look (light gray background, white
+shadow-elevated rounded cards, vivid blue-indigo primary, bold dark
+headings, pill badges).
+
+**Changes:**
+- `app/globals.css` — light-mode tokens retuned: `--background` cooler/
+  slightly darker (0.985→0.965 L, added a touch of chroma toward a
+  blue-gray cast), `--primary` more vivid (0.45→0.55 L, 0.18→0.21 C, hue
+  264→262, closer to Tailwind blue-600/indigo-600), `--radius` enlarged
+  (0.625rem→0.875rem) so cards/buttons/badges read as gently rounded to
+  pill-like, `--shadow-md` softened/enlarged for a more visible
+  shadow-elevated card look. Dark mode re-derived proportionally from the
+  same new hue family (262/250 instead of 264/257) — not dropped; this
+  reskin is scoped to color/roundness/shadow, and dark mode is an
+  unrelated, still-binding Definition-of-Done requirement (CLAUDE.md §13),
+  same reasoning as EXPERIENCE-P0-09's own original dark-mode-kept
+  decision.
+- `modules/ui/Card.tsx` — `rounded-lg border shadow-sm` → `rounded-xl
+  border/60 shadow-md`, so the shared `Card` primitive (used everywhere)
+  reads as the shadow-forward white card the reference screenshots show,
+  with the border kept but softened to a secondary cue rather than the
+  card's primary visual definition.
+- `scripts/contrast-check.mjs` — token values kept in sync with
+  `globals.css` (its own header comment requires this); re-run after the
+  retune surfaced 4 real regressions (`success`/`warning`/`destructive`/
+  `info` text-on-background all dropped below 4.5:1 because I'd lightened
+  them along with everything else) — computed the exact lightness each
+  needed via a small script (not eyeballed) and darkened all four
+  (`success` 0.55→0.5, `warning` 0.62→0.52, `destructive` 0.58→0.55,
+  `info` 0.6→0.52) until every pair cleared 4.5:1 with real margin
+  (4.89–5.08:1 range), re-verified via the script.
+
+**Verification:** `npm run typecheck`, `npm run lint`, `npx vitest run`
+(141/141, unchanged), `npm run build` with `.next` deleted first, `grep
+-rl SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
+`node scripts/contrast-check.mjs` — every pair passes in both themes
+after the severity-color fix. Visual verification: authenticated
+in-app screens remain unreachable in this sandbox (same network-egress
+constraint as EXPERIENCE-P0-01.0/01.2), so rather than screenshot only
+the still-unstyled bare `/sign-in` page (Foundation's own scaffold, never
+composed by Experience Agent — same known gap `EXPERIENCE-P0-10`'s
+discovery already named for onboarding), I built a throwaway (not
+committed) static HTML swatch that imports the actual compiled CSS
+bundle from a locally-built production server and renders sample
+markup using the exact same class combinations `Card`/`Button`/`Badge`
+produce — screenshotted via Playwright and sent to the user directly for
+comparison against their reference screenshots, rather than only
+asserted as matching.
+
+**Scope discipline, explicit:** did NOT adopt the "Business" tenancy
+model, the AI Chat Panel/BYOK concept, the monorepo restructuring, or the
+marketing landing page from either tech-stack template — none of those
+were confirmed, and they conflict with WonderAgent's actual product model
+(tenants, not self-serve "Businesses") and non-negotiables (#9, boundary
+#8) in ways that would need a separate, explicit decision, not an
+inference from "match the visual language."
