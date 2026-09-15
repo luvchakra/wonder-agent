@@ -50,8 +50,8 @@
   --info: oklch(0.52 0.14 245);
 
   --border: oklch(0 0 0 / 8%);
-  --input: oklch(0.62 0.01 250);
-  --ring: oklch(0.546 0.215 260);
+  --input: oklch(0 0 0 / 10%);
+  --ring: oklch(0.546 0.215 260 / 50%);
 
   --sidebar: oklch(0.995 0.002 250);
   --sidebar-foreground: oklch(0.22 0.02 258);
@@ -182,6 +182,7 @@
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
