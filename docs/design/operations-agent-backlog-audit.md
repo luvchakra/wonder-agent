@@ -288,3 +288,71 @@ the first-pass refresh's own note flagging that table "for the user to
 add" reads as stale against the current ownership map and this log's own
 "Built" section, which both confirm it was already added; not re-flagged
 here.
+---
+
+## 2026-09-16 — OPERATIONS-P0-07 — Governance Evidence Pack export (JSON/CSV; PDF deferred)
+
+**Agent:** Operations Agent, paired with Compliance Agent's
+`COMPLIANCE-P0-09` in the same pass, per the user's standing authorization
+to work the pending P0 backlog in order. Implements the 2026-09-15
+decision: "Compliance assembles, Operations exports."
+
+**Design.** `exportGovernanceEvidencePack(actorId, pack, format)`
+(`modules/operations/evidencePackExport.ts`) takes Compliance's already-
+assembled `GovernanceEvidencePack` (this module never reaches into
+Compliance's or any other module's tables directly — non-negotiable #6)
+and turns it into a downloadable file:
+- **JSON** — the pack's canonical JSON, verbatim.
+- **CSV** — flattened via `flattenEvidencePack()` into one row per
+  underlying record (`{section, id, details}`, `details` a JSON blob of
+  the record) across every section — identity/owners/identities/lifecycle
+  events, access grants/policy evaluations/exceptions, the SHOULD-CAN-DID
+  comparison's outcomes, risk findings, certification decisions,
+  attestations, control mappings, access requests, audit events, and
+  posture dimensions/status — reusing `toCsv()`
+  (`modules/operations/csv.ts`, `OPERATIONS-P0-01.2`'s existing serializer)
+  rather than building a second one.
+- **PDF** — confirmed, not assumed, that no PDF renderer exists anywhere
+  in this codebase (`grep -i pdf package.json` — no match) before deciding
+  not to build one; adding a PDF library is a real new dependency decision,
+  not something to introduce silently inside an unrelated story. Left
+  explicitly deferred; `EvidencePackFormat` is typed as `"json" | "csv"`
+  only, so a `"pdf"` request is a compile-time error for any future caller
+  rather than a silent no-op.
+
+Every export writes exactly one `operations.evidence_pack_exported` audit
+event (actor, tenant from the pack, agent as object, format, content hash)
+via `writeAudit()` — same tamper-evidence pattern as
+`COMPLIANCE-P0-06`'s `exportCampaignEvidence()`: a SHA-256 over the pack's
+canonical JSON, computed once regardless of output format so a JSON and a
+CSV export of the same pack share the same hash (verified by a test).
+
+**API:** `POST /api/v1/compliance/agents/[id]/evidence-pack?format=json|csv`
+lives under Compliance's existing route family (it calls
+`assembleGovernanceEvidencePack()` then this module's
+`exportGovernanceEvidencePack()`) rather than a new Operations-owned route
+— the route itself is Compliance's to own since it's agent-scoped and the
+assembly step is Compliance's; this module's contribution is the exported
+service function it calls, matching how `OPERATIONS-P0-04.1`'s report
+export already works the other direction (an Operations-owned route
+calling into other modules' read contracts).
+
+**Verification:**
+- `modules/operations/evidencePackExport.test.ts` — 3 tests: JSON content
+  matches the pack and audits correctly, CSV flattens every section into
+  the expected row count, and JSON/CSV exports of the same pack share one
+  content hash.
+- `npm run typecheck` / `npm run lint` — clean.
+- `npx vitest run` — 188/188 passing.
+- `npm run build` (with `.next` deleted first) — clean; confirmed
+  `.next/server/app/api/v1/compliance/agents/[id]/evidence-pack/route.js`
+  exists.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** `exportGovernanceEvidencePack()`
+(`modules/operations/service.ts`); `EvidencePackFormat`,
+`EvidencePackExportResult` (`lib/shared/types/operations.ts`).
+
+**Marked Partial, not Done:** PDF delivery is named in the story title
+("PDF/CSV/JSON delivery") and is genuinely not built — see above. JSON/CSV
+are fully functional and audited.

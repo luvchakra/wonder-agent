@@ -581,3 +581,86 @@ keys this module already has, no new RBAC surface needed).
 `GET/POST /api/v1/compliance/agents/[id]/attestations`.
 `docs/design/ownership-map.md` updated with the new
 `governance_attestations` table row.
+
+---
+
+## 2026-09-16 — COMPLIANCE-P0-09 — Governance Evidence Pack assembly
+
+**Agent:** Compliance Agent, continuing from `COMPLIANCE-P0-08` per the
+user's standing authorization. Paired with Operations Agent's
+`OPERATIONS-P0-07` in the same session pass (the 2026-09-15 decision:
+"Compliance assembles, Operations exports").
+
+**Design.** `assembleGovernanceEvidencePack(tenantId, agentId)`
+(`modules/certification-compliance/evidencePack.ts`) fetches every section
+the governance requirements doc's per-agent bundle calls for — identity,
+owners, purpose/lifecycle, IAM identity, effective access, SHOULD/CAN/DID,
+policies, risk findings, certifications, attestations, exceptions, control
+mappings, runtime evidence (via SHOULD/CAN/DID), remediation, audit
+events — in a single `Promise.all()`, each call going through the owning
+module's already-published read contract (non-negotiable #6):
+- Identity: `getAgent()`, `getAgentContract()`, `listOwners()`,
+  `listAgentIdentities()`, `listLifecycleEvents()`.
+- Access: `getEffectiveAccess()` (CAN), `listPolicyEvaluations()`,
+  `listGovernanceExceptions()`, `listAccessRequests()` (remediation).
+- Runtime: `compareShouldCanDid()` — reused whole rather than re-deriving
+  SHOULD/CAN/DID separately, since Runtime Agent already publishes exactly
+  this three-way comparison.
+- Risk: `getFindings()`.
+- This module's own: `getCertificationHistory()`, `listAttestationsForAgent()`
+  (COMPLIANCE-P0-08, built immediately prior), and `getGovernancePosture()`
+  (COMPLIANCE-P0-07) included as a summary section.
+- Control mappings: reuses the exact controlRef-to-control_mappings
+  correlation COMPLIANCE-P0-07's `compliance_controls` dimension already
+  performs, rather than inventing a second version of it.
+- **New cross-module dependency direction:** Operations' `listAuditLogs()`
+  (`@/modules/operations/service`). Every prior dependency in this module
+  flowed from earlier-numbered modules (Identity/Access/Runtime/Risk); this
+  is the first time Compliance consumes a *later*-numbered module's
+  contract. This is correct per `docs/design/ownership-map.md`, which
+  already designates Operations as `audit_logs`'s read/presentation owner
+  regardless of module numbering — module numbers are a build-order
+  convention, not a dependency-direction constraint, and the ownership map
+  is what non-negotiable #6 actually binds to. Verified the resulting
+  Compliance↔Operations circular module reference (Operations' `reports.ts`
+  already imports from Compliance's service) causes no runtime issue: both
+  sides only call the other's functions inside async function bodies, never
+  at module top-level/import time, so `npm run build` compiles cleanly (a
+  live check, not an assumption).
+
+**Audit events scoping (documented limitation, not a silent gap):** the
+bundle includes only audit events whose direct object is the agent itself
+(`objectType: "agent"`, `objectId === agentId`) — not every audit event
+*related to* the agent (e.g. a certification decision's own audit event
+carries that decision's id as its object, not the agent's). Operations'
+published `AuditLogFilter` has no "related agent" filter to widen this
+without inventing one on Operations' behalf, which this module has no
+standing to do unilaterally.
+
+**Not implemented / deliberately excluded:**
+- No new table — the pack is computed fresh on every call, same
+  no-persistence principle as `COMPLIANCE-P0-07`.
+- File generation/delivery is explicitly out of scope here — that's
+  `OPERATIONS-P0-07`, recorded separately in Operations' own audit log.
+
+**Verification:**
+- `modules/certification-compliance/evidencePack.test.ts` — 4 tests
+  (agent-not-found, full assembly from mocked dependencies, audit-event
+  objectId filtering, control-mapping correlation).
+- `npm run typecheck` — clean (including across the new
+  Compliance↔Operations circular type reference).
+- `npm run lint` — clean.
+- `npx vitest run` — 188/188 passing (up from 181 before this pair of
+  stories).
+- `npm run build` (with `.next` deleted first) — clean; confirmed the new
+  route compiled by checking `.next/server/app/api/v1/compliance/agents/
+  [id]/evidence-pack/route.js` exists.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** `assembleGovernanceEvidencePack()`
+(`modules/certification-compliance/service.ts`); `GovernanceEvidencePack`
+(`lib/shared/types/compliance.ts`);
+`POST /api/v1/compliance/agents/[id]/evidence-pack?format=json|csv`
+(`compliance.manage`, matching the `COMPLIANCE-P0-06` campaign-export
+precedent's permission gate and POST-not-GET convention for an audited
+export action).

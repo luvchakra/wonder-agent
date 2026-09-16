@@ -28,7 +28,7 @@ issued.
 | OPERATIONS-P0-04.2 | Report traceability (linked records + data freshness) | Done |
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Partial — `getJobStatusSummary()` and `GET /api/v1/jobs/status` built; no dedicated customer-facing page this session (scope cut, flagged) |
-| OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Not Started — 2026-09-15, user decided Compliance assembles + Operations exports; see Requirements Refresh below |
+| OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Partial — JSON/CSV export done (`exportGovernanceEvidencePack()`); no PDF renderer exists in this codebase, PDF deferred (confirmed, not assumed) |
 
 ---
 

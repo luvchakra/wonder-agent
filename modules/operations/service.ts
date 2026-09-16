@@ -26,3 +26,4 @@ export {
 } from "./reports";
 export { saveReportDefinition, listSavedReportDefinitions, type SaveReportDefinitionInput } from "./savedReports";
 export { getJobStatusSummary } from "./jobs";
+export { exportGovernanceEvidencePack } from "./evidencePackExport";

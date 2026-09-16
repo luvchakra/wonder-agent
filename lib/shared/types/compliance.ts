@@ -6,6 +6,12 @@
  * — never by querying certification_campaigns/control_mappings/etc. directly.
  */
 
+import type { Agent, AgentContract, AgentIdentityLink, AgentLifecycleEvent, AgentOwner } from "./agent-identity";
+import type { AccessGrant, AccessRequest, PolicyEvaluationResult, PolicyException } from "./access-governance";
+import type { ShouldCanDidComparison } from "./runtime";
+import type { RiskFinding } from "./risk";
+import type { AuditLogEntry } from "./operations";
+
 export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent";
 export type CampaignCadence = "one_time" | "periodic" | "event_driven";
 export type CampaignStatus = "draft" | "active" | "completed" | "cancelled";
@@ -200,6 +206,57 @@ export type GovernanceAttestation = {
   validUntil: string | null;
   decidedAt: string;
   createdAt: string;
+};
+
+/**
+ * COMPLIANCE-P0-09 — Governance Evidence Pack: a per-agent evidence bundle
+ * assembled entirely from other modules' already-published read contracts
+ * (non-negotiable #6 — never a direct cross-module table read). This module
+ * only assembles the structured bundle; OPERATIONS-P0-07 turns it into a
+ * downloadable file (PDF/CSV/JSON). Extends, not replaces,
+ * `COMPLIANCE-P0-06`'s existing per-campaign `EvidenceExportPackage`, which
+ * remains campaign-scoped rather than agent-scoped.
+ */
+export type GovernanceEvidencePack = {
+  agentId: string;
+  tenantId: string;
+  generatedAt: string;
+  identity: {
+    agent: Agent;
+    contract: AgentContract | null;
+    owners: AgentOwner[];
+    identities: AgentIdentityLink[];
+    lifecycleEvents: AgentLifecycleEvent[];
+  };
+  access: {
+    effectiveAccess: AccessGrant[];
+    policyEvaluations: PolicyEvaluationResult[];
+    exceptions: PolicyException[];
+  };
+  /** SHOULD vs CAN vs DID, reusing Runtime Agent's own comparison engine. */
+  shouldCanDid: ShouldCanDidComparison;
+  risk: {
+    findings: RiskFinding[];
+  };
+  certifications: CertificationDecision[];
+  attestations: GovernanceAttestation[];
+  controlMappings: ControlMapping[];
+  remediation: {
+    accessRequests: AccessRequest[];
+  };
+  /**
+   * Audit events whose direct object is the agent itself (objectType
+   * "agent", objectId === agentId) — a correctly-scoped but narrower slice
+   * than "every audit event ever related to this agent" (e.g. a
+   * certification decision's own audit event has that decision's id as its
+   * object, not the agent's), since Operations' published
+   * `listAuditLogs()` contract has no "related agent" filter to widen this
+   * without inventing one on Operations' behalf. Documented limitation,
+   * not a silent gap.
+   */
+  auditEvents: AuditLogEntry[];
+  /** COMPLIANCE-P0-07's own posture computation, included as a summary. */
+  posture: GovernancePosture;
 };
 
 /**

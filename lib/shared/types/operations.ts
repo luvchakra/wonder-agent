@@ -150,3 +150,21 @@ export type JobStatusSummary = {
   failureCountLast30Days: number;
   totalRetries: number;
 };
+
+/**
+ * OPERATIONS-P0-07 — the result of turning Compliance's assembled
+ * GovernanceEvidencePack into a downloadable file. `contentHash` is a
+ * SHA-256 over the pack's canonical JSON (same tamper-evidence pattern as
+ * COMPLIANCE-P0-06's EvidenceExportPackage), computed once regardless of
+ * output format so a JSON and a CSV export of the same pack share the same
+ * hash. PDF is not produced — no PDF renderer exists in this codebase yet
+ * (confirmed, not assumed); only "json" and "csv" are valid formats today.
+ */
+export type EvidencePackFormat = "json" | "csv";
+
+export type EvidencePackExportResult = {
+  content: string;
+  contentType: string;
+  filename: string;
+  contentHash: string;
+};
