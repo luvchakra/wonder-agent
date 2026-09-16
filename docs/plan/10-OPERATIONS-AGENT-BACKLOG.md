@@ -20,7 +20,7 @@ issued.
 |---|---|---|
 | OPERATIONS-P0-01.1 | Audit log viewer | Done |
 | OPERATIONS-P0-01.2 | Evidence export | Done |
-| OPERATIONS-P0-02.1 | Schema & channels | Partial — in-app channel real and working; email channel not implemented (no transactional email provider wired into this project yet, and the backlog explicitly forbids adding one without asking) |
+| OPERATIONS-P0-02.1 | Schema & channels | Done — 2026-09-16: user picked Resend. Both channels real: in-app (unchanged) plus `modules/operations/email.ts`'s `sendNotificationEmail()`, called from `notify()` for every event. Targets the specific `userId` when set, otherwise broadcasts to every active tenant member (same semantics the in-app channel already used), honoring each recipient's `notification_preferences.email_enabled` (defaults to on when no row exists) |
 | OPERATIONS-P0-02.2 | `notify(event)` and trigger wiring | Partial → wired into 3 of 7 event types across 3 producing modules (Risk's `critical_finding`/`rogue_agent`, Integration's `integration_failure`, Compliance's `certification_overdue`); `certification_due`/`ownership_missing`/`lifecycle_expiry` remain unwired — genuinely ambiguous trigger points (no scheduler, no single unambiguous write event), documented rather than guessed |
 | OPERATIONS-P0-03.1 | Global search (higher bar) | Partial — re-checked 2026-09-16, still 6 of 9 named object types; identity/owner/entitlement still have no tenant-wide list contract published (re-verified: `listAgentIdentities`/`listOwners` remain agent-scoped only) |
 | OPERATIONS-P0-03.2 | Search traceability & role-based field masking | Done |
@@ -120,13 +120,25 @@ email infrastructure dependency without asking) and **in-app** (the `notificatio
 table itself, read via `GET /api/v1/notifications`). Slack/Teams/webhook channels
 are explicitly P1.
 
+**Resolved 2026-09-16** (user picked Resend): `modules/operations/email.ts`'s
+`sendNotificationEmail()`. Calls Resend's REST API directly via `fetch()` (no new
+npm dependency). Deliberately NOT wrapped in `next/server`'s `after()` (unlike
+Integration Agent's sync-job dispatch) — `notify()` is called from deep inside
+service-layer call chains (e.g. `evaluateAgentRisk() → createOrUpdateFinding() →
+notifyForFinding() → notify()`), not only from an API route handler, and `after()`
+throws when called outside an active request scope. `sendNotificationEmail()` is
+awaited inline instead; it never throws (matching `notify()`'s and `writeAudit()`'s
+own discipline) and a single Resend call is fast enough (typically well under a
+second, and broadcast recipients are sent in parallel via `Promise.all()`) that the
+added latency on the triggering write was judged an acceptable, safer trade-off
+than risking a genuinely fire-and-forget promise getting cut off mid-flight in a
+serverless invocation before the email actually sends.
+
 ### OPERATIONS-P0-02.2 — `notify(event)` and trigger wiring
 
-`notify(event)` inserts the `notifications` row and, for email-eligible types,
-enqueues the email send (do not block the caller's request on email delivery —
-fire-and-forget or a lightweight async dispatch, matching the same
-"don't put long-running work in the request cycle" rule Integration Agent follows
-for sync jobs). Each P0 trigger type is invoked by its owning module at the moment
+`notify(event)` inserts the `notifications` row and sends the email (see
+OPERATIONS-P0-02.1's resolution note above for why this is awaited inline rather
+than fire-and-forget/`after()`-dispatched). Each P0 trigger type is invoked by its owning module at the moment
 the underlying event occurs (e.g. Risk Agent calls `notify({type:
 'critical_finding', ...})` right after inserting a `critical` `risk_findings` row) —
 Operations Agent does not poll for these conditions itself; it only provides the

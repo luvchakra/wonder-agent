@@ -504,3 +504,61 @@ Capped 1 previously-unbounded query with the new shared
 `notifications.ts`'s `listNotifications()`/its own `.limit(100)` were
 already real/bounded before this pass (QA's original finding excluded
 them) and were the precedent this pass's shared constant follows.
+
+---
+
+## 2026-09-16 — OPERATIONS-P0-02.1 email channel resolved (Resend)
+
+Previously `Partial`: the backlog explicitly forbade adding a new email
+infrastructure dependency without asking. User picked Resend as part of
+the same "what's left before launch" prioritization pass (after the
+pagination pass, §above).
+
+**Built:**
+- `lib/db/env.ts` — `getResendApiKey()`/`getResendFromEmail()`, both
+  deliberately optional (same shape as `getPlatformOpenAiApiKey()`): a
+  deployment with neither set stays in-app-only, no crash, no error.
+- `modules/operations/email.ts` — `sendNotificationEmail(event)`,
+  internal-only (never exported via `service.ts`; `notify()` is the only
+  caller). Calls Resend's REST API directly via `fetch()` (no new npm
+  dependency, matching this codebase's minimal-dependency ethos — same
+  choice already made for OpenAI/Gemini). Never throws (mirrors
+  `writeAudit()`/`notify()`'s own discipline). Recipient resolution:
+  `event.userId` set → that one user; unset → every active
+  `tenant_memberships` row for the tenant (the same broadcast semantics
+  the in-app channel already uses), each filtered by their
+  `notification_preferences.email_enabled` (defaults to on when no row
+  exists, per OPERATIONS-P0-05.1's own documented default). Since every
+  P0 notification type is mandatory in this build, `email_enabled` can
+  never actually be set to `false` via `setNotificationPreference()`
+  today — so in practice every recipient always gets the email — but the
+  real preference row is still read rather than hard-coded, so this stays
+  correct once a non-mandatory (P1) type exists.
+- `notifications.ts`'s `notify()` now calls `sendNotificationEmail(event)`
+  after the in-app insert. Deliberately NOT wrapped in `next/server`'s
+  `after()` — `notify()`'s call graph includes deep service-layer chains
+  outside any request scope (e.g. `evaluateAgentRisk() →
+  createOrUpdateFinding() → notifyForFinding() → notify()`), and `after()`
+  throws when called outside an active request. Awaited inline instead;
+  the added latency (a single Resend call, or `Promise.all()`'d for a
+  broadcast) was judged an acceptable trade-off against the real risk of
+  a genuinely fire-and-forget promise getting cut off mid-flight in a
+  serverless invocation before delivery completes.
+- `.env.local.example` documents `RESEND_API_KEY`/`RESEND_FROM_EMAIL`.
+- `/settings/notifications`'s existing copy ("Email: On (mandatory)")
+  already accurately described this intended behavior — updated its code
+  comment only, no UI change needed.
+
+**Verification:**
+- New `modules/operations/email.test.ts` (6 tests): silent no-op when
+  unconfigured; targeted-user send with the exact Resend request body
+  asserted; tenant-wide broadcast to every active member; a recipient
+  with `email_enabled: false` excluded; a non-OK Resend response and a
+  rejected `fetch()` both resolve without throwing.
+- `npm run typecheck` clean, `npm run lint` clean, `npx vitest run`
+  232/232 (up from 226), `npm run build` (with `.next` deleted first)
+  clean, `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` no match.
+
+Progress Tracker: OPERATIONS-P0-02.1 moves from `Partial` to `Done`.
+OPERATIONS-P0-02.2's own text updated to point at this resolution rather
+than the old "enqueue" language.

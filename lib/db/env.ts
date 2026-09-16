@@ -48,6 +48,26 @@ export function getSecretEncryptionKey(): string {
  * optional: a deployment may run BYOK-only, with every tenant supplying its
  * own key and no platform-wide fallback configured at all.
  */
+/**
+ * OPERATIONS-P0-02.1's email channel (resolved 2026-09-16: Resend). Both
+ * deliberately optional, same shape as `getPlatformOpenAiApiKey()` — a
+ * deployment may run in-app-only with neither set, degrading gracefully
+ * rather than crashing.
+ */
+export function getResendApiKey(): string | null {
+  if (typeof window !== "undefined") {
+    throw new Error("RESEND_API_KEY must never be read from client code.");
+  }
+  return process.env.RESEND_API_KEY || null;
+}
+
+export function getResendFromEmail(): string | null {
+  if (typeof window !== "undefined") {
+    throw new Error("RESEND_FROM_EMAIL must never be read from client code.");
+  }
+  return process.env.RESEND_FROM_EMAIL || null;
+}
+
 export function getPlatformOpenAiApiKey(): string | null {
   if (typeof window !== "undefined") {
     throw new Error("PLATFORM_OPENAI_API_KEY must never be read from client code.");

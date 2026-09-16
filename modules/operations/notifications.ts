@@ -5,6 +5,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { Notification, NotificationPreference, NotifyEvent, NotificationType } from "@/lib/shared/types/operations";
 import { MANDATORY_NOTIFICATION_TYPES } from "@/lib/shared/types/operations";
 import { toNotification, toNotificationPreference } from "./mappers";
+import { sendNotificationEmail } from "./email";
 
 /**
  * OPERATIONS-P0-02.2's published entry point — every producing module
@@ -17,13 +18,10 @@ import { toNotification, toNotificationPreference } from "./mappers";
  * notification-delivery failure must never abort the legitimate action
  * that triggered it.
  *
- * **Email channel**: not implemented this session. This project has no
- * transactional email provider wired in yet (checked: no existing
- * send-email utility anywhere in `lib/*`/`modules/*`), and the backlog's
- * own instruction is explicit — "do not add a new email infrastructure
- * dependency without asking." Recorded here as an open dependency for the
- * user rather than guessed at; the in-app channel (this table +
- * `GET /api/v1/notifications`) is the only channel actually delivered.
+ * **Email channel**: resolved 2026-09-16 (user picked Resend) — see
+ * `./email.ts`'s `sendNotificationEmail()`. It also never throws, so
+ * awaiting it here is safe even when Resend isn't configured (it's a
+ * no-op) or a send fails (logged, not propagated).
  */
 export async function notify(event: NotifyEvent): Promise<void> {
   try {
@@ -43,6 +41,8 @@ export async function notify(event: NotifyEvent): Promise<void> {
   } catch (err) {
     console.error("notify() threw", { type: event.type, err });
   }
+
+  await sendNotificationEmail(event);
 }
 
 /** In-app channel read: the caller's own targeted notifications plus every tenant-wide broadcast. */

@@ -10,6 +10,8 @@ import { Card, CardHeader, CardBody, Badge, TableContainer, Thead, Th, Td, Tr } 
 // as locked-on rather than a togglable preference — setNotificationPreference()
 // already rejects an attempt to disable one; the toggle UI itself has
 // nothing to wire to until an optional notification type exists (P1).
+// Email delivery (OPERATIONS-P0-02.1, resolved 2026-09-16 via Resend) is
+// real now — "Email: On (mandatory)" here means what it says.
 export default async function NotificationPreferencesPage() {
   let ctx;
   try {
