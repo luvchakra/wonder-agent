@@ -493,3 +493,93 @@ and rendered once, above `<main>`, for every customer page.
 **Published this session:** none from this module — `AnnouncementsBanner`
 is Experience-owned (`modules/ui/index.ts`); see that module's own audit
 log for its entry.
+
+---
+
+## 2026-09-16 — PLATFORM-P0-05.2 (AI Provider Configuration), resolved and built
+
+Previously `Deferred` per this row's own stop-and-report note: the story text
+left "which providers" and "what capability/budget model" genuinely open, and
+the ownership-map addition it needed was explicitly flagged for the user
+rather than guessed. Resolved today via `AskUserQuestion` (in the context of
+the user picking this up as one of 3 "not fully done P0" gaps to fix): provider
+= OpenAI; key scope = both — a tenant may bring its own OpenAI key (BYOK) or
+rely on a platform-wide default key, chosen per tenant.
+
+**Built:**
+- `supabase/migrations/0057_platform_ai_provider_config.sql` — new `ai.manage`
+  permission, granted only to `TENANT_SUPER_ADMIN` (same restriction as
+  `sso.manage` — no other role gets it by default). New
+  `platform_ai_provider_configs` table: `tenant_id` primary key (one row per
+  tenant, BYOK override only), `use_own_key`, `encrypted_api_key` (nullable —
+  null until BYOK is enabled), `model`, `updated_by`/timestamps. RLS enabled,
+  zero client-facing policies at all — same lockdown as
+  `integration_credentials` (0021). The platform-wide default key is
+  deliberately NOT a row in this table (which would need a `tenant_id null`
+  special case with fragile nullable-uniqueness semantics) — it's the
+  `PLATFORM_OPENAI_API_KEY` server-only env var instead, consistent with how
+  `SUPABASE_SERVICE_ROLE_KEY`/`SECRET_ENCRYPTION_KEY` are handled (CLAUDE.md
+  §16). Applied live to the dev project; re-checked `get_advisors` after —
+  only the expected `rls_enabled_no_policy` INFO finding (same as every other
+  zero-client-policy table) plus an initially-missing FK index on
+  `updated_by`, fixed in the same migration (`platform_ai_provider_configs_
+  updated_by_idx`) before commit, matching the `governance_attestations_
+  agent_id_idx` precedent.
+- `modules/platform-admin/aiProviderConfig.ts` — `getAiProviderConfig`,
+  `setAiProviderConfig`, `resolveAiProviderKey`. Service-role client, manual
+  tenant-ownership verification, `encryptSecret()`/`decryptSecret()` (never a
+  module-invented scheme, per the story's own instruction), `writeAudit()`
+  (Foundation's tenant `audit_logs`, not `platform_audit_logs` — this is a
+  tenant-scoped customer setting, not a vendor-console action) with metadata
+  that excludes the key itself. `resolveAiProviderKey()` is BYOK-first, else
+  platform-wide fallback via `getPlatformOpenAiApiKey()` (new getter in
+  `lib/db/env.ts`, deliberately not using the `required()` helper since the
+  platform-wide key is legitimately optional), else `null`. Exported from
+  `modules/platform-admin/service.ts`.
+- `lib/ai/summarize.ts` (Foundation-owned, FOUNDATION-P0-16) rewritten:
+  `summarize(tenantId, request)` now calls `resolveAiProviderKey(tenantId)` —
+  a published Platform contract call, the same "a shared primitive consumes
+  another module's already-published service function" pattern used
+  repeatedly elsewhere this build (e.g. Compliance calling Operations' export
+  primitive) — and, when a key resolves, calls OpenAI's chat-completions API
+  directly via `fetch()` (no new npm dependency, matching this codebase's
+  minimal-dependency ethos). Still throws `AiNotConfiguredError` when nothing
+  resolves; a real OpenAI-side failure now throws a distinct error instead
+  (never disguised as "not configured"). `app/api/v1/ai/summarize/route.ts`
+  updated to pass `ctx.tenantId!` through.
+- `/settings/ai` (bare functional page, gated by `requirePermission("ai.manage")`,
+  401→`/sign-in`/403→`/settings`) + `app/actions/ai.ts`
+  (`setAiProviderConfigAction`) — mirrors `/settings/sso` + `app/actions/sso.ts`
+  exactly. Shows active key source (BYOK / platform default / not configured)
+  and whether a platform default is even available, without ever rendering a
+  key value; the form's API-key field is `type="password"`, left blank keeps
+  the existing stored key. Linked from `/settings`'s index page.
+- `.env.local.example` documents the new optional `PLATFORM_OPENAI_API_KEY`.
+
+**Verification:**
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npx vitest run` — 217/217 passing (up from 210 going into this story).
+  `lib/ai/summarize.test.ts` rewritten: not-configured (mocked
+  `resolveAiProviderKey` → `null`), BYOK-path OpenAI call shape/headers,
+  platform-fallback path, a non-OK OpenAI response producing a distinct
+  (non-`AiNotConfiguredError`) error, plus the pre-existing no-DB-import and
+  exported-surface structural tests (both still pass unmodified).
+- `npm run build` (with `.next` deleted first) — clean; `/settings/ai` present
+  in the route list.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+- `mcp__Supabase__get_advisors(security)` / `(performance)` re-checked after
+  applying the migration — no new findings beyond the expected
+  `rls_enabled_no_policy` INFO (fixed the FK-index gap before commit).
+
+**Deliberately not built:** budget/spend limits, per-capability allow-lists,
+and the `ai_assistant` feature-flag gate mentioned in the story's original
+text — no user direction to add spend controls specifically, and no existing
+route currently checks an `ai_assistant` flag before calling `summarize()`
+(EXPERIENCE-P0-14's route only checks the domain `*.read` permission for the
+data being summarized). Left for a future story if the user wants
+budget/safety controls.
+
+**Published this session:** `modules/platform-admin/aiProviderConfig.ts`'s
+three functions, re-exported from `modules/platform-admin/service.ts` — the
+contract Foundation's `lib/ai/summarize.ts` now consumes.

@@ -585,3 +585,24 @@ FOUNDATION-P0-16 moves from `Not Started` to `Partial` — the primitive's
 contract and boundary are real and tested; the live capability
 (`EXPERIENCE-P0-14` needs a working `summarize()` to build against) is
 still blocked on the provider decision.
+
+---
+
+## 2026-09-16 — FOUNDATION-P0-16 unblocked by PLATFORM-P0-05.2, moves to Done
+
+The provider/credential decision this row was waiting on was resolved today
+(user picked this up as one of 3 "not fully done P0" gaps): OpenAI, both
+platform-wide default and per-tenant BYOK. Platform Agent built the actual
+credential storage/resolution (`platform_ai_provider_configs`,
+`modules/platform-admin/aiProviderConfig.ts`'s `resolveAiProviderKey()`) —
+see `docs/design/platform-agent-backlog-audit.md`'s 2026-09-16 entry for the
+full detail. This module's own file, `lib/ai/summarize.ts`, needed a small,
+directly-expected change as a consequence: `summarize()` gained a leading
+`tenantId` parameter, calls `resolveAiProviderKey(tenantId)` (a published
+Platform contract call — not a database query of its own; the "no DB client
+import" boundary this file's tests assert is unchanged and still enforced
+structurally), and makes a real OpenAI `fetch()` call when a key resolves.
+`app/api/v1/ai/summarize/route.ts` (Experience-owned) was updated to pass
+`ctx.tenantId!` through. Full verification pipeline re-run (typecheck, lint,
+217/217 vitest, clean build, no service-role-key leakage) — all green.
+FOUNDATION-P0-16 moves from `Partial` to `Done`.

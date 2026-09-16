@@ -41,3 +41,16 @@ export function getSecretEncryptionKey(): string {
   }
   return required("SECRET_ENCRYPTION_KEY", process.env.SECRET_ENCRYPTION_KEY);
 }
+
+/**
+ * PLATFORM-P0-05.2's platform-wide default OpenAI key. Deliberately does
+ * NOT use `required()` — unlike the vars above, this one is legitimately
+ * optional: a deployment may run BYOK-only, with every tenant supplying its
+ * own key and no platform-wide fallback configured at all.
+ */
+export function getPlatformOpenAiApiKey(): string | null {
+  if (typeof window !== "undefined") {
+    throw new Error("PLATFORM_OPENAI_API_KEY must never be read from client code.");
+  }
+  return process.env.PLATFORM_OPENAI_API_KEY || null;
+}

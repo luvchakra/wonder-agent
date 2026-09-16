@@ -26,3 +26,9 @@ export {
   type AnnouncementScope,
   type AnnouncementType,
 } from "./announcements";
+export {
+  getAiProviderConfig,
+  setAiProviderConfig,
+  resolveAiProviderKey,
+  type SetAiProviderConfigInput,
+} from "./aiProviderConfig";

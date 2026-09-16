@@ -1478,3 +1478,24 @@ primitives. Added to the Integrations nav group in
 **Verification:** full pipeline (typecheck/lint/`npx vitest run`
 214/214/build/secret-leak check) run as part of Operations' own pass —
 see that module's audit log entry for the complete record.
+
+---
+
+## 2026-09-16 — `app/api/v1/ai/summarize/route.ts` signature follow-through (paired with PLATFORM-P0-05.2)
+
+**Agent:** Platform Agent (small, paired change — the story is tracked under
+Platform's own backlog as `PLATFORM-P0-05.2`; full account in that module's
+audit log).
+
+`lib/ai/summarize.ts`'s `summarize()` gained a leading `tenantId` parameter
+(needed to resolve which OpenAI key to use — BYOK vs. platform default).
+This route, which Experience Agent added under Foundation's `lib/ai/`
+umbrella for `EXPERIENCE-P0-14`, is the only caller — updated the one call
+site to `summarize(ctx.tenantId!, { kind, data })`, matching the
+`ctx.tenantId!` pattern already used by every other route in this codebase.
+No other change to this route; its own permission gating and payload-size
+check are untouched.
+
+**Verification:** full pipeline (typecheck/lint/`npx vitest run` 217/217/
+build/secret-leak check) run as part of Platform's own pass — see that
+module's audit log entry for the complete record.

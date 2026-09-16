@@ -54,7 +54,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await summarize({ kind: kind as AiSummaryKind, data: data as Record<string, unknown> });
+    const result = await summarize(ctx.tenantId!, { kind: kind as AiSummaryKind, data: data as Record<string, unknown> });
     return NextResponse.json({ ok: true, data: result });
   } catch (err) {
     if (err instanceof AiNotConfiguredError) {

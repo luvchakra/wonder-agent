@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AiSummaryKind, AiSummaryRequest, AiSummaryResult } from "@/lib/shared/types/ai";
+import { resolveAiProviderKey } from "@/modules/platform-admin/service";
 
 /**
  * FOUNDATION-P0-16 — the shared, read-only, advisory-only LLM summarization
@@ -11,25 +12,24 @@ import type { AiSummaryKind, AiSummaryRequest, AiSummaryResult } from "@/lib/sha
  * - This module has no Supabase client import anywhere in it and never will
  *   — it cannot query a database itself. Every fact it summarizes must
  *   already be computed and passed in by the calling module via `data`.
+ *   The one exception is `resolveAiProviderKey()` — a published contract
+ *   call into Platform Agent's own module (same "a shared primitive calls
+ *   another module's already-published service function" pattern used
+ *   elsewhere in this build, e.g. Compliance calling Operations' export
+ *   primitive), not a direct database query of its own.
  * - It has no write path to anything — its only export returns a string.
  * - Its output is typed `AiSummaryResult.summary: string` (prose), never a
  *   structured value — nothing in this codebase may read a summarization
  *   result back into a deterministic decision (authorization, risk score,
  *   policy evaluation, remediation), per non-negotiable #9.
  *
- * Provider wiring is deliberately NOT implemented yet. Per the story's own
- * resolution (docs/plan/01-FOUNDATION-AGENT-BACKLOG.md, FOUNDATION-P0-16):
- * "Needs an explicit provider/credential decision... before the first real
- * call; stub/interface can be built without one." Which LLM API, and where
- * its credential is stored/scoped (a new table? platform-wide or
- * per-tenant? via encryptSecret()?) is the same open question
- * PLATFORM-P0-05.2 (AI Provider Configuration) was already deferred on —
- * inventing a schema/table here to answer it unilaterally would be exactly
- * the kind of new shared-foundation-location decision
- * docs/design/ownership-map.md §5 reserves to the user. Until that lands,
- * every call deterministically throws `AiNotConfiguredError`, and callers
- * are expected to render that as "Connect an AI provider" — never a crash,
- * never a silently-empty summary.
+ * Provider: OpenAI, resolved 2026-09-16 via AskUserQuestion (see
+ * PLATFORM-P0-05.2 / modules/platform-admin/aiProviderConfig.ts). A tenant
+ * may bring its own key (BYOK) or fall back to the platform-wide default
+ * key; `resolveAiProviderKey()` picks whichever applies. When neither is
+ * configured, every call deterministically throws `AiNotConfiguredError`,
+ * and callers are expected to render that as "Connect an AI provider" —
+ * never a crash, never a silently-empty summary.
  */
 export class AiNotConfiguredError extends Error {
   constructor() {
@@ -38,28 +38,75 @@ export class AiNotConfiguredError extends Error {
   }
 }
 
-function isConfigured(): boolean {
-  // No provider/credential decision has been made yet (see the file-level
-  // comment above) — always false until that lands. A single explicit
-  // function rather than an inline check so the "not configured" path has
-  // exactly one place to change once a provider is chosen.
-  return false;
+const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+
+const KIND_INSTRUCTIONS: Record<AiSummaryKind, string> = {
+  finding: "Summarize this risk finding for a security administrator: what happened, why it matters, and what evidence supports it. Do not recommend a specific remediation action — only describe the evidence.",
+  evidence_bundle: "Summarize this evidence bundle in plain language for an auditor reviewing it, highlighting what it does and does not demonstrate.",
+  should_can_did_comparison: "Summarize this SHOULD vs CAN vs DID comparison for a reviewer: what the agent is approved to do, what it can technically do, and what it actually did, and where they diverge.",
+  certification_item: "Summarize this access certification item for a reviewer deciding whether to keep, review, or remove the access, describing the risk and usage evidence without stating a recommendation.",
+};
+
+const SYSTEM_PROMPT =
+  "You are an assistant that summarizes already-computed enterprise AI-governance data for a human reviewer. " +
+  "You only describe and explain the data you are given — you never invent facts not present in it, and you never " +
+  "state or imply an authorization, risk-scoring, policy, or remediation decision; those are made deterministically " +
+  "elsewhere in the system, never by you. Keep the summary to a few sentences of plain prose.";
+
+function buildUserPrompt(request: AiSummaryRequest): string {
+  return `${KIND_INSTRUCTIONS[request.kind]}\n\nData:\n${JSON.stringify(request.data, null, 2)}`;
 }
 
 /**
  * Summarizes already-computed evidence for the Experience Agent's
- * AI-Assisted Investigation UI (EXPERIENCE-P0-14). Throws
- * `AiNotConfiguredError` until a provider is wired — never returns a fake
+ * AI-Assisted Investigation UI (EXPERIENCE-P0-14). `tenantId` is the
+ * server-resolved tenant context (never client-supplied — CLAUDE.md §14),
+ * used only to look up which key to call OpenAI with. Throws
+ * `AiNotConfiguredError` when no key is configured — never returns a fake
  * or empty summary, and never partially succeeds.
  */
-export async function summarize(request: AiSummaryRequest): Promise<AiSummaryResult> {
-  void request; // used once a provider is wired; see the file-level comment
-  if (!isConfigured()) {
+export async function summarize(tenantId: string, request: AiSummaryRequest): Promise<AiSummaryResult> {
+  const resolved = await resolveAiProviderKey(tenantId);
+  if (!resolved) {
     throw new AiNotConfiguredError();
   }
-  // Provider call goes here once one is configured — intentionally left
-  // unimplemented rather than guessed at. See the file-level comment.
-  throw new AiNotConfiguredError();
+
+  const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${resolved.apiKey}`,
+    },
+    body: JSON.stringify({
+      model: resolved.model,
+      temperature: 0.2,
+      max_tokens: 400,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: buildUserPrompt(request) },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+
+  const payload = (await response.json()) as {
+    choices?: { message?: { content?: string } }[];
+  };
+  const content = payload.choices?.[0]?.message?.content?.trim();
+  if (!content) {
+    throw new Error("OpenAI response contained no summary content");
+  }
+
+  return {
+    kind: request.kind,
+    summary: content,
+    provider: resolved.provider,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 export type { AiSummaryKind, AiSummaryRequest, AiSummaryResult };

@@ -68,13 +68,13 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `subscriptions` | PA | Per-tenant plan/subscription record |
 | `platform_audit_logs` | PA | Platform-admin action audit (separate from tenant `audit_logs`) |
 | `platform_config_versions` | PA | PLATFORM-P0-05.3 — version history for branding/feature-flag-default config changes, with rollback |
+| `platform_ai_provider_configs` | PA | PLATFORM-P0-05.2 — per-tenant BYOK OpenAI key override (RLS enabled, zero client policies, mirrors `integration_credentials`); the platform-wide default key is the `PLATFORM_OPENAI_API_KEY` env var, not a row in this table — migration `0057`, built 2026-09-16 |
 | `platform_announcements` | PA | PLATFORM-P0-05.4 — maintenance-mode windows and platform notices (global or per-tenant scope); Experience Agent renders via the published `getActiveAnnouncements()` read contract, not by querying this table directly |
 | `agent_duplicate_candidates` | IA | IDENTITY-P0-04 (duplicate detection/merge review) — migration `0041`, built 2026-09-14 |
 | `agent_attestations` | IA | Planned — IDENTITY-P1-02 (attestation), not yet implemented |
 | `integration_exports` | INT | Planned — INTEGRATION-P1-05 (SIEM export delivery/retry status), not yet implemented |
 | `runtime_event_quarantine` | RA | RUNTIME-P0-11 (ingestion hardening: replay protection/quarantine) — migration `0043`, built 2026-09-14 |
 | `risk_campaigns` / `risk_campaign_items` | RiskA | Planned — RISK-P1-03 (risk campaigns), not yet implemented |
-| `platform_ai_provider_configs` | PA | Planned — PLATFORM-P0-05.2 (AI provider configuration), not yet implemented |
 | `platform_announcements` | PA | Planned — PLATFORM-P0-05.4 (maintenance mode/platform announcements); Experience Agent will need a read-only contract to render these in the customer shell once built |
 | `notification_preferences` | OA | OPERATIONS-P0-05.1 (notification preferences) — migration `0048`, built 2026-09-14 |
 | `governance_attestations` | CA | Planned — COMPLIANCE-P0-08 (broad Governance Attestation, resolved 2026-09-15), not yet implemented |

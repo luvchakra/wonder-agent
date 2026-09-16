@@ -27,7 +27,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-04.1 | `platform_audit_logs` | Done |
 | PLATFORM-P0-04.2 | Support access (higher bar) | Deferred — no time-bound/audited support-access infrastructure exists; the backlog explicitly forbids shipping an unbounded shortcut, so nothing was built |
 | PLATFORM-P0-05.1 | Usage & Limits tracking/enforcement | Done — `checkUsageLimit()`/`getUsageSummary()` published; not yet called by any other module's create path (same as `isFeatureEnabled()` itself) |
-| PLATFORM-P0-05.2 | AI Provider Configuration | Deferred — genuine open product/architecture question (which providers, what capability/budget model), not a mechanical ownership-map gap; stopped and recorded rather than guessed, per CLAUDE.md §4's stop-and-report rule |
+| PLATFORM-P0-05.2 | AI Provider Configuration | Done — resolved 2026-09-16 via `AskUserQuestion` (provider = OpenAI; key scope = both platform-wide default and per-tenant BYOK, tenant chooses). `platform_ai_provider_configs` (migration `0057`), `modules/platform-admin/aiProviderConfig.ts`, `/settings/ai` UI, and `lib/ai/summarize.ts` now call OpenAI's REST API for real |
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 
@@ -251,10 +251,46 @@ model routing, allowed capabilities, budget and safety controls, gating the
 platform-wide `ai_assistant` feature flag. Credentials must never reach browser code,
 logs or source control (non-negotiable #10).
 
-**Ownership-map flag:** this needs a new table (e.g. `platform_ai_provider_configs`)
-that isn't yet listed in `docs/design/ownership-map.md`. Not added here per this
-task's constraints — flagged for the user to approve an ownership-map addition
-before implementation.
+**Resolved 2026-09-16** (previously deferred pending user direction — see the prior
+version of this entry below): provider = OpenAI; key scope = both — a tenant may
+bring its own OpenAI key (BYOK) or fall back to a platform-wide default key, chosen
+per tenant via `use_own_key`.
+
+- `supabase/migrations/0057_platform_ai_provider_config.sql` — new `ai.manage`
+  permission (TENANT_SUPER_ADMIN only, same restriction as `sso.manage`) and
+  `platform_ai_provider_configs` (per-tenant BYOK override only; the platform-wide
+  default key is `PLATFORM_OPENAI_API_KEY`, a server-only env var — never a
+  `tenant_id null` row, avoiding a fragile nullable-uniqueness special case). Same
+  lockdown as `integration_credentials`: RLS enabled, zero client-facing policies.
+- `modules/platform-admin/aiProviderConfig.ts` — `getAiProviderConfig`,
+  `setAiProviderConfig`, `resolveAiProviderKey` (BYOK-first, else platform-wide
+  fallback, else `null`). Exported from `modules/platform-admin/service.ts`.
+- `lib/ai/summarize.ts` (Foundation-owned) now calls
+  `resolveAiProviderKey(tenantId)` — a published Platform contract call, the same
+  "shared primitive consumes another module's already-published service function"
+  pattern used elsewhere (e.g. Compliance calling Operations' export primitive) —
+  and makes a real OpenAI chat-completions call via `fetch()` (no new npm
+  dependency, per this codebase's minimal-dependency ethos). `app/api/v1/ai/
+  summarize/route.ts` threads the server-resolved `tenantId` through.
+- `/settings/ai` (bare functional page, gated by `ai.manage`) + `app/actions/ai.ts`
+  mirror the `/settings/sso` pattern exactly. The BYOK key is entered via a password
+  input, never rendered back, and the settings page only ever shows whether a key is
+  stored, never its value.
+- Budget/safety controls and the `ai_assistant` feature-flag gate from the story's
+  original text were not built — no user direction to add spend limits/safety
+  controls beyond what non-negotiable #9's "advisory-only, never a deterministic
+  input" already enforces structurally, and no existing route currently checks an
+  `ai_assistant` flag before calling `summarize()`. Left for a future story if the
+  user wants budget/safety controls specifically.
+- Tests: `lib/ai/summarize.test.ts` covers not-configured (mocked
+  `resolveAiProviderKey` returning `null`), BYOK path, platform-fallback path, and a
+  real-failure (non-OK OpenAI response) path distinct from "not configured".
+
+**Prior status (superseded):** Deferred — genuine open product/architecture question
+(which providers, what capability/budget model), not a mechanical ownership-map gap;
+stopped and recorded rather than guessed, per CLAUDE.md §4's stop-and-report rule.
+The ownership-map addition this note originally flagged is now resolved — see
+`docs/design/ownership-map.md`.
 
 ### PLATFORM-P0-05.3 — Global Configuration Versioning
 
