@@ -1394,3 +1394,42 @@ own "No ownership-map change is needed" note anticipated.
 
 **Open dependency recorded for Access Agent:** an API route wrapping
 `createGovernanceException()` — see "Create exception" above.
+
+---
+
+## 2026-09-16 — Re-verification sweep of remaining Partial rows
+
+**Agent:** Experience Agent, per the user's standing authorization.
+Checked all four remaining `Partial` rows
+(`EXPERIENCE-P0-01.0`/`01.2`, `04`, `08`) for a genuine unblock before
+moving on; none were.
+
+**EXPERIENCE-P0-01.0 / EXPERIENCE-P0-01.2 (authenticated in-app visual
+verification)** — re-confirmed the blocker still holds with a direct,
+cheap test rather than re-attempting a full signup flow again: `curl` to
+this tenant's actual Supabase Auth REST endpoint
+(`https://ekgyjwoenteadaaqakmd.supabase.co/auth/v1/health`) from this
+sandbox. Result: the egress proxy explicitly rejects the connection
+("connect_rejected... organization policy"), not a timeout or DNS
+failure — this is a standing sandbox network policy, unchanged since it
+was first documented, not something any code change in this repository
+can affect. Rows left exactly as already (accurately) documented.
+
+**EXPERIENCE-P0-04 (bulk-action reporting)** — re-checked for any bulk
+endpoint added anywhere this session (Identity's discovery/duplicate
+routes, Compliance's escalation sweep, everything touched by this
+session's other 20+ stories). None exists: every write endpoint in this
+codebase still operates on exactly one record per call. Building a bulk
+endpoint just to exercise `ConfirmActionDialog`'s already-built bulk-result
+UI would be inventing a feature no story calls for, and would mean adding
+new API surface to whichever module "owns" the bulk target — not this
+module's call to make unilaterally. Left `Partial`, unchanged.
+
+**EXPERIENCE-P0-08 (server-side pagination)** — still blocked on multiple
+other modules' `list*()` read contracts gaining `limit`/`offset` or
+keyset parameters, a change to those modules' own published signatures
+that Experience Agent doesn't make on their behalf (non-negotiable #18).
+Left `Partial`, unchanged.
+
+No code changed in this pass; recorded so this check isn't silently
+skipped from the audit trail.
