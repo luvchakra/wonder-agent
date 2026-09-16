@@ -5,6 +5,7 @@ import {
   listAccountsForAgent,
   getEffectiveAccess,
   listPolicyEvaluations,
+  getAccessGraph,
 } from "@/modules/access-governance/service";
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -24,6 +25,7 @@ import {
   Tr,
   SelectField,
   TextField,
+  AccessGraphView,
 } from "@/modules/ui";
 import { AccessPathEvidenceTrigger, AccessPathEvidenceDrawer } from "./AccessPathEvidenceDrawer";
 import { RevokeGrantButton } from "./RevokeGrantButton";
@@ -49,10 +51,11 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
   const agent = await getAgent(ctx.tenantId!, agentId);
   if (!agent) redirect("/agents");
 
-  const [effectiveAccess, accounts, evaluations] = await Promise.all([
+  const [effectiveAccess, accounts, evaluations, graph] = await Promise.all([
     getEffectiveAccess(ctx.tenantId!, agentId),
     listAccountsForAgent(ctx.tenantId!, agentId),
     listPolicyEvaluations(ctx.tenantId!, agentId),
+    getAccessGraph(ctx.tenantId!, agentId),
   ]);
 
   const createGrantWithId = createManualGrantAction.bind(null, agentId);
@@ -70,6 +73,13 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
       <Suspense fallback={null}>
         <AccessPathEvidenceDrawer agentId={agentId} />
       </Suspense>
+
+      <Card>
+        <CardHeader title="Access Graph" description="Agent → account → application/entitlement, exactly as effective access derives it." />
+        <CardBody>
+          <AccessGraphView graph={graph} />
+        </CardBody>
+      </Card>
 
       <Card>
         <CardHeader title="Effective Access (CAN)" description={`${effectiveAccess.length} grant${effectiveAccess.length === 1 ? "" : "s"}`} />

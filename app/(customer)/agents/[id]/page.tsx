@@ -19,6 +19,7 @@ import {
   transitionLifecycleAction,
 } from "@/app/actions/agents";
 import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
+import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
 
 const LIFECYCLE_STATES = [
   "DISCOVERED",
@@ -107,6 +108,36 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           {agent.agentType} · {agent.environment}
           {agent.purpose ? ` · ${agent.purpose}` : ""}
         </p>
+
+        {/* EXPERIENCE-P0-12 — PRD §35's worked layout header fields. */}
+        <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-sm sm:grid-cols-3 lg:grid-cols-5">
+          <div>
+            <dt className="text-xs text-muted-foreground">Business Owner</dt>
+            <dd className="text-foreground">{owners.find((o) => o.ownerType === "business_owner")?.userId ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Technical Owner</dt>
+            <dd className="text-foreground">{owners.find((o) => o.ownerType === "technical_owner")?.userId ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">IAM Identity</dt>
+            <dd className="text-foreground">
+              {identities.length > 0 ? `${identities[0].identityType}: ${identities[0].externalReference}` : "—"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Last Activity</dt>
+            <dd className="text-foreground">{agent.lastSeenAt ?? "Never observed"}</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Next Certification</dt>
+            <dd className="text-foreground">{agent.nextReviewAt ?? "Not scheduled"}</dd>
+          </div>
+        </dl>
+
+        <div className="mt-3">
+          <AgentPrimaryActionBar agentId={id} agentName={agent.agentName} />
+        </div>
       </div>
 
       <AgentTabs agentId={id} active="overview" />
@@ -156,7 +187,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         </CardBody>
       </Card>
 
-      <Card>
+      <Card className="scroll-mt-4">
+        <div id="owners" />
         <CardHeader title="Owners" description="Accountable humans for this agent, per non-negotiable #11." />
         <CardBody className="space-y-3">
           {owners.length === 0 ? (
@@ -192,7 +224,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         </CardBody>
       </Card>
 
-      <Card>
+      <Card className="scroll-mt-4">
+        <div id="contract" />
         <CardHeader title="Agent Contract (SHOULD)" description="Approved purpose, applications, data and actions — the contract SHOULD is measured against." />
         <CardBody className="space-y-3">
           {contract ? (

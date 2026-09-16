@@ -19,3 +19,4 @@ export { DataTable, useTableState, useClientFilteredRows, SimpleDataTable, type 
 export { AgentTabs, type AgentTabKey } from "./AgentTabs";
 export { Field, TextField, TextareaField, SelectField, fieldInputClass, fieldLabelClass } from "./Field";
 export { AiSummaryPanel } from "./AiSummaryPanel";
+export { AccessGraphView, layoutNodes, toFlowEdges } from "./AccessGraphView";

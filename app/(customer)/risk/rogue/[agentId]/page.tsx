@@ -7,6 +7,8 @@ import { compareShouldCanDid } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RogueCategory } from "@/lib/shared/types/risk";
 import { Badge, SeverityBadge, Card, CardHeader, CardBody, EmptyState, AiSummaryPanel } from "@/modules/ui";
+import { RogueAgentActionBar } from "./RogueAgentActionBar";
+import { FindingActions } from "./FindingActions";
 
 const ROGUE_CATEGORIES: RogueCategory[] = ["behavioral_deviation", "identity_anomaly", "ownership_violation", "lifecycle_violation"];
 
@@ -74,6 +76,10 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
             All findings
           </Link>
         </p>
+
+        <div className="mt-3">
+          <RogueAgentActionBar agentId={agentId} agentName={agent.agentName} />
+        </div>
       </div>
 
       <Card>
@@ -94,6 +100,7 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
                   <div className="mt-2">
                     <AiSummaryPanel kind="finding" data={f} label="Summarize this finding" />
                   </div>
+                  <FindingActions findingId={f.id} findingTitle={f.title} />
                 </li>
               ))}
             </ul>

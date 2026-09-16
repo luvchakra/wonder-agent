@@ -1256,3 +1256,141 @@ proven pattern, not new design work.
 (`modules/ui/index.ts` → `modules/ui/AiSummaryPanel.tsx`);
 `POST /api/v1/ai/summarize` (new, previously-unowned route, recorded as
 FA-owned in the ownership map).
+
+---
+
+## 2026-09-16 — EXPERIENCE-P0-10/11/12/13 — UI gaps from the file-level audit pass
+
+**Agent:** Experience Agent, continuing from `EXPERIENCE-P0-14` per the
+user's standing authorization. Closes the four gaps a prior file-level
+audit pass (recorded earlier in this doc) found and added as `Not
+Started` Progress Tracker rows.
+
+### EXPERIENCE-P0-10 — Tenant Selection / Onboarding Screen: already done, row was stale
+
+Re-checked `app/onboarding/page.tsx` before writing any code, per this
+session's established practice of verifying file contents rather than
+trusting a backlog row. It is already fully composed from `modules/ui/*`
+(`Card`, `CardHeader`, `CardBody`, `Button`, `TextField`) with design
+tokens throughout — no raw inline `style={{}}`, no plain `<h1>`/`<ul>`/
+`<button>`. This was restyled by the other, now-inactive parallel session
+whose Experience nav-rebuild work landed via the earlier fast-forward
+merge into `main` (see this session's own earlier "push to main" /
+"look at the pending backlog" turns) — the Progress Tracker row simply
+never got updated to reflect it. Marked `Done`; no code changed.
+
+### EXPERIENCE-P0-11 — Effective Access Graph Visualization
+
+`modules/ui/AccessGraphView.tsx` — a `reactflow`-based (already a declared
+dependency, confirmed no second graph library was needed) read-only
+visualization of Access Agent's already-published `getAccessGraph()`
+(`modules/access-governance/graph.ts`, ACCESS-P0-03). Nodes are laid out
+in four fixed columns by type (agent → account → application →
+entitlement) — a deterministic layout, not force-directed, since the
+graph is always one agent's own access and a stable, readable layout
+matters more here than automatic spacing. `nodesDraggable`/
+`nodesConnectable`/`elementsSelectable` are all `false` — this is a review
+visualization, never an editor; nothing here can mutate access
+(non-negotiable #9's spirit). `layoutNodes()`/`toFlowEdges()` are
+extracted as pure functions (same "extract the logic, keep the component
+thin" pattern as `classifyAccessGrant()` in Access Agent's own
+`comparison.ts`) so they're unit-testable without rendering reactflow.
+Wired into `app/(customer)/access/agents/[agentId]/page.tsx` as a new
+"Access Graph" card above the existing flat grant table — the table
+stays; the graph is additive, not a replacement (different consumers read
+different shapes of the same data).
+
+### EXPERIENCE-P0-12 — Agent Detail Header Fields & Primary Action Bar
+
+`app/(customer)/agents/[id]/page.tsx`'s header gained the five PRD §35
+fields (Business Owner, Technical Owner, IAM Identity, Last Activity,
+Next Certification) as a `<dl>` grid, derived entirely from data the page
+already fetches (`owners`, `identities`, `agent.lastSeenAt`,
+`agent.nextReviewAt`) — no new query. `AgentPrimaryActionBar.tsx`
+(colocated with the page, same pattern as `RevokeGrantButton.tsx`) adds
+the six named actions:
+- **Restrict / Suspend** — `ConfirmActionDialog` over the existing
+  `POST /api/v1/agents/:id/lifecycle` route (unchanged) — a second, more
+  prominent entry point to the same lifecycle-transition capability the
+  page's "Lifecycle" card's form already exposes, with a real confirmation
+  per non-negotiable #15.
+- **Request Change** — an in-page anchor link to the existing "Agent
+  Contract (SHOULD)" card (`id="contract"` added to that `Card`), since
+  there is no single-agent "request a change" action distinct from
+  creating a new contract version, which that card's form already does.
+- **Investigate** — links to `/risk/agents/:id` (existing Risk tab).
+- **View Access Graph** — links to `/access/agents/:id` (existing Access
+  tab, now showing the graph built for `EXPERIENCE-P0-11` above).
+- **Certify Access** — links to `/compliance/campaigns`, since there is no
+  "certify this one agent right now" action independent of a campaign
+  (`COMPLIANCE-P0-01.2`'s model is campaign-scoped, not per-agent).
+
+### EXPERIENCE-P0-13 — Rogue Agent Detail Action Set
+
+`RogueAgentActionBar.tsx` (page-level: Restrict, Suspend, Assign owner,
+Create exception) + `FindingActions.tsx` (per-finding: Create
+remediation, Mark false positive), both colocated with
+`app/(customer)/risk/rogue/[agentId]/page.tsx`:
+- **Restrict / Suspend** — same lifecycle-transition pattern as
+  `EXPERIENCE-P0-12`'s bar (independent component, not shared, since the
+  two pages' confirmation copy differs and sharing would couple two
+  otherwise-independent pages for no real benefit).
+- **Assign owner** — links to `/agents/:id#owners` (added `id="owners"` to
+  that Card) rather than duplicating its assign-owner form on this page.
+- **Create remediation** — reuses the exact route the general Risk tab's
+  own `RemediateFindingButton` already calls
+  (`POST /api/v1/findings/:id/remediate`), now also available on this
+  page, per finding.
+- **Mark false positive** — `POST /api/v1/findings/:id/resolve` with
+  `type: "false_positive"` (the same route/type the general Risk tab's
+  `resolveFindingAction` already uses via a form select), per finding.
+- **Create exception** — rendered as a real, visible, but *disabled*
+  button with an explanatory `title` tooltip, not silently omitted.
+  Verified by repo-wide search that Access Agent's published
+  `createGovernanceException()`
+  (`modules/access-governance/policies.ts`) has **no API route** anywhere
+  under `/api/v1/policies/*` or elsewhere — the service function exists,
+  but nothing exposes it to a client. Per non-negotiable #18, Experience
+  Agent does not add a new route to another module's owned API prefix
+  (`/api/v1/policies` is Access Agent's, per
+  `docs/design/ownership-map.md` §2) to make its own story pass.
+  **Recorded here as an open dependency on Access Agent**: publish
+  `POST /api/v1/policies/exceptions` (or an agent-scoped equivalent)
+  wrapping `createGovernanceException()`, after which this button's
+  `disabled`/`title` can be replaced with a real `ConfirmActionDialog`
+  identical in shape to the other five actions — no other change needed
+  on this page.
+
+**Verification (all four stories, one pass):**
+- `modules/ui/AccessGraphView.test.ts` — 5 tests (`@vitest-environment
+  node`, confirming `reactflow`'s own module import doesn't require a DOM
+  at import time — only rendering `<ReactFlow>` itself would): column
+  layout by node type, label passthrough, empty-graph handling, edge
+  label humanization, unique edge ids.
+- `npm run typecheck` / `npm run lint` — clean.
+- `npx vitest run` — 197/197 passing (up from 192).
+- `npm run build` (with `.next` deleted first) — clean; confirmed
+  `.next/server/app/(customer)/agents` and
+  `.next/server/app/(customer)/access` both compiled.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+- **Live functional check**: started the built production server and hit
+  `/agents/nonexistent-id` unauthenticated (307 redirect to `/sign-in`,
+  confirming the page's auth gate actually runs) and
+  `POST /api/v1/agents/x/lifecycle` unauthenticated (401
+  `{"code":"NO_TENANT"}`, confirming the lifecycle route both
+  `AgentPrimaryActionBar` and `RogueAgentActionBar` call is correctly
+  gated). Full authenticated in-app visual verification of the header
+  fields/graph/action bars remains blocked by this sandbox's documented
+  network-egress constraint (same limitation noted in this log's
+  `EXPERIENCE-P0-09.1` and `EXPERIENCE-P0-14` entries) — stated plainly,
+  not glossed over.
+
+**Published this session:** `AccessGraphView`, `layoutNodes`,
+`toFlowEdges` (`modules/ui/index.ts` →
+`modules/ui/AccessGraphView.tsx`); no new API routes, no new shared
+types, no new tables — all four stories are pure presentation-layer
+composition over already-published contracts, exactly as this backlog's
+own "No ownership-map change is needed" note anticipated.
+
+**Open dependency recorded for Access Agent:** an API route wrapping
+`createGovernanceException()` — see "Create exception" above.
