@@ -493,3 +493,14 @@ unchanged.
 was already published; the new call sites live in the producing modules'
 own files. `notifyForFinding()` is a newly-exported (for testability)
 helper in `modules/risk/findings.ts`.
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up, user-prioritized "what's left before launch")
+
+Capped 1 previously-unbounded query with the new shared
+`DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`, 200): `savedReports.ts`'s
+`listSavedReportDefinitions()`. `audit.ts`'s `listAuditLogs()` and
+`notifications.ts`'s `listNotifications()`/its own `.limit(100)` were
+already real/bounded before this pass (QA's original finding excluded
+them) and were the precedent this pass's shared constant follows.

@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { Account, AccountStatus, Application } from "@/lib/shared/types/access-governance";
 import { toAccount, toApplication } from "./mappers";
 
@@ -30,7 +31,7 @@ export async function createApplication(
 
 export async function listApplications(tenantId: string): Promise<Application[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("applications").select().eq("tenant_id", tenantId).order("name");
+  const { data, error } = await supabase.from("applications").select().eq("tenant_id", tenantId).order("name").limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toApplication);
 }

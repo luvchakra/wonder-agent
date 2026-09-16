@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type {
   Policy,
   PolicyAction,
@@ -54,7 +55,7 @@ export async function createPolicy(tenantId: string, input: CreatePolicyInput): 
 
 export async function listPolicies(tenantId: string): Promise<Policy[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("policies").select().eq("tenant_id", tenantId);
+  const { data, error } = await supabase.from("policies").select().eq("tenant_id", tenantId).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicy);
 }
@@ -255,7 +256,7 @@ export async function listGovernanceExceptions(
   if (filter?.scopeType) query = query.eq("scope_type", filter.scopeType);
   if (filter?.scopeId) query = query.eq("scope_id", filter.scopeId);
   if (filter?.agentId) query = query.eq("agent_id", filter.agentId);
-  const { data, error } = await query.order("created_at", { ascending: false });
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyException);
 }

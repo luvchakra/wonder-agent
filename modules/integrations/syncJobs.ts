@@ -4,6 +4,7 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type {
   ConnectorCapabilities,
   IntegrationObjectType,
@@ -52,7 +53,8 @@ export async function listSyncJobs(tenantId: string, integrationId: string): Pro
     .from("integration_sync_jobs")
     .select()
     .eq("integration_id", integrationId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toSyncJob);
 }

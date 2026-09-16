@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { getAgent } from "@/modules/agent-identity/service";
 import { getCertificationHistory } from "@/modules/certification-compliance/decisions";
 import type { Policy, PolicyEvaluationResult, PolicyRule } from "@/lib/shared/types/access-governance";
@@ -18,7 +19,8 @@ export async function listPolicyEvaluations(tenantId: string, agentId: string): 
     .select()
     .eq("tenant_id", tenantId)
     .eq("agent_id", agentId)
-    .order("evaluated_at", { ascending: false });
+    .order("evaluated_at", { ascending: false })
+    .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyEvaluationResult);
 }

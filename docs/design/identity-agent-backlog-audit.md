@@ -632,3 +632,25 @@ added for this thin sink directly (matching the existing pattern for
 service-role write functions like `transitionAgentLifecycle`, which also
 has no direct mocked-Supabase test) — behavior is covered end-to-end by
 `modules/risk/rules.test.ts`'s assertions on the exact values passed to it.
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up, user-prioritized "what's left before launch")
+
+Capped 3 previously-unbounded `list*()` queries with the new shared
+`DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`, 200): `agents.ts`'s
+`listAgents()`, `duplicates.ts`'s `listDuplicateCandidates()`,
+`lifecycle.ts`'s `listLifecycleEvents()`. `duplicates.ts`'s
+`listDiscoveryDecisions()` was deliberately left uncapped — it builds a
+completeness-dependent lookup map `buildDiscoveryInbox()` depends on;
+truncating it would make an already-decided discovery candidate reappear
+as new (a correctness bug, not a performance one) — see its own inline
+comment. `contracts.ts`/`identities.ts`/`owners.ts`/`relationships.ts`'s
+per-agent child-record lookups were judged genuinely bounded by real-world
+cardinality (an agent cannot realistically have hundreds of owners/
+identities/relationships/contract versions) and intentionally left
+untouched, avoiding an unnecessary change with correctness risk for
+near-zero real benefit.
+
+Verification covered as part of the full cross-module pass — see
+`INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.

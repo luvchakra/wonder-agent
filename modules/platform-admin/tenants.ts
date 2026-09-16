@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { PlatformTenant, TenantEnvironment } from "@/lib/shared/types/platform";
 import { toPlatformTenant } from "./mappers";
 import { writePlatformAudit } from "./auditLog";
@@ -54,7 +55,11 @@ export async function createTenant(actorId: string, input: CreateTenantInput): P
 
 export async function listTenants(): Promise<PlatformTenant[]> {
   const supabase = supabaseServiceRole();
-  const { data, error } = await supabase.from("platform_tenants").select("*, tenants(name, slug, status)").order("created_at", { ascending: false });
+  const { data, error } = await supabase
+    .from("platform_tenants")
+    .select("*, tenants(name, slug, status)")
+    .order("created_at", { ascending: false })
+    .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPlatformTenant);
 }

@@ -235,6 +235,23 @@ tests passing across 23 files. No cross-module type drift.
   module fixes and verifies, it does not extend scope"; non-negotiable #18). Recorded
   here as a named, actionable release-gate item for each owning module to pick up.
 
+**Update, 2026-09-16 — closed.** Each owning module picked this up (per the user's
+own "what's left before launch" prioritization). A new shared `DEFAULT_LIST_LIMIT`
+constant (`lib/shared/pagination.ts`, 200) was applied as a `.limit()` on 15
+functions across Identity, Access, Compliance, Integration, Platform and Operations,
+plus Risk's `getFindings()` (a completeness-sensitive existence-check style function
+this original grep missed — it's not `list*`-named). 4 functions that feed a
+completeness-dependent aggregate (campaign metrics, governance posture, compliance
+reports/evidence packs) were deliberately left uncapped rather than risk a silent
+compliance-evidence-integrity bug — each has an inline code comment explaining why,
+not just this note. ~12 small per-parent child-record lookups (an agent's own
+owners/identities/relationships/contract-versions, a policy's own versions/rules/
+exceptions, etc.) were judged genuinely bounded by real-world cardinality and left
+untouched. Full verification: `npm run typecheck`/`npm run lint` clean, `npx vitest
+run` 226/226 unchanged (no signature/return-type changes, so no test needed
+updating), `npm run build` clean, no service-role-key leakage. See each touched
+module's own audit log entry of the same date for its specific function list.
+
 ### QA-P0-04.4 — Regression fixes, smallest safe change
 
 Both fixes this pass (the flaky test, the security-definer EXECUTE grants) were the
@@ -295,8 +312,8 @@ exercised* — no defect was found in any of the deterministic security/isolatio
 authorization logic itself. **Not yet a clean release-gate pass**, specifically
 because of:
 
-1. The pagination gap (§5, QA-P0-04.3) — a real, named, cross-module violation of
-   CLAUDE.md §15's Definition-of-Done requirement.
+1. ~~The pagination gap (§5, QA-P0-04.3)~~ — **closed 2026-09-16**, see §5's update
+   note.
 2. FinanceBot scenario step 7 (§4) not exercised end-to-end live.
 3. The extended QA-P0-06–14 epics (§7) each carrying a real, specific, honestly-
    documented gap rather than full coverage.

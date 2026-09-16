@@ -649,3 +649,20 @@ building a parallel concept.
 
 No Progress Tracker row change beyond PLATFORM-P0-05.2's existing `Done`
 entry, which was updated in place to mention Gemini.
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up, user-prioritized "what's left before launch")
+
+Capped 3 previously-unbounded queries with the new shared
+`DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`, 200): `tenants.ts`'s
+`listTenants()` (the platform-admin console's tenant list — genuinely
+grows without bound as the platform's customer base grows, the highest-
+real-risk one of the three), `announcements.ts`'s `listAnnouncements()`
+(the platform-admin UI's history view — its separate,
+already-independently-bounded `getActiveAnnouncements()` read contract for
+the customer shell banner is unaffected), and `configVersions.ts`'s
+`listConfigVersions()` (branding/feature-flag-default version history).
+
+Verification covered as part of the full cross-module pass — see
+`INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.

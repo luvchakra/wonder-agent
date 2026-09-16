@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { AccessRequest, AccessRequestStatus } from "@/lib/shared/types/access-governance";
 import { toAccessRequest } from "./mappers";
 
@@ -53,7 +54,7 @@ export async function listAccessRequests(tenantId: string, agentId?: string): Pr
   const supabase = await supabaseServer();
   let query = supabase.from("access_requests").select().eq("tenant_id", tenantId);
   if (agentId) query = query.eq("agent_id", agentId);
-  const { data, error } = await query.order("created_at", { ascending: false });
+  const { data, error } = await query.order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toAccessRequest);
 }

@@ -627,3 +627,26 @@ SUPABASE_SERVICE_ROLE_KEY .next/static` no match. No migration needed —
 missing write path.
 
 Progress Tracker: RISK-P0-02.1 moves from `Partial` to `Done`.
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up): getFindings() flagged, deliberately left uncapped
+
+QA's original `list*()`-only grep missed `findings.ts`'s `getFindings()`
+(a real, unbounded `risk_findings` scan named `get`, not `list`). Found it
+during the cross-module pagination pass and evaluated it the same way as
+Compliance's `listCampaignItems()`/`listControlMappings()`: it feeds
+`certification-compliance/evidencePack.ts`, `campaigns.ts` (campaign
+population), and `snapshot.ts`, plus `operations/reports.ts` — all
+compliance-evidence contexts where a silent truncation would be a
+correctness/compliance-integrity bug, not just a performance one.
+Deliberately left uncapped with an inline comment rather than applying the
+new shared `DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`) blindly. The
+unfiltered case is real risk exposure worth tracking — flagged for a
+follow-up with real keyset pagination scoped to the Risk index *page's*
+own table (a separate concern from this function's aggregate-computation
+callers), not a flat cap.
+
+No Progress Tracker row change — this doesn't correspond to a new Risk
+Agent story, it's a finding recorded against the same file RISK-P0-02.1's
+2026-09-16 entry already touched.

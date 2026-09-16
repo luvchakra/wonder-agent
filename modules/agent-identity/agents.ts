@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type {
   Agent,
   AgentCriticality,
@@ -160,7 +161,7 @@ export async function listAgents(tenantId: string, filter?: AgentFilter): Promis
   }
 
   const supabase = await supabaseServer();
-  let query = supabase.from("agents").select().order("created_at", { ascending: false });
+  let query = supabase.from("agents").select().order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (filter?.lifecycleState) {
     query = query.eq("lifecycle_state", filter.lifecycleState);
   }

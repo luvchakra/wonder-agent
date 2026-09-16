@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { ConnectorCapabilities, Integration, IntegrationType } from "@/lib/shared/types/integrations";
 import { toIntegration, toIntegrationType } from "./mappers";
 import { createConnector } from "./registry";
@@ -106,7 +107,8 @@ export async function listIntegrations(tenantId: string): Promise<Integration[]>
     // Belt-and-suspenders: RLS already scopes this to the caller's tenant;
     // this explicit filter costs nothing and documents intent.
     .eq("tenant_id", tenantId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
 
   const rows = data ?? [];

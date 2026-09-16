@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { Agent, AgentIdentityType, DuplicateCandidate } from "@/lib/shared/types/agent-identity";
 import { toAgent, toDuplicateCandidate } from "./mappers";
 import type { CreateAgentInput } from "./agents";
@@ -121,7 +122,7 @@ export async function listDuplicateCandidates(
   status?: DuplicateCandidate["status"],
 ): Promise<DuplicateCandidate[]> {
   const supabase = await supabaseServer();
-  let query = supabase.from("agent_duplicate_candidates").select().order("created_at", { ascending: false });
+  let query = supabase.from("agent_duplicate_candidates").select().order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -296,6 +297,14 @@ export async function recordDiscoveryDecision(
  * Every ignore/link decision recorded so far, keyed by `sourceSystem::
  * sourceObjectId` so `buildDiscoveryInbox()` can look them up per candidate
  * in one query rather than one round trip per row.
+ *
+ * Deliberately NOT given a `DEFAULT_LIST_LIMIT` cap (unlike the other
+ * `list*()` functions touched in the 2026-09-16 pagination pass): this
+ * builds a completeness-dependent lookup map, not a paged view — silently
+ * truncating it would make an already-decided discovery candidate
+ * reappear as new in `buildDiscoveryInbox()`, a correctness regression,
+ * not just a performance one. Revisit with real keyset pagination (not a
+ * flat cap) if this ever needs bounding.
  */
 export async function listDiscoveryDecisions(tenantId: string): Promise<Map<string, DuplicateCandidate>> {
   const supabase = await supabaseServer();

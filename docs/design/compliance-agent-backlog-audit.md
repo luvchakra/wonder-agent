@@ -751,3 +751,27 @@ Operations' own audit log entry of the same date).
 `modules/certification-compliance/escalation.test.ts` (this module's
 first test file for `escalation.ts`) — 3 tests. No Progress Tracker row
 change — this doesn't correspond to a new Compliance Agent story.
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up, user-prioritized "what's left before launch")
+
+Capped 1 previously-unbounded query with the new shared
+`DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`, 200): `campaigns.ts`'s
+`listCampaigns()`. Two related functions were deliberately left uncapped,
+each with its own inline comment:
+- `campaigns.ts`'s `listCampaignItems()` — `getCampaignMetrics()` (totals/
+  pending/overdue/escalated counts) and `export.ts`'s evidence export both
+  need every item to be correct; a silent truncation would produce a wrong
+  metric or an incomplete compliance evidence artifact, not just a slower
+  query.
+- `controls.ts`'s `listControlMappings()` — `posture.ts`'s governance
+  posture score and `evidencePack.ts`/`operations/reports.ts`'s compliance
+  reports all depend on seeing every mapping for correct coverage.
+
+`controls.ts`'s `listControlEvidence()` (per-mapping) and `decisions.ts`'s
+`listDecisionsForItem()` (per-item, normally exactly one row) were judged
+genuinely bounded and left untouched.
+
+Verification covered as part of the full cross-module pass — see
+`INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.

@@ -442,3 +442,23 @@ both its failure paths: a completed run whose `finalStatus` resolves to
 unhandled exception during the run. Not fired for `'partial'` (some
 records still imported). No Progress Tracker row change — this doesn't
 correspond to a new Integration Agent story.
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up, user-prioritized "what's left before launch")
+
+Capped 2 previously-unbounded queries with the new shared
+`DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`, 200), both ordered
+`created_at desc` so the cap keeps the most recent rows: `integrations.ts`'s
+`listIntegrations()` and `syncJobs.ts`'s `listSyncJobs()`. The latter feeds
+`operations/jobs.ts`'s job-status summary (last run/last success/30-day
+failure count) — a genuinely high-frequency integration could in theory
+exceed 200 sync jobs within a 30-day window and slightly undercount, an
+accepted approximation matching the same class of trade-off this
+codebase's own precedents (`modules/operations/notifications.ts`'s
+`.limit(100)`) already made. `mappings.ts`'s `listMappings()` (per-
+integration field mappings, admin-curated and inherently small) was left
+untouched.
+
+Verification covered as part of the full cross-module pass — see
+`INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.

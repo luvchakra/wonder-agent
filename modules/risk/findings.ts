@@ -49,6 +49,22 @@ export async function notifyForFinding(tenantId: string, findingId: string, cate
  * reads run as the calling user; tenant_id is still filtered explicitly as
  * defense-in-depth per CLAUDE.md §14.
  */
+/**
+ * Deliberately NOT given a `DEFAULT_LIST_LIMIT` cap (2026-09-16 pagination
+ * pass, `lib/shared/pagination.ts`): QA's own grep for the gap only
+ * matched `list*()`-named exports and missed this one, but it has the
+ * same completeness-dependent callers as `listCampaignItems()`/
+ * `listControlMappings()` — Compliance's evidence pack, campaign
+ * population, and snapshot generation, plus Operations' compliance
+ * reports — all depend on seeing every finding to be a correct evidence
+ * artifact. A silent truncation here would be a compliance-integrity bug,
+ * not just a performance one. The unfiltered, unbounded case is realistic
+ * risk exposure worth tracking (a long-lived tenant's `risk_findings`
+ * table genuinely grows without bound) — revisit with real keyset
+ * pagination for the Risk index *page's* table specifically (a separate
+ * concern from this function's aggregate-computation callers) rather than
+ * a flat cap here.
+ */
 export async function getFindings(tenantId: string, filter: FindingFilter = {}): Promise<RiskFinding[]> {
   const supabase = await supabaseServer();
   let query = supabase.from("risk_findings").select().eq("tenant_id", tenantId).order("created_at", { ascending: false });

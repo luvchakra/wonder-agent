@@ -52,6 +52,14 @@ export async function createControlMapping(tenantId: string, actorId: string, co
   return toControlMapping(data);
 }
 
+/**
+ * Deliberately NOT given a `DEFAULT_LIST_LIMIT` cap (2026-09-16 pagination
+ * pass): `posture.ts`'s governance posture score and `evidencePack.ts`/
+ * `operations/reports.ts`'s compliance reports all depend on this
+ * returning every mapping to compute correct coverage — a silent
+ * truncation would be a correctness/compliance-integrity bug, not just a
+ * performance one.
+ */
 export async function listControlMappings(tenantId: string): Promise<ControlMapping[]> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase.from("control_mappings").select().eq("tenant_id", tenantId);

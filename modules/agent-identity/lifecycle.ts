@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { Agent, AgentLifecycleEvent, AgentLifecycleState } from "@/lib/shared/types/agent-identity";
 import { toAgent, toAgentLifecycleEvent } from "./mappers";
 
@@ -275,7 +276,8 @@ export async function listLifecycleEvents(
     .select()
     .eq("tenant_id", tenantId)
     .eq("agent_id", agentId)
-    .order("created_at", { ascending: true });
+    .order("created_at", { ascending: true })
+    .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toAgentLifecycleEvent);
 }

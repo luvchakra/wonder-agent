@@ -492,3 +492,23 @@ run` — 154/154 passing (6 new: allowed/allowed-with-approval/prohibited/
 default-restricted/case-insensitivity/prohibited-beats-approved-when-
 contradictory); `npm run build` succeeds. No migration, no advisory
 re-check needed (no schema touched).
+
+---
+
+## 2026-09-16 — pagination pass (QA-P0-04.3 follow-up, user-prioritized "what's left before launch")
+
+Capped 5 previously-unbounded queries with the new shared
+`DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`, 200): `applications.ts`'s
+`listApplications()`, `policies.ts`'s `listPolicies()` and
+`listGovernanceExceptions()`, `evaluate.ts`'s `listPolicyEvaluations()`
+(ordered `evaluated_at desc` — the existing-violation check
+`evaluateAgentRisk()` runs against it stays correct: the most recent
+evaluations are exactly what a "most recent 200" cap keeps), `requests.ts`'s
+`listAccessRequests()`. Per-parent child-record lookups
+(`listAccountsForAgent`, `listEntitlementsForApplication`,
+`listPolicyVersions`, `listPolicyRules`, `listPolicyExceptions(policyId)`)
+were judged genuinely bounded and left untouched, same reasoning as
+Identity's equivalent per-agent lookups.
+
+Verification covered as part of the full cross-module pass — see
+`INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.

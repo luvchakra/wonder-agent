@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { writePlatformAudit } from "./auditLog";
 
 export type AnnouncementScope = "global" | "tenant";
@@ -89,7 +90,7 @@ export async function createAnnouncement(actorId: string, input: CreateAnnouncem
 /** Platform-admin UI surface: every announcement, most recent first. */
 export async function listAnnouncements(): Promise<PlatformAnnouncement[]> {
   const supabase = supabaseServiceRole();
-  const { data, error } = await supabase.from("platform_announcements").select().order("starts_at", { ascending: false });
+  const { data, error } = await supabase.from("platform_announcements").select().order("starts_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toAnnouncement);
 }

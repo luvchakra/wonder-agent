@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { ReportType, SavedReportDefinition } from "@/lib/shared/types/operations";
 import { toSavedReportDefinition } from "./mappers";
 
@@ -36,7 +37,7 @@ export async function saveReportDefinition(tenantId: string, actorId: string, in
 
 export async function listSavedReportDefinitions(tenantId: string): Promise<SavedReportDefinition[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("reports").select().eq("tenant_id", tenantId).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("reports").select().eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toSavedReportDefinition);
 }

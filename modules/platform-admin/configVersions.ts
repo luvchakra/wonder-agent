@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 
 export type ConfigType = "branding" | "feature_flag_default";
 
@@ -49,7 +50,7 @@ export async function recordConfigVersion(actorId: string, configType: ConfigTyp
 
 export async function listConfigVersions(configType: ConfigType, configKey: string | null = null): Promise<ConfigVersion[]> {
   const supabase = supabaseServiceRole();
-  let query = supabase.from("platform_config_versions").select().eq("config_type", configType).order("created_at", { ascending: false });
+  let query = supabase.from("platform_config_versions").select().eq("config_type", configType).order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   query = configKey === null ? query.is("config_key", null) : query.eq("config_key", configKey);
   const { data, error } = await query;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

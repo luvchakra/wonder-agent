@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { getAgentContract, listAgents } from "@/modules/agent-identity/service";
 import { getEffectiveAccess, listPolicyEvaluations } from "@/modules/access-governance/service";
 import { getFindings } from "@/modules/risk/service";
@@ -129,11 +130,23 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
 
 export async function listCampaigns(tenantId: string): Promise<CertificationCampaign[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("certification_campaigns").select().eq("tenant_id", tenantId).order("created_at", { ascending: false });
+  const { data, error } = await supabase.from("certification_campaigns").select().eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toCertificationCampaign);
 }
 
+/**
+ * Deliberately NOT given a `DEFAULT_LIST_LIMIT` cap (unlike most other
+ * `list*()` functions touched in the 2026-09-16 pagination pass):
+ * `getCampaignMetrics()` below and `export.ts`'s evidence export both
+ * depend on this returning every item to compute correct
+ * totals/percentages and a complete compliance evidence artifact — a
+ * silent truncation here would be a correctness/compliance-integrity bug,
+ * not just a performance one. Revisit with real keyset pagination for the
+ * campaign-detail *page's* item table specifically (a separate concern
+ * from this function's aggregate-computation callers) if item counts ever
+ * become a real problem.
+ */
 export async function listCampaignItems(tenantId: string, campaignId: string): Promise<CertificationItem[]> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
