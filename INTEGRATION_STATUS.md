@@ -307,3 +307,79 @@ because of:
 
 None of the above are silent gaps: each is named, owned, and either blocked on a
 specific cross-module contract or a specific piece of non-sandboxed infrastructure.
+
+---
+
+## 9. 2026-09-16 — Final re-verification pass (QA-P0-04.1/04.2, post governance-requirements build-out)
+
+Since this document's last pass, the session completed the entire pending
+P0 backlog queued after the 2026-09-15 governance-requirements
+reconciliation, plus every remaining module `Partial`/stale row that had
+a genuine unblock. Re-verified as a single pipeline sweep rather than
+per-story, since every story already carried its own module-level
+verification (see each module's own audit log for full detail):
+
+**New stories completed this pass:**
+- `FOUNDATION-P0-16` — `lib/ai/` summarization primitive (structurally
+  enforced no-DB-access boundary, deterministic `AiNotConfiguredError`
+  stub pending a provider decision).
+- `RISK-P0-04` — Governance Drift detection (new migration `0054`).
+- `COMPLIANCE-P0-07/08/09` — Governance Posture, Governance Attestation
+  (new migration `0055`, plus FK-index fix `0056` found by this pass),
+  Governance Evidence Pack assembly.
+- `OPERATIONS-P0-07` — Evidence pack export (JSON/CSV; PDF confirmed not
+  buildable, no renderer in this codebase).
+- `EXPERIENCE-P0-14` — AI-Assisted Investigation UI (new
+  `/api/v1/ai/summarize` route).
+- `EXPERIENCE-P0-10` (re-verified already Done, row was stale),
+  `EXPERIENCE-P0-11` (Access Graph via `reactflow`), `EXPERIENCE-P0-12`
+  (Agent Detail header/action bar), `EXPERIENCE-P0-13` (Rogue Agent
+  action set — one action, "Create exception," left visibly disabled
+  pending an Access Agent API route that doesn't exist yet).
+- `RISK-P0-03.2` unblocked (human-initiated remediation now genuinely
+  calls Access Agent's `revokeAccessGrant()`).
+- `COMPLIANCE-P0-06` unblocked (campaign evidence export file/delivery,
+  reusing the Compliance-assembles/Operations-exports pattern).
+- `PLATFORM-P0-02.2` — stale row corrected (its blocker was already fixed
+  by migration `0039` on 2026-09-14; never reflected in the tracker).
+- `PLATFORM-P0-05.4` unblocked (customer-facing `AnnouncementsBanner`).
+- `OPERATIONS-P0-02.2` — `notify()` wired into 3 of 7 event types across
+  Risk/Integration/Compliance (`critical_finding`/`rogue_agent`,
+  `integration_failure`, `certification_overdue`); the remaining three
+  (`certification_due`/`ownership_missing`/`lifecycle_expiry`) each
+  lack an unambiguous single write-event trigger and are left
+  documented, not guessed at.
+- `OPERATIONS-P0-06.1` unblocked (customer-facing `/integrations/jobs`
+  page).
+
+**This pass's own findings and fixes:**
+- `mcp__Supabase__get_advisors(performance)` found
+  `governance_attestations_agent_id_fkey` (migration `0055`) had no
+  covering index — the composite `(tenant_id, agent_id)` index doesn't
+  cover a lookup on `agent_id` alone. Fixed via migration `0056`
+  (`governance_attestations_agent_id_idx`); re-checked, cleared.
+- `mcp__Supabase__get_advisors(security)` — no new findings from any
+  migration this pass (`0054`–`0056`); the 3 pre-existing findings
+  (Platform's own `rls_enabled_no_policy` rows, 2 known security-definer
+  functions) are unchanged.
+- `governance_attestations` (`COMPLIANCE-P0-08`) had no tenant-isolation
+  SQL fixture — CLAUDE.md §14's "new tables/routes without an isolation
+  test are not Done" requirement. Added
+  `tests/compliance/governance-attestation-tenant-isolation.sql`, run
+  live against the dev project: visible to Tenant A5's own user (1 row),
+  invisible to Tenant B5's user (0 rows), client insert correctly
+  rejected by RLS, client update affects 0 rows (immutability). Fixture
+  row cleaned up after the run.
+- Full pipeline re-run clean: `npm run typecheck`, `npm run lint`,
+  `npx vitest run` (214/214 passing, up from 139 at this document's last
+  pass), `npm run build` with `.next` deleted first, `grep -rl
+  SUPABASE_SERVICE_ROLE_KEY .next/static` (no match),
+  `node scripts/contrast-check.mjs` (all pairs pass, both themes),
+  `npm audit --production` (0 vulnerabilities).
+- 55 → 56 migration files, no duplicate numeric prefixes.
+
+**Not attempted this pass** (same sandbox/scope constraints §8 already
+names, unchanged by this pass's work): real SSO/MFA IdP round-trip,
+real-browser authenticated visual verification, a true from-scratch
+clean-room install, the remaining `QA-P0-06`–`14` extended epics' full
+coverage, and `QA-P1-07`.

@@ -287,3 +287,78 @@ dispatch's explicit scope.
 Guide" process-model note already flagged in the first Requirements Refresh
 (manual-dispatch-only vs. this repo's standing autopilot policy) remains
 open and unchanged by this pass.
+
+---
+
+## 2026-09-16 — Final re-verification pass (post governance-requirements build-out)
+
+**Agent:** QA Agent, per the user's standing authorization, after the
+session completed the entire pending P0 backlog (Foundation's `lib/ai/`
+primitive, Risk's Governance Drift, Compliance's Posture/Attestation/
+Evidence Pack, Operations' evidence export, Experience's four UI gaps,
+Risk/Compliance unblocks, Platform's stale-row fix and unblock,
+Operations' `notify()` wiring and job-status page — see
+`INTEGRATION_STATUS.md` §9 for the full list).
+
+**Approach:** a single repo-wide pipeline sweep plus targeted advisor/
+isolation checks, rather than re-deriving every `QA-P0-*` story from
+scratch — every new story this session already carried its own
+module-level verification (typecheck/lint/tests/build/secret-leak, and
+live Supabase checks where schema changed), recorded in each module's own
+audit log. This pass's job was to catch anything those per-story checks
+individually couldn't: cross-cutting drift (migration counts, advisor
+state) and gaps a single module's own pass wouldn't think to check for
+itself (a missing isolation test on another module's new table).
+
+**Findings, both real and fixed, not just re-confirmations:**
+1. `mcp__Supabase__get_advisors(performance)` — `governance_attestations_
+   agent_id_fkey` (Compliance's migration `0055`) had no covering index.
+   The composite `(tenant_id, agent_id)` index that migration already
+   added doesn't cover a lookup on `agent_id` alone (not the leading
+   column), which is exactly what the FK-constraint check needs on an
+   agent delete. Fixed via `supabase/migrations/0056_compliance_
+   governance_attestation_fk_index.sql`
+   (`governance_attestations_agent_id_idx`), applied live; re-checked —
+   the finding cleared (`unindexed_foreign_keys` count 14→13, the
+   remaining 13 all pre-existing from before this session).
+2. `governance_attestations` (`COMPLIANCE-P0-08`, built earlier this
+   session) had no tenant-isolation SQL fixture — a real violation of
+   CLAUDE.md §14's "new tables/routes without an isolation test are not
+   Done" that COMPLIANCE-P0-08's own audit entry didn't catch at the
+   time. Added `tests/compliance/governance-attestation-tenant-isolation.sql`,
+   reusing the existing FinanceBot fixture (Tenant A5/agent/User A5,
+   Tenant B5's User B5) rather than a new one. Ran live against the dev
+   project via `execute_sql`: visible to Tenant A5's user (1 row),
+   invisible to Tenant B5's user (0 rows), a client-role insert correctly
+   rejected by RLS (no client INSERT policy exists, per the table's own
+   design), a client-role update affects 0 rows (immutability). Fixture
+   row deleted after the run — the script itself is left in `tests/` for
+   future re-runs, consistent with every other isolation script in this
+   repo.
+3. `mcp__Supabase__get_advisors(security)` — re-checked across every
+   migration applied this session (`0054`, `0055`, `0056`): no new
+   findings; the 3 pre-existing ones (Platform's own 11
+   `rls_enabled_no_policy` rows, 2 known security-definer functions, the
+   dashboard-only leaked-password-protection setting) are unchanged.
+4. Migration count/prefix check: 56 files, no duplicate numeric prefixes
+   (`ls | sed -E 's/^([0-9]{4})_.*/\1/' | sort | uniq -d` — empty).
+
+**Full pipeline, re-run clean:** `npm run typecheck`, `npm run lint`,
+`npx vitest run` (214/214, up from 139 at this doc's last full-sweep
+entry), `npm run build` with `.next` deleted first, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` (no match), `node scripts/
+contrast-check.mjs` (every pair passes, both themes — confirms the new
+`AiSummaryPanel`/`AnnouncementsBanner`/job-status page's reused `info`/
+`warning` tones didn't regress anything), `npm audit --production` (0
+vulnerabilities).
+
+**Not attempted this pass** (unchanged sandbox/scope constraints already
+named in `INTEGRATION_STATUS.md` §8, not re-litigated here): real
+SSO/MFA IdP round-trip, real-browser authenticated visual verification, a
+true from-scratch clean-room install, full coverage of the extended
+`QA-P0-06`–`14` epics, `QA-P1-07`.
+
+**Updated:** `docs/plan/11-QA-AGENT-BACKLOG.md`'s `QA-P0-04.1`,
+`QA-P0-04.2` (re-verified, counts updated), `QA-P0-02.1` (new isolation
+test referenced). `INTEGRATION_STATUS.md` §9 added as this pass's full
+account.
