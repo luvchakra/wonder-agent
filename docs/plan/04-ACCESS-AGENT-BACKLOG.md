@@ -21,7 +21,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-01.2 | Effective access computation & explainability (higher bar) | Done — critical acceptance test passed live |
 | ACCESS-P0-01.3 | Access requests (P0 minimal) | Done |
 | ACCESS-P0-02.1 | Policy schema (higher bar) | Done |
-| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Partial — `agent.days_since_last_certification` is now real, computed from Compliance Agent's published `getCertificationHistory()` contract (2026-09-14); `agent.external_communication` remains always unknown — no module models that concept at all (not a missing contract, a genuinely undecided new field/owner), see audit log |
+| ACCESS-P0-02.2 | Deterministic evaluation engine (higher bar) | Done — 2026-09-16: `agent.days_since_last_certification` real since 2026-09-14 (Compliance's `getCertificationHistory()`); `agent.external_communication` resolved via `AskUserQuestion` — modeled as `applications.is_external` (migration `0059`), a new admin-settable flag on Access's own `applications` table. Risk's "External communication capability" factor (`modules/risk/rules.ts`) now checks whether an agent's CAN touches any application marked external, replacing the hard-coded `false` |
 | ACCESS-P0-02.3 | Segregation of Duties (SoD) (higher bar) | Done |
 | ACCESS-P0-03 | Access Graph (graph-compatible relationships + tabular view) | Done — 2026-09-14 |
 | ACCESS-P0-04 | Contract Comparison (SHOULD vs CAN diff: approved / excessive / missing / unknown) | Done — 2026-09-14, unit-tested against the live FinanceBot fixture's exact data |

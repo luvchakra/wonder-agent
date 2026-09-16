@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const ctx = await requirePermission("access.manage");
     const body = await request.json();
-    const app = await createApplication(ctx.tenantId!, body.name, body.category, body.sourceIntegrationId);
+    const app = await createApplication(ctx.tenantId!, body.name, body.category, body.sourceIntegrationId, body.isExternal ?? false);
     return NextResponse.json({ ok: true, data: app }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

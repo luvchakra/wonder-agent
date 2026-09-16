@@ -39,6 +39,10 @@ export default async function AccessPage() {
           <form action={createApplicationAction} className="flex flex-wrap items-end gap-2">
             <TextField label="Application name" name="name" required />
             <TextField label="Category" name="category" placeholder="optional" />
+            <label className="flex items-center gap-2 pb-2 text-sm text-foreground">
+              <input type="checkbox" name="isExternal" />
+              External-facing (email, messaging, public API)
+            </label>
             <Button type="submit" variant="secondary">
               Add
             </Button>

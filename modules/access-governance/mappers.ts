@@ -22,6 +22,7 @@ export function toApplication(row: any): Application {
     name: row.name,
     category: row.category,
     sourceIntegrationId: row.source_integration_id,
+    isExternal: row.is_external,
     createdAt: row.created_at,
   };
 }

@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, transitionAgentLifecycle, updateAgentRiskScore } from "@/modules/agent-identity/service";
-import { listPolicyEvaluations } from "@/modules/access-governance/service";
+import { listApplications, listPolicyEvaluations } from "@/modules/access-governance/service";
 import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -62,7 +62,7 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const agent = await getAgent(tenantId, agentId);
   if (!agent) throw new ApiError(404, "AGENT_NOT_FOUND");
 
-  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage, weights] = await Promise.all([
+  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage, weights, applications] = await Promise.all([
     getAgentContract(agentId),
     compareShouldCanDid(tenantId, agentId),
     getOwnershipIssues(tenantId, agentId, agent.criticality),
@@ -72,7 +72,9 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     getDid(tenantId, agentId),
     listRuntimeEvents(tenantId, { agentId, limit: 200 }),
     getSeverityWeights(tenantId),
+    listApplications(tenantId),
   ]);
+  const externalApplicationNames = new Set(applications.filter((a) => a.isExternal).map((a) => a.name.toLowerCase()));
 
   const approvedApplications = contract?.approvedApplications ?? [];
   const approvedAppsLower = new Set(approvedApplications.map((a) => a.toLowerCase()));
@@ -259,7 +261,15 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const factors: RiskFactor[] = [
     { name: "Production environment access", weight: w("Production environment access"), triggered: agent.environment === "production" && comparison.can.length > 0 },
     { name: "Sensitive data (PII/financial/confidential) involved", weight: w("Sensitive data (PII/financial/confidential) involved"), triggered: sensitiveInvolved },
-    { name: "External communication capability", weight: w("External communication capability"), triggered: false }, // not modeled by any module yet
+    {
+      name: "External communication capability",
+      weight: w("External communication capability"),
+      // ACCESS-P0-02.2, resolved 2026-09-16: CAN (effective access), not
+      // DID — a capability check, matching the sibling "Production
+      // environment access" factor's own CAN-based shape, not an
+      // actual-usage one.
+      triggered: comparison.can.some((c) => externalApplicationNames.has(c.application.toLowerCase())),
+    },
     { name: "Certification overdue", weight: w("Certification overdue"), triggered: false }, // Compliance Agent doesn't exist yet
     { name: "Active policy violation", weight: w("Active policy violation"), triggered: policyEvaluations.some((e) => e.result === "violation") },
     { name: "Runtime/behavioral anomaly present", weight: w("Runtime/behavioral anomaly present"), triggered: behavioralOrIdentityAnomalyPresent },

@@ -512,3 +512,42 @@ Identity's equivalent per-agent lookups.
 
 Verification covered as part of the full cross-module pass — see
 `INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.
+
+---
+
+## 2026-09-16 — ACCESS-P0-02.2 fully resolved: applications.is_external
+
+Previously `Partial`: `agent.external_communication` had no owning
+concept anywhere in the codebase — not a missing cross-module contract,
+a genuinely undecided new field/owner. Resolved via `AskUserQuestion` as
+part of the user's "any P0 item open to work?" pass: modeled as an
+application-level attribute, `applications.is_external` (migration
+`0059`, plain boolean column, default `false`, no RLS change needed —
+same client-facing policies as every other column on that table).
+
+**Built:**
+- `applications.is_external` — settable at creation via `createApplication()`'s
+  new optional parameter, surfaced as a checkbox on `/access`'s "Add an
+  application" form and a new "External" column on `ApplicationsTable`.
+  No `updateApplication()` exists yet in this codebase (out of scope to
+  add here) so an existing application's flag can't be edited after
+  creation — a real, small, documented limitation, not silently glossed
+  over.
+- `lib/shared/types/access-governance.ts`'s `Application` type and
+  `mappers.ts`'s `toApplication()` carry the new field.
+- Risk's `evaluateAgentRisk()` (`modules/risk/rules.ts`) now fetches
+  `listApplications(tenantId)` alongside its other parallel reads, builds
+  a lowercase name set of external applications, and triggers the
+  "External communication capability" factor when any of the agent's CAN
+  entries touch one — a capability check (CAN), matching the sibling
+  "Production environment access" factor's own CAN-based shape rather
+  than a DID/actual-usage one.
+
+**Verification:** `modules/risk/rules.test.ts` gained 2 new tests (the
+factor fires when CAN touches an external app; stays silent when it only
+touches non-external ones), plus the mock for
+`@/modules/access-governance/service` extended with `listApplications`.
+Full pipeline: `npm run typecheck` clean, `npm run lint` clean, `npx
+vitest run` 234/234 (up from 232), migration applied live to the dev
+Supabase project. No new RLS finding (column addition to an
+already-policied table).

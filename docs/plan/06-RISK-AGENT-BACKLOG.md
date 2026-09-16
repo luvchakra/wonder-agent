@@ -191,7 +191,7 @@ by `modules/risk/rules.test.ts`'s two existing scenarios (asserts the exact scor
 |---|---|---|
 | Production database / production environment access | 20 | `agents.environment = 'production'` + entitlement touches a data store |
 | Sensitive data (PII/financial/confidential) involved | 25 | evidence's `data_classification` |
-| External communication capability | 15 | contract/entitlement metadata flag (if not modeled yet, treat as 0 and note the gap) |
+| External communication capability | 15 | resolved 2026-09-16 — `applications.is_external` (Access Agent, migration `0059`); triggers when the agent's CAN touches an external-marked application |
 | No certification in >90 days (or contract's `certification_frequency` window) | 15 | Compliance Agent's last decision date, once available; 0 if unknown |
 | Active policy violation (`evaluatePolicies` returned `violation`) | 15 | Access Agent |
 | Runtime/behavioral anomaly present | 10 | this module's own `behavioral_deviation`/`identity_anomaly` findings |

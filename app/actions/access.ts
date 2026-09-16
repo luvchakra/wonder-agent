@@ -23,7 +23,13 @@ import type {
 
 export async function createApplicationAction(formData: FormData) {
   const ctx = await requirePermission("access.manage");
-  await createApplication(ctx.tenantId!, String(formData.get("name") ?? ""), String(formData.get("category") ?? "") || undefined);
+  await createApplication(
+    ctx.tenantId!,
+    String(formData.get("name") ?? ""),
+    String(formData.get("category") ?? "") || undefined,
+    undefined,
+    formData.get("isExternal") === "on",
+  );
   redirect("/access");
 }
 

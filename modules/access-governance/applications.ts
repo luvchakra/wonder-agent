@@ -17,12 +17,13 @@ export async function createApplication(
   name: string,
   category?: string,
   sourceIntegrationId?: string,
+  isExternal = false,
 ): Promise<Application> {
   if (!name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("applications")
-    .insert({ tenant_id: tenantId, name, category: category ?? null, source_integration_id: sourceIntegrationId ?? null })
+    .insert({ tenant_id: tenantId, name, category: category ?? null, source_integration_id: sourceIntegrationId ?? null, is_external: isExternal })
     .select()
     .single();
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create application");

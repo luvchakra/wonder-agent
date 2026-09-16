@@ -38,12 +38,13 @@ export function resolveWeight(factorName: string, overrides: Record<string, numb
  * genuine `low` finding.
  *
  * Flagged, not silently assumed (per the backlog's own worked-through
- * caveat): two factors have no real source yet — "external communication
- * capability" (no module models this concept) and "no certification in
- * >90 days" (Compliance Agent, the source of certification decisions,
- * doesn't exist in the run order yet) — both always contribute 0 until
- * those modules exist, exactly as the backlog instructs rather than
- * guessing a value.
+ * caveat): "no certification in >90 days" still has no real source
+ * (Compliance Agent's certification-decision timing isn't wired to this
+ * factor) and always contributes 0. "External communication capability"
+ * was the same until ACCESS-P0-02.2 resolved it 2026-09-16 (via
+ * `applications.is_external`, checked against CAN in `rules.ts`) — kept
+ * here only as a reminder that a currently-0 factor is a real,
+ * documented gap, not a silent omission.
  */
 export function computeSeverity(factors: RiskFactor[]): { severity: RiskSeverity; riskScore: number; reasons: string[] } {
   const riskScore = factors.reduce((sum, f) => sum + (f.triggered ? f.weight : 0), 0);

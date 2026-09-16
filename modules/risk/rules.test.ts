@@ -9,6 +9,7 @@ const mockListLifecycleEvents = vi.fn();
 const mockTransitionAgentLifecycle = vi.fn();
 const mockUpdateAgentRiskScore = vi.fn();
 const mockListPolicyEvaluations = vi.fn();
+const mockListApplications = vi.fn();
 const mockCompareShouldCanDid = vi.fn();
 const mockGetDid = vi.fn();
 const mockListRuntimeEvents = vi.fn();
@@ -25,6 +26,7 @@ vi.mock("@/modules/agent-identity/service", () => ({
 }));
 vi.mock("@/modules/access-governance/service", () => ({
   listPolicyEvaluations: (...a: unknown[]) => mockListPolicyEvaluations(...a),
+  listApplications: (...a: unknown[]) => mockListApplications(...a),
 }));
 vi.mock("@/modules/runtime-assurance/service", () => ({
   compareShouldCanDid: (...a: unknown[]) => mockCompareShouldCanDid(...a),
@@ -48,6 +50,7 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
       finding: { id: `finding-${category}`, tenantId: "tenant-a", agentId, category, ...fields, status: "open" },
       created: true,
     }));
+    mockListApplications.mockResolvedValue([]);
   });
 
   it("generates a CRITICAL sensitive_data_violation finding, excessive_access, and behavioral_deviation with evidence, and auto-restricts the agent", async () => {
@@ -155,5 +158,48 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
     // (0 here — staging, low criticality, no policy violation, no anomaly)
     // is still persisted, not left as "unknown".
     expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a2", 0);
+  });
+
+  it("ACCESS-P0-02.2: triggers 'External communication capability' when CAN touches an application marked is_external", async () => {
+    mockGetAgent.mockResolvedValue({ id: "a3", agentName: "MailBot", environment: "staging", criticality: "low", lifecycleState: "ACTIVE" });
+    mockGetAgentContract.mockResolvedValue({ approvedApplications: ["SendGrid"], approvedData: [], prohibitedData: [], approvedActions: [], prohibitedActions: [] });
+    mockCompareShouldCanDid.mockResolvedValue({
+      can: [{ application: "SendGrid", entitlementName: "SEND_EMAIL", dataClassification: null, grantId: "grant-1" }],
+      outcomes: [],
+    });
+    mockGetDid.mockResolvedValue({ tuples: [] });
+    mockListRuntimeEvents.mockResolvedValue({ events: [] });
+    mockGetOwnershipIssues.mockResolvedValue([]);
+    mockListAgentIdentities.mockResolvedValue([]);
+    mockListLifecycleEvents.mockResolvedValue([]);
+    mockListPolicyEvaluations.mockResolvedValue([]);
+    mockListApplications.mockResolvedValue([{ id: "app-1", name: "SendGrid", isExternal: true }, { id: "app-2", name: "Internal DB", isExternal: false }]);
+
+    await evaluateAgentRisk("tenant-a", "a3");
+
+    // No triggers fire (SendGrid is approved, no violation/anomaly), but the
+    // factor itself must have contributed to the persisted score — confirms
+    // it's real, not the old hard-coded `false`.
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a3", 15);
+  });
+
+  it("ACCESS-P0-02.2: does not trigger when CAN only touches non-external applications", async () => {
+    mockGetAgent.mockResolvedValue({ id: "a4", agentName: "DbBot", environment: "staging", criticality: "low", lifecycleState: "ACTIVE" });
+    mockGetAgentContract.mockResolvedValue({ approvedApplications: ["Internal DB"], approvedData: [], prohibitedData: [], approvedActions: [], prohibitedActions: [] });
+    mockCompareShouldCanDid.mockResolvedValue({
+      can: [{ application: "Internal DB", entitlementName: "READ", dataClassification: null, grantId: "grant-1" }],
+      outcomes: [],
+    });
+    mockGetDid.mockResolvedValue({ tuples: [] });
+    mockListRuntimeEvents.mockResolvedValue({ events: [] });
+    mockGetOwnershipIssues.mockResolvedValue([]);
+    mockListAgentIdentities.mockResolvedValue([]);
+    mockListLifecycleEvents.mockResolvedValue([]);
+    mockListPolicyEvaluations.mockResolvedValue([]);
+    mockListApplications.mockResolvedValue([{ id: "app-2", name: "Internal DB", isExternal: false }]);
+
+    await evaluateAgentRisk("tenant-a", "a4");
+
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a4", 0);
   });
 });

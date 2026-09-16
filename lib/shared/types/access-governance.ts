@@ -23,6 +23,8 @@ export type Application = {
   name: string;
   category: string | null;
   sourceIntegrationId: string | null;
+  /** ACCESS-P0-02.2 — an external-facing application (email/messaging/public API/etc.), the data source for Risk's "External communication capability" factor. */
+  isExternal: boolean;
   createdAt: string;
 };
 
