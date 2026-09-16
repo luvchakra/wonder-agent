@@ -9,6 +9,7 @@ import type { EvidenceType, RiskFactor, RiskFinding, RogueCategory } from "@/lib
 import { applyProhibitedDataOverride, computeSeverity, resolveWeight } from "./scoring";
 import { createOrUpdateFinding } from "./findings";
 import { getSeverityWeights } from "./config";
+import { detectGovernanceDrift } from "./governanceDrift";
 
 const SENSITIVE_KEYWORDS = ["pii", "financial", "confidential"];
 
@@ -237,6 +238,15 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
         });
       }
     }
+  }
+
+  // governance_drift — RISK-P0-04, a separate cross-module diff signal,
+  // not a duplicate of any category above (those compare current state
+  // against the *current* contract; this compares current state against
+  // the contract/ownership/access *as of the agent's last approval*).
+  const drift = await detectGovernanceDrift(tenantId, agent, contract, identities, lifecycleEvents);
+  if (drift) {
+    triggers.push(drift);
   }
 
   const sensitiveInvolved = did.tuples.some((t) => isSensitiveClassification(t.dataClassification)) || comparison.can.some((c) => isSensitiveClassification(c.dataClassification));

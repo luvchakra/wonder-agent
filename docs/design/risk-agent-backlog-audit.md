@@ -405,3 +405,88 @@ notes — depends on Access Agent eventually exposing entitlement-level
 destructive-verb and graph-position data before two of its four factors
 can trigger on anything other than 0; that dependency should be recorded
 at pickup time rather than assumed now.
+
+## 2026-09-16 — RISK-P0-04: Governance Drift detection, implemented
+
+**Agent:** Risk Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Second item in the P0-ordered sweep the user authorized ("pick up P0
+items in order, no need to ask before picking the next story"), following
+the 2026-09-15 governance reconciliation's resolved decision
+("Governance Drift → Risk Agent").
+
+**Design:** a new deterministic `governance_drift` finding category,
+built the same way every other category in this module already is —
+diff current state against a reference point already tracked by another
+module, no new snapshot mechanism. The reference point chosen is the
+agent's most recent `APPROVED` lifecycle transition (via Identity's
+already-published `listLifecycleEvents()`) — the last point governance
+affirmed a baseline, matching the doc's own "material *post-approval*
+changes" framing exactly. An agent never approved has no reference point
+and is correctly skipped (returns `null`, no finding), not defaulted to
+some fabricated baseline.
+
+**Sub-signals covered**, all derived from already-published contracts,
+no new table:
+- Purpose changed, autonomy level increased (never decreased — a lowered
+  autonomy level is a tightening, not drift), new `allowedTools` entry,
+  new `approvedActions` entry — all via a single mechanism: diffing the
+  contract version active at-or-before the approval timestamp
+  (`listContractVersions()`) against the current active contract.
+- Owner added since approval (`listOwners()`, `assignedAt >`
+  referenceTime) — owners assigned before approval correctly excluded.
+- New IAM identity linked since approval (`listAgentIdentities()`,
+  already fetched by the caller, `createdAt >` referenceTime).
+- Access expanded since approval — `getEffectiveAccessAsOf(tenantId,
+  agentId, referenceTime)` (Access Agent's point-in-time contract, built
+  this same session for `RUNTIME-P0-13`) vs. current `getEffectiveAccess()`;
+  new grant IDs present now that weren't present as-of approval.
+
+**Deliberately not covered, documented not silently skipped:**
+- "New tool/data source" beyond what's captured by `allowedTools` — no
+  other module publishes a "first seen since timestamp" contract for
+  tools/resources (`runtime_tools`/`runtime_resources` are Runtime
+  Agent's own tables; querying them directly here would violate
+  non-negotiable #6, and Runtime Agent hasn't published a suitable
+  query — not something Risk Agent should invent unilaterally per
+  non-negotiable #18).
+- "Runtime behavior changed" as its own drift sub-signal — would
+  duplicate the already-existing `behavioral_deviation` category rather
+  than add new detection value; no module may invent a second concept
+  for the same thing.
+
+**Schema:** migration `0054_risk_governance_drift.sql` — additive-only,
+widens `risk_findings.category`'s check constraint (`governance_drift`)
+and `risk_evidence.evidence_type`'s (`governance_baseline`, a new generic
+evidence type covering contract-baseline-diff facts — purpose/autonomy/
+tools/actions/owner/identity changes — since none of the five existing
+evidence types fit; access-expansion evidence reuses the existing
+`access_grant` type, no new type needed there). Applied live via the
+Supabase MCP `apply_migration` tool against project `ekgyjwoenteadaaqakmd`;
+`get_advisors(security)` re-run clean afterward, same three
+already-accepted exceptions as every prior pass.
+
+**Deliberately excluded from the "rogue agent" partition:** `ROGUE_AGENT_
+CATEGORIES`/`ROGUE_CATEGORIES` (`modules/operations/reports.ts`,
+`app/(customer)/risk/rogue/*.tsx`) were NOT updated to include
+`governance_drift` — those are Operations'/Experience's own files
+(non-negotiable #18), and more fundamentally, a drifted-but-approved
+change is a different concept from rogue/anomalous behavior; the
+requirements doc itself frames Governance Drift as distinct from rogue
+detection, not a ninth rogue category.
+
+**Verified:** 7 new unit tests (`modules/risk/governanceDrift.test.ts`) —
+no-approval-event returns null without calling any dependency; no-change
+returns null; purpose-change detected; autonomy-increase detected,
+autonomy-decrease correctly NOT flagged; new-owner-since-approval
+detected, pre-approval owner correctly excluded; access-expansion
+detected via the exact point-in-time call; reference-version selection
+picks the most recent version at-or-before approval time, not the
+oldest. Existing `modules/risk/rules.test.ts` (2 tests, FinanceBot
+scenario) re-run and still passing unmodified — its fixture's
+`listLifecycleEvents` mock returns `[]`, so the new code path correctly
+short-circuits to `null` without needing new mocks. Full pipeline: `npm
+run typecheck`, `npm run lint`, `npx vitest run` (165/165, up from 158),
+`npm run build` with `.next` deleted first, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
+
+RISK-P0-04 moves from `Not Started` to `Done`.

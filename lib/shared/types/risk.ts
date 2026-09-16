@@ -13,7 +13,8 @@ export type RogueCategory =
   | "behavioral_deviation"
   | "identity_anomaly"
   | "ownership_violation"
-  | "lifecycle_violation";
+  | "lifecycle_violation"
+  | "governance_drift";
 
 export type RiskSeverity = "info" | "low" | "medium" | "high" | "critical";
 
@@ -33,7 +34,7 @@ export type FindingStatus =
   | "false_positive"
   | "exception";
 
-export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event";
+export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event" | "governance_baseline";
 
 export type RiskEvidence = {
   id: string;
