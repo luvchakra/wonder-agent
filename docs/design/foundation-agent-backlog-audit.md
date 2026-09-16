@@ -606,3 +606,30 @@ structurally), and makes a real OpenAI `fetch()` call when a key resolves.
 `ctx.tenantId!` through. Full verification pipeline re-run (typecheck, lint,
 217/217 vitest, clean build, no service-role-key leakage) — all green.
 FOUNDATION-P0-16 moves from `Partial` to `Done`.
+
+---
+
+## 2026-09-16 — FOUNDATION-P0-03.3 (SSO) confirmed infra-blocked, user chose to skip
+
+As part of the user's P0-gap-closure pass (3 gaps picked from the earlier
+"not completely done P0 items" audit: SSO, AI Provider Configuration,
+agents.risk_score persistence), re-investigated this row's real blocker
+rather than assuming. Verified live via `mcp__Supabase__get_organization`
+(org `ryahximilsdatarfcjcq`, plan `free`) and Supabase's own docs
+(`mcp__Supabase__search_docs` — "SAML 2.0 support is offered on plans Pro
+and above") that this is a genuine infrastructure/billing blocker, not a
+code gap: every application-side piece (connection CRUD, domain routing,
+JIT provisioning, the auth callback) is already built and unit-tested —
+only the real end-to-end IdP handshake needs a paid Supabase plan plus a
+real identity provider, neither of which this environment or this agent
+can provide.
+
+Presented this to the user with the concrete steps to unblock it
+(upgrade to Pro+, enable SAML in Auth Providers, register a real IdP).
+**User's explicit decision: skip SSO, close out the P0 gap-closure pass
+without it.** This story stays `Partial` — not marked `Done`, not silently
+dropped — and is not blocking anything else; the other two gaps in this
+pass (`PLATFORM-P0-05.2` AI Provider Configuration, `RISK-P0-02.1`
+agents.risk_score persistence) were both fully closed the same day. Resume
+this story only if the user later upgrades the Supabase plan and supplies
+a real IdP to test against.

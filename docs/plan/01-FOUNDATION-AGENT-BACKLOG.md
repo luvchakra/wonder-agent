@@ -27,7 +27,7 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-02.5 | `getTenantContext()` helper | Done |
 | FOUNDATION-P0-03.1 | Email/password auth | Done |
 | FOUNDATION-P0-03.2 | Tenant selection / JIT provisioning | Done |
-| FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Partial — 2026-09-14: full CRUD service/API/admin UI, domain-based sign-in routing, auth callback + JIT provisioning, live RLS-verified; real end-to-end IdP handshake still unverified (needs a real IdP + Supabase-project-level SSO provider registration), see audit log |
+| FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Partial, intentionally deferred — 2026-09-14: full CRUD service/API/admin UI, domain-based sign-in routing, auth callback + JIT provisioning, live RLS-verified; real end-to-end IdP handshake still unverified. 2026-09-16: confirmed via `mcp__Supabase__get_organization` + Supabase's own docs that this is a hard infrastructure blocker, not a code gap — SAML 2.0 is Pro-plan-and-above only, and this org is on the free plan. User explicitly chose to skip this and close out the P0 gap-closure pass without it (see audit log); resume only if the user upgrades the plan and supplies a real IdP |
 | FOUNDATION-P0-03.4 | MFA foundation | Partial — 2026-09-14: Supabase Auth TOTP enroll/verify/unenroll wired at `/settings/security`; real enrollment against a physical authenticator app not verified in this sandbox, see audit log |
 | FOUNDATION-P0-04.1 | `requirePermission()` | Done |
 | FOUNDATION-P0-04.2 | `requirePlatformAdmin()` (higher bar) | Done |
