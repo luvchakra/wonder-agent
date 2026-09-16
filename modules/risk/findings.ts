@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { revokeAccessGrant } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { EvidenceType, FindingFilter, FindingStatus, ResolutionType, RiskFinding, RogueCategory } from "@/lib/shared/types/risk";
 import { toRiskEvidence, toRiskFinding } from "./mappers";
@@ -206,19 +207,52 @@ export async function assignFinding(tenantId: string, actorId: string, findingId
 
 /**
  * RISK-P0-03.2. Risk Agent never revokes access itself (non-negotiable
- * #6/#15). Access Agent has not published a remediation-initiation
- * contract yet (checked: modules/access-governance/service.ts exports no
- * such function as of this session) — per the backlog's own explicit
- * instruction for this exact situation, this records the dependency and
- * leaves the finding at its current status with a note, rather than
- * fabricating a hand-off or silently flipping status to
- * 'remediation_in_progress' without an actual remediation path behind it.
+ * #6/#15) — it calls Access Agent's already-published
+ * `revokeAccessGrant(tenantId, actorId, grantId)` for every grant this
+ * finding's own evidence names (`evidence_type = 'access_grant'`,
+ * `reference_id` = the grant's id — the exact evidence shape
+ * `detectExcessiveAccess()`/`detectUnauthorizedResource()`/etc. already
+ * attach in rules.ts). The human who clicked "Request remediation" is the
+ * explicit approval non-negotiable #15 requires — this function performs
+ * the hand-off synchronously rather than only creating a pending
+ * `access_requests` row, since revoking excessive/unauthorized access is
+ * itself the corrective action, not a request for new access (which is
+ * what `createAccessRequest()` models instead — a different, wrong-
+ * direction contract for this use case).
+ *
+ * A finding whose category has no `access_grant` evidence (e.g.
+ * ownership_violation, lifecycle_violation, governance_drift) has no
+ * grant to revoke — `wired` is honestly `false` for those, with a note,
+ * rather than fabricating a hand-off. A grant that's already
+ * revoked/removed by the time this runs doesn't fail the whole call; it's
+ * skipped and reflected in `wired` only if zero grants actually revoked.
  */
-export async function remediateFinding(tenantId: string, actorId: string, findingId: string): Promise<{ finding: RiskFinding; wired: boolean }> {
+export async function remediateFinding(
+  tenantId: string,
+  actorId: string,
+  findingId: string,
+): Promise<{ finding: RiskFinding; wired: boolean; revokedGrantIds: string[] }> {
   const supabase = supabaseServiceRole();
-  const { data: finding, error } = await supabase.from("risk_findings").select().eq("id", findingId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: findingRow, error } = await supabase.from("risk_findings").select().eq("id", findingId).eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  if (!finding) throw new ApiError(404, "FINDING_NOT_FOUND");
+  if (!findingRow) throw new ApiError(404, "FINDING_NOT_FOUND");
+
+  const { data: evidenceRows, error: evidenceError } = await supabase.from("risk_evidence").select().eq("finding_id", findingId);
+  if (evidenceError) throw new ApiError(500, "QUERY_FAILED", evidenceError.message);
+
+  const grantIds = [...new Set((evidenceRows ?? []).filter((e) => e.evidence_type === "access_grant").map((e) => e.reference_id as string))];
+
+  const revokedGrantIds: string[] = [];
+  for (const grantId of grantIds) {
+    try {
+      await revokeAccessGrant(tenantId, actorId, grantId);
+      revokedGrantIds.push(grantId);
+    } catch (err) {
+      console.error("remediateFinding: failed to revoke grant (already removed?)", { grantId, err });
+    }
+  }
+
+  const wired = revokedGrantIds.length > 0;
 
   await writeAudit({
     tenantId,
@@ -227,11 +261,31 @@ export async function remediateFinding(tenantId: string, actorId: string, findin
     action: "risk.remediation_requested",
     objectType: "risk_finding",
     objectId: findingId,
-    outcome: "failure",
-    metadata: { reason: "Access Agent has not published a remediation-initiation contract yet; no automated hand-off performed." },
+    outcome: wired ? "success" : "failure",
+    metadata: wired
+      ? { revokedGrantIds }
+      : {
+          reason:
+            grantIds.length > 0
+              ? "This finding named access_grant evidence but none could be revoked (already removed?)."
+              : "This finding's category has no access_grant evidence to remediate via revocation.",
+        },
   });
 
-  return { finding: toRiskFinding(finding), wired: false };
+  let finalRow = findingRow;
+  if (wired) {
+    const { data: updated, error: updateError } = await supabase
+      .from("risk_findings")
+      .update({ status: "remediation_in_progress" })
+      .eq("id", findingId)
+      .eq("tenant_id", tenantId)
+      .select()
+      .maybeSingle();
+    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+    if (updated) finalRow = updated;
+  }
+
+  return { finding: toRiskFinding(finalRow), wired, revokedGrantIds };
 }
 
 /**

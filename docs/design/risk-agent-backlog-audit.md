@@ -490,3 +490,91 @@ run typecheck`, `npm run lint`, `npx vitest run` (165/165, up from 158),
 SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
 
 RISK-P0-04 moves from `Not Started` to `Done`.
+
+---
+
+## 2026-09-16 — Unblock check: RISK-P0-02.1 and RISK-P0-03.2
+
+**Agent:** Risk Agent. Picked up per the user's standing authorization to
+continue working the pending backlog in order; this was originally queued
+as "check Risk unblocks" after several other modules published new
+contracts this session (Identity's `IDENTITY-P0-07` autonomy fields,
+Access's broadened `policy_exceptions`, etc.).
+
+**RISK-P0-02.1 (agent risk-score persistence) — still blocked, re-verified
+not silently done.** Checked `modules/agent-identity/service.ts`'s exports
+again: still only `createAgent, getAgent, listAgents` plus the
+contract/lifecycle/owner/identity functions — no `updateAgentRiskScore()`
+or any other generic agent-mutation function that could carry a risk score
+onto `agents.risk_score`. This remains exactly the dependency the backlog
+itself names, and per non-negotiable #14, Risk Agent does not write to
+`agents` directly. No change made; row stays `Partial` with its existing,
+still-accurate note.
+
+**RISK-P0-03.2 (human-initiated remediation) — unblocked, now `Done`.**
+Re-read the story's own wording: it names Access Agent publishing "a
+remediation-initiation contract (once published — e.g.
+`requestRemediation(findingId, recommendedAction)`)" as the blocker, giving
+that function name only as an *example*, not a required exact signature.
+Checked what Access Agent has actually published since this dependency was
+first recorded: `revokeAccessGrant(tenantId, actorId, grantId)` — already
+existed even before this session, just never previously connected to this
+endpoint. This is a better fit than the example name suggests:
+`createAccessRequest()` (Access's other candidate) models *requesting new
+access*, the wrong direction for remediating excessive/unauthorized access;
+`revokeAccessGrant()` is exactly "the corrective action" a rogue-access
+finding calls for.
+
+**Design.** `remediateFinding()` (`modules/risk/findings.ts`) now:
+1. Loads the finding's own `risk_evidence` rows.
+2. Collects every distinct `reference_id` where `evidence_type =
+   'access_grant'` — the exact evidence shape the detection rules in
+   `rules.ts` already attach for `excessive_access`/`unauthorized_resource`/
+   `sensitive_data_violation`/etc. (no schema change needed; this evidence
+   already existed, just wasn't being read back for remediation).
+3. Calls `revokeAccessGrant(tenantId, actorId, grantId)` for each — a
+   *synchronous* hand-off, not merely creating a pending `access_requests`
+   row, because the human who clicked "Request remediation" already gave
+   the explicit approval non-negotiable #15 requires; revoking is itself
+   the corrective action, not a request that still needs a second
+   approval step.
+4. A grant that fails to revoke (e.g. already removed) doesn't fail the
+   whole call — it's skipped, logged, and simply doesn't count toward
+   `revokedGrantIds`.
+5. `wired` is `true` only if at least one grant was actually revoked.
+   Finding categories with no `access_grant` evidence at all (ownership_
+   violation, lifecycle_violation, governance_drift, identity_anomaly)
+   correctly report `wired: false` with an honest reason in the audit
+   event — this function still never fabricates a remediation action for
+   a category that has none.
+6. On a wired outcome, the finding's `status` is set to
+   `remediation_in_progress` — the status transition the story's own spec
+   always called for but the old blocked implementation never actually
+   performed (it wrote the audit event but left `status` untouched even
+   in its own code, regardless of the `wired` value — a small pre-existing
+   gap between the docstring and the code, closed here).
+
+**Not changed:** the API route's permission gate (`risk.manage`,
+unchanged), `resolveFinding()`'s separate re-evaluation requirement
+(`RISK-P0-03.3`, untouched), and Access Agent's own file
+(`modules/access-governance/grants.ts`) — `revokeAccessGrant()` is
+consumed exactly as already published, no modification to it or any other
+Access Agent file (non-negotiable #18).
+
+**Verification:**
+- `modules/risk/findings.test.ts` (new) — 5 tests: 404 on a missing
+  finding; honestly `wired: false` with no `access_grant` evidence; every
+  named grant revoked + status transitioned + audit success; still
+  `wired: true` when one of two grants fails (already removed) but the
+  other succeeds; `wired: false` with an audit failure reason when every
+  named grant fails.
+- `npm run typecheck` / `npm run lint` — clean.
+- `npx vitest run` — 202/202 passing (up from 197).
+- `npm run build` (with `.next` deleted first) — clean.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** no new exports — `remediateFinding()`'s return
+shape gained one additive field (`revokedGrantIds: string[]`), and
+`POST /api/v1/findings/:id/remediate`'s response now also includes it.
+Existing callers (`app/actions/risk.ts`'s `remediateFindingAction`, which
+doesn't destructure the return value) are unaffected.

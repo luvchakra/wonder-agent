@@ -23,7 +23,7 @@ this module is higher bar (see below).
 | RISK-P0-01.3 | Explainability | Done |
 | RISK-P0-02.1 | Severity/risk score | Partial — `agents.risk_score` persistence blocked on Identity publishing `updateAgentRiskScore()`; the score is fully computed and stored on every finding |
 | RISK-P0-03.1 | Assignment & recommendation | Done |
-| RISK-P0-03.2 | Human-initiated remediation | Partial — endpoint/UI exist and behave honestly (`wired: false`); blocked on Access Agent publishing a remediation-initiation contract |
+| RISK-P0-03.2 | Human-initiated remediation | Done — `remediateFinding()` now calls Access Agent's already-published `revokeAccessGrant()` for every `access_grant`-evidenced grant; honestly `wired: false` for finding categories with no such evidence |
 | RISK-P0-03.3 | Re-evaluation & resolution | Done |
 | RISK-P0-01.4 | Evaluator version on evidence pack | Done |
 | RISK-P0-02.2 | Configurable severity weights & INFO tier | Done |
