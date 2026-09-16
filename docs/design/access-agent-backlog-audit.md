@@ -575,3 +575,25 @@ no RLS policy change (the column has a default, and `access_requests`'
 existing client-facing INSERT policy already constrains every column it
 cares about — `status`/`decided_by`/`decided_at` — unaffected by this
 addition).
+
+---
+
+## 2026-09-16 — published hasOpenPolicyViolation() (unblocks COMPLIANCE-P0-02.2); agent.external_communication resolved
+
+Small, paired addition — the story is tracked under Compliance's own
+backlog as `COMPLIANCE-P0-02.2`; full account in that module's audit log.
+`hasOpenPolicyViolation(tenantId, policyId)` published from
+`modules/access-governance/evaluate.ts`, exported via `service.ts`.
+
+Also resolved in the same file, using the `applications.is_external` data
+`ACCESS-P0-02.2` added earlier the same day:
+`evaluatePolicies()`'s `agentFacts["agent.external_communication"]` fact
+— previously always `undefined`, silently untestable by any policy rule
+condition — now computed from whether the agent's effective access
+touches any external-marked application. This is a distinct use from
+Risk's own scoring factor (same underlying flag, different consumer:
+Access's deterministic policy-rule engine vs. Risk's weighted score).
+
+**Verification:** full pipeline (typecheck/lint/`npx vitest run` 248/248/
+build/secret-leak check) run as part of Compliance's own pass — see that
+module's audit log entry for the complete record.

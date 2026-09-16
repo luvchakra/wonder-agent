@@ -22,7 +22,7 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-01.3 | Reviewer decision flow | Done — 2026-09-16: Access Agent published `request_type` (migration `0060`, `'grant'`/`'modify'`) plus `getAccessGrant()`/`getEntitlement()`; `modify` now resolves the item's grant → entitlement → application and calls `createAccessRequest(..., "modify")`, setting `remediationId` to the new request's id (same pattern `revoke` already used for `access_grants`) |
 | COMPLIANCE-P0-01.4 | Certification detail panel data | Done |
 | COMPLIANCE-P0-02.1 | Schema (higher bar) | Done |
-| COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Partial — status computed from evidence recency only; live policy-violation state not checked, blocked on Access/Risk publishing a policy-scoped violation query |
+| COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Done — 2026-09-16: Access Agent published `hasOpenPolicyViolation(tenantId, policyId)` (each evaluated agent's most-recent `policy_evaluations` result, so a stale/since-fixed violation never keeps a mapping flagged); `addControlEvidence()` now computes `non_compliant` when the mapped policy has an open violation, unless an explicit manual attestation overrides it |
 | COMPLIANCE-P0-03 | Evidence snapshot (contract/policy versions) | Done |
 | COMPLIANCE-P0-04 | Reviewer authorization & Segregation of Duties | Done |
 | COMPLIANCE-P0-05 | Escalation of overdue certification items | Partial — no scheduler exists in this codebase yet, so `escalateOverdueItems()` is exposed as an operator/API-triggered sweep rather than an automatic cron; the escalation logic, recording and audit trail themselves are fully implemented and verified |

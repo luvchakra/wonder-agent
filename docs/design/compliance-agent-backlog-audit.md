@@ -820,3 +820,51 @@ arguments and sets `remediationId`; no `accessGrantId` → audit-only,
 clean, `npm run lint` clean, `npx vitest run` 239/239 (up from 236), `npm
 run build` clean, no service-role-key leakage. Migration applied live to
 the dev Supabase project.
+
+---
+
+## 2026-09-16 — COMPLIANCE-P0-02.2 fully resolved: live policy-violation status
+
+Previously `Partial`: `addControlEvidence()`'s status computation only
+considered evidence recency, not live policy-violation state, because
+neither Access nor Risk published a policy-scoped (as opposed to
+agent-scoped) violation query. Resolved as part of the user's "any P0 item
+open to work?" pass, same self-contained cross-module pattern as
+COMPLIANCE-P0-01.3 above.
+
+**Built (Access Agent's half — see that module's own audit log entry):**
+`hasOpenPolicyViolation(tenantId, policyId)` (`modules/access-governance/
+evaluate.ts`) — queries `policy_evaluations` for the given policy, keeps
+only each evaluated agent's most recent row (ordered `evaluated_at desc`,
+first-seen-per-agent), and returns true if any of those latest results is
+`'violation'`. Deliberately NOT capped by `DEFAULT_LIST_LIMIT` — a flat
+cap could let one frequently-re-evaluated agent's rows crowd another
+agent's out of the window, silently hiding a real violation; same
+correctness-first exception class as `getFindings()`/`listCampaignItems()`/
+`listControlMappings()`.
+
+**Built (Compliance's half):** `addControlEvidence()` now computes
+`non_compliant` when the mapping's `policyId` currently has an open
+violation, unless the caller supplies an explicit `manual_attestation`
+(which still always wins — a human call overrides the automated signal).
+`not_applicable` remains manual-attestation-only, since there's still no
+automated "this control doesn't apply here" signal.
+
+**Also resolved in the same pass** (same underlying data source,
+`applications.is_external`, from `ACCESS-P0-02.2`): `evaluate.ts`'s
+`agentFacts["agent.external_communication"]` — previously always
+`undefined` — is now real, computed from whether the agent's effective
+access includes any application marked external. This is Access's
+deterministic policy-rule-evaluation engine's own fact (a policy rule can
+condition on it), a different use of the same underlying flag from Risk's
+scoring factor.
+
+**Verification:** new `modules/access-governance/evaluate.test.ts` (5
+tests covering the "most recent per agent" dedup logic, including the
+stale-violation-superseded-by-a-pass case) and new
+`modules/certification-compliance/controls.test.ts` (4 tests: violation
+→ `non_compliant`; no violation → `compliant`; no `policyId` → live check
+skipped entirely; manual attestation always wins). Full pipeline: `npm
+run typecheck` clean, `npm run lint` clean, `npx vitest run` 248/248 (up
+from 239), `npm run build` clean, no service-role-key leakage. No schema
+change needed.

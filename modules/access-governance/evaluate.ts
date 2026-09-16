@@ -8,6 +8,7 @@ import { getCertificationHistory } from "@/modules/certification-compliance/deci
 import type { Policy, PolicyEvaluationResult, PolicyRule } from "@/lib/shared/types/access-governance";
 import { toPolicy, toPolicyEvaluationResult, toPolicyRule } from "./mappers";
 import { getEffectiveAccess } from "./grants";
+import { listApplications } from "./applications";
 import { evaluateCondition } from "./conditions";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -23,6 +24,38 @@ export async function listPolicyEvaluations(tenantId: string, agentId: string): 
     .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyEvaluationResult);
+}
+
+/**
+ * COMPLIANCE-P0-02.2's published dependency: whether a policy currently
+ * has an open violation among the agents evaluated against it —
+ * "currently" meaning each agent's own MOST RECENT evaluation of this
+ * policy, so an old, since-superseded violation can never keep a policy
+ * flagged forever. Deliberately NOT given a `DEFAULT_LIST_LIMIT` cap
+ * (unlike `listPolicyEvaluations` above): a flat cap could truncate
+ * before covering every agent evaluated against this policy (one
+ * frequently-re-evaluated agent could otherwise crowd out another
+ * agent's rows within the cap), which would make this a silently
+ * incomplete compliance signal — the same class of correctness risk
+ * this codebase's other completeness-dependent exceptions
+ * (`getFindings`, `listCampaignItems`, `listControlMappings`) already
+ * avoid for the same reason.
+ */
+export async function hasOpenPolicyViolation(tenantId: string, policyId: string): Promise<boolean> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("policy_evaluations")
+    .select("agent_id, result")
+    .eq("tenant_id", tenantId)
+    .eq("policy_id", policyId)
+    .order("evaluated_at", { ascending: false });
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+
+  const latestResultByAgent = new Map<string, string>();
+  for (const row of (data ?? []) as { agent_id: string; result: string }[]) {
+    if (!latestResultByAgent.has(row.agent_id)) latestResultByAgent.set(row.agent_id, row.result);
+  }
+  return [...latestResultByAgent.values()].some((result) => result === "violation");
 }
 
 function policyScopeMatches(policy: Policy, agent: { criticality: string; agentType: string }): boolean {
@@ -60,7 +93,8 @@ export async function evaluatePolicies(tenantId: string, agentId: string): Promi
   const policies = (policyRows ?? []).map(toPolicy).filter((p) => policyScopeMatches(p, agent));
   if (policies.length === 0) return [];
 
-  const effectiveAccess = await getEffectiveAccess(tenantId, agentId);
+  const [effectiveAccess, applications] = await Promise.all([getEffectiveAccess(tenantId, agentId), listApplications(tenantId)]);
+  const externalApplicationNames = new Set(applications.filter((a) => a.isExternal).map((a) => a.name.toLowerCase()));
 
   // agent.days_since_last_certification is now resolvable via Compliance
   // Agent's own published contract (getCertificationHistory() — its own
@@ -78,14 +112,10 @@ export async function evaluatePolicies(tenantId: string, agentId: string): Promi
     "agent.criticality": agent.criticality,
     "agent.environment": agent.environment,
     "agent.days_since_last_certification": daysSinceLastCertification,
-    // agent.external_communication has no owning schema concept anywhere in
-    // this codebase (no module models "this agent/application communicates
-    // externally") — deliberately left unknown rather than guessed. Building
-    // it would mean inventing a new field on either Identity's agents or
-    // Access's applications table without a product decision on what it
-    // means or which module owns it; per CLAUDE.md §3, treated as scope
-    // creep and stopped rather than guessed, see the Access Agent audit log.
-    "agent.external_communication": undefined,
+    // ACCESS-P0-02.2, resolved 2026-09-16: real now, sourced from
+    // applications.is_external — true when the agent's effective access
+    // includes any application marked external-facing.
+    "agent.external_communication": effectiveAccess.some((g) => g.application && externalApplicationNames.has(g.application.toLowerCase())),
   };
 
   const admin = supabaseServiceRole();

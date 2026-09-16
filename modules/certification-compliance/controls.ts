@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { hasOpenPolicyViolation } from "@/modules/access-governance/service";
 import type { Control, ControlEvidence, ControlEvidenceType, ControlFramework, ControlMapping, ControlStatus } from "@/lib/shared/types/compliance";
 import { toControl, toControlEvidence, toControlFramework, toControlMapping } from "./mappers";
 
@@ -82,17 +83,20 @@ export async function listControlEvidence(tenantId: string, mappingId: string): 
  * COMPLIANCE-P0-02.2 (higher bar). Adds an evidence row and recomputes
  * `status` from evidence alone — never a bare human-typed status flip.
  *
- * Flagged, not silently assumed: the backlog's rule also references "no
- * open non_compliant-implying finding on the mapped policy," but neither
- * Access Agent nor Risk Agent publishes a policy-scoped (as opposed to
- * agent-scoped) findings/violation query — `listPolicyEvaluations` and
- * `getFindings` are both keyed by agentId. Adding that cross-cutting query
- * is those modules' contract to publish, not this module's to invent by
- * reaching into their tables (non-negotiable #6/#14/#18); the recorded gap
- * is this: automatic status computation here only considers evidence
- * recency, not live policy-violation state. `non_compliant` and
- * `not_applicable` are therefore only ever set by an explicit
- * `manual_attestation` evidence row naming that status, never inferred.
+ * Resolved 2026-09-16: Access Agent published `hasOpenPolicyViolation()`
+ * — a policy-scoped (not agent-scoped) query over its own
+ * `policy_evaluations` table, checking each evaluated agent's MOST RECENT
+ * result so a stale, since-fixed violation can't keep a mapping flagged
+ * forever. When the mapping has a `policyId` and that policy currently
+ * has an open violation, status computes to `non_compliant` even without
+ * an explicit human attestation. `not_applicable` is still only ever set
+ * by an explicit `manual_attestation` evidence row naming it — there is
+ * no automated signal for "this control doesn't apply here."
+ *
+ * Word-choice reminder (CLAUDE.md §10 — hard product-boundary rule, not a
+ * copywriting nicety): this `status` value is scoped to one control for
+ * one agent — never surface it as "certified compliant" or "ISO
+ * compliant" at the tenant level.
  */
 export async function addControlEvidence(
   tenantId: string,
@@ -119,9 +123,13 @@ export async function addControlEvidence(
 
   let status: ControlStatus;
   if (evidenceType === "manual_attestation" && manualStatus && (manualStatus === "non_compliant" || manualStatus === "not_applicable")) {
-    // The only path to these two statuses — an explicit human attestation,
-    // never inferred from evidence recency alone (see this function's doc).
+    // The only path to `not_applicable` — an explicit human attestation,
+    // never inferred. A manual `non_compliant` attestation is honored the
+    // same way, even though the live-violation check below could also
+    // produce it — an explicit human call always takes precedence.
     status = manualStatus;
+  } else if (mappingRow.policy_id && (await hasOpenPolicyViolation(tenantId, mappingRow.policy_id))) {
+    status = "non_compliant";
   } else {
     status = "compliant";
   }
