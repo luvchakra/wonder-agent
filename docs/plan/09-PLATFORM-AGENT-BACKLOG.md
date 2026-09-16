@@ -27,7 +27,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-04.1 | `platform_audit_logs` | Done |
 | PLATFORM-P0-04.2 | Support access (higher bar) | Deferred — no time-bound/audited support-access infrastructure exists; the backlog explicitly forbids shipping an unbounded shortcut, so nothing was built |
 | PLATFORM-P0-05.1 | Usage & Limits tracking/enforcement | Done — `checkUsageLimit()`/`getUsageSummary()` published; not yet called by any other module's create path (same as `isFeatureEnabled()` itself) |
-| PLATFORM-P0-05.2 | AI Provider Configuration | Done — resolved 2026-09-16 via `AskUserQuestion` (provider = OpenAI; key scope = both platform-wide default and per-tenant BYOK, tenant chooses). `platform_ai_provider_configs` (migration `0057`), `modules/platform-admin/aiProviderConfig.ts`, `/settings/ai` UI, and `lib/ai/summarize.ts` now call OpenAI's REST API for real |
+| PLATFORM-P0-05.2 | AI Provider Configuration | Done — resolved 2026-09-16 via `AskUserQuestion` (provider = OpenAI; key scope = both platform-wide default and per-tenant BYOK, tenant chooses). Gemini added the same day per a follow-up user request. `platform_ai_provider_configs` (migrations `0057`/`0058`), `modules/platform-admin/aiProviderConfig.ts`, `/settings/ai` UI (provider selector), and `lib/ai/summarize.ts` now call the real OpenAI or Gemini REST API depending on the tenant's configured provider |
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 
@@ -285,6 +285,31 @@ per tenant via `use_own_key`.
 - Tests: `lib/ai/summarize.test.ts` covers not-configured (mocked
   `resolveAiProviderKey` returning `null`), BYOK path, platform-fallback path, and a
   real-failure (non-OK OpenAI response) path distinct from "not configured".
+
+**Gemini added, same day, per a follow-up user request mid-turn:** the
+`provider` column's check constraint widened from `openai`-only to
+`openai`/`gemini` (`supabase/migrations/0058_platform_ai_provider_gemini.sql`
+— a plain `ALTER TABLE ... DROP/ADD CONSTRAINT`, no data migration needed
+since every existing row was already `'openai'`). `setAiProviderConfig()`
+now takes an explicit `provider` field and, critically, never reuses a
+BYOK key stored for one provider as if it were valid for the other — an
+API key is provider-specific, so switching provider without supplying a
+fresh key throws the same `API_KEY_REQUIRED` error as configuring BYOK for
+the first time (see `providerChanged` in `aiProviderConfig.ts`).
+`resolveAiProviderKey()` falls back only to that same provider's platform
+default (`PLATFORM_GEMINI_API_KEY` for Gemini, `PLATFORM_OPENAI_API_KEY`
+for OpenAI) — never silently substitutes the other provider's key.
+`lib/ai/summarize.ts` gained a second REST call path
+(`callGemini()`, Gemini's `generateContent` endpoint) alongside the
+existing OpenAI chat-completions call, selected by `resolved.provider` at
+call time. `/settings/ai` gained a provider `<select>`; the model field's
+default now depends on the selected provider (`gpt-4o-mini` vs.
+`gemini-2.0-flash`). New `modules/platform-admin/aiProviderConfig.test.ts`
+(5 tests) covers the provider-switch/key-isolation logic directly with a
+mocked service-role client, mirroring `modules/integrations/
+credentials.test.ts`'s existing pattern; `lib/ai/summarize.test.ts` gained
+a Gemini-path test asserting the Gemini endpoint (not OpenAI's) is called
+with the right model/key.
 
 **Prior status (superseded):** Deferred — genuine open product/architecture question
 (which providers, what capability/budget model), not a mechanical ownership-map gap;

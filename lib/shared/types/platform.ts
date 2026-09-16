@@ -64,7 +64,8 @@ export type PlatformBranding = {
 
 // PLATFORM-P0-05.2 — AI Provider Configuration (resolved 2026-09-16: OpenAI,
 // platform-wide default + per-tenant BYOK, tenant chooses via useOwnKey).
-export type AiProviderName = "openai";
+// Gemini added 2026-09-16 as a second supported provider, same model.
+export type AiProviderName = "openai" | "gemini";
 
 export type AiProviderConfig = {
   tenantId: string;

@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { AiSummaryKind, AiSummaryRequest, AiSummaryResult } from "@/lib/shared/types/ai";
+import type { ResolvedAiProviderKey } from "@/lib/shared/types/platform";
 import { resolveAiProviderKey } from "@/modules/platform-admin/service";
 
 /**
@@ -23,13 +24,15 @@ import { resolveAiProviderKey } from "@/modules/platform-admin/service";
  *   result back into a deterministic decision (authorization, risk score,
  *   policy evaluation, remediation), per non-negotiable #9.
  *
- * Provider: OpenAI, resolved 2026-09-16 via AskUserQuestion (see
- * PLATFORM-P0-05.2 / modules/platform-admin/aiProviderConfig.ts). A tenant
- * may bring its own key (BYOK) or fall back to the platform-wide default
- * key; `resolveAiProviderKey()` picks whichever applies. When neither is
- * configured, every call deterministically throws `AiNotConfiguredError`,
- * and callers are expected to render that as "Connect an AI provider" —
- * never a crash, never a silently-empty summary.
+ * Providers: OpenAI, resolved 2026-09-16 via AskUserQuestion, plus Gemini
+ * (added the same day per a follow-up user request) — see PLATFORM-P0-05.2
+ * / modules/platform-admin/aiProviderConfig.ts. A tenant may bring its own
+ * key for whichever provider it configured (BYOK) or fall back to that
+ * same provider's platform-wide default key; `resolveAiProviderKey()`
+ * picks whichever applies and which provider. When neither is configured,
+ * every call deterministically throws `AiNotConfiguredError`, and callers
+ * are expected to render that as "Connect an AI provider" — never a
+ * crash, never a silently-empty summary.
  */
 export class AiNotConfiguredError extends Error {
   constructor() {
@@ -39,6 +42,7 @@ export class AiNotConfiguredError extends Error {
 }
 
 const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
+const GEMINI_GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const KIND_INSTRUCTIONS: Record<AiSummaryKind, string> = {
   finding: "Summarize this risk finding for a security administrator: what happened, why it matters, and what evidence supports it. Do not recommend a specific remediation action — only describe the evidence.",
@@ -57,20 +61,7 @@ function buildUserPrompt(request: AiSummaryRequest): string {
   return `${KIND_INSTRUCTIONS[request.kind]}\n\nData:\n${JSON.stringify(request.data, null, 2)}`;
 }
 
-/**
- * Summarizes already-computed evidence for the Experience Agent's
- * AI-Assisted Investigation UI (EXPERIENCE-P0-14). `tenantId` is the
- * server-resolved tenant context (never client-supplied — CLAUDE.md §14),
- * used only to look up which key to call OpenAI with. Throws
- * `AiNotConfiguredError` when no key is configured — never returns a fake
- * or empty summary, and never partially succeeds.
- */
-export async function summarize(tenantId: string, request: AiSummaryRequest): Promise<AiSummaryResult> {
-  const resolved = await resolveAiProviderKey(tenantId);
-  if (!resolved) {
-    throw new AiNotConfiguredError();
-  }
-
+async function callOpenAi(resolved: ResolvedAiProviderKey, userPrompt: string): Promise<string> {
   const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
     method: "POST",
     headers: {
@@ -83,7 +74,7 @@ export async function summarize(tenantId: string, request: AiSummaryRequest): Pr
       max_tokens: 400,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(request) },
+        { role: "user", content: userPrompt },
       ],
     }),
   });
@@ -100,6 +91,52 @@ export async function summarize(tenantId: string, request: AiSummaryRequest): Pr
   if (!content) {
     throw new Error("OpenAI response contained no summary content");
   }
+  return content;
+}
+
+async function callGemini(resolved: ResolvedAiProviderKey, userPrompt: string): Promise<string> {
+  const url = `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(resolved.model)}:generateContent?key=${encodeURIComponent(resolved.apiKey)}`;
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
+      generationConfig: { temperature: 0.2, maxOutputTokens: 400 },
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 500)}`);
+  }
+
+  const payload = (await response.json()) as {
+    candidates?: { content?: { parts?: { text?: string }[] } }[];
+  };
+  const content = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+  if (!content) {
+    throw new Error("Gemini response contained no summary content");
+  }
+  return content;
+}
+
+/**
+ * Summarizes already-computed evidence for the Experience Agent's
+ * AI-Assisted Investigation UI (EXPERIENCE-P0-14). `tenantId` is the
+ * server-resolved tenant context (never client-supplied — CLAUDE.md §14),
+ * used only to look up which provider/key to call. Throws
+ * `AiNotConfiguredError` when no key is configured — never returns a fake
+ * or empty summary, and never partially succeeds.
+ */
+export async function summarize(tenantId: string, request: AiSummaryRequest): Promise<AiSummaryResult> {
+  const resolved = await resolveAiProviderKey(tenantId);
+  if (!resolved) {
+    throw new AiNotConfiguredError();
+  }
+
+  const userPrompt = buildUserPrompt(request);
+  const content = resolved.provider === "gemini" ? await callGemini(resolved, userPrompt) : await callOpenAi(resolved, userPrompt);
 
   return {
     kind: request.kind,

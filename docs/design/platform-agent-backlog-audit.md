@@ -583,3 +583,69 @@ budget/safety controls.
 **Published this session:** `modules/platform-admin/aiProviderConfig.ts`'s
 three functions, re-exported from `modules/platform-admin/service.ts` — the
 contract Foundation's `lib/ai/summarize.ts` now consumes.
+
+---
+
+## 2026-09-16 — Gemini added as a second AI provider (follow-up to PLATFORM-P0-05.2)
+
+Mid-turn follow-up request from the user right after PLATFORM-P0-05.2
+(OpenAI-only) shipped: also support a Gemini API key. Extended the same
+platform-wide-default-or-BYOK model to a second provider rather than
+building a parallel concept.
+
+**Built:**
+- `supabase/migrations/0058_platform_ai_provider_gemini.sql` — widens
+  `platform_ai_provider_configs.provider`'s check constraint from
+  `openai`-only to `openai`/`gemini`. Plain `ALTER TABLE ... DROP/ADD
+  CONSTRAINT`, no data migration needed (every existing row was already
+  `'openai'`). Applied live; `get_advisors(security)`/`(performance)`
+  re-checked — no new findings.
+- `getPlatformGeminiApiKey()` added to `lib/db/env.ts` (same
+  deliberately-optional, no-`required()` shape as
+  `getPlatformOpenAiApiKey()`), plus `PLATFORM_GEMINI_API_KEY` documented
+  in `.env.local.example`.
+- `modules/platform-admin/aiProviderConfig.ts`: `setAiProviderConfig()`
+  now takes an explicit `provider` field. The key correctness property
+  this needed: an API key is provider-specific (an OpenAI key is not a
+  valid Gemini key), so switching provider must never silently carry the
+  old provider's encrypted key forward as if it were the new provider's.
+  Implemented via a `providerChanged` check — switching provider without
+  supplying a fresh key throws the same `API_KEY_REQUIRED` error as
+  configuring BYOK for the first time, and the previously stored
+  `encrypted_api_key` is discarded (set to `null`), never reused, when
+  provider changes without a fresh key being rejected outright first.
+  `resolveAiProviderKey()` resolves the platform-wide fallback strictly for
+  the tenant's configured provider (`PLATFORM_GEMINI_API_KEY` for Gemini,
+  `PLATFORM_OPENAI_API_KEY` for OpenAI) — never the other provider's key.
+- `lib/ai/summarize.ts` gained `callGemini()` (Gemini's `generateContent`
+  REST endpoint, still no new npm dependency) alongside the existing
+  `callOpenAi()`; `summarize()` picks the call based on
+  `resolved.provider`. `AiProviderName` widened to `"openai" | "gemini"`
+  in `lib/shared/types/platform.ts`.
+- `/settings/ai` gained a provider `<select>` (OpenAI / Google Gemini);
+  the model field's default now depends on the selected provider
+  (`gpt-4o-mini` vs. `gemini-2.0-flash`); the page explicitly tells the
+  user switching provider never reuses a previously stored key.
+  `app/actions/ai.ts` validates `provider` is one of the two values.
+
+**Verification:**
+- New `modules/platform-admin/aiProviderConfig.test.ts` (5 tests, mocked
+  service-role client mirroring `modules/integrations/credentials.test.ts`'s
+  existing pattern) — directly covers the provider-switch/key-isolation
+  logic: first-time BYOK requires a key; switching provider without a
+  fresh key is rejected even though an old key is stored; switching with a
+  fresh key discards the old encrypted key and stores the new one with the
+  new provider's default model; re-saving the same provider without a new
+  key keeps the existing key; `resolveAiProviderKey()` resolves BYOK,
+  falls back to the same provider's platform default only (asserted the
+  other provider's getter is never called), and returns `null` when
+  neither exists.
+- `lib/ai/summarize.test.ts` gained a Gemini-path test asserting the
+  Gemini `generateContent` URL (not OpenAI's) is called with the right
+  model and key.
+- Full pipeline: `npm run typecheck` clean, `npm run lint` clean, `npx
+  vitest run` 226/226 (up from 217), `npm run build` (with `.next` deleted
+  first) clean, `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` no match.
+
+No Progress Tracker row change beyond PLATFORM-P0-05.2's existing `Done`
+entry, which was updated in place to mention Gemini.

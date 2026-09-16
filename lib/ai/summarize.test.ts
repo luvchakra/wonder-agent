@@ -64,6 +64,30 @@ describe("summarize — FOUNDATION-P0-16 / PLATFORM-P0-05.2", () => {
     expect(body.model).toBe("gpt-4o-mini");
   });
 
+  it("calls Gemini's generateContent endpoint (not OpenAI's) when the resolved provider is gemini", async () => {
+    mockResolveAiProviderKey.mockResolvedValue({
+      source: "byok",
+      provider: "gemini",
+      apiKey: "AIza-tenant-key",
+      model: "gemini-2.0-flash",
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ candidates: [{ content: { parts: [{ text: "Gemini summary." }] } }] }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await summarize("tenant-3", { kind: "finding", data: { id: "f1" } });
+
+    expect(result.summary).toBe("Gemini summary.");
+    expect(result.provider).toBe("gemini");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url] = fetchMock.mock.calls[0];
+    expect(url).toContain("generativelanguage.googleapis.com");
+    expect(url).toContain("gemini-2.0-flash");
+    expect(url).toContain("key=AIza-tenant-key");
+  });
+
   it("falls back to the platform-wide key when the tenant has no BYOK key configured (resolveAiProviderKey already encodes that precedence)", async () => {
     mockResolveAiProviderKey.mockResolvedValue({
       source: "platform",

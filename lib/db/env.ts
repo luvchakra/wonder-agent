@@ -54,3 +54,14 @@ export function getPlatformOpenAiApiKey(): string | null {
   }
   return process.env.PLATFORM_OPENAI_API_KEY || null;
 }
+
+/**
+ * Same deliberate optionality as `getPlatformOpenAiApiKey()` above — a
+ * deployment may run BYOK-only for Gemini too, or not offer Gemini at all.
+ */
+export function getPlatformGeminiApiKey(): string | null {
+  if (typeof window !== "undefined") {
+    throw new Error("PLATFORM_GEMINI_API_KEY must never be read from client code.");
+  }
+  return process.env.PLATFORM_GEMINI_API_KEY || null;
+}
