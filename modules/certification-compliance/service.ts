@@ -26,3 +26,4 @@ export {
 } from "./controls";
 export { escalateOverdueItems } from "./escalation";
 export { exportCampaignEvidence } from "./export";
+export { getGovernancePosture } from "./posture";

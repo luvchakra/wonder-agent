@@ -134,6 +134,47 @@ export type CertificationItemDetail = CertificationItem & {
 };
 
 /**
+ * COMPLIANCE-P0-07 — Governance Posture: a composite, explainable status
+ * distinct from Risk Agent's risk score (never conflated with it — risk
+ * measures threat/impact of observed behavior, posture measures whether
+ * the agent's *governance scaffolding itself* — identity, ownership,
+ * contract, access, certification, oversight — is intact). Computed
+ * on-demand from other modules' published read contracts; never stored,
+ * never duplicating another module's table.
+ */
+export type GovernancePostureStatus = "GOVERNED" | "PARTIALLY_GOVERNED" | "NON_COMPLIANT" | "EXCEPTION_APPROVED" | "SUSPENDED";
+
+export type GovernanceDimension =
+  | "identity"
+  | "ownership"
+  | "purpose"
+  | "access"
+  | "action_authority"
+  | "certification"
+  | "runtime_monitoring"
+  | "human_oversight"
+  | "policy_compliance"
+  | "lifecycle"
+  | "compliance_controls"
+  | "evidence_completeness";
+
+export type GovernanceDimensionResult = {
+  dimension: GovernanceDimension;
+  status: "governed" | "gap" | "not_applicable";
+  reason: string;
+};
+
+export type GovernancePosture = {
+  agentId: string;
+  tenantId: string;
+  status: GovernancePostureStatus;
+  computedAt: string;
+  dimensions: GovernanceDimensionResult[];
+  /** Active governance exceptions covering this agent — populated only when status is EXCEPTION_APPROVED. */
+  coveringExceptionIds: string[];
+};
+
+/**
  * COMPLIANCE-P0-06 — the assembled evidence bundle for a completed campaign.
  * `contentHash` is a SHA-256 over the canonical JSON of everything else in
  * this object (campaign/items/decisions), so any post-export tampering with

@@ -359,3 +359,134 @@ touched.
 here): the evidence-export file/delivery ownership question
 (Compliance vs. Operations Agent) and the `CERT-P2-03` Auditor Workspace
 authorization-boundary question both remain open for the user.
+
+---
+
+## 2026-09-16 — COMPLIANCE-P0-07 — Governance Posture
+
+**Agent:** Compliance Agent. Picked up per the user's standing authorization
+to work through the pending P0 backlog from the 2026-09-15 governance
+requirements reconciliation in order, without stopping to ask before each
+story (`docs/plan/07-COMPLIANCE-AGENT-BACKLOG.md`'s "Requirements Refresh —
+2026-09-15" section, `COMPLIANCE-P0-07`).
+
+**Design.** The story's own spec (in the backlog) already resolved the main
+ambiguity: "a read-model computed from existing published contracts... no
+new table duplicating another module's data; deterministic and explainable,
+with a documented reason per dimension, not a single opaque number." Built
+exactly that — `getGovernancePosture(tenantId, agentId)`
+(`modules/certification-compliance/posture.ts`) computes, on every call,
+twelve independent dimension checks (Identity, Ownership, Purpose, Access,
+Action authority, Certification, Runtime monitoring, Human oversight,
+Policy compliance, Lifecycle, Compliance controls, Evidence completeness),
+each returning `{ dimension, status: "governed"|"gap"|"not_applicable",
+reason }`, then derives one of five composite statuses (`GOVERNED`,
+`PARTIALLY_GOVERNED`, `NON_COMPLIANT`, `EXCEPTION_APPROVED`, `SUSPENDED`)
+deterministically from those results (non-negotiable #9) — never a single
+score, and never conflated with Risk Agent's risk score (they answer
+different questions: risk measures threat/impact of observed behavior,
+posture measures whether the agent's governance scaffolding itself —
+identity, ownership, contract, access, certification, oversight — is
+intact).
+
+**Every dimension is sourced from another module's already-published read
+contract** (non-negotiable #6 — no direct table reads across module
+boundaries):
+- Identity/Ownership/Purpose/Lifecycle — `getAgent()`, `getAgentContract()`,
+  `listAgentIdentities()`, `getOwnershipIssues()` (Identity Agent).
+- Access — `compareAccessToContract()` (Access Agent's SHOULD-vs-CAN diff);
+  gap iff any `excessive` row.
+- Action authority — `getDid()` (Runtime Agent) to find distinct observed
+  actions, then `classifyActionsForAgent()` (Access Agent's 4-state
+  ACCESS-P0-06 model) on those *actually observed* actions specifically
+  (not the contract's own declared-action list, which would be trivially
+  self-consistent) — gap iff any observed action classifies `prohibited`
+  or `restricted`.
+- Runtime monitoring — same `getDid()` call, reused; applicable only when
+  `contract.requiredMonitoring` is set (the explicit SHOULD signal
+  IDENTITY-P0-07 published); gap iff zero observed events despite a
+  declared monitoring requirement.
+- Human oversight — pure contract-field check: autonomy level ≥3 (high
+  autonomy) with an empty `actionsRequiringApproval` list is a gap (a
+  documented, deliberately simple rule — verifying that a declared approval
+  requirement was actually *followed* at runtime is a distinct, harder
+  question left to Risk Agent's existing categories, not duplicated here).
+- Policy compliance — `listPolicyEvaluations()` (Access Agent), gap iff the
+  *latest* evaluation of any policy is `violation`.
+- Compliance controls — applicable only when
+  `contract.requiredComplianceControls` is non-empty; matches each
+  free-text control ref against `listControlFrameworks()` +
+  `listControls()` (this module's own control catalog) by `controlRef`,
+  then checks the matched control's `listControlMappings()` status is
+  `compliant` or `not_applicable`; gap iff unmapped or any other status.
+  This is a genuinely new correlation this module didn't have before —
+  `requiredComplianceControls` (a free-text list on the contract) and
+  `control_mappings` (keyed by `control_id`, not by agent or by ref) had no
+  prior link; posture.ts is the first place they're joined, in-memory, by
+  `controlRef` string match — documented here since it's not obvious from
+  either schema alone.
+- Certification — this module's own `getCertificationHistory()`; gap if the
+  agent's lifecycle state is `CERTIFICATION_DUE`, or if it has never been
+  certified.
+- Evidence completeness — same certification history; gap unless at least
+  one decision carries a non-null `snapshot` (COMPLIANCE-P0-03).
+
+**Composite status derivation:** `SUSPENDED` overrides everything when
+`agent.lifecycleState === "SUSPENDED"` (an explicit terminal governance
+state, not merely "a dimension with a gap"). Otherwise: zero gaps →
+`GOVERNED`; any gap but at least one *active* governance exception scoped to
+the agent (`listGovernanceExceptions()`, ACCESS-P0-07's broadened model) →
+`EXCEPTION_APPROVED` (a human already approved a compensating control for
+this agent's gap — this is exactly what that model exists for); any gap in
+a "core" dimension (`identity`, `ownership`, `purpose`, `lifecycle` — the
+foundational governance scaffolding, without which nothing else is
+meaningful) → `NON_COMPLIANT`; any other gap → `PARTIALLY_GOVERNED`.
+`RETIRED` lifecycle state is deliberately not special-cased into its own
+composite bucket (the five allowed statuses don't include one) — it falls
+through to `NON_COMPLIANT` via the `lifecycle` dimension's own gap, which is
+an honest characterization, not a workaround.
+
+**Not implemented / deliberately excluded:**
+- No new column or table stores the computed posture — every call
+  recomputes it fresh from live data, per the story's own instruction. The
+  existing `agents.posture_score` numeric column (migration `0012`, a
+  currently-unused Identity-owned column) is left untouched — writing to it
+  would be modifying another module's table (non-negotiable #6/#18), and a
+  single numeric column can't carry the12-dimension explainability this
+  story requires; if a cached/stored posture is wanted later, that's an
+  Identity-owned schema decision, not this module's to make unilaterally.
+- No UI — Experience Agent composes the panel from this read contract.
+
+**Verification:**
+- `modules/certification-compliance/posture.test.ts` — 10 tests, fully
+  mocking every consumed module's service (Identity, Access, Runtime, and
+  this module's own sibling `./decisions`/`./controls`), covering: agent-
+  not-found (404), all-governed happy path, `SUSPENDED` override,
+  `NON_COMPLIANT` via a core-dimension gap, `PARTIALLY_GOVERNED` via a
+  non-core gap, `EXCEPTION_APPROVED` when an active exception covers a gap,
+  `action_authority` gap from a prohibited observed action,
+  `human_oversight` gap from high autonomy with no approval list, every
+  contract-dependent dimension correctly `not_applicable` with no contract,
+  and `compliance_controls` gap from an unmapped required control.
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npx vitest run` — 175/175 passing (up from 165 before this story).
+- `npm run build` (with `.next` deleted first) — clean; new route
+  `GET /api/v1/compliance/agents/[id]/posture` compiled as a dynamic
+  function alongside the rest of `/api/v1/compliance/*`.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:**
+`getGovernancePosture(tenantId, agentId)`
+(`modules/certification-compliance/service.ts`); `GovernancePostureStatus`,
+`GovernanceDimension`, `GovernanceDimensionResult`, `GovernancePosture`
+(`lib/shared/types/compliance.ts`); `GET /api/v1/compliance/agents/[id]/posture`
+(`compliance.read` permission, matching this module's existing route
+conventions).
+
+**Dependencies consumed:** Identity's `getAgent()`, `getAgentContract()`,
+`listAgentIdentities()`, `getOwnershipIssues()`; Access's
+`compareAccessToContract()`, `classifyActionsForAgent()`,
+`listPolicyEvaluations()`, `listGovernanceExceptions()`; Runtime's
+`getDid()` — all already-published contracts, used exactly as published, no
+modification to any other module's file.
