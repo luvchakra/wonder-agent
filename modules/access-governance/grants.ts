@@ -75,6 +75,32 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
 }
 
 /**
+ * COMPLIANCE-P0-01.3's published dependency: a single grant by id, for a
+ * certification reviewer's "modify" decision to resolve which entitlement
+ * (and therefore which application) the resulting access_requests row
+ * should target. `access_grants` grants a client-facing SELECT policy
+ * (migration 0027), so this runs as the calling user via supabaseServer(),
+ * same as getEffectiveAccess().
+ */
+export async function getAccessGrant(tenantId: string, grantId: string): Promise<AccessGrant | null> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("access_grants")
+    .select("*, entitlements(name, data_classification, applications(name))")
+    .eq("id", grantId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle<EffectiveAccessRow>();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!data) return null;
+  return {
+    ...toAccessGrant(data),
+    application: data.entitlements?.applications?.name,
+    entitlementName: data.entitlements?.name,
+    dataClassification: data.entitlements?.data_classification ?? null,
+  };
+}
+
+/**
  * ACCESS-P0-01.2: "why can X access Y" — the specific chain from agent
  * identity through to the entitlement, for one resource reference in the
  * form "Application:Entitlement" (e.g. "Snowflake:CustomerDB_READ") or just

@@ -551,3 +551,27 @@ Full pipeline: `npm run typecheck` clean, `npm run lint` clean, `npx
 vitest run` 234/234 (up from 232), migration applied live to the dev
 Supabase project. No new RLS finding (column addition to an
 already-policied table).
+
+---
+
+## 2026-09-16 — published request_type + getAccessGrant()/getEntitlement() (unblocks COMPLIANCE-P0-01.3)
+
+Small, paired addition — the story is tracked under Compliance's own
+backlog as `COMPLIANCE-P0-01.3`; full account in that module's audit log.
+`access_requests` gained a `request_type` column (migration `0060`,
+`'grant'`/`'modify'`, defaulting to `'grant'` — fully backward compatible
+with every existing row and caller). `createAccessRequest()` gained an
+optional `requestType` parameter (default `'grant'`). Two new published
+lookups so a consuming module can resolve a grant's entitlement/
+application without querying Access's own tables directly
+(non-negotiable #6): `getAccessGrant(tenantId, grantId)` and
+`getEntitlement(tenantId, entitlementId)`, both exported from
+`modules/access-governance/service.ts`.
+
+**Verification:** full pipeline (typecheck/lint/`npx vitest run` 239/239/
+build/secret-leak check) run as part of Compliance's own pass — see that
+module's audit log entry for the complete record. Migration applied live;
+no RLS policy change (the column has a default, and `access_requests`'
+existing client-facing INSERT policy already constrains every column it
+cares about — `status`/`decided_by`/`decided_at` — unaffected by this
+addition).

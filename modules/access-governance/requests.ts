@@ -4,7 +4,7 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
-import type { AccessRequest, AccessRequestStatus } from "@/lib/shared/types/access-governance";
+import type { AccessRequest, AccessRequestStatus, AccessRequestType } from "@/lib/shared/types/access-governance";
 import { toAccessRequest } from "./mappers";
 
 /**
@@ -19,6 +19,7 @@ export async function createAccessRequest(
   applicationId: string,
   entitlementId: string | undefined,
   justification: string,
+  requestType: AccessRequestType = "grant",
 ): Promise<AccessRequest> {
   if (!justification.trim()) throw new ApiError(400, "INVALID_INPUT", "justification is required");
   const supabase = await supabaseServer();
@@ -30,6 +31,7 @@ export async function createAccessRequest(
       requested_by: requestedBy,
       application_id: applicationId,
       entitlement_id: entitlementId ?? null,
+      request_type: requestType,
       justification,
     })
     .select()
@@ -40,11 +42,11 @@ export async function createAccessRequest(
     tenantId,
     actorId: requestedBy,
     actorType: "user",
-    action: "access.request_submitted",
+    action: requestType === "modify" ? "access.modify_request_submitted" : "access.request_submitted",
     objectType: "access_request",
     objectId: data.id,
     outcome: "success",
-    metadata: { agentId, applicationId, entitlementId },
+    metadata: { agentId, applicationId, entitlementId, requestType },
   });
 
   return toAccessRequest(data);

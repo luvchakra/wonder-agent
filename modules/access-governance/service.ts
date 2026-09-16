@@ -7,8 +7,8 @@ import "server-only";
  */
 
 export { createApplication, listApplications, getApplication, createAccount, listAccountsForAgent } from "./applications";
-export { createEntitlement, listEntitlementsForApplication } from "./entitlements";
-export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createManualAccessGrant, revokeAccessGrant } from "./grants";
+export { createEntitlement, listEntitlementsForApplication, getEntitlement } from "./entitlements";
+export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createManualAccessGrant, revokeAccessGrant, getAccessGrant } from "./grants";
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
 export {
   createPolicy,

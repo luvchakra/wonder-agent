@@ -19,7 +19,7 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 |---|---|---|
 | COMPLIANCE-P0-01.1 | Schema | Done |
 | COMPLIANCE-P0-01.2 | Campaign launch & item population | Partial — only `scope_type: 'agent'` (criticality-filtered) has real population logic; the other four scope types are schema-ready but unimplemented pending a concrete spec |
-| COMPLIANCE-P0-01.3 | Reviewer decision flow | Partial — approve/revoke/delegate/request_information fully work (revoke really calls `revokeAccessGrant()`); modify doesn't create an `access_requests` row, blocked on Access Agent publishing a distinct request type |
+| COMPLIANCE-P0-01.3 | Reviewer decision flow | Done — 2026-09-16: Access Agent published `request_type` (migration `0060`, `'grant'`/`'modify'`) plus `getAccessGrant()`/`getEntitlement()`; `modify` now resolves the item's grant → entitlement → application and calls `createAccessRequest(..., "modify")`, setting `remediationId` to the new request's id (same pattern `revoke` already used for `access_grants`) |
 | COMPLIANCE-P0-01.4 | Certification detail panel data | Done |
 | COMPLIANCE-P0-02.1 | Schema (higher bar) | Done |
 | COMPLIANCE-P0-02.2 | Status computation, never a compliance claim (higher bar) | Partial — status computed from evidence recency only; live policy-violation state not checked, blocked on Access/Risk publishing a policy-scoped violation query |

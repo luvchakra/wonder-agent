@@ -3,7 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { revokeAccessGrant } from "@/modules/access-governance/service";
+import { revokeAccessGrant, getAccessGrant, getEntitlement, createAccessRequest } from "@/modules/access-governance/service";
 import { listOwners } from "@/modules/agent-identity/service";
 import type { CertificationDecision, CertificationItemDetail, DecisionType } from "@/lib/shared/types/compliance";
 import { toCertificationDecision, toCertificationItem } from "./mappers";
@@ -125,25 +125,48 @@ export async function recordDecision(
       });
     }
   } else if (input.decision === "modify") {
-    // Flagged, not silently assumed: the backlog says this "creates an
-    // access_requests row of type modify," but Access Agent's
-    // access_requests schema (migration 0028) has no type discriminator
-    // between a new-access request and a modify request — repurposing it
-    // without one would misrepresent this as a plain access request to
-    // any consumer of that table (e.g. Access Agent's own SoD checker).
-    // The modify intent is fully captured in this decision's own
-    // `justification` (required, immutable) instead; no access_requests
-    // row is created until Access Agent publishes a distinct type.
-    await writeAudit({
-      tenantId,
-      actorId,
-      actorType: "user",
-      action: "compliance.modify_not_wired",
-      objectType: "certification_item",
-      objectId: itemId,
-      outcome: "failure",
-      metadata: { reason: "Access Agent's access_requests table has no 'modify' type; the intended change is recorded only in this decision's justification." },
-    });
+    // Resolved 2026-09-16: Access Agent published a request_type
+    // discriminator (migration 0060) so a reviewer-initiated "modify"
+    // creates a real, distinct access_requests row rather than only being
+    // recorded in this decision's justification text.
+    if (item.accessGrantId) {
+      const grant = await getAccessGrant(tenantId, item.accessGrantId);
+      const entitlement = grant ? await getEntitlement(tenantId, grant.entitlementId) : null;
+      if (entitlement) {
+        const request = await createAccessRequest(
+          tenantId,
+          actorId,
+          item.agentId,
+          entitlement.applicationId,
+          entitlement.id,
+          input.justification,
+          "modify",
+        );
+        remediationId = request.id;
+      } else {
+        await writeAudit({
+          tenantId,
+          actorId,
+          actorType: "user",
+          action: "compliance.modify_request_failed",
+          objectType: "certification_item",
+          objectId: itemId,
+          outcome: "failure",
+          metadata: { reason: "The item's access_grant_id or its entitlement could not be resolved; no access_requests row was created." },
+        });
+      }
+    } else {
+      await writeAudit({
+        tenantId,
+        actorId,
+        actorType: "user",
+        action: "compliance.modify_without_specific_grant",
+        objectType: "certification_item",
+        objectId: itemId,
+        outcome: "failure",
+        metadata: { reason: "This item has no access_grant_id (not an entitlement-level item) — no specific entitlement to target a modify request at." },
+      });
+    }
   }
 
   const { data: decisionRow, error: decisionError } = await supabase

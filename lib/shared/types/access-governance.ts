@@ -94,6 +94,9 @@ export type AccessPath = {
 
 export type AccessRequestStatus = "pending" | "approved" | "rejected" | "fulfilled";
 
+/** COMPLIANCE-P0-01.3 — 'grant' is a request for new access; 'modify' is a reviewer-initiated request to change an entitlement already covered by an existing access_grant. */
+export type AccessRequestType = "grant" | "modify";
+
 export type AccessRequest = {
   id: string;
   tenantId: string;
@@ -101,6 +104,7 @@ export type AccessRequest = {
   requestedBy: string;
   applicationId: string;
   entitlementId: string | null;
+  requestType: AccessRequestType;
   justification: string;
   status: AccessRequestStatus;
   decidedBy: string | null;

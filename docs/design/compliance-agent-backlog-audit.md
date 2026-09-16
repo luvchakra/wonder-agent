@@ -775,3 +775,48 @@ genuinely bounded and left untouched.
 
 Verification covered as part of the full cross-module pass — see
 `INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.
+
+---
+
+## 2026-09-16 — COMPLIANCE-P0-01.3 fully resolved: modify creates a real access_requests row
+
+Previously `Partial`: `recordDecision()`'s `modify` branch only wrote an
+audit event (`compliance.modify_not_wired`) because Access's
+`access_requests` table had no discriminator between a plain new-access
+request and a reviewer-initiated modify request — repurposing it without
+one would have misrepresented the row to any other consumer (e.g. Access's
+own SoD checker). Resolved as part of the user's "any P0 item open to
+work?" pass, picked up as a self-contained cross-module fix (matching the
+RISK-P0-02.1/updateAgentRiskScore precedent from earlier this session).
+
+**Built (Access Agent's half — see that module's own audit log entry
+for the full detail):**
+- `access_requests.request_type` (migration `0060`, `'grant'`/`'modify'`,
+  default `'grant'` — every existing row and every caller that doesn't
+  pass a type keeps today's exact behavior).
+- `getAccessGrant(tenantId, grantId)` and `getEntitlement(tenantId,
+  entitlementId)` — new published lookups so a caller outside Access's own
+  module can resolve which application/entitlement a grant belongs to
+  without querying Access's tables directly (non-negotiable #6).
+- `createAccessRequest()` gained an optional `requestType` parameter
+  (default `'grant'`, fully backward compatible).
+
+**Built (Compliance's half):** `decisions.ts`'s `modify` branch now: (1)
+resolves `item.accessGrantId → getAccessGrant() → getEntitlement()` to
+find the application/entitlement being modified; (2) calls
+`createAccessRequest(tenantId, actorId, item.agentId,
+entitlement.applicationId, entitlement.id, justification, "modify")`; (3)
+sets the decision's `remediationId` to the new request's id — same
+pattern `revoke` already used for `access_grants`. Two failure paths
+stay audit-only (no request created), matching `revoke`'s own existing
+"no specific grant" precedent: no `accessGrantId` on the item at all, or
+the grant/entitlement can't be resolved (e.g. already deleted).
+
+**Verification:** new `modules/certification-compliance/decisions.test.ts`
+(3 tests: successful resolution creates the request with the exact
+arguments and sets `remediationId`; no `accessGrantId` → audit-only,
+`createAccessRequest` never called; unresolvable grant → audit-only,
+`createAccessRequest` never called). Full pipeline: `npm run typecheck`
+clean, `npm run lint` clean, `npx vitest run` 239/239 (up from 236), `npm
+run build` clean, no service-role-key leakage. Migration applied live to
+the dev Supabase project.

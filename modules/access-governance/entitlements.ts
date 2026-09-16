@@ -30,6 +30,13 @@ export async function createEntitlement(
   return toEntitlement(data);
 }
 
+export async function getEntitlement(tenantId: string, entitlementId: string): Promise<Entitlement | null> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("entitlements").select().eq("id", entitlementId).eq("tenant_id", tenantId).maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return data ? toEntitlement(data) : null;
+}
+
 export async function listEntitlementsForApplication(
   tenantId: string,
   applicationId: string,

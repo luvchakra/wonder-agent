@@ -72,6 +72,7 @@ export function toAccessRequest(row: any): AccessRequest {
     requestedBy: row.requested_by,
     applicationId: row.application_id,
     entitlementId: row.entitlement_id,
+    requestType: row.request_type,
     justification: row.justification,
     status: row.status,
     decidedBy: row.decided_by,
