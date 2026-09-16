@@ -526,3 +526,62 @@ desired") in the doc, no acceptance criterion attached.
 **No existing row's status was changed.** No application code, migration, or
 test was touched in this pass — this was a documentation/planning-only
 reconciliation as instructed.
+
+## 2026-09-16 — FOUNDATION-P0-16: `lib/ai/` primitive, interface/stub only
+
+**Agent:** Foundation Agent · **Branch:** `claude/wonderagent-setup-lasmly`.
+Picked up as the first item in a P0-ordered sweep of the backlog per the
+user's explicit "pick up P0 items in order, no need to ask before picking
+the next story" instruction, following the 2026-09-15 governance
+reconciliation's resolved decision ("start now, read-only summaries
+only").
+
+Built exactly what that story's own text says is buildable without the
+still-open provider/credential decision: `lib/shared/types/ai.ts`
+(`AiSummaryKind`, `AiSummaryRequest`, `AiSummaryResult` — a closed
+`AiSummaryKind` enum, not free-text, so every summarizable shape is a
+deliberate addition) and `lib/ai/summarize.ts` (`summarize()`,
+`AiNotConfiguredError`).
+
+**Boundary enforcement is structural, not just documented:** the file has
+no Supabase client import anywhere in it (a unit test asserts this by
+reading the file's own source and regex-matching for
+`supabaseServer|supabaseServiceRole|supabaseBrowser` — genuinely
+impossible for this module to query a database itself, not merely
+promised not to), has no write path at all (its only export returns a
+string), and its result type is prose (`summary: string`), never a
+structured value — nothing in the codebase can read a summarization
+result back into a deterministic decision (non-negotiable #9).
+
+**Deliberately NOT done:** the actual provider wiring. `summarize()`
+deterministically throws `AiNotConfiguredError` on every call —
+`isConfigured()` is a single hardcoded `return false`, the one place this
+changes once a provider is chosen. This is not an oversight: the story's
+own text explicitly gates "the first real call" on an explicit
+provider/credential decision (which LLM API, where its credential is
+stored/scoped — a new table? platform-wide or per-tenant? via
+`encryptSecret()`?), and that is the *same* open question
+`PLATFORM-P0-05.2` (AI Provider Configuration) was already deferred on.
+Inventing a schema/credential-storage answer here to unblock the "real"
+implementation would be exactly the kind of new shared-foundation-location
+decision `docs/design/ownership-map.md` §5 reserves to the user — recorded
+as still-open, not guessed at.
+
+**Verified:** 4 new unit tests (`lib/ai/summarize.test.ts`) — throws
+`AiNotConfiguredError` rather than returning a fake/empty summary;
+rejects (never resolves) so callers can rely on `.catch()`; source-level
+assertion of no DB client import; exported surface is exactly
+`{AiNotConfiguredError, summarize}` (no accidental extra exports). Also
+ran `npm install` first — the other session's recent commits added
+`lucide-react` to `package.json` but `node_modules` hadn't been updated
+in this environment, which was blocking `npm run typecheck` before this
+change even started (unrelated to this story; fixed as a prerequisite).
+Full pipeline after: `npm run typecheck`, `npm run lint`, `npx vitest run`
+(158/158, up from 141 — the other session's own new tests plus these 4,
+all green), `npm run build` with `.next` deleted first, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` (no match) — all green.
+
+FOUNDATION-P0-16 moves from `Not Started` to `Partial` — the primitive's
+contract and boundary are real and tested; the live capability
+(`EXPERIENCE-P0-14` needs a working `summarize()` to build against) is
+still blocked on the provider decision.
