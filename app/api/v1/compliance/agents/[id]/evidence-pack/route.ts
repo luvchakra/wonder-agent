@@ -19,11 +19,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const pack = await assembleGovernanceEvidencePack(ctx.tenantId!, id);
 
     const url = new URL(request.url);
-    const format = (url.searchParams.get("format") === "csv" ? "csv" : "json") as EvidencePackFormat;
+    const formatParam = url.searchParams.get("format");
+    const format = (formatParam === "csv" || formatParam === "pdf" ? formatParam : "json") as EvidencePackFormat;
     const result = await exportGovernanceEvidencePack(ctx.userId, pack, format);
 
-    if (format === "csv") {
-      return new NextResponse(result.content, {
+    if (format === "csv" || format === "pdf") {
+      const body = typeof result.content === "string" ? result.content : Buffer.from(result.content);
+      return new NextResponse(body, {
         headers: { "Content-Type": result.contentType, "Content-Disposition": `attachment; filename=${result.filename}` },
       });
     }

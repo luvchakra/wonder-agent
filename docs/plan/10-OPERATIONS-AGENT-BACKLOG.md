@@ -28,7 +28,7 @@ issued.
 | OPERATIONS-P0-04.2 | Report traceability (linked records + data freshness) | Done |
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
-| OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Partial — JSON/CSV export done (`exportGovernanceEvidencePack()`); no PDF renderer exists in this codebase, PDF deferred (confirmed, not assumed) |
+| OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
 
 ---
 

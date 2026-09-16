@@ -3,7 +3,6 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { exportCampaignEvidence } from "@/modules/certification-compliance/service";
 import { exportCampaignEvidencePackage } from "@/modules/operations/service";
 import { errorResponse } from "@/modules/certification-compliance/http";
-import type { EvidencePackFormat } from "@/lib/shared/types/operations";
 
 /**
  * COMPLIANCE-P0-06 — tamper-evident evidence export package for a
@@ -22,8 +21,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const url = new URL(request.url);
     if (url.searchParams.get("format") === "csv") {
-      const result = exportCampaignEvidencePackage(pkg, "csv" as EvidencePackFormat);
-      return new NextResponse(result.content, {
+      const result = exportCampaignEvidencePackage(pkg, "csv");
+      return new NextResponse(result.content as string, {
         headers: { "Content-Type": result.contentType, "Content-Disposition": `attachment; filename=${result.filename}` },
       });
     }

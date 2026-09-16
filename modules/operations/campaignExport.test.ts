@@ -39,7 +39,7 @@ describe("exportCampaignEvidencePackage — COMPLIANCE-P0-06 file delivery", () 
     const pkg = makePackage();
     const result = exportCampaignEvidencePackage(pkg, "json");
     expect(result.contentType).toBe("application/json");
-    expect(JSON.parse(result.content)).toEqual(pkg);
+    expect(JSON.parse(result.content as string)).toEqual(pkg);
     expect(result.contentHash).toBe("abc123");
   });
 
@@ -47,7 +47,7 @@ describe("exportCampaignEvidencePackage — COMPLIANCE-P0-06 file delivery", () 
     const pkg = makePackage();
     const result = exportCampaignEvidencePackage(pkg, "csv");
     expect(result.contentType).toBe("text/csv");
-    const lines = result.content.split("\n");
+    const lines = (result.content as string).split("\n");
     expect(lines[0]).toBe("section,id,details");
     expect(lines).toHaveLength(4); // header + campaign + item + decision
     expect(lines[1]).toContain("campaign,campaign-1");

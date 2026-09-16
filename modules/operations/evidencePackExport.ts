@@ -3,6 +3,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { toCsv } from "./csv";
+import { renderEvidencePackPdf } from "./evidencePackPdf";
 import type { GovernanceEvidencePack } from "@/lib/shared/types/compliance";
 import type { EvidencePackExportResult, EvidencePackFormat } from "@/lib/shared/types/operations";
 
@@ -56,8 +57,18 @@ export async function exportGovernanceEvidencePack(
   const canonicalContent = JSON.stringify(pack);
   const contentHash = createHash("sha256").update(canonicalContent).digest("hex");
 
-  const content = format === "csv" ? toCsv(flattenEvidencePack(pack)) : canonicalContent;
-  const contentType = format === "csv" ? "text/csv" : "application/json";
+  let content: string | Uint8Array;
+  let contentType: string;
+  if (format === "csv") {
+    content = toCsv(flattenEvidencePack(pack));
+    contentType = "text/csv";
+  } else if (format === "pdf") {
+    content = await renderEvidencePackPdf(pack);
+    contentType = "application/pdf";
+  } else {
+    content = canonicalContent;
+    contentType = "application/json";
+  }
   const filename = `governance-evidence-pack-${pack.agentId}.${format}`;
 
   await writeAudit({

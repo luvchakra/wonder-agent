@@ -156,14 +156,14 @@ export type JobStatusSummary = {
  * GovernanceEvidencePack into a downloadable file. `contentHash` is a
  * SHA-256 over the pack's canonical JSON (same tamper-evidence pattern as
  * COMPLIANCE-P0-06's EvidenceExportPackage), computed once regardless of
- * output format so a JSON and a CSV export of the same pack share the same
- * hash. PDF is not produced — no PDF renderer exists in this codebase yet
- * (confirmed, not assumed); only "json" and "csv" are valid formats today.
+ * output format so a JSON, CSV and PDF export of the same pack all share
+ * the same hash.
  */
-export type EvidencePackFormat = "json" | "csv";
+export type EvidencePackFormat = "json" | "csv" | "pdf";
 
 export type EvidencePackExportResult = {
-  content: string;
+  /** A rendered PDF's bytes; string for the "json"/"csv" formats. */
+  content: string | Uint8Array;
   contentType: string;
   filename: string;
   contentHash: string;

@@ -30,8 +30,15 @@ function flattenCampaignPackage(pkg: EvidenceExportPackage): ExportRow[] {
  * already-hashed, already-audited package into a file; it does not
  * recompute the hash or write a second audit event for the same export
  * action.
+ *
+ * `format` deliberately excludes "pdf" — OPERATIONS-P0-07's PDF renderer
+ * was built for the agent-scoped GovernanceEvidencePack
+ * (evidencePackPdf.ts), not this campaign-scoped package; widening this
+ * function to accept "pdf" without a renderer for this shape would
+ * silently fall through to the JSON branch below while claiming a
+ * `.pdf` filename and the wrong content type.
  */
-export function exportCampaignEvidencePackage(pkg: EvidenceExportPackage, format: EvidencePackFormat): EvidencePackExportResult {
+export function exportCampaignEvidencePackage(pkg: EvidenceExportPackage, format: Exclude<EvidencePackFormat, "pdf">): EvidencePackExportResult {
   const content = format === "csv" ? toCsv(flattenCampaignPackage(pkg)) : JSON.stringify(pkg);
   const contentType = format === "csv" ? "text/csv" : "application/json";
   const filename = `campaign-evidence-${pkg.campaign.id}.${format}`;

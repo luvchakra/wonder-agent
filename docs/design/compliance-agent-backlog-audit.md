@@ -985,3 +985,21 @@ lint` clean, `npx vitest run` 258/258 (up from 255), `npm run build`
 `/api/cron/compliance-escalate-overdue` route appears in the build
 output — `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` and `grep -rl
 CRON_SECRET .next/static` both no-match. No schema/migration change.
+
+## 2026-09-16 — paired note: exportCampaignEvidencePackage()'s format type narrowed (OPERATIONS-P0-07 side effect)
+
+Small, paired note — the story is tracked under Operations' own backlog
+as `OPERATIONS-P0-07`; full account in that module's audit log.
+`modules/operations/campaignExport.ts`'s `exportCampaignEvidencePackage()`
+(the file delivery mechanism this module's own `COMPLIANCE-P0-06` route,
+`app/api/v1/compliance/campaigns/[id]/export/route.ts`, calls with
+`format: "csv"`) had its `format` parameter type narrowed from the now-3-
+member `EvidencePackFormat` to `Exclude<EvidencePackFormat, "pdf">`, since
+Operations built a PDF renderer only for the agent-scoped
+`GovernanceEvidencePack` shape, not this campaign-scoped one. No
+behavioral change to this module's own export route — it only ever
+passed `"csv"`, still does, and that call now typechecks against the
+narrower type without a cast.
+
+**Verification:** covered by Operations' own full pipeline run — see that
+module's audit log entry.

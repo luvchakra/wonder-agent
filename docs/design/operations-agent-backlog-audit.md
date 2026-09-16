@@ -562,3 +562,71 @@ pagination pass, §above).
 Progress Tracker: OPERATIONS-P0-02.1 moves from `Partial` to `Done`.
 OPERATIONS-P0-02.2's own text updated to point at this resolution rather
 than the old "enqueue" language.
+
+## 2026-09-16 — OPERATIONS-P0-07: real PDF renderer for the Governance Evidence Pack
+
+**User decision (bucket B, "continue uninterrupted" pass):** "Add pdf-lib
+(Recommended)" — a new npm dependency, explicitly approved rather than
+building a hand-rolled PDF writer or continuing to defer the format.
+
+**Built:**
+- `pdf-lib` added to `package.json`/`package-lock.json` (5 packages
+  total including its own small dependency tree — `@pdf-lib/standard-
+  fonts`, `@pdf-lib/upng`, `pako`, etc.).
+- `modules/operations/evidencePackPdf.ts` (new) — `renderEvidencePackPdf(pack):
+  Promise<Uint8Array>`. Renders one section per `GovernanceEvidencePack`
+  category (identity, effective access & policy, SHOULD/CAN/DID, risk
+  findings, certification decisions, attestations, control mappings,
+  remediation, posture) as a human-readable summary line per record —
+  deliberately not a raw-field dump (the JSON export already serves that
+  need); paginates automatically via a small `PageWriter` helper when a
+  page fills up, and strips characters outside `StandardFonts.Helvetica`'s
+  WinAnsi range (free-text justification/reason fields could otherwise
+  throw and abort the whole export).
+- `modules/operations/evidencePackExport.ts` — `exportGovernanceEvidencePack()`
+  gains a `"pdf"` branch (`contentType: "application/pdf"`), calling the
+  new renderer. `contentHash` is still computed once, over the pack's
+  canonical JSON, regardless of output format — a JSON, CSV and PDF
+  export of the same pack now all share the same hash, extending the
+  existing JSON/CSV invariant to the new format rather than special-casing
+  it.
+- `lib/shared/types/operations.ts` — `EvidencePackFormat` gains `"pdf"`;
+  `EvidencePackExportResult.content` widened to `string | Uint8Array`
+  (PDF bytes vs. JSON/CSV text).
+- `modules/operations/campaignExport.ts` — `exportCampaignEvidencePackage()`'s
+  (COMPLIANCE-P0-06, a distinct campaign-scoped export, not this story's
+  agent-scoped pack) `format` parameter narrowed to `Exclude<EvidencePackFormat,
+  "pdf">`, since widening `EvidencePackFormat` would otherwise let a
+  future caller silently pass `"pdf"` into a function with no PDF branch
+  — it would fall through to the JSON branch while still claiming a
+  `.pdf` filename and the JSON content type. No renderer built for that
+  shape in this pass; out of this story's scope.
+- `app/api/v1/compliance/agents/[id]/evidence-pack/route.ts` — accepts
+  `?format=pdf`, returns the PDF bytes as the response body (`Buffer.from()`
+  wrapping the `Uint8Array` for `NextResponse`'s `BodyInit` typing) with
+  `Content-Type: application/pdf` and a `Content-Disposition: attachment`
+  header, same pattern the existing `csv` branch already used.
+- `app/api/v1/compliance/campaigns/[id]/export/route.ts` — untouched
+  behaviorally; its `"csv" as EvidencePackFormat` cast was replaced with
+  a direct `"csv"` literal (now narrower-typed) and its `NextResponse`
+  body cast updated for the widened `EvidencePackExportResult.content`
+  type, no functional change.
+
+**No UI wiring in this pass:** no page in the repository calls the
+evidence-pack export route yet (confirmed via search) — it has been
+API-level-only since COMPLIANCE-P0-09/OPERATIONS-P0-07 were built, and
+stays that way here; Experience Agent's composition pass is where a
+"download PDF/CSV/JSON" control would be added.
+
+**Verification:** `modules/operations/evidencePackExport.test.ts`
+extended with 2 new tests (PDF output starts with the `%PDF-` signature
+and shares its content hash with the JSON export of the same pack; a
+pack with every section empty still renders without throwing). Existing
+JSON/CSV tests updated only for the now-widened `content` type (`as
+string` casts where the test already knew the format was text).
+`modules/operations/campaignExport.test.ts` similarly updated for the
+widened type, no behavioral change. Full pipeline: `npm run typecheck`
+clean, `npm run lint` clean, `npx vitest run` 260/260 (up from 258), `npm
+run build` (with `.next` deleted first) clean, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` no match. No schema/migration
+change.
