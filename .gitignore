@@ -13,6 +13,13 @@
 # testing
 /coverage
 
+# playwright — never commit storage-state auth files (they hold real session tokens)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+tests/e2e/.auth/
+
 # next.js
 /.next/
 /out/

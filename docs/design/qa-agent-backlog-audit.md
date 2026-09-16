@@ -411,3 +411,77 @@ in this session's transcript. No files in the working checkout were
 touched by this story (verification-only, no code change) — Progress
 Tracker updated to reflect the narrower, honest scope of what's still
 open.
+
+## 2026-09-16 — QA-P0-16: full Playwright E2E suite (user-requested, browser-driven, real Supabase Auth)
+
+**Request and scoping:** user asked for "a full qa suite based on
+playwright." No Playwright/E2E infrastructure existed at all beforehand —
+every prior `tests/**` fixture was a SQL-level RLS/session-claims
+simulation, never a real browser login. Asked 3 scoping questions before
+starting: (1) run against the existing dev Supabase project with
+namespaced test tenants, vs. a paid fresh branch — user chose the existing
+project; (2) framework-only vs. deep per-module coverage — user chose deep
+coverage; (3) CI-wired vs. local-only — user chose CI-wired. Full detail on
+what was built is in `docs/plan/11-QA-AGENT-BACKLOG.md`'s own `QA-P0-16`
+section; this entry covers the build/verification trail and the one real
+blocker hit along the way.
+
+**Genuine mid-build blocker, reported not routed around:** after building
+the framework, seed script and auth-setup project, running the setup
+project against a real `next start` server failed with "Host not in
+allowlist" from a Node fetch, then a direct `curl` to the same host
+confirmed a `403 CONNECT tunnel failed... organization policy` from this
+session's own agent proxy — this sandbox cannot reach the dev Supabase
+project's host at all, for any process, regardless of how the code is
+written. Per this environment's own proxy documentation ("do not retry or
+route around it — report the blocked host"), stopped and asked the user
+how to proceed rather than silently downgrading scope or fabricating a
+"tests pass" claim. User chose to have the full suite built anyway, with
+CI as the real validation gate — recorded here so a future reader
+understands why this story shipped `Partial` with zero live executions,
+not because the work is incomplete but because this specific sandbox
+cannot run it.
+
+**Built** (see `docs/plan/11-QA-AGENT-BACKLOG.md`'s `QA-P0-16` for the full
+file-by-file account): `playwright.config.ts`; `.gitignore` additions for
+`test-results/`/`playwright-report/`/`tests/e2e/.auth/` (the last holds
+real session tokens — never committed); `package.json` gains
+`test:e2e`/`test:e2e:ui`/`test:e2e:report`; `@playwright/test` added as a
+devDependency; `tests/e2e/support/testUsers.ts`, `seedTestData.ts`,
+`seedFinanceBotAccess.ts`; `tests/e2e/auth.setup.ts`; 9 spec files
+(`auth`, `navigation-smoke`, `agents`, `access`, `runtime`, `risk`,
+`compliance`, `integrations`, `platform-admin`,
+`financebot-central-scenario`); `.github/workflows/e2e.yml`.
+
+**A real product gap this work surfaced, not fixed (non-negotiable #18 —
+recorded, not silently patched into another module's code):** there is no
+UI path anywhere in this codebase to create an `accounts` row for an
+agent — they only ever arrive via an integration sync. This blocked a
+pure-UI FinanceBot central-scenario spec; `seedFinanceBotAccess.ts` seeds
+that one piece directly via the Supabase Admin API instead, mirroring the
+shape `tests/access/financebot-scenario-and-tenant-isolation.sql` already
+uses at the SQL level. Worth Access/Experience Agent's attention if a
+"manually connect an account" flow is ever wanted as a P1/P2 story — not
+raised as a bug against this pass, since manual account creation was never
+an acceptance criterion of any existing Access Agent story.
+
+**Verification:** `npm run typecheck` clean, `npm run lint` clean, `npx
+vitest run` unaffected — 260/260, confirming zero collision between
+Playwright's `*.spec.ts` naming and vitest's `*.test.ts` include glob.
+`npm run build` (with `.next` deleted first) clean, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` no match. Every Playwright spec
+was written against the actual source (page components, server actions,
+the shared `Field`/`Table`/`ConfirmActionDialog` primitives, exact
+migration schemas) rather than guessed selectors — including catching and
+correcting, before commit, two selector-locality traps a naive read would
+have missed: the campaign-launch page's `<details>` element whose
+`<summary>` text collides with its own submit button's text, and
+`ConfirmActionDialog`'s trigger and in-dialog confirm button sharing an
+identical accessible name. **Not run live** — see the blocker note above;
+first real execution is the CI workflow's first run once the 4 required
+Supabase secrets are added to the repo (the user's own action, not
+performed here).
+
+Progress Tracker: `QA-P0-16` added (`Partial`); `QA-P0-06` and
+`QA-P0-03.1` both updated to reference the new real browser coverage
+without being marked `Done`, since neither has a confirmed live pass yet.

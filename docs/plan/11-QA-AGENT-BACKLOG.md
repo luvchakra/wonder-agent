@@ -25,13 +25,13 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-02.1 | Full cross-tenant sweep | Partial — DB/API/search/reports/jobs layers all verified live; `tests/operations/tenant-isolation.sql` and (2026-09-16) `tests/compliance/governance-attestation-tenant-isolation.sql` (new — closes `COMPLIANCE-P0-08`'s missing isolation test) both run live and passing; `platform_config_versions`/`platform_announcements` confirmed to have zero client-facing policies at all (no customer-session isolation test needed — no customer session can read them), see `INTEGRATION_STATUS.md` §3/§9 |
 | QA-P0-02.2 | RBAC boundary sweep | Partial — orphaned-permission check clean (0 found); negative-permission proof is generic (the shared gate function itself), not per-permission-key enumerated; SSO JIT mapping unit-tested, real IdP round-trip unverified (sandbox) |
 | QA-P0-02.3 | Platform-admin isolation sweep | Done — live smoke test against every current `/platform-admin/*` page and `/api/platform/v1/*` route, all correctly denied unauthenticated |
-| QA-P0-03.1 | The FinanceBot acceptance scenario, executed live | Partial — 6 of 8 steps pass live against the real fixture; step 6 (remediation) honestly partial and step 7 (simulated removal + re-evaluation) not exercised end-to-end this pass, both for reasons already recorded in Risk Agent's own audit log — see `INTEGRATION_STATUS.md` §4 |
+| QA-P0-03.1 | The FinanceBot acceptance scenario, executed live | Partial — SQL-fixture-level proof (6 of 8 steps, see `INTEGRATION_STATUS.md` §4) unchanged; 2026-09-16 added a full 8-step browser-driven proof, `tests/e2e/financebot-central-scenario.spec.ts` (see `QA-P0-16`), covering every PRD §11 step including remediation-request and grant-revocation-then-resolve — still `Partial` because that spec has not yet had a first real CI run (see `QA-P0-16`'s own notes on why it couldn't run live in this pass) |
 | QA-P0-04.1 | Pipeline sweep | Done — re-verified 2026-09-16: typecheck/lint/214 tests/cold-cache build all green repo-wide, `npm audit --production` 0 vulnerabilities, contrast-check all pairs pass both themes; see `INTEGRATION_STATUS.md` §9 |
 | QA-P0-04.2 | Migration validation | Done — re-verified 2026-09-16: 56 migrations, no duplicate prefixes; found and fixed one real gap (`governance_attestations_agent_id_fkey` unindexed, migration `0056`), re-checked advisors clean; see `INTEGRATION_STATUS.md` §9 |
 | QA-P0-04.3 | Responsive & performance spot-check | Partial — responsive still not re-verified (sandbox). The pagination gap this row named is now closed: 2026-09-16, each owning module capped its `list*()`/`getFindings()` DB queries via a new shared `DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`) — 15 functions across Identity, Access, Compliance, Integration, Platform and Operations, plus Risk's `getFindings()` (found during this pass, missed by QA's original `list*()`-only grep); a further 4 functions (completeness-dependent aggregate/evidence-pack inputs) were deliberately left uncapped with an inline documented reason each, and ~12 small per-parent child-record lookups were judged genuinely bounded and left untouched — see each module's own audit log entry of the same date |
 | QA-P0-04.4 | Regression fixes only, smallest safe change | Done — both fixes this pass were minimal, logged in Foundation's audit log, re-verified |
 | QA-P0-05 | Clean install verification | Partial — 2026-09-16: a genuine from-scratch `git clone` + `npm ci` + typecheck/lint/full test suite (260/260)/production build all verified clean in an isolated directory (no carried-over `node_modules`/`.env.local`); the fresh-database migration-apply half still deliberately not attempted — creating a Supabase branch is a real billable action, and the user chose to skip it rather than incur the cost for this verification pass |
-| QA-P0-06 | Authentication suite (SAML/OIDC/session) | Partial — role-mapping and session-expiry unit-tested; real IdP exchange, wrong-tenant/domain and logout paths not covered |
+| QA-P0-06 | Authentication suite (SAML/OIDC/session) | Partial — role-mapping and session-expiry still only unit-tested (idle/absolute-expiry timing isn't practically E2E-testable without waiting real clock time); 2026-09-16 added real browser coverage for what was previously fully uncovered: sign-in success/failure, sign-up (including the already-registered-email and under-minlength-password paths), logout, unauthenticated redirect, and negative-permission/tenant-isolation checks (`tests/e2e/auth.spec.ts`, part of `QA-P0-16`). SAML/OIDC real IdP exchange and wrong-tenant/domain SSO paths remain out of scope (no test IdP available) |
 | QA-P0-07 | Connector contract tests | Partial — Generic REST connector partially covered across existing unit tests; not all 8 named properties independently tested per connector; Saviynt/MCP contract tests not built |
 | QA-P0-08 | Runtime test corpus | Partial — live fixture data covers some categories incidentally; no versioned, explicitly-enumerated `tests/**` corpus covering all 6 named event categories exists as its own artifact |
 | QA-P0-09 | SHOULD/CAN/DID reproducibility | Done — `compare.test.ts` directly asserts identical repeated output and evaluator-version stability |
@@ -41,6 +41,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-13 | Failure recovery (retry/idempotency) | Partial — dedupe-key idempotency unit-tested; no end-to-end forced-failure-and-retry test built |
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
 | QA-P1-07 | Release record completeness standard | Not Started — `INTEGRATION_STATUS.md` does not currently record a commit/version identifier for the release snapshot, nor does it give an explicit P1/P2 status summary alongside its existing P0 detail |
+| QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16: full framework built and pushed (`playwright.config.ts`, idempotent test-tenant/user seeding, auth-setup project with per-role storage state, 9 spec files covering auth/RBAC/tenant-isolation, one smoke pass over every top-level route, a CRUD/decision-flow spec per module, and the full FinanceBot central scenario) plus a GitHub Actions workflow. Not yet run live anywhere — this sandbox's network egress policy blocks the dev Supabase project's host entirely (confirmed via a direct `curl` 403), so nothing in this suite has executed against a real server. First real validation is the CI workflow's first run once `NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`/`SUPABASE_SERVICE_ROLE_KEY`/`SECRET_ENCRYPTION_KEY` are added as GitHub Actions repo secrets — expect a small number of selector/assumption fixes on that first run |
 
 ---
 
@@ -476,6 +477,79 @@ document's larger open items (Governance Posture, Attestation, Exceptions,
 Drift, Evidence Pack, AI-Assisted Investigation) are unresolved ownership/
 architecture questions, not buildable stories, so no new acceptance
 criteria were added here. Revisit once any of those land.
+
+### QA-P0-16 — Playwright E2E suite (browser-driven, real Supabase Auth)
+
+User-requested ("can you create a full qa suite based on playwright"), scoped
+via 3 follow-up decisions: run against the existing dev Supabase project
+(namespaced `e2e-*` test tenants/users, never colliding with any
+`fixture-tenant-*` SQL fixture); build deep per-module coverage, not just a
+framework skeleton; wire it into CI. Real Supabase Auth throughout — no
+mocked login.
+
+**Framework** (`playwright.config.ts`): `testDir: tests/e2e`, a `setup`
+project (serial, not `fullyParallel`, so seeding always completes before any
+login attempt races it) feeding a `chromium` project via `dependencies:
+['setup']`. `webServer` always runs a real `next build && next start` on a
+dedicated port, so a pass reflects what actually ships — never `next dev`
+(whose dev overlay would mask the real `app/(customer)/error.tsx` boundary
+this suite asserts against for every negative-permission case). Node's
+built-in `process.loadEnvFile()` loads `.env.local` locally (no new
+`dotenv` dependency); CI supplies the same 4 vars as real environment
+variables via repo secrets.
+
+**Seeding** (`tests/e2e/support/`): `seedTestData.ts` is idempotent
+(select-or-insert throughout) and creates 2 tenants (`E2E Tenant One/Two`)
+and 5 real Supabase Auth users covering `TENANT_SUPER_ADMIN`/`READ_ONLY`/
+`REQUESTER` (Tenant One), a second `TENANT_SUPER_ADMIN` (Tenant Two, for
+cross-tenant isolation checks), and a `platform_admins` row with zero
+tenant memberships. `auth.setup.ts` (the `setup` project) logs in each role
+through the real `/sign-in` form and saves one `storageState` JSON per role
+under `tests/e2e/.auth/` (gitignored — real session tokens) for every spec
+to reuse via `test.use({ storageState: authFile(...) })`.
+
+**Specs** (`tests/e2e/*.spec.ts`, 9 files): `auth.spec.ts` (sign-in success/
+failure, sign-up including already-registered-email and under-minlength-
+password paths, sign-out, unauthenticated redirect, RBAC negative-
+permission checks against both this codebase's two distinct 403 UX
+patterns — a graceful page-level redirect and an error-boundary-rendering
+action throw — and a UI-level cross-tenant isolation proof via a live
+404); `navigation-smoke.spec.ts` (every top-level customer + platform-admin
+route, zero console/page errors); one CRUD/decision-flow spec per module
+(`agents`, `access`, `runtime`, `risk`, `compliance`, `integrations`,
+`platform-admin`); `financebot-central-scenario.spec.ts` (CLAUDE.md §11's
+full 8-step scenario, browser-driven). `tests/e2e/support/
+seedFinanceBotAccess.ts` seeds the scenario's CAN half (Application →
+Account → Entitlement → AccessGrant) directly via the Supabase Admin API,
+since **accounts have no UI creation path at all** in this codebase today
+— they only ever arrive via an integration sync — a real, confirmed
+product gap recorded here rather than silently worked around; SHOULD (the
+contract) and DID (a runtime event) are driven through the real forms, so
+the scenario is genuinely browser-driven everywhere a path exists.
+
+**CI** (`.github/workflows/e2e.yml`): runs on push-to-`main` and every PR,
+builds a real production bundle, runs the full suite, uploads the HTML
+report as an artifact. Requires 4 repo secrets
+(`NEXT_PUBLIC_SUPABASE_URL`/`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`/
+`SUPABASE_SERVICE_ROLE_KEY`/`SECRET_ENCRYPTION_KEY`) that were not set as
+part of this story — setting them is the user's own action on their GitHub
+repo settings, not something this session did or should do unasked.
+
+**Why this is `Partial`, not `Done`:** this sandbox's network egress policy
+blocks outbound HTTPS to the dev Supabase project's host entirely
+(`ekgyjwoenteadaaqakmd.supabase.co` — confirmed via a direct `curl`, which
+got a `403 CONNECT tunnel failed... organization policy` from the agent
+proxy, not a code-level error). This is the same host the Supabase MCP
+tools reach through a separate, pre-approved channel — a plain Node/browser
+request from inside this container cannot. Every spec type-checks and
+lint-passes, and every selector/assumption was checked against the actual
+source (page components, server actions, shared `Field`/`Table`
+primitives) rather than guessed — but **nothing in this suite has actually
+executed against a live server**. The user was asked and chose to proceed
+this way (build everything, validate via CI) rather than stop at a
+framework skeleton. Expect the first real CI run to surface a small number
+of selector/timing fixes; that is the genuine first live signal for this
+story, not this pass.
 
 ## DO NOT IMPLEMENT
 
