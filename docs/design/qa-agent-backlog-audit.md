@@ -362,3 +362,52 @@ true from-scratch clean-room install, full coverage of the extended
 `QA-P0-04.2` (re-verified, counts updated), `QA-P0-02.1` (new isolation
 test referenced). `INTEGRATION_STATUS.md` §9 added as this pass's full
 account.
+
+## 2026-09-16 — QA-P0-05: genuine from-scratch clean-install run attempted
+
+**Trigger:** the standing "any P0 item open to work?" sweep, bucket A
+(pure-code, no product decision needed).
+
+**Done:** a real from-scratch verification, not the existing checkout's
+cold-cache build this story's `Partial` status previously relied on.
+`git clone --branch main --depth 1 https://github.com/luvchakra/wonder-agent.git`
+into a scratch directory (no shared `node_modules`, no `.env.local`
+carried over from this working checkout), then:
+- `npm ci` (lockfile-driven install, not `npm install`) — 598 packages,
+  0 vulnerabilities, ~30s.
+- A `.env.local` synthesized purely from `.env.local.example`'s own
+  documented variable names (placeholder values) — proving the app
+  builds from documented env vars alone, not some undocumented local
+  override.
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npx vitest run` — 260/260, matching the working checkout's count
+  exactly (proves the test suite has no dependency on anything outside
+  the committed repo + documented env vars).
+- `npm run build` — clean production build, ~25s. The client bundle
+  correctly inlines the `NEXT_PUBLIC_*` placeholder values (expected —
+  those are meant to be public) and does not contain
+  `SUPABASE_SERVICE_ROLE_KEY` (confirmed via the same `grep -rl` check
+  this pipeline always runs).
+
+**Deliberately still not attempted:** applying every migration to a
+genuinely fresh database (rather than the existing dev Supabase
+project). `mcp__Supabase__create_branch` requires a `confirm_cost` step
+first — the tool's own description says to "always repeat the cost to
+the user and confirm their understanding before proceeding," since
+branch creation is real, hourly-billed infrastructure spend on the
+user's Supabase organization, not a free/local action. Asked the user
+directly (check the cost and proceed if small, vs. skip the paid step);
+the user chose to skip it. This is a documented, informed scoping
+decision, not a silently-abandoned acceptance criterion — the code-level
+half of QA-P0-05's acceptance criteria (fresh clone, fresh install,
+build) is now genuinely verified; the fresh-migration-apply half remains
+`Partial` for a real, named cost reason rather than a "sandbox
+limitation" excuse.
+
+**Verification:** as described above, run entirely in an isolated
+scratch directory separate from the working checkout, output captured
+in this session's transcript. No files in the working checkout were
+touched by this story (verification-only, no code change) — Progress
+Tracker updated to reflect the narrower, honest scope of what's still
+open.
