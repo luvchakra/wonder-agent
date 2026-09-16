@@ -462,3 +462,39 @@ untouched.
 
 Verification covered as part of the full cross-module pass — see
 `INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.
+
+---
+
+## 2026-09-16 — Retried the two items this log recorded as egress-blocked
+
+**1. `documenter.getpostman.com` is reachable again.** The "Attempted Saviynt
+API doc verification" entry above recorded a hard blocker: the egress proxy
+returned `EGRESS_BLOCKED`/403 on the CONNECT tunnel for that host. Re-tested
+today: `curl https://documenter.getpostman.com/view/23973797/2s9Yyy8JLo`
+returns 200. **No connector change follows from this**, because the blocker
+was already resolved by a different route — the user pasted the Saviynt
+Enterprise Identity Cloud API Reference v24.2 directly, and
+`modules/integrations/connectors/saviynt.ts` was corrected against it (see
+that entry, and the connector's own docblock: `POST` list endpoints with
+`max`/`offset` body pagination, the real `/ECM/api/v5/` paths, the flagged
+absence of a generic policy-list endpoint). Recorded here only so the stale
+"this could not be retrieved" note does not mislead a future session into
+thinking the connector is still built on guesses.
+
+**2. `GenericRestConnector.testConnection()` exercised against a real
+endpoint at last.** The INTEGRATION-P0-04.2 entry above noted the
+persist-only-on-success change was verified with mocks because "a genuine
+live HTTP round-trip could not be exercised." It can now. Ran three live
+round-trips through the real connector (temporary test file, deleted after —
+the committed suite stays hermetic and network-free on purpose):
+
+- reachable endpoint (`https://httpbin.org/get`) → `{"ok":true}`
+- real error status (`/status/503`) → `{"ok":false,"message":"HTTP 503"}` —
+  the status is surfaced, not swallowed
+- unresolvable host (`.invalid` TLD) → `{"ok":false,"message":"fetch failed"}`
+  — reported as a message, not an uncaught throw
+
+So `RestHttpClient` + `testConnection()`'s error handling behave against a
+real network exactly as the mocked tests assert. The mocked tests remain the
+committed ones; this is a one-off live confirmation, not new permanent
+coverage.

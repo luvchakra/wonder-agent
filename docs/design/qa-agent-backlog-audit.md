@@ -485,3 +485,65 @@ performed here).
 Progress Tracker: `QA-P0-16` added (`Partial`); `QA-P0-06` and
 `QA-P0-03.1` both updated to reference the new real browser coverage
 without being marked `Done`, since neither has a confirmed live pass yet.
+
+---
+
+## 2026-09-16 (later) — QA-P0-16 taken as far as available credentials allow; live cross-module isolation proof added
+
+The sandbox's Supabase egress blocker that this log, and every other module's,
+recorded as a hard constraint is **gone** for HTTPS (see
+`docs/design/foundation-agent-backlog-audit.md`'s entry of this date for the
+full re-test, including what is still blocked: raw Postgres on 5432/6543).
+So this pass retried everything that had been deferred to "when the network
+allows it."
+
+**Done, and passing: `tests/live-client-tenant-isolation.mjs` (new,
+QA-owned).** Cross-module tenant isolation proven through two genuinely
+authenticated Supabase JS client sessions over HTTPS rather than server-side
+JWT simulation — all 44 tenant-scoped tables both directions, a fixture
+reality check, foreign primary-key lookup, cross-tenant update/delete/insert,
+a forged `audit_logs` insert, and an anon sweep. Every check passed. Details
+and the `auth.users` seeding gotcha are in the Foundation entry.
+
+**QA-P0-16 (Playwright E2E): the framework is now proven against a real
+server, the suite itself is still not fully run — and the reason has changed
+from "network" to "credentials."** What actually happened:
+
+- Config gained three optional env hooks so the suite can target something
+  other than a local build: `E2E_BASE_URL` (run against a deployment, skipping
+  the local `webServer`), `E2E_BOOTSTRAP_URL` (visit a deployment-protection
+  bypass link first so its cookie lands in the saved storage state),
+  `E2E_SKIP_SEED=1` (fixtures seeded out of band, no service-role key in the
+  process), and `E2E_CHROMIUM_PATH`/`E2E_CHROMIUM_ARGS`. All unset in normal
+  local and CI runs, so nothing about the default path changed.
+- Pointed at the **production** deployment (the only one with environment
+  variables configured), the setup project reached the real app and **signed
+  in for real through Supabase Auth** — `authenticate as platformAdmin`
+  passed end to end, landing on `/onboarding` and saving storage state. That
+  is the first time any part of this suite has executed against a live server.
+- The four tenant-user logins failed, and the failure was **a genuine product
+  bug, not a test defect** — `getTenantContext()` returning every colleague's
+  membership row. Fixed (Foundation + Experience); see their audit logs.
+- Re-running against a **preview** deployment of the fix is not possible: the
+  Vercel project's Supabase environment variables are scoped to Production
+  only, so every preview 500s with `Missing required environment variable:
+  NEXT_PUBLIC_SUPABASE_URL` (confirmed in the deployment's runtime logs).
+  That is a real deployment-configuration gap in its own right — every PR
+  preview of this project is broken — and it is the user's Vercel setting to
+  change, not a code fix.
+- The CI path is equally blocked: both `E2E (Playwright)` workflow runs to
+  date failed, and the job log shows all five secrets resolving **empty**
+  (`NEXT_PUBLIC_SUPABASE_URL:` with no value, and the same for
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+  `SECRET_ENCRYPTION_KEY`, `CRON_SECRET`). The repo secrets named in the
+  previous entry still have not been added.
+
+**Stop-and-report, per CLAUDE.md §4.** A complete run needs
+`SUPABASE_SERVICE_ROLE_KEY` (and `SECRET_ENCRYPTION_KEY`) somewhere this
+process can read them — as GitHub Actions repo secrets, as Vercel Preview
+environment variables, or handed to a session directly. No key is inferable
+from anything this environment can reach, and inventing a degraded substitute
+(pointing the service-role client at the anon key) would produce confidently
+wrong results, which is worse than an honest gap. `QA-P0-16` therefore stays
+`Partial`, with its blocker restated accurately rather than left as the
+now-false "network egress blocks the Supabase host."

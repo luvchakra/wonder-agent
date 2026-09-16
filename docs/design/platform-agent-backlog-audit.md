@@ -666,3 +666,24 @@ the customer shell banner is unaffected), and `configVersions.ts`'s
 
 Verification covered as part of the full cross-module pass — see
 `INTEGRATION_STATUS.md` §5's update note for the shared pipeline run.
+
+---
+
+## 2026-09-16 — Egress caveat in this log is obsolete; isolation re-proven with a real client
+
+This log's tenant-isolation entry records that the proof was run through the
+Supabase MCP with a server-side simulated JWT "because this sandbox's network
+egress cannot reach Supabase directly." That restriction has lifted for HTTPS.
+The deferred half has now been done once, centrally, rather than re-run
+per module: `tests/live-client-tenant-isolation.mjs` drives two genuinely
+authenticated Supabase JS client sessions over HTTPS across **all 44
+tenant-scoped tables** — this module's included — in both directions, plus
+cross-tenant read/update/delete/insert attempts and an unauthenticated anon
+sweep. Every check passed, and the live result agrees with this module's
+earlier simulated proof.
+
+No code in this module changed. See
+`docs/design/foundation-agent-backlog-audit.md` and
+`docs/design/qa-agent-backlog-audit.md` (both dated 2026-09-16) for the full
+account, including what remains blocked (raw Postgres; a complete Playwright
+E2E run, which needs credentials this environment does not have).

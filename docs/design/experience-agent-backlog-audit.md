@@ -1519,3 +1519,82 @@ this as calling `setState` synchronously inside an effect.
 
 **Verification:** covered as part of Risk's own pass — see that module's
 audit log entry for the full pipeline record.
+
+---
+
+## 2026-09-16 (later) — EXPERIENCE-P0-01.0 / 01.2 re-run for real: authenticated screens finally verified in a browser
+
+This log's EXPERIENCE-P0-01.0/01.2 entries have stood as `Partial` for one
+reason only — "the egress proxy explicitly rejects the connection
+(`connect_rejected... organization policy`)", so no authenticated screen could
+ever be rendered. **That blocker is gone.** Re-tested directly: the dev
+Supabase project's Auth/PostgREST/Storage endpoints all answer over HTTPS from
+this sandbox (see `docs/design/foundation-agent-backlog-audit.md`, same date).
+
+**Method.** Real Chromium, real sign-in through the real Supabase Auth form on
+the live deployment (no mocked session, no storage-state shortcut), as a
+seeded `TENANT_SUPER_ADMIN` with real tenant data in every domain table. Then
+every top-level customer route walked at three widths (mobile 390, tablet 768,
+desktop 1440) in **both** themes, with `data-theme` set explicitly rather than
+trusting the OS preference — 72 page renders in total. Each render was checked
+for horizontal overflow (`scrollWidth - clientWidth`), for the app's own error
+boundary or a 404/500 body, and for the resolved `background-color` actually
+changing between themes (a token that silently fails to switch is the classic
+dark-mode regression this catches). Desktop renders and every failure were
+screenshotted.
+
+**A real product defect found first, before any of that could run.** Signing
+in as any tenant user landed on `/onboarding` showing three identical "E2E
+Tenant One" buttons instead of Overview. `app/onboarding/page.tsx` selected
+`tenant_memberships` filtered only by `status`, leaving the user-level filter
+to RLS — but that policy is tenant-scoped, so the page rendered one
+organization button per *member of the tenant*. `getTenantContext()` had the
+identical bug and is the reason for the redirect. Both now filter
+`.eq("user_id", user.id)` explicitly; measured live, the old query returns 3
+rows and the fixed one returns 1. The `getTenantContext()` half is
+Foundation-owned and is logged there too (CLAUDE.md §18 — smallest safe change
+in the owning module's own file, recorded in that module's log).
+
+**Result: 78 authenticated renders, no visual defect found.** 16 real routes
+(`/`, `/agents`, `/access`, `/access/requests`, `/runtime`, `/risk`,
+`/risk/rogue`, `/compliance/campaigns`, `/integrations`, `/policies`,
+`/audit`, `/reports`, `/search`, `/settings`, plus detail pages reached from
+them) × 3 widths × 2 themes:
+
+- **Horizontal overflow: 0px on every single render.** No clipping, no
+  sideways scroll at 390px.
+- **Every route rendered its own real heading against real data** — Overview,
+  AI Agents, Applications, Access Requests, Runtime Assurance, Risk, Rogue
+  Agents, Certification Campaigns, Integrations, Policies, Audit Trail,
+  Reports, Search, Administration. No `NotYetAvailable` placeholder, no
+  unstyled scaffolding, no error boundary anywhere.
+- **Dark mode genuinely switches**: resolved `body` background is
+  `lab(96.75 -0.66 -2.15)` in light and `lab(3.66 -0.38 -3.77)` in dark on
+  every route — i.e. the OKLCH token layer resolves under `data-theme` at
+  every breakpoint, not just where it was spot-checked by hand. Overview
+  specifically was eyeballed in both themes: cards, the Recharts severity
+  chart, severity badges and the topbar all read correctly, no invisible
+  text, no light-mode-only surface leaking into dark.
+
+Two things the sweep caught that are *not* Experience defects, recorded so
+they are not re-discovered: `/compliance` and `/settings/users` return Next's
+default 404 — neither is a real route (`/compliance/campaigns` and
+`/settings` are), and nothing in the app links to them; and two transient
+Vercel `502`s on a static chunk and one RSC payload, which are hosting
+hiccups, not application errors.
+
+**One real runtime error observed**: `/onboarding` returned HTTP 500 with
+React error #441 on the deployed (unfixed) build. This is the same
+membership-query defect above — the page was rendering a list built from
+every member of the tenant. The fix is on this branch but **not yet verified
+against a deployed build**: the Vercel project's Supabase environment
+variables are scoped to Production only, so the preview deployment of this
+branch 500s on every route with `Missing required environment variable`.
+Verified at the data layer instead (old query 3 rows → fixed query 1 row).
+
+**Rows:** EXPERIENCE-P0-01.0 and 01.2 move from `Partial` (blocked) to `Done`
+for everything that was actually blocked — authenticated screens are now
+verified in a real browser, in both themes, at three widths, against real
+tenant data. What remains open in this module is unrelated to this pass
+(EXPERIENCE-P0-04's bulk-action reporting, EXPERIENCE-P0-08's server-side
+pagination).

@@ -633,3 +633,72 @@ pass (`PLATFORM-P0-05.2` AI Provider Configuration, `RISK-P0-02.1`
 agents.risk_score persistence) were both fully closed the same day. Resume
 this story only if the user later upgrades the Supabase plan and supplies
 a real IdP to test against.
+
+---
+
+## 2026-09-16 — Live JS-client tenant-isolation proof (the deferred half of FOUNDATION-P0-07), plus a real `getTenantContext()` defect
+
+**The standing egress blocker is gone.** Re-tested from this session's
+sandbox: `https://ekgyjwoenteadaaqakmd.supabase.co` now resolves and answers
+over HTTPS — `/auth/v1/health` 200 (GoTrue v2.197.0), `/rest/v1/...` 200 with
+real rows against the anon key, `/storage/v1/bucket` 200 — from `curl` *and*
+from Node's global `fetch`, which is what actually matters: a JS-client
+integration test can run from here now. General egress is open too
+(`api.github.com`, `httpbin.org`, `documenter.getpostman.com` all 200), so
+the "non-Supabase hosts are blocked" note recorded throughout this repo's
+audit logs is also obsolete. Still unreachable: **raw Postgres**.
+`db.<ref>.supabase.co` has no A record from here and every
+`aws-0/aws-1-ap-southeast-1.pooler.supabase.com` endpoint on 5432/6543 times
+out — only 443 gets out, so `psql`/`supabase db push` still cannot be used
+and migrations continue to go through the Supabase MCP.
+
+**FOUNDATION-P0-07, the half that was always deferred.** Every prior module
+proved tenant isolation by simulating the JWT server-side
+(`set_config('request.jwt.claims', ...)` + `set role authenticated`), because
+no client could reach Supabase. That half is now done for real:
+`tests/live-client-tenant-isolation.mjs` (new, QA-owned per CLAUDE.md §5)
+signs two users in through GoTrue with email and password and drives
+PostgREST over HTTPS exactly as the browser does. Coverage: all 44
+tenant-scoped tables read in both directions (A must see no row of B's and no
+foreign tenant_id at all, and vice versa); a fixture reality check, because a
+zero-row result only proves isolation when the other tenant's rows are known
+to exist; direct primary-key lookup of a known foreign row; cross-tenant
+`UPDATE`/`DELETE` (0 rows affected) and `INSERT` (rejected by RLS policy); a
+forged `audit_logs` insert claiming the other tenant (rejected); a
+survivability check that B's row is untouched afterwards; and an
+unauthenticated anon sweep over all 44 tables. **Result: every check passed.**
+Anon is denied at `current_tenant_ids()` on the tenant-scoped tables and
+returns 0 rows on the platform-only ones. The simulated proof and the live
+one agree.
+
+Fixture: the `e2e-*` tenants/users the Playwright suite already defines
+(`tests/e2e/support/testUsers.ts`), seeded directly in Postgres via the
+Supabase MCP rather than `auth.admin.createUser` (no service-role key is
+available to this sandbox), plus one representative row per module in each of
+the two tenants. Two notes for whoever picks this up: (1) rows inserted into
+`auth.users` by hand need `confirmation_token`/`recovery_token`/
+`email_change*`/`phone_change*`/`reauthentication_token` set to `''`, not
+NULL, or GoTrue fails every sign-in with "Database error querying schema";
+(2) this fixture is deliberately **left in place** rather than deleted like
+earlier ones, because the committed script is meant to be re-runnable — it is
+all under the `e2e-*` namespace and `seedTestData()` is idempotent against it.
+
+**Real defect found, fixed (QA-P0-04.4 discipline).** The Playwright suite's
+first-ever live run failed to sign in as any tenant user: they landed on
+`/onboarding` showing three identical "E2E Tenant One" buttons instead of
+Overview. Cause: `getTenantContext()` selected `tenant_memberships` filtered
+only by `status`, leaving the user-level filter to RLS — but that policy is
+*tenant*-scoped (`tenant_id in current_tenant_ids()`), so the query returned
+every member of the tenant, not the user's own membership. Measured against
+the live database: the old query returns 3 rows (`SELF`, `COLLEAGUE`,
+`COLLEAGUE`), the fixed one returns exactly 1 (`SELF`). `app/onboarding/
+page.tsx` had the identical query and rendered one organization button per
+member. Both now filter `.eq("user_id", user.id)` explicitly, with a comment
+saying why RLS is not sufficient here. This is not a tenant-isolation breach —
+every row RLS returns still belongs to a tenant the user is a member of — but
+it is a direct instance of CLAUDE.md §14's rule that application-level
+filtering is defence-in-depth and must not be *replaced* by RLS. The
+`/onboarding` half is Experience-owned; logged there too.
+
+Verified: `npm run typecheck`, `npm run lint`, `npm test` (44 files, 260
+tests) all clean after the change.

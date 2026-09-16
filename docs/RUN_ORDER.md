@@ -27,7 +27,7 @@ stop-and-report rule always wins).
 | 4 | Risk Agent | Pure consumer of Identity + Access + Runtime's outputs — can't produce real findings before those exist | Done (two sub-pieces Partial pending Identity/Access publishing new contracts — see its audit log) |
 | 4 | Compliance Agent | Needs Identity, Access, Runtime, and Risk (for the Risk column in certification review) | Done, including the 2026-09-14 requirements-refresh P0 stories (evidence snapshot, reviewer authorization/SoD, escalation, evidence export) — five sub-pieces Partial pending another module publishing a contract, an unspecified scope, or (export/escalation) this codebase having no scheduler/export-delivery mechanism yet — see its audit log |
 | 5 | Platform Agent | Only needs Foundation — independent of the domain chain, so it could technically run right after Wave 1, but is grouped here to match the original execution guide's review batches | Done — surfaced a CRITICAL cross-module finding (tenant suspension didn't block data access); **resolved** by Foundation Agent same day via migration `0039`, verified live. See both agents' audit logs. Also includes the 2026-09-14 requirements-refresh P0 stories (Usage & Limits, Global Configuration Versioning, Maintenance Mode & Announcements — Platform-side); AI Provider Configuration was deliberately deferred as an open product/security question, not guessed. |
-| 5 | Experience Agent | Composes every domain module's published contract — most screens render "not yet available" until earlier waves exist | Partial, down to 3 of 12 Progress Tracker rows — 9 are `Done`, including the full Locked Design System v2 rip-and-replace (EXPERIENCE-P0-09, adopted 2026-09-14 by explicit user approval), the Agent Detail worked layout, the Rogue Agent Detail worked layout, and every domain screen restyled onto shared `modules/ui/*` primitives. The 3 remaining `Partial` rows are down to small, explicitly-named remainders, not broad gaps: EXPERIENCE-P0-01.0/01.2 (authenticated real-browser verification) are blocked by this sandbox's network egress policy, confirmed empirically, not by remaining implementation work; EXPERIENCE-P0-04 (Action Safety) has 6 real `ConfirmActionDialog` consumers, missing only bulk-action reporting (no bulk endpoint exists anywhere yet); EXPERIENCE-P0-08 (Data Table) has 8 real consumers, missing only a few smaller lists reasonable at their current size. See its audit log. |
+| 5 | Experience Agent | Composes every domain module's published contract — most screens render "not yet available" until earlier waves exist | Partial, down to 3 of 12 Progress Tracker rows — 9 are `Done`, including the full Locked Design System v2 rip-and-replace (EXPERIENCE-P0-09, adopted 2026-09-14 by explicit user approval), the Agent Detail worked layout, the Rogue Agent Detail worked layout, and every domain screen restyled onto shared `modules/ui/*` primitives. The 3 remaining `Partial` rows are down to small, explicitly-named remainders, not broad gaps: EXPERIENCE-P0-01.0/01.2 (authenticated real-browser verification) were re-run for real on 2026-09-16 once the sandbox's Supabase egress blocker lifted — see that date's entries in the Experience and QA audit logs for what passed and what did not; EXPERIENCE-P0-04 (Action Safety) has 6 real `ConfirmActionDialog` consumers, missing only bulk-action reporting (no bulk endpoint exists anywhere yet); EXPERIENCE-P0-08 (Data Table) has 8 real consumers, missing only a few smaller lists reasonable at their current size. See its audit log. |
 | 5 | Operations Agent | Reads across every domain module for audit/search/reports/notifications | Done — full P0 backlog built in its first dispatch (2026-09-14): audit viewer/export, notifications (in-app channel; email deferred, no provider available), search (6 of 9 object types), reports (all 8), notification preferences, job status. `notify()` is published but no producing module calls it yet — see its audit log. |
 | 6 | QA Agent | Cross-module verification and the full P0 acceptance scenario — must run last, after everything it's testing exists | Partial — first dispatch complete; found and fixed two real defects (a flaky test, an over-permissive SECURITY DEFINER grant), found and fixed a stale ownership-map route-prefix drift, ran the FinanceBot scenario live (6/8 steps pass), and produced `INTEGRATION_STATUS.md` as the true current state including a real, named cross-module pagination gap and honestly-partial coverage of the requirements-refresh's extended hardening epics (QA-P0-06–14). Not yet a clean release-gate pass — see `INTEGRATION_STATUS.md` §8. See its audit log. |
 
@@ -78,3 +78,28 @@ the releases above (see `CLAUDE.md` §3 "Priority tiers").
   real authenticator-app enrollment need a non-sandboxed environment to
   finish verifying; see `docs/design/foundation-agent-backlog-audit.md`.
   None of this blocks Wave 2+.
+
+---
+
+## 2026-09-16 — Standing "network egress" caveat is obsolete
+
+Every audit log in this repo carries some version of the note that this build
+sandbox could not reach `*.supabase.co` (or any non-Supabase host), which is
+why module isolation proofs were run through the Supabase MCP with a simulated
+JWT and why no authenticated screen was ever verified in a real browser. That
+restriction no longer applies to HTTPS: the dev project's PostgREST, GoTrue
+and Storage endpoints all answer from the sandbox, from `curl` and from Node's
+`fetch`, and general egress is open too.
+
+What is still genuinely blocked, and should not be re-attempted blindly:
+
+- **Raw Postgres** (`db.<ref>.supabase.co:5432`, every pooler endpoint on
+  5432/6543) — only 443 escapes, so `psql` and `supabase db push` remain
+  unusable; migrations still go through the Supabase MCP.
+- **A full Playwright E2E run** — blocked on credentials, not connectivity:
+  the Vercel project's Supabase environment variables are Production-scoped
+  (previews 500), and all five GitHub Actions secrets resolve empty. See
+  `docs/design/qa-agent-backlog-audit.md`.
+
+A session picking up a story that was deferred "because of egress" should
+re-test the specific operation rather than trusting the old note.
