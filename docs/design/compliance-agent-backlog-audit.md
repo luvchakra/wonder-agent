@@ -868,3 +868,59 @@ skipped entirely; manual attestation always wins). Full pipeline: `npm
 run typecheck` clean, `npm run lint` clean, `npx vitest run` 248/248 (up
 from 239), `npm run build` clean, no service-role-key leakage. No schema
 change needed.
+
+## 2026-09-16 — COMPLIANCE-P0-01.2: real population logic for all 4 remaining scope types
+
+**User decision (bucket B, "continue uninterrupted" pass):** "Build all 4
+(Recommended)" — real population logic for `application`, `entitlement`,
+`privileged_access`, `high_risk_agent`, not a stub/deferred spec.
+
+**Built:** `modules/certification-compliance/campaigns.ts` — extracted the
+`agent`-scope population loop (previously inlined) into a shared
+`populateCertificationItems(tenantId, campaignId, agents, input,
+grantFilter?)` helper, then gave each of the 4 previously-unimplemented
+scope types a real branch in `launchCampaign()`:
+
+- `application` — every agent, grants filtered to
+  `grant.applicationId === scope.applicationId`.
+- `entitlement` — every agent, grants filtered to
+  `grant.entitlementId === scope.entitlementId`.
+- `privileged_access` — every agent, grants filtered to
+  `grant.privilegeLevel === "elevated" || "admin"`.
+- `high_risk_agent` — agents filtered by `agents.risk_score >= threshold`
+  (no grant filter — every grant for a qualifying agent is certified).
+  `threshold` defaults to `50`, deliberately reusing Risk Agent's own
+  `scoring.ts` "high" severity band lower bound rather than inventing a
+  new number, overridable via `scope.minRiskScore`.
+
+`application`/`entitlement` scope input is now validated (via Access
+Agent's `getApplication()`/`getEntitlement()`) **before** the
+`certification_campaigns` row is inserted — a correctness improvement over
+the prior insert-first ordering, so invalid scope input never leaves
+behind an empty, orphaned campaign.
+
+**Consumed (Access Agent's newly-extended contract — see that module's own
+audit log entry):** `AccessGrant.applicationId` and `AccessGrant.privilegeLevel`
+— both denormalized fields Access Agent's `getEffectiveAccess()`/
+`getAccessGrant()` now populate at read time (joined from `entitlements`),
+alongside the pre-existing `application`/`entitlementName`/
+`dataClassification` fields. No schema change on Compliance's own tables.
+
+**UI scope, deliberate:** `app/(customer)/compliance/campaigns/page.tsx`
+(the bare functional campaign-launch page) is left exposing only
+`scope_type` and a `criticality` text field for this pass. Adding form
+inputs for `applicationId`/`entitlementId`/`minRiskScore` is UI polish
+belonging to Experience Agent's composition pass per CLAUDE.md §13's "bare
+functional page" allowance — this story's acceptance criteria is the real
+population *logic*, reachable today via the service/API layer for all 5
+scope types, not the customer-facing form.
+
+**Verification:** new `modules/certification-compliance/launchCampaign.test.ts`
+(7 tests: `application`/`entitlement` scope validation-before-insert
+rejections, correct per-scope grant filtering for all 4 new scope types,
+`high_risk_agent`'s default and custom `minRiskScore` threshold behavior).
+Existing `campaigns.test.ts` (4 tests, pure `computeRecommendation` cases)
+unaffected. Full pipeline: `npm run typecheck` clean, `npm run lint`
+clean, `npx vitest run` 255/255 (up from 248), `npm run build` (with
+`.next` deleted first) clean, `grep -rl SUPABASE_SERVICE_ROLE_KEY
+.next/static` — no match. No schema change.

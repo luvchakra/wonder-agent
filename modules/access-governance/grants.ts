@@ -16,7 +16,7 @@ type EffectiveAccessRow = {
   granted_at: string;
   revoked_at: string | null;
   accounts: { external_account_ref: string; application_id: string } | null;
-  entitlements: { name: string; data_classification: string | null; applications: { name: string } | null } | null;
+  entitlements: { application_id: string; name: string; data_classification: string | null; privilege_level: string; applications: { name: string } | null } | null;
 };
 
 /**
@@ -59,7 +59,7 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
 
   let query = supabase
     .from("access_grants")
-    .select("*, accounts(external_account_ref, application_id), entitlements(name, data_classification, applications(name))")
+    .select("*, accounts(external_account_ref, application_id), entitlements(application_id, name, data_classification, privilege_level, applications(name))")
     .in("account_id", accountIds);
   query = asOf === null ? query.is("revoked_at", null) : query.lte("granted_at", asOf).or(`revoked_at.is.null,revoked_at.gt.${asOf}`);
 
@@ -69,8 +69,10 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
   return (data ?? []).map((row) => ({
     ...toAccessGrant(row),
     application: row.entitlements?.applications?.name,
+    applicationId: row.entitlements?.application_id,
     entitlementName: row.entitlements?.name,
     dataClassification: row.entitlements?.data_classification ?? null,
+    privilegeLevel: row.entitlements?.privilege_level as AccessGrant["privilegeLevel"],
   }));
 }
 
@@ -86,7 +88,7 @@ export async function getAccessGrant(tenantId: string, grantId: string): Promise
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("access_grants")
-    .select("*, entitlements(name, data_classification, applications(name))")
+    .select("*, entitlements(application_id, name, data_classification, privilege_level, applications(name))")
     .eq("id", grantId)
     .eq("tenant_id", tenantId)
     .maybeSingle<EffectiveAccessRow>();
@@ -95,8 +97,10 @@ export async function getAccessGrant(tenantId: string, grantId: string): Promise
   return {
     ...toAccessGrant(data),
     application: data.entitlements?.applications?.name,
+    applicationId: data.entitlements?.application_id,
     entitlementName: data.entitlements?.name,
     dataClassification: data.entitlements?.data_classification ?? null,
+    privilegeLevel: data.entitlements?.privilege_level as AccessGrant["privilegeLevel"],
   };
 }
 

@@ -597,3 +597,23 @@ Access's deterministic policy-rule engine vs. Risk's weighted score).
 **Verification:** full pipeline (typecheck/lint/`npx vitest run` 248/248/
 build/secret-leak check) run as part of Compliance's own pass — see that
 module's audit log entry for the complete record.
+
+## 2026-09-16 — AccessGrant.applicationId / privilegeLevel published (unblocks COMPLIANCE-P0-01.2's 4 remaining scope types)
+
+Small, paired addition — the consuming story is tracked under Compliance's
+own backlog as `COMPLIANCE-P0-01.2`; full account in that module's audit
+log. `AccessGrant`'s existing denormalized-at-read-time field set
+(`application`, `entitlementName`, `dataClassification`) is extended with
+two more fields from the same `entitlements` join, populated by
+`getEffectiveAccess()`/`getEffectiveAccessAsOf()`/`getAccessGrant()` in
+`modules/access-governance/grants.ts`: `applicationId` (so a caller can
+filter grants to one specific application without a second lookup by
+name) and `privilegeLevel` (`standard`/`elevated`/`admin`, so a caller can
+identify privileged access without re-deriving it). Neither is a new
+persisted column — both are joined at read time exactly like the
+pre-existing denormalized fields.
+
+**Verification:** full pipeline (typecheck/lint/`npx vitest run` 255/255/
+build/secret-leak check) run as part of Compliance's own pass — see that
+module's audit log entry for the complete record. No schema/migration
+change, no RLS change.

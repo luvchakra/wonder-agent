@@ -76,8 +76,10 @@ export type AccessGrant = {
   // Denormalized for convenience (populated by getEffectiveAccess/explainAccessPath
   // — never persisted columns, just joined at read time):
   application?: string;
+  applicationId?: string;
   entitlementName?: string;
   dataClassification?: string | null;
+  privilegeLevel?: PrivilegeLevel;
 };
 
 export type AccessPathStep = {

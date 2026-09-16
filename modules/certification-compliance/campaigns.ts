@@ -5,7 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { getAgentContract, listAgents } from "@/modules/agent-identity/service";
-import { getEffectiveAccess, listPolicyEvaluations } from "@/modules/access-governance/service";
+import { getEffectiveAccess, listPolicyEvaluations, getApplication, getEntitlement } from "@/modules/access-governance/service";
 import { getFindings } from "@/modules/risk/service";
 import { getDid } from "@/modules/runtime-assurance/service";
 import type { CampaignCadence, CampaignScopeType, CampaignMetrics, CertificationCampaign, CertificationItem } from "@/lib/shared/types/compliance";
@@ -41,15 +41,97 @@ export function computeRecommendation(riskAtReview: RiskSeverity | null, usageAt
 }
 
 /**
- * COMPLIANCE-P0-01.2. Only `scope_type: 'agent'` with a `criticality` array
- * in `scope` is implemented against a real filter in P0 — the other scope
- * types (application/entitlement/privileged_access/high_risk_agent) are
- * accepted by the schema's check constraint but not yet given their own
- * population logic; flagged rather than silently guessed, since the
- * backlog's only worked example is the criticality-scoped agent case.
+ * Deterministic risk-band boundary already established by
+ * `modules/risk/scoring.ts` (50-74 high, 75+ critical) — reused here, not
+ * a new invented threshold, so `high_risk_agent` scope means exactly what
+ * a risk finding at "high" severity already means elsewhere in this
+ * codebase. `scope.minRiskScore` overrides it when a tenant wants a
+ * stricter/looser cut.
+ */
+const HIGH_RISK_SCORE_THRESHOLD = 50;
+
+/**
+ * Shared by every `scope_type` below: one `certification_items` row per
+ * (agent, effective-access grant) pair, optionally narrowed by
+ * `grantFilter` (used by application/entitlement/privileged_access scopes
+ * to certify only the grants relevant to that scope — an `agent`- or
+ * `high_risk_agent`-scoped campaign has no grant-level filter, since the
+ * scope already narrowed which *agents* are in it).
+ */
+async function populateCertificationItems(
+  tenantId: string,
+  campaignId: string,
+  agents: { id: string }[],
+  input: LaunchCampaignInput,
+  grantFilter?: (grant: Awaited<ReturnType<typeof getEffectiveAccess>>[number]) => boolean,
+): Promise<void> {
+  const svc = supabaseServiceRole();
+  for (const agent of agents) {
+    const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
+      getAgentContract(agent.id),
+      getEffectiveAccess(tenantId, agent.id),
+      listPolicyEvaluations(tenantId, agent.id),
+      getFindings(tenantId, { agentId: agent.id, status: "open" }),
+      getDid(tenantId, agent.id),
+    ]);
+
+    const worstFinding = computeWorstSeverity(findings);
+    const grants = grantFilter ? effectiveAccess.filter(grantFilter) : effectiveAccess;
+
+    for (const grant of grants) {
+      const usageAtReview = computeUsageForApplication(did.tuples, findings.length > 0, grant.application);
+      const recommendation = computeRecommendation(worstFinding, usageAtReview);
+      // COMPLIANCE-P0-03 — snapshot everything the reviewer will see at
+      // the moment this item is populated (contract/policy versions,
+      // this specific grant, risk/usage) so a decision made later can be
+      // reproduced exactly, even if the live contract/policy has since
+      // changed.
+      const snapshot = shapeCertificationSnapshot({ contract, grant, policyEvaluations, riskAtReview: worstFinding, usageAtReview });
+
+      const { error: itemError } = await svc.from("certification_items").insert({
+        tenant_id: tenantId,
+        campaign_id: campaignId,
+        agent_id: agent.id,
+        access_grant_id: grant.id,
+        reviewer_id: input.reviewerId,
+        risk_at_review: worstFinding,
+        usage_at_review: usageAtReview,
+        recommendation,
+        due_date: input.dueDate ?? null,
+        snapshot,
+      });
+      if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
+    }
+  }
+}
+
+/**
+ * COMPLIANCE-P0-01.2. All five `scope_type`s populate real items:
+ * - `agent` — optionally narrowed by `scope.criticality` (an array).
+ * - `application` — every agent's grants on `scope.applicationId`.
+ * - `entitlement` — every agent's grants of `scope.entitlementId`.
+ * - `privileged_access` — every agent's grants whose entitlement is
+ *   `elevated`/`admin` privilege level.
+ * - `high_risk_agent` — every agent whose current `agents.risk_score` (set
+ *   by Risk Agent's `evaluateAgentRisk()`) is at/above `scope.minRiskScore`
+ *   or the `high` severity band default; all of that agent's grants.
+ * Scope input is validated before the campaign row is created, so an
+ * invalid scope never leaves behind an empty, orphaned campaign.
  */
 export async function launchCampaign(tenantId: string, actorId: string, input: LaunchCampaignInput): Promise<CertificationCampaign> {
   if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
+
+  let applicationId: string | null = null;
+  let entitlementId: string | null = null;
+  if (input.scopeType === "application") {
+    applicationId = typeof input.scope?.applicationId === "string" ? input.scope.applicationId : null;
+    if (!applicationId) throw new ApiError(400, "INVALID_INPUT", "scope.applicationId is required for scope_type 'application'");
+    if (!(await getApplication(tenantId, applicationId))) throw new ApiError(404, "APPLICATION_NOT_FOUND");
+  } else if (input.scopeType === "entitlement") {
+    entitlementId = typeof input.scope?.entitlementId === "string" ? input.scope.entitlementId : null;
+    if (!entitlementId) throw new ApiError(400, "INVALID_INPUT", "scope.entitlementId is required for scope_type 'entitlement'");
+    if (!(await getEntitlement(tenantId, entitlementId))) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+  }
 
   const supabase = await supabaseServer();
   const { data: campaignRow, error: campaignError } = await supabase
@@ -74,44 +156,20 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     const criticalities = Array.isArray(input.scope?.criticality) ? (input.scope!.criticality as string[]) : null;
     const agents = await listAgents(tenantId);
     const matching = criticalities ? agents.filter((a) => criticalities.includes(a.criticality)) : agents;
-
-    const svc = supabaseServiceRole();
-    for (const agent of matching) {
-      const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
-        getAgentContract(agent.id),
-        getEffectiveAccess(tenantId, agent.id),
-        listPolicyEvaluations(tenantId, agent.id),
-        getFindings(tenantId, { agentId: agent.id, status: "open" }),
-        getDid(tenantId, agent.id),
-      ]);
-
-      const worstFinding = computeWorstSeverity(findings);
-
-      for (const grant of effectiveAccess) {
-        const usageAtReview = computeUsageForApplication(did.tuples, findings.length > 0, grant.application);
-        const recommendation = computeRecommendation(worstFinding, usageAtReview);
-        // COMPLIANCE-P0-03 — snapshot everything the reviewer will see at
-        // the moment this item is populated (contract/policy versions,
-        // this specific grant, risk/usage) so a decision made later can be
-        // reproduced exactly, even if the live contract/policy has since
-        // changed.
-        const snapshot = shapeCertificationSnapshot({ contract, grant, policyEvaluations, riskAtReview: worstFinding, usageAtReview });
-
-        const { error: itemError } = await svc.from("certification_items").insert({
-          tenant_id: tenantId,
-          campaign_id: campaign.id,
-          agent_id: agent.id,
-          access_grant_id: grant.id,
-          reviewer_id: input.reviewerId,
-          risk_at_review: worstFinding,
-          usage_at_review: usageAtReview,
-          recommendation,
-          due_date: input.dueDate ?? null,
-          snapshot,
-        });
-        if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
-      }
-    }
+    await populateCertificationItems(tenantId, campaign.id, matching, input);
+  } else if (input.scopeType === "application") {
+    const agents = await listAgents(tenantId);
+    await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.applicationId === applicationId);
+  } else if (input.scopeType === "entitlement") {
+    const agents = await listAgents(tenantId);
+    await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.entitlementId === entitlementId);
+  } else if (input.scopeType === "privileged_access") {
+    const agents = await listAgents(tenantId);
+    await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.privilegeLevel === "elevated" || grant.privilegeLevel === "admin");
+  } else if (input.scopeType === "high_risk_agent") {
+    const threshold = typeof input.scope?.minRiskScore === "number" ? (input.scope.minRiskScore as number) : HIGH_RISK_SCORE_THRESHOLD;
+    const agents = (await listAgents(tenantId)).filter((a) => a.riskScore !== null && a.riskScore >= threshold);
+    await populateCertificationItems(tenantId, campaign.id, agents, input);
   }
 
   await writeAudit({
