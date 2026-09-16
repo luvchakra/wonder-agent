@@ -27,3 +27,4 @@ export {
 export { saveReportDefinition, listSavedReportDefinitions, type SaveReportDefinitionInput } from "./savedReports";
 export { getJobStatusSummary } from "./jobs";
 export { exportGovernanceEvidencePack } from "./evidencePackExport";
+export { exportCampaignEvidencePackage } from "./campaignExport";

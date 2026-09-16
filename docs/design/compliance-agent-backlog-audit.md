@@ -664,3 +664,74 @@ standing to do unilaterally.
 (`compliance.manage`, matching the `COMPLIANCE-P0-06` campaign-export
 precedent's permission gate and POST-not-GET convention for an audited
 export action).
+
+---
+
+## 2026-09-16 — Partial-item sweep: unblocked COMPLIANCE-P0-06; four others confirmed still genuinely blocked
+
+**Agent:** Compliance Agent, per the user's standing authorization to pick
+up buildable `Partial` items. Checked all five `Partial` rows
+(`COMPLIANCE-P0-01.2`, `01.3`, `02.2`, `05`, `06`) for a real unblock
+before touching anything.
+
+**COMPLIANCE-P0-06 — unblocked, now `Done`.** Its own row named the
+blocker precisely: "the actual export file/delivery mechanism is
+intentionally not built, per this story's own ownership-map flag...
+Operations Agent overlap, undecided." That question was resolved earlier
+this session by `COMPLIANCE-P0-09`/`OPERATIONS-P0-07`'s 2026-09-15
+decision ("Compliance assembles, Operations exports"). Extended the same
+pattern to campaign evidence: `modules/operations/campaignExport.ts`
+(`exportCampaignEvidencePackage()`) turns the already-assembled,
+already-hashed `EvidenceExportPackage` (`exportCampaignEvidence()`,
+unchanged) into a JSON or flattened CSV file. Unlike the governance
+evidence pack, this function does **not** recompute a content hash or
+write a second audit event — `exportCampaignEvidence()` already does both
+at assembly time (`compliance.evidence_exported`), and duplicating either
+would misrepresent one export action as two. `app/api/v1/compliance/
+campaigns/[id]/export/route.ts` gained `?format=csv` (JSON stays the
+unchanged default response shape — fully backward compatible).
+
+**COMPLIANCE-P0-01.2 — re-checked, still genuinely blocked, not touched.**
+The other four `scope_type`s (`application`, `entitlement`,
+`privileged_access`, `high_risk_agent`) are blocked on "a concrete spec,"
+not a missing cross-module contract — no amount of checking other
+modules' published functions resolves an undefined product decision about
+what each scope type's item-population rule should actually be. Left
+exactly as documented.
+
+**COMPLIANCE-P0-01.3 — re-checked, still genuinely blocked, not touched.**
+Re-read `supabase/migrations/0028_access_requests.sql`: `access_requests`
+still has no `type`/modify-scoped column or concept — Access Agent has not
+published a distinct request type for "modify" decisions since this
+dependency was first recorded. Confirmed by reading the actual migration,
+not just trusting the backlog text.
+
+**COMPLIANCE-P0-02.2 — re-checked, still genuinely blocked, not touched.**
+`modules/access-governance/evaluate.ts` still exports only
+`listPolicyEvaluations(tenantId, agentId)` (agent-scoped) and
+`evaluatePolicies()` — no policy-scoped ("does policy X currently have any
+active violation, across any agent") query exists. Confirmed by reading
+the file's actual exports, not just the backlog text.
+
+**COMPLIANCE-P0-05 — re-checked, still genuinely blocked, not touched.**
+This one isn't blocked on another *module's* contract at all — it's
+blocked on this codebase having no scheduler/cron infrastructure
+whatsoever (confirmed: no cron job runner, no scheduled-task table,
+nothing resembling one anywhere in `lib/`/`modules/`). Building generic
+scheduling infrastructure is not this story's or this module's scope; the
+escalation logic itself remains fully implemented and exposed as an
+operator/API-triggered sweep, exactly as already documented.
+
+**Verification (COMPLIANCE-P0-06 unblock):**
+- `modules/operations/campaignExport.test.ts` — 2 tests: JSON content
+  matches the package and reuses its existing content hash; CSV flattens
+  campaign + item + decision into the expected row count.
+- `npm run typecheck` / `npm run lint` — clean.
+- `npx vitest run` — 204/204 passing (up from 202).
+- `npm run build` (with `.next` deleted first) — clean.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** none from this module (the new function is
+Operations-owned); `app/api/v1/compliance/campaigns/[id]/export/route.ts`
+gained a `?format=csv` branch, response shape for the default JSON path
+unchanged.

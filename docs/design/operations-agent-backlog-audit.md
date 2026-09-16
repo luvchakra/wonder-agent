@@ -356,3 +356,33 @@ calling into other modules' read contracts).
 **Marked Partial, not Done:** PDF delivery is named in the story title
 ("PDF/CSV/JSON delivery") and is genuinely not built — see above. JSON/CSV
 are fully functional and audited.
+
+---
+
+## 2026-09-16 — exportCampaignEvidencePackage() (unblocks Compliance's COMPLIANCE-P0-06)
+
+**Agent:** Operations Agent (small, paired addition — the actual story
+this closes is tracked under Compliance's own backlog as
+`COMPLIANCE-P0-06`; see that module's audit log for the full account).
+
+`modules/operations/campaignExport.ts` — `exportCampaignEvidencePackage(
+pkg, format)` turns Compliance's already-assembled, already-hashed
+`EvidenceExportPackage` (campaign + items + decisions) into a JSON or
+flattened CSV file, reusing `toCsv()` — the same serialization
+responsibility this module already performs for
+`OPERATIONS-P0-07`'s governance evidence pack, applied to campaign
+evidence too. Deliberately does **not** compute a content hash or write
+an audit event itself: `exportCampaignEvidence()`
+(`modules/certification-compliance/export.ts`, unchanged) already does
+both at assembly time, and a second audit event for the same export
+action would misrepresent one export as two.
+
+**Verification:** `modules/operations/campaignExport.test.ts` — 2 tests.
+Full pipeline (typecheck/lint/`npx vitest run` 204/204/build/secret-leak
+check) run as part of Compliance's own pass — see that module's audit log
+entry for the complete verification record; not re-run separately here to
+avoid a redundant, identical second pipeline execution for the same
+commit.
+
+**Published this session:** `exportCampaignEvidencePackage()`
+(`modules/operations/service.ts`).
