@@ -735,3 +735,19 @@ operator/API-triggered sweep, exactly as already documented.
 Operations-owned); `app/api/v1/compliance/campaigns/[id]/export/route.ts`
 gained a `?format=csv` branch, response shape for the default JSON path
 unchanged.
+
+---
+
+## 2026-09-16 — notify() wiring (OPERATIONS-P0-02.2, from Operations Agent's pass)
+
+**Agent:** Operations Agent (recorded here too since the actual code
+change lives in this module's own file —
+`modules/certification-compliance/escalation.ts`; full rationale in
+Operations' own audit log entry of the same date).
+
+`escalateOverdueItems()` now calls `notify({type: 'certification_overdue',
+...})` per escalated item, targeted at the specific `escalatedTo` user
+(business owner, falling back to the campaign creator). New
+`modules/certification-compliance/escalation.test.ts` (this module's
+first test file for `escalation.ts`) — 3 tests. No Progress Tracker row
+change — this doesn't correspond to a new Compliance Agent story.

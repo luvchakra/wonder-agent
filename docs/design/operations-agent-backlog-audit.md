@@ -386,3 +386,110 @@ commit.
 
 **Published this session:** `exportCampaignEvidencePackage()`
 (`modules/operations/service.ts`).
+
+---
+
+## 2026-09-16 — notify() wiring (OPERATIONS-P0-02.2) + customer-facing job-status page (OPERATIONS-P0-06.1)
+
+**Agent:** Operations Agent, per the user's standing authorization to
+wire `notify()`, build the job-status page, and re-check search unblocks.
+
+**notify() wiring — 3 of 7 event types, across 3 producing modules.**
+`OPERATIONS-P0-02.2`'s own docstring names the exact worked example this
+pass followed: "Risk Agent calls `notify({type: 'critical_finding', ...})`
+right after inserting a `critical` `risk_findings` row." Each call was
+added inside the producing module's own file, at its own single
+create/write event, not invented from outside:
+- **Risk** (`modules/risk/findings.ts`) — `createOrUpdateFinding()`'s two
+  write paths (fresh creation, and reopening a `false_positive`-resolved
+  finding whose expiry passed) both now call a new local
+  `notifyForFinding()` helper: `critical_finding` when `severity ===
+  'critical'`, `rogue_agent` when the category is one of the four
+  behavioral/identity/ownership/lifecycle categories (same local-constant
+  pattern this session's `RISK-P0-04` entry already documented as an
+  accepted, non-canonical convention in this codebase — Risk Agent has no
+  exported "rogue categories" constant of its own either). Deliberately
+  **not** fired on a routine re-evaluation refresh of an already-open
+  finding (same status, just refreshed evidence) — only on a genuinely
+  new alert-worthy state change, so `evaluateAgentRisk()` running
+  repeatedly doesn't re-notify on every pass.
+- **Integration** (`modules/integrations/syncJobs.ts`) —
+  `runSyncJob()`'s two failure paths (a completed run whose `finalStatus`
+  resolves to `'failed'`, and the outer `catch` for an unhandled
+  exception) both call `notify({type: 'integration_failure', ...})`.
+  Deliberately **not** fired for `'partial'` (some records still
+  imported) — that's visible on the new job-status page without an
+  alert-level interrupt.
+- **Compliance** (`modules/certification-compliance/escalation.ts`) —
+  `escalateOverdueItems()` calls `notify({type: 'certification_overdue',
+  ...})` per escalated item, targeted at the specific `escalatedTo` user
+  (not a tenant-wide broadcast) since that's exactly who the event is
+  actionable for.
+
+**Deliberately left unwired** — `certification_due`, `ownership_missing`,
+`lifecycle_expiry`. Checked each for an unambiguous single write-event
+trigger point before deciding not to guess:
+- `certification_due` fires structurally inside Identity's
+  `maybeMarkCertificationDue()`, which is called from read paths
+  (`getAgent()`/`listAgents()`) rather than a discrete user- or
+  system-initiated write event — wiring a notification into a function
+  invoked on every read would misrepresent "someone viewed this agent" as
+  "an event occurred."
+- `ownership_missing` is a *detected condition*
+  (`getOwnershipIssues()`), not a discrete event with one clear moment it
+  "happens" — it could fire on agent registration, on every owner
+  removal, or periodically, and this codebase has no scheduler to run a
+  periodic check with (the same gap `COMPLIANCE-P0-05` already
+  documents).
+- `lifecycle_expiry` has no single field it unambiguously means —
+  candidate sources (`nextReviewAt`, `retirementDate`) overlap
+  conceptually with `certification_due`/`certification_overdue` without a
+  specified distinction.
+
+Per non-negotiable #18/CLAUDE.md §3 ("if unsure whether something is a
+required extension point or genuine scope creep, treat it as scope
+creep"), inventing a specific trigger design for these three on Identity's
+behalf would be guessing at that module's own architecture. Recorded here
+as the concrete remaining gap rather than silently left unexplained.
+
+**OPERATIONS-P0-06.1 — job-status page, now Done.**
+`app/(customer)/integrations/jobs/page.tsx` composes the already-published
+`getJobStatusSummary()` into a real table (integration name, last run
+status/time, last successful run, 30-day failure count, total retries),
+added to the Integrations nav group as "Job Status." No new data logic —
+pure composition, per Experience Agent's own ownership boundary, built
+here since it was this story's own explicitly-flagged scope cut.
+
+**OPERATIONS-P0-03.1 — search unblock re-checked, still genuinely
+blocked.** Re-read `modules/agent-identity/identities.ts` and `owners.ts`:
+`listAgentIdentities()`/`listOwners()` remain agent-scoped only (require
+an `agentId`), same as when this was first documented — no tenant-wide
+"list all identities/owners across every agent" contract has been
+published. `modules/access-governance/entitlements.ts` similarly only
+exposes `listEntitlementsForApplication()` (application-scoped), not
+tenant-wide. Building any of these three would mean querying another
+module's tables directly, which this module doesn't do. Left `Partial`,
+unchanged.
+
+**Verification:**
+- `modules/risk/findings.test.ts` — 4 new tests for `notifyForFinding()`
+  (exported for direct testability): critical-only, rogue-only, both when
+  a finding is both critical and rogue, neither for an unremarkable
+  finding.
+- `modules/certification-compliance/escalation.test.ts` (new) — 3 tests:
+  notifies the escalated-to user, falls back to the campaign creator when
+  there's no business owner, notifies nothing when there's nothing
+  overdue.
+- `npm run typecheck` / `npm run lint` — clean, including across the two
+  new Risk→Operations and Integration→Operations circular module
+  references (both already-established patterns this session, per the
+  `COMPLIANCE-P0-09` audit entry's precedent).
+- `npx vitest run` — 214/214 passing (up from 207).
+- `npm run build` (with `.next` deleted first) — clean; confirmed
+  `/integrations/jobs` compiled.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** none new from Operations itself — `notify()`
+was already published; the new call sites live in the producing modules'
+own files. `notifyForFinding()` is a newly-exported (for testability)
+helper in `modules/risk/findings.ts`.

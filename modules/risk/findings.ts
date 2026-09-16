@@ -3,9 +3,46 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { revokeAccessGrant } from "@/modules/access-governance/service";
+import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { EvidenceType, FindingFilter, FindingStatus, ResolutionType, RiskFinding, RogueCategory } from "@/lib/shared/types/risk";
 import { toRiskEvidence, toRiskFinding } from "./mappers";
+
+/**
+ * OPERATIONS-P0-02.2's own worked example, wired here per that story's
+ * instruction that each producing module picks this up in its own story
+ * ("Risk Agent calls notify({type: 'critical_finding', ...}) right after
+ * inserting a critical risk_findings row"). Same local-constant pattern
+ * this session's RISK-P0-04 entry already documented as an existing,
+ * accepted inconsistency (Operations' `ROGUE_AGENT_CATEGORIES` and
+ * Experience's `ROGUE_CATEGORIES` are each their own file's copy, not a
+ * shared export) — Risk Agent has no canonical exported constant for this
+ * either, so this is a fourth same-shaped local copy, not a new pattern.
+ */
+const ROGUE_NOTIFY_CATEGORIES: RogueCategory[] = ["behavioral_deviation", "identity_anomaly", "ownership_violation", "lifecycle_violation"];
+
+export async function notifyForFinding(tenantId: string, findingId: string, category: RogueCategory, severity: string, title: string, explanation: string) {
+  if (severity === "critical") {
+    await notify({
+      tenantId,
+      type: "critical_finding",
+      title: `Critical risk finding: ${title}`,
+      body: explanation,
+      referenceType: "risk_finding",
+      referenceId: findingId,
+    });
+  }
+  if (ROGUE_NOTIFY_CATEGORIES.includes(category)) {
+    await notify({
+      tenantId,
+      type: "rogue_agent",
+      title: `Rogue-behavior finding: ${title}`,
+      body: explanation,
+      referenceType: "risk_finding",
+      referenceId: findingId,
+    });
+  }
+}
 
 /**
  * risk_findings/risk_evidence grant client SELECT only (migration 0034) —
@@ -135,6 +172,14 @@ export async function createOrUpdateFinding(
       if (insertEvidenceError) throw new ApiError(500, "CREATE_FAILED", insertEvidenceError.message);
     }
 
+    // Only a genuinely new alert-worthy state change (reopened from
+    // false_positive) notifies — a routine re-evaluation refresh of an
+    // already-open finding (same status, just refreshed evidence/score)
+    // does not re-fire the same alert on every evaluateAgentRisk() call.
+    if (reopening) {
+      await notifyForFinding(tenantId, existing.id, category, fields.severity, fields.title, fields.explanation);
+    }
+
     return { finding: toRiskFinding(updated), created: false };
   }
 
@@ -174,6 +219,8 @@ export async function createOrUpdateFinding(
     outcome: "success",
     metadata: { agentId, category, severity: fields.severity },
   });
+
+  await notifyForFinding(tenantId, created.id, category, fields.severity, fields.title, fields.explanation);
 
   return { finding: toRiskFinding(created), created: true };
 }

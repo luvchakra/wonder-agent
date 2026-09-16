@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listOwners } from "@/modules/agent-identity/service";
 import { toCertificationItem } from "./mappers";
@@ -55,6 +56,21 @@ export async function escalateOverdueItems(tenantId: string, actorId: string | n
       outcome: "success",
       metadata: { agentId: item.agentId, dueDate: item.dueDate, escalatedTo },
     });
+
+    // OPERATIONS-P0-02.2 — wired per that story's own instruction that
+    // each producing module picks this up in its own work. Targeted at
+    // the specific escalatedTo user, not a tenant-wide broadcast, since
+    // that's exactly who this event is actionable for.
+    await notify({
+      tenantId,
+      userId: escalatedTo,
+      type: "certification_overdue",
+      title: "Certification item overdue",
+      body: `A certification item for agent ${item.agentId} is overdue (due ${item.dueDate}) and has been escalated to you.`,
+      referenceType: "certification_item",
+      referenceId: item.id,
+    });
+
     escalatedCount += 1;
   }
 

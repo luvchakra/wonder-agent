@@ -49,7 +49,10 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Integrations",
     href: "/integrations",
     icon: "Plug",
-    children: [{ label: "Connected Systems", href: "/integrations" }],
+    children: [
+      { label: "Connected Systems", href: "/integrations" },
+      { label: "Job Status", href: "/integrations/jobs" },
+    ],
   },
   { label: "Search", href: "/search", icon: "Search" },
   {

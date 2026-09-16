@@ -427,3 +427,18 @@ exactly as they were.
 Progress Tracker and this audit log already describe as built — nothing
 undocumented was found that would change any row's status, which is moot
 here since no new rows were added.
+
+---
+
+## 2026-09-16 — notify() wiring (OPERATIONS-P0-02.2, from Operations Agent's pass)
+
+**Agent:** Operations Agent (recorded here too since the actual code
+change lives in this module's own file — `modules/integrations/syncJobs.ts`;
+full rationale in Operations' own audit log entry of the same date).
+
+`runSyncJob()` now calls `notify({type: 'integration_failure', ...})` on
+both its failure paths: a completed run whose `finalStatus` resolves to
+`'failed'` (zero records processed), and the outer `catch` for an
+unhandled exception during the run. Not fired for `'partial'` (some
+records still imported). No Progress Tracker row change — this doesn't
+correspond to a new Integration Agent story.

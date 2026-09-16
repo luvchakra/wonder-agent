@@ -1459,3 +1459,22 @@ module's audit log entry for the complete verification record.
 
 **Published this session:** `AnnouncementsBanner`
 (`modules/ui/index.ts` → `modules/ui/AnnouncementsBanner.tsx`).
+
+---
+
+## 2026-09-16 — Job Status page (Experience's half of OPERATIONS-P0-06.1)
+
+**Agent:** Operations Agent (small, paired addition — the story itself is
+tracked under Operations' own backlog as `OPERATIONS-P0-06.1`; full
+account in that module's audit log).
+
+`app/(customer)/integrations/jobs/page.tsx` — a customer-facing table
+(integration name, last run status/time, last successful run, 30-day
+failure count, total retries) composing Operations' already-published
+`getJobStatusSummary()`, reusing `TableContainer`/`Badge`/`EmptyState`
+primitives. Added to the Integrations nav group in
+`app/(customer)/layout.tsx` as "Job Status."
+
+**Verification:** full pipeline (typecheck/lint/`npx vitest run`
+214/214/build/secret-leak check) run as part of Operations' own pass —
+see that module's audit log entry for the complete record.

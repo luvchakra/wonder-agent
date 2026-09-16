@@ -578,3 +578,22 @@ shape gained one additive field (`revokedGrantIds: string[]`), and
 `POST /api/v1/findings/:id/remediate`'s response now also includes it.
 Existing callers (`app/actions/risk.ts`'s `remediateFindingAction`, which
 doesn't destructure the return value) are unaffected.
+
+---
+
+## 2026-09-16 — notify() wiring (OPERATIONS-P0-02.2, from Operations Agent's pass)
+
+**Agent:** Operations Agent (recorded here too since the actual code
+change lives in this module's own file — `modules/risk/findings.ts`; full
+rationale in Operations' own audit log entry of the same date).
+
+`createOrUpdateFinding()` now calls a new, exported `notifyForFinding()`
+helper on both its create and reopen-from-false-positive paths:
+`notify({type: 'critical_finding', ...})` when severity is `critical`,
+`notify({type: 'rogue_agent', ...})` when the category is one of
+`behavioral_deviation`/`identity_anomaly`/`ownership_violation`/
+`lifecycle_violation`. Not fired on a routine re-evaluation refresh of an
+already-open finding. `modules/risk/findings.test.ts` gained 4 tests for
+`notifyForFinding()`'s own decision logic. No Progress Tracker row change
+— this doesn't correspond to a new Risk Agent story, it's Risk's own file
+being the implementation site for `OPERATIONS-P0-02.2`.

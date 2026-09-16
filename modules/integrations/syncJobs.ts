@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
   ConnectorCapabilities,
@@ -198,6 +199,21 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       correlationId: jobRow.correlation_id,
       metadata: { status: finalStatus, recordsProcessed, recordsFailed, integrationId: integration.id },
     });
+
+    // OPERATIONS-P0-02.2 — wired per that story's own instruction that
+    // each producing module picks this up in its own work. Only a
+    // "failed" outcome notifies; "partial" (some records still imported)
+    // is visible on the job-status page without an alert-level interrupt.
+    if (finalStatus === "failed") {
+      await notify({
+        tenantId,
+        type: "integration_failure",
+        title: `Integration sync failed: ${integration.name}`,
+        body: errors[0]?.message ?? "Sync failed with no recorded records processed.",
+        referenceType: "integration_sync_job",
+        referenceId: jobId,
+      });
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     await supabase
@@ -220,6 +236,15 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       outcome: "failure",
       correlationId: jobRow.correlation_id,
       metadata: { status: "failed", message },
+    });
+
+    await notify({
+      tenantId,
+      type: "integration_failure",
+      title: "Integration sync failed",
+      body: message,
+      referenceType: "integration_sync_job",
+      referenceId: jobId,
     });
   }
 }

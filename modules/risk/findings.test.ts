@@ -9,6 +9,11 @@ vi.mock("@/modules/access-governance/service", () => ({
   revokeAccessGrant: (...a: unknown[]) => revokeAccessGrant(...a),
 }));
 
+const notify = vi.fn();
+vi.mock("@/modules/operations/service", () => ({
+  notify: (...a: unknown[]) => notify(...a),
+}));
+
 let findingRow: Record<string, unknown> | null = { id: "finding-1", tenant_id: "tenant-a", status: "open" };
 let evidenceRows: Record<string, unknown>[] = [];
 let updatedRow: Record<string, unknown> | null = null;
@@ -54,7 +59,7 @@ vi.mock("@/lib/db/supabaseServer", () => ({
   supabaseServer: async () => ({ from: (t: string) => makeFrom(t) }),
 }));
 
-import { remediateFinding } from "./findings";
+import { remediateFinding, notifyForFinding } from "./findings";
 import { ApiError } from "@/lib/shared/types/foundation";
 
 beforeEach(() => {
@@ -123,5 +128,32 @@ describe("remediateFinding — RISK-P0-03.2", () => {
     expect(writeAudit).toHaveBeenCalledWith(
       expect.objectContaining({ outcome: "failure", metadata: { reason: expect.stringContaining("none could be revoked") } }),
     );
+  });
+});
+
+describe("notifyForFinding — OPERATIONS-P0-02.2 wiring", () => {
+  it("notifies critical_finding for a critical-severity finding of any category", async () => {
+    await notifyForFinding("tenant-a", "finding-1", "excessive_access", "critical", "Excessive access", "explanation");
+    expect(notify).toHaveBeenCalledWith(
+      expect.objectContaining({ tenantId: "tenant-a", type: "critical_finding", referenceType: "risk_finding", referenceId: "finding-1" }),
+    );
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies rogue_agent for a rogue-category finding regardless of severity", async () => {
+    await notifyForFinding("tenant-a", "finding-1", "behavioral_deviation", "medium", "Deviation", "explanation");
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({ type: "rogue_agent" }));
+    expect(notify).toHaveBeenCalledTimes(1);
+  });
+
+  it("notifies both when a rogue-category finding is also critical", async () => {
+    await notifyForFinding("tenant-a", "finding-1", "identity_anomaly", "critical", "Anomaly", "explanation");
+    expect(notify).toHaveBeenCalledTimes(2);
+    expect(notify.mock.calls.map((c) => c[0].type).sort()).toEqual(["critical_finding", "rogue_agent"]);
+  });
+
+  it("notifies nothing for a non-rogue, non-critical finding", async () => {
+    await notifyForFinding("tenant-a", "finding-1", "excessive_access", "medium", "Access", "explanation");
+    expect(notify).not.toHaveBeenCalled();
   });
 });
