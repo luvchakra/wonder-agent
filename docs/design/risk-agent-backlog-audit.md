@@ -650,3 +650,49 @@ callers), not a flat cap.
 No Progress Tracker row change — this doesn't correspond to a new Risk
 Agent story, it's a finding recorded against the same file RISK-P0-02.1's
 2026-09-16 entry already touched.
+
+---
+
+## 2026-09-16 — RUNTIME-P0-13 unblocked: getFindingAsOfDetection()
+
+Previously flagged in Runtime's own row: `compareShouldCanDid(tenantId,
+agentId, asOf?)` could resolve CAN as of a point in time (built and
+unit-tested 2026-09-14 once Access published `getEffectiveAccessAsOf()`),
+but nothing called it with a real timestamp — explicitly left as "Risk
+Agent's own judgment call to adopt." Picked up as part of the user's "any
+P0 item open to work?" pass.
+
+**Design decision (Risk's own scope, not asked of the user — a
+non-speculative, directly-grounded choice):** rather than changing
+`evaluateAgentRisk()`'s own detection-loop semantics (which correctly
+scores *current* state for ongoing monitoring — changing that would be
+a much larger, riskier behavior change), added a separate, read-only
+investigation function: `getFindingAsOfDetection(tenantId, findingId)`
+(`modules/risk/findings.ts`). Uses the finding's own `created_at` as the
+`asOf` timestamp — it's set once on insert and never touched by
+`createOrUpdateFinding()`'s update branch, so it's a stable "when was
+this first detected" anchor, directly satisfying the story's acceptance
+criteria wording: reconstructing what CAN looked like when a finding was
+raised, so a genuine historical `excessive_access` finding's evidence
+stays explicable even after the entitlement has since been revoked
+(re-evaluating against *today's* CAN would otherwise make it look
+unjustified — the exact distortion risk the story named).
+
+**Built:**
+- `getFindingAsOfDetection()`, exported via `modules/risk/service.ts`.
+- `GET /api/v1/findings/[id]/historical-context` — read-only, gated by
+  `risk.read` (same permission as the finding itself).
+- A small addition to Experience's `FindingEvidenceDrawer.tsx`: a
+  collapsed-by-default "Show access as of detection time" panel (fetched
+  on demand, not on every drawer open, to avoid an extra request per
+  finding view) — see Experience's own audit log for that half.
+
+**Verification:** new `modules/risk/getFindingAsOfDetection.test.ts` (2
+tests: returns `null` for a missing/foreign-tenant finding without calling
+`compareShouldCanDid` at all; resolves CAN using the finding's exact
+`created_at`, not "now"). Full pipeline: `npm run typecheck` clean, `npm
+run lint` clean (caught and fixed a real `react-hooks/set-state-in-effect`
+issue in the first drawer implementation — replaced a reset-effect with a
+`forFindingId` guard matching the existing `showDetail` pattern), `npx
+vitest run` 236/236 (up from 234), `npm run build` clean, no
+service-role-key leakage.

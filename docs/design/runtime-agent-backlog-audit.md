@@ -353,3 +353,17 @@ checked and found to be identical.
 than inventing scope to appear thorough — the re-uploaded file's content,
 line for line in its substantive sections, matches what the earlier,
 smaller-labeled version already supplied.
+
+---
+
+## 2026-09-16 — RUNTIME-P0-13 unblocked: Risk adopted the real asOf caller
+
+**Agent:** Risk Agent (small, paired change — the story is tracked under
+Risk's own backlog as the caller-adoption half of `RUNTIME-P0-13`; full
+account in Risk's audit log).
+
+`compareShouldCanDid(tenantId, agentId, asOf?)` — built and unit-tested
+2026-09-14, waiting on a real caller since — is now called by Risk's new
+`getFindingAsOfDetection()` with a finding's own `created_at` as the
+`asOf` timestamp. No change to this module's own files. Progress Tracker
+row moves from `Partial` to `Done`.

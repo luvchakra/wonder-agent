@@ -4,8 +4,10 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { revokeAccessGrant } from "@/modules/access-governance/service";
 import { notify } from "@/modules/operations/service";
+import { compareShouldCanDid } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { EvidenceType, FindingFilter, FindingStatus, ResolutionType, RiskFinding, RogueCategory } from "@/lib/shared/types/risk";
+import type { ShouldCanDidComparison } from "@/lib/shared/types/runtime";
 import { toRiskEvidence, toRiskFinding } from "./mappers";
 
 /**
@@ -91,6 +93,28 @@ export async function getFinding(tenantId: string, findingId: string): Promise<R
   if (evidenceError) throw new ApiError(500, "QUERY_FAILED", evidenceError.message);
 
   return { ...toRiskFinding(data), evidence: (evidenceRows ?? []).map(toRiskEvidence) };
+}
+
+/**
+ * RUNTIME-P0-13 — the caller `compareShouldCanDid(tenantId, agentId, asOf?)`
+ * was waiting on ("no existing caller passes a real asOf yet"). A finding's
+ * own `created_at` is exactly the "point in time" the story's acceptance
+ * criteria cares about: it's set once on insert and never touched again by
+ * `createOrUpdateFinding()`'s update branch, so it's a stable "when was
+ * this first detected" anchor. Reconstructs what CAN looked like at that
+ * moment, so a reviewer can see a genuine historical `excessive_access`
+ * finding's justification even if the entitlement has since been revoked
+ * (re-evaluating with *today's* CAN would otherwise make the evidence look
+ * unexplainable) — the exact distortion risk RUNTIME-P0-13 named.
+ */
+export async function getFindingAsOfDetection(
+  tenantId: string,
+  findingId: string,
+): Promise<{ finding: RiskFinding; comparisonAsOfDetection: ShouldCanDidComparison } | null> {
+  const finding = await getFinding(tenantId, findingId);
+  if (!finding) return null;
+  const comparisonAsOfDetection = await compareShouldCanDid(tenantId, finding.agentId, finding.createdAt);
+  return { finding, comparisonAsOfDetection };
 }
 
 type EvidenceInput = { evidenceType: EvidenceType; referenceId: string; summary: string };

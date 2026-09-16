@@ -24,7 +24,7 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-02.2 | Comparison engine (higher bar) | Done |
 | RUNTIME-P0-11 | Ingestion Hardening — replay protection & event quarantine | Done — 2026-09-14, live RLS-verified |
 | RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
-| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Partial — 2026-09-14: Access Agent's dependency now resolved (`getEffectiveAccessAsOf()`); `compareShouldCanDid(tenantId, agentId, asOf?)` can resolve CAN as of a given timestamp, unit-tested; no existing caller passes a real `asOf` yet (Risk Agent's own judgment call to adopt), see audit log |
+| RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
 
 ---

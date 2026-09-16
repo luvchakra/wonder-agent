@@ -1499,3 +1499,23 @@ check are untouched.
 **Verification:** full pipeline (typecheck/lint/`npx vitest run` 217/217/
 build/secret-leak check) run as part of Platform's own pass — see that
 module's audit log entry for the complete record.
+
+---
+
+## 2026-09-16 — FindingEvidenceDrawer gains an "as of detection" panel (RUNTIME-P0-13)
+
+**Agent:** Risk Agent (small, paired UI addition — the story is tracked
+under Runtime's backlog as `RUNTIME-P0-13`, adopted by Risk; full account
+in Risk's audit log).
+
+`app/(customer)/risk/agents/[agentId]/FindingEvidenceDrawer.tsx`
+(EXPERIENCE-P0-06's drawer) gained a collapsed-by-default section fetching
+`GET /api/v1/findings/[id]/historical-context` on demand and rendering the
+agent's effective access as of the finding's detection time. Reused the
+drawer's existing `showDetail`-style guard pattern (a `forFindingId` field
+on the fetched state) rather than a reset-`useEffect`, after ESLint's
+`react-hooks/set-state-in-effect` correctly flagged the first version of
+this as calling `setState` synchronously inside an effect.
+
+**Verification:** covered as part of Risk's own pass — see that module's
+audit log entry for the full pipeline record.
