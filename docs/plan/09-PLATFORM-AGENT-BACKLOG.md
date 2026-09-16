@@ -20,7 +20,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-01.1 | Route isolation (higher bar) | Done |
 | PLATFORM-P0-01.2 | Seeding & bootstrap | Done |
 | PLATFORM-P0-02.1 | Schema | Done |
-| PLATFORM-P0-02.2 | Tenant lifecycle actions | Partial — status changes correctly, but a CRITICAL cross-module finding means suspension does not yet block data access (Foundation's `current_tenant_ids()` gap) — see audit log |
+| PLATFORM-P0-02.2 | Tenant lifecycle actions | Done — the CRITICAL `current_tenant_ids()` gap was fixed by Foundation (migration `0039`, applied live) on 2026-09-14; re-verified 2026-09-16 that the fix is applied to the dev Supabase project and the function now filters on `tenants.status = 'active'` — row was simply stale, no new work needed |
 | PLATFORM-P0-02.3 | Feature flags | Done |
 | PLATFORM-P0-03.1 | Global branding | Done |
 | PLATFORM-P0-03.2 | Platform health surface | Done |
@@ -29,7 +29,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-05.1 | Usage & Limits tracking/enforcement | Done — `checkUsageLimit()`/`getUsageSummary()` published; not yet called by any other module's create path (same as `isFeatureEnabled()` itself) |
 | PLATFORM-P0-05.2 | AI Provider Configuration | Deferred — genuine open product/architecture question (which providers, what capability/budget model), not a mechanical ownership-map gap; stopped and recorded rather than guessed, per CLAUDE.md §4's stop-and-report rule |
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
-| PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Partial — Platform-side schema/management/`getActiveAnnouncements()` read contract done; Experience Agent's customer-facing rendering of active announcements is not built (cross-module, Experience Agent's own ownership) |
+| PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 
 ---
 

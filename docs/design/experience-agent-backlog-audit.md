@@ -1433,3 +1433,29 @@ Left `Partial`, unchanged.
 
 No code changed in this pass; recorded so this check isn't silently
 skipped from the audit trail.
+
+---
+
+## 2026-09-16 — AnnouncementsBanner (Experience's half of PLATFORM-P0-05.4)
+
+**Agent:** Experience Agent (small, paired addition while checking
+Platform Agent's `Partial` rows for buildable unblocks — the story itself
+is tracked under Platform's own backlog as `PLATFORM-P0-05.4`; see that
+module's audit log for the full account).
+
+`modules/ui/AnnouncementsBanner.tsx` — a small, presentation-only Server
+Component rendering Platform Agent's already-published
+`getActiveAnnouncements(tenantId)`, styled by `type` (`maintenance` →
+warning tone, `notice` → info tone) using the existing semantic design
+tokens, no new pattern. Wired into `app/(customer)/layout.tsx`'s existing
+parallel data-fetch (added to the same `Promise.all()`, not a new
+sequential fetch) and rendered once above `<main>` so every customer page
+picks it up automatically without each page needing its own wiring.
+
+**Verification:** `modules/ui/AnnouncementsBanner.test.tsx` — 3 tests.
+Full pipeline (typecheck/lint/`npx vitest run` 207/207/build/secret-leak
+check) run as part of Platform's own pass for this same commit — see that
+module's audit log entry for the complete verification record.
+
+**Published this session:** `AnnouncementsBanner`
+(`modules/ui/index.ts` → `modules/ui/AnnouncementsBanner.tsx`).

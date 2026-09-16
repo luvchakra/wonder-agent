@@ -437,3 +437,59 @@ exactly as the prior pass left them. Also re-confirmed non-negotiable #3
 not blurred anywhere in the new document — nothing to flag on that front
 either. This entry documents a genuine "nothing new" outcome rather than
 manufacturing a gap to appear thorough.
+
+---
+
+## 2026-09-16 — Stale-row fix (PLATFORM-P0-02.2) and unblock (PLATFORM-P0-05.4)
+
+**Agent:** Platform Agent, per the user's standing authorization to fix
+any stale Progress Tracker rows and check for buildable unblocks.
+
+**PLATFORM-P0-02.2 (Tenant lifecycle actions) — was stale, now `Done`.**
+This row still read "Partial — ... a CRITICAL cross-module finding means
+suspension does not yet block data access (Foundation's
+`current_tenant_ids()` gap)." That gap was actually fixed by Foundation
+back on 2026-09-14 (`supabase/migrations/0039_foundation_fix_current_
+tenant_ids_status_check.sql`, whose own header comment says exactly
+"Foundation Agent — critical fix, flagged by Platform Agent... verified
+live") — the Progress Tracker row simply never got updated to reflect it.
+Re-verified today via `mcp__Supabase__list_migrations` that
+`foundation_fix_current_tenant_ids_status_check` is applied to the dev
+project, and read the function body directly: it now filters on both
+`tm.status = 'active' and t.status = 'active'`, so a suspended tenant's
+members lose RLS access via every policy that calls this function
+(i.e. every table in the system) — exactly the enforcement
+`suspendTenant()` was always missing. No code changed; only the stale
+Progress Tracker text was corrected.
+
+**PLATFORM-P0-05.4 (Maintenance Mode & Platform Announcements) —
+unblocked, now `Done`.** The Platform-side half (schema, management,
+`getActiveAnnouncements()`) was already built; the customer-facing
+rendering was explicitly Experience Agent's half, per this row's own note
+and the file header comment in `modules/platform-admin/announcements.ts`
+("Platform Agent owns the admin-side data model... Experience Agent owns
+rendering a notice inside customer-facing UI"). Built it: `modules/ui/
+AnnouncementsBanner.tsx` (a small, presentation-only Server Component —
+no dismiss/mutation, since announcements are platform-authored and
+already time-windowed via `startsAt`/`endsAt`, not a per-viewer
+preference) wired into `app/(customer)/layout.tsx`'s existing parallel
+`Promise.all()` data fetch (CLAUDE.md §15 — no sequential waterfall added)
+and rendered once, above `<main>`, for every customer page.
+
+**Verification:**
+- `modules/ui/AnnouncementsBanner.test.tsx` — 3 tests (empty state
+  renders nothing; a single announcement's title/body render; several
+  announcements all render).
+- `npm run typecheck` — clean, including confirming the `import type`-only
+  reference to `modules/platform-admin/service.ts` (which has its own
+  `import "server-only"`) compiles cleanly out of the `modules/ui/index.ts`
+  barrel that client components also import from.
+- `npm run lint` — clean.
+- `npx vitest run` — 207/207 passing (up from 204).
+- `npm run build` (with `.next` deleted first) — clean; the customer
+  layout compiles for every route that uses it.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** none from this module — `AnnouncementsBanner`
+is Experience-owned (`modules/ui/index.ts`); see that module's own audit
+log for its entry.

@@ -8,6 +8,8 @@ import { AccountPanel } from "@/modules/ui/AccountPanel";
 import { WorkspaceSwitcher } from "@/modules/ui/WorkspaceSwitcher";
 import { Logo } from "@/modules/ui/Logo";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
+import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
+import { getActiveAnnouncements } from "@/modules/platform-admin/service";
 
 const NAV_GROUPS: NavGroup[] = [
   { label: "Overview", href: "/", icon: "LayoutDashboard" },
@@ -82,7 +84,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
 
   // Independent reads, fetched in parallel (CLAUDE.md §15 — no sequential
   // waterfalls for a page's independent data).
-  const [{ data: profile }, { data: memberships }, isAdmin] = await Promise.all([
+  const [{ data: profile }, { data: memberships }, isAdmin, announcements] = await Promise.all([
     supabase.from("users").select("display_name").eq("id", user.id).maybeSingle<{ display_name: string | null }>(),
     // Tenant-switcher list: the user's own active memberships, RLS-scoped —
     // read directly here (display-only, not a mutation) since Foundation
@@ -94,6 +96,10 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       .eq("status", "active")
       .returns<{ tenant_id: string; tenants: { name: string; slug: string } | null }[]>(),
     isPlatformAdmin(),
+    // PLATFORM-P0-05.4 — Experience Agent's half of Platform's already-
+    // published getActiveAnnouncements(): every customer page sees any
+    // active global/tenant-scoped maintenance/notice banner.
+    getActiveAnnouncements(ctx.tenantId),
   ]);
 
   const tenantOptions = (memberships ?? []).map((m) => ({
@@ -132,6 +138,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           <ShellNotifications />
         </div>
       </header>
+      <AnnouncementsBanner announcements={announcements} />
       <main id="main-content" className="flex-1 bg-background px-4 py-6 lg:px-6">
         <div className="mx-auto max-w-6xl">{children}</div>
       </main>
