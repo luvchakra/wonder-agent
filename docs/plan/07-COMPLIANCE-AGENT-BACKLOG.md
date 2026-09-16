@@ -28,7 +28,7 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-05 | Escalation of overdue certification items | Partial — no scheduler exists in this codebase yet, so `escalateOverdueItems()` is exposed as an operator/API-triggered sweep rather than an automatic cron; the escalation logic, recording and audit trail themselves are fully implemented and verified |
 | COMPLIANCE-P0-06 | Tamper-evident evidence export package | Partial — evidence assembly + SHA-256 integrity marker + audited export event are implemented; the actual export file/delivery mechanism is intentionally not built, per this story's own ownership-map flag to the user (Operations Agent overlap, undecided) |
 | COMPLIANCE-P0-07 | Governance Posture (composite score, distinct from risk) | Done — computed read-model across 12 dimensions, `getGovernancePosture()`, `GET /api/v1/compliance/agents/[id]/posture` |
-| COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Not Started — 2026-09-15, promoted from Identity's P1-tier concept, user decided Compliance-owned/broad scope |
+| COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Not Started — 2026-09-15, user decided Compliance assembles + Operations exports; see OPERATIONS-P0-07 |
 
 ---

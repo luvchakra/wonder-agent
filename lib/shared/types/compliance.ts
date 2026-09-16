@@ -175,6 +175,34 @@ export type GovernancePosture = {
 };
 
 /**
+ * COMPLIANCE-P0-08 — Governance Attestation (broad). Promoted to P0 per the
+ * user's 2026-09-15 decision; distinct from and broader than Identity's own
+ * narrower `IDENTITY-P1-02` self-attestation concept (which stays P1,
+ * unchanged). Fields per the governance requirements doc's P0-13: agent,
+ * policy/requirements, checklist, approver, approval timestamp, validity,
+ * decision, comments, evidence references.
+ */
+export type AttestationChecklistItem = { item: string; checked: boolean };
+export type AttestationEvidenceReference = { type: string; referenceId: string | null; summary: string };
+export type AttestationDecision = "attested" | "rejected" | "needs_more_info";
+
+export type GovernanceAttestation = {
+  id: string;
+  tenantId: string;
+  agentId: string;
+  policyRequirement: string;
+  checklist: AttestationChecklistItem[];
+  approverId: string;
+  decision: AttestationDecision;
+  comments: string | null;
+  evidenceReferences: AttestationEvidenceReference[];
+  validFrom: string;
+  validUntil: string | null;
+  decidedAt: string;
+  createdAt: string;
+};
+
+/**
  * COMPLIANCE-P0-06 — the assembled evidence bundle for a completed campaign.
  * `contentHash` is a SHA-256 over the canonical JSON of everything else in
  * this object (campaign/items/decisions), so any post-export tampering with

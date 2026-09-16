@@ -53,6 +53,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `controls` | CA | Individual controls within a framework |
 | `control_mappings` | CA | Control ↔ WonderAgent policy mapping |
 | `control_evidence` | CA | Evidence attached to a control |
+| `governance_attestations` | CA | COMPLIANCE-P0-08 — broad governance attestation decisions (agent/policy/checklist/approver/decision/evidence) |
 | `integrations` | INT | Configured integration instances |
 | `integration_types` | INT | Catalog of supported connector types |
 | `integration_credentials` | INT | Encrypted, server-only credential storage |

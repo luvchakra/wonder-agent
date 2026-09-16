@@ -7,6 +7,7 @@ import type {
   ControlEvidence,
   ControlFramework,
   ControlMapping,
+  GovernanceAttestation,
 } from "@/lib/shared/types/compliance";
 import type { Control } from "@/lib/shared/types/compliance";
 
@@ -87,6 +88,24 @@ export function toControlEvidence(row: any): ControlEvidence {
     evidenceType: row.evidence_type,
     referenceId: row.reference_id,
     summary: row.summary,
+    createdAt: row.created_at,
+  };
+}
+
+export function toGovernanceAttestation(row: any): GovernanceAttestation {
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    agentId: row.agent_id,
+    policyRequirement: row.policy_requirement,
+    checklist: row.checklist ?? [],
+    approverId: row.approver_id,
+    decision: row.decision,
+    comments: row.comments,
+    evidenceReferences: row.evidence_references ?? [],
+    validFrom: row.valid_from,
+    validUntil: row.valid_until,
+    decidedAt: row.decided_at,
     createdAt: row.created_at,
   };
 }

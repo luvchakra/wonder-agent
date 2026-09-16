@@ -490,3 +490,94 @@ conventions).
 `listPolicyEvaluations()`, `listGovernanceExceptions()`; Runtime's
 `getDid()` — all already-published contracts, used exactly as published, no
 modification to any other module's file.
+
+---
+
+## 2026-09-16 — COMPLIANCE-P0-08 — Governance Attestation (broad)
+
+**Agent:** Compliance Agent, continuing directly from `COMPLIANCE-P0-07`
+per the user's standing authorization to work through the pending P0
+backlog in order without stopping to ask between stories.
+
+**Design.** Per the backlog's own resolved spec: fields "agent,
+policy/requirements, checklist, approver, approval timestamp, validity,
+decision, comments, evidence references," a new Compliance-owned table
+(`governance_attestations`, tenant-scoped, RLS), `writeAudit()` on every
+decision. Deliberately distinct from Identity's own narrower, still-P1,
+unbuilt self-attestation concept referenced in
+`docs/plan/02-IDENTITY-AGENT-BACKLOG.md`'s P1 list (`IDENTITY-P1-02`) — no
+naming or table collision, confirmed that module hasn't created its table
+yet.
+
+**Schema** (`supabase/migrations/0055_compliance_governance_attestation.sql`,
+applied live): `governance_attestations(id, tenant_id, agent_id,
+policy_requirement, checklist jsonb, approver_id, decision, comments,
+evidence_references jsonb, valid_from, valid_until, decided_at,
+created_at)`. `decision` is `attested | rejected | needs_more_info`. Same
+evidentiary lockdown pattern as `certification_decisions`
+(migration 0036): client `SELECT` policy only, no client-facing `INSERT`
+or `UPDATE` policy at all — a decision is recorded once, server-mediated,
+through `recordAttestation()`, and a correction is a new row, never an
+edit (non-negotiable #11).
+
+**Service** (`modules/certification-compliance/attestations.ts`):
+`recordAttestation(tenantId, approverId, agentId, input)` uses
+`supabaseServiceRole()` (required — no client INSERT policy exists) and,
+per CLAUDE.md §14's service-role guardrail, manually verifies the target
+agent belongs to `tenantId` before writing (visible in the function body,
+not buried) — this is the standing pattern this module already established
+in `decisions.ts`. Writes exactly one audit event
+(`compliance.attestation_recorded`) per call, never silently swallowed.
+`listAttestationsForAgent()` and `getLatestAttestation()` (optionally
+filtered to one `policyRequirement`, since one agent can be attested
+against several independent policy requirements over time) are plain
+tenant-scoped reads through the RLS-respecting `supabaseServer()` client.
+
+**API:** `GET/POST /api/v1/compliance/agents/[id]/attestations`
+(`compliance.read` for GET, `compliance.manage` for POST — same permission
+keys this module already has, no new RBAC surface needed).
+
+**Not implemented / deliberately excluded:**
+- No SoD/self-attestation check analogous to `COMPLIANCE-P0-04`'s
+  reviewer-vs-owner rule — the story's own field list doesn't call for one,
+  and adding it here would be inventing scope the backlog didn't ask for
+  (`CLAUDE.md` §3: "if unsure whether something is a required extension
+  point or genuine scope creep, treat it as scope creep and stop").
+- No UI — Experience Agent composes it from this read/write contract.
+- No wiring into `getGovernancePosture()` (COMPLIANCE-P0-07, built
+  immediately prior) — that story's "Human oversight"/"Policy compliance"
+  dimensions were deliberately scoped to what was already published *at
+  the time it was built*; retrofitting it to also read attestations is a
+  reasonable future enhancement but out of scope for *this* story, which
+  is `getLatestAttestation()`'s stated design purpose ("used by
+  COMPLIANCE-P0-09's evidence pack assembly") — not silently expanded here.
+
+**Verification:**
+- `modules/certification-compliance/attestations.test.ts` — 6 tests
+  (mocking `@/lib/db/supabaseServer` and `@/lib/audit/writeAudit`, the same
+  DB-client-mocking pattern Integration Agent's `credentials.test.ts`
+  established): empty-`policyRequirement` rejection, agent-not-in-tenant
+  404, successful insert + audit-event shape, row-to-type mapping, and
+  `getLatestAttestation`'s policy-requirement filter (including the
+  no-match-returns-null case).
+- `npm run typecheck` — clean.
+- `npm run lint` — clean.
+- `npx vitest run` — 181/181 passing (up from 175 before this story).
+- Migration applied live to the dev Supabase project (`ekgyjwoenteadaaqakmd`)
+  via `apply_migration`; `get_advisors(security)` re-checked afterward —
+  the 3 findings returned are all pre-existing (Platform Agent's tables and
+  2 already-known security-definer functions), nothing new from this
+  migration.
+- `npm run build` (with `.next` deleted first) — clean; new route compiles
+  alongside the rest of `/api/v1/compliance/*`.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+
+**Published this session:** `recordAttestation()`,
+`listAttestationsForAgent()`, `getLatestAttestation()`
+(`modules/certification-compliance/service.ts`);
+`GovernanceAttestation`, `AttestationChecklistItem`,
+`AttestationEvidenceReference`, `AttestationDecision`
+(`lib/shared/types/compliance.ts`);
+`GET/POST /api/v1/compliance/agents/[id]/attestations`.
+`docs/design/ownership-map.md` updated with the new
+`governance_attestations` table row.
