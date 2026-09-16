@@ -924,3 +924,64 @@ unaffected. Full pipeline: `npm run typecheck` clean, `npm run lint`
 clean, `npx vitest run` 255/255 (up from 248), `npm run build` (with
 `.next` deleted first) clean, `grep -rl SUPABASE_SERVICE_ROLE_KEY
 .next/static` — no match. No schema change.
+
+## 2026-09-16 — COMPLIANCE-P0-05: real Vercel Cron scheduler for escalateOverdueItems()
+
+**User decision (bucket B, "continue uninterrupted" pass):** "Add pdf-lib
+(Recommended)" was for OPERATIONS-P0-07 (separate task); for this story,
+the standing "any P0 item open to work?" sweep flagged the previously
+missing scheduler as pure-code fixable now (no product decision needed) —
+Vercel Cron is already the platform's own hosting choice (CLAUDE.md's
+Locked Architecture, §2), so wiring `vercel.json`'s native `crons` config
+was the natural, non-speculative choice, not a new infrastructure
+dependency.
+
+**Built:**
+- `modules/certification-compliance/escalation.ts` — new
+  `escalateOverdueItemsForAllTenants(): Promise<EscalationSweepResult[]>`.
+  Reads `tenants` (Foundation's canonical schema; a plain unfiltered id
+  read, not a Platform-Administration operation, so queried directly
+  rather than duplicating another module's service) for every
+  `status = 'active'` tenant, then calls the existing per-tenant
+  `escalateOverdueItems(tenantId, null)` for each (actorId null →
+  `writeAudit`'s existing `actorType: "system"` branch, unchanged).
+  Each tenant's escalation is isolated in its own try/catch — one
+  tenant's failure is recorded in its own result row (`error` set)
+  rather than aborting the sweep for every other tenant, so a bug or
+  transient failure scoped to one tenant can never silently suppress
+  escalation for the rest.
+- `app/api/cron/compliance-escalate-overdue/route.ts` (new) — `GET`
+  handler (Vercel Cron always sends `GET`), deliberately outside both
+  `/api/v1/*` (customer-facing, resolves tenant from a user session —
+  there is no session here) and `/api/platform/v1/*` (vendor-admin
+  session). Authorization is a `CRON_SECRET` bearer token compared with
+  `node:crypto`'s `timingSafeEqual` (same reasoning Integration Agent's
+  webhook HMAC check already established in
+  `modules/integrations/webhooks.ts` — a length-checked, constant-time
+  comparison rather than `===`). A missing/unset `CRON_SECRET` refuses
+  every request (401) rather than silently allowing unauthenticated
+  cross-tenant escalation.
+- `vercel.json` (new) — `crons: [{ path: "/api/cron/compliance-escalate-
+  overdue", schedule: "0 6 * * *" }]` (daily, 06:00 UTC).
+- `.env.local.example` — documents `CRON_SECRET` alongside the project's
+  other server-only secrets.
+- `app/api/v1/compliance/campaigns/escalate-overdue/route.ts` — doc
+  comment updated; the operator/API-triggered per-tenant sweep is kept
+  as-is (still useful for an admin who wants on-demand escalation
+  without waiting for the daily cron), now cross-referencing the new
+  automatic path.
+
+**Verification:** `modules/certification-compliance/escalation.test.ts`
+extended with 3 new tests for `escalateOverdueItemsForAllTenants()`
+(sums counts across multiple active tenants; isolates and reports one
+tenant's query failure while still sweeping the rest; empty-tenant-list
+sweep returns `[]`) — the existing 3 `escalateOverdueItems()` tests
+unaffected. No route-level test added: consistent with this codebase's
+established pattern of testing only at the module/service layer, never
+`route.ts` handlers directly (verified no other route in the repo has a
+`route.test.ts`). Full pipeline: `npm run typecheck` clean, `npm run
+lint` clean, `npx vitest run` 258/258 (up from 255), `npm run build`
+(with `.next` deleted first) clean — confirmed the new
+`/api/cron/compliance-escalate-overdue` route appears in the build
+output — `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` and `grep -rl
+CRON_SECRET .next/static` both no-match. No schema/migration change.

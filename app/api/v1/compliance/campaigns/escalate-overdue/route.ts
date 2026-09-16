@@ -4,9 +4,12 @@ import { escalateOverdueItems } from "@/modules/certification-compliance/service
 import { errorResponse } from "@/modules/certification-compliance/http";
 
 /**
- * COMPLIANCE-P0-05. No scheduler exists in this codebase yet, so this is an
- * operator-triggered (or, once a job runner exists, cron-triggered) sweep
- * across every campaign in the tenant rather than a per-campaign action.
+ * COMPLIANCE-P0-05. Operator/API-triggered sweep across every campaign in
+ * the calling tenant, for an admin who wants to run escalation on demand
+ * rather than wait for the daily automatic sweep. The automatic path is
+ * `app/api/cron/compliance-escalate-overdue/route.ts`, wired to Vercel
+ * Cron via `vercel.json` — it calls the same underlying
+ * `escalateOverdueItems()` across every tenant, not just this one.
  */
 export async function POST() {
   try {

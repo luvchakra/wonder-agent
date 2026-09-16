@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/compliance-escalate-overdue",
+      "schedule": "0 6 * * *"
+    }
+  ]
+}

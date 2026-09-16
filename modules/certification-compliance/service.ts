@@ -24,7 +24,7 @@ export {
   addControlEvidence,
   recomputeStaleControlMappings,
 } from "./controls";
-export { escalateOverdueItems } from "./escalation";
+export { escalateOverdueItems, escalateOverdueItemsForAllTenants, type EscalationSweepResult } from "./escalation";
 export { exportCampaignEvidence } from "./export";
 export { getGovernancePosture } from "./posture";
 export {
