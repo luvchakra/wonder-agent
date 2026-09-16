@@ -6,7 +6,7 @@ import { getFindings } from "@/modules/risk/service";
 import { compareShouldCanDid } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RogueCategory } from "@/lib/shared/types/risk";
-import { Badge, SeverityBadge, Card, CardHeader, CardBody, EmptyState } from "@/modules/ui";
+import { Badge, SeverityBadge, Card, CardHeader, CardBody, EmptyState, AiSummaryPanel } from "@/modules/ui";
 
 const ROGUE_CATEGORIES: RogueCategory[] = ["behavioral_deviation", "identity_anomaly", "ownership_violation", "lifecycle_violation"];
 
@@ -91,6 +91,9 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
                   </div>
                   <h3 className="mt-2 text-sm font-semibold text-foreground">{f.title}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{f.explanation}</p>
+                  <div className="mt-2">
+                    <AiSummaryPanel kind="finding" data={f} label="Summarize this finding" />
+                  </div>
                 </li>
               ))}
             </ul>
@@ -105,6 +108,11 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
         />
         <CardBody>
           {comparison.shouldUnknown && <Badge tone="warning">SHOULD undefined — no active contract to compare against</Badge>}
+          {!comparison.shouldUnknown && deviations.length > 0 && (
+            <div className="mb-3">
+              <AiSummaryPanel kind="should_can_did_comparison" data={comparison} label="Summarize this comparison" />
+            </div>
+          )}
           {!comparison.shouldUnknown && deviations.length === 0 ? (
             <p className="text-sm text-muted-foreground">No deviation outcomes — this agent&apos;s runtime activity matches its approved contract.</p>
           ) : (

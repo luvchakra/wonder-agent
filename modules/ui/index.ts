@@ -18,3 +18,4 @@ export { ShellGlobalSearch, ShellNotifications } from "./ShellSearchAndNotificat
 export { DataTable, useTableState, useClientFilteredRows, SimpleDataTable, type DataTableColumn, type TableState, type SortDir } from "./DataTable";
 export { AgentTabs, type AgentTabKey } from "./AgentTabs";
 export { Field, TextField, TextareaField, SelectField, fieldInputClass, fieldLabelClass } from "./Field";
+export { AiSummaryPanel } from "./AiSummaryPanel";

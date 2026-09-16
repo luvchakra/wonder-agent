@@ -1167,3 +1167,92 @@ were confirmed, and they conflict with WonderAgent's actual product model
 (tenants, not self-serve "Businesses") and non-negotiables (#9, boundary
 #8) in ways that would need a separate, explicit decision, not an
 inference from "match the visual language."
+
+---
+
+## 2026-09-16 — EXPERIENCE-P0-14 — AI-Assisted Investigation UI (read-only summaries)
+
+**Agent:** Experience Agent, picked up per the user's standing
+authorization to work the pending P0 backlog in order. Implements the
+2026-09-15 resolved decision: "start now, read-only summaries only,"
+unblocked by `FOUNDATION-P0-16`'s `lib/ai/summarize.ts` primitive
+(built earlier this session, currently a deterministic stub — every call
+throws `AiNotConfiguredError` until a provider is chosen).
+
+**New route, not owned by any existing domain module:**
+`app/api/v1/ai/summarize/route.ts` — a pure passthrough wrapper over
+`lib/ai/summarize()`, carrying no business logic of its own beyond
+authorizing the caller against the *kind* of data being summarized
+(`finding`→`risk.read`, `should_can_did_comparison`→`runtime.read`,
+`evidence_bundle`/`certification_item`→`compliance.read` — the same gates
+those domains' own existing routes already require, since a summary of
+data the caller couldn't otherwise see would leak it) and a payload-size
+cap (50,000 chars) against abuse. This is genuinely not any existing
+module's route to own: `lib/ai/` isn't a `modules/*` domain, and no module
+in `docs/design/ownership-map.md`'s API-prefix table covers it. Recorded
+as `FA`-owned in the ownership map (since it wraps Foundation's own
+primitive 1:1) with an explicit note that Experience Agent added it to
+unblock this story — this does NOT modify Foundation's `lib/ai/summarize.ts`
+itself (non-negotiable #18 is about not touching another module's
+*implementation* to make your own story pass; adding a new thin wrapper
+route in a previously-unowned location is different, and is exactly what
+ownership-map §5's "genuinely new, add it and update the map" path is for).
+
+**Component:** `modules/ui/AiSummaryPanel.tsx` (client component, added to
+the shared design-system barrel `modules/ui/index.ts`) — an idle
+"Summarize with AI" button that, on click, calls the route and renders
+one of four states: loading, a plain "not configured" notice (501 →
+never a crash, never a fake/empty summary), a retryable error, or the
+summary itself in a visually distinct box explicitly labeled "AI-generated
+summary — advisory only, not a decision" (the exact framing
+`EXPERIENCE-P0-14`'s resolved decision requires: "never presented as a
+fact or a decision," "always next to, never instead of, the authoritative
+structured data it summarizes"). The component never fetches or computes
+the data it summarizes itself — `data` is always passed in by the calling
+page from already-authorized, already-rendered structured data, so nothing
+here can become an unaudited second data-access path.
+
+**Wired into a real screen**, not left unused: `app/(customer)/risk/rogue/
+[agentId]/page.tsx` (Rogue Agent Detail) — a "Summarize this finding"
+panel per rogue-category finding (`kind: "finding"`) and a "Summarize this
+comparison" panel on the SHOULD/CAN/DID deviation card (`kind:
+"should_can_did_comparison"`, shown only when there are actual deviations
+to summarize). These are exactly the two examples the resolved decision
+itself named. Did not add a summarize affordance to every possible screen
+this session — two real, working examples demonstrate and exercise the
+full contract; wiring the same `AiSummaryPanel` into more screens later
+(evidence bundles, certification items) is pure repetition of an already-
+proven pattern, not new design work.
+
+**Verification:**
+- `modules/ui/AiSummaryPanel.test.tsx` — 4 tests (React Testing Library +
+  jsdom, both already-installed but previously-unused dev dependencies in
+  this codebase — this is the first UI component unit test written this
+  session; the codebase's prior convention for UI verification was
+  build + manual/Playwright browser checks only, since no authenticated
+  in-app screen has been reachable in this sandbox all session per prior
+  entries' "network-egress constraint" note): idle state never fetches
+  until clicked; a successful summary renders clearly labeled and distinct
+  from the underlying data; a 501 renders the plain not-configured notice,
+  never a crash; a network failure renders a retryable error.
+- `npm run typecheck` / `npm run lint` — clean.
+- `npx vitest run` — 192/192 passing (up from 188).
+- `npm run build` (with `.next` deleted first) — clean; confirmed
+  `.next/server/app/api/v1/ai/summarize/route.js` and the rebuilt
+  `risk/rogue/[agentId]` page both compiled.
+- `grep -rl SUPABASE_SERVICE_ROLE_KEY .next/static` — no match (exit 1).
+- **Live functional check** (not just a build check): started the built
+  production server locally and sent an unauthenticated `POST
+  /api/v1/ai/summarize` request — got back `401 {"code":"NO_TENANT"}` as
+  designed, confirming the route's authorization gate actually runs, not
+  just compiles. Full authenticated in-app browser verification of the
+  wired-in Rogue Agent Detail screen remains blocked by this sandbox's
+  same network-egress constraint noted in this log's `EXPERIENCE-P0-09.1`
+  entry — not claimed as done; the component-level RTL tests plus this
+  live unauthenticated route check are what this pass actually verified,
+  stated plainly rather than glossed over.
+
+**Published this session:** `AiSummaryPanel`
+(`modules/ui/index.ts` → `modules/ui/AiSummaryPanel.tsx`);
+`POST /api/v1/ai/summarize` (new, previously-unowned route, recorded as
+FA-owned in the ownership map).

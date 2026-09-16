@@ -158,6 +158,7 @@ consume and persist into their own tables.
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |
 | `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
+| `/api/v1/ai/summarize` | FA — pure passthrough wrapper over `lib/ai/summarize.ts` (FOUNDATION-P0-16); added by Experience Agent to unblock `EXPERIENCE-P0-14`, since no domain module owns this cross-cutting primitive |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 
 All API authorization happens server-side, inside the route handler or a shared
