@@ -28,9 +28,14 @@ export async function getTenantContext(): Promise<TenantContext> {
     return { userId: "", tenantId: null, tenantSlug: null, roles: [], permissions: [] };
   }
 
+  // `user_id` is filtered explicitly, not left to RLS: the
+  // tenant_memberships policy is tenant-scoped (every member of a tenant
+  // can read that tenant's membership rows), so without this the list is
+  // every colleague's membership, not this user's own.
   const { data: memberships } = await supabase
     .from("tenant_memberships")
     .select("tenant_id, tenants(slug)")
+    .eq("user_id", user.id)
     .eq("status", "active")
     .returns<MembershipRow[]>();
 

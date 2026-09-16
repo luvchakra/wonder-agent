@@ -23,9 +23,13 @@ export default async function OnboardingPage() {
   // back to "/" before they can reach the create-organization form below.
   const ctx = await getTenantContext();
 
+  // Filtered by user_id for the same reason as getTenantContext(): the
+  // tenant_memberships RLS policy is tenant-scoped, so relying on it alone
+  // renders one organization button per member of the tenant.
   const { data: memberships } = await supabase
     .from("tenant_memberships")
     .select("tenant_id, tenants(name)")
+    .eq("user_id", user.id)
     .eq("status", "active")
     .returns<{ tenant_id: string; tenants: { name: string } | null }[]>();
 

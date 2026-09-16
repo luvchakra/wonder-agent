@@ -11,6 +11,11 @@ mkdirSync("tests/e2e/.auth", { recursive: true });
 // otherwise race a login attempt against user/tenant rows that don't
 // exist yet.
 setup.beforeAll(async () => {
+  // `E2E_SKIP_SEED=1` is for runs against an environment whose tenants/
+  // users were already seeded out of band (and where no service-role key
+  // is available to this process). The specs themselves are unaffected —
+  // they only ever read the fixed identities in testUsers.ts.
+  if (process.env.E2E_SKIP_SEED === "1") return;
   const seeded = await seedTestData();
   expect(seeded.userIds.adminOne).toBeTruthy();
   expect(seeded.userIds.adminTwo).toBeTruthy();
@@ -19,6 +24,13 @@ setup.beforeAll(async () => {
 function signInAndSaveState(key: TestUserKey) {
   setup(`authenticate as ${key}`, async ({ page }) => {
     const spec = TEST_USERS[key];
+    // Some hosted targets sit behind deployment protection that is
+    // cleared by visiting a one-time URL which sets a bypass cookie
+    // (e.g. a Vercel share link). Visiting it first means that cookie is
+    // captured in the storage state every spec reuses.
+    if (process.env.E2E_BOOTSTRAP_URL) {
+      await page.goto(process.env.E2E_BOOTSTRAP_URL);
+    }
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(spec.email);
     await page.getByLabel("Password").fill(spec.password);
