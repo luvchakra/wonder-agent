@@ -7,6 +7,7 @@ const mockGetOwnershipIssues = vi.fn();
 const mockListAgentIdentities = vi.fn();
 const mockListLifecycleEvents = vi.fn();
 const mockTransitionAgentLifecycle = vi.fn();
+const mockUpdateAgentRiskScore = vi.fn();
 const mockListPolicyEvaluations = vi.fn();
 const mockCompareShouldCanDid = vi.fn();
 const mockGetDid = vi.fn();
@@ -20,6 +21,7 @@ vi.mock("@/modules/agent-identity/service", () => ({
   listAgentIdentities: (...a: unknown[]) => mockListAgentIdentities(...a),
   listLifecycleEvents: (...a: unknown[]) => mockListLifecycleEvents(...a),
   transitionAgentLifecycle: (...a: unknown[]) => mockTransitionAgentLifecycle(...a),
+  updateAgentRiskScore: (...a: unknown[]) => mockUpdateAgentRiskScore(...a),
 }));
 vi.mock("@/modules/access-governance/service", () => ({
   listPolicyEvaluations: (...a: unknown[]) => mockListPolicyEvaluations(...a),
@@ -118,6 +120,12 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
     expect(excessiveCall![3].severity).toBe("critical");
     expect(excessiveCall![3].riskScore).toBe(80);
 
+    // RISK-P0-02.1 — the deterministic agent-level score is persisted onto
+    // agents.risk_score via Identity's published sink, once per evaluation
+    // (not once per finding).
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledTimes(1);
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "financebot", 80);
+
     // A CRITICAL finding on an ACTIVE agent triggers auto-restriction.
     expect(mockTransitionAgentLifecycle).toHaveBeenCalledWith(
       "tenant-a",
@@ -142,5 +150,10 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
     const results = await evaluateAgentRisk("tenant-a", "a2");
     expect(results).toEqual([]);
     expect(mockTransitionAgentLifecycle).not.toHaveBeenCalled();
+
+    // Even with zero triggered categories, the agent's computed score
+    // (0 here — staging, low criticality, no policy violation, no anomaly)
+    // is still persisted, not left as "unknown".
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a2", 0);
   });
 });

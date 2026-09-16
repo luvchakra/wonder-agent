@@ -9,7 +9,7 @@ import "server-only";
  * module's internal schema can evolve without breaking consumers.
  */
 
-export { createAgent, getAgent, listAgents, type CreateAgentInput } from "./agents";
+export { createAgent, getAgent, listAgents, updateAgentRiskScore, type CreateAgentInput } from "./agents";
 export {
   getAgentContract,
   listContractVersions,

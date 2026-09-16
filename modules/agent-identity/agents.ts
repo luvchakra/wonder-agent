@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
@@ -170,4 +170,26 @@ export async function listAgents(tenantId: string, filter?: AgentFilter): Promis
 
   const agents = (data ?? []).map(toAgent);
   return Promise.all(agents.map((a) => maybeMarkCertificationDue(tenantId, a)));
+}
+
+/**
+ * RISK-P0-02.1 — the sink for `agents.risk_score`, the deterministic
+ * weighted score `evaluateAgentRisk()` (Risk Agent) recomputes on every
+ * evaluation run. This is a system-triggered side effect of risk
+ * evaluation (not a user editing the agent through `agent.update`), so it
+ * runs via the service-role client and — per CLAUDE.md §14 — must verify
+ * the tenant_id of the row it touches itself, visibly, since RLS isn't
+ * doing that job for a service-role caller. No separate audit event: a
+ * routine score refresh is not itself a new security-relevant state
+ * change (matching `createOrUpdateFinding()`'s own discipline of only
+ * auditing a genuinely new state, not every re-evaluation refresh).
+ */
+export async function updateAgentRiskScore(tenantId: string, agentId: string, riskScore: number): Promise<void> {
+  const supabase = supabaseServiceRole();
+  const { error } = await supabase
+    .from("agents")
+    .update({ risk_score: riskScore })
+    .eq("id", agentId)
+    .eq("tenant_id", tenantId);
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
 }

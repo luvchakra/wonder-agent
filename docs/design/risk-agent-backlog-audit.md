@@ -597,3 +597,33 @@ already-open finding. `modules/risk/findings.test.ts` gained 4 tests for
 `notifyForFinding()`'s own decision logic. No Progress Tracker row change
 — this doesn't correspond to a new Risk Agent story, it's Risk's own file
 being the implementation site for `OPERATIONS-P0-02.2`.
+
+---
+
+## 2026-09-16 — RISK-P0-02.1 unblocked: agents.risk_score now persisted
+
+Previously flagged `Partial`: the score was fully computed and stored on
+every `risk_findings` row but never rolled up onto `agents.risk_score`,
+since that column belongs to Identity's `agents` table and Risk had no
+published write path onto it. Identity published
+`updateAgentRiskScore(tenantId, agentId, riskScore)` today (see Identity's
+own audit log entry of the same date for the implementation detail).
+`evaluateAgentRisk()` (`modules/risk/rules.ts`) now calls it once per
+evaluation run, right after computing `base` (the deterministic agent-level
+score every trigger in that run shares) — including when zero categories
+trigger, so a clean agent's real score (e.g. `0`) is recorded rather than
+left stale/null.
+
+**Verification:** `modules/risk/rules.test.ts` updated — both existing
+scenarios now assert the exact call: `("tenant-a", "financebot", 80)` for
+the FinanceBot CRITICAL scenario (Production 20 + sensitive-data 25 +
+policy-violation 15 + anomaly 10 + criticality-high 10 = 80), and
+`("tenant-a", "a2", 0)` for the clean-agent scenario. Full pipeline:
+`npm run typecheck` clean, `npm run lint` clean, `npx vitest run` 217/217
+(unchanged count — existing tests extended, no new test files), `npm run
+build` (with `.next` deleted first) clean, `grep -rl
+SUPABASE_SERVICE_ROLE_KEY .next/static` no match. No migration needed —
+`agents.risk_score` already existed (migration `0012`), this was purely a
+missing write path.
+
+Progress Tracker: RISK-P0-02.1 moves from `Partial` to `Done`.

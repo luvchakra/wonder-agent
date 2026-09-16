@@ -21,7 +21,7 @@ this module is higher bar (see below).
 | RISK-P0-01.1 | Schema | Done |
 | RISK-P0-01.2 | Detection rules, one per category | Done |
 | RISK-P0-01.3 | Explainability | Done |
-| RISK-P0-02.1 | Severity/risk score | Partial — `agents.risk_score` persistence blocked on Identity publishing `updateAgentRiskScore()`; the score is fully computed and stored on every finding |
+| RISK-P0-02.1 | Severity/risk score | Done — 2026-09-16: Identity published `updateAgentRiskScore()` (`modules/agent-identity/agents.ts`, service-role write with manual tenant check); `evaluateAgentRisk()` now calls it once per evaluation with the deterministic agent-level score (`base.riskScore`), persisting onto `agents.risk_score` regardless of whether any finding category actually triggered |
 | RISK-P0-03.1 | Assignment & recommendation | Done |
 | RISK-P0-03.2 | Human-initiated remediation | Done — `remediateFinding()` now calls Access Agent's already-published `revokeAccessGrant()` for every `access_grant`-evidenced grant; honestly `wired: false` for finding categories with no such evidence |
 | RISK-P0-03.3 | Re-evaluation & resolution | Done |
@@ -169,6 +169,20 @@ non-negotiable #9.
 ## Epic RISK-P0-02 — Deterministic Risk Scoring
 
 ### RISK-P0-02.1 — Severity/risk score
+
+**`agents.risk_score` persistence, resolved 2026-09-16:** previously the score was
+fully computed and stored on every `risk_findings` row but never rolled up onto the
+agent record, blocked on Identity publishing a write path for a column Risk doesn't
+own. Identity published `updateAgentRiskScore(tenantId, agentId, riskScore)`
+(`modules/agent-identity/agents.ts`, exported via `modules/agent-identity/service.ts`)
+— service-role client, explicit `tenant_id` filter visible in the call (CLAUDE.md
+§14, since a service-role caller must verify tenant ownership itself). `rules.ts`'s
+`evaluateAgentRisk()` calls it once per evaluation, right after computing `base` (the
+deterministic agent-level score shared by every trigger that run produces) — not
+once per finding, and not skipped when zero categories trigger (a clean agent's real
+computed score, e.g. `0`, is still worth recording, not left `null`/stale). Covered
+by `modules/risk/rules.test.ts`'s two existing scenarios (asserts the exact score
+`80` for the FinanceBot CRITICAL scenario, and `0` for the clean-agent scenario).
 
 `severity` is computed from a deterministic weighted rule set over these factors
 (each contributes 0 or its weight; sum maps to a severity band):

@@ -608,3 +608,27 @@ service-role write function here); `npm run build` succeeds. Migration
 applied to the live dev Supabase project via the Supabase MCP tool;
 `get_advisors(security)` re-checked — no new findings, same accepted-
 exception set as before.
+
+---
+
+## 2026-09-16 — published `updateAgentRiskScore()` (unblocks RISK-P0-02.1)
+
+Small, paired addition — the story is tracked under Risk Agent's own
+backlog as `RISK-P0-02.1`; full account in that module's audit log.
+`modules/agent-identity/agents.ts` gained `updateAgentRiskScore(tenantId,
+agentId, riskScore)`: service-role client (this is a system-triggered side
+effect of risk evaluation, not a user editing the agent through
+`agent.update`), with the tenant_id filter visible in the call per
+CLAUDE.md §14. No separate audit event for a routine score refresh — same
+discipline `createOrUpdateFinding()` already uses (only a genuinely new
+state change is audited, not every re-evaluation refresh). Exported from
+`modules/agent-identity/service.ts`. No schema change — `agents.risk_score`
+already existed (migration `0012`).
+
+**Verification:** full pipeline (typecheck/lint/`npx vitest run` 217/217/
+build/secret-leak check) run as part of Risk's own pass — see that
+module's audit log entry for the complete record. No dedicated unit test
+added for this thin sink directly (matching the existing pattern for
+service-role write functions like `transitionAgentLifecycle`, which also
+has no direct mocked-Supabase test) — behavior is covered end-to-end by
+`modules/risk/rules.test.ts`'s assertions on the exact values passed to it.

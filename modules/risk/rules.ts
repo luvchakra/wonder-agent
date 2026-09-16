@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, transitionAgentLifecycle } from "@/modules/agent-identity/service";
+import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, transitionAgentLifecycle, updateAgentRiskScore } from "@/modules/agent-identity/service";
 import { listPolicyEvaluations } from "@/modules/access-governance/service";
 import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { writeAudit } from "@/lib/audit/writeAudit";
@@ -267,6 +267,14 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     { name: "Missing or invalid ownership", weight: w("Missing or invalid ownership"), triggered: ownershipIssues.length > 0 },
   ];
   const base = computeSeverity(factors);
+
+  // RISK-P0-02.1 — persist the agent-level score computed above onto
+  // agents.risk_score via Identity's published sink, regardless of
+  // whether any category trigger actually fired this run (a clean agent
+  // still has a real, evaluated score of e.g. 0 worth recording, not just
+  // "unknown"). Previously this was computed and stored on every finding
+  // but never rolled up onto the agent record itself.
+  await updateAgentRiskScore(tenantId, agentId, base.riskScore);
 
   const results: RiskFinding[] = [];
   let anyCritical = false;
