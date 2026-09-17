@@ -883,3 +883,84 @@ test:e2e` wherever `.env.local` is configured, before merging.
 
 **Open — needs the user:** the Vercel Preview environment variable gap in
 finding 1 above. Everything in finding 2 is code-complete on this branch.
+
+---
+
+## 2026-09-17 — Forgot-password (FOUNDATION)
+
+**Built:** the missing password-reset flow — `/forgot-password` (request a
+reset link), `/update-password` (set a new one), and the supporting server
+actions in `app/actions/auth.ts`: `requestPasswordResetAction()` and
+`updatePasswordAction()`.
+
+- **Rate-limited** the same way as sign-in/sign-up (`checkAndRecordAttempt`,
+  5/hour per email, per-IP too when `isDistinguishingClientIp()` says the
+  resolved address is real — see the 2026-09-17 rate-limiter entry above).
+- **Email-enumeration protected**: `requestPasswordResetAction()` always
+  returns the same `ok: true` shape and the UI always shows one generic "if
+  an account exists…" message, matching sign-up's existing property —
+  Supabase Auth itself does not reveal account existence through this call.
+- **Reuses the existing SSO callback route** (`app/auth/callback/route.ts`)
+  rather than adding a second one: `requestPasswordResetAction()` builds
+  `redirectTo` as `${origin}/auth/callback?next=/update-password`, and the
+  callback now honors a same-origin-only `next` param (new exported
+  `isSafeRelativeNextPath()`, unit-tested against the protocol-relative and
+  absolute-URL open-redirect vectors) right after its existing
+  session-cookie stamping, before the SSO/onboarding branches.
+- **`/update-password` is a server component** that checks
+  `supabase.auth.getUser()` before rendering anything, so an
+  expired/already-used/missing link shows a real "Link expired" state
+  immediately rather than a form that only fails on submit.
+- Added a **"Forgot password?"** link to `/sign-in`.
+
+**Verified live against this project's real Supabase instance** (not
+mocked): rate limiting (both sign-in-style and this feature's own),
+email-enumeration protection, and `/update-password`'s expired-link guard
+— all pass in `tests/e2e/auth.spec.ts`'s new `"password reset"` describe
+block. Also unit-tested directly: `app/actions/auth.test.ts` (rate
+limiting, the exact `redirectTo` shape, session guard, real-Supabase-error
+surfacing) and `app/auth/callback/route.test.ts` (`isSafeRelativeNextPath`
+against every open-redirect case). Full suite: `npm run typecheck`, `npm
+run lint`, `npm run test` (283/283), `npm run test:e2e` for
+`tests/e2e/auth.spec.ts` (27/27).
+
+**Confirmed the real request-side wiring is correct** by querying
+`auth.flow_state` directly after a real `requestPasswordResetAction()` call
+(triggered by the enumeration test above): it recorded a PKCE row
+(`code_challenge_method: "s256"`, a non-null `code_challenge`) for the
+tested user — proof the app's server action correctly negotiates PKCE, the
+same mechanism `app/auth/callback/route.ts`'s `exchangeCodeForSession()`
+expects on the other end.
+
+**Not verified — flagged rather than faked, same category as this file's
+existing SSO-callback caveat:** actually clicking a real recovery link
+through to a completed password change. Blocked by three compounding,
+environment-specific limitations, not a code issue: (1) this session has no
+real email inbox: `supabase.auth.admin.generateLink()` — the only way to
+mint a verification link without sending real mail — does not go through
+the PKCE code-challenge a genuine `resetPasswordForEmail()` call negotiates,
+so it returns tokens in a URL fragment instead of `?code=`, which cannot
+exercise this app's callback route or represent what a real user's flow
+does; (2) this project's own built-in-SMTP quota (a couple sends/hour —
+already documented on the "fresh, valid email" sign-up test) was exhausted
+by this same test run, so triggering enough real emails to test around (1)
+wasn't an option either; (3) this sandbox's outbound-HTTPS proxy re-
+terminates TLS with a CA the pre-installed Chromium doesn't trust, so
+Playwright can't even navigate directly to `<project>.supabase.co` to
+inspect a verify link's behavior (confirmed via `curl`, which does trust
+the proxy's CA, that `admin.generateLink()`'s link resolves via a 303 to a
+fragment-based redirect — consistent with point (1), and separately
+surfaced a real, unrelated finding: the generated link's `redirect_to`
+silently fell back to the project's configured Site URL rather than the
+`http://localhost:3100/...` this suite requested, meaning `localhost` is
+not in this Supabase project's redirect-URL allowlist — a dashboard
+configuration item, not code, and irrelevant to the real flow since real
+users are redirected against the deployed origin, not localhost).
+
+**Open — needs the user, whenever full click-through verification against
+a real inbox is wanted:** confirm the deployed origin (and any other origin
+this app is ever served from) is in the Supabase project's Auth → URL
+Configuration → Redirect URLs allowlist, ideally as a wildcard
+(`https://<domain>/**`) rather than an exact match, so `/auth/callback` with
+a `next` query param is honored rather than silently falling back to the
+bare Site URL.

@@ -58,9 +58,13 @@ function signInAndSaveState(key: TestUserKey) {
   });
 }
 
-// signOutOnly deliberately has no saved storage state: its one test signs
-// in itself and then signs out, and a globally-scoped sign-out would
-// invalidate any state saved here anyway.
-for (const key of (Object.keys(TEST_USERS) as TestUserKey[]).filter((k) => k !== "signOutOnly")) {
+// signOutOnly and passwordResetOnly deliberately have no saved storage
+// state: signOutOnly's one test signs in itself and then signs out (a
+// globally-scoped sign-out would invalidate any state saved here anyway),
+// and passwordResetOnly's one test changes its own password via the real
+// reset flow, which would invalidate a storage state saved against the
+// original password.
+const EXCLUDED: TestUserKey[] = ["signOutOnly", "passwordResetOnly"];
+for (const key of (Object.keys(TEST_USERS) as TestUserKey[]).filter((k) => !EXCLUDED.includes(k))) {
   signInAndSaveState(key);
 }

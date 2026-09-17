@@ -12,7 +12,7 @@ export const E2E_PASSWORD = "E2E-Test-Passw0rd!1";
 export const TENANT_ONE = { name: "E2E Tenant One", slug: "e2e-tenant-one" };
 export const TENANT_TWO = { name: "E2E Tenant Two", slug: "e2e-tenant-two" };
 
-export type TestUserKey = "adminOne" | "readOnly" | "requester" | "adminTwo" | "platformAdmin" | "signOutOnly";
+export type TestUserKey = "adminOne" | "readOnly" | "requester" | "adminTwo" | "platformAdmin" | "signOutOnly" | "passwordResetOnly";
 
 export type TestUserSpec = {
   email: string;
@@ -41,6 +41,12 @@ export const TEST_USERS: Record<TestUserKey, TestUserSpec> = {
   signOutOnly: { email: "e2e-signout@e2e.wonderagent.test", password: E2E_PASSWORD, role: "READ_ONLY", tenant: TENANT_ONE, isPlatformAdmin: false },
   // Vendor-only platform_admins row, deliberately zero tenant memberships — see platform-admin.spec.ts.
   platformAdmin: { email: "e2e-platform-admin@e2e.wonderagent.test", password: E2E_PASSWORD, role: null, tenant: null, isPlatformAdmin: true },
+  // Used by exactly one test: auth.spec.ts's password-reset round trip. Its
+  // whole point is to actually change this identity's password via the
+  // real flow, so — same reasoning as signOutOnly — it needs an identity no
+  // other spec's stored auth state or fresh sign-in depends on. Excluded
+  // from auth.setup.ts's signInAndSaveState loop for the same reason.
+  passwordResetOnly: { email: "e2e-password-reset@e2e.wonderagent.test", password: E2E_PASSWORD, role: "READ_ONLY", tenant: TENANT_ONE, isPlatformAdmin: false },
 };
 
 export function authFile(key: TestUserKey): string {

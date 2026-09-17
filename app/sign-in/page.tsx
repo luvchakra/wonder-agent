@@ -110,6 +110,11 @@ function SignInForm() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
+        <div className="-mt-2 text-right text-sm">
+          <Link href="/forgot-password" className="font-medium text-primary hover:underline">
+            Forgot password?
+          </Link>
+        </div>
 
         {sessionExpired && !error ? (
           <p role="status" className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">

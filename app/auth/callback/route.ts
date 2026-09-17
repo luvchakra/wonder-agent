@@ -6,6 +6,17 @@ import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
 
 /**
+ * True only for a same-origin relative path — rejects a protocol-relative
+ * URL ("//evil.example.com") and anything else that isn't a bare "/..."
+ * path, so `next` can never turn this callback into an open redirect.
+ * Exported (rather than kept private) so it has direct unit-test coverage
+ * without needing a Next.js request/response round trip.
+ */
+export function isSafeRelativeNextPath(next: string | null): next is string {
+  return !!next && next.startsWith("/") && !next.startsWith("//");
+}
+
+/**
  * FOUNDATION-P0-03.3 — completes an SSO (or any Supabase Auth PKCE) redirect
  * and performs SSO just-in-time tenant provisioning.
  *
@@ -48,6 +59,16 @@ export async function GET(request: NextRequest) {
   const nowStamp = Date.now().toString();
   cookieStore.set(SESSION_STARTED_COOKIE, nowStamp, sessionCookieOpts);
   cookieStore.set(SESSION_LAST_SEEN_COOKIE, nowStamp, sessionCookieOpts);
+
+  // Forgot-password (requestPasswordResetAction in app/actions/auth.ts)
+  // routes its emailed link through this same callback with
+  // ?next=/update-password rather than a dedicated callback route, so the
+  // recovery code-exchange above reuses this route's session-cookie
+  // stamping.
+  const next = request.nextUrl.searchParams.get("next");
+  if (isSafeRelativeNextPath(next)) {
+    return NextResponse.redirect(new URL(next, request.url));
+  }
 
   if (domain) {
     const connection = await getFullActiveSsoConnectionByDomain(domain);

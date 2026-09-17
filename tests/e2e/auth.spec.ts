@@ -217,6 +217,93 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
   });
 });
 
+test.describe("password reset — forgot/update password", () => {
+  // Serial: the round-trip test signs passwordResetOnly out with global
+  // scope (supabase.auth.signOut()'s default), which — like the sign-out
+  // describe block below — would revoke any other in-flight session for
+  // that same identity. The mismatched-confirmation test below also opens
+  // a fresh recovery session for passwordResetOnly, so the two must never
+  // overlap.
+  test.describe.configure({ mode: "serial" });
+
+  test("requesting a reset shows the same generic message for a registered and an unregistered email (enumeration protection)", async ({ page }) => {
+    // Same property as the sign-up enumeration test above: Supabase Auth
+    // does not reveal account existence through this call, and the UI
+    // never distinguishes the two cases either. Unlike sign-up's own
+    // enumeration test, a reset request for an address that DOES have an
+    // account sends a real email, so it competes with every other spec's
+    // signups for this project's built-in-SMTP quota (documented on the
+    // "fresh, valid email" sign-up test above: a couple sends per hour) —
+    // asserting the generic message OR Supabase's own quota message is the
+    // same defensive pattern that test already established. Either way,
+    // nothing enumeration-revealing may appear for either address.
+    async function submitAndCheck(email: string) {
+      await page.goto("/forgot-password");
+      await page.getByLabel("Email").fill(email);
+      await page.getByRole("button", { name: "Send reset link", exact: true }).click();
+      await expect(page.getByText(/if an account exists|email rate limit exceeded/i)).toBeVisible();
+      await expect(page.getByText(/no account|not found|no user|does not exist/i)).toHaveCount(0);
+    }
+    await submitAndCheck(TEST_USERS.adminOne.email);
+    await submitAndCheck(`no-such-account-${Date.now()}@e2e.wonderagent.test`);
+  });
+
+  test("reset requests are blocked with the rate-limit message once the per-email attempt limit is reached", async ({ page }) => {
+    const email = `e2e-ratelimit-reset-${Date.now()}@e2e.wonderagent.test`;
+    await page.goto("/forgot-password");
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await page.getByLabel("Email").fill(email);
+      await page.getByRole("button", { name: "Send reset link", exact: true }).click();
+      // Not asserted further here — same reasoning as the sign-up
+      // rate-limit test above: checkAndRecordAttempt() runs before
+      // Supabase is ever called, so these 5 attempts are recorded
+      // regardless of whether Supabase's own SMTP quota lets each one
+      // through; only the 6th attempt (below) is this test's concern.
+      await page.waitForTimeout(300);
+      await page.goto("/forgot-password");
+    }
+    await page.getByLabel("Email").fill(email);
+    await page.getByRole("button", { name: "Send reset link", exact: true }).click();
+    await expect(page.getByText(/too many password reset requests/i)).toBeVisible();
+  });
+
+  test("visiting /update-password without an active recovery session shows the expired-link state, not a bare form", async ({ page }) => {
+    await page.goto("/update-password");
+    await expect(page.getByText(/link expired/i)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Request a new link" })).toBeVisible();
+  });
+
+  // NOT covered here: clicking a real recovery link through to
+  // /update-password and completing the change. Confirmed instead by two
+  // other means — see docs/design/foundation-agent-backlog-audit.md's
+  // entry on this feature for the full account:
+  //
+  // 1. Queried auth.flow_state directly after a real
+  //    requestPasswordResetAction() call from this suite's own "generic
+  //    message" test above: it recorded a PKCE row
+  //    (code_challenge_method "s256", code_challenge present) for that
+  //    user, proving the request half of the real flow — the one that
+  //    matters for app/auth/callback/route.ts's exchangeCodeForSession()
+  //    to work — is wired correctly.
+  // 2. app/actions/auth.test.ts unit-tests updatePasswordAction() and
+  //    requestPasswordResetAction() directly (session guard, rate
+  //    limiting, the redirectTo shape, error surfacing), and
+  //    app/auth/callback/route.test.ts covers the `next` open-redirect
+  //    guard.
+  //
+  // What's NOT verified end to end: actually clicking a recovery link and
+  // landing on /update-password with a live session. Supabase Auth's
+  // admin.generateLink() (the only way to mint a verification link
+  // without sending real mail) does not go through the PKCE
+  // code_challenge a real resetPasswordForEmail() call negotiates, so it
+  // redirects with tokens in a URL fragment instead of `?code=` and can't
+  // exercise this app's callback route. Driving the real thing needs a
+  // real inbox this environment doesn't have, and this project's
+  // built-in-SMTP quota was already exhausted by this same test run.
+  // Same category of gap as the SSO callback's own documented caveat
+  // above this file's rate-limiting tests. Flagged rather than faked.
+});
+
 test.describe("sign-out", () => {
   // Signs in as its OWN dedicated identity rather than reusing a saved
   // storage state. signOutAction() calls supabase.auth.signOut(), whose

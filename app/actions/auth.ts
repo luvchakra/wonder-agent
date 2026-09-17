@@ -12,8 +12,24 @@ async function clientIp(): Promise<string> {
   return h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 }
 
+/**
+ * Server-resolved origin for building the password-reset email's redirect
+ * link. Reads the platform-supplied forwarding headers (Vercel sets both)
+ * rather than trusting anything client-submitted, consistent with never
+ * trusting a client-supplied value for something security-relevant
+ * (CLAUDE.md non-negotiable #2's spirit, applied here to a redirect target
+ * rather than tenant_id).
+ */
+async function siteOrigin(): Promise<string> {
+  const h = await headers();
+  const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3100";
+  const proto = h.get("x-forwarded-proto") ?? (process.env.NODE_ENV === "production" ? "https" : "http");
+  return `${proto}://${host}`;
+}
+
 const SIGNIN_LIMIT = { maxAttempts: 10, windowSeconds: 5 * 60 };
 const SIGNUP_LIMIT = { maxAttempts: 5, windowSeconds: 60 * 60 };
+const PASSWORD_RESET_LIMIT = { maxAttempts: 5, windowSeconds: 60 * 60 };
 
 /**
  * FOUNDATION-P0-05.3 — sign-in is now routed through this server action
@@ -79,6 +95,62 @@ export async function signUpAction(email: string, password: string): Promise<Aut
 
   const supabase = await supabaseServer();
   const { error } = await supabase.auth.signUp({ email, password });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * FOUNDATION — forgot-password. Rate-limited the same way as sign-in/
+ * sign-up (per-email and, when the client IP is distinguishing, per-IP —
+ * see isDistinguishingClientIp), and deliberately returns the same `ok:
+ * true` shape whether or not the address has an account: Supabase Auth
+ * itself does not reveal account existence through this call (same
+ * email-enumeration protection already relied on for sign-up — see
+ * auth.spec.ts), and the UI always shows one generic "if an account
+ * exists…" message regardless.
+ *
+ * `redirectTo` carries `next=/update-password` through the existing SSO
+ * callback route (app/auth/callback/route.ts) rather than a dedicated
+ * callback, so the recovery code-exchange reuses that route's session-
+ * cookie stamping instead of duplicating it.
+ */
+export async function requestPasswordResetAction(email: string): Promise<AuthActionResult> {
+  const ip = await clientIp();
+  const checks: Promise<RateLimitResult>[] = [
+    checkAndRecordAttempt("password-reset:email", email.toLowerCase(), PASSWORD_RESET_LIMIT),
+  ];
+  if (isDistinguishingClientIp(ip)) checks.push(checkAndRecordAttempt("password-reset:ip", ip, PASSWORD_RESET_LIMIT));
+  const results = await Promise.all(checks);
+  if (results.some((r) => !r.allowed)) {
+    return { ok: false, error: "Too many password reset requests. Please try again later." };
+  }
+
+  const origin = await siteOrigin();
+  const supabase = await supabaseServer();
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${origin}/auth/callback?next=/update-password`,
+  });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Completes the forgot-password flow. Requires an active session — the one
+ * established by exchanging the recovery link's code in
+ * app/auth/callback/route.ts — rather than accepting a token directly, so
+ * this action has nothing token-shaped to validate itself; Supabase Auth
+ * already refused to issue that session for an invalid/expired/already-used
+ * link.
+ */
+export async function updatePasswordAction(newPassword: string): Promise<AuthActionResult> {
+  const supabase = await supabaseServer();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "This password reset link has expired or already been used. Request a new one." };
+  }
+  const { error } = await supabase.auth.updateUser({ password: newPassword });
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

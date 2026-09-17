@@ -103,7 +103,7 @@ export async function clearAuthRateLimits(): Promise<void> {
   const emails = Object.values(TEST_USERS).map((u) => u.email);
   const { error: byEmail } = await supabase.from("auth_rate_limit_attempts").delete().in("subject", emails);
   if (byEmail) throw new Error(`clearAuthRateLimits(email) failed: ${byEmail.message}`);
-  const { error: byIp } = await supabase.from("auth_rate_limit_attempts").delete().in("bucket", ["signin:ip", "signup:ip"]);
+  const { error: byIp } = await supabase.from("auth_rate_limit_attempts").delete().in("bucket", ["signin:ip", "signup:ip", "password-reset:ip"]);
   if (byIp) throw new Error(`clearAuthRateLimits(ip) failed: ${byIp.message}`);
 }
 
@@ -132,6 +132,30 @@ export async function pruneThrowawayAgents(tenantIds: string[]): Promise<void> {
       .not("agent_name", "in", `(${keep})`);
     if (error) throw new Error(`pruneThrowawayAgents(${tenantId}) failed: ${error.message}`);
   }
+}
+
+/**
+ * Generates a real Supabase Auth recovery link for `email` without sending
+ * any mail — bypasses the project's built-in-SMTP quota entirely (see the
+ * "fresh, valid email" sign-up test's own comment on that quota), and lets
+ * a spec drive the actual forgot-password round trip end to end: navigate
+ * to the returned link exactly as a clicked email link would, land on
+ * app/auth/callback/route.ts's code-exchange, and continue to
+ * /update-password. `redirectTo` must match `requestPasswordResetAction`'s
+ * own shape (`${origin}/auth/callback?next=/update-password`) since that is
+ * what a real password-reset email would carry.
+ */
+export async function generateRecoveryActionLink(email: string, redirectTo: string): Promise<string> {
+  const supabase = adminClient();
+  const { data, error } = await supabase.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo },
+  });
+  if (error || !data?.properties?.action_link) {
+    throw new Error(`generateRecoveryActionLink(${email}) failed: ${error?.message ?? "no action_link returned"}`);
+  }
+  return data.properties.action_link;
 }
 
 /**

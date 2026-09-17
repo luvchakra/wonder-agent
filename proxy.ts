@@ -8,7 +8,7 @@ import {
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 
-const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback", "/welcome"];
+const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback", "/welcome", "/forgot-password", "/update-password"];
 
 /**
  * Refreshes the Supabase session cookie on every request (required by
