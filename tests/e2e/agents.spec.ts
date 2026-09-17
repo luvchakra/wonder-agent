@@ -92,3 +92,34 @@ test.describe("Identity module — agents", () => {
     await expect(page).toHaveURL(/\/agents\/duplicates/);
   });
 });
+
+/**
+ * EXPERIENCE-P0-15 — the agents list and agent detail, rebuilt to the
+ * supplied design: count pills above the list, and an identity header with
+ * a governance-posture panel on the detail page.
+ */
+test.describe("agents — design rebuild", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("the count pills filter the list", async ({ page }) => {
+    await page.goto("/agents");
+    const pills = page.getByRole("radiogroup", { name: "Filter agents" });
+    await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+
+    await pills.getByRole("radio", { name: /^Approved/ }).click();
+    await expect(pills.getByRole("radio", { name: /^Approved/ })).toHaveAttribute("aria-checked", "true");
+    await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("agent detail shows the governance posture panel, and no raw JSON", async ({ page }) => {
+    await page.goto("/agents");
+    await page.getByRole("link", { name: /^E2E Agent/ }).first().click();
+    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
+
+    await expect(page.getByRole("heading", { name: "Agent information" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Governance posture" })).toBeVisible();
+
+    // Ownership issues used to render as JSON.stringify output on a badge.
+    await expect(page.getByText('{"type":"missing_owner"')).toHaveCount(0);
+  });
+});

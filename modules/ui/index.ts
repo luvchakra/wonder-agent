@@ -31,4 +31,5 @@ export { NavIcon } from "./NavIcon";
 export { AccountPanel, type TenantOption } from "./AccountPanel";
 export { KpiCard, type KpiTone } from "./KpiCard";
 export { Tabs, TabPanel } from "./Tabs";
+export { CountPills, type CountPill } from "./CountPills";
 export { DonutChart, TrendChart, CoverageBars, type Slice, type TrendSeries } from "./charts";

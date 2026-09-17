@@ -1837,3 +1837,39 @@ posture" panel heading instead. The two sign-out tests no longer open a
 drawer first, because the account trigger is permanently visible in the
 rail at their viewport. The only failure left is the pre-existing GoTrue
 fresh-signup case, which needs an MX-backed domain.
+
+### Agents list and agent detail (same story, 2026-09-17)
+
+**List.** Count pills above the table (All / Approved / Pending / At risk),
+and the design's two-line identity cell — a source tile, the display name,
+and `source · type` — replacing a bare name link. The "At risk" count comes
+from Risk Agent's published `getFindings()`, joined to agents by id; risk is
+not re-derived here (non-negotiable #9). New shared primitive:
+`modules/ui/CountPills.tsx`, a radio group rather than a row of buttons so
+the current filter is announced as one choice out of a set.
+
+The segment, search, sort and page are still all applied client-side to the
+already-fetched list. That is the same stopgap recorded when EXPERIENCE-P0-08
+shipped, not a new one: `listAgents()` has no pagination or sort parameters,
+and a paginated variant from the Identity Agent is still the fix
+(CLAUDE.md §15).
+
+**Detail.** Header rebuilt to the design: source tile, name, lifecycle /
+criticality / environment badges, the one-line description, and the existing
+primary action bar moved to the right. Below the tabs, the old header
+definition list became an "Agent information" panel, beside a new
+"Governance posture" panel — a score ring plus the per-dimension
+governed/gap list, driven by Compliance's published
+`getGovernancePosture()`. The score is `governed / applicable`, computed
+from that read-model; no new scoring concept was invented here. If the
+read-model throws (one of the four modules it consults being unavailable)
+the panel says so rather than 500ing the whole agent page.
+
+**Defect fixed in passing:** the Lifecycle card rendered Identity's
+`OwnershipIssue` union through `JSON.stringify` onto a badge, so the screen
+showed `{"type":"missing_owner","ownerType":"business_owner"}` to the
+administrator. It now reads "No business owner assigned". Covered by a
+regression assertion in `tests/e2e/agents.spec.ts`.
+
+**Verified:** typecheck, lint, build, and `agents.spec.ts` (12 passing),
+including two new cases for the pills and the posture panel.

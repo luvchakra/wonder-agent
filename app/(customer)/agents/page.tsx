@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
+import { getFindings } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { LinkButton } from "@/modules/ui";
 import { AgentsTable } from "./AgentsTable";
@@ -21,13 +22,34 @@ export default async function AgentsPage() {
     throw err;
   }
 
-  const agents = await listAgents(ctx.tenantId!);
+  const tenantId = ctx.tenantId!;
+  // Independent reads, in parallel (CLAUDE.md §15). The findings are only
+  // used to mark which agents are at risk — the "At risk" pill in the
+  // design's list header — using Risk Agent's published contract rather
+  // than re-deriving risk here (non-negotiable #9).
+  const [agents, openFindings] = await Promise.all([
+    listAgents(tenantId),
+    getFindings(tenantId, { status: "open" }),
+  ]);
+  const atRiskAgentIds = new Set(
+    openFindings.filter((f) => f.severity === "critical" || f.severity === "high").map((f) => f.agentId),
+  );
+  const rows = agents.map((a) => ({
+    id: a.id,
+    agentName: a.agentName,
+    displayName: a.displayName,
+    agentType: a.agentType,
+    sourceSystem: a.sourceSystem,
+    lifecycleState: a.lifecycleState,
+    criticality: a.criticality,
+    atRisk: atRiskAgentIds.has(a.id),
+  }));
 
   return (
     <div className="space-y-4">
       <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground hover:underline">
-          Overview
+          Dashboard
         </Link>
         <span aria-hidden> / </span>
         <span className="text-foreground">AI Identity</span>
@@ -51,7 +73,7 @@ export default async function AgentsPage() {
         </div>
       </div>
 
-      <AgentsTable agents={agents} />
+      <AgentsTable agents={rows} />
     </div>
   );
 }
