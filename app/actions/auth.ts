@@ -2,7 +2,7 @@
 
 import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/db/supabaseServer";
-import { checkAndRecordAttempt } from "@/lib/security/rateLimiter";
+import { checkAndRecordAttempt, isDistinguishingClientIp, type RateLimitResult } from "@/lib/security/rateLimiter";
 import { SESSION_STARTED_COOKIE, SESSION_LAST_SEEN_COOKIE } from "@/lib/tenant/sessionSecurity";
 
 type AuthActionResult = { ok: true } | { ok: false; error: string };
@@ -27,11 +27,16 @@ const SIGNUP_LIMIT = { maxAttempts: 5, windowSeconds: 60 * 60 };
  */
 export async function signInAction(email: string, password: string): Promise<AuthActionResult> {
   const ip = await clientIp();
-  const [emailLimit, ipLimit] = await Promise.all([
-    checkAndRecordAttempt("signin:email", email.toLowerCase(), SIGNIN_LIMIT),
-    checkAndRecordAttempt("signin:ip", ip, SIGNIN_LIMIT),
-  ]);
-  if (!emailLimit.allowed || !ipLimit.allowed) {
+  const checks: Promise<RateLimitResult>[] = [checkAndRecordAttempt("signin:email", email.toLowerCase(), SIGNIN_LIMIT)];
+  // Skip the IP bucket entirely when the resolved address can't distinguish
+  // one visitor from another (see isDistinguishingClientIp) — otherwise a
+  // burst of attempts from anyone sharing that non-distinguishing address
+  // (or, on this project, an intermediary that reports the same loopback
+  // address for every request) locks out every other visitor too. The
+  // per-email bucket above still fully protects each individual account.
+  if (isDistinguishingClientIp(ip)) checks.push(checkAndRecordAttempt("signin:ip", ip, SIGNIN_LIMIT));
+  const results = await Promise.all(checks);
+  if (results.some((r) => !r.allowed)) {
     return { ok: false, error: "Too many sign-in attempts. Please try again in a few minutes." };
   }
 
@@ -65,11 +70,10 @@ async function stampSessionCookies() {
 
 export async function signUpAction(email: string, password: string): Promise<AuthActionResult> {
   const ip = await clientIp();
-  const [emailLimit, ipLimit] = await Promise.all([
-    checkAndRecordAttempt("signup:email", email.toLowerCase(), SIGNUP_LIMIT),
-    checkAndRecordAttempt("signup:ip", ip, SIGNUP_LIMIT),
-  ]);
-  if (!emailLimit.allowed || !ipLimit.allowed) {
+  const checks: Promise<RateLimitResult>[] = [checkAndRecordAttempt("signup:email", email.toLowerCase(), SIGNUP_LIMIT)];
+  if (isDistinguishingClientIp(ip)) checks.push(checkAndRecordAttempt("signup:ip", ip, SIGNUP_LIMIT));
+  const results = await Promise.all(checks);
+  if (results.some((r) => !r.allowed)) {
     return { ok: false, error: "Too many sign-up attempts from this location. Please try again later." };
   }
 

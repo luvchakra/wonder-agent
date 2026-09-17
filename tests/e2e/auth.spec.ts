@@ -67,6 +67,39 @@ test.describe("unauthenticated", () => {
     expect(isValid).toBe(false);
   });
 
+  test("sign-in with empty fields is blocked client-side and never reaches the server action", async ({ page }) => {
+    await page.goto("/sign-in");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    const emailValid = await page.getByLabel("Email").evaluate((el: HTMLInputElement) => el.validity.valid);
+    expect(emailValid).toBe(false);
+  });
+
+  test("sign-up with empty fields is blocked client-side and never reaches the server action", async ({ page }) => {
+    await page.goto("/sign-up");
+    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await expect(page).toHaveURL(/\/sign-up$/);
+    const emailValid = await page.getByLabel("Email").evaluate((el: HTMLInputElement) => el.validity.valid);
+    expect(emailValid).toBe(false);
+  });
+
+  test("a signed-in session survives a full page reload (no bounce to /welcome or /sign-in)", async ({ page }) => {
+    // Regression coverage for EXPERIENCE-P0-14's proxy.ts rewrite of "/" to
+    // /welcome for signed-out visitors — a signed-in user reloading "/"
+    // must keep seeing the app, never the marketing page or a forced
+    // re-authentication.
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
+    await page.getByLabel("Password").fill(TEST_USERS.adminOne.password);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
+
+    await page.reload();
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
+  });
+
   test("sign-up with a fresh, valid email does not error and leaves the sign-up page", async ({ page }) => {
     // NOT the @e2e.wonderagent.test domain the seeded identities use:
     // GoTrue validates the address on the signup path and rejects the
@@ -100,6 +133,87 @@ test.describe("unauthenticated", () => {
     if (!left) {
       await expect(page.getByText(/email rate limit exceeded/i)).toBeVisible();
     }
+  });
+});
+
+test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
+  // Every identity here is freshly generated and used only within its own
+  // test, deliberately never TEST_USERS.adminOne/etc — tripping a shared
+  // bucket here would spuriously block every other spec that signs in as
+  // one of those identities for the rest of the window.
+
+  test("sign-in is blocked with the rate-limit message once the per-email attempt limit is reached", async ({ page }) => {
+    const email = `e2e-ratelimit-signin-${Date.now()}@e2e.wonderagent.test`;
+    await page.goto("/sign-in");
+    for (let attempt = 0; attempt < 10; attempt++) {
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill("definitely-the-wrong-password");
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page.getByText(/invalid login credentials/i)).toBeVisible();
+    }
+    // The 11th attempt against the SAME email within the 5-minute window is
+    // our own rate limiter, not Supabase — a distinct, actionable message
+    // rather than another "invalid login credentials".
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill("definitely-the-wrong-password");
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page.getByText(/too many sign-in attempts/i)).toBeVisible();
+  });
+
+  test("distinct emails signing in from the same client are never cross-blocked by a shared/non-distinguishing IP bucket", async ({ page }) => {
+    // Regression test for the defect found in this project's own
+    // auth_rate_limit_attempts table (2026-09-17): the sign-in server
+    // action's IP bucket (app/actions/auth.ts) keyed on whatever
+    // `x-forwarded-for` resolves to for this client — "unknown" with no
+    // header at all (true for a direct connection to a local/preview
+    // deployment with nothing in front of it), which every unrelated
+    // visitor collapsed into. Ten failed sign-ins by anyone, for any
+    // account, exhausted that one shared bucket and then blocked every
+    // other visitor's sign-in for the rest of the window — indistinguishable
+    // from "login is broken" to the next real user, whose own credentials
+    // and attempt count were never the issue. isDistinguishingClientIp()
+    // (lib/security/rateLimiter.ts) now excludes exactly this kind of
+    // address from IP-bucket enforcement, so only the per-email bucket
+    // (which is correctly scoped to one account) can ever block a sign-in.
+    //
+    // Eleven distinct, never-before-used identities from the one Playwright
+    // client: before the fix, the 11th would have been blocked by the
+    // shared IP bucket regardless of its own (empty) history. After the
+    // fix, it is evaluated purely on its own — still-empty — per-email
+    // bucket, so it reaches Supabase and gets Supabase's own answer.
+    await page.goto("/sign-in");
+    for (let i = 0; i < 11; i++) {
+      const email = `e2e-ratelimit-ip-${Date.now()}-${i}@e2e.wonderagent.test`;
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill("definitely-the-wrong-password");
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page.getByText(/invalid login credentials/i)).toBeVisible();
+      await expect(page.getByText(/too many sign-in attempts/i)).toHaveCount(0);
+    }
+  });
+
+  test("sign-up is blocked with the rate-limit message once the per-email attempt limit is reached", async ({ page }) => {
+    // Real-TLD address — GoTrue rejects .test outright on the signup path
+    // (see the "fresh, valid email" test above), and every attempt here
+    // must reach our own checkAndRecordAttempt() regardless of what
+    // Supabase itself does with the address afterwards.
+    const email = `e2e-ratelimit-signup-${Date.now()}@example.com`;
+    await page.goto("/sign-up");
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await page.getByLabel("Email").fill(email);
+      await page.getByLabel("Password").fill(E2E_PASSWORD);
+      await page.getByRole("button", { name: "Sign up", exact: true }).click();
+      // Not asserted further here — Supabase's own response to a repeat
+      // submission of the same address (success-shaped, or its own SMTP
+      // throttling) isn't this test's concern; only that our rate limiter
+      // has now recorded 5 attempts for this email within the hour.
+      await page.waitForTimeout(300);
+      await page.goto("/sign-up");
+    }
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByRole("button", { name: "Sign up", exact: true }).click();
+    await expect(page.getByText(/too many sign-up attempts/i)).toBeVisible();
   });
 });
 

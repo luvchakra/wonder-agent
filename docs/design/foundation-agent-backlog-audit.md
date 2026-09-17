@@ -788,3 +788,98 @@ preview deployment `dpl_48kHKDmRFB2eTeXmH2GSfk45cTtm`, `/`, `/welcome` and
 which is why the authenticated routes still 500 there. That is a project
 configuration step in Vercel's dashboard, not a code change, and none of
 these values may be committed (CLAUDE.md §16). Flagged to the user.
+
+---
+
+## 2026-09-17 — Sign-in/sign-up rate limiter could lock out unrelated users on a shared/non-distinguishing IP
+
+**Reported:** the user observed login and sign-up "not working properly."
+
+**Investigated two independent causes, both confirmed with live evidence, not guessed:**
+
+1. **This project's Vercel Preview environment is missing
+   `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` /
+   `SUPABASE_SERVICE_ROLE_KEY` / `SECRET_ENCRYPTION_KEY`** — the same gap
+   flagged as open in the 2026-09-17 "Proxy no longer takes the whole
+   deployment down on missing env" entry above, still unresolved.
+   `get_runtime_errors` on the Vercel project shows `Missing required
+   environment variable: NEXT_PUBLIC_SUPABASE_URL` on routes `/sign-in`,
+   `/sign-up`, `/agents` — 9 occurrences, 4 distinct users, as recently as
+   2026-09-17T17:30:16Z (deployment `dpl_HsrzHs87ntugqDnv3k1R6sLjrmHw`,
+   `target: null` — a Preview build). Any Preview deployment 500s on
+   sign-in/sign-up outright until this is fixed. **Not a code change** —
+   these are secrets that must be set in Vercel's dashboard (Project
+   Settings → Environment Variables, Preview scope) and must never be
+   typed into a committed file or this conversation (CLAUDE.md §16). No
+   Vercel MCP tool in this session can write environment variable values
+   (deliberately — they're secrets), so this cannot be applied by an
+   agent; it needs the user, or whoever holds the project's Vercel access,
+   to do it directly.
+
+2. **The sign-in/sign-up rate limiter's IP bucket could collapse many
+   unrelated visitors into one counter and block all of them together —
+   a real code defect, now fixed.** `app/actions/auth.ts`'s `clientIp()`
+   falls back to the literal string `"unknown"` when `x-forwarded-for` is
+   absent, and — confirmed against this project's own
+   `auth_rate_limit_attempts` table — an intermediary in front of at least
+   one deployment reports the loopback address `127.0.0.1` for every
+   request regardless of the real visitor. Both values get used as the
+   `signin:ip`/`signup:ip` rate-limit bucket key exactly like a real,
+   distinguishing client IP would be. Queried the live table directly: the
+   `signin:ip` bucket for subject `127.0.0.1` was sitting at 10/10 attempts
+   within its 5-minute window as of 17:22:31Z — meaning every sign-in from
+   behind that address, by anyone, for any account, was being rejected
+   with "Too many sign-in attempts" regardless of whose credentials they
+   used. `tests/e2e/support/seedTestData.ts`'s `clearAuthRateLimits()`
+   already works around the *test suite* tripping this same mechanism
+   (its own comment: "looks like an auth bug and isn't one") — but the
+   identical mechanism was never fixed for real traffic, and a corporate
+   NAT/shared IP, not just a test runner, can trigger it for real users.
+
+   **Change:** added `isDistinguishingClientIp()` to
+   `lib/security/rateLimiter.ts` — rejects `"unknown"`, `""`, and known
+   non-distinguishing loopback/unspecified addresses
+   (`127.0.0.1`/`::1`/`::ffff:127.0.0.1`/`0.0.0.0`). `signInAction()` and
+   `signUpAction()` in `app/actions/auth.ts` now skip the IP-bucket check
+   entirely when the resolved address fails that test, relying solely on
+   the per-email bucket (unchanged: 10/5min sign-in, 5/hour sign-up),
+   which already fully protects each individual account regardless of
+   which IP it's attempted from. **Deliberately not done:** did not widen
+   or remove the IP bucket for a genuinely distinguishing address — it
+   stays as defense-in-depth against a single source hitting many
+   different accounts.
+
+   Unblocked the live project immediately: deleted the saturated
+   `signin:ip`/`signup:ip` rows from `auth_rate_limit_attempts` directly
+   (an operational rate-limit cache, not the audit trail — `audit_logs` is
+   untouched).
+
+**Tests added:**
+- `lib/security/rateLimiter.test.ts` (new) — `checkAndRecordAttempt()`
+  allow/block/prune behavior, and `isDistinguishingClientIp()` against
+  every case above plus a real distinguishing IP (must still enforce).
+- `tests/e2e/auth.spec.ts` — new `"rate limiting"` describe block:
+  sign-in's own rate-limit message is now actually asserted (previously
+  untested even though the feature existed); a regression test signing in
+  as 11 distinct, never-before-used identities from one client and
+  asserting none is ever blocked by a shared IP bucket (the defect above,
+  directly); sign-up's rate-limit message. Also added: empty-field
+  submission is blocked client-side on both screens (never reaches the
+  server action), and a signed-in session survives a full page reload
+  without bouncing to `/welcome` or `/sign-in` (regression coverage for
+  EXPERIENCE-P0-14's proxy rewrite of `/`).
+
+**Verified:** `npm run typecheck`, `npm run lint`, and the full `npm run
+test` (vitest) suite — 269/269 passing, including the 19 new/changed
+tests in `lib/security/rateLimiter.test.ts`. The new
+`tests/e2e/auth.spec.ts` cases were not run in this environment — no
+`SUPABASE_SERVICE_ROLE_KEY` is available here (correctly: it's a secret,
+and this session has no tool that exposes it), so `next build`/`next
+start` cannot serve authenticated routes locally. They follow this
+suite's existing conventions exactly (dedicated, timestamp-unique
+identities per CLAUDE.md's isolation pattern; never touch a shared
+`TEST_USERS` identity's bucket) and should be run for real with `npm run
+test:e2e` wherever `.env.local` is configured, before merging.
+
+**Open — needs the user:** the Vercel Preview environment variable gap in
+finding 1 above. Everything in finding 2 is code-complete on this branch.
