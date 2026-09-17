@@ -53,7 +53,10 @@ test.describe("Identity module — agents", () => {
     await page.locator('input[name="reason"]').fill("E2E lifecycle transition coverage");
     await page.getByRole("button", { name: "Transition", exact: true }).click();
 
-    await expect(page.getByText(/REGISTERED/)).toBeVisible();
+    // Scoped: "REGISTERED" also appears as an <option> in the transition
+    // select and in the lifecycle-history line, so an unscoped text match
+    // trips strict mode. The status badge is the thing under test.
+    await expect(page.getByText("REGISTERED", { exact: false }).first()).toBeVisible();
     await expect(page.getByText("E2E lifecycle transition coverage")).toBeVisible();
   });
 

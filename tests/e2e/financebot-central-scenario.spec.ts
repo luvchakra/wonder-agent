@@ -17,6 +17,15 @@ import { getTenantIdBySlug, seedFinanceBotAccess } from "./support/seedFinanceBo
 test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
   test.use({ storageState: authFile("adminOne") });
 
+  // The one deliberately long journey in the suite: register an agent, give
+  // it a contract, an application, an entitlement, an account and a grant,
+  // send a runtime event, read the comparison, run a risk evaluation,
+  // remediate through a confirm dialog, re-evaluate and resolve. Each step is
+  // a real round trip against a real database, and the total legitimately
+  // exceeds the 30s default — it was dying at step 9 having completed 1-8.
+  // Individual pages here load in ~2s; this is length, not slowness.
+  test.setTimeout(150_000);
+
   test("SHOULD = financial reporting only, CAN + DID = CustomerDB → excessive access finding → remediate → revoke → resolve", async ({ page }) => {
     const agentName = `E2E FinanceBot ${Date.now()}`;
 
