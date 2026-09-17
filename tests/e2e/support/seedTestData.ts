@@ -57,11 +57,7 @@ async function ensurePlatformTenant(supabase: SupabaseClient, tenantId: string):
 async function ensureAuthUser(supabase: SupabaseClient, email: string, password: string): Promise<string> {
   const { data: existing, error: selectError } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
   if (selectError) throw new Error(`ensureAuthUser(${email}) select failed: ${selectError.message}`);
-  if (existing) {
-    // Idempotent for tenants seeded before this helper existed, too.
-    await ensurePlatformTenant(supabase, existing.id as string);
-    return existing.id as string;
-  }
+  if (existing) return existing.id as string;
 
   const { data: created, error: createError } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
   if (createError || !created.user) throw new Error(`ensureAuthUser(${email}) createUser failed: ${createError?.message}`);
