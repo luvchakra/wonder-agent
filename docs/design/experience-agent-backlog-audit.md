@@ -1921,3 +1921,86 @@ campaign-row assertion moved from a table `row` role to a `listitem`. The
 two remaining failures are both pre-existing and unrelated to this work:
 the GoTrue fresh-signup case (needs an MX-backed domain) and the FinanceBot
 scenario's final `resolved` assertion.
+
+### 2026-09-17 — Playwright design review of the rebuilt UI
+
+The user asked for the rebuilt UI to be *tested* against the supplied
+design, not just eyeballed. Two things came out of that: a repeatable
+conformance spec, and four real look-and-feel defects it (or the
+screenshots it drove) exposed.
+
+**New spec — `tests/e2e/design-review.spec.ts`.** The mechanical half of
+UI-UX-DESIGN-RULES.md §32's checklist, run over twelve top-level customer
+routes:
+
+- No clipped content at seven widths (1680 / 1440 / 1280 / 1024 / 834 /
+  430 / 390). It measures content wider than the viewport that is *not*
+  inside a declared scroll region — clipping, rather than a deliberate
+  internal scroll.
+- The rail and the tab bar swap at `lg`, never both visible, never
+  neither.
+- The rail stays a dark surface in **both** themes while the page
+  background flips. Note for anyone extending this: the tokens are OKLCH,
+  so `getComputedStyle` returns `lab(...)`, and parsing that string with a
+  number regex silently misreads it as RGB — the check paints the colour
+  onto a 1×1 canvas to normalize it first.
+- Exactly one `<h1>` per screen.
+- No `[object Object]`, `undefined`, `NaN` or `{"type":` in visible text —
+  a standing guard against the `JSON.stringify` defect fixed earlier today.
+- Mobile tab hit areas are at least 40px tall.
+
+Whether a screen *looks* right is still a human call; this only catches
+what a machine can judge.
+
+**Defects fixed:**
+
+1. **The agents list looked like a debug dump on a phone.** `DataTable`'s
+   generic card transform stacked each row as `AGENT / LIFECYCLE /
+   CRITICALITY` label-value pairs, nothing like the design's single-line
+   mobile row. `DataTable` (and `SimpleDataTable`) now take an optional
+   `renderCard`, and the agents list supplies the design's row — tile,
+   name, `source · type`, status, chevron. Screens that pass nothing are
+   unchanged.
+2. **The governance-posture card left a dead gap** under its donut
+   whenever the grid row was taller than its content. `Card` is now a flex
+   column so a body marked `flex-1` can take the spare height; cards that
+   do not opt in look exactly as before.
+3. **The dashboard hero panel lost its edge in dark mode** — it uses the
+   rail's navy, which sits close to `--card` there — so it now carries an
+   explicit ring.
+4. **Runtime rows printed an empty "—" line** on narrow viewports for
+   events with no resource or application. Suppressed.
+
+Quick actions also went back to the design's 2×2 grid at rail width.
+
+**Improved, not a defect:** `TableContainer`'s horizontal scroll was
+implicit, so a table wider than a phone could not be reached without a
+pointer. It is now a named `role="region"` with `tabIndex={0}` and a focus
+ring.
+
+**Reported, not fixed — other modules' screens.** Eleven customer screens
+still render a raw `TableContainer` that scrolls horizontally below `md`
+instead of collapsing to cards, which UI-UX-DESIGN-RULES.md's table
+section forbids for critical data: `/audit`, `/reports/[type]`,
+`/risk/rogue`, `/integrations/jobs`, `/agents/duplicates`,
+`/access/agents/[agentId]`, `/runtime/agents/[agentId]`, and four
+`/settings/*` pages. These belong to the Operations, Risk, Integration,
+Identity, Access, Runtime and Foundation agents respectively. The shared
+primitive they would need (`DataTable` with `renderCard`) now exists, but
+converting another module's screens is that module's call, not
+Experience's (non-negotiable #18) — recorded here rather than done.
+
+Also noted while reviewing, not acted on: `/access` renders "Applications"
+twice (page title and card title) and ends with a stray "← AI Agents"
+link. Cosmetic, Access Agent's screen.
+
+**Dev-environment note:** the review needed a tenant with realistic data,
+so the demo tenant's admin (`ava.chen@northwind.example`, the Northwind
+Financial demo kept by the user's 2026-09-17 decision) had its password
+reset through the service-role admin API. It is a demo account in the dev
+project only; the new password is not committed anywhere.
+
+**Verified:** typecheck, lint, build, and the full Playwright suite —
+107 of 109 passing. The two failures are the same pre-existing pair: the
+GoTrue fresh-signup case (needs an MX-backed domain) and the FinanceBot
+scenario's final `resolved` assertion.

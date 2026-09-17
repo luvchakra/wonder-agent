@@ -10,7 +10,14 @@ import { cn } from "@/lib/utils";
  * output), not as the card's primary visual definition anymore.
  */
 export function Card({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <div className={cn("rounded-xl border border-border/60 bg-card text-card-foreground shadow-md", className)}>{children}</div>;
+  // `flex flex-col` so a card placed in a stretched grid row can hand the
+  // spare height to a body marked `flex-1` instead of leaving a dead gap
+  // under its content. Cards that do not opt in look exactly as before.
+  return (
+    <div className={cn("flex flex-col rounded-xl border border-border/60 bg-card text-card-foreground shadow-md", className)}>
+      {children}
+    </div>
+  );
 }
 
 export function CardHeader({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {

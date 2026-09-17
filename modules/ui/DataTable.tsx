@@ -102,6 +102,7 @@ export function DataTable<T>({
   emptyDescription,
   filterPlaceholder = "Filter…",
   onRowClick,
+  renderCard,
 }: {
   columns: DataTableColumn<T>[];
   rows: T[];
@@ -113,6 +114,15 @@ export function DataTable<T>({
   emptyDescription?: string;
   filterPlaceholder?: string;
   onRowClick?: (row: T) => void;
+  /**
+   * Below `md`, render each row as this instead of the generic
+   * label/value card. A screen whose design has a real mobile row — an
+   * avatar, a title, a subtitle and a status — should supply it here:
+   * the generic transform turns that into a stack of
+   * "AGENT / LIFECYCLE / CRITICALITY" pairs, which is legible but reads
+   * as a debug dump rather than a designed list.
+   */
+  renderCard?: (row: T) => React.ReactNode;
 }) {
   const totalPages = Math.max(1, Math.ceil(totalCount / state.pageSize));
 
@@ -192,27 +202,35 @@ export function DataTable<T>({
           </div>
 
           {/* Narrow viewports: card-transform, below md only. */}
-          <ul className="space-y-2 md:hidden">
-            {rows.map((row) => (
-              <li key={getRowId(row)}>
-                <button
-                  type="button"
-                  onClick={() => onRowClick?.(row)}
-                  disabled={!onRowClick}
-                  className="w-full rounded-lg border border-border bg-background p-3 text-left shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
-                >
-                  <dl className="space-y-1">
-                    {columns.map((col) => (
-                      <div key={col.key} className="flex items-baseline justify-between gap-3 text-sm">
-                        <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{col.cardLabel ?? col.header}</dt>
-                        <dd className="text-right text-foreground">{col.render(row)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </button>
-              </li>
-            ))}
-          </ul>
+          {renderCard ? (
+            <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border/60 bg-card shadow-md md:hidden">
+              {rows.map((row) => (
+                <li key={getRowId(row)}>{renderCard(row)}</li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="space-y-2 md:hidden">
+              {rows.map((row) => (
+                <li key={getRowId(row)}>
+                  <button
+                    type="button"
+                    onClick={() => onRowClick?.(row)}
+                    disabled={!onRowClick}
+                    className="w-full rounded-lg border border-border bg-background p-3 text-left shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-default"
+                  >
+                    <dl className="space-y-1">
+                      {columns.map((col) => (
+                        <div key={col.key} className="flex items-baseline justify-between gap-3 text-sm">
+                          <dt className="shrink-0 text-xs font-medium uppercase tracking-wide text-muted-foreground">{col.cardLabel ?? col.header}</dt>
+                          <dd className="text-right text-foreground">{col.render(row)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </>
       )}
 
@@ -264,6 +282,7 @@ export function SimpleDataTable<T>({
   emptyDescription,
   filterPlaceholder = "Filter…",
   onRowClick,
+  renderCard,
 }: {
   rows: T[];
   columns: DataTableColumn<T>[];
@@ -276,6 +295,15 @@ export function SimpleDataTable<T>({
   emptyDescription?: string;
   filterPlaceholder?: string;
   onRowClick?: (row: T) => void;
+  /**
+   * Below `md`, render each row as this instead of the generic
+   * label/value card. A screen whose design has a real mobile row — an
+   * avatar, a title, a subtitle and a status — should supply it here:
+   * the generic transform turns that into a stack of
+   * "AGENT / LIFECYCLE / CRITICALITY" pairs, which is legible but reads
+   * as a debug dump rather than a designed list.
+   */
+  renderCard?: (row: T) => React.ReactNode;
 }) {
   const state = useTableState(paramPrefix, { sortKey: defaultSortKey ?? null, pageSize: 25 });
   const filtered = useClientFilteredRows(rows, state.filter, getSearchableText);
@@ -304,6 +332,7 @@ export function SimpleDataTable<T>({
       emptyDescription={emptyDescription}
       filterPlaceholder={filterPlaceholder}
       onRowClick={onRowClick}
+      renderCard={renderCard}
     />
   );
 }

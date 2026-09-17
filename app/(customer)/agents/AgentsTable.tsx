@@ -155,6 +155,33 @@ export function AgentsTable({ agents }: { agents: AgentRow[] }) {
         state={state}
         emptyTitle="No agents match this filter"
         filterPlaceholder="Search agents…"
+        // Below `md` the generic card transform would stack the columns as
+        // "AGENT / LIFECYCLE / CRITICALITY" label-value pairs. The design's
+        // mobile row is a single line — tile, name, source, status,
+        // chevron — so supply it rather than accept the debug-dump look.
+        renderCard={(a) => (
+          <Link
+            href={`/agents/${a.id}`}
+            className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+          >
+            <span
+              aria-hidden="true"
+              className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-muted text-xs font-semibold uppercase text-muted-foreground"
+            >
+              {(a.sourceSystem?.trim() || a.displayName?.trim() || a.agentName).slice(0, 2)}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium text-foreground">
+                {a.displayName?.trim() || a.agentName}
+              </span>
+              <span className="block truncate text-xs text-muted-foreground">
+                {a.sourceSystem ? `${a.sourceSystem} · ${a.agentType}` : a.agentType}
+              </span>
+            </span>
+            <StatusBadge tone={LIFECYCLE_TONE[a.lifecycleState] ?? "neutral"}>{a.lifecycleState}</StatusBadge>
+            <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </Link>
+        )}
       />
     </div>
   );

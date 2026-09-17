@@ -220,7 +220,7 @@ export default async function OverviewPage() {
           <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
             <Card>
               <CardHeader title="Agent governance posture" description="Every agent, scored across 12 dimensions" />
-              <CardBody className="flex items-center justify-center py-5">
+              <CardBody className="flex flex-1 items-center justify-center py-5">
                 <DonutChart
                   slices={postureSlices}
                   centerValue={agents.length}
@@ -380,7 +380,11 @@ export default async function OverviewPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="rounded-xl bg-sidebar p-5 text-sidebar-foreground shadow-md">
+          {/* Uses the rail's own navy in both themes, so it reads as the
+              same "product frame" surface rather than another card. In dark
+              mode that navy sits close to --card, hence the explicit ring
+              to keep it a distinct panel. */}
+          <div className="rounded-xl bg-sidebar p-5 text-sidebar-foreground shadow-md ring-1 ring-sidebar-border">
             <h2 className="text-lg font-semibold leading-snug tracking-[-0.01em]">
               Turn AI agents into a force for good.
             </h2>
@@ -396,7 +400,7 @@ export default async function OverviewPage() {
 
           <Card>
             <CardHeader title="Quick actions" />
-            <CardBody className="grid grid-cols-2 gap-2 xl:grid-cols-1 2xl:grid-cols-2">
+            <CardBody className="grid grid-cols-2 gap-2">
               {[
                 { href: "/agents/new", icon: Plus, title: "Register agent", sub: "Onboard and define governance" },
                 { href: "/compliance/campaigns", icon: ClipboardCheck, title: "Run certification", sub: "Validate access and ownership" },

@@ -145,9 +145,13 @@ export function RuntimeActivity({ rows, windowLabel }: { rows: ActivityRow[]; wi
                         <span className="shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                           {row.action}
                         </span>
-                        <span className="min-w-0 basis-full truncate text-xs text-muted-foreground sm:basis-auto sm:w-56">
-                          {row.resource ?? row.application ?? "—"}
-                        </span>
+                        {row.resource || row.application ? (
+                          <span className="min-w-0 basis-full truncate text-xs text-muted-foreground sm:w-56 sm:basis-auto">
+                            {row.resource ?? row.application}
+                          </span>
+                        ) : (
+                          <span className="hidden text-xs text-muted-foreground sm:inline sm:w-56">—</span>
+                        )}
                         <Badge tone={row.success ? "success" : "danger"}>{row.success ? "Allowed" : "Blocked"}</Badge>
                       </button>
                     </li>
