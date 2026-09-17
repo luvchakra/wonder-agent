@@ -1,21 +1,46 @@
-import { Activity, Bot, ClipboardList, LayoutDashboard, Plug, Search, Settings, ShieldAlert, ShieldCheck, type LucideIcon } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  ClipboardCheck,
+  ClipboardList,
+  FileBarChart,
+  Home,
+  KeyRound,
+  LayoutDashboard,
+  Plug,
+  Radar,
+  Scale,
+  ScrollText,
+  Search,
+  Settings,
+  ShieldAlert,
+  ShieldCheck,
+  type LucideIcon,
+} from "lucide-react";
 
 /**
- * Resolves a nav group's icon name to its lucide-react component — same
- * "name string on the data, component lookup in the shell" pattern
- * WonderArk's own ModuleIcon uses (packages/core/src/components/shell/
- * module-icon.tsx), so nav data stays plain/serializable.
+ * Resolves a nav item's icon name to its lucide-react component — the
+ * "name string on the data, component lookup in the shell" pattern that
+ * keeps modules/ui/shell-nav.ts plain and serializable, so the server
+ * layout can pass it straight into client components.
  */
 const ICONS: Record<string, LucideIcon> = {
-  LayoutDashboard,
-  Bot,
-  ShieldCheck,
   Activity,
-  ShieldAlert,
-  Plug,
-  Search,
+  Bot,
+  ClipboardCheck,
   ClipboardList,
+  FileBarChart,
+  Home,
+  KeyRound,
+  LayoutDashboard,
+  Plug,
+  Radar,
+  Scale,
+  ScrollText,
+  Search,
   Settings,
+  ShieldAlert,
+  ShieldCheck,
 };
 
 export function NavIcon({ name, className }: { name?: string; className?: string }) {

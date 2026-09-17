@@ -53,11 +53,18 @@
   --input: oklch(0 0 0 / 10%);
   --ring: oklch(0.546 0.215 260 / 50%);
 
-  --sidebar: oklch(0.995 0.002 250);
-  --sidebar-foreground: oklch(0.22 0.02 258);
-  --sidebar-accent: oklch(0.93 0.03 260);
-  --sidebar-accent-foreground: oklch(0.4 0.18 260);
-  --sidebar-border: oklch(0 0 0 / 7%);
+  /* The primary navigation is a deep navy surface in BOTH themes — it is
+     the product's fixed frame, not a themed content surface, so these
+     tokens are deliberately declared once here and NOT re-declared in the
+     dark blocks below. Everything inside the sidebar must be coloured
+     from these tokens (never from --foreground/--muted-foreground, which
+     invert with the theme and would go dark-on-dark in light mode). */
+  --sidebar: oklch(0.212 0.032 264);
+  --sidebar-foreground: oklch(0.965 0.004 250);
+  --sidebar-muted-foreground: oklch(0.7 0.018 258);
+  --sidebar-accent: oklch(0.312 0.055 264);
+  --sidebar-accent-foreground: oklch(0.985 0.003 250);
+  --sidebar-border: oklch(1 0 0 / 10%);
 
   --radius: 0.625rem;
   --shadow-sm: 0 1px 3px oklch(0.16 0.015 257 / 0.06);
@@ -97,11 +104,6 @@
     --input: oklch(0.5 0.025 257);
     --ring: oklch(0.72 0.17 262);
 
-    --sidebar: oklch(0.205 0.016 257);
-    --sidebar-foreground: oklch(0.95 0.005 250);
-    --sidebar-accent: oklch(0.28 0.05 262);
-    --sidebar-accent-foreground: oklch(0.85 0.07 262);
-    --sidebar-border: oklch(1 0 0 / 8%);
 
     --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
@@ -140,11 +142,6 @@
   --input: oklch(0.5 0.025 257);
   --ring: oklch(0.72 0.17 262);
 
-  --sidebar: oklch(0.205 0.016 257);
-  --sidebar-foreground: oklch(0.95 0.005 250);
-  --sidebar-accent: oklch(0.28 0.05 262);
-  --sidebar-accent-foreground: oklch(0.85 0.07 262);
-  --sidebar-border: oklch(1 0 0 / 8%);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
   --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
@@ -175,6 +172,7 @@
   --color-ring: var(--ring);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);

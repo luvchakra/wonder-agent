@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Check, ChevronDown, Plus } from "lucide-react";
+import { Building2, Check, ChevronDown, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TenantOption } from "./AccountPanel";
 
@@ -32,9 +32,18 @@ import type { TenantOption } from "./AccountPanel";
 export function WorkspaceSwitcher({
   tenants,
   onSelectTenant,
+  variant = "topbar",
 }: {
   tenants: TenantOption[];
   onSelectTenant: (formData: FormData) => void | Promise<void>;
+  /**
+   * "topbar" is the bordered chip in the page header; "sidebar" is the
+   * wider block pinned above the account panel on the navy rail, which
+   * must colour itself from the --sidebar* tokens rather than
+   * --foreground/--accent (those invert with the theme, and the rail
+   * does not).
+   */
+  variant?: "topbar" | "sidebar";
 }) {
   const current = tenants.find((t) => t.current);
   const [, startTransition] = useTransition();
@@ -50,13 +59,41 @@ export function WorkspaceSwitcher({
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-        >
-          <span className="truncate">{current?.name ?? "Select organization"}</span>
-          <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        </button>
+        {variant === "sidebar" ? (
+          <button
+            type="button"
+            aria-label="Switch organization"
+            className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+          >
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground">
+              <Building2 className="size-4" aria-hidden="true" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{current?.name ?? "Select organization"}</span>
+              <span className="block truncate text-xs text-sidebar-muted-foreground">
+                {current?.slug ? `wonderagent.app/${current.slug}` : "No organization selected"}
+              </span>
+            </span>
+            <ChevronDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label="Switch organization"
+            className="flex min-w-0 items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            <span className="flex size-6 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <Building2 className="size-3.5" aria-hidden="true" />
+            </span>
+            <span className="hidden min-w-0 text-left sm:block">
+              <span className="block truncate leading-tight">{current?.name ?? "Select organization"}</span>
+              <span className="block truncate text-[11px] font-normal leading-tight text-muted-foreground">
+                Production
+              </span>
+            </span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </button>
+        )}
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content

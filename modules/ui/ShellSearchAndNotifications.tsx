@@ -34,6 +34,7 @@ type Notification = {
  * for real rather than the earlier NotYetAvailable placeholder.
  */
 export function ShellGlobalSearch() {
+  const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -53,19 +54,41 @@ export function ShellGlobalSearch() {
     return () => clearTimeout(handle);
   }, [query]);
 
+  // ⌘K / Ctrl-K opens search from anywhere in the shell — the shortcut the
+  // trigger itself advertises, so it has to actually work.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
   const trimmedQuery = query.trim();
   const displayResults = trimmedQuery ? results : null;
 
   return (
-    <Dialog.Root onOpenChange={(open) => !open && setQuery("")}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setQuery("");
+      }}
+    >
       <Dialog.Trigger asChild>
         <button
           type="button"
           aria-label="Search"
-          className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-accent-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          className="flex h-9 w-full items-center gap-2.5 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground transition-colors hover:border-ring/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
         >
-          <Search className="size-4" aria-hidden="true" />
-          <span className="hidden text-xs text-muted-foreground md:inline">Search…</span>
+          <Search className="size-4 shrink-0" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate text-left">Search agents, owners, applications, actions…</span>
+          <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[10px] font-medium text-muted-foreground sm:inline">
+            ⌘K
+          </kbd>
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>

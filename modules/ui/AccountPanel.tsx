@@ -29,11 +29,14 @@ export type TenantOption = { id: string; name: string; slug: string; current: bo
 export function AccountPanel({
   email,
   displayName,
+  subtitle,
   isPlatformAdmin,
   onSignOut,
 }: {
   email: string;
   displayName?: string | null;
+  /** Second line under the name — the user's role in the current tenant. */
+  subtitle?: string | null;
   isPlatformAdmin?: boolean;
   onSignOut: (formData: FormData) => void | Promise<void>;
 }) {
@@ -46,11 +49,16 @@ export function AccountPanel({
         <DropdownMenu.Trigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 px-3 py-2.5 text-left hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
           >
             <Avatar name={displayName} email={email} size="sm" />
-            <span className="min-w-0 flex-1 truncate text-sm font-medium">{name}</span>
-            <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">{name}</span>
+              {subtitle ? (
+                <span className="block truncate text-xs text-sidebar-muted-foreground">{subtitle}</span>
+              ) : null}
+            </span>
+            <ChevronsUpDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />
           </button>
         </DropdownMenu.Trigger>
 
