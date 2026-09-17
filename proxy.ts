@@ -8,7 +8,7 @@ import {
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 
-const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback"];
+const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback", "/welcome"];
 
 /**
  * Refreshes the Supabase session cookie on every request (required by
@@ -41,6 +41,20 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // EXPERIENCE-P0-14 — the public landing page lives at /welcome but is
+  // SERVED at "/" for signed-out visitors. A rewrite (not a redirect) keeps
+  // the URL at "/" while rendering the marketing tree, which lets the
+  // landing page and the authenticated Overview share the root path without
+  // two route groups both declaring a `page.tsx` for it.
+  const { pathname } = request.nextUrl;
+  if (!user && pathname === "/") {
+    return NextResponse.rewrite(new URL("/welcome", request.url), { request });
+  }
+  // A signed-in user has no use for the marketing page; send them to the app.
+  if (user && pathname === "/welcome") {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
 
   if (user && !UNENFORCED_PATHS.some((p) => request.nextUrl.pathname.startsWith(p))) {
     const startedAt = request.cookies.get(SESSION_STARTED_COOKIE)?.value;

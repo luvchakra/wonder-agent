@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUpAction } from "@/app/actions/auth";
+import { AuthShell, Button, TextField } from "@/modules/ui";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -27,38 +29,52 @@ export default function SignUpPage() {
   }
 
   return (
-    <main style={{ maxWidth: 360, margin: "4rem auto", fontFamily: "sans-serif" }}>
-      <h1>Create your WonderAgent account</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ display: "block", width: "100%", marginBottom: 12 }}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ display: "block", width: "100%", marginBottom: 12 }}
-          />
-        </label>
-        {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
-        <button type="submit" disabled={submitting}>
+    <AuthShell
+      title="Create your WonderAgent account"
+      subtitle="Start governing your AI agents in minutes."
+      footer={
+        <>
+          Already have an account?{" "}
+          <Link href="/sign-in" className="font-medium text-primary hover:underline">
+            Sign in
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <TextField
+          label="Email"
+          name="email"
+          className="h-10 px-3"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <TextField
+          label="Password"
+          name="password"
+          className="h-10 px-3"
+          type="password"
+          autoComplete="new-password"
+          required
+          minLength={8}
+          hint="At least 8 characters."
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
+        {error ? (
+          <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+
+        <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? "Creating account…" : "Sign up"}
-        </button>
+        </Button>
       </form>
-      <p>
-        Already have an account? <a href="/sign-in">Sign in</a>
-      </p>
-    </main>
+    </AuthShell>
   );
 }

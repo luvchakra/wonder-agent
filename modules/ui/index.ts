@@ -21,3 +21,4 @@ export { Field, TextField, TextareaField, SelectField, fieldInputClass, fieldLab
 export { AiSummaryPanel } from "./AiSummaryPanel";
 export { AccessGraphView, layoutNodes, toFlowEdges } from "./AccessGraphView";
 export { AnnouncementsBanner } from "./AnnouncementsBanner";
+export { AuthShell } from "./AuthShell";

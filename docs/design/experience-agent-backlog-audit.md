@@ -1598,3 +1598,63 @@ verified in a real browser, in both themes, at three widths, against real
 tenant data. What remains open in this module is unrelated to this pass
 (EXPERIENCE-P0-04's bulk-action reporting, EXPERIENCE-P0-08's server-side
 pagination).
+
+---
+
+## 2026-09-17 — EXPERIENCE-P0-14: public landing page, restyled auth screens, real fonts
+
+**Why now.** The product had no front door: a signed-out visitor to `/` was
+redirected straight to `/sign-in`, and both auth screens were still the raw
+inline-styled scaffolding they shipped as (`<main style={{maxWidth:360,
+fontFamily:"sans-serif"}}>`), which CLAUDE.md §13 explicitly calls functional
+scaffolding pending this module's pass. User asked for a landing page with
+sign-in/sign-up, taking WonderArk as the reference point.
+
+**Routing.** Two route groups cannot both declare a `page.tsx` for `/`, and
+moving the authenticated Overview would have broken every `href="/"` and a
+dozen specs. So the landing page lives at `app/welcome/*` and `proxy.ts`
+**rewrites** `/` to it for unauthenticated requests — the URL stays `/`, the
+marketing tree renders, and the authenticated Overview is untouched. A
+signed-in user hitting `/welcome` is redirected into the app. `/welcome` was
+added to `UNENFORCED_PATHS` so session-expiry logic never applies to a page
+that has no session by definition.
+
+**Design.** Built entirely from the locked design system — the same OKLCH
+tokens, `modules/ui` primitives and CVA button variants the app uses. No
+second styling approach, and nothing from §5's prohibited list: no gradient
+backgrounds, glassmorphism, neon, glow or decorative blobs. The "AI/robotic"
+character the user asked for comes from precision rather than effects: a
+hairline 56px grid behind the hero and auth card (radially masked so it fades
+out, using `var(--border)` so it is correct in both themes), monospace for
+every machine-readable value, hairline borders on layered surfaces, and small
+status dots. The centrepiece is §11's SHOULD/CAN/DID model rendered in the
+product's own vocabulary, ending in a worked CRITICAL `excessive_access`
+finding for FinanceBot with its recommended revocation — the same scenario as
+CLAUDE.md §11, so the page argues the product's actual thesis rather than
+showing generic marketing filler.
+
+**Auth screens.** New `AuthShell` (Experience-owned, exported from
+`modules/ui`) gives `/sign-in` and `/sign-up` one centred card on the same
+grid, with the brand lockup linking back to the landing page. Behaviour is
+untouched — the rate-limited server actions, the SSO domain-lookup path, the
+session-expired notice, the client-side 8-character `minLength` block and
+every accessible name the E2E specs assert on are all preserved.
+
+**Fonts.** `globals.css` has always mapped `--font-sans`/`--font-mono` onto
+`--font-geist-sans`/`--font-geist-mono`, but nothing ever defined those
+variables, so the entire app silently rendered in `-apple-system`. Added the
+two `next/font/google` declarations in the root layout. No token name or value
+changed; every screen in the product now renders in the typeface the design
+system always specified.
+
+**Verified.** 0px horizontal overflow at all seven named widths
+(320/390/430/768/1024/1440/1920) across `/`, `/sign-in` and `/sign-up`; both
+themes checked by resolved `body` background and by eye on desktop and mobile
+screenshots; `body` font confirmed as Geist. One real defect caught and fixed
+during the pass: at <640px the header's theme toggle, "Log in" and "Get
+started" together overflowed by 18px, so the three-option toggle is now hidden
+below `sm` (the page still follows the OS colour scheme there). New
+`tests/e2e/welcome.spec.ts` covers the rewrite in both directions, both CTAs
+landing on the real auth screens, and the mobile overflow bound — 10 passing.
+`auth.spec.ts` + `navigation-smoke.spec.ts` re-run green (48 passing) to
+confirm the restyle broke no selector and the root rewrite broke no route.

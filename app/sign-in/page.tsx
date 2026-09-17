@@ -1,9 +1,11 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { signInAction } from "@/app/actions/auth";
+import { AuthShell, Button, TextField } from "@/modules/ui";
 
 export default function SignInPage() {
   return (
@@ -75,43 +77,65 @@ function SignInForm() {
   }
 
   return (
-    <main style={{ maxWidth: 360, margin: "4rem auto", fontFamily: "sans-serif" }}>
-      <h1>Sign in to WonderAgent</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ display: "block", width: "100%", marginBottom: 12 }}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={{ display: "block", width: "100%", marginBottom: 12 }}
-          />
-        </label>
+    <AuthShell
+      title="Sign in to WonderAgent"
+      subtitle="Govern every AI agent. Verify every action."
+      footer={
+        <>
+          Need an account?{" "}
+          <Link href="/sign-up" className="font-medium text-primary hover:underline">
+            Sign up
+          </Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <TextField
+          label="Email"
+          name="email"
+          className="h-10 px-3"
+          type="email"
+          autoComplete="email"
+          required
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+        <TextField
+          label="Password"
+          name="password"
+          className="h-10 px-3"
+          type="password"
+          autoComplete="current-password"
+          required
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+
         {sessionExpired && !error ? (
-          <p style={{ color: "#946200" }}>Your session expired. Please sign in again.</p>
+          <p role="status" className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
+            Your session expired. Please sign in again.
+          </p>
         ) : null}
-        {error ? <p style={{ color: "crimson" }}>{error}</p> : null}
-        <button type="submit" disabled={submitting}>
+        {error ? (
+          <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+
+        <Button type="submit" disabled={submitting} className="w-full">
           {submitting ? "Signing in…" : "Sign in"}
-        </button>
+        </Button>
       </form>
-      <button type="button" onClick={handleSsoSignIn} disabled={ssoChecking} style={{ marginTop: 8 }}>
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+        <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">or</span>
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      </div>
+
+      <Button type="button" variant="outline" onClick={handleSsoSignIn} disabled={ssoChecking} className="w-full">
         {ssoChecking ? "Checking…" : "Sign in with SSO"}
-      </button>
-      <p>
-        Need an account? <a href="/sign-up">Sign up</a>
-      </p>
-    </main>
+      </Button>
+    </AuthShell>
   );
 }
