@@ -51,10 +51,17 @@ export async function getTenantContext(): Promise<TenantContext> {
 
   const tenantId = activeMembership.tenant_id;
 
+  // Filtered by user_id for the same reason as the membership query above:
+  // the user_roles RLS policy is tenant-scoped, so without this the caller
+  // inherits the union of EVERY role held by EVERY member of the tenant —
+  // a READ_ONLY user in a tenant that also contains a TENANT_SUPER_ADMIN
+  // would resolve with role.manage, agent.create and the rest. Privilege
+  // escalation, not just a cosmetic over-fetch.
   const { data: roleRows } = await supabase
     .from("user_roles")
     .select("roles(name, role_permissions(permissions(key)))")
     .eq("tenant_id", tenantId)
+    .eq("user_id", user.id)
     .returns<
       { roles: { name: string; role_permissions: { permissions: { key: string } }[] } }[]
     >();
