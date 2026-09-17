@@ -10,7 +10,15 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { LinkButton } from "@/modules/ui";
+import { BrowserFrame, FlowDiagram, LinkButton, PhoneFrame } from "@/modules/ui";
+import agentsDesktopDark from "@/assets/product/agents-desktop-dark.png";
+import agentsDesktopLight from "@/assets/product/agents-desktop-light.png";
+import overviewDesktopDark from "@/assets/product/overview-desktop-dark.png";
+import overviewDesktopLight from "@/assets/product/overview-desktop-light.png";
+import overviewMobileDark from "@/assets/product/overview-mobile-dark.png";
+import overviewMobileLight from "@/assets/product/overview-mobile-light.png";
+import riskDesktopDark from "@/assets/product/risk-desktop-dark.png";
+import riskDesktopLight from "@/assets/product/risk-desktop-light.png";
 
 export const metadata: Metadata = {
   title: "WonderAgent — Govern every AI agent. Verify every action.",
@@ -149,17 +157,90 @@ export default function WelcomePage() {
         </div>
       </section>
 
+      {/* ------------------------------------------------ product shot */}
+      <section className="relative border-b border-border bg-card/40">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="relative -mt-10 pb-16 sm:-mt-14 sm:pb-20">
+            <BrowserFrame
+              light={overviewDesktopLight}
+              dark={overviewDesktopDark}
+              alt="The WonderAgent overview dashboard: agent counts, risk by severity, an action queue and recent findings for a tenant called Northwind Financial."
+              priority
+              sizes="(min-width: 1280px) 1100px, 100vw"
+            />
+            {/* The phone tucks into the corner on large screens and sits
+                beneath the browser on small ones, so neither is ever cropped. */}
+            <div className="mt-6 flex justify-center lg:mt-0 lg:absolute lg:-bottom-4 lg:-right-6 lg:block">
+              <PhoneFrame
+                light={overviewMobileLight}
+                dark={overviewMobileDark}
+                alt="The same overview on a phone, with the metric cards stacked two across."
+                className="w-40 sm:w-48 lg:w-[220px]"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ----------------------------------------------------- the problem */}
+      <section id="problem" className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="max-w-2xl">
+            <SectionLabel>The problem</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+              AI agents got production access. Nobody gave them an identity.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              An agent is provisioned like a service account, inherits access like a person, and
+              acts continuously like neither. Your IAM records the credential. Nothing records the
+              intent, the owner, or the behaviour — so the questions an auditor asks have no owner
+              inside the business.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-3">
+            {[
+              {
+                q: "Who owns this agent?",
+                a: "It was provisioned as SVC_FINANCEBOT_PRD by someone who has since changed teams. No business owner, no technical owner, nobody to approve a change to its access.",
+              },
+              {
+                q: "What is it allowed to do?",
+                a: "Its purpose lives in a ticket, a design doc, or somebody's memory — never anywhere a control can evaluate it. So \u201cis this access appropriate?\u201d has no answer.",
+              },
+              {
+                q: "What did it actually do last night?",
+                a: "Runtime logs sit in an observability tool keyed by service name, disconnected from the identity, the entitlement and the approval that allowed it.",
+              },
+            ].map((item) => (
+              <div key={item.q} className="rounded-xl border border-border bg-card p-5">
+                <p className="text-base font-semibold text-foreground">{item.q}</p>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.a}</p>
+              </div>
+            ))}
+          </div>
+
+          <p className="mt-8 max-w-3xl border-l-2 border-destructive/40 pl-4 text-base leading-relaxed text-foreground">
+            The gap is not that agents are dangerous. It is that{" "}
+            <span className="font-semibold">nothing compares what an agent was approved to do
+            against what it can reach and what it actually did</span> — so excessive access is only
+            discovered after it has been used.
+          </p>
+        </div>
+      </section>
+
       {/* ------------------------------------------- SHOULD / CAN / DID */}
       <section id="model" className="border-b border-border bg-card/40">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="max-w-2xl">
-            <SectionLabel>The governance model</SectionLabel>
+            <SectionLabel>The solution</SectionLabel>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
-              Three answers that should agree — and usually don&rsquo;t.
+              Close the gap by holding all three answers at once.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              Most teams can answer one of these. Governance needs all three, continuously, for
-              every agent.
+              WonderAgent keeps an agent&rsquo;s approved purpose, its effective access and its
+              observed behaviour side by side, and treats any divergence between them as a finding
+              with evidence attached.
             </p>
           </div>
 
@@ -241,6 +322,76 @@ export default function WelcomePage() {
                   the change lands.
                 </p>
               </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------ the flow, moving */}
+      {/* overflow-hidden: the comparison node's pulse ring scales past its
+          own box, and at phone widths that box already spans the viewport. */}
+      <section className="overflow-hidden border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="max-w-2xl">
+            <SectionLabel>How the evaluation runs</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+              One pipeline, running continuously.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Contract, entitlements and runtime events flow into the same deterministic comparison.
+              No model decides whether access is appropriate — the rules do, and the evidence is
+              kept.
+            </p>
+          </div>
+          <div className="mt-10">
+            <FlowDiagram />
+          </div>
+        </div>
+      </section>
+
+      {/* --------------------------------------------- inside the product */}
+      <section id="product" className="border-b border-border bg-card/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="max-w-2xl">
+            <SectionLabel>Inside the product</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+              Built for the person who has to answer for it.
+            </h2>
+          </div>
+
+          <div className="mt-10 grid gap-8 lg:grid-cols-2">
+            <div>
+              <BrowserFrame
+                light={riskDesktopLight}
+                dark={riskDesktopDark}
+                alt="The Risk screen listing every agent with open findings, worst severity first — FinanceBot critical, ProcurementCopilot high, SupportTriageBot medium."
+                label="app.wonderagent.com/risk"
+                sizes="(min-width: 1024px) 50vw, 100vw"
+              />
+              <h3 className="mt-5 text-base font-semibold text-foreground">
+                Risk, ordered by what to do first
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                Every agent with an open finding, worst severity first, each one tracing back to the
+                entitlement and the runtime event that produced it.
+              </p>
+            </div>
+
+            <div>
+              <BrowserFrame
+                light={agentsDesktopLight}
+                dark={agentsDesktopDark}
+                alt="The AI Agents inventory listing FinanceBot, SupportTriageBot, InvoiceReconciler, ProcurementCopilot and DataQualityAgent with lifecycle state, criticality and owner."
+                label="app.wonderagent.com/agents"
+                sizes="(min-width: 1024px) 50vw, 100vw"
+              />
+              <h3 className="mt-5 text-base font-semibold text-foreground">
+                An inventory that is actually governed
+              </h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                Lifecycle state, criticality and accountable owner on every agent — so an unowned
+                agent in production is a visible exception, not a silent one.
+              </p>
             </div>
           </div>
         </div>

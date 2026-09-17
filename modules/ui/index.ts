@@ -22,3 +22,5 @@ export { AiSummaryPanel } from "./AiSummaryPanel";
 export { AccessGraphView, layoutNodes, toFlowEdges } from "./AccessGraphView";
 export { AnnouncementsBanner } from "./AnnouncementsBanner";
 export { AuthShell } from "./AuthShell";
+export { BrowserFrame, PhoneFrame } from "./ProductShot";
+export { FlowDiagram } from "./FlowDiagram";

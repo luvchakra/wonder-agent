@@ -1658,3 +1658,80 @@ below `sm` (the page still follows the OS colour scheme there). New
 landing on the real auth screens, and the mobile overflow bound — 10 passing.
 `auth.spec.ts` + `navigation-smoke.spec.ts` re-run green (48 passing) to
 confirm the restyle broke no selector and the root rewrite broke no route.
+
+---
+
+## 2026-09-17 (later) — EXPERIENCE-P0-15: real product imagery, problem/solution narrative, animated flow
+
+User asked for screenshots of the working application on desktop and
+mobile, presented professionally with elevation, an animation showing data
+flow, and a clearly stated problem with its solution.
+
+**The screenshots are real, and reproducible.** Not mockups: they are the
+actual app, captured by `scripts/capture-landing-shots.mjs` against a running
+build, so they can be regenerated whenever the UI changes rather than going
+stale. Captured at DPR 2 into `assets/product/` (imported, not served from
+`public/`, so Next fingerprints and optimizes them and the originals are
+never exposed unoptimized). ~1MB for eight files.
+
+The demo data behind them was seeded deliberately, because the existing
+fixtures photograph badly — `E2E Agent 1789606872392` is not something to put
+on a landing page. A tenant (Northwind Financial) with five plausible agents
+(FinanceBot, SupportTriageBot, InvoiceReconciler, ProcurementCopilot,
+DataQualityAgent), four named owners across the business/technical/IAM/
+application owner types, real applications and entitlements, runtime events
+and three open findings at three severities. The data tells the product's own
+story: FinanceBot's critical excessive-access finding is the same scenario as
+CLAUDE.md §11, and ProcurementCopilot is deliberately left unowned so the
+ownership finding is real rather than staged.
+
+Two things learned while making the shots read as finished, both now handled
+in the capture script: the global "Welcome to WonderAgent" announcement banner
+was parked for the duration of each capture and restored immediately after
+(it is real product chrome, but it reads as demo scaffolding in a marketing
+shot); and viewport heights are tuned per screen so no frame has 200px of
+dead page under the content, with the two side-by-side desktop shots sharing
+a height so their captions align.
+
+**Theme pairing.** Every screen is captured light *and* dark, and
+`.theme-light-only` / `.theme-dark-only` (new, in `app/globals.css`) choose
+between them with guards that mirror the token blocks exactly. Done in CSS,
+not JS, so the correct image is right on first paint with no flash — and
+because the hidden one is `display: none`, the browser never downloads it.
+
+**Framing.** New `modules/ui/ProductShot.tsx` — `BrowserFrame` (hairline
+window chrome, traffic lights, a monospace URL pill) and `PhoneFrame`
+(rounded bezel with a speaker slot). Elevation is a three-layer shadow in the
+same OKLCH ink as the design tokens rather than a generic black blur, so it
+sits in the palette. On large screens the phone tucks into the browser's
+bottom-right corner; below `lg` it drops beneath, so neither is ever cropped.
+
+**Animation.** `modules/ui/FlowDiagram.tsx` shows contract + entitlements +
+runtime events flowing into the deterministic comparison and out as a
+finding. Real HTML nodes with small SVG connectors between them, not one wide
+SVG — the labels stay selectable, translatable and readable by AT, and the
+whole thing reflows from a row to a column instead of scaling into
+illegibility. Motion is a travelling stroke dash plus a pulse ring, both pure
+CSS, both disabled under `prefers-reduced-motion`: it conveys direction only,
+never information.
+
+**Narrative.** A dedicated problem section now precedes the solution — "AI
+agents got production access. Nobody gave them an identity." — framed as the
+three questions nobody can answer (who owns it, what is it allowed to do,
+what did it do last night), closing on the actual gap: nothing compares
+approved purpose against reachable access against observed behaviour. The
+old "governance model" section is re-framed as the answer to that.
+
+**Verified.** 0px horizontal overflow at 320/390/430/768/1024/1440/1920;
+exactly four of the eight product images visible per theme (the swap works
+and does not double-render). One real defect caught: the pulse ring scaled to
+1.9x past its own box and pushed the document 145px wide at phone widths —
+reduced to 1.28x with `overflow-hidden` on the section.
+
+Also fixed a genuine fixture defect this surfaced: `auth.spec.ts`'s
+fresh-signup test used an `@e2e.wonderagent.test` address, and GoTrue
+validates the address on the signup path and rejects the reserved `.test`
+TLD outright. That test could never have passed. The seeded identities only
+exist because they are inserted server-side, which skips that validation.
+Now uses an `@example.com` address (RFC 2606, real TLD). 53 passing across
+`welcome.spec.ts`, `auth.spec.ts` and `navigation-smoke.spec.ts`.

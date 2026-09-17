@@ -68,7 +68,13 @@ test.describe("unauthenticated", () => {
   });
 
   test("sign-up with a fresh, valid email does not error and leaves the sign-up page", async ({ page }) => {
-    const email = `pw-signup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@e2e.wonderagent.test`;
+    // NOT the @e2e.wonderagent.test domain the seeded identities use:
+    // GoTrue validates the address on the signup path and rejects the
+    // reserved `.test` TLD outright ("Email address ... is invalid"), so no
+    // signup through this form can ever succeed with it. The seeded users
+    // only exist because they are inserted server-side, which skips that
+    // validation. example.com is reserved by RFC 2606 and has a real TLD.
+    const email = `pw-signup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
     await page.goto("/sign-up");
     await page.getByLabel("Email").fill(email);
     await page.getByLabel("Password").fill(E2E_PASSWORD);

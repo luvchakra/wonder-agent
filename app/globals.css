@@ -210,3 +210,71 @@ body {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
+
+/*
+ * EXPERIENCE-P0-15 — theme-paired assets. Product screenshots exist in a
+ * light and a dark capture; only one may be visible. The guards mirror the
+ * token blocks above exactly (OS preference unless `data-theme` overrides
+ * it) so an image can never disagree with the surrounding surface.
+ */
+.theme-dark-only {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-dark-only {
+    display: block;
+  }
+  :root:not([data-theme="light"]) .theme-light-only {
+    display: none;
+  }
+}
+:root[data-theme="dark"] .theme-dark-only {
+  display: block;
+}
+:root[data-theme="dark"] .theme-light-only {
+  display: none;
+}
+
+/*
+ * EXPERIENCE-P0-15 — the landing page's data-flow animation. A dash travels
+ * the connector path from the source systems, through evaluation, to the
+ * finding, so the pipeline reads as a flow rather than a static diagram.
+ * Pure CSS on an SVG stroke: no animation library, no layout thrash.
+ */
+@keyframes wa-flow-dash {
+  to {
+    stroke-dashoffset: -28;
+  }
+}
+.wa-flow-line {
+  stroke-dasharray: 5 9;
+  animation: wa-flow-dash 1.1s linear infinite;
+}
+@keyframes wa-pulse-ring {
+  0% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+  70%,
+  100% {
+    opacity: 0;
+    transform: scale(1.28);
+  }
+}
+.wa-pulse-ring {
+  animation: wa-pulse-ring 2.4s ease-out infinite;
+}
+
+/* Motion is decoration here — never required to understand the diagram. */
+@media (prefers-reduced-motion: reduce) {
+  .wa-flow-line,
+  .wa-pulse-ring {
+    animation: none;
+  }
+  .wa-flow-line {
+    stroke-dasharray: 5 9;
+  }
+  .wa-pulse-ring {
+    opacity: 0.35;
+  }
+}

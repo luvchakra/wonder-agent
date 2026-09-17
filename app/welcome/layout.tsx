@@ -9,8 +9,9 @@ import { LinkButton, ThemeToggle } from "@/modules/ui";
  * getTenantContext() or anything that assumes a user.
  */
 const NAV = [
-  { href: "#model", label: "Governance model" },
-  { href: "#platform", label: "Platform" },
+  { href: "#problem", label: "The problem" },
+  { href: "#model", label: "The solution" },
+  { href: "#product", label: "Product" },
   { href: "#how-it-works", label: "How it works" },
 ] as const;
 

@@ -13,7 +13,7 @@ test.describe("landing page (signed out)", () => {
     await page.goto("/");
     await expect(page).toHaveURL("/");
     await expect(page.getByRole("heading", { name: /Govern every AI agent/i })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Three answers that should agree/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Close the gap by holding all three answers/i })).toBeVisible();
   });
 
   test("both calls to action reach the real auth screens", async ({ page }) => {
