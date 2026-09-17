@@ -702,3 +702,40 @@ filtering is defence-in-depth and must not be *replaced* by RLS. The
 
 Verified: `npm run typecheck`, `npm run lint`, `npm test` (44 files, 260
 tests) all clean after the change.
+
+---
+
+## 2026-09-17 — Sign-out scope decided: global, and now stated rather than inherited
+
+The E2E suite's first working sign-out test exposed that `signOutAction()`
+revoked every session the user held, on every device — one test logging out
+invalidated 39 other specs running in parallel on the same identity. That was
+never a written decision: `supabase.auth.signOut()` defaults to
+`scope: "global"` in supabase-js v2, and the code simply took the default.
+
+**Put to the user, who chose global.** Appropriate for a security product —
+an administrator who suspects a session is compromised gets one control that
+ends all of them, rather than having to hunt device by device. The trade-off
+they accepted is the ordinary one: logging out on a laptop also signs you out
+on your phone.
+
+Behaviour is therefore unchanged; what changed is that it is now explicit.
+`app/actions/tenant.ts` passes `{ scope: "global" }` with the decision and its
+date recorded inline, so a supabase-js upgrade that changes the default cannot
+silently downgrade the posture — which is exactly the kind of drift an
+inherited default invites.
+
+`proxy.ts`'s expiry path was made explicit the same way, but is **flagged, not
+decided**: that call is the idle/absolute-timeout path, not a user-initiated
+logout, so as written, timing out on one device also ends the user's sessions
+elsewhere. That was already the behaviour (same library default) and is
+consistent with the global posture, but the user decided the logout case, not
+this one. Left as-is and raised rather than changed unilaterally.
+
+Covered by a new test in `tests/e2e/auth.spec.ts`: two independent browser
+contexts sign in as the same identity, one logs out through the account menu,
+and the other is asserted to be bounced to `/sign-in` on its next navigation —
+a direct assertion of the global scope rather than a comment claiming it. It
+uses the dedicated `signOutOnly` identity for the same reason the other
+sign-out test does: a global revocation would otherwise take every parallel
+spec's session with it. 18/18 passing in `auth.spec.ts`.

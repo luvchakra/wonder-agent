@@ -65,7 +65,15 @@ export async function proxy(request: NextRequest) {
     );
 
     if (expired) {
-      await supabase.auth.signOut();
+      // Same global scope as signOutAction(), stated explicitly so the two
+      // sign-out paths cannot drift apart on a supabase-js upgrade. Note
+      // this is the IDLE/ABSOLUTE-EXPIRY path, not a user-initiated logout:
+      // it means timing out on one device also ends the user's sessions
+      // elsewhere. That is the current behaviour (it was always the
+      // library default) and is consistent with the product's global
+      // posture, but it was not separately decided — flagged here rather
+      // than changed.
+      await supabase.auth.signOut({ scope: "global" });
       const redirectResponse = NextResponse.redirect(new URL("/sign-in?reason=expired", request.url));
       redirectResponse.cookies.delete(SESSION_STARTED_COOKIE);
       redirectResponse.cookies.delete(SESSION_LAST_SEEN_COOKIE);

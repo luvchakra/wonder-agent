@@ -85,7 +85,15 @@ export async function selectTenantAction(formData: FormData) {
 
 export async function signOutAction() {
   const supabase = await supabaseServer();
-  await supabase.auth.signOut();
+  // `scope: "global"` is stated explicitly, not left to supabase-js's
+  // default, because it is a deliberate product decision (user, 2026-09-17):
+  // logging out revokes EVERY refresh token this user holds, on every
+  // device, not just the session doing the logging out. Appropriate for a
+  // security product — an administrator who suspects a session is
+  // compromised gets one control that ends all of them. Writing it down
+  // also means a supabase-js upgrade that changes the default cannot
+  // silently downgrade the posture.
+  await supabase.auth.signOut({ scope: "global" });
   const cookieStore = await cookies();
   cookieStore.delete(TENANT_COOKIE_NAME);
   // FOUNDATION-P0-09 — logout invalidation must also clear the session-

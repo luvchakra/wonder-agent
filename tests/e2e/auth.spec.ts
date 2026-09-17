@@ -127,6 +127,40 @@ test.describe("sign-out", () => {
     await page.goto("/agents");
     await expect(page).toHaveURL(/\/sign-in/);
   });
+
+  test("signing out is global — it ends the user's other sessions too", async ({ browser }) => {
+    // Asserts a deliberate product decision (user, 2026-09-17): logout
+    // revokes every refresh token the user holds, not just the current
+    // session. Two independent contexts, same identity; logging out of one
+    // must invalidate the other. Uses the dedicated sign-out identity for
+    // the same reason the test above does — a global revocation would
+    // otherwise take every parallel spec's session with it.
+    const first = await browser.newContext();
+    const second = await browser.newContext();
+    const pages = [];
+    for (const ctx of [first, second]) {
+      const page = await ctx.newPage();
+      await page.goto("/sign-in");
+      await page.getByLabel("Email").fill(TEST_USERS.signOutOnly.email);
+      await page.getByLabel("Password").fill(TEST_USERS.signOutOnly.password);
+      await page.getByRole("button", { name: "Sign in", exact: true }).click();
+      await expect(page).toHaveURL("/");
+      pages.push(page);
+    }
+    const [sessionA, sessionB] = pages;
+
+    await sessionA.getByRole("button", { name: "Open navigation" }).click();
+    await sessionA.getByRole("button", { name: TEST_USERS.signOutOnly.email }).click();
+    await sessionA.getByRole("menuitem", { name: "Log Out" }).click();
+    await expect(sessionA).toHaveURL(/\/sign-in/);
+
+    // The other session's refresh token is now revoked server-side.
+    await sessionB.goto("/agents");
+    await expect(sessionB).toHaveURL(/\/sign-in/);
+
+    await first.close();
+    await second.close();
+  });
 });
 
 test.describe("RBAC — negative permission checks", () => {

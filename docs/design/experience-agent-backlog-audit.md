@@ -1735,3 +1735,27 @@ TLD outright. That test could never have passed. The seeded identities only
 exist because they are inserted server-side, which skips that validation.
 Now uses an `@example.com` address (RFC 2606, real TLD). 53 passing across
 `welcome.spec.ts`, `auth.spec.ts` and `navigation-smoke.spec.ts`.
+
+---
+
+## 2026-09-17 — Demo tenant retained by decision
+
+The `Northwind Financial` tenant seeded for the landing page's product
+screenshots (five agents, four named owners, applications, entitlements,
+runtime events, three open findings) is **kept**, by the user's explicit
+decision, rather than torn down after the capture.
+
+Reason to keep it: `scripts/capture-landing-shots.mjs` needs a tenant whose
+data is worth photographing in order to regenerate the images when the UI
+changes. Without it the screenshots become unreproducible and start drifting
+from the product — which is the failure mode the script exists to prevent.
+
+What it implies, recorded so it is not a surprise later: the dev project now
+holds four sign-in-capable users under `@northwind.example`
+(`ava.chen`, `marcus.webb`, `priya.nair`, `tom.alvarez`). They are ordinary
+tenant members — `ava.chen` is TENANT_SUPER_ADMIN of that tenant only, the
+other three are READ_ONLY — and RLS scopes them to Northwind Financial like
+any other customer user, so they cannot see the `e2e-*` tenants or any other
+data. Their password is not committed anywhere; the capture script reads
+credentials from `WONDERAGENT_EMAIL`/`WONDERAGENT_PASSWORD`. Rotate or delete
+them whenever the demo data is no longer wanted.
