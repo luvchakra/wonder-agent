@@ -739,3 +739,52 @@ a direct assertion of the global scope rather than a comment claiming it. It
 uses the dedicated `signOutOnly` identity for the same reason the other
 sign-out test does: a global revocation would otherwise take every parallel
 spec's session with it. 18/18 passing in `auth.spec.ts`.
+
+---
+
+## 2026-09-17 — Proxy no longer takes the whole deployment down on missing env
+
+**Reported:** the Vercel preview served "Internal Server Error" on every URL,
+including `/welcome`, which is a static marketing page that touches no
+database. The build itself was clean.
+
+**Cause:** `proxy.ts` called Foundation's `getSupabaseUrl()` /
+`getSupabasePublishableKey()`, which throw when the variable is unset. The
+proxy runs ahead of every route (`matcher` covers everything but
+`_next/static`, `_next/image`, `favicon.ico`), so a single missing variable
+turned into a 500 on every path rather than only the pages that need a
+session. Vercel's runtime-error grouping showed it as
+`Error running the exported Web Handler: Missing required environment
+variable: NEXT_PUBLIC_SUPABASE_URL`, route `/middleware`.
+
+**Change:** added non-throwing `getOptionalSupabaseUrl()` /
+`getOptionalSupabasePublishableKey()` to `lib/db/env.ts` and used them in
+`proxy.ts` only. When either is absent the proxy skips all session work —
+there can be no session to read or refresh, so every visitor is signed out
+and `/` is rewritten to `/welcome` as it already is for signed-out visitors;
+everything else passes through untouched.
+
+**Deliberately not done:** the throwing getters are unchanged and every other
+caller still uses them. A route that genuinely needs the database must fail
+loudly rather than silently render as though no user were signed in — this
+fix makes a misconfigured deployment *legible* (public pages up, app pages
+erroring) instead of uniformly broken, it does not paper one over. No
+authorization behaviour changes: the proxy's expiry check was already
+defense-in-depth on top of per-route `getTenantContext()`/
+`requirePlatformAdmin()` enforcement (non-negotiable #3), and that per-route
+enforcement is what actually gates access.
+
+**Verified:** built and served with both variables unset — `/`, `/welcome`
+and `/sign-in` return 200 and render, `/agents` does not. `npm run
+typecheck`, `npm run lint`, and `welcome.spec.ts` + `auth.spec.ts` +
+`navigation-smoke.spec.ts` (53 passed; the one failure is the pre-existing
+GoTrue fresh-signup case that needs an MX-backed domain). On the resulting
+preview deployment `dpl_48kHKDmRFB2eTeXmH2GSfk45cTtm`, `/`, `/welcome` and
+`/sign-up` return 200 and the landing page renders.
+
+**Open — not an application defect:** the Vercel project has no
+`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` or `SECRET_ENCRYPTION_KEY` in its Preview scope,
+which is why the authenticated routes still 500 there. That is a project
+configuration step in Vercel's dashboard, not a code change, and none of
+these values may be committed (CLAUDE.md §16). Flagged to the user.
