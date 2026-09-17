@@ -198,6 +198,50 @@ test.describe("design review — structure and theming", () => {
     expect(problems, problems.join("\n")).toEqual([]);
   });
 
+  test("tables collapse to labelled cards below md, never sideways scroll", async ({ page }) => {
+    // UI-UX-DESIGN-RULES.md's table section: critical data must never
+    // require horizontal scrolling. Every raw table in the product goes
+    // through the shared TableContainer, so this checks the rule holds
+    // wherever one actually renders — including the agent-scoped and
+    // report routes, which are not in ROUTES above.
+    test.setTimeout(150_000);
+    await page.setViewportSize({ width: 390, height: 844 });
+
+    await page.goto("/agents");
+    const agentHref = await page
+      .locator('a[href^="/agents/"]')
+      .evaluateAll((links) => links.map((l) => l.getAttribute("href")).find((h) => /^\/agents\/[0-9a-f-]{36}$/.test(h ?? "")) ?? null);
+    const agentId = agentHref?.split("/agents/")[1];
+
+    const routes = [
+      ...ROUTES,
+      "/reports/agent-inventory",
+      ...(agentId ? [`/runtime/agents/${agentId}`, `/access/agents/${agentId}`] : []),
+    ];
+
+    const problems: string[] = [];
+    for (const route of routes) {
+      await settle(page, route);
+      const bad = await page.evaluate(() => {
+        const vw = document.documentElement.clientWidth;
+        const out: string[] = [];
+        for (const table of Array.from(document.querySelectorAll("table"))) {
+          // React/Next leave hidden, empty parse-context tables in the
+          // body while streaming rows; they are not rendered UI.
+          if (!table.querySelector("tbody tr")) continue;
+          if (table.getBoundingClientRect().width > vw + 2) out.push(`a table is ${Math.round(table.getBoundingClientRect().width)}px wide`);
+          for (const head of Array.from(table.querySelectorAll("thead"))) {
+            if (getComputedStyle(head).display !== "none") out.push("a table head is still shown at phone width");
+          }
+        }
+        return out;
+      });
+      for (const problem of bad) problems.push(`${route}: ${problem}`);
+    }
+
+    expect(problems, problems.join("\n")).toEqual([]);
+  });
+
   test("mobile tab targets are large enough to hit", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");

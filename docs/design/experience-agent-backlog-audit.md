@@ -2004,3 +2004,51 @@ project only; the new password is not committed anywhere.
 107 of 109 passing. The two failures are the same pre-existing pair: the
 GoTrue fresh-signup case (needs an MX-backed domain) and the FinanceBot
 scenario's final `resolved` assertion.
+
+### 2026-09-17 — Tables collapse to cards below `md` (all twelve, one primitive)
+
+The previous entry reported eleven screens still rendering a raw table
+that scrolls sideways on a phone, and left them for their owning modules.
+The user then asked for them to be fixed, so they are — but from the
+shared primitive rather than by rewriting eleven screens.
+
+All twelve tables (eleven files; `/runtime/agents/[id]` has two) use the
+same `TableContainer` / `Thead` / `Th` / `Tr` / `Td` composition, so
+`modules/ui/Table.tsx` now:
+
+- Reads each column's label from the table's own `<Th>` cells and injects
+  it into the matching `<Td>` as `data-label`, by walking the children it
+  is handed. Callers keep writing a plain table and get the responsive
+  behaviour for free — not one line changed in Operations', Risk's,
+  Integration's, Identity's, Access's, Runtime's or Foundation's pages
+  (non-negotiable #18 stays intact).
+- Below `md`, hides the head and lays each row out as a card with the
+  label beside its value. The label is rendered as real text, not a CSS
+  `content:` string: with the head hidden the `<th>`/`<td>` association is
+  gone, and generated content is not reliably announced.
+- From `md` up it is an ordinary table again — verified: `display: table`,
+  head visible, cells `table-cell`.
+
+**A second defect surfaced while checking it.** `/settings/roles` puts a
+`<select>` and an Assign button in a nowrap flex row inside a cell. A
+select will not shrink below the width of its longest option, so the row
+still pushed past the edge of a phone and the button was cut in half. The
+primitive now applies `min-w-0` and `max-w-full` to inputs and selects
+inside a cell, which fixes it without touching Foundation's page.
+
+`tests/e2e/design-review.spec.ts` gained a case that walks every route
+(plus `/reports/[type]` and the two agent-scoped routes, which are not in
+its main list) at 390px and fails if any table with rows is wider than the
+viewport or still shows its head. It skips the hidden, empty
+`<table hidden><tbody></tbody></table>` elements React leaves in the body
+while streaming rows — those are pre-existing (46 of them on `/audit`
+before any of today's changes) and are not rendered UI.
+
+One test needed tightening, not a product change: `access.spec.ts`
+asserted `row.getByText("External")`, which now matches twice in that row
+— the injected column label (display:none at that width) and the badge.
+It targets the badge directly now.
+
+**Verified:** typecheck, lint, build, and the full Playwright suite —
+109 of 110 passing, the one failure being the pre-existing FinanceBot
+`resolved` assertion.

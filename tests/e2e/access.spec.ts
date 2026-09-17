@@ -34,7 +34,11 @@ test.describe("Access module", () => {
     await expect(page).toHaveURL("/access");
     const row = page.getByRole("row", { name: new RegExp(appName) });
     await expect(row).toBeVisible();
-    await expect(row.getByText("External")).toBeVisible();
+    // Below `md` the shared table stacks each cell and prints its column
+    // label beside the value, so the string "External" appears twice in
+    // this row's markup — once as that label (display:none at this
+    // width), once as the badge. Target the badge itself.
+    await expect(row.locator("span.rounded-full", { hasText: "External" })).toBeVisible();
   });
 
   test("an agent's Access (CAN) page shows the access graph and effective access sections", async ({ page }) => {
