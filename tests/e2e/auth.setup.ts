@@ -1,6 +1,6 @@
 import { test as setup, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { seedTestData } from "./support/seedTestData";
+import { clearAuthRateLimits, seedTestData } from "./support/seedTestData";
 import { TEST_USERS, authFile, type TestUserKey } from "./support/testUsers";
 
 mkdirSync("tests/e2e/.auth", { recursive: true });
@@ -16,6 +16,9 @@ setup.beforeAll(async () => {
   // is available to this process). The specs themselves are unaffected —
   // they only ever read the fixed identities in testUsers.ts.
   if (process.env.E2E_SKIP_SEED === "1") return;
+  // Before anything logs in — otherwise a previous run's attempts can still
+  // be inside the 5-minute window and throttle this one.
+  await clearAuthRateLimits();
   const seeded = await seedTestData();
   expect(seeded.userIds.adminOne).toBeTruthy();
   expect(seeded.userIds.adminTwo).toBeTruthy();

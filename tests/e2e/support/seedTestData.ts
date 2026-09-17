@@ -65,6 +65,30 @@ async function ensurePlatformAdmin(supabase: SupabaseClient, userId: string): Pr
   if (error) throw new Error(`ensurePlatformAdmin(${userId}) failed: ${error.message}`);
 }
 
+/**
+ * The sign-in server action rate-limits 10 attempts per email AND per IP
+ * per 5 minutes (app/actions/auth.ts). A full E2E run signs in far more
+ * often than that from a single address — the setup project alone logs in
+ * as five roles, and auth.spec.ts adds more — so without this the suite
+ * throttles itself and every later login fails with "Too many sign-in
+ * attempts", which looks like an auth bug and isn't one. Observed for real
+ * on this suite's first green-ish run.
+ *
+ * Clears only the throttle counters: the seeded test identities' own rows,
+ * plus the IP buckets (which regenerate immediately and hold no audit
+ * value — real audit lives in audit_logs). Deliberately does NOT touch
+ * other users' email buckets. This is one more reason the suite must only
+ * ever be pointed at the dev project, as playwright.config.ts documents.
+ */
+export async function clearAuthRateLimits(): Promise<void> {
+  const supabase = adminClient();
+  const emails = Object.values(TEST_USERS).map((u) => u.email);
+  const { error: byEmail } = await supabase.from("auth_rate_limit_attempts").delete().in("subject", emails);
+  if (byEmail) throw new Error(`clearAuthRateLimits(email) failed: ${byEmail.message}`);
+  const { error: byIp } = await supabase.from("auth_rate_limit_attempts").delete().in("bucket", ["signin:ip", "signup:ip"]);
+  if (byIp) throw new Error(`clearAuthRateLimits(ip) failed: ${byIp.message}`);
+}
+
 export type SeededTestData = {
   tenantIds: { one: string; two: string };
   userIds: Record<TestUserKey, string>;
