@@ -43,7 +43,15 @@ export async function revokePlatformAdmin(actorId: string, targetUserId: string)
 
 export async function listPlatformAdmins(): Promise<{ userId: string; email: string; grantedAt: string }[]> {
   const supabase = supabaseServiceRole();
-  const { data, error } = await supabase.from("platform_admins").select("user_id, granted_at, users(email)").order("granted_at", { ascending: true });
+  // The FK is named explicitly because platform_admins has TWO foreign keys
+  // to users — `user_id` (the admin) and `granted_by` (who granted them) —
+  // so a bare `users(email)` embed is ambiguous and PostgREST rejects the
+  // whole query ("Could not embed because more than one relationship was
+  // found"), 500-ing this page. We want the admin's own email here.
+  const { data, error } = await supabase
+    .from("platform_admins")
+    .select("user_id, granted_at, users!platform_admins_user_id_fkey(email)")
+    .order("granted_at", { ascending: true });
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map((row: { user_id: string; granted_at: string; users: { email: string }[] | { email: string } | null }) => ({
     userId: row.user_id,
