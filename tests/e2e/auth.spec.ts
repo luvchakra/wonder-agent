@@ -98,15 +98,23 @@ test.describe("unauthenticated", () => {
 });
 
 test.describe("sign-out", () => {
-  test.use({ storageState: authFile("adminOne") });
-
+  // Signs in as its OWN dedicated identity rather than reusing a saved
+  // storage state. signOutAction() calls supabase.auth.signOut(), whose
+  // default scope in supabase-js v2 is "global": it revokes every refresh
+  // token that user holds. Sharing an identity here logged every other
+  // parallel spec out mid-run — 39 failures traced back to this one test
+  // the first time its selector worked.
   test("logs out via the account menu and can no longer reach a protected route", async ({ page }) => {
-    await page.goto("/");
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(TEST_USERS.signOutOnly.email);
+    await page.getByLabel("Password").fill(TEST_USERS.signOutOnly.password);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page).toHaveURL("/");
     // Since EXPERIENCE-P0-09 the left nav is a drawer at every width and the
     // account panel sits at its foot, so the drawer has to be opened before
     // the account trigger exists in the accessibility tree.
     await page.getByRole("button", { name: "Open navigation" }).click();
-    await page.getByRole("button", { name: TEST_USERS.adminOne.email }).click();
+    await page.getByRole("button", { name: TEST_USERS.signOutOnly.email }).click();
     await page.getByRole("menuitem", { name: "Log Out" }).click();
     await expect(page).toHaveURL(/\/sign-in/);
 

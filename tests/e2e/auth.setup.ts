@@ -56,6 +56,9 @@ function signInAndSaveState(key: TestUserKey) {
   });
 }
 
-for (const key of Object.keys(TEST_USERS) as TestUserKey[]) {
+// signOutOnly deliberately has no saved storage state: its one test signs
+// in itself and then signs out, and a globally-scoped sign-out would
+// invalidate any state saved here anyway.
+for (const key of (Object.keys(TEST_USERS) as TestUserKey[]).filter((k) => k !== "signOutOnly")) {
   signInAndSaveState(key);
 }
