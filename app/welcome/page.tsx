@@ -93,7 +93,7 @@ const STEPS = [
   {
     n: "04",
     title: "Remediate through your workflow",
-    body: "Recommended revocations route into the IAM workflow you already use, with human approval for anything consequential. Re-evaluated after the change lands.",
+    body: "Every recommended revocation waits for a human to confirm it, is recorded against the finding as evidence, and is re-evaluated once the access changes.",
   },
 ] as const;
 
@@ -318,8 +318,8 @@ export default function WelcomePage() {
                   Revoke <span className="font-mono">CustomerDB</span> entitlement
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  Routed to your IAM workflow. Human approval required. Finding re-evaluated once
-                  the change lands.
+                  Applied only after a human confirms, and the finding is re-evaluated
+                  once the access actually changes.
                 </p>
               </div>
             </div>

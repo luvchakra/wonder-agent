@@ -102,7 +102,7 @@ export function FlowDiagram() {
         </div>
         <p className="mt-2 text-sm text-foreground">Excessive access, with evidence</p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-          Routed to your IAM workflow for human approval.
+          Recorded with evidence, applied only on human approval.
         </p>
       </div>
     </div>

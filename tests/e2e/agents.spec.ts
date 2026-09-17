@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
-import { authFile } from "./support/testUsers";
+import { getSeededUserId } from "./support/seedTestData";
+import { TEST_USERS, authFile } from "./support/testUsers";
 
 test.describe("Identity module — agents", () => {
   test.use({ storageState: authFile("adminOne") });
@@ -34,6 +35,19 @@ test.describe("Identity module — agents", () => {
     await page.getByLabel("Purpose").fill("End-to-end lifecycle coverage");
     await page.getByRole("button", { name: "Register", exact: true }).click();
     await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
+
+    // A lifecycle transition requires an ACTIVE business owner AND technical
+    // owner ("Agent requires an active business_owner and technical_owner") —
+    // a real governance rule, so the test satisfies it rather than working
+    // around it. Both are assigned to the acting admin, whose id is taken
+    // from the tenant-members table on the roles screen.
+    const userId = await getSeededUserId(TEST_USERS.adminOne.email);
+    for (const ownerType of ["business_owner", "technical_owner"]) {
+      await page.locator('select[name="ownerType"]').selectOption(ownerType);
+      await page.locator('input[name="userId"]').fill(userId);
+      await page.getByRole("button", { name: "Assign owner", exact: true }).click();
+      await expect(page.getByText(ownerType).first()).toBeVisible();
+    }
 
     await page.locator('select[name="toState"]').selectOption("REGISTERED");
     await page.locator('input[name="reason"]').fill("E2E lifecycle transition coverage");

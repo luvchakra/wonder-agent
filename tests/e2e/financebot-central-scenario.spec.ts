@@ -85,15 +85,20 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     await expect(remediateDialog.getByText(/Done\.|Failed/)).toBeVisible();
     await remediateDialog.getByRole("button", { name: "Close" }).click();
 
-    // 8. The unauthorized access is actually removed.
+    // 8. The unauthorized access is actually removed — BY step 7, not by a
+    // second manual revoke. remediateFinding() revokes every access_grant
+    // referenced in the finding's evidence itself (modules/risk/findings.ts),
+    // so by the time we look, the grant is already gone. The original spec
+    // expected to revoke it by hand here and timed out waiting for a Revoke
+    // button on a row that no longer existed.
+    //
+    // Note what "removed" means today: revokeAccessGrant() stamps revoked_at
+    // on WonderAgent's own access_grants row. It does not write back to the
+    // source IAM — connectors are read-only in P0 (non-negotiable #12) — so
+    // this asserts WonderAgent's record of the access, not Saviynt's.
     await page.goto(`/access/agents/${agentId}`);
-    const grantRow = page.getByRole("row", { name: /CustomerDB_READ/ });
-    await grantRow.getByRole("button", { name: "Revoke" }).click();
-    const revokeDialog = page.getByRole("dialog", { name: "Revoke access grant" });
-    await revokeDialog.getByRole("button", { name: "Revoke access" }).click();
-    await expect(revokeDialog.getByText("Done.")).toBeVisible();
-    await revokeDialog.getByRole("button", { name: "Close" }).click();
     await expect(page.getByText("0 grants")).toBeVisible();
+    await expect(page.getByRole("row", { name: /CustomerDB_READ/ })).toHaveCount(0);
 
     // 9. Re-evaluate, then resolve the finding now that its evidence is gone.
     await page.goto(`/risk/agents/${agentId}`);

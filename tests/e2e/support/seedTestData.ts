@@ -134,6 +134,19 @@ export async function pruneThrowawayAgents(tenantIds: string[]): Promise<void> {
   }
 }
 
+/**
+ * Resolves a seeded identity's user id. Some screens take a raw user id as
+ * input (the agent-detail "Assign owner" form asks for a uuid, since there
+ * is no member picker yet), and a spec has no other way to learn it.
+ */
+export async function getSeededUserId(email: string): Promise<string> {
+  const supabase = adminClient();
+  const { data, error } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
+  if (error) throw new Error(`getSeededUserId(${email}) failed: ${error.message}`);
+  if (!data) throw new Error(`getSeededUserId(${email}): no such user — has seedTestData() run?`);
+  return data.id as string;
+}
+
 export type SeededTestData = {
   tenantIds: { one: string; two: string };
   userIds: Record<TestUserKey, string>;
