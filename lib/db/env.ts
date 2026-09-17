@@ -85,3 +85,19 @@ export function getPlatformGeminiApiKey(): string | null {
   }
   return process.env.PLATFORM_GEMINI_API_KEY || null;
 }
+
+/**
+ * Non-throwing reads of the two public Supabase variables, for the one
+ * caller that must survive their absence: proxy.ts runs before every
+ * route, so a throw there turns a missing variable into a 500 on every
+ * URL — including the public marketing page, which needs no database at
+ * all. Application code keeps using the throwing getters above; a missing
+ * variable should fail loudly where a real session is actually required.
+ */
+export function getOptionalSupabaseUrl(): string | null {
+  return process.env.NEXT_PUBLIC_SUPABASE_URL || null;
+}
+
+export function getOptionalSupabasePublishableKey(): string | null {
+  return process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || null;
+}

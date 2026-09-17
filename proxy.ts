@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/db/env";
+import { getOptionalSupabasePublishableKey, getOptionalSupabaseUrl } from "@/lib/db/env";
 import {
   SESSION_LAST_SEEN_COOKIE,
   SESSION_STARTED_COOKIE,
@@ -20,8 +20,28 @@ const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback", "/welcome"];
  */
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
+  const { pathname } = request.nextUrl;
 
-  const supabase = createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {
+  // The proxy runs ahead of EVERY route, so anything it throws becomes a
+  // 500 on every URL in the deployment — including /welcome, which is a
+  // static marketing page that touches no database. Read the two public
+  // Supabase variables without throwing and, when the deployment has not
+  // been given them, skip the session work entirely: there can be no
+  // session to read or refresh, so every visitor is signed out and the
+  // landing page is what "/" should serve. Routes that genuinely need the
+  // database still fail loudly, in their own handlers, via the throwing
+  // getters in lib/db/env.ts — this makes a misconfigured deployment
+  // legible instead of uniformly broken, it does not paper over one.
+  const supabaseUrl = getOptionalSupabaseUrl();
+  const supabaseKey = getOptionalSupabasePublishableKey();
+  if (!supabaseUrl || !supabaseKey) {
+    if (pathname === "/") {
+      return NextResponse.rewrite(new URL("/welcome", request.url), { request });
+    }
+    return response;
+  }
+
+  const supabase = createServerClient(supabaseUrl, supabaseKey, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -47,7 +67,6 @@ export async function proxy(request: NextRequest) {
   // the URL at "/" while rendering the marketing tree, which lets the
   // landing page and the authenticated Overview share the root path without
   // two route groups both declaring a `page.tsx` for it.
-  const { pathname } = request.nextUrl;
   if (!user && pathname === "/") {
     return NextResponse.rewrite(new URL("/welcome", request.url), { request });
   }
