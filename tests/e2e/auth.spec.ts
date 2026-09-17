@@ -25,13 +25,13 @@ test.describe("unauthenticated", () => {
     await expect(page).toHaveURL(/\/sign-in/);
   });
 
-  test("sign-in with correct credentials reaches Overview", async ({ page }) => {
+  test("sign-in with correct credentials reaches the dashboard", async ({ page }) => {
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
     await page.getByLabel("Password").fill(TEST_USERS.adminOne.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
   });
 
   test("session-expired query param shows the expected notice", async ({ page }) => {
@@ -116,10 +116,9 @@ test.describe("sign-out", () => {
     await page.getByLabel("Password").fill(TEST_USERS.signOutOnly.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
-    // Since EXPERIENCE-P0-09 the left nav is a drawer at every width and the
-    // account panel sits at its foot, so the drawer has to be opened before
-    // the account trigger exists in the accessibility tree.
-    await page.getByRole("button", { name: "Open navigation" }).click();
+    // Since EXPERIENCE-P0-15 the navigation rail is permanent at this
+    // viewport, so the account trigger at its foot is directly reachable —
+    // no drawer to open first.
     await page.getByRole("button", { name: TEST_USERS.signOutOnly.email }).click();
     await page.getByRole("menuitem", { name: "Log Out" }).click();
     await expect(page).toHaveURL(/\/sign-in/);
@@ -149,7 +148,6 @@ test.describe("sign-out", () => {
     }
     const [sessionA, sessionB] = pages;
 
-    await sessionA.getByRole("button", { name: "Open navigation" }).click();
     await sessionA.getByRole("button", { name: TEST_USERS.signOutOnly.email }).click();
     await sessionA.getByRole("menuitem", { name: "Log Out" }).click();
     await expect(sessionA).toHaveURL(/\/sign-in/);

@@ -1759,3 +1759,81 @@ any other customer user, so they cannot see the `e2e-*` tenants or any other
 data. Their password is not committed anywhere; the capture script reads
 credentials from `WONDERAGENT_EMAIL`/`WONDERAGENT_PASSWORD`. Rotate or delete
 them whenever the demo data is no longer wanted.
+
+---
+
+## 2026-09-17 — EXPERIENCE-P0-15: rebuild the shell and dashboard to the supplied UI design
+
+The user supplied a ten-screen mobile design and a three-screen desktop
+design and asked that the layout be followed closely, treating the content
+in them as indicative. This entry covers the first two pieces.
+
+### Shell
+
+Replaced the hamburger-drawer-only shell with the navigation the design
+calls for: a permanent navy rail from `lg` up, a bottom tab bar plus the
+same rail as a drawer below that, and one slim page header carrying
+search, notifications, help, the organization chip and the account avatar.
+
+- `modules/ui/shell-nav.ts` is the single source of truth for the nav, as
+  plain serializable data, so the rail, the tab bar and the drawer cannot
+  disagree — including about which item is current. `isNavItemActive()`
+  lets a more specific sibling win over its parent, so `/agents/discovery`
+  lights up Discovery and not Agents.
+- The rail is a deep navy in **both** themes. Its `--sidebar*` tokens are
+  now declared once in `:root` and deliberately **not** re-declared in the
+  two dark blocks, and a new `--sidebar-muted-foreground` was added.
+  Anything inside the rail must colour from `--sidebar-*`: `--foreground`
+  and `--muted-foreground` invert with the theme and would render dark
+  text on the dark rail in light mode.
+- Global search became the wide field the design shows, and the ⌘K it
+  advertises now actually opens it.
+- The content column widened from `max-w-6xl` to 1560px, which the
+  design's two- and three-column dashboards need.
+- `Nav.tsx` and `Logo.tsx` were deleted rather than left as dead code.
+
+### Dashboard
+
+`app/(customer)/page.tsx` rebuilt to the design: greeting, a five-up KPI
+row, a governance-posture donut, a risk-trend line chart, compliance
+coverage bars, a tabbed activity panel, top agents by activity, and a
+right rail with the hero panel and quick actions. New shared primitives:
+`KpiCard`, `Tabs`/`TabPanel` (Radix), and `charts.tsx`
+(`DonutChart`/`TrendChart`/`CoverageBars`).
+
+Every number is a real query against the owning module's published
+contract — nothing is hardcoded and nothing is inferred by an LLM
+(non-negotiable #9). The posture ring and the coverage bars are driven by
+Compliance's `getGovernancePosture()`, whose twelve dimensions map
+directly onto the design's "Compliance Coverage" rows.
+
+**Deliberately not done:**
+
+- The design's "Unregistered" KPI and the Discovery nav badge are not
+  wired up. The only published source for either, Identity's
+  `buildDiscoveryInbox()`, scans every agent and identity per call, and
+  paying that on every page render would break CLAUDE.md §15. The KPI slot
+  shows *Unowned* instead (a real number from
+  `getOwnershipIssues()`), and the Discovery badge is absent. Both need a
+  cheap count contract from the Identity Agent; recorded here rather than
+  worked around, and not invented locally (non-negotiable #18).
+- `getGovernancePosture()` is fanned out across the agent list in
+  parallel, not awaited per agent, and the route's existing
+  `loading.tsx` skeleton covers the wait. It is nonetheless an expensive
+  read-model (it consults Identity, Access, Runtime and Compliance per
+  agent) and is the first thing that will need a bulk contract from the
+  Compliance Agent as tenants grow.
+- The greeting's time of day is computed in the browser via
+  `useSyncExternalStore`, not on the server: the server renders in UTC and
+  would greet half the world wrongly. Before hydration it shows the name
+  alone rather than a guess that then flips.
+
+**Verified:** typecheck, lint, build, and Playwright — a new
+`tests/e2e/shell.spec.ts` (rail, active state, ⌘K, tab bar, drawer, no
+mobile overflow) plus welcome/auth/navigation-smoke. Four specs asserted
+on a `heading "Overview"` that the design replaces with a personalised
+greeting; they now assert on the dashboard's stable "Agent governance
+posture" panel heading instead. The two sign-out tests no longer open a
+drawer first, because the account trigger is permanently visible in the
+rail at their viewport. The only failure left is the pre-existing GoTrue
+fresh-signup case, which needs an MX-backed domain.

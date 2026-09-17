@@ -1,6 +1,8 @@
 import {
   Activity,
   Bot,
+  CircleAlert,
+  Clock,
   ClipboardCheck,
   ClipboardList,
   FileBarChart,
@@ -15,6 +17,8 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Siren,
+  UserX,
   type LucideIcon,
 } from "lucide-react";
 
@@ -27,6 +31,8 @@ import {
 const ICONS: Record<string, LucideIcon> = {
   Activity,
   Bot,
+  CircleAlert,
+  Clock,
   ClipboardCheck,
   ClipboardList,
   FileBarChart,
@@ -41,6 +47,8 @@ const ICONS: Record<string, LucideIcon> = {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Siren,
+  UserX,
 };
 
 export function NavIcon({ name, className }: { name?: string; className?: string }) {

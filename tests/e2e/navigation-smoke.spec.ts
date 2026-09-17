@@ -9,7 +9,7 @@ import { authFile } from "./support/testUsers";
  * shallow half of coverage; each module spec below is the deep half.
  */
 const ROUTES = [
-  { path: "/", heading: "Overview" },
+  { path: "/", heading: "Agent governance posture" },
   { path: "/agents", heading: "AI Agents" },
   { path: "/agents/new", heading: "Register an AI Agent" },
   { path: "/agents/discovery", heading: null },

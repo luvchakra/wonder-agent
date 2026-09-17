@@ -43,13 +43,13 @@ test.describe("landing page (signed in)", () => {
 
   test('"/" still serves the authenticated Overview', async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Govern every AI agent/i })).toHaveCount(0);
   });
 
   test("/welcome redirects a signed-in user into the app", async ({ page }) => {
     await page.goto("/welcome");
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
   });
 });

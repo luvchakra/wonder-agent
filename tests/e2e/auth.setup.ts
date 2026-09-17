@@ -51,7 +51,7 @@ function signInAndSaveState(key: TestUserKey) {
       // Exactly one tenant membership each (seedTestData) — getTenantContext()
       // resolves it with no ambiguity, so sign-in lands straight on Overview.
       await expect(page).toHaveURL("/");
-      await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
     }
 
     await page.context().storageState({ path: authFile(key) });

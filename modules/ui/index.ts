@@ -29,3 +29,6 @@ export { MobileTabBar } from "./MobileTabBar";
 export { SHELL_NAV, MOBILE_TABS, isNavItemActive, type ShellNavItem, type ShellBadgeCounts } from "./shell-nav";
 export { NavIcon } from "./NavIcon";
 export { AccountPanel, type TenantOption } from "./AccountPanel";
+export { KpiCard, type KpiTone } from "./KpiCard";
+export { Tabs, TabPanel } from "./Tabs";
+export { DonutChart, TrendChart, CoverageBars, type Slice, type TrendSeries } from "./charts";
