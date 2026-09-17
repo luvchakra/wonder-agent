@@ -107,6 +107,33 @@ export async function clearAuthRateLimits(): Promise<void> {
   if (byIp) throw new Error(`clearAuthRateLimits(ip) failed: ${byIp.message}`);
 }
 
+/**
+ * Every run of agents/access/runtime/financebot registers new agents and
+ * never removes them, so the E2E tenants grow without bound: nine runs had
+ * left 43 agents in Tenant One. That is not just untidy — campaign launch
+ * populates certification items per agent, so the suite got measurably
+ * slower every run (~440ms per agent; 19s by the time it was noticed, past
+ * Playwright's 10s expect timeout) and would eventually fail on time alone.
+ *
+ * Pruning back to the stable fixture agents at the start of each run makes
+ * the suite repeatable and keeps its runtime flat. Safe and complete: every
+ * child FK of `agents` is ON DELETE CASCADE (one SET NULL), so identities,
+ * contracts, owners, grants, runtime events, findings and certification
+ * items all go with it. Scoped to the two `e2e-*` tenants only.
+ */
+export async function pruneThrowawayAgents(tenantIds: string[]): Promise<void> {
+  const supabase = adminClient();
+  const keep = [TENANT_ONE, TENANT_TWO].map((t) => `"E2E Agent ${t.slug}"`).join(",");
+  for (const tenantId of tenantIds) {
+    const { error } = await supabase
+      .from("agents")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .not("agent_name", "in", `(${keep})`);
+    if (error) throw new Error(`pruneThrowawayAgents(${tenantId}) failed: ${error.message}`);
+  }
+}
+
 export type SeededTestData = {
   tenantIds: { one: string; two: string };
   userIds: Record<TestUserKey, string>;
