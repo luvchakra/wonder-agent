@@ -37,7 +37,12 @@ function SignInForm() {
       setError(result.error);
       return;
     }
-    router.push("/onboarding");
+    // Go to the app, not the organization picker. `app/(customer)/layout.tsx`
+    // already redirects to /onboarding when getTenantContext() resolves no
+    // tenant (a brand-new user with no membership yet), so pushing there
+    // unconditionally only made every returning single-tenant user sit
+    // through a "Select an organization" interstitial on each sign-in.
+    router.push("/");
     router.refresh();
   }
 
