@@ -29,6 +29,9 @@ test.describe("Identity module — agents", () => {
     await page.goto("/agents/new");
     await page.getByLabel("Agent name").fill(agentName);
     await page.getByLabel("Agent type").fill("automation");
+    // Purpose is required before any lifecycle transition ("Agent must have
+    // a purpose set") — a real governance rule, not an incidental field.
+    await page.getByLabel("Purpose").fill("End-to-end lifecycle coverage");
     await page.getByRole("button", { name: "Register", exact: true }).click();
     await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
 

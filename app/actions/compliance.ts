@@ -13,7 +13,13 @@ export async function launchCampaignAction(formData: FormData) {
     scopeType: (formData.get("scopeType") as CampaignScopeType) || "agent",
     scope: criticalityRaw ? { criticality: criticalityRaw.split(",").map((s) => s.trim()) } : {},
     cadence: (formData.get("cadence") as CampaignCadence) || "one_time",
-    reviewerId: String(formData.get("reviewerId") ?? ctx.userId),
+    // The Reviewer field is optional and submits "" when left blank, and ""
+    // is not null — `?? ctx.userId` never fired, so a blank field sent an
+    // empty string straight into certification_items.reviewer_id (a uuid).
+    // The campaign row was created first, so every default-path launch from
+    // this form 500'd AFTER leaving an orphaned active campaign with zero
+    // items behind it.
+    reviewerId: String(formData.get("reviewerId") ?? "").trim() || ctx.userId,
   });
   redirect(`/compliance/campaigns/${campaign.id}`);
 }

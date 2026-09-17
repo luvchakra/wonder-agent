@@ -17,7 +17,11 @@ function adminClient(): SupabaseClient {
 async function ensureTenant(supabase: SupabaseClient, tenant: { name: string; slug: string }): Promise<string> {
   const { data: existing, error: selectError } = await supabase.from("tenants").select("id").eq("slug", tenant.slug).maybeSingle();
   if (selectError) throw new Error(`ensureTenant(${tenant.slug}) select failed: ${selectError.message}`);
-  if (existing) return existing.id as string;
+  if (existing) {
+    // Idempotent for tenants seeded before this helper existed, too.
+    await ensurePlatformTenant(supabase, existing.id as string);
+    return existing.id as string;
+  }
 
   const { data: created, error: insertError } = await supabase.from("tenants").insert({ name: tenant.name, slug: tenant.slug }).select("id").single();
   if (insertError || !created) throw new Error(`ensureTenant(${tenant.slug}) insert failed: ${insertError?.message}`);
@@ -25,6 +29,7 @@ async function ensureTenant(supabase: SupabaseClient, tenant: { name: string; sl
   const { error: settingsError } = await supabase.from("tenant_settings").insert({ tenant_id: created.id });
   if (settingsError) throw new Error(`ensureTenant(${tenant.slug}) tenant_settings insert failed: ${settingsError.message}`);
 
+  await ensurePlatformTenant(supabase, created.id as string);
   return created.id as string;
 }
 
@@ -36,10 +41,27 @@ async function ensureTenant(supabase: SupabaseClient, tenant: { name: string; sl
  * (supabase/migrations/0002_foundation_users.sql), so falling back to a
  * plain table lookup there is reliable and version-independent.
  */
+/**
+ * The vendor console lists platform_tenants, not tenants — that row is
+ * created by the platform-admin "create tenant" flow, so a tenant seeded
+ * straight into `tenants` (as this fixture does, and as every tests/**\/*.sql
+ * fixture does) is invisible at /platform-admin/tenants. Mirroring the real
+ * flow here keeps platform-admin.spec.ts meaningful instead of asserting
+ * against a tenant the console was never going to show.
+ */
+async function ensurePlatformTenant(supabase: SupabaseClient, tenantId: string): Promise<void> {
+  const { error } = await supabase.from("platform_tenants").upsert({ tenant_id: tenantId }, { onConflict: "tenant_id" });
+  if (error) throw new Error(`ensurePlatformTenant(${tenantId}) failed: ${error.message}`);
+}
+
 async function ensureAuthUser(supabase: SupabaseClient, email: string, password: string): Promise<string> {
   const { data: existing, error: selectError } = await supabase.from("users").select("id").eq("email", email).maybeSingle();
   if (selectError) throw new Error(`ensureAuthUser(${email}) select failed: ${selectError.message}`);
-  if (existing) return existing.id as string;
+  if (existing) {
+    // Idempotent for tenants seeded before this helper existed, too.
+    await ensurePlatformTenant(supabase, existing.id as string);
+    return existing.id as string;
+  }
 
   const { data: created, error: createError } = await supabase.auth.admin.createUser({ email, password, email_confirm: true });
   if (createError || !created.user) throw new Error(`ensureAuthUser(${email}) createUser failed: ${createError?.message}`);

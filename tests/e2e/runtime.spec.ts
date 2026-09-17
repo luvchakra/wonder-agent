@@ -33,7 +33,9 @@ test.describe("Runtime module", () => {
 
     await expect(page).toHaveURL(`/runtime/agents/${agentId}`);
     await expect(page.getByText("No events yet.")).not.toBeVisible();
-    const eventRow = page.getByRole("row", { name: /Snowflake.*CustomerDB/ });
+    // The same event is rendered twice on this page — once in the events
+    // table and once in the SHOULD/CAN/DID comparison — so scope to the first.
+    const eventRow = page.getByRole("row", { name: /Snowflake.*CustomerDB/ }).first();
     await expect(eventRow).toBeVisible();
 
     await expect(page.getByText("No comparison outcomes yet.")).not.toBeVisible();

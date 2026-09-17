@@ -62,7 +62,10 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     await expect(page.getByText(/Snowflake:financial reporting/)).toBeVisible();
     await expect(page.getByText(/Snowflake:CustomerDB_READ/)).toBeVisible();
     await expect(page.getByText(/Snowflake:CustomerDB(?!_)/)).toBeVisible();
-    await expect(page.getByText(/excessive access|behavioral violation/)).toBeVisible();
+    // The scenario legitimately produces BOTH categories (an excessive-access
+    // finding and a behavioural one), so this resolves to more than one badge
+    // — assert at least one is rendered rather than tripping strict mode.
+    await expect(page.getByText(/excessive access|behavioral violation/).first()).toBeVisible();
 
     // 6. Risk evaluation generates the excessive-access finding with
     // evidence and a removal recommendation.

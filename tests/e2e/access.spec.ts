@@ -25,7 +25,9 @@ test.describe("Access module", () => {
     const appName = `E2E App ${Date.now()}`;
     await page.goto("/access");
     await page.getByLabel("Application name").fill(appName);
-    await page.getByLabel("Category").fill("saas");
+    // exact: true — the table's filter box is labelled "Filter by name or
+    // category…", which a substring match also resolves to.
+    await page.getByLabel("Category", { exact: true }).fill("saas");
     await page.getByLabel("External-facing (email, messaging, public API)").check();
     await page.getByRole("button", { name: "Add", exact: true }).click();
 
