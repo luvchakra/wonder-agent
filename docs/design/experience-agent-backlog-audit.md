@@ -1873,3 +1873,51 @@ regression assertion in `tests/e2e/agents.spec.ts`.
 
 **Verified:** typecheck, lint, build, and `agents.spec.ts` (12 passing),
 including two new cases for the pills and the posture panel.
+
+### Runtime activity, Risks & alerts, Certification (same story, 2026-09-17)
+
+**Runtime activity (`/runtime`).** Was a bare table of agent links. It is
+now the tenant-wide activity stream the design shows: a filter row (agent,
+result, search), a dense event list, and an "Activity details" panel with
+Details / Raw log tabs for the selected event. Rows come from Runtime
+Agent's published `listRuntimeEvents()` with a server-side `limit` of 200
+(CLAUDE.md §15 — never the whole table); the filters narrow that window in
+the browser, and the panel header states the window so the user is not
+misled into thinking they are searching all of history.
+
+The design's third details tab, "Policy Evaluation", was deliberately not
+built: per-event policy evaluation belongs to the Access Agent, which
+publishes no per-runtime-event evaluation contract. Inventing one here
+would be Experience claiming another module's domain (non-negotiable #18).
+
+**Risks & alerts (`/risk`).** Now leads with the findings list the design
+shows — severity count pills over rows carrying a severity icon, the
+finding, its agent, its category and how long it has been open — with the
+previous per-agent table kept below as "By agent". Severity is never
+carried by colour alone: each row has an icon and the severity word.
+Relative timestamps are computed against a single server-rendered instant
+so they cannot drift row to row.
+
+**Certification (`/compliance/campaigns`).** Leads with the campaign list
+and its status pills (All / Active / Overdue / Completed), each row showing
+its outstanding-item count and a Review action; the launch form moved below
+the list. Outstanding and overdue counts come from Compliance's own
+`listCampaignItems()`.
+
+**Recorded gap (not worked around):** that per-campaign fan-out is one
+query per campaign, and `listCampaigns()` has no pagination. The seeded dev
+tenant already holds 41 campaigns, so this page issues 41 queries and
+renders every row. It is the same gap the dashboard's active-campaign
+fan-out already had rather than a new pattern, but it now affects a second
+page and needs a paginated list plus a bulk item-count contract from the
+Compliance Agent to satisfy CLAUDE.md §15 properly.
+
+**Verified:** typecheck, lint, build, and the full Playwright suite —
+95 of 97 passing, with new cases for the runtime filters/details panel and
+for both sets of count pills. Four heading assertions moved with their
+screens (`/runtime` → "Runtime activity", `/risk` → "Risks & alerts",
+`/compliance/campaigns` → "Certification"), and compliance.spec's
+campaign-row assertion moved from a table `row` role to a `listitem`. The
+two remaining failures are both pre-existing and unrelated to this work:
+the GoTrue fresh-signup case (needs an MX-backed domain) and the FinanceBot
+scenario's final `resolved` assertion.

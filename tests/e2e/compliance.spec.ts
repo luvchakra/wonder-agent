@@ -17,7 +17,7 @@ test.describe("Compliance module", () => {
 
   test("list page shows the launch-campaign form", async ({ page }) => {
     await page.goto("/compliance/campaigns");
-    await expect(page.getByRole("heading", { name: "Certification Campaigns" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Certification", exact: true })).toBeVisible();
     await expect(page.getByLabel("Campaign name")).toBeVisible();
   });
 
@@ -32,7 +32,9 @@ test.describe("Compliance module", () => {
     await expect(page.getByText(/\d+ total · \d+ pending · \d+ decided · \d+ overdue · \d+ escalated/)).toBeVisible();
 
     await page.goto("/compliance/campaigns");
-    await expect(page.getByRole("row", { name: new RegExp(campaignName) })).toBeVisible();
+    // The campaign index is a list of rows with a Review action now, not a
+    // table, so there is no row role to match on.
+    await expect(page.getByRole("listitem").filter({ hasText: campaignName })).toBeVisible();
   });
 
   for (const scopeType of SCOPE_TYPES_THAT_SUCCEED) {
@@ -57,4 +59,22 @@ test.describe("Compliance module", () => {
       await expect(page.getByText(/an unexpected error occurred/i)).toBeVisible();
     });
   }
+});
+
+/**
+ * EXPERIENCE-P0-15 — /compliance/campaigns leads with the campaign list
+ * and its status pills, each row carrying a Review action.
+ */
+test.describe("certification — design rebuild", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("status pills filter the campaign list", async ({ page }) => {
+    await page.goto("/compliance/campaigns");
+    const pills = page.getByRole("radiogroup", { name: "Filter campaigns" });
+    await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+
+    await pills.getByRole("radio", { name: /^Completed/ }).click();
+    await expect(pills.getByRole("radio", { name: /^Completed/ })).toHaveAttribute("aria-checked", "true");
+    await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "false");
+  });
 });

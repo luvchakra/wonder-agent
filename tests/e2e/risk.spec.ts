@@ -15,7 +15,7 @@ test.describe("Risk module", () => {
 
   test("list page and rogue-agents page load", async ({ page }) => {
     await page.goto("/risk");
-    await expect(page.getByRole("heading", { name: "Risk", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Risks & alerts" })).toBeVisible();
 
     await page.goto("/risk/rogue");
     await expect(page.getByRole("heading", { name: "Rogue Agents" })).toBeVisible();
@@ -32,5 +32,23 @@ test.describe("Risk module", () => {
     await page.getByRole("button", { name: "Run risk evaluation now" }).click();
     await expect(page).toHaveURL(`/risk/agents/${agentId}`);
     await expect(page.getByText(/an unexpected error occurred/i)).not.toBeVisible();
+  });
+});
+
+/**
+ * EXPERIENCE-P0-15 — /risk leads with the findings list the supplied
+ * design shows, with severity count pills over it.
+ */
+test.describe("risks & alerts — design rebuild", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("severity pills filter the findings list", async ({ page }) => {
+    await page.goto("/risk");
+    const pills = page.getByRole("radiogroup", { name: "Filter findings by severity" });
+    await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
+
+    await pills.getByRole("radio", { name: /^Critical/ }).click();
+    await expect(pills.getByRole("radio", { name: /^Critical/ })).toHaveAttribute("aria-checked", "true");
+    await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "false");
   });
 });

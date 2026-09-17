@@ -1,10 +1,10 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listCampaigns } from "@/modules/certification-compliance/service";
+import { listCampaigns, listCampaignItems } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { launchCampaignAction } from "@/app/actions/compliance";
-import { Card, CardHeader, CardBody, Badge, Button, EmptyState, TextField, SelectField, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
+import { Card, CardHeader, CardBody, Button, TextField, SelectField } from "@/modules/ui";
+import { CampaignsList, type CampaignRow } from "./CampaignsList";
 
 export default async function CampaignsPage() {
   let ctx;
@@ -17,9 +17,33 @@ export default async function CampaignsPage() {
 
   const campaigns = await listCampaigns(ctx.tenantId!);
 
+  // Outstanding/overdue counts per campaign, so the list leads with what
+  // still needs a human decision rather than just a status word. Fanned out
+  // in parallel (CLAUDE.md §15) over Compliance's own published contract.
+  const nowIso = new Date().toISOString();
+  const itemLists = await Promise.all(campaigns.map((c) => listCampaignItems(ctx.tenantId!, c.id)));
+  const rows: CampaignRow[] = campaigns.map((c, i) => {
+    const pendingItems = itemLists[i].filter((item) => item.status === "pending");
+    return {
+      id: c.id,
+      name: c.name,
+      scopeType: c.scopeType,
+      status: c.status,
+      pending: pendingItems.length,
+      overdue: pendingItems.filter((item) => item.dueDate && item.dueDate < nowIso).length,
+    };
+  });
+
   return (
-    <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-foreground">Certification Campaigns</h1>
+    <div className="space-y-5">
+      <div>
+        <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Certification</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Campaigns that put a named human behind every agent&rsquo;s access.
+        </p>
+      </div>
+
+      <CampaignsList campaigns={rows} />
 
       <Card>
         <CardHeader title="Launch a new campaign" />
@@ -46,42 +70,6 @@ export default async function CampaignsPage() {
               <Button type="submit">Launch</Button>
             </div>
           </form>
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Campaigns" description={`${campaigns.length} total`} />
-        <CardBody>
-          {campaigns.length === 0 ? (
-            <EmptyState title="No campaigns yet" />
-          ) : (
-            <TableContainer>
-              <Thead>
-                <tr>
-                  <Th>Name</Th>
-                  <Th>Scope</Th>
-                  <Th>Status</Th>
-                </tr>
-              </Thead>
-              <tbody>
-                {campaigns.map((c) => (
-                  <Tr key={c.id}>
-                    <Td>
-                      <Link href={`/compliance/campaigns/${c.id}`} className="text-primary hover:underline">
-                        {c.name}
-                      </Link>
-                    </Td>
-                    <Td>
-                      <Badge tone="neutral">{c.scopeType}</Badge>
-                    </Td>
-                    <Td>
-                      <Badge tone={c.status === "active" ? "success" : c.status === "completed" ? "neutral" : "warning"}>{c.status}</Badge>
-                    </Td>
-                  </Tr>
-                ))}
-              </tbody>
-            </TableContainer>
-          )}
         </CardBody>
       </Card>
     </div>

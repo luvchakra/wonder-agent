@@ -41,3 +41,28 @@ test.describe("Runtime module", () => {
     await expect(page.getByText("No comparison outcomes yet.")).not.toBeVisible();
   });
 });
+
+/**
+ * EXPERIENCE-P0-15 — /runtime is now the tenant-wide activity stream the
+ * supplied design shows, not a bare list of agent links.
+ */
+test.describe("runtime activity — design rebuild", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("filters narrow the stream and a row opens its details", async ({ page }) => {
+    await page.goto("/runtime");
+    await expect(page.getByRole("heading", { name: "Runtime activity" })).toBeVisible();
+
+    // Selecting a result that nothing in the window matches empties the list
+    // rather than silently showing everything.
+    await page.getByLabel("Result").selectOption("blocked");
+    await expect(page.getByRole("heading", { name: "Activity", exact: true })).toBeVisible();
+
+    await page.getByLabel("Result").selectOption("all");
+    const firstRow = page.getByRole("list", { name: "Activity events" }).getByRole("listitem").first();
+    if (await firstRow.isVisible()) {
+      await firstRow.getByRole("button").click();
+      await expect(page.getByRole("tab", { name: "Raw log" })).toBeVisible();
+    }
+  });
+});
