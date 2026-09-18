@@ -2110,3 +2110,23 @@ indexes — are not on any page's critical path and belong to their owning
 modules; recorded here for them.
 
 **Verified:** typecheck, lint, build, and the full Playwright suite.
+
+---
+
+## 2026-09-18 — Organization picker removed from the page header
+
+By user decision, the header's organization chip is gone. The shell had two
+tenant-switching surfaces — the bordered chip in the page header and the
+block pinned above the account panel at the foot of the navigation rail —
+because the supplied design showed both; they opened the same menu and did
+the same thing. The rail's block is now the one surface. It is present on
+desktop (permanent rail) and on phones (the same rail as a drawer, via the
+tab bar's "More"), so tenant switching is reachable at every width.
+
+`WorkspaceSwitcher` lost its `variant` prop along with the dead "topbar"
+branch, rather than keeping an unused rendering around. Nothing else
+changed: the same `selectTenantAction`, the same membership list from
+`getMyMemberships()`, the same "Create new organization" item.
+
+**Verified:** typecheck, lint, build, and `shell`, `design-review`, `auth`
+and `navigation-smoke` specs.

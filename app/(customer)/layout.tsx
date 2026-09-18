@@ -8,7 +8,6 @@ import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { getFindings } from "@/modules/risk/service";
 import { AppSidebar, MobileNavDrawer, MobileNavTrigger } from "@/modules/ui/AppSidebar";
 import { MobileTabBar } from "@/modules/ui/MobileTabBar";
-import { WorkspaceSwitcher } from "@/modules/ui/WorkspaceSwitcher";
 import { Avatar } from "@/modules/ui/Avatar";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
@@ -36,9 +35,10 @@ function humanizeRole(role: string | undefined): string | null {
 // check /platform-admin's own routes already enforce.
 //
 // Layout: a permanent navy navigation rail from `lg` up with a slim page
-// header beside it (search, notifications, help, organization, account),
-// and below `lg` a bottom tab bar whose "More" slot opens the same rail
-// as a drawer. See modules/ui/AppSidebar.tsx.
+// header beside it (search, notifications, help, account), and below `lg`
+// a bottom tab bar whose "More" slot opens the same rail as a drawer. See
+// modules/ui/AppSidebar.tsx. Organization switching lives only at the foot
+// of the rail (user decision, 2026-09-18: the header chip duplicated it).
 //
 // Data: the session check is local (lib/tenant/session.ts) and the tenant
 // context, membership list and platform-admin check are all request-cached,
@@ -122,7 +122,6 @@ export default async function CustomerLayout({ children }: { children: React.Rea
             >
               <CircleHelp className="size-5" aria-hidden="true" />
             </Link>
-            <WorkspaceSwitcher tenants={tenantOptions} onSelectTenant={selectTenantAction} />
             <span className="hidden lg:inline-flex">
               <Avatar name={sidebarUser.displayName} email={sidebarUser.email} size="sm" />
             </span>

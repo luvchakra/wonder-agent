@@ -110,7 +110,7 @@ function SidebarBody({ badges, tenants, user, onSelectTenant, onSignOut, onNavig
       <Brand />
       <NavList badges={badges} onNavigate={onNavigate} />
       <div className="shrink-0 border-t border-sidebar-border px-2 py-2">
-        <WorkspaceSwitcher tenants={tenants} onSelectTenant={onSelectTenant} variant="sidebar" />
+        <WorkspaceSwitcher tenants={tenants} onSelectTenant={onSelectTenant} />
       </div>
       <AccountPanel
         email={user.email}
