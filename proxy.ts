@@ -17,10 +17,23 @@ import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
  * recovery session (app/update-password/page.tsx) — that UX only ever runs
  * if the proxy lets the unauthenticated request through to it instead of
  * redirecting to /sign-in first.
+ *
+ * /help is public too (2026-09-18): the user guide and FAQ are product
+ * documentation, identical for every visitor and containing no customer
+ * data, so there is no reason to gate them behind a session — see
+ * app/help/layout.tsx.
  */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help"];
 /** Paths the idle/absolute session-expiry clock does not run on. */
-const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback", "/welcome", "/forgot-password", "/update-password"];
+const UNENFORCED_PATHS = [
+  "/sign-in",
+  "/sign-up",
+  "/auth/callback",
+  "/welcome",
+  "/forgot-password",
+  "/update-password",
+  "/help",
+];
 
 /**
  * Refreshes the Supabase session cookie on every request (required by

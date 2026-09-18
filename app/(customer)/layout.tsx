@@ -116,8 +116,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
           <div className="ml-auto flex shrink-0 items-center gap-1 sm:gap-2">
             <ShellNotifications />
             <Link
-              href="/reports"
-              aria-label="Help and reporting"
+              href="/help"
+              aria-label="Get Help"
               className="hidden size-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring sm:flex"
             >
               <CircleHelp className="size-5" aria-hidden="true" />

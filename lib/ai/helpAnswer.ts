@@ -98,6 +98,33 @@ function toLinks(sections: GuideSection[]): HelpAnswer["sections"] {
   return sections.map((s) => ({ id: s.id, title: s.title, category: s.category, href: `/help#${s.id}` }));
 }
 
+/**
+ * Retrieval-only answer, no model call. Used both as `answerHelpQuestion`'s
+ * fallback (no provider configured, or the provider call failed) and as
+ * the entire answer for an anonymous caller (`/help` is public, but an
+ * unauthenticated endpoint calling a paid AI provider on every request is
+ * an abuse/cost vector with no tenant to attribute or rate-limit it to —
+ * see app/api/v1/help/ask/route.ts). Exported so both call sites share
+ * exactly the same "guide does not cover it" copy.
+ */
+export function guideOnlyAnswer(question: string): HelpAnswer {
+  const sections = retrieveSections(question);
+  if (sections.length === 0) {
+    return {
+      answer:
+        "I couldn't find anything in the user guide for that. Try rephrasing it, or browse the sections below — " +
+        "the guide covers getting started, the SHOULD/CAN/DID model, agents, integrations, access, runtime, risk, " +
+        "certification, and settings.",
+      sections: [],
+      source: "guide",
+    };
+  }
+  // Only the best match's summary — concatenating all three read as three
+  // unrelated sentences stapled together; the other matches are already
+  // offered as links beside the answer.
+  return { answer: sections[0].summary, sections: toLinks(sections), source: "guide" };
+}
+
 const SYSTEM_PROMPT =
   "You answer questions about the WonderAgent product using ONLY the documentation excerpts provided in the " +
   "user message. Never state anything the excerpts do not support, and never invent features, screens, URLs or " +
@@ -119,25 +146,8 @@ function buildPrompt(question: string, sections: GuideSection[]): string {
  * no customer data, so nothing tenant-scoped is ever sent to a provider.
  */
 export async function answerHelpQuestion(tenantId: string, question: string): Promise<HelpAnswer> {
-  const sections = retrieveSections(question);
-
-  if (sections.length === 0) {
-    return {
-      answer:
-        "I couldn't find anything in the user guide for that. Try rephrasing it, or browse the sections below — " +
-        "the guide covers getting started, the SHOULD/CAN/DID model, agents, integrations, access, runtime, risk, " +
-        "certification, and settings.",
-      sections: [],
-      source: "guide",
-    };
-  }
-
-  // Retrieval-only answer: correct and useful on its own, and the fallback
-  // whenever no provider is configured or a provider call fails. Only the
-  // best match's summary — concatenating all three read as three unrelated
-  // sentences stapled together; the other matches are already offered as
-  // links beside the answer.
-  const guideAnswer = sections[0].summary;
+  const guideAnswer = guideOnlyAnswer(question);
+  if (guideAnswer.sections.length === 0) return guideAnswer;
 
   let resolved = null;
   try {
@@ -145,11 +155,10 @@ export async function answerHelpQuestion(tenantId: string, question: string): Pr
   } catch {
     resolved = null;
   }
-  if (!resolved) {
-    return { answer: guideAnswer, sections: toLinks(sections), source: "guide" };
-  }
+  if (!resolved) return guideAnswer;
 
   try {
+    const sections = retrieveSections(question);
     const answer = await callAiProvider(resolved, {
       system: SYSTEM_PROMPT,
       user: buildPrompt(question, sections),
@@ -159,6 +168,6 @@ export async function answerHelpQuestion(tenantId: string, question: string): Pr
   } catch {
     // A provider outage degrades to the guide answer rather than an error —
     // the user still gets the right sections.
-    return { answer: guideAnswer, sections: toLinks(sections), source: "guide" };
+    return guideAnswer;
   }
 }

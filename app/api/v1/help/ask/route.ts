@@ -1,14 +1,22 @@
 import { NextResponse } from "next/server";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
-import { answerHelpQuestion } from "@/lib/ai/helpAnswer";
+import { answerHelpQuestion, guideOnlyAnswer } from "@/lib/ai/helpAnswer";
 
 /**
- * The `/help` assistant's endpoint.
+ * The `/help` assistant's endpoint. Needs no module permission and no
+ * session: `/help` is public (2026-09-18, proxy.ts) and the guide is
+ * product documentation, identical for every visitor, containing no
+ * customer data.
  *
- * Requires a session (it is mounted inside the authenticated app) but needs
- * no module permission: the guide is product documentation, identical for
- * every tenant, containing no customer data. Tenant context is resolved
- * anyway because it decides which AI provider key applies.
+ * Tenant context is resolved only to decide which AI provider key applies
+ * — a signed-in caller with a tenant gets that tenant's configured
+ * provider (or the platform default) if one exists, same as before. A
+ * caller with no tenant (anonymous, or signed in but not yet onboarded)
+ * gets retrieval-only answers, deliberately: an unauthenticated endpoint
+ * that can trigger a paid AI provider call, with no tenant to attribute or
+ * rate-limit the spend to, is an abuse/cost vector. The design already
+ * degrades to retrieval gracefully (`source: "guide"`), so the public
+ * assistant stays fully useful without it.
  *
  * Never 501s the way `/api/v1/ai/summarize` does when no provider is
  * configured — the assistant falls back to deterministic retrieval and
@@ -18,12 +26,6 @@ const MAX_QUESTION_CHARS = 500;
 
 export async function POST(request: Request) {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) {
-    return NextResponse.json(
-      { ok: false, error: { code: "NO_TENANT", message: "No active tenant membership" } },
-      { status: 401 },
-    );
-  }
 
   let body: unknown;
   try {
@@ -50,7 +52,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await answerHelpQuestion(ctx.tenantId, question.trim());
+    const result = ctx.tenantId
+      ? await answerHelpQuestion(ctx.tenantId, question.trim())
+      : guideOnlyAnswer(question.trim());
     return NextResponse.json({ ok: true, data: result });
   } catch (err) {
     console.error("Help assistant failed", err);

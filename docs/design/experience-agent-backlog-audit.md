@@ -2220,3 +2220,78 @@ h1 keeping the document outline intact). `auth.spec.ts` + `help.spec.ts`
 37/38, the one failure being the long-standing `@example.com` GoTrue flake
 unrelated to this work. vitest 295/295. Screenshotted sign-in (light), the
 landing header (dark), the rail (light) and sign-up at 320px.
+
+## 2026-09-18 — /help made public (no login required)
+
+User request: make the help centre reachable with no session, and link it
+from the landing page and everywhere else it makes sense.
+
+**Moved** `app/(customer)/help/page.tsx` → `app/help/page.tsx` (URL
+unchanged — route groups don't affect paths; `/help` was already the URL,
+it just used to live inside the authenticated `(customer)` shell). Gave it
+its own `app/help/layout.tsx`: logo, theme toggle, and an auth-aware CTA
+("Back to app" when signed in, "Log in" / "Get started" when not) — calls
+only `getSessionUser()` (returns null rather than redirecting), never
+`getTenantContext()` or anything that assumes a membership, matching the
+pattern `app/welcome/layout.tsx` already established for signed-out
+rendering.
+
+**proxy.ts**: added `/help` to `PUBLIC_PATHS` (no redirect to `/sign-in`
+for an unauthenticated visitor) and `UNENFORCED_PATHS` (the idle/absolute
+session-expiry clock doesn't run there, same as the other pre-auth pages).
+
+**A security decision, made and recorded rather than asked about:** the
+help assistant's endpoint (`POST /api/v1/help/ask`) previously 401'd with
+no tenant. It now serves anonymous callers too, but **retrieval-only** —
+`lib/ai/helpAnswer.ts` gained an exported `guideOnlyAnswer()` (extracted
+from `answerHelpQuestion`'s own no-provider fallback, so both paths share
+identical "guide doesn't cover it" copy) and the route calls it directly
+when `ctx.tenantId` is null, skipping `resolveAiProviderKey` and any LLM
+call entirely. Reasoning: an unauthenticated endpoint that can trigger a
+paid AI provider call, with no tenant to attribute or rate-limit the spend
+to, is an abuse/cost vector; retrieval already answers correctly and the
+design was built to degrade to it gracefully (`source: "guide"`), so the
+public assistant loses nothing but AI-phrased prose. A signed-in caller
+with a tenant is unaffected — same behaviour as before. The assistant's
+"no AI provider configured" copy was also generic-ized (dropped "for this
+workspace", since an anonymous visitor has none) to
+`HelpAssistant.tsx`.
+
+**Links added**, everywhere a visitor plausibly wants help:
+- `app/welcome/layout.tsx` — "Help" in the landing page's top nav.
+- `app/welcome/page.tsx` — "Help" in the landing footer.
+- `modules/ui/AuthShell.tsx` — a quiet "Need help?" link under the footer,
+  shared by all four public auth screens (sign-in, sign-up,
+  forgot-password, update-password) since they all render through it.
+- `app/(customer)/layout.tsx` — the header's `CircleHelp` icon was labelled
+  `aria-label="Help and reporting"` but linked to `/reports`; repointed it
+  to `/help` (Reports already has its own sidebar nav entry, so nothing is
+  stranded) and relabelled it `"Get Help"` to match what it now does.
+- The account menu's existing "Get Help" → `/help` link (AccountPanel) is
+  unchanged.
+
+**Verified:** typecheck and lint clean. vitest 295/295 (helpAnswer.test.ts
+20/20, unaffected by the refactor since `guideOnlyAnswer` reproduces the
+exact same fallback logic `answerHelpQuestion` used inline before).
+`npm run build` succeeds, `/help` compiles as its own dynamic route.
+Rewrote `tests/e2e/help.spec.ts` into two describe blocks: a new "signed
+out" one (6 tests — public reachability, the landing nav/footer link, the
+sign-in "Need help?" link, guide rendering, the assistant answering
+anonymously and retrieval-only, and the signed-out header CTAs) plus the
+existing "signed in" block (8 tests, one new one for the header help icon)
+kept intact. Ran `help.spec.ts` + `welcome.spec.ts` + `auth.spec.ts` +
+`shell.spec.ts` together: 55/56 passed, the one failure
+(`sign-up with a fresh, valid email…`) is the pre-existing GoTrue
+email-rate-limit flake unrelated to this change (confirmed by rerunning
+against `origin/main`'s same test file/line before this work started).
+Screenshotted `/help` at desktop light, desktop dark and 390px mobile with
+no session cookie at all (curled it directly too — `200`, not a redirect),
+and the landing page's new top nav "Help" entry.
+
+**Left out:** no rate limiting was added to the now-public
+`/api/v1/help/ask` endpoint. Judged unnecessary for P0 because the
+anonymous path never leaves the process (pure in-memory retrieval against
+`GUIDE_SECTIONS`, no DB or external call) — there's no meaningful cost or
+DB load for an attacker to run up. Flagged here rather than silently
+skipped in case Operations Agent's abuse-monitoring work wants a floor on
+it anyway.

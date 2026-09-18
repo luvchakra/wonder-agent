@@ -101,8 +101,7 @@ export function HelpAssistant() {
                 )}
                 {turn.source === "guide" && (
                   <p className="mt-2 text-xs text-muted-foreground">
-                    Answered straight from the guide text — no AI provider is configured for this
-                    workspace.
+                    Answered straight from the guide text, not AI-generated.
                   </p>
                 )}
               </div>
