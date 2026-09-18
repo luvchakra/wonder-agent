@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
-import { LinkButton, ThemeToggle } from "@/modules/ui";
+import { LinkButton, ThemeToggle, Logo } from "@/modules/ui";
 
 /**
  * Public marketing chrome. Deliberately separate from the authenticated
@@ -27,13 +26,8 @@ export default function WelcomeLayout({ children }: { children: React.ReactNode 
 
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-          <Link href="/" aria-label="WonderAgent" className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <ShieldCheck className="size-5" aria-hidden="true" />
-            </span>
-            <span className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
-              WonderAgent
-            </span>
+          <Link href="/" aria-label="WonderAgent" className="flex items-center">
+            <Logo variant="lockup" height={30} priority />
           </Link>
 
           <nav aria-label="Primary" className="ml-6 hidden items-center gap-6 lg:flex">

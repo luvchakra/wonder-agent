@@ -7,6 +7,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
+import { Logo } from "./Logo";
 import { AccountPanel, type TenantOption } from "./AccountPanel";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { SHELL_NAV, isNavItemActive, type ShellBadgeCounts } from "./shell-nav";
@@ -46,9 +47,10 @@ function Brand() {
       href="/"
       className="flex items-center gap-2.5 px-4 py-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
     >
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary text-base font-bold text-primary-foreground">
-        W
-      </span>
+      {/* The rail stays dark in both themes, so the mark alone is right
+          here — it is brand-coloured throughout and needs no light/dark
+          pair, and the wordmark would duplicate the name beside it. */}
+      <Logo variant="mark" height={34} className="shrink-0" />
       <span className="min-w-0">
         <span className="block truncate text-[15px] font-semibold tracking-[-0.01em] text-sidebar-foreground">
           WonderAgent

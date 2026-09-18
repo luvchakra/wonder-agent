@@ -2165,3 +2165,58 @@ and an off-topic question). Screenshotted at 1000px.
 deep links from domain screens back into the guide, and no search box over
 the guide (the assistant covers that need). The guide is not yet part of the
 nav rail — the account menu is its only entry point, as asked.
+
+---
+
+## 2026-09-18 — Real logo applied across the app, in light and dark pairs
+
+**Supplied:** the WonderAgent logo as a single 2172×724 PNG on a white
+background — badge + wordmark + "GOVERN. TRUST. ENABLE." tagline.
+
+**Extracted** into `assets/brand/` (7 assets + a README documenting each).
+Two things about the source made this more than a crop, both recorded there
+because they will recur if the logo is ever re-supplied:
+
+- The background is **near**-white (253–255, not 255), so keying on white
+  left the whole image faintly opaque. Alpha instead comes from flood-filling
+  the background inward from the image borders, which has the second benefit
+  of keeping the white robot face and W strokes *inside* the badge opaque —
+  a global white key would have punched holes through them.
+- The letter "o" is kerned **behind** the badge (they overlap in x), so no
+  vertical crop yields a clean mark. The mark keeps only the connected
+  components whose mean saturation is ≥0.45 — the badge's measure 0.82–0.90,
+  the letter's 0.24.
+
+**Light/dark pairs.** The wordmark's "onder" is a dark neutral that all but
+disappears on a dark surface. The dark variants recolour only the neutral
+text (wordmark → `#ECEFF5`, tagline → `#9AA6BA`), split by saturation so the
+badge and the blue/purple "Agent" are never touched. The mark needs no pair.
+
+**New `modules/ui/Logo.tsx`** with three variants — `mark`, `lockup`,
+`full` — sized by height, width following each asset's own ratio. The
+theme-paired variants render both and let `.theme-light-only` /
+`.theme-dark-only` show one, reusing the guards EXPERIENCE-P0-15 added for
+the product screenshots (they mirror the token blocks, so the logo cannot
+disagree with its surface).
+
+**Applied to:** the auth screens (`AuthShell`, so sign-in, sign-up,
+forgot-password and update-password all get it), the landing header and
+footer, onboarding, and the nav rail. The rail takes the **mark** alone —
+it stays dark in both themes, and the wordmark would have duplicated the
+name already printed beside it. Also replaced `app/favicon.ico` and added
+`app/icon.png` / `app/apple-icon.png` (the Apple tile on brand navy, since
+iOS composites on an opaque square).
+
+**One real constraint found:** the full lockup is 4.5:1, so at its natural
+height it is wider than a 320px screen. Heights were set to 56px on the auth
+and onboarding screens and every variant carries `h-auto max-w-full`, so a
+narrow container scales it rather than overflowing.
+
+**Verified:** typecheck, lint, build; `design-review.spec.ts` +
+`welcome.spec.ts` 23/23 — which is the real check here, since it asserts
+**zero horizontal overflow at all seven widths in both themes** and one h1
+per screen (onboarding's visible heading became the logo, with an `sr-only`
+h1 keeping the document outline intact). `auth.spec.ts` + `help.spec.ts`
+37/38, the one failure being the long-standing `@example.com` GoTrue flake
+unrelated to this work. vitest 295/295. Screenshotted sign-in (light), the
+landing header (dark), the rail (light) and sign-up at 320px.

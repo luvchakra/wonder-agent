@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
+import { Logo } from "./Logo";
 
 /**
  * Shared chrome for the two public auth screens, so /sign-in and /sign-up
@@ -36,17 +36,8 @@ export function AuthShell({
 
       <main className="relative flex flex-1 items-center justify-center px-4 py-12 sm:py-16">
         <div className="w-full max-w-sm">
-          <Link
-            href="/"
-            aria-label="WonderAgent"
-            className="mx-auto flex w-fit items-center gap-2.5"
-          >
-            <span className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <ShieldCheck className="size-5" aria-hidden="true" />
-            </span>
-            <span className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
-              WonderAgent
-            </span>
+          <Link href="/" aria-label="WonderAgent" className="mx-auto flex w-fit items-center">
+            <Logo variant="full" height={56} priority />
           </Link>
 
           <div className="mt-8 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-md)] sm:p-7">

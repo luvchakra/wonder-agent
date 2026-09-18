@@ -3,7 +3,7 @@ import { Check } from "lucide-react";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { createTenantAction, selectTenantAction } from "@/app/actions/tenant";
-import { Card, CardHeader, CardBody, Button, TextField } from "@/modules/ui";
+import { Card, CardHeader, CardBody, Button, Logo, TextField } from "@/modules/ui";
 
 export default async function OnboardingPage() {
   const supabase = await supabaseServer();
@@ -41,9 +41,10 @@ export default async function OnboardingPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4 py-12">
-      <div className="text-center">
-        <h1 className="text-xl font-semibold text-foreground">WonderAgent</h1>
-        <p className="mt-1 text-sm text-muted-foreground">AI Identity Governance &amp; Runtime Assurance</p>
+      <div className="flex flex-col items-center text-center">
+        <h1 className="sr-only">WonderAgent</h1>
+        <Logo variant="full" height={56} priority />
+        <p className="mt-3 text-sm text-muted-foreground">AI Identity Governance &amp; Runtime Assurance</p>
       </div>
 
       {memberships && memberships.length > 0 && (

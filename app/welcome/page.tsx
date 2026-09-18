@@ -10,7 +10,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { BrowserFrame, FlowDiagram, LinkButton, PhoneFrame } from "@/modules/ui";
+import { BrowserFrame, FlowDiagram, LinkButton, Logo, PhoneFrame } from "@/modules/ui";
 import agentsDesktopDark from "@/assets/product/agents-desktop-dark.png";
 import agentsDesktopLight from "@/assets/product/agents-desktop-light.png";
 import overviewDesktopDark from "@/assets/product/overview-desktop-dark.png";
@@ -483,12 +483,7 @@ export default function WelcomePage() {
       {/* ---------------------------------------------------------- footer */}
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex items-center gap-2.5">
-            <span className="flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <ShieldCheck className="size-4" aria-hidden="true" />
-            </span>
-            <span className="text-sm font-semibold text-foreground">WonderAgent</span>
-          </div>
+          <Logo variant="lockup" height={26} alt="WonderAgent" className="flex items-center" />
           <p className="text-sm text-muted-foreground">
             AI Identity Governance &amp; Runtime Assurance
           </p>
