@@ -29,6 +29,18 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  experimental: {
+    // Keep a visited dynamic route's payload in the client router cache
+    // for 30s, so Back/Forward and re-clicking a nav item paint instantly
+    // from memory instead of re-rendering on the server. Thirty seconds is
+    // short enough that governance data — findings, lifecycle states —
+    // never reads stale for long; every mutation goes through a server
+    // action that revalidates anyway.
+    staleTimes: { dynamic: 30, static: 180 },
+    // Tree-shake these at the import site instead of pulling their whole
+    // barrel into every chunk that touches one icon or one chart type.
+    optimizePackageImports: ["lucide-react", "recharts"],
+  },
 };
 
 export default nextConfig;

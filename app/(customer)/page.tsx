@@ -1,41 +1,38 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { ArrowRight, ClipboardCheck, Plus, Search, Siren } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
-import { supabaseServer } from "@/lib/db/supabaseServer";
-import { listAgents, getOwnershipIssues } from "@/modules/agent-identity/service";
+import { getProfile } from "@/lib/tenant/session";
+import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
-import { listCampaigns, listCampaignItems, getGovernancePosture } from "@/modules/certification-compliance/service";
 import { listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import type { Agent } from "@/lib/shared/types/agent-identity";
-import type { GovernanceDimension, GovernancePosture } from "@/lib/shared/types/compliance";
 import { Card, CardHeader, CardBody, KpiCard, SeverityBadge, Badge, EmptyState, Tabs, TabPanel } from "@/modules/ui";
-import { CoverageBars, DonutChart, TrendChart } from "@/modules/ui/charts";
+import { TrendChart } from "@/modules/ui/charts.lazy";
 import { Greeting } from "./Greeting";
+import {
+  KpiSkeleton,
+  OverdueCertificationsCard,
+  PanelSkeleton,
+  PendingCertifications,
+  PosturePanels,
+  UnownedKpi,
+} from "./dashboard-panels";
 
 // EXPERIENCE-P0-02 / P0-16. Every number on this page is a real query
 // against the owning module's published contract — never a hardcoded
 // figure, and never an LLM's guess (CLAUDE.md non-negotiable #9).
+//
+// Two tiers of data. The first wave — agents, open findings, recent
+// events, the greeting's profile — is four parallel queries and drives the
+// header, the KPI row, the risk trend and the activity list; the page
+// paints as soon as it lands. Everything that then fans out per agent or
+// per campaign (governance posture, ownership issues, certification
+// items) lives in ./dashboard-panels.tsx behind Suspense boundaries and
+// streams in behind a skeleton, so a slow read-model never delays the
+// numbers an administrator came for.
 
 const TREND_DAYS = 14;
-
-/** The design's posture ring. Maps Compliance's five real statuses onto it. */
-const POSTURE_SLICES = [
-  { status: "GOVERNED", label: "Compliant", color: "var(--color-success)" },
-  { status: "PARTIALLY_GOVERNED", label: "Needs attention", color: "var(--color-warning)" },
-  { status: "NON_COMPLIANT", label: "At risk", color: "var(--color-destructive)" },
-  { status: "EXCEPTION_APPROVED", label: "Exception approved", color: "var(--color-info)" },
-  { status: "SUSPENDED", label: "Suspended", color: "var(--color-muted-foreground)" },
-] as const;
-
-/** The design's "Compliance Coverage" rows, in its order. */
-const COVERAGE_DIMENSIONS: Array<{ dimension: GovernanceDimension; label: string }> = [
-  { dimension: "identity", label: "Identity & ownership" },
-  { dimension: "purpose", label: "Purpose & use case" },
-  { dimension: "access", label: "Access governance" },
-  { dimension: "runtime_monitoring", label: "Runtime monitoring" },
-  { dimension: "certification", label: "Certification" },
-  { dimension: "policy_compliance", label: "Policy & controls" },
-];
 
 const APPROVED_STATES = new Set(["APPROVED", "PROVISIONED", "ACTIVE", "CERTIFICATION_DUE"]);
 const PENDING_STATES = new Set(["DISCOVERED", "REGISTERED", "ASSESSED"]);
@@ -66,41 +63,15 @@ export default async function OverviewPage() {
   const ctx = await getTenantContext();
   const tenantId = ctx.tenantId!;
 
-  const supabase = await supabaseServer();
-  const [agents, openFindings, campaigns, runtimePage, { data: profile }] = await Promise.all([
+  const [agents, openFindings, runtimePage, profile] = await Promise.all([
     listAgents(tenantId),
     getFindings(tenantId, { status: "open" }),
-    listCampaigns(tenantId),
     listRuntimeEvents(tenantId, { limit: 100 }),
-    supabase.from("users").select("display_name").eq("id", ctx.userId).maybeSingle<{ display_name: string | null }>(),
+    getProfile(),
   ]);
 
-  // Second wave — each of these needs the agent/campaign list above, so it
-  // cannot be hoisted into the first Promise.all, but the fan-out itself is
-  // parallel rather than a per-agent await chain (CLAUDE.md §15).
-  //
-  // getGovernancePosture() is a genuinely expensive read-model: it consults
-  // Identity, Access, Runtime and this module per agent. Fanning it out
-  // across the whole agent list is acceptable at P0 fixture scale and is
-  // covered by this route's loading.tsx skeleton, but it is the first thing
-  // that will need a bulk contract from the Compliance Agent as tenants
-  // grow — recorded in the Experience audit log.
-  const [ownershipResults, postures, activeCampaignItemLists] = await Promise.all([
-    Promise.all(agents.map((a) => getOwnershipIssues(tenantId, a.id, a.criticality))),
-    Promise.all(
-      agents.map((a) =>
-        getGovernancePosture(tenantId, a.id).catch(() => null as GovernancePosture | null),
-      ),
-    ),
-    Promise.all(campaigns.filter((c) => c.status === "active").map((c) => listCampaignItems(tenantId, c.id))),
-  ]);
-
-  const unownedCount = ownershipResults.filter((issues) => issues.length > 0).length;
-  const activeCampaignItems = activeCampaignItemLists.flat();
   const now = new Date();
   const nowIso = now.toISOString();
-  const pendingCertifications = activeCampaignItems.filter((i) => i.status === "pending");
-  const overdueCertifications = pendingCertifications.filter((i) => i.dueDate && i.dueDate < nowIso);
 
   // --- KPI row ------------------------------------------------------------
   const weekAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
@@ -111,31 +82,6 @@ export default async function OverviewPage() {
     openFindings.filter((f) => f.severity === "critical" || f.severity === "high").map((f) => f.agentId),
   );
   const share = (n: number) => (agents.length === 0 ? "—" : `${Math.round((n / agents.length) * 100)}% of all agents`);
-
-  // --- Governance posture ring -------------------------------------------
-  const postureCounts = new Map<string, number>();
-  for (const p of postures) {
-    if (!p) continue;
-    postureCounts.set(p.status, (postureCounts.get(p.status) ?? 0) + 1);
-  }
-  const postureSlices = POSTURE_SLICES.map((s) => ({
-    label: s.label,
-    value: postureCounts.get(s.status) ?? 0,
-    color: s.color,
-  }));
-
-  // --- Compliance coverage ------------------------------------------------
-  const coverageRows = COVERAGE_DIMENSIONS.map(({ dimension, label }) => {
-    let applicable = 0;
-    let governed = 0;
-    for (const p of postures) {
-      const result = p?.dimensions.find((d) => d.dimension === dimension);
-      if (!result || result.status === "not_applicable") continue;
-      applicable += 1;
-      if (result.status === "governed") governed += 1;
-    }
-    return { label, percent: applicable === 0 ? 0 : (governed / applicable) * 100 };
-  });
 
   // --- Risk trend ---------------------------------------------------------
   const days = lastDays(now, TREND_DAYS);
@@ -162,7 +108,7 @@ export default async function OverviewPage() {
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
-          <Greeting name={profile?.display_name?.trim() || "there"} />
+          <Greeting name={profile?.displayName?.trim() || "there"} />
           <p className="mt-1 text-sm text-muted-foreground">
             Here&rsquo;s what&rsquo;s happening with your AI agents today.
           </p>
@@ -199,14 +145,9 @@ export default async function OverviewPage() {
               footnote={share(pendingApproval)}
               href="/agents"
             />
-            <KpiCard
-              icon="UserX"
-              tone="warning"
-              label="Unowned"
-              value={unownedCount}
-              footnote={share(unownedCount)}
-              href="/agents"
-            />
+            <Suspense fallback={<KpiSkeleton />}>
+              <UnownedKpi tenantId={tenantId} agents={agents} />
+            </Suspense>
             <KpiCard
               icon="ShieldAlert"
               tone="danger"
@@ -218,46 +159,22 @@ export default async function OverviewPage() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            <Card>
-              <CardHeader title="Agent governance posture" description="Every agent, scored across 12 dimensions" />
-              <CardBody className="flex flex-1 items-center justify-center py-5">
-                <DonutChart
-                  slices={postureSlices}
-                  centerValue={agents.length}
-                  centerLabel={agents.length === 1 ? "agent" : "agents"}
-                  size={148}
-                />
-              </CardBody>
-            </Card>
-
-            <Card>
-              <CardHeader title="Risk trend" description={`Last ${TREND_DAYS} days`} />
-              <CardBody>
-                <TrendChart
-                  data={trendData}
-                  series={[
-                    { key: "findings", label: "Findings opened", color: "var(--color-primary)" },
-                    { key: "severe", label: "Critical & high", color: "var(--color-destructive)" },
-                    { key: "agents", label: "Agents registered", color: "var(--color-warning)" },
-                  ]}
-                />
-              </CardBody>
-            </Card>
-
-            <Card className="lg:col-span-2 2xl:col-span-1">
-              <CardHeader
-                title="Compliance coverage"
-                description="Share of applicable agents governed on each dimension"
-                actions={
-                  <Link href="/reports" className="text-xs font-medium text-primary hover:underline">
-                    View reports
-                  </Link>
-                }
-              />
-              <CardBody>
-                <CoverageBars rows={coverageRows} />
-              </CardBody>
-            </Card>
+            {/* Order matters for the grid: posture, trend, coverage. The
+                trend card is rendered eagerly between the two streamed
+                panels, so the streamed pair is split around it by the
+                Suspense boundary's fragment — both halves fill in
+                together once the posture fan-out completes. */}
+            <Suspense
+              fallback={
+                <>
+                  <PanelSkeleton title="Agent governance posture" description="Every agent, scored across 12 dimensions" />
+                  <RiskTrendCard data={trendData} />
+                  <PanelSkeleton title="Compliance coverage" description="Share of applicable agents governed on each dimension" />
+                </>
+              }
+            >
+              <PosturePanelsWithTrend tenantId={tenantId} agents={agents} trendData={trendData} />
+            </Suspense>
           </div>
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -267,7 +184,7 @@ export default async function OverviewPage() {
                 tabs={[
                   { value: "activity", label: "Recent activity" },
                   { value: "findings", label: "Open findings", count: openFindings.length },
-                  { value: "certifications", label: "Pending approvals", count: pendingCertifications.length },
+                  { value: "certifications", label: "Pending approvals" },
                 ]}
               >
                 <TabPanel value="activity" className="pt-1">
@@ -320,28 +237,9 @@ export default async function OverviewPage() {
                 </TabPanel>
 
                 <TabPanel value="certifications" className="pt-1">
-                  {pendingCertifications.length === 0 ? (
-                    <EmptyState title="Nothing awaiting review" />
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {pendingCertifications.slice(0, 6).map((item) => {
-                        const overdue = !!item.dueDate && item.dueDate < nowIso;
-                        return (
-                          <li key={item.id} className="flex items-center gap-3 py-2.5 text-sm">
-                            <Link
-                              href={`/compliance/campaigns/${item.campaignId}`}
-                              className="min-w-0 flex-1 truncate text-foreground hover:text-primary"
-                            >
-                              {agentById.get(item.agentId) ? agentLabel(agentById.get(item.agentId)!) : "Agent review"}
-                            </Link>
-                            <Badge tone={overdue ? "danger" : "neutral"}>
-                              {overdue ? "Overdue" : item.dueDate ? `Due ${item.dueDate.slice(0, 10)}` : "No due date"}
-                            </Badge>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
+                  <Suspense fallback={<div aria-hidden="true" className="my-2 h-24 animate-pulse rounded-lg bg-muted" />}>
+                    <PendingCertifications tenantId={tenantId} agentById={agentById} nowIso={nowIso} />
+                  </Suspense>
                 </TabPanel>
               </Tabs>
             </Card>
@@ -420,25 +318,51 @@ export default async function OverviewPage() {
             </CardBody>
           </Card>
 
-          {overdueCertifications.length > 0 && (
-            <Card>
-              <CardHeader title="Needs attention" />
-              <CardBody>
-                <p className="text-sm text-muted-foreground">
-                  {overdueCertifications.length} certification item
-                  {overdueCertifications.length === 1 ? " is" : "s are"} overdue.
-                </p>
-                <Link
-                  href="/compliance/campaigns"
-                  className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
-                >
-                  Review now
-                </Link>
-              </CardBody>
-            </Card>
-          )}
+          <Suspense fallback={null}>
+            <OverdueCertificationsCard tenantId={tenantId} nowIso={nowIso} />
+          </Suspense>
         </aside>
       </div>
     </div>
+  );
+}
+
+function RiskTrendCard({ data }: { data: Array<Record<string, string | number>> }) {
+  return (
+    <Card>
+      <CardHeader title="Risk trend" description={`Last ${TREND_DAYS} days`} />
+      <CardBody>
+        <TrendChart
+          data={data}
+          series={[
+            { key: "findings", label: "Findings opened", color: "var(--color-primary)" },
+            { key: "severe", label: "Critical & high", color: "var(--color-destructive)" },
+            { key: "agents", label: "Agents registered", color: "var(--color-warning)" },
+          ]}
+        />
+      </CardBody>
+    </Card>
+  );
+}
+
+/**
+ * The posture pair with the trend card slotted between them, so the grid
+ * order (posture, trend, coverage) survives the Suspense boundary. The
+ * trend card needs nothing beyond the first wave, but rendering it here
+ * keeps it in its designed column without a second boundary.
+ */
+async function PosturePanelsWithTrend({
+  tenantId,
+  agents,
+  trendData,
+}: {
+  tenantId: string;
+  agents: Agent[];
+  trendData: Array<Record<string, string | number>>;
+}) {
+  return (
+    <>
+      <PosturePanels tenantId={tenantId} agents={agents} trendCard={<RiskTrendCard data={trendData} />} />
+    </>
   );
 }

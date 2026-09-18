@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CircleHelp } from "lucide-react";
-import { supabaseServer } from "@/lib/db/supabaseServer";
-import { getTenantContext } from "@/lib/tenant/getTenantContext";
+import { getProfile, getSessionUser } from "@/lib/tenant/session";
+import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContext";
 import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { getFindings } from "@/modules/risk/service";
@@ -39,30 +39,23 @@ function humanizeRole(role: string | undefined): string | null {
 // header beside it (search, notifications, help, organization, account),
 // and below `lg` a bottom tab bar whose "More" slot opens the same rail
 // as a drawer. See modules/ui/AppSidebar.tsx.
+//
+// Data: the session check is local (lib/tenant/session.ts) and the tenant
+// context, membership list and platform-admin check are all request-cached,
+// so the page rendering beside this layout reuses them instead of
+// repeating them. Everything below is one parallel wave of queries.
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) redirect("/sign-in");
 
   const ctx = await getTenantContext();
   if (!ctx.tenantId) redirect("/onboarding");
 
-  // Independent reads, fetched in parallel (CLAUDE.md §15 — no sequential
-  // waterfalls for a page's independent data).
-  const [{ data: profile }, { data: memberships }, isAdmin, announcements, openFindings] = await Promise.all([
-    supabase.from("users").select("display_name").eq("id", user.id).maybeSingle<{ display_name: string | null }>(),
-    // Tenant-switcher list: the user's own active memberships, RLS-scoped —
-    // read directly here (display-only, not a mutation) since Foundation
-    // publishes getTenantContext() for the *current* tenant but not a
-    // "list all my memberships" contract; flagged in the audit log.
-    supabase
-      .from("tenant_memberships")
-      .select("tenant_id, tenants(name, slug)")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .returns<{ tenant_id: string; tenants: { name: string; slug: string } | null }[]>(),
+  const [profile, memberships, isAdmin, announcements, openFindings] = await Promise.all([
+    getProfile(),
+    // Already resolved by getTenantContext() above — the cache hands back
+    // the same promise, so this costs nothing.
+    getMyMemberships(),
     isPlatformAdmin(),
     // PLATFORM-P0-05.4 — Experience Agent's half of Platform's already-
     // published getActiveAnnouncements(): every customer page sees any
@@ -78,17 +71,17 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     getFindings(ctx.tenantId, { status: "open" }),
   ]);
 
-  const tenantOptions = (memberships ?? []).map((m) => ({
-    id: m.tenant_id,
-    name: m.tenants?.name ?? m.tenant_id,
-    slug: m.tenants?.slug ?? "",
-    current: m.tenant_id === ctx.tenantId,
+  const tenantOptions = memberships.map((m) => ({
+    id: m.tenantId,
+    name: m.name,
+    slug: m.slug,
+    current: m.tenantId === ctx.tenantId,
   }));
 
   const badges: ShellBadgeCounts = { risk: openFindings.length };
   const sidebarUser = {
     email: user.email ?? "",
-    displayName: profile?.display_name ?? null,
+    displayName: profile?.displayName ?? null,
     roleLabel: humanizeRole(ctx.roles[0]),
     isPlatformAdmin: isAdmin,
   };

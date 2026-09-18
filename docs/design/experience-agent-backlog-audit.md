@@ -2052,3 +2052,61 @@ It targets the badge directly now.
 **Verified:** typecheck, lint, build, and the full Playwright suite —
 109 of 110 passing, the one failure being the pre-existing FinanceBot
 `resolved` assertion.
+
+---
+
+## 2026-09-18 — Snappier pages: streaming dashboard, lazy charts, router cache, function region
+
+The user reported the app as slow and asked for an immediate, snappy
+experience using every available technique. The Foundation entry of the same
+date covers the biggest cause (auth/tenant round trips); this entry covers
+the rest.
+
+**Dashboard streams.** `app/(customer)/page.tsx` now renders after its first
+wave — agents, open findings, recent events, the greeting's profile, four
+parallel queries — and everything that fans out per agent or per campaign
+(`getGovernancePosture()` ×N, `getOwnershipIssues()` ×N, campaign items) has
+moved to `dashboard-panels.tsx` behind `Suspense` boundaries with matching
+skeletons. The posture ring, coverage bars, the Unowned KPI, the pending
+approvals tab and the overdue card stream in; the numbers an administrator
+came for no longer wait on the slowest read-model. The two panels that both
+want campaign items share one request-cached loader. The trend card is
+threaded through the posture boundary so the grid's designed order
+(posture, trend, coverage) survives the split.
+
+**Charts load on demand.** `modules/ui/charts.lazy.tsx` wraps `DonutChart`
+and `TrendChart` in `next/dynamic` (`ssr: false`, with a skeleton), and
+`CoverageBars` moved to its own file so it no longer drags recharts in. The
+largest client chunk went from 597 KB to 372 KB; screens that draw no chart
+no longer download the charting library.
+
+**Router cache.** `experimental.staleTimes: { dynamic: 30, static: 180 }` in
+`next.config.ts`: a visited route's payload stays in the client router cache
+for 30 s, so Back/Forward and re-clicking a nav item paint instantly. Thirty
+seconds keeps governance data from reading stale for long, and every
+mutation goes through a server action that revalidates anyway.
+`optimizePackageImports` covers `lucide-react` and `recharts`.
+
+**Function region.** The Supabase project is in **ap-southeast-1**
+(Singapore); Vercel's default function region is **iad1** (Virginia). Every
+database round trip was crossing the Pacific. `vercel.json` now pins
+`"regions": ["sin1"]`, which turns each ~270 ms trip into tens of
+milliseconds. This is the single largest production win and it is
+configuration, not code — it takes effect on the next deployment.
+
+**Measured** with `scripts/measure-page-timings.mjs` (new, env-driven, kept
+for before/after comparisons): every page 1,350 → ~560 ms TTFB; dashboard
+first paint 3,117 → ~560 ms with panels streaming in behind it. The residual
+560 ms is two database round trips from a container ~270 ms away from the
+database; from `sin1` the same two trips are ~20–40 ms.
+
+**Database, checked and left alone:** Supabase's performance advisors report
+no missing indexes on the hot tables (`agents`, `tenant_memberships`,
+`user_roles`, `risk_findings`, `runtime_events` are covered). The findings
+it does list — thirteen unindexed foreign keys on rarely-queried
+`created_by`/`reviewed_by` columns, `auth.<fn>()` re-evaluated per row in the
+`notifications`/`notification_preferences` RLS policies, nineteen unused
+indexes — are not on any page's critical path and belong to their owning
+modules; recorded here for them.
+
+**Verified:** typecheck, lint, build, and the full Playwright suite.

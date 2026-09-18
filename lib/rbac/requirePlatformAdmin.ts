@@ -1,7 +1,8 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { cache } from "react";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
+import { getSessionUser } from "@/lib/tenant/session";
 import { ApiError } from "@/lib/shared/types/foundation";
 
 /**
@@ -11,12 +12,13 @@ import { ApiError } from "@/lib/shared/types/foundation";
  * this check: `platform_admins` has no RLS policy granting any access to
  * regular authenticated clients, so this always reads it via the
  * service-role client.
+ *
+ * Resolved once per request (`cache()`): the customer layout asks this to
+ * decide whether to show the "Admin console" link, and the platform-admin
+ * routes ask it to gate themselves; they share one lookup.
  */
-export async function isPlatformAdmin(): Promise<boolean> {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export const isPlatformAdmin = cache(async (): Promise<boolean> => {
+  const user = await getSessionUser();
   if (!user) return false;
 
   const admin = supabaseServiceRole();
@@ -28,13 +30,10 @@ export async function isPlatformAdmin(): Promise<boolean> {
 
   if (error) return false;
   return data !== null;
-}
+});
 
 export async function requirePlatformAdmin(): Promise<{ userId: string }> {
-  const supabase = await supabaseServer();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getSessionUser();
   if (!user) {
     throw new ApiError(401, "UNAUTHENTICATED");
   }
