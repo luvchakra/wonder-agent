@@ -38,7 +38,7 @@ function signInAndSaveState(key: TestUserKey) {
     }
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(spec.email);
-    await page.getByLabel("Password").fill(spec.password);
+    await page.getByRole("textbox", { name: "Password" }).fill(spec.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
 
     if (spec.isPlatformAdmin) {

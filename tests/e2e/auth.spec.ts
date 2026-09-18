@@ -19,7 +19,7 @@ test.describe("unauthenticated", () => {
   test("sign-in with a wrong password shows an error and does not navigate away", async ({ page }) => {
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
-    await page.getByLabel("Password").fill("definitely-the-wrong-password");
+    await page.getByRole("textbox", { name: "Password" }).fill("definitely-the-wrong-password");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByText(/invalid login credentials/i)).toBeVisible();
     await expect(page).toHaveURL(/\/sign-in/);
@@ -28,7 +28,7 @@ test.describe("unauthenticated", () => {
   test("sign-in with correct credentials reaches the dashboard", async ({ page }) => {
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
-    await page.getByLabel("Password").fill(TEST_USERS.adminOne.password);
+    await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.adminOne.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
     await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
@@ -49,7 +49,7 @@ test.describe("unauthenticated", () => {
     // seeded user's address produces no error and leaves /sign-up.
     await page.goto("/sign-up");
     await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
-    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByRole("textbox", { name: "Password" }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: "Sign up", exact: true }).click();
     await expect(page).not.toHaveURL(/\/sign-up/, { timeout: 10_000 });
     await expect(page.getByText(/already registered|already exists|user already registered/i)).toHaveCount(0);
@@ -58,12 +58,12 @@ test.describe("unauthenticated", () => {
   test("sign-up with a password under the 8-character minimum is blocked client-side", async ({ page }) => {
     await page.goto("/sign-up");
     await page.getByLabel("Email").fill(`pw-too-short-${Date.now()}@e2e.wonderagent.test`);
-    await page.getByLabel("Password").fill("short1");
+    await page.getByRole("textbox", { name: "Password" }).fill("short1");
     await page.getByRole("button", { name: "Sign up", exact: true }).click();
     // Native HTML5 minLength validation blocks the form submit entirely —
     // never reaches the server action, so the URL never changes.
     await expect(page).toHaveURL(/\/sign-up/);
-    const isValid = await page.getByLabel("Password").evaluate((el: HTMLInputElement) => el.validity.valid);
+    const isValid = await page.getByRole("textbox", { name: "Password" }).evaluate((el: HTMLInputElement) => el.validity.valid);
     expect(isValid).toBe(false);
   });
 
@@ -83,6 +83,54 @@ test.describe("unauthenticated", () => {
     expect(emailValid).toBe(false);
   });
 
+  test("sign-in has a Forgot password? link to /forgot-password", async ({ page }) => {
+    await page.goto("/sign-in");
+    await page.getByRole("link", { name: "Forgot password?" }).click();
+    await expect(page).toHaveURL(/\/forgot-password/);
+  });
+
+  test("the password reveal toggle shows and hides the typed password on sign-in", async ({ page }) => {
+    await page.goto("/sign-in");
+    const password = page.getByRole("textbox", { name: "Password" });
+    await password.fill("correct-horse-battery-staple");
+    await expect(password).toHaveAttribute("type", "password");
+
+    const toggle = page.getByRole("button", { name: "Show password" });
+    await toggle.click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("correct-horse-battery-staple");
+
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+  });
+
+  test("the password reveal toggle shows and hides the typed password on sign-up", async ({ page }) => {
+    await page.goto("/sign-up");
+    const password = page.getByRole("textbox", { name: "Password" });
+    await password.fill("correct-horse-battery-staple");
+    await expect(password).toHaveAttribute("type", "password");
+
+    await page.getByRole("button", { name: "Show password" }).click();
+    await expect(password).toHaveAttribute("type", "text");
+    await expect(password).toHaveValue("correct-horse-battery-staple");
+
+    await page.getByRole("button", { name: "Hide password" }).click();
+    await expect(password).toHaveAttribute("type", "password");
+  });
+
+  test("the reveal toggle is a plain button — clicking it never submits the form", async ({ page }) => {
+    // A <button> inside a <form> defaults to type="submit"; TextField's
+    // reveal toggle must set type="button" explicitly or clicking it would
+    // fire the real sign-in request with whatever partial credentials are
+    // in the form.
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
+    await page.getByRole("textbox", { name: "Password" }).fill("not-yet-the-real-password");
+    await page.getByRole("button", { name: "Show password" }).click();
+    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page.getByText(/invalid login credentials/i)).toHaveCount(0);
+  });
+
   test("a signed-in session survives a full page reload (no bounce to /welcome or /sign-in)", async ({ page }) => {
     // Regression coverage for EXPERIENCE-P0-14's proxy.ts rewrite of "/" to
     // /welcome for signed-out visitors — a signed-in user reloading "/"
@@ -90,7 +138,7 @@ test.describe("unauthenticated", () => {
     // re-authentication.
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(TEST_USERS.adminOne.email);
-    await page.getByLabel("Password").fill(TEST_USERS.adminOne.password);
+    await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.adminOne.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
     await expect(page.getByRole("heading", { name: "Agent governance posture" })).toBeVisible();
@@ -110,7 +158,7 @@ test.describe("unauthenticated", () => {
     const email = `pw-signup-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@example.com`;
     await page.goto("/sign-up");
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByRole("textbox", { name: "Password" }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: "Sign up", exact: true }).click();
     // Whether this Supabase project requires email confirmation determines
     // the exact landing page (an immediate session -> /onboarding; no
@@ -147,7 +195,7 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
     await page.goto("/sign-in");
     for (let attempt = 0; attempt < 10; attempt++) {
       await page.getByLabel("Email").fill(email);
-      await page.getByLabel("Password").fill("definitely-the-wrong-password");
+      await page.getByRole("textbox", { name: "Password" }).fill("definitely-the-wrong-password");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page.getByText(/invalid login credentials/i)).toBeVisible();
     }
@@ -155,7 +203,7 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
     // our own rate limiter, not Supabase — a distinct, actionable message
     // rather than another "invalid login credentials".
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill("definitely-the-wrong-password");
+    await page.getByRole("textbox", { name: "Password" }).fill("definitely-the-wrong-password");
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page.getByText(/too many sign-in attempts/i)).toBeVisible();
   });
@@ -185,7 +233,7 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
     for (let i = 0; i < 11; i++) {
       const email = `e2e-ratelimit-ip-${Date.now()}-${i}@e2e.wonderagent.test`;
       await page.getByLabel("Email").fill(email);
-      await page.getByLabel("Password").fill("definitely-the-wrong-password");
+      await page.getByRole("textbox", { name: "Password" }).fill("definitely-the-wrong-password");
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page.getByText(/invalid login credentials/i)).toBeVisible();
       await expect(page.getByText(/too many sign-in attempts/i)).toHaveCount(0);
@@ -201,7 +249,7 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
     await page.goto("/sign-up");
     for (let attempt = 0; attempt < 5; attempt++) {
       await page.getByLabel("Email").fill(email);
-      await page.getByLabel("Password").fill(E2E_PASSWORD);
+      await page.getByRole("textbox", { name: "Password" }).fill(E2E_PASSWORD);
       await page.getByRole("button", { name: "Sign up", exact: true }).click();
       // Not asserted further here — Supabase's own response to a repeat
       // submission of the same address (success-shaped, or its own SMTP
@@ -211,7 +259,7 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
       await page.goto("/sign-up");
     }
     await page.getByLabel("Email").fill(email);
-    await page.getByLabel("Password").fill(E2E_PASSWORD);
+    await page.getByRole("textbox", { name: "Password" }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: "Sign up", exact: true }).click();
     await expect(page.getByText(/too many sign-up attempts/i)).toBeVisible();
   });
@@ -314,7 +362,7 @@ test.describe("sign-out", () => {
   test("logs out via the account menu and can no longer reach a protected route", async ({ page }) => {
     await page.goto("/sign-in");
     await page.getByLabel("Email").fill(TEST_USERS.signOutOnly.email);
-    await page.getByLabel("Password").fill(TEST_USERS.signOutOnly.password);
+    await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.signOutOnly.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
     // Since EXPERIENCE-P0-15 the navigation rail is permanent at this
@@ -342,7 +390,7 @@ test.describe("sign-out", () => {
       const page = await ctx.newPage();
       await page.goto("/sign-in");
       await page.getByLabel("Email").fill(TEST_USERS.signOutOnly.email);
-      await page.getByLabel("Password").fill(TEST_USERS.signOutOnly.password);
+      await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.signOutOnly.password);
       await page.getByRole("button", { name: "Sign in", exact: true }).click();
       await expect(page).toHaveURL("/");
       pages.push(page);

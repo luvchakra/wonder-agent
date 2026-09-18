@@ -1,3 +1,7 @@
+"use client";
+
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -28,11 +32,42 @@ export function TextField({
   name,
   hint,
   className,
+  type,
   ...props
 }: { label: string; hint?: string; className?: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  const [revealed, setRevealed] = useState(false);
+  // Only a password field gets the reveal toggle — every other input keeps
+  // rendering exactly as before, including its own `type`.
+  const isPassword = type === "password";
+
+  if (!isPassword) {
+    return (
+      <Field label={label} htmlFor={name!} hint={hint} required={props.required}>
+        <input id={name} name={name} type={type} className={cn(fieldInputClass, className)} {...props} />
+      </Field>
+    );
+  }
+
   return (
     <Field label={label} htmlFor={name!} hint={hint} required={props.required}>
-      <input id={name} name={name} className={cn(fieldInputClass, className)} {...props} />
+      <div className="relative">
+        <input
+          id={name}
+          name={name}
+          type={revealed ? "text" : "password"}
+          className={cn(fieldInputClass, className, "pr-9")}
+          {...props}
+        />
+        <button
+          type="button"
+          onClick={() => setRevealed((v) => !v)}
+          aria-label={revealed ? "Hide password" : "Show password"}
+          aria-pressed={revealed}
+          className="absolute inset-y-0 right-0 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          {revealed ? <EyeOff className="size-4" aria-hidden="true" /> : <Eye className="size-4" aria-hidden="true" />}
+        </button>
+      </div>
     </Field>
   );
 }
