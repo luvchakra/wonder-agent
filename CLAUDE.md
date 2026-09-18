@@ -187,6 +187,18 @@ required extension point or genuine scope creep, treat it as scope creep and sto
 
 ## 4. Workflow
 
+**Sync before anything else.** The first action in every session — before
+reading a backlog, before opening a file, before answering a question about the
+code — is `git fetch origin main`, followed by bringing the working branch up
+to date with it: fast-forward when the branch has no unmerged commits of its
+own, otherwise rebase (a branch only you push to) or merge (a shared branch)
+onto `origin/main`. Several agents and sessions push to `main` concurrently, so
+a checkout that was current an hour ago is not current now; work started on a
+stale base produces conflicts, duplicated fixes, and audit entries that
+describe code nobody is running. After syncing, re-read anything you intend to
+change — it may have moved. Fetch again immediately before every push, and
+never force-push over commits you have not seen.
+
 Each agent works one story at a time from its own backlog doc:
 
 1. **Before starting a story**: read this file, the module's backlog
@@ -323,8 +335,9 @@ without stopping to ask. The only reasons to stop and wait for the user are:
 Everything else below still applies to how each agent behaves once running:
 
 - When an agent is started (by the user, or automatically per the policy above), it
-  must read this file (`CLAUDE.md`), its module backlog, and the tail of its own
-  audit log before doing anything.
+  must first sync with `origin/main` (§4, "Sync before anything else"), then read
+  this file (`CLAUDE.md`), its module backlog, and the tail of its own audit log
+  before doing anything.
 - An agent must never invoke, delegate to, or implement another module's agent
   concurrently, or claim ownership of another module's tables, routes or services in
   its status reports — auto-chaining means starting the *next* agent only after the
