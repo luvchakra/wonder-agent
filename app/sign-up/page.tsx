@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUpAction } from "@/app/actions/auth";
-import { AuthShell, Button, TextField } from "@/modules/ui";
+import { AuthShell, Button, GoogleAuthButton, TextField } from "@/modules/ui";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -75,6 +75,14 @@ export default function SignUpPage() {
           {submitting ? "Creating account…" : "Sign up"}
         </Button>
       </form>
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+        <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">or</span>
+        <span className="h-px flex-1 bg-border" aria-hidden="true" />
+      </div>
+
+      <GoogleAuthButton label="Sign up with Google" />
     </AuthShell>
   );
 }

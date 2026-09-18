@@ -1101,3 +1101,56 @@ this is a scope decision, not an oversight to silently fix — building
 platform-wide config storage/UI is materially larger (global config table,
 Platform Agent's own module) and wasn't asked for; flagged here rather
 than assumed.
+
+---
+
+## 2026-09-18 — Google sign-in on /sign-in and /sign-up
+
+**Built:** `modules/ui/GoogleAuthButton.tsx` — one control on both auth
+screens (Google itself decides new vs returning, so there is no separate
+"sign up with Google" flow to build). Starts Supabase Auth's OAuth flow
+via the browser client's `signInWithOAuth({ provider: "google" })`, which
+returns to the existing `/auth/callback` route — the same one SSO and
+password recovery already use. The browser client is used deliberately:
+`@supabase/ssr`'s `createBrowserClient` writes the PKCE code verifier to a
+cookie the server callback can read, which is what lets
+`exchangeCodeForSession()` complete server-side.
+
+**Also fixed on the way:** `/auth/callback`'s final fallback sent every
+non-SSO user to `/onboarding`, and `/onboarding` deliberately does not
+auto-forward a user who already has memberships (it doubles as the "create
+another organization" screen) — so every returning OAuth or email user
+would have picked their organization on each sign-in. That is exactly the
+friction removed from the password path in "sign-in lands on the app, not
+the organization picker"; the callback now resolves tenant context and
+sends a user with a tenant to `/`, keeping `/onboarding` for genuinely new
+users.
+
+**Deliberately not rate-limited** through `app/actions/auth.ts` like the
+password paths: no credential is presented to this app to throttle —
+Google authenticates, and Supabase Auth applies its own limits.
+
+**Verified:** typecheck, lint, build, and the full `auth.spec.ts` suite
+(32 tests). New e2e case intercepts the outgoing `/auth/v1/authorize`
+request and asserts it carries `provider=google` and a `redirect_to`
+pointing back at this app's `/auth/callback` — no dependency on Google
+being enabled yet or on egress this sandbox's TLS-intercepting proxy
+blocks. Screenshotted both screens.
+
+**Two real test flakes found and fixed while running this** (both
+pre-existing, both mine from earlier in the session): the sign-up and
+password-reset rate-limit tests navigated away 300ms after submitting,
+which aborted some server actions in flight so they were never recorded
+and the final over-limit request wasn't over the limit. Both now wait for
+the attempt to actually complete. The password-reset one also had to match
+its outcome paragraphs by CSS (`p[role="status"], p[role="alert"]`) rather
+than by role — the document carries an always-present empty alert region
+that a role-based wait resolves against instantly, so it never waited.
+
+**Needs the user (configuration, not code) — Google is not enabled on the
+Supabase project yet**, so the button currently surfaces Supabase's
+"provider is not enabled" message rather than reaching Google. See the
+handover notes given to the user: a Google Cloud OAuth client, the
+client ID/secret pasted into Supabase's Google provider, and the redirect
+URL allowlist (which, as recorded in the forgot-password entry above,
+still does not include this app's origins).

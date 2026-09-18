@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getFullActiveSsoConnectionByDomain, provisionSsoMembership } from "@/lib/auth/sso";
-import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
+import { TENANT_COOKIE_NAME, getTenantContext } from "@/lib/tenant/getTenantContext";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
 
 /**
@@ -91,7 +91,15 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Not an SSO-provisioned domain (or no match) — fall back to the ordinary
-  // membership-selection/creation flow.
-  return NextResponse.redirect(new URL("/onboarding", request.url));
+  // Not an SSO-provisioned domain (or no match). A user who already has a
+  // tenant goes straight to the app — /onboarding deliberately does NOT
+  // auto-forward someone with memberships (it doubles as the "create
+  // another organization" screen), so sending everyone there would make
+  // every returning Google/email user pick their organization on each
+  // sign-in. That is the same friction FOUNDATION already removed from the
+  // password path ("sign-in lands on the app, not the organization
+  // picker"); this brings the OAuth/callback path in line with it. Only a
+  // genuinely new user with no membership yet still needs /onboarding.
+  const ctx = await getTenantContext();
+  return NextResponse.redirect(new URL(ctx.tenantId ? "/" : "/onboarding", request.url));
 }

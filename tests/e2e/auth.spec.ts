@@ -83,6 +83,36 @@ test.describe("unauthenticated", () => {
     expect(emailValid).toBe(false);
   });
 
+  test("both auth screens offer Google, and the button really starts the OAuth flow", async ({ page }) => {
+    // Asserts the button is wired, not merely present, without depending on
+    // anything outside this app: the click is expected to navigate to
+    // Supabase Auth's own /auth/v1/authorize endpoint (which is what then
+    // forwards to Google), so the request is intercepted and aborted there
+    // and its URL is checked. Deliberately not asserting a real trip to
+    // accounts.google.com — that needs Google enabled on the project AND
+    // egress this sandbox's TLS-intercepting proxy doesn't allow.
+    for (const path of ["/sign-in", "/sign-up"]) {
+      let authorizeUrl: string | null = null;
+      await page.route("**/auth/v1/authorize**", async (route) => {
+        authorizeUrl = route.request().url();
+        await route.abort();
+      });
+
+      await page.goto(path);
+      const google = page.getByRole("button", { name: /with Google/i });
+      await expect(google).toBeVisible();
+      await google.click();
+
+      await expect
+        .poll(() => authorizeUrl, { timeout: 10_000 })
+        .toMatch(/\/auth\/v1\/authorize\?.*provider=google/);
+      // The return leg must come back to this app's own callback, which is
+      // where the PKCE code is exchanged.
+      expect(decodeURIComponent(authorizeUrl!)).toContain("/auth/callback");
+      await page.unroute("**/auth/v1/authorize**");
+    }
+  });
+
   test("sign-in has a Forgot password? link to /forgot-password", async ({ page }) => {
     await page.goto("/sign-in");
     await page.getByRole("link", { name: "Forgot password?" }).click();
@@ -254,8 +284,11 @@ test.describe("rate limiting — FOUNDATION-P0-05.3", () => {
       // Not asserted further here — Supabase's own response to a repeat
       // submission of the same address (success-shaped, or its own SMTP
       // throttling) isn't this test's concern; only that our rate limiter
-      // has now recorded 5 attempts for this email within the hour.
-      await page.waitForTimeout(300);
+      // has now recorded 5 attempts for this email within the hour. But
+      // the attempt must be allowed to COMPLETE before navigating away, or
+      // it is aborted in flight and never recorded — see the same fix in
+      // the password-reset rate-limit test below.
+      await expect(page.getByRole("button", { name: "Sign up", exact: true })).toBeEnabled();
       await page.goto("/sign-up");
     }
     await page.getByLabel("Email").fill(email);
@@ -302,12 +335,16 @@ test.describe("password reset — forgot/update password", () => {
     for (let attempt = 0; attempt < 5; attempt++) {
       await page.getByLabel("Email").fill(email);
       await page.getByRole("button", { name: "Send reset link", exact: true }).click();
-      // Not asserted further here — same reasoning as the sign-up
-      // rate-limit test above: checkAndRecordAttempt() runs before
-      // Supabase is ever called, so these 5 attempts are recorded
-      // regardless of whether Supabase's own SMTP quota lets each one
-      // through; only the 6th attempt (below) is this test's concern.
-      await page.waitForTimeout(300);
+      // Wait for the attempt to actually COMPLETE before navigating away.
+      // A fixed sleep here raced the server action: the round trip to
+      // Supabase costs ~270ms+, so navigating after 300ms aborted some
+      // attempts in flight, they were never recorded, and the 6th request
+      // below then wasn't over the limit — a real flake, observed twice.
+      // Matched by CSS on the page's own two outcome paragraphs (success
+      // `p[role=status]`, error `p[role=alert]`) rather than by role: the
+      // document also carries an always-present empty alert region, which
+      // a role-based wait resolves against instantly and so never waits.
+      await expect(page.locator('p[role="status"], p[role="alert"]')).toBeVisible();
       await page.goto("/forgot-password");
     }
     await page.getByLabel("Email").fill(email);

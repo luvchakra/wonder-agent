@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { signInAction } from "@/app/actions/auth";
-import { AuthShell, Button, TextField } from "@/modules/ui";
+import { AuthShell, Button, GoogleAuthButton, TextField } from "@/modules/ui";
 
 export default function SignInPage() {
   return (
@@ -138,9 +138,12 @@ function SignInForm() {
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
 
-      <Button type="button" variant="outline" onClick={handleSsoSignIn} disabled={ssoChecking} className="w-full">
-        {ssoChecking ? "Checking…" : "Sign in with SSO"}
-      </Button>
+      <div className="space-y-2">
+        <GoogleAuthButton label="Sign in with Google" />
+        <Button type="button" variant="outline" onClick={handleSsoSignIn} disabled={ssoChecking} className="w-full">
+          {ssoChecking ? "Checking…" : "Sign in with SSO"}
+        </Button>
+      </div>
     </AuthShell>
   );
 }

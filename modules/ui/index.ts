@@ -22,6 +22,7 @@ export { AiSummaryPanel } from "./AiSummaryPanel";
 export { AccessGraphView, layoutNodes, toFlowEdges } from "./AccessGraphView";
 export { AnnouncementsBanner } from "./AnnouncementsBanner";
 export { AuthShell } from "./AuthShell";
+export { GoogleAuthButton } from "./GoogleAuthButton";
 export { BrowserFrame, PhoneFrame } from "./ProductShot";
 export { FlowDiagram } from "./FlowDiagram";
 export { AppSidebar, MobileNavDrawer, MobileNavTrigger, openMobileNav, type SidebarUser } from "./AppSidebar";
