@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
@@ -13,8 +14,14 @@ import {
  * Request-scoped Supabase client that forwards the current user's session via
  * cookies, so PostgreSQL RLS applies exactly as that authenticated user.
  * This is what almost all server code / API routes should use.
+ *
+ * Wrapped in React's `cache()` so a request builds one client and every
+ * caller in it — the layout, the page, each module service they call —
+ * shares it. The client itself is cheap to construct; what matters is that
+ * its auth state (the verified session, a refreshed token) is resolved once
+ * per request instead of once per caller.
  */
-export async function supabaseServer() {
+export const supabaseServer = cache(async () => {
   const cookieStore = await cookies();
 
   return createServerClient(getSupabaseUrl(), getSupabasePublishableKey(), {
@@ -34,7 +41,7 @@ export async function supabaseServer() {
       },
     },
   });
-}
+});
 
 /**
  * Trusted, service-role Supabase client. Bypasses RLS entirely.

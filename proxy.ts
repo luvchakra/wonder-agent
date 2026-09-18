@@ -8,6 +8,18 @@ import {
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 
+/**
+ * Reachable without a session. Everything else under the matcher needs one.
+ * /forgot-password and /update-password join this list alongside
+ * /sign-in/up: a visitor resetting a password is by definition
+ * unauthenticated when they land on /forgot-password, and /update-password
+ * shows its own "Link expired" state for a missing/expired/already-used
+ * recovery session (app/update-password/page.tsx) — that UX only ever runs
+ * if the proxy lets the unauthenticated request through to it instead of
+ * redirecting to /sign-in first.
+ */
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password"];
+/** Paths the idle/absolute session-expiry clock does not run on. */
 const UNENFORCED_PATHS = ["/sign-in", "/sign-up", "/auth/callback", "/welcome", "/forgot-password", "/update-password"];
 
 /**
@@ -57,10 +69,49 @@ export async function proxy(request: NextRequest) {
     },
   });
 
-  // Touch the session so @supabase/ssr can refresh expired tokens.
+  // This is the ONE place per request that asks the auth server whether
+  // the session is still good. Everything rendered after it — the layout,
+  // the page, the module services — verifies the token locally instead
+  // (lib/tenant/session.ts), so a page costs one GoTrue round trip rather
+  // than the four or five it used to.
+  //
+  // It has to be a real round trip and not a signature check, because of
+  // a product decision (user, 2026-09-17): logging out is global and takes
+  // effect immediately in every other session. A revoked session's access
+  // token still has a valid signature until it expires; only the auth
+  // server knows it was revoked. getUser() also lets @supabase/ssr rotate
+  // an expired token's cookies here, before the route runs.
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // Enforcement moved here from the customer layout so a session the auth
+  // server has rejected never reaches a route whose local check would
+  // still pass. "Presented a session cookie but the server rejected it"
+  // is distinguished from "no session at all": the former is refused on
+  // every path, the latter is refused on protected pages and passed
+  // through on the API, whose routes without a session (the cron job, the
+  // integration webhooks, the MCP ingest, the SSO domain lookup) hold
+  // their own credentials and gate themselves.
+  if (!user) {
+    const presentedSession = request.cookies
+      .getAll()
+      .some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
+    const isApi = pathname.startsWith("/api/");
+    const isPublicPage = pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+    if (isApi && presentedSession) {
+      return NextResponse.json(
+        { ok: false, error: { code: "UNAUTHENTICATED", message: "Session is no longer valid" } },
+        { status: 401 },
+      );
+    }
+    if (!isApi && !isPublicPage) {
+      const signIn = new URL("/sign-in", request.url);
+      if (presentedSession) signIn.searchParams.set("reason", "expired");
+      return NextResponse.redirect(signIn);
+    }
+  }
 
   // EXPERIENCE-P0-14 — the public landing page lives at /welcome but is
   // SERVED at "/" for signed-out visitors. A rewrite (not a redirect) keeps

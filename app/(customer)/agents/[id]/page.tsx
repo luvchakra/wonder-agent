@@ -22,7 +22,7 @@ import { getGovernancePosture } from "@/modules/certification-compliance/service
 import type { GovernancePosture } from "@/lib/shared/types/compliance";
 import type { OwnershipIssue } from "@/lib/shared/types/agent-identity";
 import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
-import { DonutChart } from "@/modules/ui/charts";
+import { DonutChart } from "@/modules/ui/charts.lazy";
 import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
 
 /**

@@ -964,3 +964,76 @@ Configuration → Redirect URLs allowlist, ideally as a wildcard
 (`https://<domain>/**`) rather than an exact match, so `/auth/callback` with
 a `next` query param is honored rather than silently falling back to the
 bare Site URL.
+
+---
+
+## 2026-09-18 — Per-request auth and tenant resolution: 5 network round trips → 1 local check + 1 parallel query wave
+
+**Reported:** every page in the customer shell had a ~1,350 ms TTFB, even
+trivial ones like `/settings`, measured as the median of warm runs with
+`scripts/measure-page-timings.mjs`. Page content was not the cost; the shell's
+auth and tenant plumbing was, and it was identical on every route.
+
+**Cause, measured:** from the environment used to test, one Supabase call —
+any call — costs ~270–330 ms of network. `supabase.auth.getUser()` is such a
+call, and a single page made it four or five times: once in `proxy.ts` before
+routing, once in the layout, once inside `getTenantContext()`, once inside
+`isPlatformAdmin()`, and then the page's own `requirePermission()` ran
+`getTenantContext()` all over again because nothing was deduplicated between
+the layout and the page. `getTenantContext()` itself then ran its membership
+and role queries one after the other.
+
+**Changes (all in Foundation-owned plumbing, no schema change):**
+
+- `proxy.ts` is now the ONE place per request that asks the auth server
+  whether the session is still good (`getUser()`, one round trip), and it
+  enforces the answer: a presented-but-rejected session is redirected to
+  `/sign-in` on pages and refused with 401 on `/api/*`; a request with no
+  session at all is redirected on protected pages and passed through on the
+  API, whose sessionless routes (cron, integration webhooks, MCP ingest, SSO
+  domain lookup) gate themselves. Unauthenticated-page enforcement thereby
+  moved earlier, from the customer layout into the proxy.
+- `lib/tenant/session.ts` (new): `getSessionUser()` resolves the user from
+  `supabase.auth.getClaims()`, which verifies the access token's **ES256**
+  signature locally against the project JWKS — auth-js caches that JWKS
+  globally across client instances, so it is ~1 ms after the first request.
+  The project's tokens were checked: header `{"alg":"ES256"}`, so
+  verification is genuinely local. This is safe only because the proxy has
+  already validated the same session against the server; the layout, page
+  and services merely re-derive identity from it.
+- **A first version of this change used `getClaims()` in the proxy too, and
+  the suite caught it**: `auth.spec.ts`'s "signing out is global" case
+  failed, because a revoked session's token still verifies until it
+  expires. That test encodes the user's 2026-09-17 decision that logout is
+  global and immediate, so the proxy's check went back to a real round trip
+  rather than the test being weakened. Net: one GoTrue call per request
+  instead of five, with revocation semantics exactly as before.
+- `supabaseServer()`, `getSessionUser()`, `getTenantContext()`,
+  `getMyMemberships()`, `getProfile()` and `isPlatformAdmin()` are wrapped in
+  React's `cache()`: resolved once per request and shared by the layout, the
+  page and every module service under them.
+- `getTenantContext()` now fetches memberships and role rows **in parallel**
+  (roles for the user across tenants, then filtered to the active tenant in
+  code) instead of sequentially. Both queries keep their explicit `user_id`
+  filter — the privilege-escalation guard noted in the previous entry is
+  unchanged.
+- `getMyMemberships()` is published for the customer shell's organization
+  switcher, which had been re-running the same membership query itself.
+
+**Result, same script, same machine:** every page ~830 ms TTFB, from
+~1,350 — one auth-server round trip in the proxy, one parallel wave of
+tenant/profile/shell queries, then the page's own wave. Each of those is a
+~270 ms trip from this environment; see the Experience entry of the same
+date for the deployment-region change that makes them tens of milliseconds
+in production.
+
+**Deliberately not done:** embedding memberships and roles in the JWT via a
+custom access-token hook would make tenant resolution fully local (zero round
+trips) and CLAUDE.md §2 explicitly permits claims as a source — but claims go
+stale until the token refreshes, so a role revocation would lag by up to the
+token lifetime. That is a security-semantics decision for the user, recorded
+here rather than made.
+
+**Verified:** typecheck, lint, build, and the full Playwright suite
+(sign-in/out, session expiry redirect, platform-admin gate, RBAC negatives,
+tenant isolation) — see the Experience entry for the run.
