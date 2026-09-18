@@ -1,8 +1,8 @@
 import "server-only";
 
 import type { AiSummaryKind, AiSummaryRequest, AiSummaryResult } from "@/lib/shared/types/ai";
-import type { ResolvedAiProviderKey } from "@/lib/shared/types/platform";
 import { resolveAiProviderKey } from "@/modules/platform-admin/service";
+import { callAiProvider } from "./provider";
 
 /**
  * FOUNDATION-P0-16 — the shared, read-only, advisory-only LLM summarization
@@ -46,9 +46,6 @@ export class AiNotConfiguredError extends Error {
   }
 }
 
-const OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions";
-const GEMINI_GENERATE_CONTENT_URL = "https://generativelanguage.googleapis.com/v1beta/models";
-
 const KIND_INSTRUCTIONS: Record<AiSummaryKind, string> = {
   finding: "Summarize this risk finding for a security administrator: what happened, why it matters, and what evidence supports it. Do not recommend a specific remediation action — only describe the evidence.",
   evidence_bundle: "Summarize this evidence bundle in plain language for an auditor reviewing it, highlighting what it does and does not demonstrate.",
@@ -66,66 +63,6 @@ function buildUserPrompt(request: AiSummaryRequest): string {
   return `${KIND_INSTRUCTIONS[request.kind]}\n\nData:\n${JSON.stringify(request.data, null, 2)}`;
 }
 
-async function callOpenAi(resolved: ResolvedAiProviderKey, userPrompt: string): Promise<string> {
-  const response = await fetch(OPENAI_CHAT_COMPLETIONS_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${resolved.apiKey}`,
-    },
-    body: JSON.stringify({
-      model: resolved.model,
-      temperature: 0.2,
-      max_tokens: 400,
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: userPrompt },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`OpenAI request failed (${response.status}): ${detail.slice(0, 500)}`);
-  }
-
-  const payload = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const content = payload.choices?.[0]?.message?.content?.trim();
-  if (!content) {
-    throw new Error("OpenAI response contained no summary content");
-  }
-  return content;
-}
-
-async function callGemini(resolved: ResolvedAiProviderKey, userPrompt: string): Promise<string> {
-  const url = `${GEMINI_GENERATE_CONTENT_URL}/${encodeURIComponent(resolved.model)}:generateContent?key=${encodeURIComponent(resolved.apiKey)}`;
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{ role: "user", parts: [{ text: userPrompt }] }],
-      generationConfig: { temperature: 0.2, maxOutputTokens: 400 },
-    }),
-  });
-
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "");
-    throw new Error(`Gemini request failed (${response.status}): ${detail.slice(0, 500)}`);
-  }
-
-  const payload = (await response.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
-  };
-  const content = payload.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
-  if (!content) {
-    throw new Error("Gemini response contained no summary content");
-  }
-  return content;
-}
-
 /**
  * Summarizes already-computed evidence for the Experience Agent's
  * AI-Assisted Investigation UI (EXPERIENCE-P0-14). `tenantId` is the
@@ -140,8 +77,7 @@ export async function summarize(tenantId: string, request: AiSummaryRequest): Pr
     throw new AiNotConfiguredError();
   }
 
-  const userPrompt = buildUserPrompt(request);
-  const content = resolved.provider === "gemini" ? await callGemini(resolved, userPrompt) : await callOpenAi(resolved, userPrompt);
+  const content = await callAiProvider(resolved, { system: SYSTEM_PROMPT, user: buildUserPrompt(request) });
 
   return {
     kind: request.kind,

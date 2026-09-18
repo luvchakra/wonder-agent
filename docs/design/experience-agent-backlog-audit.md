@@ -2130,3 +2130,38 @@ changed: the same `selectTenantAction`, the same membership list from
 
 **Verified:** typecheck, lint, build, and `shell`, `design-review`, `auth`
 and `navigation-smoke` specs.
+
+---
+
+## 2026-09-18 — Help centre: user guide, FAQ and the ask-the-guide assistant
+
+**Built** `/help` (inside the authenticated shell) plus a **Get Help** entry
+in the account menu — `modules/ui/AccountPanel.tsx`, between Settings and
+Appearance.
+
+The guide content is **structured data**, not prose pages:
+`modules/ui/help/content.ts` holds 23 sections (getting started, the
+SHOULD/CAN/DID model, agents/contracts/discovery, integrations, effective
+access, policies, runtime, findings, rogue detection, certification,
+reports/audit/search, notifications, roles, SSO/sessions, AI provider keys,
+tenancy, and 3 FAQ entries). The page renders them; the assistant retrieves
+against them. One source, so an answer can never link to a section the page
+does not render — enforced by an e2e test that walks every contents link and
+asserts the anchor exists.
+
+**Content rule applied throughout:** describe only what is actually built,
+and say so where something is not. The AI section states plainly that the
+platform-wide key is an environment variable with no admin screen yet; the
+notifications section states email needs a configured provider and degrades
+to in-app otherwise.
+
+**Verified:** typecheck, lint, build, and `tests/e2e/help.spec.ts` — 11
+passing against the running app as a seeded tenant admin (menu → guide
+navigation, section and FAQ rendering, every contents anchor resolving, a
+real assistant round trip linking the right section, a suggested question,
+and an off-topic question). Screenshotted at 1000px.
+
+**Deliberately not done:** no separate marketing/docs site, no per-section
+deep links from domain screens back into the guide, and no search box over
+the guide (the assistant covers that need). The guide is not yet part of the
+nav rail — the account menu is its only entry point, as asked.

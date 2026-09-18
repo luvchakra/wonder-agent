@@ -1154,3 +1154,49 @@ handover notes given to the user: a Google Cloud OAuth client, the
 client ID/secret pasted into Supabase's Google provider, and the redirect
 URL allowlist (which, as recorded in the forgot-password entry above,
 still does not include this app's origins).
+
+---
+
+## 2026-09-18 — Help assistant: deterministic retrieval, AI phrasing optional
+
+**Built** `lib/ai/helpAnswer.ts` and `POST /api/v1/help/ask`, behind the
+Experience Agent's `/help` page (see that module's audit entry for the guide
+itself).
+
+**Design point worth keeping:** retrieval runs first and is deterministic.
+The question is scored against the guide sections
+(`modules/ui/help/content.ts`) by weighted term matching — title and curated
+keywords weighted far above body prose, with a per-section body cap so a long
+section cannot win on length alone — and **those matches, not the model,
+produce the links shown to the user.** An LLM, when configured, only phrases
+an answer grounded in the sections retrieval already chose, under a system
+prompt that forbids writing links at all.
+
+Two properties follow, both deliberate:
+- The assistant cannot cite a page that does not exist, because it never
+  chooses links.
+- It works with no AI provider at all, returning the best-matching section's
+  summary and the section links, and disclosing in the UI that the answer
+  came from the guide text rather than a model. AI improves phrasing; it is
+  not load-bearing (non-negotiable #9's posture, applied to a help feature).
+
+**Refactor:** the OpenAI/Gemini request shapes moved out of
+`lib/ai/summarize.ts` into a new `lib/ai/provider.ts` when this second caller
+appeared, so the two request formats, error handling and empty-response
+handling exist once. `summarize.ts` keeps its exact export shape — its own
+test asserts the module exports exactly `["AiNotConfiguredError",
+"summarize"]`, and that still holds.
+
+**Also:** `/api/v1/help/ask` deliberately does not 501 when no provider is
+configured, unlike `/api/v1/ai/summarize`. Falling back to retrieval is the
+correct behaviour for a help feature; returning an error would be worse than
+the answer it can already give. It requires a session but no module
+permission — the guide is product documentation, identical for every tenant,
+and no tenant-scoped data is ever sent to a provider.
+
+**Verified:** `lib/ai/helpAnswer.test.ts` — 12 tests covering routing
+accuracy (password → sign-in section, Saviynt → integrations, SHOULD/CAN/DID
+→ the concept section), the no-match case, the cap, the "only ever returns
+real sections" property, and all three answer paths (no provider, provider
+failure, provider success keeping retrieval's links). Full vitest suite
+295/295; `summarize.test.ts` still 8/8 after the refactor.
