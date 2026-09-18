@@ -23,6 +23,7 @@ export function AiSummaryPanel({ kind, data, label = "Summarize with AI" }: { ki
   const [state, setState] = useState<PanelState>("idle");
   const [summary, setSummary] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [unavailableMessage, setUnavailableMessage] = useState<string | null>(null);
 
   async function handleSummarize() {
     setState("loading");
@@ -34,6 +35,12 @@ export function AiSummaryPanel({ kind, data, label = "Summarize with AI" }: { ki
         body: JSON.stringify({ kind, data }),
       });
       if (res.status === 501) {
+        // AiNotConfiguredError's own message (lib/ai/summarize.ts) already
+        // says where to fix this — bring your own key in Settings → AI, or
+        // ask a platform administrator to set the deployment's default
+        // — so surface it rather than a generic notice.
+        const json = await res.json().catch(() => null);
+        setUnavailableMessage(json?.error?.message ?? null);
         setState("unavailable");
         return;
       }
@@ -71,7 +78,7 @@ export function AiSummaryPanel({ kind, data, label = "Summarize with AI" }: { ki
   if (state === "unavailable") {
     return (
       <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" role="note">
-        AI summaries aren&apos;t configured for this workspace yet.
+        {unavailableMessage ?? "AI summaries aren't configured for this workspace yet."}
       </div>
     );
   }

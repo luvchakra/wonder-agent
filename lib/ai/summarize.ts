@@ -36,7 +36,12 @@ import { resolveAiProviderKey } from "@/modules/platform-admin/service";
  */
 export class AiNotConfiguredError extends Error {
   constructor() {
-    super("No AI provider is configured for this deployment.");
+    super(
+      "No AI provider is configured for this workspace. Bring your own key in " +
+        "Settings → AI, or ask your platform administrator to set a default (there's " +
+        "no Platform Admin page for this yet — set PLATFORM_OPENAI_API_KEY or " +
+        "PLATFORM_GEMINI_API_KEY as a deployment environment variable).",
+    );
     this.name = "AiNotConfiguredError";
   }
 }

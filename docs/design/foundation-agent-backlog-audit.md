@@ -1037,3 +1037,67 @@ here rather than made.
 **Verified:** typecheck, lint, build, and the full Playwright suite
 (sign-in/out, session expiry redirect, platform-admin gate, RBAC negatives,
 tenant isolation) — see the Experience entry for the run.
+
+---
+
+## 2026-09-18 — AI key fallback: message where to fix "not configured" (BYOK → platform default → tell the user)
+
+**Reported:** the app's AI API key should default to the platform-wide key
+when a tenant hasn't configured BYOK, and when neither is available the
+user should be told where to fix it — the Platform Admin page if one
+exists for this, otherwise the environment variable to set.
+
+**Found the fallback mechanism (BYOK → platform default) was already
+fully implemented and correct** — `resolveAiProviderKey()`
+(`modules/platform-admin/aiProviderConfig.ts`, PLATFORM-P0-05.2, shipped
+2026-09-16): BYOK-first, falls back to that provider's
+`PLATFORM_OPENAI_API_KEY`/`PLATFORM_GEMINI_API_KEY`, returns `null` only
+when neither exists. Nothing to change there.
+
+**What was actually missing:** when `resolveAiProviderKey()` returns
+`null`, `AiNotConfiguredError`'s message was just "No AI provider is
+configured for this deployment." — true, but not actionable. And
+`modules/ui/AiSummaryPanel.tsx` (used on `/risk/rogue/[agentId]`) threw
+that message away entirely: on a 501 it always rendered the same
+hard-coded "AI summaries aren't configured for this workspace yet.",
+regardless of what the API actually said.
+
+**Confirmed there is no Platform Admin page for this setting** — checked
+every route under `app/platform-admin/*`: admins, announcements, branding,
+features, health, tenants, tenant usage. None of them configure AI
+provider keys; the only UI for this is the tenant-level
+`/settings/ai` (BYOK), and the platform-wide default has only ever been
+settable via the two env vars. So the correct message, per the user's own
+"ask me to configure it on platform admin page (if it exists), if not
+then ask me to set in environment variable," is the environment-variable
+instruction — there's no page to point to instead.
+
+**Changes:**
+- `AiNotConfiguredError`'s message (`lib/ai/summarize.ts`) now says both
+  things: bring your own key in Settings → AI, or a platform administrator
+  should set `PLATFORM_OPENAI_API_KEY`/`PLATFORM_GEMINI_API_KEY` — stated
+  explicitly that there's no Platform Admin page for this yet, so nobody
+  goes looking for one.
+- `AiSummaryPanel.tsx` now reads and renders that message from the API's
+  501 body instead of discarding it for a generic string.
+- `/settings/ai`'s existing "no platform-wide default key" status line
+  gained the same environment-variable instruction (it already correctly
+  showed BYOK vs platform-default vs not-configured status and prompted
+  BYOK — this only adds the missing half for whoever controls the
+  deployment).
+
+**Verified live:** rebuilt and served the app (`next build && next
+start`), signed in, confirmed `/settings/ai` renders the updated message
+(screenshotted), and called `POST /api/v1/ai/summarize` directly to
+confirm the 501 response body now carries the full actionable message
+end-to-end (this deployment's `.env.local` has neither platform key set,
+so the not-configured path is real, not simulated). Full vitest suite:
+283/283 (no existing test asserted the old message's exact text, so
+nothing needed updating there).
+
+**Deliberately not done:** did not build a `/platform-admin` AI provider
+config page. The user's own phrasing ("if it exists... if not") signals
+this is a scope decision, not an oversight to silently fix — building
+platform-wide config storage/UI is materially larger (global config table,
+Platform Agent's own module) and wasn't asked for; flagged here rather
+than assumed.

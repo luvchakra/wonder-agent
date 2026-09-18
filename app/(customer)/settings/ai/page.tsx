@@ -49,7 +49,7 @@ export default async function AiProviderSettingsPage() {
           <p className="text-sm text-muted-foreground">
             {platformDefaultAvailable
               ? "A platform-wide default key is available for tenants that don't bring their own."
-              : "No platform-wide default key is configured for this deployment — bring your own key to enable AI summaries."}
+              : "No platform-wide default key is configured for this deployment. Bring your own key below, or — if you're the platform operator — set PLATFORM_OPENAI_API_KEY or PLATFORM_GEMINI_API_KEY as a deployment environment variable; there is no Platform Admin page for this setting yet."}
           </p>
           {config && (
             <p className="text-xs text-muted-foreground">
