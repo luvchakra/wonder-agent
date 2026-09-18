@@ -199,6 +199,20 @@ describe code nobody is running. After syncing, re-read anything you intend to
 change — it may have moved. Fetch again immediately before every push, and
 never force-push over commits you have not seen.
 
+**Record before you stop.** Whenever a major piece of work is complete — a
+backlog story, but equally a performance pass, a design review, a
+cross-module fix, a deployment or configuration change, an investigation that
+reached a conclusion — write it down under `docs/` before moving on, in the
+same commit as the work. The place is the audit log of the module whose code
+or screens changed (`docs/design/<module>-backlog-audit.md`); work that
+touched several modules gets an entry in each, and status that spans the
+programme goes in `docs/RUN_ORDER.md`. A dated entry states what changed and
+why, how it was verified (the exact checks and suites, with the pass/fail
+counts), what was measured before and after where numbers exist, and what was
+deliberately left out or handed to another module. The next session — another
+agent, another person, or you after a context reset — starts from the docs,
+not from memory; work that is not written down there does not exist to them.
+
 Each agent works one story at a time from its own backlog doc:
 
 1. **Before starting a story**: read this file, the module's backlog
@@ -337,7 +351,8 @@ Everything else below still applies to how each agent behaves once running:
 - When an agent is started (by the user, or automatically per the policy above), it
   must first sync with `origin/main` (§4, "Sync before anything else"), then read
   this file (`CLAUDE.md`), its module backlog, and the tail of its own audit log
-  before doing anything.
+  before doing anything — and must record what it did under `docs/` before it
+  stops (§4, "Record before you stop").
 - An agent must never invoke, delegate to, or implement another module's agent
   concurrently, or claim ownership of another module's tables, routes or services in
   its status reports — auto-chaining means starting the *next* agent only after the
