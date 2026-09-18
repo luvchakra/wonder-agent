@@ -232,10 +232,15 @@ Each agent works one story at a time from its own backlog doc:
    `Partial`, or `Deferred` as appropriate. This table must always reflect the true
    current state — never mark a row `Done` before its acceptance criteria are
    actually met and verified.
-6. **Commit** with a focused message scoped to the story, then push and merge per
+6. **Regenerate the product-wide progress rollup** — `npm run progress`, which
+   rewrites [`docs/PROGRESS.md`](docs/PROGRESS.md) from every module's Progress
+   Tracker table — and include it in the same commit as step 5. The module tables
+   stay the source of truth; `docs/PROGRESS.md` is generated from them and must
+   never be hand-edited, so the rollup cannot drift from the backlogs.
+7. **Commit** with a focused message scoped to the story, then push and merge per
    [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md) — which includes an automatic
    fast-forward push to `main` after every commit; no need to ask first.
-7. Move to the next unfinished story automatically. Never restart or duplicate
+8. Move to the next unfinished story automatically. Never restart or duplicate
    completed work, and never stop to ask before continuing — only a genuine
    blocker or a key decision the backlog doesn't specify is a reason to pause.
 
