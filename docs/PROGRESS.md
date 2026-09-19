@@ -8,22 +8,22 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-09-18 from 11 module backlogs.
+Generated 2026-09-19 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**139 of 165 tracked stories complete — 84%**
+**140 of 165 tracked stories complete — 85%**
 
 ```
-██████████████████████████████████░░░░░░  84%
+██████████████████████████████████░░░░░░  85%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 139 |
-| Partial | 22 |
+| Done | 140 |
+| Partial | 21 |
 | Deferred | 1 |
 | Not Started | 3 |
 | **Total tracked** | **165** |
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 0 | 21 | `████████████████░░` 90% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 0 | 13 | `█████████████████░` 92% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 8 | 3 | 0 | 0 | 11 | `█████████████░░░░░` 73% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 7 | 14 | 0 | 1 | 22 | `██████░░░░░░░░░░░░` 32% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 8 | 13 | 0 | 1 | 22 | `███████░░░░░░░░░░░` 36% |
 
 ---
 
@@ -291,7 +291,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 7 done · 14 partial · 0 deferred · 1 not started (22 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 8 done · 13 partial · 0 deferred · 1 not started (22 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -308,7 +308,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-05 | Clean install verification | Partial — 2026-09-16: a genuine from-scratch `git clone` + `npm ci` + typecheck/lint/full test suite (260/260)/production build all verified clean in an isolated directory (no carried-over `node_modules`/`.env.local`); the fresh-database migration-apply half still deliberately not attempted — creating a Supabase branch is a real billable action, and the user chose to skip it rather than incur the cost for this verification pass |
 | QA-P0-06 | Authentication suite (SAML/OIDC/session) | Partial — role-mapping and session-expiry still only unit-tested (idle/absolute-expiry timing isn't practically E2E-testable without waiting real clock time); 2026-09-16 added real browser coverage for what was previously fully uncovered: sign-in success/failure, sign-up (including the already-registered-email and under-minlength-password paths), logout, unauthenticated redirect, and negative-permission/tenant-isolation checks (`tests/e2e/auth.spec.ts`, part of `QA-P0-16`). SAML/OIDC real IdP exchange and wrong-tenant/domain SSO paths remain out of scope (no test IdP available) |
 | QA-P0-07 | Connector contract tests | Partial — Generic REST connector partially covered across existing unit tests; not all 8 named properties independently tested per connector; Saviynt/MCP contract tests not built |
-| QA-P0-08 | Runtime test corpus | Partial — live fixture data covers some categories incidentally; no versioned, explicitly-enumerated `tests/**` corpus covering all 6 named event categories exists as its own artifact |
+| QA-P0-08 | Runtime test corpus | Done — 2026-09-19: `tests/runtime/should-can-did-corpus.ts`, six deterministic cases (one per named category), reused (not re-authored) by both `modules/runtime-assurance/compare.test.ts` (QA-P0-09) and `modules/risk/rules.test.ts` — see audit log |
 | QA-P0-09 | SHOULD/CAN/DID reproducibility | Done — `compare.test.ts` directly asserts identical repeated output and evaluator-version stability |
 | QA-P0-10 | Risk regression suite | Partial — 1 positive + 1 negative test exist, covering 3 of 8 categories; the full 5-kind × 8-category matrix is not built (deferred to Risk Agent's own further work, not duplicated here per non-negotiable #18) |
 | QA-P0-11 | Certification regression | Partial — reviewer authorization/SoD live-verified, snapshot reproduction unit-tested; no dedicated escalation regression test or fast self-review unit test |

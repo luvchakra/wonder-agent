@@ -42,6 +42,7 @@ vi.mock("./config", () => ({
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: vi.fn() }));
 
 import { evaluateAgentRisk } from "./rules";
+import { SHOULD_CAN_DID_CORPUS } from "@/tests/runtime/should-can-did-corpus";
 
 describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance scenario", () => {
   beforeEach(() => {
@@ -201,5 +202,70 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
     await evaluateAgentRisk("tenant-a", "a4");
 
     expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a4", 0);
+  });
+});
+
+describe("evaluateAgentRisk — QA-P0-08, the shared runtime event corpus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateOrUpdateFinding.mockImplementation(async (_tenantId, agentId, category, fields) => ({
+      finding: { id: `finding-${category}`, tenantId: "tenant-a", agentId, category, ...fields, status: "open" },
+      created: true,
+    }));
+    mockListApplications.mockResolvedValue([]);
+    mockGetOwnershipIssues.mockResolvedValue([]);
+    mockListAgentIdentities.mockResolvedValue([]);
+    mockListLifecycleEvents.mockResolvedValue([]);
+    mockListPolicyEvaluations.mockResolvedValue([]);
+    mockListRuntimeEvents.mockResolvedValue({ events: [] });
+    mockTransitionAgentLifecycle.mockResolvedValue({});
+  });
+
+  // Expected trigger categories per corpus case — derived independently
+  // from rules.ts's own logic (not copied from compare.ts's outcome
+  // types): excessive_access/behavioral_violation come straight off
+  // comparison.outcomes, but unauthorized_resource and
+  // sensitive_data_violation are each rules.ts's OWN check, computed
+  // directly from did.tuples/comparison.can rather than reusing
+  // compare.ts's unexpected_capability/behavioral_violation outcomes —
+  // see the corpus module's per-case doc comments for the full trace.
+  const EXPECTED_CATEGORIES: Record<string, string[]> = {
+    allowed: [],
+    // unused_capability is a real comparison outcome, but no rule in this
+    // file reads it — a documented, current gap (see the corpus case),
+    // not a bug in this test.
+    can_only_unused: [],
+    // behavioral_deviation is suppressed here because unauthorized_resource
+    // already captures the same Workday divergence (rules.ts's own
+    // de-duplication — see "alreadyCapturedApps").
+    did_only_unexpected: ["excessive_access", "unauthorized_resource"],
+    unauthorized_resource: ["unauthorized_resource"],
+    sensitive_data: ["excessive_access", "sensitive_data_violation", "behavioral_deviation"],
+    unmappable: [],
+  };
+
+  it.each(SHOULD_CAN_DID_CORPUS)("$category ($id): triggers exactly the expected finding categories", async (c) => {
+    mockGetAgent.mockResolvedValue({
+      id: c.id,
+      agentName: `Agent-${c.id}`,
+      environment: "production",
+      criticality: "low",
+      lifecycleState: "ACTIVE",
+    });
+    mockGetAgentContract.mockResolvedValue(c.contract);
+    mockCompareShouldCanDid.mockResolvedValue({
+      can: c.effectiveAccess.map((g) => ({
+        application: g.application,
+        dataClassification: g.dataClassification,
+        entitlementName: g.entitlementName,
+        grantId: g.id,
+      })),
+      outcomes: c.expectedOutcomes,
+    });
+    mockGetDid.mockResolvedValue({ tuples: c.didTuples });
+
+    const results = await evaluateAgentRisk("tenant-a", c.id);
+    const categories = results.map((r: { category: string }) => r.category).sort();
+    expect(categories).toEqual([...EXPECTED_CATEGORIES[c.category]].sort());
   });
 });

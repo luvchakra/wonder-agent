@@ -547,3 +547,72 @@ from anything this environment can reach, and inventing a degraded substitute
 wrong results, which is worse than an honest gap. `QA-P0-16` therefore stays
 `Partial`, with its blocker restated accurately rather than left as the
 now-false "network egress blocks the Supabase host."
+
+## 2026-09-19 — QA-P0-08: the runtime event corpus, built and wired for reuse
+
+Picked up the next actionable, unblocked gap from `INTEGRATION_STATUS.md` §7
+(QA-P0-08 was the only one of the extended hardening epics that is entirely
+QA-owned — under `tests/**` — and needs no external infrastructure this
+sandbox lacks, unlike QA-P0-06/07's real-IdP dependency or the
+credential-gated QA-P0-16).
+
+**Built** `tests/runtime/should-can-did-corpus.ts`: six deterministic,
+versioned `{contract, effectiveAccess, didTuples}` cases, one per category
+named in the story text — `allowed`, `can_only_unused` (granted but idle),
+`did_only_unexpected` (used but not approved), `unauthorized_resource`
+(no CAN grant and no approval at all), `sensitive_data` (the product's own
+central FinanceBot/CustomerDB scenario, CLAUDE.md §11), and `unmappable`
+(a DID tuple with an unresolved application). Each case carries a hand-
+traced `expectedOutcomes`/`expectedOutcomeTypes` and a doc comment
+explaining exactly why — e.g. `can_only_unused` deliberately uses one
+shared `approvedData` term across two applications, documented inline,
+because `compareShouldCanDid()` builds SHOULD as the full cross-product of
+`approvedApplications x approvedData` (found this the hard way — the first
+draft used two apps with two distinct data terms and every case spuriously
+produced `insufficient_access`, since each app's grant wasn't compatible
+with the *other* app's data term; fixed by giving both apps one shared,
+substring-compatible term).
+
+**Reused, not re-authored — the story's own acceptance criterion:**
+- `modules/runtime-assurance/compare.test.ts` (QA-P0-09) gained a new
+  `describe` block that runs the REAL `compareShouldCanDid()` against all
+  six cases and asserts it reproduces exactly `expectedOutcomes` — this is
+  what keeps the corpus honest; the expected outcomes are asserted against
+  the implementation on every run, not just hand-verified once. Also
+  replaced three pre-existing tests' inline literal duplicates of the
+  `sensitive_data`, `allowed`, and `unmappable` scenarios with calls to
+  `corpusCase(...)`, removing ~70 lines of duplicated fixture data rather
+  than adding a fourth copy of the same scenario.
+- `modules/risk/rules.test.ts` gained a matching `describe` block: for each
+  of the six cases, feeds the corpus's `contract`/`effectiveAccess`
+  (mapped to `CanEntry[]`)/`didTuples`/`expectedOutcomes` into
+  `evaluateAgentRisk()`'s mocked dependencies and asserts the exact set of
+  finding categories it triggers — independently re-derived from rules.ts's
+  own logic (not copied from compare.ts's outcome types), since
+  `unauthorized_resource` and `sensitive_data_violation` are Risk's own
+  checks computed straight from `did.tuples`/`comparison.can`, not a
+  passthrough of compare.ts's `unexpected_capability`/`behavioral_violation`.
+  Every one of the six hand-derived predictions matched on the first test
+  run.
+
+**A real, current gap this pass surfaced rather than silently working
+around:** `unused_capability`, `unexpected_capability`, `insufficient_access`
+and `unscored_unknown` — four of `compareShouldCanDid()`'s seven outcome
+types — are never read anywhere in `modules/risk/rules.ts`. Only
+`excessive_access` and `behavioral_violation` feed a Risk finding today. The
+`can_only_unused` and `unmappable` corpus cases both assert **zero** Risk
+findings for exactly this reason, documented in each case's own comment and
+in the new `rules.test.ts` describe block's `EXPECTED_CATEGORIES` map, so
+the behavior is pinned rather than accidentally masked. Per non-negotiable
+#18 this is Risk Agent's own scope to close (a new "unused entitlement"/
+"technically-impossible activity" finding category is a real product
+decision — severity, whether it's worth a finding at all for every unused
+grant — not a QA-owned fix), so it is recorded here rather than invented.
+
+**Verified:** typecheck and lint clean. `compare.test.ts` 15/15 (was 8),
+`rules.test.ts` 10/10 (was 4). Full vitest suite 308/308 (was 295 before
+this pass — the 13 new tests are the corpus coverage; no existing test's
+assertions changed, only their fixture data source for the three
+de-duplicated ones).
+
+**Progress Tracker:** QA-P0-08 moved from `Partial` to `Done`.
