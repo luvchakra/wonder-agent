@@ -657,3 +657,42 @@ instruction to report state accurately applies as much to fixing a false
 vitest suite 312/312 (was 308 after the QA-P0-08 pass earlier today).
 
 **Progress Tracker:** QA-P0-11 moved from `Partial` to `Done`.
+
+## 2026-09-19 (later still) — QA-P1-07: release record completeness
+
+Closed the last of today's three actionable, unblocked QA gaps.
+`INTEGRATION_STATUS.md` now opens with:
+- A **release identifier** — the commit this snapshot is built on
+  (`2c6f5d8`) plus the date, and an explicit note that "production ready"
+  is never claimed while a mandatory P0 gate fails (§8 remains the single
+  authoritative statement of gate status).
+- An **explicit P0/P1/P2 status summary** — P0 is the individually-tracked,
+  per-story Progress Tracker table detail every section already cites
+  (141/165 Done as of this commit, per `docs/PROGRESS.md`); P1/P2 are each
+  module's own prose scope bullets (~52 P1 / ~32 P2 combined), explicitly
+  named as overwhelmingly Not Started **by design** — CLAUDE.md §3 says an
+  agent must not build P1/P2 scope ahead of its own module's P0 stories,
+  so "mostly not started" is the correct, intended state of a program still
+  finishing its P0 release gate, not an oversight.
+
+No code changed this pass — documentation-completeness only, per the
+story's own scope (CLAUDE.md §3: a release-process rigor requirement, not
+a security/isolation gate).
+
+**Progress Tracker:** QA-P1-07 moved from `Not Started` to `Done`.
+
+---
+
+**Three-story summary for today's dispatch:** QA-P0-08 (runtime event
+corpus), QA-P0-11 (certification regression), QA-P1-07 (release record
+completeness) all closed. `INTEGRATION_STATUS.md` §8's Release Gate blockers
+are unchanged by this pass — none of today's three stories touched a
+release-gate blocker directly (FinanceBot step 7, the extended QA-P0-06/07
+epics' real-IdP/deeper-connector gaps, or the sandbox-only constraints) —
+each was a genuinely separate, independently-closeable QA-owned gap. The
+remaining `Partial` QA-P0-0x rows (§7) are blocked on real external
+infrastructure this environment cannot provide (a test IdP, GitHub Actions
+secrets/Vercel Preview env vars, a Lighthouse/timing run against a loaded
+tenant) or are explicitly another module's own scope per non-negotiable #18
+(the Risk regression matrix, QA-P0-10) — recorded, not silently worked
+around.

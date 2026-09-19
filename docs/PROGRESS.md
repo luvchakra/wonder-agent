@@ -14,18 +14,18 @@ Generated 2026-09-19 from 11 module backlogs.
 
 ## Overall
 
-**141 of 165 tracked stories complete — 85%**
+**142 of 165 tracked stories complete — 86%**
 
 ```
-██████████████████████████████████░░░░░░  85%
+██████████████████████████████████░░░░░░  86%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 141 |
+| Done | 142 |
 | Partial | 20 |
 | Deferred | 1 |
-| Not Started | 3 |
+| Not Started | 2 |
 | **Total tracked** | **165** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 0 | 21 | `████████████████░░` 90% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 0 | 13 | `█████████████████░` 92% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 8 | 3 | 0 | 0 | 11 | `█████████████░░░░░` 73% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 9 | 12 | 0 | 1 | 22 | `███████░░░░░░░░░░░` 41% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 10 | 12 | 0 | 0 | 22 | `████████░░░░░░░░░░` 45% |
 
 ---
 
@@ -291,7 +291,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 9 done · 12 partial · 0 deferred · 1 not started (22 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 10 done · 12 partial · 0 deferred · 0 not started (22 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -315,6 +315,6 @@ and are deliberately excluded from the counts above.
 | QA-P0-12 | Security scanning | Partial — live advisor scan run, one real finding fixed (security-definer over-grant); `npm audit` now run (prod + full scope), 0 vulnerabilities either way; no static-analysis pass beyond ESLint, `auth_leaked_password_protection` still disabled (dashboard-only setting, flagged for follow-up) |
 | QA-P0-13 | Failure recovery (retry/idempotency) | Partial — dedupe-key idempotency unit-tested; no end-to-end forced-failure-and-retry test built |
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
-| QA-P1-07 | Release record completeness standard | Not Started — `INTEGRATION_STATUS.md` does not currently record a commit/version identifier for the release snapshot, nor does it give an explicit P1/P2 status summary alongside its existing P0 detail |
+| QA-P1-07 | Release record completeness standard | Done — 2026-09-19: `INTEGRATION_STATUS.md` now opens with a Release identifier (commit + date) and an explicit P0/P1/P2 status summary (P0 detail is the table-level status below; P1/P2 are the modules' own prose `## P1`/`## P2` bullets, ~52/32 combined, overwhelmingly Not Started by design per CLAUDE.md §3) — see audit log |
 | QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16 (later): the sandbox's Supabase egress blocker is gone, so the suite was pointed at the live production deployment and **the framework is now proven against a real server** — `authenticate as platformAdmin` signed in end-to-end through real Supabase Auth and saved storage state. The four tenant-user logins failed on a **genuine product bug the suite existed to catch**: `getTenantContext()` returned every colleague's `tenant_memberships` row (RLS there is tenant-scoped, not user-scoped), so a single-tenant user resolved as a member of three organizations and was bounced to `/onboarding`; fixed in Foundation + Experience, proven at the data layer (3 rows → 1). A full run is still blocked, but on **credentials, not the network**: Vercel's Supabase env vars are Production-scoped so every preview 500s, and all five GitHub Actions secrets resolve empty in the job log. Needs `SUPABASE_SERVICE_ROLE_KEY` + `SECRET_ENCRYPTION_KEY` as repo secrets or Preview env vars — see `docs/design/qa-agent-backlog-audit.md` |
 
