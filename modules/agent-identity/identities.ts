@@ -49,3 +49,25 @@ export async function listAgentIdentities(
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toAgentIdentityLink);
 }
+
+/**
+ * OPERATIONS-P0-03.1's "identity" search object type — the tenant-wide
+ * counterpart to `listAgentIdentities()` above, same reasoning as
+ * `listOwnersForTenant()` (modules/agent-identity/owners.ts): the embed
+ * is a real FK (`agent_identities.agent_id -> agents(id)`), read here
+ * rather than making Operations query `agents` itself.
+ */
+export type IdentityWithContext = AgentIdentityLink & { agentName: string };
+
+export async function listIdentitiesForTenant(tenantId: string): Promise<IdentityWithContext[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("agent_identities")
+    .select("*, agents(agent_name)")
+    .eq("tenant_id", tenantId);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map((row: Record<string, unknown> & { agents: { agent_name: string } | null }) => ({
+    ...toAgentIdentityLink(row),
+    agentName: row.agents?.agent_name ?? "",
+  }));
+}

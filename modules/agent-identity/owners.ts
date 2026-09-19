@@ -85,6 +85,40 @@ export async function listOwners(tenantId: string, agentId: string): Promise<Age
 }
 
 /**
+ * OPERATIONS-P0-03.1's "owner" search object type — the tenant-wide
+ * counterpart to `listOwners()` above, which is deliberately agent-scoped
+ * for its own callers (the agent detail page). `agent_owners.user_id` and
+ * `.agent_id` are both real FKs (`users(id)`/`agents(id)`, migration
+ * 0014), so PostgREST can embed both directly rather than this needing a
+ * second round trip or Operations reaching into `users`/`agents` itself
+ * (non-negotiable #6) — the embedded names exist only to give a search
+ * result a human-readable title/subtitle, nothing else reads them.
+ */
+export type OwnerWithContext = AgentOwner & {
+  userDisplayName: string | null;
+  userEmail: string;
+  agentName: string;
+};
+
+export async function listOwnersForTenant(tenantId: string): Promise<OwnerWithContext[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("agent_owners")
+    .select("*, users(display_name, email), agents(agent_name)")
+    .eq("tenant_id", tenantId)
+    .is("removed_at", null);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map(
+    (row: Record<string, unknown> & { users: { display_name: string | null; email: string } | null; agents: { agent_name: string } | null }) => ({
+      ...toAgentOwner(row),
+      userDisplayName: row.users?.display_name ?? null,
+      userEmail: row.users?.email ?? "",
+      agentName: row.agents?.agent_name ?? "",
+    }),
+  );
+}
+
+/**
  * IDENTITY-P0-02.2: exposes ownership *facts* only — never creates a
  * risk_findings row (that is Risk Agent's job once it exists).
  */

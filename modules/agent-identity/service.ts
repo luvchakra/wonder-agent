@@ -22,8 +22,8 @@ export {
   isStructurallyAllowedTransition,
   type LifecycleActor,
 } from "./lifecycle";
-export { assignOwner, removeOwner, listOwners, getOwnershipIssues } from "./owners";
-export { linkAgentIdentity, listAgentIdentities } from "./identities";
+export { assignOwner, removeOwner, listOwners, listOwnersForTenant, getOwnershipIssues, type OwnerWithContext } from "./owners";
+export { linkAgentIdentity, listAgentIdentities, listIdentitiesForTenant, type IdentityWithContext } from "./identities";
 export { addRelationship, listRelationships, removeRelationship } from "./relationships";
 export {
   listDuplicateCandidates,

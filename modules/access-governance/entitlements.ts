@@ -50,3 +50,24 @@ export async function listEntitlementsForApplication(
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toEntitlement);
 }
+
+/**
+ * OPERATIONS-P0-03.1's "entitlement" search object type — the tenant-wide
+ * counterpart to `listEntitlementsForApplication()` above, same reasoning
+ * as Identity Agent's `listOwnersForTenant()`/`listIdentitiesForTenant()`:
+ * the embed is a real FK (`entitlements.application_id -> applications(id)`).
+ */
+export type EntitlementWithContext = Entitlement & { applicationName: string };
+
+export async function listEntitlementsForTenant(tenantId: string): Promise<EntitlementWithContext[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("entitlements")
+    .select("*, applications(name)")
+    .eq("tenant_id", tenantId);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map((row: Record<string, unknown> & { applications: { name: string } | null }) => ({
+    ...toEntitlement(row),
+    applicationName: row.applications?.name ?? "",
+  }));
+}

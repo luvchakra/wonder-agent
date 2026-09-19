@@ -630,3 +630,50 @@ clean, `npm run lint` clean, `npx vitest run` 260/260 (up from 258), `npm
 run build` (with `.next` deleted first) clean, `grep -rl
 SUPABASE_SERVICE_ROLE_KEY .next/static` no match. No schema/migration
 change.
+
+## 2026-09-19 — OPERATIONS-P0-03.1: the last three search object types
+
+Closed the gap this row had carried since it was first built: "identity"
+and "owner" and "entitlement" were three of the nine named search object
+types with no tenant-wide list contract to compose. Rather than leave it
+recorded-and-blocked indefinitely, published the missing contracts in
+their owning modules (`docs/design/identity-agent-backlog-audit.md` and
+`docs/design/access-agent-backlog-audit.md`, both dated today) and wired
+them in here:
+
+- **`identity`** — `listIdentitiesForTenant()`. Matches on the identity's
+  `externalReference` (the service-account email/client ID an
+  administrator would actually search for); titled by it, subtitled by
+  the owning agent's name, linked to `/agents/{agentId}`.
+- **`owner`** — `listOwnersForTenant()`. Matches on the owner's display
+  name OR email; titled by display name (falling back to email when unset
+  — not every `users` row has one), subtitled by `"{owner type} of {agent
+  name}"`, linked to `/agents/{agentId}`.
+- **`entitlement`** — `listEntitlementsForTenant()`. Matches on the
+  entitlement's own name; titled by it, subtitled by its application,
+  linked to `/access` (same as the existing `application` result — no
+  entitlement-detail route exists to link to more specifically).
+
+`lib/shared/types/operations.ts`'s `SearchObjectType` gained the three new
+literals. No UI change needed at all: `ShellSearchAndNotifications.tsx`
+already renders `objectType` generically (`r.objectType.replace(/_/g, "
+")` as a badge label), so the three new types render correctly with zero
+Experience Agent involvement.
+
+**Verified:** typecheck, lint clean. New `modules/operations/search.test.ts`
+coverage (this file previously tested only the pure `maskRiskField()`
+helper, never `search()` itself) — 11 tests: empty-query short-circuit,
+each new type matches on its intended field (identity by external
+reference, owner by name and separately by email, entitlement by name),
+owner's email fallback when no display name is set, permission-gating
+proven both ways for the two new permission-gated groups (`agent.read`
+withholds identity/owner and the dependency isn't even called;
+`access.read` withholds entitlement the same way — the story's own
+"never enters the returned array, and don't even fetch it" bar), and one
+full sweep asserting all nine named object types are returned together.
+Full vitest suite 325/325 (was 317). `npm run build` (fresh `.next`)
+clean. No schema/migration change.
+
+**Progress Tracker:** OPERATIONS-P0-03.1 moved from `Partial` to `Done` —
+all nine named object types are now implemented, each backed by a real
+tenant-wide list function.

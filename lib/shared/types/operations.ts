@@ -86,7 +86,16 @@ export type NotificationPreference = {
   updatedAt: string;
 };
 
-export type SearchObjectType = "agent" | "application" | "finding" | "certification_campaign" | "policy" | "integration";
+export type SearchObjectType =
+  | "agent"
+  | "application"
+  | "finding"
+  | "certification_campaign"
+  | "policy"
+  | "integration"
+  | "identity"
+  | "owner"
+  | "entitlement";
 
 /**
  * OPERATIONS-P0-03.1/03.2. `riskSeverity`/`riskMasked` are present only on

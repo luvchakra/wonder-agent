@@ -14,16 +14,16 @@ Generated 2026-09-19 from 11 module backlogs.
 
 ## Overall
 
-**142 of 165 tracked stories complete — 86%**
+**143 of 165 tracked stories complete — 87%**
 
 ```
-██████████████████████████████████░░░░░░  86%
+███████████████████████████████████░░░░░  87%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 142 |
-| Partial | 21 |
+| Done | 143 |
+| Partial | 20 |
 | Deferred | 1 |
 | Not Started | 1 |
 | **Total tracked** | **165** |
@@ -47,7 +47,7 @@ and are deliberately excluded from the counts above.
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 0 | 21 | `████████████████░░` 90% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 0 | 13 | `█████████████████░` 92% |
-| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 8 | 3 | 0 | 0 | 11 | `█████████████░░░░░` 73% |
+| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 9 | 2 | 0 | 0 | 11 | `███████████████░░░` 82% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 10 | 12 | 0 | 0 | 22 | `████████░░░░░░░░░░` 45% |
 
 ---
@@ -271,7 +271,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Audit, Reporting, Notifications & Search  
 **Backlog status:** DORMANT — do not start until the user says "Run Operations Agent"  
-**Stories:** 8 done · 3 partial · 0 deferred · 0 not started (11 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 9 done · 2 partial · 0 deferred · 0 not started (11 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -279,7 +279,7 @@ and are deliberately excluded from the counts above.
 | OPERATIONS-P0-01.2 | Evidence export | Done |
 | OPERATIONS-P0-02.1 | Schema & channels | Done — 2026-09-16: user picked Resend. Both channels real: in-app (unchanged) plus `modules/operations/email.ts`'s `sendNotificationEmail()`, called from `notify()` for every event. Targets the specific `userId` when set, otherwise broadcasts to every active tenant member (same semantics the in-app channel already used), honoring each recipient's `notification_preferences.email_enabled` (defaults to on when no row exists) |
 | OPERATIONS-P0-02.2 | `notify(event)` and trigger wiring | Partial → wired into 3 of 7 event types across 3 producing modules (Risk's `critical_finding`/`rogue_agent`, Integration's `integration_failure`, Compliance's `certification_overdue`); `certification_due`/`ownership_missing`/`lifecycle_expiry` remain unwired — genuinely ambiguous trigger points (no scheduler, no single unambiguous write event), documented rather than guessed |
-| OPERATIONS-P0-03.1 | Global search (higher bar) | Partial — re-checked 2026-09-16, still 6 of 9 named object types; identity/owner/entitlement still have no tenant-wide list contract published (re-verified: `listAgentIdentities`/`listOwners` remain agent-scoped only) |
+| OPERATIONS-P0-03.1 | Global search (higher bar) | Done — 2026-09-19: all 9 named object types implemented. Identity Agent published `listOwnersForTenant()`/`listIdentitiesForTenant()` and Access Agent published `listEntitlementsForTenant()` (each the tenant-wide counterpart of an already-published per-agent/per-application list), wired into `search()` for the previously-missing identity/owner/entitlement types — see audit log |
 | OPERATIONS-P0-03.2 | Search traceability & role-based field masking | Done |
 | OPERATIONS-P0-04.1 | P0 report set | Done |
 | OPERATIONS-P0-04.2 | Report traceability (linked records + data freshness) | Done |

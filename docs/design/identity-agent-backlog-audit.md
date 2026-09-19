@@ -675,3 +675,40 @@ No code in this module changed. See
 `docs/design/qa-agent-backlog-audit.md` (both dated 2026-09-16) for the full
 account, including what remains blocked (raw Postgres; a complete Playwright
 E2E run, which needs credentials this environment does not have).
+
+## 2026-09-19 — Two tenant-wide read functions published for Operations' global search
+
+Picked up as a cross-module dependency for OPERATIONS-P0-03.1 (Global
+search): Operations' `search()` names "identity" and "owner" as two of the
+nine object types it needs to cover, but every existing read on
+`agent_owners`/`agent_identities` in this module was agent-scoped only
+(`listOwners(tenantId, agentId)`, `listAgentIdentities(tenantId, agentId)`
+— the agent detail page's own need). Rather than leave the dependency
+recorded-and-blocked, published the tenant-wide counterparts this
+module's own data can support:
+
+- **`listOwnersForTenant(tenantId)`** (`modules/agent-identity/owners.ts`)
+  — same RLS-protected `agent_owners` table, no `agent_id` filter. Embeds
+  `users(display_name, email)` and `agents(agent_name)` via their real FKs
+  (migration 0014) so a search result has a human-readable title/subtitle
+  without Operations reaching into `users`/`agents` itself
+  (non-negotiable #6) — the returned `OwnerWithContext` type is `AgentOwner`
+  plus exactly those three extra fields, nothing else changed about the
+  existing shape.
+- **`listIdentitiesForTenant(tenantId)`** (`modules/agent-identity/identities.ts`)
+  — same shape, embeds `agents(agent_name)` via `agent_identities.agent_id`.
+
+Both exported from `modules/agent-identity/service.ts` alongside the
+existing agent-scoped functions, which are unchanged and still the right
+choice for their own callers.
+
+**Verified:** typecheck, lint clean (fixed two `@typescript-eslint/
+no-explicit-any` lint errors from the initial draft — narrowed the raw-row
+parameter type instead of using `any`, since these two files aren't
+`mappers.ts` and don't carry that file's blanket disable). No unit test of
+their own added (this module's existing pattern for thin Supabase-query
+wrappers like `listOwners`/`listAgentIdentities` is RLS/live verification,
+not client-mocked unit tests) — real coverage is
+`modules/operations/search.test.ts`'s new tests, which exercise both
+functions' actual consumer. `npm run build` clean. No schema/migration
+change — same tables, same RLS, a different filter.

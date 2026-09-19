@@ -638,3 +638,28 @@ No code in this module changed. See
 `docs/design/qa-agent-backlog-audit.md` (both dated 2026-09-16) for the full
 account, including what remains blocked (raw Postgres; a complete Playwright
 E2E run, which needs credentials this environment does not have).
+
+## 2026-09-19 — Tenant-wide entitlement read published for Operations' global search
+
+Same cross-module dependency as Identity Agent's matching entry today
+(`docs/design/identity-agent-backlog-audit.md`): Operations' `search()`
+names "entitlement" as one of the nine named object types, but
+`listEntitlementsForApplication(tenantId, applicationId)` was the only
+read this module published, scoped to one application (the entitlement-
+management UI's own need).
+
+**Published `listEntitlementsForTenant(tenantId)`**
+(`modules/access-governance/entitlements.ts`) — same RLS-protected
+`entitlements` table, no `application_id` filter. Embeds
+`applications(name)` via the real FK so a search result gets a
+human-readable subtitle without Operations querying `applications`
+itself (non-negotiable #6); the returned `EntitlementWithContext` type is
+`Entitlement` plus exactly that one extra field. Exported from
+`modules/access-governance/service.ts` alongside the existing
+application-scoped function, unchanged.
+
+**Verified:** typecheck, lint clean (same narrowed-row-type fix as
+Identity's two functions, not `any`). No dedicated unit test in this
+module (matches this module's existing pattern for thin query wrappers)
+— covered by `modules/operations/search.test.ts`'s new tests. `npm run
+build` clean. No schema/migration change.

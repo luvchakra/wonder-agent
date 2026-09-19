@@ -1,7 +1,7 @@
 import "server-only";
 
-import { listAgents } from "@/modules/agent-identity/service";
-import { listApplications, listPolicies } from "@/modules/access-governance/service";
+import { listAgents, listOwnersForTenant, listIdentitiesForTenant } from "@/modules/agent-identity/service";
+import { listApplications, listPolicies, listEntitlementsForTenant } from "@/modules/access-governance/service";
 import { getFindings } from "@/modules/risk/service";
 import { listCampaigns } from "@/modules/certification-compliance/service";
 import { listIntegrations } from "@/modules/integrations/service";
@@ -30,14 +30,14 @@ const SEVERITY_RANK: Record<RiskSeverity, number> = { info: -1, low: 0, medium: 
  * note, a result type the caller cannot see never enters the returned
  * array at all.
  *
- * **Scope, flagged rather than silently assumed**: the backlog's object-
- * type list also names "identity" and "owner" and "entitlement" — none of
- * Identity/Access's published contracts expose a tenant-wide (as opposed
- * to per-agent/per-application) list for these, so building one here would
- * mean reaching into their internal schema rather than composing their
- * existing contract (non-negotiable #6). Implemented: agent, application,
- * finding, certification_campaign, policy, integration — six of the nine
- * named types, each backed by a real tenant-wide list function.
+ * 2026-09-19: the previously-missing "identity"/"owner"/"entitlement"
+ * types are now wired too — Identity Agent published
+ * `listOwnersForTenant()`/`listIdentitiesForTenant()` and Access Agent
+ * published `listEntitlementsForTenant()` (each the tenant-wide
+ * counterpart of an already-published per-agent/per-application list,
+ * composed through the module's own service contract, never a direct
+ * table query — non-negotiable #6). All nine named object types are now
+ * implemented.
  */
 export async function search(tenantId: string, permissions: string[], query: string): Promise<SearchResult[]> {
   const q = query.trim().toLowerCase();
@@ -84,6 +84,48 @@ export async function search(tenantId: string, permissions: string[], query: str
         subtitle: app.category,
         href: `/access`,
         freshness: app.createdAt,
+      });
+    }
+
+    const entitlements = await listEntitlementsForTenant(tenantId);
+    for (const e of entitlements) {
+      if (!e.name.toLowerCase().includes(q)) continue;
+      results.push({
+        objectType: "entitlement",
+        id: e.id,
+        title: e.name,
+        subtitle: e.applicationName || null,
+        href: `/access`,
+        freshness: e.createdAt,
+      });
+    }
+  }
+
+  if (permissions.includes("agent.read")) {
+    const identities = await listIdentitiesForTenant(tenantId);
+    for (const identity of identities) {
+      if (!identity.externalReference.toLowerCase().includes(q)) continue;
+      results.push({
+        objectType: "identity",
+        id: identity.id,
+        title: identity.externalReference,
+        subtitle: identity.agentName || identity.sourceSystem,
+        href: `/agents/${identity.agentId}`,
+        freshness: identity.createdAt,
+      });
+    }
+
+    const owners = await listOwnersForTenant(tenantId);
+    for (const owner of owners) {
+      const matches = (owner.userDisplayName ?? "").toLowerCase().includes(q) || owner.userEmail.toLowerCase().includes(q);
+      if (!matches) continue;
+      results.push({
+        objectType: "owner",
+        id: owner.id,
+        title: owner.userDisplayName || owner.userEmail,
+        subtitle: owner.agentName ? `${owner.ownerType.replace(/_/g, " ")} of ${owner.agentName}` : owner.ownerType.replace(/_/g, " "),
+        href: `/agents/${owner.agentId}`,
+        freshness: owner.assignedAt,
       });
     }
   }
