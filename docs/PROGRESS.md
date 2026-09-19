@@ -14,7 +14,7 @@ Generated 2026-09-19 from 11 module backlogs.
 
 ## Overall
 
-**143 of 165 tracked stories complete — 87%**
+**144 of 165 tracked stories complete — 87%**
 
 ```
 ███████████████████████████████████░░░░░  87%
@@ -22,10 +22,10 @@ Generated 2026-09-19 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 143 |
+| Done | 144 |
 | Partial | 20 |
 | Deferred | 1 |
-| Not Started | 1 |
+| Not Started | 0 |
 | **Total tracked** | **165** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 26 | 2 | 0 | 1 | 29 | `████████████████░░` 90% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 27 | 2 | 0 | 0 | 29 | `█████████████████░` 93% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 0 | 11 | `██████████████████` 100% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 0 | 12 | `█████████████████░` 92% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 11 | 0 | 0 | 0 | 11 | `██████████████████` 100% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 26 done · 2 partial · 0 deferred · 1 not started (29 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 27 done · 2 partial · 0 deferred · 0 not started (29 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -89,7 +89,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-11 | Input/Output Safety (shared validation/encoding utility) | Done — 2026-09-14: `lib/security/validate.ts` published, unit-tested, adopted by the new SSO route |
 | FOUNDATION-P0-12 | Database Migration Discipline (explicit policy) | Done — already followed as informal practice every module this session; now written down explicitly, see Requirements Refresh below |
 | FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
-| FOUNDATION-P1-05 | CSRF protection verification & hardening for state-changing `/api/v1/*` routes | Not Started — baseline mitigation exists (`sameSite: "lax"` on every WonderAgent-set cookie: `app/auth/callback/route.ts`, `app/actions/auth.ts`, `app/actions/tenant.ts`) but is not yet verified/documented as covering all 50 state-changing routes under `app/api/**`, and Supabase Auth's own session-cookie `SameSite` setting has not been confirmed; see Requirements Refresh (round 2) below |
+| FOUNDATION-P1-05 | CSRF protection verification & hardening for state-changing `/api/v1/*` routes | Done — 2026-09-19: confirmed from `@supabase/ssr`'s own installed source (`DEFAULT_COOKIE_OPTIONS`, unoverridden by `proxy.ts`/`lib/db/supabaseServer.ts`) that every session cookie is genuinely `SameSite=Lax`; added `tests/e2e/csrf.spec.ts`, a real-browser positive/negative proof (a cross-site page's authenticated-looking fetch is rejected — the auth-token cookie is withheld, confirmed by inspecting the actual outgoing request) run live against this session's dev server — see audit log |
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
 
 ### 02 — Identity Agent

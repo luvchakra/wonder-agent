@@ -1200,3 +1200,50 @@ accuracy (password → sign-in section, Saviynt → integrations, SHOULD/CAN/DID
 real sections" property, and all three answer paths (no provider, provider
 failure, provider success keeping retrieval's links). Full vitest suite
 295/295; `summarize.test.ts` still 8/8 after the refactor.
+
+## 2026-09-19 — FOUNDATION-P1-05: CSRF protection verified and tested
+
+**Confirmed the baseline is real, from the library's own source, not
+assumed.** `@supabase/ssr`'s `node_modules/@supabase/ssr/dist/main/utils/
+constants.js` defines `DEFAULT_COOKIE_OPTIONS = { path: "/", sameSite:
+"lax", httpOnly: false, maxAge: ... }`. Neither `proxy.ts` nor
+`lib/db/supabaseServer.ts` passes an overriding `cookieOptions` to
+`createServerClient()`, so every `sb-*-auth-token` cookie Supabase Auth
+sets on this app genuinely carries `SameSite=Lax` — this row's acceptance
+criterion's first branch ("confirm Supabase Auth's own session cookie is
+also SameSite=Lax") is satisfied outright; its "or add explicit Origin/
+Referer verification" fallback is therefore not needed.
+
+**Built the isolation-style positive/negative test the row asked for** —
+`tests/e2e/csrf.spec.ts`. SameSite is a *browser-enforced* cookie policy,
+not application code, so the only faithful way to prove it is a real
+browser making a real cross-site request; a raw HTTP client has no
+cookie-jar SameSite policy to violate in the first place, and would
+"pass" a fake version of this test regardless of whether the real
+protection works. The cross-site page is a Playwright-intercepted
+`http://csrf-attack.invalid` origin (never resolved via real DNS, no
+outbound network dependency) whose script issues an authenticated-looking
+`fetch(..., { credentials: "include" })` at the real app; the request to
+the real app is left un-intercepted except to inspect (not fake) the
+`Cookie` header Chromium actually sent, which is the fact under test.
+
+**A finding along the way, not a defect:** the cross-site request is
+rejected by *two* independent layers, not one — SameSite=Lax withholds
+the cookie (confirmed directly: no `sb-*-auth-token` in the captured
+header), and separately this app sends no CORS headers permitting a
+foreign origin to read a cross-site response at all, so the attacker
+page's `fetch()` never even sees a status code — it gets an opaque
+network error before either the cookie exclusion or the resulting 401
+would matter to it. The test's first draft wrongly expected the page to
+read a `401`; it can't, by design, and that opacity is itself a second,
+correctly-functioning defense, not a test bug to route around.
+
+**Verified:** ran the new spec live against this session's actual dev
+server (not simulated) — 2/2 passing, including a same-origin positive
+control (`fetch("/api/v1/tenant")` from within the app itself returns
+`200`, proving the negative case is a real contrast and not just "every
+request fails"). `npm run typecheck`/`npm run lint` clean (no non-test
+code changed — this story's gap was verification and test coverage, not
+a missing mitigation). No schema/migration change.
+
+**Progress Tracker:** FOUNDATION-P1-05 moved from `Not Started` to `Done`.
