@@ -45,6 +45,44 @@ export async function notify(event: NotifyEvent): Promise<void> {
   await sendNotificationEmail(event);
 }
 
+/**
+ * OPERATIONS-P0-02.2 (2026-09-19 follow-up) — a small dedup guard for a
+ * producing module whose trigger condition is a *sweep over a passively-
+ * true state* (e.g. "this exception's expiry date has passed") rather
+ * than a discrete write event it can hook `notify()` into exactly once.
+ * Without this, a daily sweep would re-notify every single day for as
+ * long as the condition stays true. Reuses the `notifications` table
+ * itself as the record of "was this already sent" rather than adding a
+ * new per-caller dedup column to every producing module's own schema —
+ * `type` + `referenceId` already uniquely identifies "this specific
+ * condition, for this specific row."
+ *
+ * Most P0 trigger types don't need this at all: `certification_due` and
+ * `ownership_missing` are wired at their own genuine write events
+ * (an agent's lifecycle transition; an owner removal that creates a
+ * gap) and are naturally idempotent without it — see
+ * `modules/agent-identity/lifecycle.ts`/`owners.ts`.
+ */
+export async function wasRecentlyNotified(
+  tenantId: string,
+  type: NotificationType,
+  referenceId: string,
+  withinDays: number,
+): Promise<boolean> {
+  const supabase = supabaseServiceRole();
+  const since = new Date(Date.now() - withinDays * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("type", type)
+    .eq("reference_id", referenceId)
+    .gte("created_at", since)
+    .limit(1);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).length > 0;
+}
+
 /** In-app channel read: the caller's own targeted notifications plus every tenant-wide broadcast. */
 export async function listNotifications(tenantId: string, userId: string, unreadOnly = false): Promise<Notification[]> {
   const supabase = await supabaseServer();

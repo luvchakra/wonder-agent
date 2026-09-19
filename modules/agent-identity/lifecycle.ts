@@ -2,10 +2,12 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { Agent, AgentLifecycleEvent, AgentLifecycleState } from "@/lib/shared/types/agent-identity";
 import { toAgent, toAgentLifecycleEvent } from "./mappers";
+import { listOwners } from "./owners";
 
 export type LifecycleActor = {
   actorType: "user" | "system";
@@ -286,19 +288,45 @@ export async function listLifecycleEvents(
  * IDENTITY-P0-02.1: "ACTIVE -> CERTIFICATION_DUE ... can be computed on read
  * rather than requiring a background cron." Called from getAgent()/
  * listAgents() rather than a scheduled job.
+ *
+ * OPERATIONS-P0-02.2 (2026-09-19) — this transition is also
+ * `certification_due`'s notify() trigger, and deliberately needs no
+ * scheduler of its own: `NORMAL_TRANSITIONS` only allows ACTIVE ->
+ * CERTIFICATION_DUE, so the guard above (`lifecycleState !== "ACTIVE"`)
+ * already makes this fire at most once per due cycle — whichever request
+ * happens to read the agent first after `next_review_at` elapses is the
+ * one genuine write event, with no separate dedup needed.
  */
 export async function maybeMarkCertificationDue(tenantId: string, agent: Agent): Promise<Agent> {
   if (agent.lifecycleState !== "ACTIVE" || !agent.nextReviewAt) return agent;
   if (new Date(agent.nextReviewAt).getTime() > Date.now()) return agent;
 
   try {
-    return await transitionAgentLifecycle(
+    const updated = await transitionAgentLifecycle(
       tenantId,
       agent.id,
       "CERTIFICATION_DUE",
       "next_review_at elapsed",
       { actorType: "system" },
     );
+
+    // Targeted at the business owner, same reasoning as
+    // escalateOverdueItems()'s own escalation target (the person
+    // accountable for the agent) — broadcast to the tenant only when
+    // there isn't one, rather than silently notifying no one.
+    const owners = await listOwners(tenantId, agent.id);
+    const businessOwner = owners.find((o) => o.ownerType === "business_owner");
+    await notify({
+      tenantId,
+      userId: businessOwner?.userId ?? null,
+      type: "certification_due",
+      title: "Agent certification due",
+      body: `${agent.agentName}'s certification/access review is due (was scheduled for ${agent.nextReviewAt}).`,
+      referenceType: "agent",
+      referenceId: agent.id,
+    });
+
+    return updated;
   } catch {
     // If the transition can't be applied for any reason, surface the agent
     // as originally read rather than fail the caller's read entirely.

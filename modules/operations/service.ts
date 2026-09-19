@@ -11,7 +11,7 @@ import "server-only";
 
 export { listAuditLogs, exportAuditLogs } from "./audit";
 export { toCsv } from "./csv";
-export { notify, listNotifications, markNotificationRead, listNotificationPreferences, setNotificationPreference } from "./notifications";
+export { notify, wasRecentlyNotified, listNotifications, markNotificationRead, listNotificationPreferences, setNotificationPreference } from "./notifications";
 export { search, maskRiskField } from "./search";
 export {
   generateReport,

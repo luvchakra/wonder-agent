@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { notify, wasRecentlyNotified } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type {
@@ -295,4 +296,84 @@ export async function revokeException(tenantId: string, actorId: string, excepti
     objectId: exceptionId,
     outcome: "success",
   });
+}
+
+/**
+ * OPERATIONS-P0-02.2's `lifecycle_expiry` trigger (2026-09-19). Unlike
+ * `certification_due`/`ownership_missing` (each wired at a genuine write
+ * event — see `modules/agent-identity/lifecycle.ts`/`owners.ts`), an
+ * exception's `expires_at` passing is a passive, time-based condition
+ * with no write of its own to hook — nobody writes anything when a
+ * timestamp elapses. This genuinely needs a periodic sweep (the cron
+ * scheduler COMPLIANCE-P0-05 established, `app/api/cron/**`), gated by
+ * `wasRecentlyNotified()` so a still-unactioned exception gets a repeat
+ * reminder rather than either silence or a daily one.
+ *
+ * Notifies once an exception has *already* expired (`expires_at` in the
+ * past) but is still `active` (nobody revoked or renewed it) — "lifecycle
+ * expiry" read as "this temporary allowance's own lifecycle has ended,"
+ * distinct from a `certification_due`-style advance warning. Targeted at
+ * the approver, who is positioned to decide whether to renew it or let
+ * the underlying policy resume enforcement.
+ */
+export async function sendExpiredExceptionReminders(tenantId: string): Promise<number> {
+  const supabase = supabaseServiceRole();
+  const nowIso = new Date().toISOString();
+
+  const { data: expiredRows, error } = await supabase
+    .from("policy_exceptions")
+    .select()
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .not("expires_at", "is", null)
+    .lt("expires_at", nowIso);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+
+  let notifiedCount = 0;
+  for (const row of expiredRows ?? []) {
+    const exception = toPolicyException(row);
+    if (await wasRecentlyNotified(tenantId, "lifecycle_expiry", exception.id, 7)) continue;
+
+    await notify({
+      tenantId,
+      userId: exception.approvedBy,
+      type: "lifecycle_expiry",
+      title: "Governance exception expired",
+      body: `A governance exception you approved (${exception.reason}) expired on ${exception.expiresAt} and is still active. Renew it or let the underlying policy resume enforcement.`,
+      referenceType: "policy_exception",
+      referenceId: exception.id,
+    });
+    notifiedCount += 1;
+  }
+  return notifiedCount;
+}
+
+export type ExceptionExpiryReminderResult = {
+  tenantId: string;
+  notifiedCount: number;
+  error?: string;
+};
+
+/**
+ * The scheduler entry point (`app/api/cron/access-exception-expiry-
+ * reminders/route.ts`) — same isolate-per-tenant-failure shape as
+ * `escalateOverdueItemsForAllTenants()` (Compliance Agent's matching
+ * cron sweep), so one tenant's failure never aborts the rest.
+ */
+export async function sendExpiredExceptionRemindersForAllTenants(): Promise<ExceptionExpiryReminderResult[]> {
+  const supabase = supabaseServiceRole();
+  const { data: tenants, error } = await supabase.from("tenants").select("id").eq("status", "active");
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+
+  const results: ExceptionExpiryReminderResult[] = [];
+  for (const tenant of tenants ?? []) {
+    const tenantId = (tenant as { id: string }).id;
+    try {
+      const notifiedCount = await sendExpiredExceptionReminders(tenantId);
+      results.push({ tenantId, notifiedCount });
+    } catch (err) {
+      results.push({ tenantId, notifiedCount: 0, error: err instanceof Error ? err.message : String(err) });
+    }
+  }
+  return results;
 }

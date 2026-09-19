@@ -712,3 +712,70 @@ not client-mocked unit tests) — real coverage is
 `modules/operations/search.test.ts`'s new tests, which exercise both
 functions' actual consumer. `npm run build` clean. No schema/migration
 change — same tables, same RLS, a different filter.
+
+## 2026-09-19 (later) — OPERATIONS-P0-02.2: certification_due and ownership_missing wired
+
+Picked up, at the user's explicit direction, two of Operations' three
+previously-unwired notification triggers — the backlog had left them
+unwired because each needed a real product decision it didn't specify
+("genuinely ambiguous trigger points"); the user asked for reasonable
+defaults, clearly documented, rather than leaving them unbuilt.
+
+**`certification_due`** — wired directly into `maybeMarkCertificationDue()`
+(`modules/agent-identity/lifecycle.ts`), which already existed
+(IDENTITY-P0-02.1) to compute the on-read `ACTIVE -> CERTIFICATION_DUE`
+lifecycle transition. This needed **no new scheduler at all**: the
+transition table only allows `ACTIVE -> CERTIFICATION_DUE`, so the
+function's own existing guard (`lifecycleState !== "ACTIVE"`) already
+makes the transition — and now the `notify()` call right after it —
+fire at most once per due cycle, whichever request happens to read the
+agent first after `next_review_at` elapses. That is a real, single write
+event (an `agent_lifecycle_events` insert + `agents.lifecycle_state`
+update), resolving the backlog's own "no single unambiguous write event"
+concern for this trigger specifically. Targeted at the agent's business
+owner (`listOwners()`, matching `escalateOverdueItems()`'s own
+escalation-target reasoning); broadcasts (`userId: null`) when there
+isn't one.
+
+**`ownership_missing`** — wired into `removeOwner()`
+(`modules/agent-identity/owners.ts`). Ownership issues are otherwise
+purely derived (`getOwnershipIssues()` computes them on read with no
+write of its own), so this hooks the one genuine write event that can
+*create* a gap: a removal is snapshotted against the owner list
+beforehand, and `notify()` fires only when this specific removal is what
+takes a required owner type (`business_owner`/`technical_owner`) to
+zero — not merely "a gap happens to exist" (which could be pre-existing
+and unrelated to this call). No owner remains to target, so it
+broadcasts to the tenant.
+
+**A real gap left deliberately, not silently:** an agent that has never
+had a required owner assigned since creation (rather than one removed
+later) produces no notification under this design — there is no
+discrete write event marking "ownership was never set," and firing on
+every single agent creation (which routinely happens without an owner,
+as a separate onboarding step) would be close to unconditional noise,
+not a meaningful signal. Recorded here rather than guessed at with an
+invented grace-period threshold.
+
+**Verified:** typecheck, lint clean. New `modules/agent-identity/
+lifecycle.test.ts` coverage (5 cases: notifies the business owner,
+broadcasts with none, and three "does nothing" guards — not ACTIVE, not
+yet due, no `next_review_at` set) and new `modules/agent-identity/
+owners.test.ts` (4 cases: notifies on a gap-creating removal, does not
+notify when another owner of the same type remains, does not notify for
+a non-required type, still performs the removal/audit either way). Full
+vitest suite 342/342 (was 325 before this and the matching Access Agent
+change — see `docs/design/access-agent-backlog-audit.md` and
+`docs/design/operations-agent-backlog-audit.md` for the third trigger
+and the shared dedup helper). `npm run build` (fresh `.next`) clean.
+
+Circular import note: `lifecycle.ts`/`owners.ts` now import `notify`
+from `@/modules/operations/service`, which itself imports
+`listAgents`/`listOwnersForTenant`/`listIdentitiesForTenant` back from
+this module's own `service.ts` (via `search.ts`) — a cycle. This exact
+shape already existed before this change (Compliance's
+`escalation.ts` -> Operations -> Compliance, via the same `search.ts`
+composition) and resolves cleanly because nothing here reads another
+module's export at top-level module-initialization time, only inside
+async function bodies called later — confirmed empirically (typecheck,
+build, and the full test suite all pass) rather than assumed safe.

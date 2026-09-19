@@ -663,3 +663,65 @@ Identity's two functions, not `any`). No dedicated unit test in this
 module (matches this module's existing pattern for thin query wrappers)
 — covered by `modules/operations/search.test.ts`'s new tests. `npm run
 build` clean. No schema/migration change.
+
+## 2026-09-19 (later) — OPERATIONS-P0-02.2: lifecycle_expiry wired
+
+The third of Operations' three previously-unwired notification triggers
+(see `docs/design/identity-agent-backlog-audit.md`'s matching entry for
+`certification_due`/`ownership_missing`, picked up in the same pass at
+the user's explicit direction to pick reasonable, clearly-documented
+defaults rather than leave these unbuilt).
+
+**Interpreted `lifecycle_expiry`** as: a governance exception
+(`policy_exceptions`) whose `expires_at` has passed while it is still
+`status: 'active'` — i.e. a temporary allowance in an agent's access
+lifecycle whose own lifecycle has ended, but nobody has revoked or
+renewed it. This is a genuine judgment call, recorded explicitly rather
+than assumed: `policies.expiry_date` (the *policy's* own scheduled
+expiry) was the other real candidate in this schema, but "lifecycle" in
+this codebase's own vocabulary ties to an *agent's* governance state
+(SHOULD/CAN/DID, `AgentLifecycleState`), which an agent-scoped exception
+expiring matches more literally than a tenant-wide policy expiring.
+
+**Unlike the other two triggers, this one genuinely has no discrete
+write event to hook** — an `expires_at` timestamp elapsing is a passive
+condition nobody writes anything when it happens. Built
+`sendExpiredExceptionReminders(tenantId)` /
+`sendExpiredExceptionRemindersForAllTenants()`
+(`modules/access-governance/policies.ts`), the same isolate-per-tenant-
+failure shape as Compliance's `escalateOverdueItemsForAllTenants()`, and
+a new cron entry point (`app/api/cron/access-exception-expiry-
+reminders/route.ts`, added to `vercel.json`'s `crons` array alongside
+the existing `compliance-escalate-overdue` job — same bearer-secret
+auth pattern, scheduled at 07:00 UTC, staggered an hour after the
+existing 06:00 job). Deduped via a new shared
+`wasRecentlyNotified(tenantId, type, referenceId, withinDays)` helper
+(Operations Agent's own audit log has the full detail) with a 7-day
+window — my own judgment call on cadence, flagged as such rather than
+silently picked: frequent enough that an unactioned expiry doesn't go
+unmentioned for weeks, infrequent enough not to read as spam. Targeted
+at the exception's `approvedBy` user, who is positioned to decide
+whether to renew it or let the underlying policy resume enforcement.
+
+**Vercel Cron plan-limit note, flagged rather than assumed:** this is
+now 2 scheduled jobs total. Historically Vercel's Hobby tier has limited
+cron jobs (commonly to 2), and this session cannot confirm which plan
+tier this project is on — kept the increment to exactly one new job
+rather than adding a separate one per trigger, and flagging this here in
+case the user's actual plan needs the count checked against Vercel's
+current limits.
+
+**Verified:** typecheck, lint clean. New `modules/access-governance/
+policies.test.ts` (8 cases): notifies the approver for an expired,
+still-active, not-recently-notified exception; respects the dedup
+window; ignores an exception with no expiry date, an already-revoked
+one, and one not yet expired; the all-tenants sweep sums counts across
+tenants, isolates one tenant's failure from the rest, and no-ops
+cleanly with no active tenants. Full vitest suite 342/342. `npm run
+build` (fresh `.next`) clean — confirmed both cron routes compile
+(`/api/cron/compliance-escalate-overdue`,
+`/api/cron/access-exception-expiry-reminders`). No schema/migration
+change — reads the same `policy_exceptions` table `listGovernanceExceptions()`
+already reads, via the service-role client (consistent with every other
+cron-triggered sweep in this codebase, which has no user session to run
+as).

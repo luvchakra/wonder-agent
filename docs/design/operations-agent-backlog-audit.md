@@ -677,3 +677,42 @@ clean. No schema/migration change.
 **Progress Tracker:** OPERATIONS-P0-03.1 moved from `Partial` to `Done` —
 all nine named object types are now implemented, each backed by a real
 tenant-wide list function.
+
+## 2026-09-19 (later) — OPERATIONS-P0-02.2: the last 3 trigger types wired
+
+All 7 P0 notification types are now wired. The last three
+(`certification_due`, `ownership_missing`, `lifecycle_expiry`) were left
+unwired at this module's own original pass specifically because each
+needed a real product decision the backlog didn't specify — not a code
+gap, a decision gap. At the user's explicit direction ("pick reasonable
+defaults, document them clearly"), this pass made those three decisions
+and wired all three: `certification_due` and `ownership_missing` in
+Identity Agent's own files (`modules/agent-identity/lifecycle.ts`/
+`owners.ts` — see that module's audit log), `lifecycle_expiry` in Access
+Agent's (`modules/access-governance/policies.ts` — see that module's
+audit log).
+
+**This module's own contribution: `wasRecentlyNotified()`**
+(`modules/operations/notifications.ts`), a small dedup guard for
+exactly one of the three — `lifecycle_expiry`, the only one of the
+three whose trigger condition is a passively-true state discovered by a
+periodic sweep rather than a discrete write event. Reuses the
+`notifications` table itself as the "was this already sent" record
+(`type` + `referenceId` already uniquely identifies "this condition, for
+this row") rather than adding a bespoke dedup column to Access Agent's
+own schema for one caller. The other two triggers are wired at genuine
+write events and are naturally idempotent without it (see Identity's
+audit log) — this helper is available for a future producing module
+that finds itself in the same "sweep, not event" shape, not a general
+requirement on every `notify()` caller.
+
+**Verified:** typecheck, lint clean. Full vitest suite 342/342 (was
+325 before this whole pass — the increase is split across
+`modules/agent-identity/lifecycle.test.ts` (+5), `modules/agent-identity/
+owners.test.ts` (new, 4), and `modules/access-governance/policies.test.ts`
+(new, 8) — this module's own `notifications.ts` change has no dedicated
+new test file since `wasRecentlyNotified()` is exercised through its one
+real caller's tests, matching this module's existing pattern for thin
+query helpers). `npm run build` (fresh `.next`) clean.
+
+**Progress Tracker:** OPERATIONS-P0-02.2 moved from `Partial` to `Done`.

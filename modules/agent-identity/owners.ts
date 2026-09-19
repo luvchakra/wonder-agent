@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AgentOwner, AgentOwnerType, OwnershipIssue } from "@/lib/shared/types/agent-identity";
 import { toAgentOwner } from "./mappers";
@@ -53,6 +54,14 @@ export async function removeOwner(
   actorId: string,
 ): Promise<void> {
   const supabase = await supabaseServer();
+
+  // OPERATIONS-P0-02.2 (2026-09-19) — snapshot required-type coverage
+  // before the removal so the notify() below fires only when THIS
+  // removal is what creates the gap, not because one happened to already
+  // exist for an unrelated reason.
+  const before = await listOwners(tenantId, agentId);
+  const removedRow = before.find((o) => o.id === ownerRowId);
+
   const { error } = await supabase
     .from("agent_owners")
     .update({ removed_at: new Date().toISOString() })
@@ -70,6 +79,26 @@ export async function removeOwner(
     outcome: "success",
     metadata: { ownerRowId, change: "removed" },
   });
+
+  // `ownership_missing`'s notify() trigger: getOwnershipIssues() derives
+  // the gap on read, with no write of its own to hook — this removal,
+  // when it's the one that takes a required owner type to zero, is the
+  // one genuine write event. No specific person to target (there's no
+  // owner left of that type), so this broadcasts to the tenant.
+  if (removedRow && REQUIRED_OWNER_TYPES.includes(removedRow.ownerType)) {
+    const stillHasType = before.some((o) => o.id !== ownerRowId && o.ownerType === removedRow.ownerType);
+    if (!stillHasType) {
+      await notify({
+        tenantId,
+        userId: null,
+        type: "ownership_missing",
+        title: "Agent missing required ownership",
+        body: `An agent no longer has a ${removedRow.ownerType.replace(/_/g, " ")} after an owner was removed.`,
+        referenceType: "agent",
+        referenceId: agentId,
+      });
+    }
+  }
 }
 
 export async function listOwners(tenantId: string, agentId: string): Promise<AgentOwner[]> {

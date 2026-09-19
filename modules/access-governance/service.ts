@@ -29,6 +29,9 @@ export {
   createGovernanceException,
   listGovernanceExceptions,
   revokeException,
+  sendExpiredExceptionReminders,
+  sendExpiredExceptionRemindersForAllTenants,
+  type ExceptionExpiryReminderResult,
   type CreatePolicyInput,
   type GovernanceExceptionInput,
 } from "./policies";
