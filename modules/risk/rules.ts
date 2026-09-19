@@ -1,7 +1,7 @@
 import "server-only";
 
 import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, transitionAgentLifecycle, updateAgentRiskScore } from "@/modules/agent-identity/service";
-import { listApplications, listPolicyEvaluations } from "@/modules/access-governance/service";
+import { getEffectiveAccess, listApplications, listPolicyEvaluations } from "@/modules/access-governance/service";
 import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -62,7 +62,7 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const agent = await getAgent(tenantId, agentId);
   if (!agent) throw new ApiError(404, "AGENT_NOT_FOUND");
 
-  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage, weights, applications] = await Promise.all([
+  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage, weights, applications, effectiveAccess] = await Promise.all([
     getAgentContract(agentId),
     compareShouldCanDid(tenantId, agentId),
     getOwnershipIssues(tenantId, agentId, agent.criticality),
@@ -73,6 +73,14 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     listRuntimeEvents(tenantId, { agentId, limit: 200 }),
     getSeverityWeights(tenantId),
     listApplications(tenantId),
+    // RISK-P1-05 — already one of this module's own declared dependencies
+    // (see this backlog's "Dependencies" section); fetched directly here
+    // rather than reusing comparison.can because Runtime Agent's CanEntry
+    // (lib/shared/types/runtime.ts) intentionally doesn't carry
+    // privilegeLevel — reaching into Access Agent's own published contract
+    // for it keeps this a same-module addition, not a cross-module type
+    // change (non-negotiable #6/#14).
+    getEffectiveAccess(tenantId, agentId),
   ]);
   const externalApplicationNames = new Set(applications.filter((a) => a.isExternal).map((a) => a.name.toLowerCase()));
 
@@ -253,6 +261,12 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
 
   const sensitiveInvolved = did.tuples.some((t) => isSensitiveClassification(t.dataClassification)) || comparison.can.some((c) => isSensitiveClassification(c.dataClassification));
   const behavioralOrIdentityAnomalyPresent = remainingBehavioral.length > 0 || anomalousEvents.length > 0;
+  // RISK-P1-05 — a capability check (CAN), same shape as the sibling
+  // "Production environment access"/"External communication capability"
+  // factors, not a usage (DID) one: the agent holding elevated/admin
+  // access is itself the exposure, independent of whether it has been
+  // exercised yet.
+  const hasElevatedOrAdminAccess = effectiveAccess.some((g) => g.privilegeLevel === "elevated" || g.privilegeLevel === "admin");
 
   // RISK-P0-02.2 — weights come from this tenant's configured overrides
   // (falling back to the deterministic defaults), never hard-coded
@@ -275,6 +289,45 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     { name: "Runtime/behavioral anomaly present", weight: w("Runtime/behavioral anomaly present"), triggered: behavioralOrIdentityAnomalyPresent },
     { name: "Business criticality high/critical", weight: w("Business criticality high/critical"), triggered: agent.criticality === "high" || agent.criticality === "critical" },
     { name: "Missing or invalid ownership", weight: w("Missing or invalid ownership"), triggered: ownershipIssues.length > 0 },
+    // RISK-P1-05 — four additional deterministic factors from the master
+    // requirements doc's "# 15. Risk Engine" section. Each gets its own
+    // named weight in the same configurable-weight machinery as the eight
+    // above (RISK-P0-02.2) — a tenant can retune or zero any of them via
+    // setSeverityWeight() with no code change. Only "Privilege level" has
+    // a real, already-published data source right now (Access Agent's
+    // entitlements.privilege_level, via getEffectiveAccess() above); the
+    // other three are wired with real names/weights but always
+    // `triggered: false` until their own data source exists, same
+    // documented pattern as "Certification overdue" above (not a silent
+    // omission — a currently-0 factor that contributes nothing until a
+    // dependency is resolved). This must never change an already-`Done`
+    // scoring outcome (this story's own acceptance criterion) — verified
+    // for the FinanceBot central scenario in rules.test.ts.
+    { name: "Privilege level (elevated/admin access)", weight: w("Privilege level (elevated/admin access)"), triggered: hasElevatedOrAdminAccess },
+    // Destructive capability: needs a destructive-verb flag on the
+    // entitlement itself (delete/purge/overwrite), which Access Agent's
+    // effective-access model doesn't expose yet — DID's own `action`
+    // field records what was actually *done*, not what an entitlement
+    // technically *allows*, and every other capability factor here is
+    // deliberately CAN-based (see "External communication capability"
+    // above), so DID's action isn't a substitute. Recording the
+    // dependency here rather than inventing Access Agent's representation
+    // of it, per this story's own acceptance note.
+    { name: "Destructive capability present", weight: w("Destructive capability present"), triggered: false },
+    // Credential status: needs credential/secret health (expiry, weak,
+    // shared, rotation-overdue) for the AGENT's own runtime identity —
+    // distinct from Integration Agent's connector credentials (which
+    // authenticate WonderAgent's own connection to a source system, not
+    // the monitored agent's). No such contract is published by Identity
+    // Agent yet (AgentIdentityLink tracks confidence/status, not
+    // credential hygiene).
+    { name: "Credential status unhealthy", weight: w("Credential status unhealthy"), triggered: false },
+    // Attack path: needs the agent's position on a path to a higher-
+    // value/blast-radius resource in the effective-access graph — a
+    // graph-traversal contract Access Agent hasn't published (distinct
+    // from RISK-P2-02's downstream-propagation modeling, per this
+    // story's own note).
+    { name: "Position on a high-value attack path", weight: w("Position on a high-value attack path"), triggered: false },
   ];
   const base = computeSeverity(factors);
 

@@ -29,7 +29,7 @@ this module is higher bar (see below).
 | RISK-P0-02.2 | Configurable severity weights & INFO tier | Done |
 | RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Done |
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
-| RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Not Started |
+| RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Partial — 2026-09-19: "Privilege level" fully wired (real data via `getEffectiveAccess()`'s `privilegeLevel`, triggers on elevated/admin); the other three have real names/weights but always contribute 0, each with its own documented missing-contract dependency, per this story's own explicit acceptance allowance — see audit log |
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
 
 ---

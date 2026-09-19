@@ -696,3 +696,87 @@ issue in the first drawer implementation — replaced a reset-effect with a
 `forFindingId` guard matching the existing `showDetail` pattern), `npx
 vitest run` 236/236 (up from 234), `npm run build` clean, no
 service-role-key leakage.
+
+## 2026-09-19 — RISK-P1-05: additional deterministic risk factors
+
+Picked up as the next tracked story after Risk's full P0 backlog was
+already `Done` (CLAUDE.md §3 — building P1 scope now is not "ahead of"
+this module's own P0 work, since none remains).
+
+**Built** the four factors the master requirements doc's "# 15. Risk
+Engine" section names beyond the existing eight (RISK-P0-02.1/02.2):
+Privilege level, Destructive capability, Credential status, Attack path.
+Each gets its own named weight in `DEFAULT_SEVERITY_WEIGHTS`
+(`modules/risk/scoring.ts`) — no new config mechanism, reusing
+`RISK-P0-02.2`'s existing tenant-override machinery
+(`risk_severity_weights`) exactly as the story's acceptance criterion
+requires.
+
+**Only one of the four has a real, already-published data source right
+now: Privilege level.** `getEffectiveAccess()` — already one of this
+module's own declared dependencies — populates `privilegeLevel` from
+`entitlements.privilege_level` (Access Agent's own schema), so
+`evaluateAgentRisk()` now fetches it directly (a new leg of the existing
+`Promise.all`, not a new round trip pattern) and triggers when any
+effective-access grant is `elevated` or `admin`. Deliberately CAN-based
+(a capability check), matching the sibling "Production environment
+access"/"External communication capability" factors' own shape, not a
+DID-based "was it actually used" one.
+
+**The other three are wired with real names/weights but always
+`triggered: false`, documented inline exactly why**, per the story's own
+"contributes 0 until its data source is actually available" acceptance
+note (the same pattern `RISK-P0-02.2` already established for
+"Certification overdue"):
+- **Destructive capability** — needs a destructive-verb flag on the
+  entitlement itself; DID's own `action` field records what was actually
+  done, not what an entitlement technically allows, and every other
+  capability factor here is CAN-based, so it isn't a substitute.
+- **Credential status** — needs credential/secret health (expiry, weak,
+  shared, rotation-overdue) for the *agent's own runtime identity* —
+  checked and confirmed distinct from Integration Agent's connector
+  credentials (which authenticate WonderAgent's own connection to a
+  source system) and from `AgentIdentityLink`'s `confidence`/`status`
+  (identity mapping quality, not credential hygiene). No such contract
+  exists yet from any module.
+- **Attack path** — needs the agent's position on a path to a
+  higher-value resource in the effective-access graph; no such
+  graph-traversal contract is published by Access Agent yet.
+
+None of these three's dependencies were invented — recorded as real,
+named gaps for whichever module eventually publishes the missing
+contract, per this backlog's own Dependencies section instruction.
+
+**Did not implement `explainAccessPath()`/graph-position reuse for
+Attack path** even though Access Agent's `AccessGraphView` exists —
+that view is a UI composition (Experience Agent's), not a published
+graph-*query* contract Risk could call; building one would be Access
+Agent's own scope decision, not something to reach past.
+
+**Verified — the acceptance criterion that matters most here: no
+already-`Done` scoring outcome changed.** The FinanceBot central scenario
+in `rules.test.ts` still asserts `riskScore: 80` exactly (Production 20 +
+Sensitive data 25 + Active policy violation 15 + Runtime anomaly 10 +
+Criticality 10 = 80) — the new "Privilege level" factor contributes 0 in
+that test because its `getEffectiveAccess()` mock (newly added, default
+`[]`) has no elevated/admin grant. Same for every `QA-P0-08` corpus case
+and the two ACCESS-P0-02.2 external-communication tests.
+
+New coverage: 5 tests in `rules.test.ts`'s new "RISK-P1-05" describe
+block — triggers on `admin`, triggers on `elevated`, does not trigger on
+`standard`, does not trigger with no effective access, and an explicit
+"nothing else silently triggers" check (an admin-privilege grant alone
+must score exactly 15, not more — would catch any of the other three
+factors accidentally flipping on).
+
+Typecheck/lint clean. `rules.test.ts` 15/15 (was 10). Full vitest suite
+317/317 (was 312). `npm run build` clean (no route/UI touched, but
+`evaluateAgentRisk()` is called from several API routes, so built anyway
+rather than assuming).
+
+**Progress Tracker:** RISK-P1-05 moved from `Not Started` to `Partial` —
+one of four named factors has real triggering logic and a real data
+source; the other three are honestly stubbed pending contracts from
+other modules, which is the acceptance criterion's own explicitly
+allowed state ("contributes 0 until its data source is actually
+available"), not a shortfall against it.

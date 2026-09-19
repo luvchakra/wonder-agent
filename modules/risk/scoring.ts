@@ -22,6 +22,16 @@ export const DEFAULT_SEVERITY_WEIGHTS: Record<string, number> = {
   "Runtime/behavioral anomaly present": 10,
   "Business criticality high/critical": 10,
   "Missing or invalid ownership": 10,
+  // RISK-P1-05 — four additional deterministic factors (modules/risk/rules.ts
+  // has the full rationale for each, including which have a real data
+  // source today vs. which always contribute 0 pending one). Weighted
+  // in-range with the eight above (10-25): destructive capability is
+  // weighted higher than a passive capability/exposure factor, matching
+  // its greater severity if a future data source lets it trigger.
+  "Privilege level (elevated/admin access)": 15,
+  "Destructive capability present": 20,
+  "Credential status unhealthy": 15,
+  "Position on a high-value attack path": 15,
 };
 
 /** Tenant override takes precedence; otherwise the deterministic default. */

@@ -10,6 +10,7 @@ const mockTransitionAgentLifecycle = vi.fn();
 const mockUpdateAgentRiskScore = vi.fn();
 const mockListPolicyEvaluations = vi.fn();
 const mockListApplications = vi.fn();
+const mockGetEffectiveAccess = vi.fn();
 const mockCompareShouldCanDid = vi.fn();
 const mockGetDid = vi.fn();
 const mockListRuntimeEvents = vi.fn();
@@ -27,6 +28,7 @@ vi.mock("@/modules/agent-identity/service", () => ({
 vi.mock("@/modules/access-governance/service", () => ({
   listPolicyEvaluations: (...a: unknown[]) => mockListPolicyEvaluations(...a),
   listApplications: (...a: unknown[]) => mockListApplications(...a),
+  getEffectiveAccess: (...a: unknown[]) => mockGetEffectiveAccess(...a),
 }));
 vi.mock("@/modules/runtime-assurance/service", () => ({
   compareShouldCanDid: (...a: unknown[]) => mockCompareShouldCanDid(...a),
@@ -52,6 +54,7 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
       created: true,
     }));
     mockListApplications.mockResolvedValue([]);
+    mockGetEffectiveAccess.mockResolvedValue([]);
   });
 
   it("generates a CRITICAL sensitive_data_violation finding, excessive_access, and behavioral_deviation with evidence, and auto-restricts the agent", async () => {
@@ -213,6 +216,7 @@ describe("evaluateAgentRisk — QA-P0-08, the shared runtime event corpus", () =
       created: true,
     }));
     mockListApplications.mockResolvedValue([]);
+    mockGetEffectiveAccess.mockResolvedValue([]);
     mockGetOwnershipIssues.mockResolvedValue([]);
     mockListAgentIdentities.mockResolvedValue([]);
     mockListLifecycleEvents.mockResolvedValue([]);
@@ -267,5 +271,73 @@ describe("evaluateAgentRisk — QA-P0-08, the shared runtime event corpus", () =
     const results = await evaluateAgentRisk("tenant-a", c.id);
     const categories = results.map((r: { category: string }) => r.category).sort();
     expect(categories).toEqual([...EXPECTED_CATEGORIES[c.category]].sort());
+  });
+});
+
+describe("evaluateAgentRisk — RISK-P1-05, additional deterministic risk factors", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateOrUpdateFinding.mockImplementation(async (_tenantId, agentId, category, fields) => ({
+      finding: { id: `finding-${category}`, tenantId: "tenant-a", agentId, category, ...fields, status: "open" },
+      created: true,
+    }));
+    mockListApplications.mockResolvedValue([]);
+    mockGetAgent.mockResolvedValue({ id: "a5", agentName: "PrivBot", environment: "staging", criticality: "low", lifecycleState: "ACTIVE" });
+    mockGetAgentContract.mockResolvedValue({ approvedApplications: [], approvedData: [], prohibitedData: [], approvedActions: [], prohibitedActions: [] });
+    // No trigger from compareShouldCanDid/DID/policy/ownership — isolates
+    // the new "Privilege level" factor's own contribution to the score.
+    mockCompareShouldCanDid.mockResolvedValue({ can: [], outcomes: [] });
+    mockGetDid.mockResolvedValue({ tuples: [] });
+    mockListRuntimeEvents.mockResolvedValue({ events: [] });
+    mockGetOwnershipIssues.mockResolvedValue([]);
+    mockListAgentIdentities.mockResolvedValue([]);
+    mockListLifecycleEvents.mockResolvedValue([]);
+    mockListPolicyEvaluations.mockResolvedValue([]);
+  });
+
+  it("triggers 'Privilege level' when effective access includes an admin-privilege entitlement", async () => {
+    mockGetEffectiveAccess.mockResolvedValue([{ id: "grant-1", application: "SAP", privilegeLevel: "admin" }]);
+
+    await evaluateAgentRisk("tenant-a", "a5");
+
+    expect(mockGetEffectiveAccess).toHaveBeenCalledWith("tenant-a", "a5");
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 15);
+  });
+
+  it("triggers 'Privilege level' for an elevated-privilege entitlement too, not just admin", async () => {
+    mockGetEffectiveAccess.mockResolvedValue([{ id: "grant-1", application: "SAP", privilegeLevel: "elevated" }]);
+
+    await evaluateAgentRisk("tenant-a", "a5");
+
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 15);
+  });
+
+  it("does not trigger 'Privilege level' when every entitlement is standard", async () => {
+    mockGetEffectiveAccess.mockResolvedValue([{ id: "grant-1", application: "SAP", privilegeLevel: "standard" }]);
+
+    await evaluateAgentRisk("tenant-a", "a5");
+
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 0);
+  });
+
+  it("does not trigger 'Privilege level' with no effective access at all", async () => {
+    mockGetEffectiveAccess.mockResolvedValue([]);
+
+    await evaluateAgentRisk("tenant-a", "a5");
+
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 0);
+  });
+
+  it("the other three RISK-P1-05 factors never trigger yet — no published data source (documented, not a silent gap)", async () => {
+    // An admin-privilege grant alone should contribute exactly 15
+    // (its own weight) and nothing more — if "Destructive capability
+    // present" (20), "Credential status unhealthy" (15), or "Position on
+    // a high-value attack path" (15) ever silently started triggering,
+    // this score would jump well past 15 and this test would catch it.
+    mockGetEffectiveAccess.mockResolvedValue([{ id: "grant-1", application: "SAP", privilegeLevel: "admin" }]);
+
+    await evaluateAgentRisk("tenant-a", "a5");
+
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 15);
   });
 });

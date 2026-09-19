@@ -23,9 +23,9 @@ Generated 2026-09-19 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 142 |
-| Partial | 20 |
+| Partial | 21 |
 | Deferred | 1 |
-| Not Started | 2 |
+| Not Started | 1 |
 | **Total tracked** | **165** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -43,7 +43,7 @@ and are deliberately excluded from the counts above.
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 0 | 12 | `█████████████████░` 92% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 11 | 0 | 0 | 0 | 11 | `██████████████████` 100% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 9 | 0 | 0 | 0 | 9 | `██████████████████` 100% |
-| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 0 | 0 | 1 | 13 | `█████████████████░` 92% |
+| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 0 | 13 | `█████████████████░` 92% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 0 | 21 | `████████████████░░` 90% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 0 | 13 | `█████████████████░` 92% |
@@ -175,7 +175,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Risk Engine & Rogue Agent Detection  
 **Backlog status:** DORMANT — do not start until the user says "Run Risk Agent"  
-**Stories:** 12 done · 0 partial · 0 deferred · 1 not started (13 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 12 done · 1 partial · 0 deferred · 0 not started (13 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -190,7 +190,7 @@ and are deliberately excluded from the counts above.
 | RISK-P0-02.2 | Configurable severity weights & INFO tier | Done |
 | RISK-P0-03.4 | Expanded finding lifecycle states (ACKNOWLEDGED/INVESTIGATING/MITIGATED/EXCEPTION) | Done |
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
-| RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Not Started |
+| RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Partial — 2026-09-19: "Privilege level" fully wired (real data via `getEffectiveAccess()`'s `privilegeLevel`, triggers on elevated/admin); the other three have real names/weights but always contribute 0, each with its own documented missing-contract dependency, per this story's own explicit acceptance allowance — see audit log |
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
 
 ### 07 — Compliance Agent
