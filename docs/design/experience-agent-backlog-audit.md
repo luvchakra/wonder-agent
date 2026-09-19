@@ -2295,3 +2295,41 @@ anonymous path never leaves the process (pure in-memory retrieval against
 DB load for an attacker to run up. Flagged here rather than silently
 skipped in case Operations Agent's abuse-monitoring work wants a floor on
 it anyway.
+
+## 2026-09-19 — Landing page contact details: real domain + a mailto CTA
+
+Direct user request: replace the placeholder website address shown on the
+landing page with the real one, and add an email contact as a CTA (not the
+address printed in the clear).
+
+**Website address** — the browser-chrome address bar shown above the three
+product screenshots (`modules/ui/ProductShot.tsx`'s `BrowserFrame`) read
+the placeholder `app.wonderagent.com`. Updated all three occurrences to
+`agent.WonderApps.biz`: the component's own default (used by the hero
+screenshot, `app/welcome/page.tsx`), and the two explicit overrides on the
+Risk and Agents screenshots (`.../risk`, `.../agents`). `BrowserFrame` is
+only ever used on this one page (confirmed via grep), so no other screen
+needed touching.
+
+**Email CTA** — added "Email us" to the landing footer
+(`app/welcome/page.tsx`), a small outline pill `LinkButton` with a `Mail`
+icon (lucide-react) next to the existing Help/Sign in/Get started links.
+`href="mailto:connect@wonderapps.biz"` — the address itself is never
+printed as visible text anywhere on the page, only inside the link target,
+per the request ("no need to show the email fully on landing page").
+Confirmed via a raw `curl`: the page's HTML contains the `mailto:` href
+but the plain address string appears nowhere else in the rendered text.
+
+Scoped to the landing page only (`/welcome` and its shared `ProductShot`
+component) — the two places on the site that reference a domain or invite
+contact — rather than also touching the auth screens or in-app shell,
+which have no such placeholder today and weren't part of the request.
+
+**Verified:** typecheck, lint clean. `npm run build` clean. Screenshotted
+the footer in light, dark, and at 390px mobile width — the button wraps
+cleanly with the other footer links at every width, no overflow. Live
+`design-review.spec.ts` (12 cases: 0px horizontal overflow at all seven
+tracked widths, both themes, plus structural checks) and `welcome.spec.ts`
+(5 cases) both re-run against this change: 23/23 passing. Full vitest
+suite unaffected (342/342, no unit test references the old placeholder
+string).

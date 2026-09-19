@@ -55,7 +55,7 @@ export function BrowserFrame({
   light,
   dark,
   alt,
-  label = "app.wonderagent.com",
+  label = "agent.WonderApps.biz",
   priority,
   className,
   sizes = "(min-width: 1024px) 60vw, 100vw",

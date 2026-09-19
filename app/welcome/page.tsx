@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Fingerprint,
   KeyRound,
+  Mail,
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
@@ -365,7 +366,7 @@ export default function WelcomePage() {
                 light={riskDesktopLight}
                 dark={riskDesktopDark}
                 alt="The Risk screen listing every agent with open findings, worst severity first — FinanceBot critical, ProcurementCopilot high, SupportTriageBot medium."
-                label="app.wonderagent.com/risk"
+                label="agent.WonderApps.biz/risk"
                 sizes="(min-width: 1024px) 50vw, 100vw"
               />
               <h3 className="mt-5 text-base font-semibold text-foreground">
@@ -382,7 +383,7 @@ export default function WelcomePage() {
                 light={agentsDesktopLight}
                 dark={agentsDesktopDark}
                 alt="The AI Agents inventory listing FinanceBot, SupportTriageBot, InvoiceReconciler, ProcurementCopilot and DataQualityAgent with lifecycle state, criticality and owner."
-                label="app.wonderagent.com/agents"
+                label="agent.WonderApps.biz/agents"
                 sizes="(min-width: 1024px) 50vw, 100vw"
               />
               <h3 className="mt-5 text-base font-semibold text-foreground">
@@ -497,6 +498,18 @@ export default function WelcomePage() {
             <Link href="/sign-up" className="text-muted-foreground hover:text-foreground">
               Get started
             </Link>
+            {/* The address itself is deliberately never printed on the page —
+                the mailto: link is the only place it lives, so it can't be
+                scraped straight off the rendered HTML. */}
+            <LinkButton
+              href="mailto:connect@wonderapps.biz"
+              variant="outline"
+              size="sm"
+              className="rounded-full"
+            >
+              <Mail className="size-3.5" aria-hidden="true" />
+              Email us
+            </LinkButton>
           </div>
         </div>
       </footer>
