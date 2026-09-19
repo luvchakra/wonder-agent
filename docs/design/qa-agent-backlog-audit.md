@@ -616,3 +616,44 @@ assertions changed, only their fixture data source for the three
 de-duplicated ones).
 
 **Progress Tracker:** QA-P0-08 moved from `Partial` to `Done`.
+
+## 2026-09-19 (later) — QA-P0-11: certification regression closed; one stale claim corrected
+
+Continuing down the same actionable-gap list (INTEGRATION_STATUS.md §7)
+after QA-P0-08 above.
+
+**Built** the missing half: a fast unit test for COMPLIANCE-P0-04's
+Segregation-of-Duties self-certification restriction, added to
+`modules/certification-compliance/decisions.test.ts` (reusing that file's
+existing mocked `supabaseServer`/`supabaseServiceRole` table doubles rather
+than standing up a second mocking scheme). Four cases: blocked with
+`SOD_CONFLICT`/409 when the reviewer owns the agent and passes no override
+(and audits `compliance.sod_conflict_blocked`, no decision row written);
+succeeds and audits `compliance.sod_override_used` as its own event
+(distinct from `compliance.decision_recorded`) when `overrideSoD: true` is
+passed; does not apply at all when the reviewer isn't an owner; does not
+apply to a non-`approve` decision even when the reviewer is an owner (the
+code's own documented scoping — self-serving bias is specific to
+affirming your own access, not to revoke/modify/delegate/
+request_information).
+
+**Found the other named gap was stale, not real.** This row also said "no
+dedicated escalation regression test," attributed to escalation having no
+scheduler yet. `git log --follow` on
+`modules/certification-compliance/escalation.test.ts` shows it was added in
+the same commit as COMPLIANCE-P0-05's real Vercel Cron scheduler for
+`escalateOverdueItems()` — which post-dates the QA pass that wrote this
+row. The file already has six real regression cases: notifies the
+escalated-to user per overdue item, falls back to the campaign creator
+when there's no business owner, no-ops cleanly with nothing overdue, sweeps
+every active tenant and sums counts, isolates one tenant's failure from the
+rest of the sweep, and no-ops cleanly with no active tenants. Verified this
+directly rather than trusting the stale note, then corrected the record
+instead of re-authoring coverage that already exists — CLAUDE.md's
+instruction to report state accurately applies as much to fixing a false
+`Partial` as to fixing a false `Done`.
+
+**Verified:** typecheck, lint clean. `decisions.test.ts` 7/7 (was 3). Full
+vitest suite 312/312 (was 308 after the QA-P0-08 pass earlier today).
+
+**Progress Tracker:** QA-P0-11 moved from `Partial` to `Done`.

@@ -66,6 +66,7 @@ vi.mock("@/lib/db/supabaseServer", () => ({
 }));
 
 import { recordDecision } from "./decisions";
+import { ApiError } from "@/lib/shared/types/foundation";
 
 describe("recordDecision — 'modify' creates a real access_requests row (COMPLIANCE-P0-01.3)", () => {
   beforeEach(() => {
@@ -119,5 +120,94 @@ describe("recordDecision — 'modify' creates a real access_requests row (COMPLI
 
     expect(mockCreateAccessRequest).not.toHaveBeenCalled();
     expect(writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.modify_request_failed" }));
+  });
+});
+
+/**
+ * QA-P0-11 — a fast unit test for COMPLIANCE-P0-04's Segregation of Duties
+ * restriction (decisions.ts's own doc comment: "a reviewer must not
+ * approve an agent whose access they themselves own"), previously proven
+ * only by a live RLS/SoD check against a seeded tenant
+ * (docs/design/compliance-agent-backlog-audit.md) — not by anything that
+ * runs in `npm test`. Reuses this file's existing mocked
+ * supabaseServer/supabaseServiceRole tables rather than standing up a
+ * second mocking scheme.
+ */
+describe("recordDecision — COMPLIANCE-P0-04 Segregation of Duties (QA-P0-11)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    insertedDecisions.length = 0;
+    itemRow = {
+      id: "item-1",
+      tenant_id: "tenant-a",
+      agent_id: "agent-1",
+      access_grant_id: "grant-1",
+      reviewer_id: "reviewer-1",
+      status: "pending",
+    };
+  });
+
+  it("blocks self-certification: the reviewer is an owner of the agent and did not pass overrideSoD", async () => {
+    mockListOwners.mockResolvedValue([{ userId: "reviewer-1" }, { userId: "someone-else" }]);
+
+    await expect(
+      recordDecision("tenant-a", "reviewer-1", "item-1", { decision: "approve", justification: "Looks fine" }),
+    ).rejects.toMatchObject({ status: 409, code: "SOD_CONFLICT" } satisfies Partial<ApiError>);
+
+    // Blocked before any decision row is written — self-certification
+    // never partially succeeds.
+    expect(insertedDecisions).toHaveLength(0);
+    expect(writeAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "compliance.sod_conflict_blocked", outcome: "failure" }),
+    );
+    expect(writeAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.decision_recorded" }));
+  });
+
+  it("allows self-certification with an explicit overrideSoD, and audits the override as its own event", async () => {
+    mockListOwners.mockResolvedValue([{ userId: "reviewer-1" }]);
+
+    const result = await recordDecision("tenant-a", "reviewer-1", "item-1", {
+      decision: "approve",
+      justification: "Reviewed and correct; overriding SoD because no other reviewer is available",
+      overrideSoD: true,
+    });
+
+    expect(result.decision).toBe("approve");
+    expect(insertedDecisions).toHaveLength(1);
+    // Two distinct audit events, per this option's own doc comment ("Its
+    // use is always audited as its own event, distinct from the decision
+    // itself") — the override is not silently folded into the ordinary
+    // decision-recorded event.
+    expect(writeAudit).toHaveBeenCalledWith(
+      expect.objectContaining({ action: "compliance.sod_override_used", outcome: "success" }),
+    );
+    expect(writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.decision_recorded" }));
+    expect(writeAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.sod_conflict_blocked" }));
+  });
+
+  it("does not apply the SoD check at all when the reviewer is not an owner", async () => {
+    mockListOwners.mockResolvedValue([{ userId: "someone-else" }]);
+
+    const result = await recordDecision("tenant-a", "reviewer-1", "item-1", { decision: "approve", justification: "Reviewed and correct" });
+
+    expect(result.decision).toBe("approve");
+    expect(writeAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.sod_conflict_blocked" }));
+    expect(writeAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.sod_override_used" }));
+  });
+
+  it("does not apply the SoD check to a non-approve decision, even when the reviewer is an owner", async () => {
+    // decisions.ts scopes the check to 'approve' deliberately — see its own
+    // doc comment: revoke/modify/delegate/request_information don't carry
+    // the same self-serving-bias risk as affirming your own access.
+    mockListOwners.mockResolvedValue([{ userId: "reviewer-1" }]);
+
+    const result = await recordDecision("tenant-a", "reviewer-1", "item-1", {
+      decision: "request_information",
+      justification: "Need more context before deciding",
+    });
+
+    expect(result.decision).toBe("request_information");
+    expect(mockListOwners).not.toHaveBeenCalled();
+    expect(writeAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.sod_conflict_blocked" }));
   });
 });

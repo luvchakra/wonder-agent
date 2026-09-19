@@ -14,7 +14,7 @@ Generated 2026-09-19 from 11 module backlogs.
 
 ## Overall
 
-**140 of 165 tracked stories complete — 85%**
+**141 of 165 tracked stories complete — 85%**
 
 ```
 ██████████████████████████████████░░░░░░  85%
@@ -22,8 +22,8 @@ Generated 2026-09-19 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 140 |
-| Partial | 21 |
+| Done | 141 |
+| Partial | 20 |
 | Deferred | 1 |
 | Not Started | 3 |
 | **Total tracked** | **165** |
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 0 | 21 | `████████████████░░` 90% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 0 | 13 | `█████████████████░` 92% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 8 | 3 | 0 | 0 | 11 | `█████████████░░░░░` 73% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 8 | 13 | 0 | 1 | 22 | `███████░░░░░░░░░░░` 36% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 9 | 12 | 0 | 1 | 22 | `███████░░░░░░░░░░░` 41% |
 
 ---
 
@@ -291,7 +291,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 8 done · 13 partial · 0 deferred · 1 not started (22 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 9 done · 12 partial · 0 deferred · 1 not started (22 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -311,7 +311,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-08 | Runtime test corpus | Done — 2026-09-19: `tests/runtime/should-can-did-corpus.ts`, six deterministic cases (one per named category), reused (not re-authored) by both `modules/runtime-assurance/compare.test.ts` (QA-P0-09) and `modules/risk/rules.test.ts` — see audit log |
 | QA-P0-09 | SHOULD/CAN/DID reproducibility | Done — `compare.test.ts` directly asserts identical repeated output and evaluator-version stability |
 | QA-P0-10 | Risk regression suite | Partial — 1 positive + 1 negative test exist, covering 3 of 8 categories; the full 5-kind × 8-category matrix is not built (deferred to Risk Agent's own further work, not duplicated here per non-negotiable #18) |
-| QA-P0-11 | Certification regression | Partial — reviewer authorization/SoD live-verified, snapshot reproduction unit-tested; no dedicated escalation regression test or fast self-review unit test |
+| QA-P0-11 | Certification regression | Done — 2026-09-19: added the missing fast self-review/SoD unit test (`decisions.test.ts`, 4 new cases: blocked without override, allowed+audited with override, not applied to a non-owner, not applied to a non-approve decision); the "no escalation regression test" half of this row was stale — `escalation.test.ts` already covers it in full (added alongside COMPLIANCE-P0-05's real Vercel Cron scheduler, after this row was last written) — see audit log |
 | QA-P0-12 | Security scanning | Partial — live advisor scan run, one real finding fixed (security-definer over-grant); `npm audit` now run (prod + full scope), 0 vulnerabilities either way; no static-analysis pass beyond ESLint, `auth_leaked_password_protection` still disabled (dashboard-only setting, flagged for follow-up) |
 | QA-P0-13 | Failure recovery (retry/idempotency) | Partial — dedupe-key idempotency unit-tested; no end-to-end forced-failure-and-retry test built |
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
