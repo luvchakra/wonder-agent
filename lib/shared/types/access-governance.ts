@@ -170,8 +170,9 @@ export type Policy = {
   status: PolicyStatus;
   /** ACCESS-P0-05 — incremented on every updatePolicy() call. */
   version: number;
-  /** ACCESS-P0-05 — higher priority policies take precedence in a future
-   * conflict-resolution story; P0 only stores and surfaces the value. */
+  /** ACCESS-P0-05, used since ACCESS-P0-12: runtime policies are evaluated
+   * highest priority first, and among equally severe outcomes the higher
+   * priority decides. */
   priority: number;
 };
 
@@ -368,3 +369,21 @@ export type RuntimeDecision = {
   /** Every step in evaluation order, so each decision is explainable. */
   steps: RuntimeDecisionStep[];
 };
+
+/**
+ * ACCESS-P0-12 (master P0-23) — what a policy applies to. Stored in
+ * `policies.scope.targets`. A policy with no targets applies to every
+ * request in its category; a policy with targets applies only when at
+ * least one target matches the request (case-insensitive):
+ * - TOOL: the requested tool;
+ * - MCP_SERVER: the MCP server the request came through;
+ * - MCP_TOOL: "<server>:<tool>", both must match;
+ * - DATA_SOURCE: a data source by name, matched against the request's
+ *   resource or application;
+ * - DATA_RESOURCE: the request's resource, with a trailing `*` as prefix
+ *   match (e.g. "CustomerDB.*");
+ * - ACTION: the requested action.
+ */
+export type PolicyTargetType = "TOOL" | "MCP_SERVER" | "MCP_TOOL" | "DATA_SOURCE" | "DATA_RESOURCE" | "ACTION";
+export const POLICY_TARGET_TYPES: PolicyTargetType[] = ["TOOL", "MCP_SERVER", "MCP_TOOL", "DATA_SOURCE", "DATA_RESOURCE", "ACTION"];
+export type PolicyTarget = { type: PolicyTargetType; value: string };

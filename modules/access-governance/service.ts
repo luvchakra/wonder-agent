@@ -19,6 +19,7 @@ export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createMa
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
 export {
   createPolicy,
+  publishPolicy,
   listPolicies,
   getPolicy,
   updatePolicy,

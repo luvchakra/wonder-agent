@@ -992,3 +992,74 @@ record for now. It is flagged to Risk as a candidate signal.
 
 **Verified:** eslint clean, vitest **519/519**, Playwright **188/188**
 (8.6 min, a fresh build containing this story).
+
+## 2026-09-25 — ACCESS-P0-12: policy targets, priority, and a publish step (master P0-23)
+
+- **Targets.** A policy's `scope.targets` lists what it applies to:
+  `TOOL`, `MCP_SERVER`, `MCP_TOOL` (`server:tool`), `DATA_SOURCE`
+  (matched against the request's resource or application), `DATA_RESOURCE`
+  (the resource, with a trailing `*` as prefix match), and `ACTION`.
+  - No targets means every request in the category, as before.
+  - Matching is pure (`policyTargets.ts`) and case-insensitive.
+  - Stored targets that are malformed never match.
+  - Input is validated at the boundary: at most 50 targets; `MCP_TOOL`
+    must be `server:tool`.
+  - No migration was needed: `scope` is existing jsonb.
+- **Runtime.** The gateway's loader now reads `priority` and `scope`.
+  - Step 9 evaluates only the policies whose targets match the request.
+  - Policies run highest priority first, stable for ties. Among equally
+    severe outcomes the higher priority decides the reported policy.
+  - Priority never lets a milder outcome override a more severe one.
+  - When active policies exist but none targets the request, the step
+    says so.
+- **Publish:**
+  - `createPolicy()` accepts `status: draft | active`. The default stays
+    `active` so existing callers are unchanged.
+  - The API and the form require `policy.publish` to create an active
+    policy, and `PATCH` requires it to set `status: active`.
+  - New `publishPolicy()` (`POST /api/v1/policies/:id/publish`,
+    `policy.publish`): draft or disabled → active as a **new version**.
+    The prior state is snapshotted, there is a lost-update guard, and it
+    is audited as `policy.published`. Publishing an active policy is
+    409.
+  - Roles: today `policy.create` and `policy.publish` belong to the same
+    three roles (IAM_ARCHITECT, SECURITY_ADMIN, TENANT_SUPER_ADMIN), so
+    nobody loses a capability. A custom role can now separate authoring
+    from publishing.
+- **Fixed on the way.** `createPolicy()` wrote no audit event (#11). It
+  now writes `policy.created`.
+- **UI:**
+  - The create form gains "Applies to" and "Target", "Priority", and
+    "Status". Users without `policy.publish` can only save a draft.
+  - The detail page shows "In effect" / draft / disabled, the version,
+    the priority, and what the policy applies to, plus a Publish button
+    that shows the real result.
+
+**Tests:**
+
+- `policyTargets.test.ts` (5): every target type, any-of matching,
+  malformed stored targets, boundary validation.
+- `runtimeDecision.test.ts` +3: a targeted policy applies only to its
+  target; the higher priority decides regardless of load order; priority
+  never downgrades severity.
+- E2E `policy-publish.spec.ts`:
+  - a draft runtime policy on a unique tool leaves the gateway's policy
+    step at `NO_POLICY_FIRED`;
+  - read-only gets 403 publishing;
+  - publishing through the UI gives "Published as version 2" and "In
+    effect";
+  - the gateway step becomes `POLICY_BLOCK` for that tool only, with
+    another tool still `NO_POLICY_FIRED`;
+  - publishing again is 409;
+  - the policy is disabled in `finally`.
+- `policies.spec` still passes.
+
+**Verification (2026-09-25):**
+
+- `tsc`, `eslint` clean; `vitest run modules/access-governance` passes.
+- Full Playwright suite: 185 passed, 4 failed. All four failures were in
+  `agents.spec.ts` (list, tabs, sections nav, posture panel). They fell in
+  the ~5-minute window when Identity's migration 0073 made the
+  `agent_owners` → `users` embed ambiguous (recorded in the Identity audit
+  log, fixed by 0074). Rerun afterwards: all four pass. None touch
+  policies.

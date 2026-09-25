@@ -4,6 +4,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getPolicy, listPolicyExceptions, listPolicyRules } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { addPolicyRuleAction, addPolicyExceptionAction, revokeExceptionAction } from "@/app/actions/access";
+import { targetsFromScope } from "@/modules/access-governance/policyTargets";
+import { PublishPolicyButton } from "./PublishPolicyButton";
 import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, EmptyState, TextField, SelectField } from "@/modules/ui";
 
 const RULE_TYPES = ["rbac", "abac", "resource", "time"] as const;
@@ -11,8 +13,9 @@ const RESIDUAL_RISKS = ["low", "medium", "high", "critical"] as const;
 
 export default async function PolicyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  let ctx;
   try {
-    await requirePermission("policy.read");
+    ctx = await requirePermission("policy.read");
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
@@ -22,6 +25,8 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
   if (!policy) notFound();
 
   const [rules, exceptions] = await Promise.all([listPolicyRules(id), listPolicyExceptions(id)]);
+  const targets = targetsFromScope(policy.scope);
+  const canPublish = ctx.permissions.includes("policy.publish");
   const addRuleWithId = addPolicyRuleAction.bind(null, id);
   const addExceptionWithId = addPolicyExceptionAction.bind(null, id);
 
@@ -33,10 +38,22 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
       <div>
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-xl font-semibold text-foreground">{policy.name}</h1>
-          <Badge tone={policy.status === "active" ? "success" : "neutral"}>{policy.status}</Badge>
+          <Badge tone={policy.status === "active" ? "success" : policy.status === "draft" ? "warning" : "neutral"}>
+            {policy.status === "active" ? "In effect" : policy.status}
+          </Badge>
+          <span className="text-xs text-muted-foreground">v{policy.version}</span>
+          {/* ACCESS-P0-12: a draft or disabled policy takes effect only when published. */}
+          {policy.status !== "active" && canPublish ? <PublishPolicyButton policyId={policy.id} /> : null}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Category: {policy.policyCategory} · Severity: <SeverityBadge severity={policy.severity} /> · Action: {policy.action}
+          Category: {policy.policyCategory} · Severity: <SeverityBadge severity={policy.severity} /> · Action: {policy.action} · Priority:{" "}
+          {policy.priority ?? 0}
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Applies to:{" "}
+          {targets.length === 0
+            ? "every request in its category"
+            : targets.map((t) => `${t.type.replace(/_/g, " ").toLowerCase()} “${t.value}”`).join(", ")}
         </p>
       </div>
 

@@ -18,6 +18,7 @@ import type {
   PolicyVersionRecord,
   UpdatePolicyInput,
 } from "@/lib/shared/types/access-governance";
+import { validateTargets } from "./policyTargets";
 import { toPolicy, toPolicyException, toPolicyRule, toPolicyVersionRecord } from "./mappers";
 
 export type CreatePolicyInput = {
@@ -29,11 +30,25 @@ export type CreatePolicyInput = {
   action: PolicyAction;
   exceptionProcess?: string;
   ownerId?: string;
+  /**
+   * ACCESS-P0-12: "draft" saves it without effect; "active" (the default,
+   * as before) makes it take effect at once. The API and the form require
+   * `policy.publish` for "active".
+   */
+  status?: "draft" | "active";
+  /** ACCESS-P0-12 */
+  priority?: number;
 };
 
 /** ACCESS-P0-02.1 (higher bar). Client-facing tenant-scoped RLS (migration 0029). */
-export async function createPolicy(tenantId: string, input: CreatePolicyInput): Promise<Policy> {
+export async function createPolicy(tenantId: string, input: CreatePolicyInput, actorId: string | null = null): Promise<Policy> {
   if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
+  const status = input.status ?? "active";
+  if (status !== "draft" && status !== "active") throw new ApiError(400, "VALIDATION_FAILED", "status: draft or active");
+  const scope = { ...(input.scope ?? {}), targets: validateTargets((input.scope as { targets?: unknown } | undefined)?.targets) };
+  if (input.priority !== undefined && (!Number.isInteger(input.priority) || input.priority < -1000 || input.priority > 1000)) {
+    throw new ApiError(400, "VALIDATION_FAILED", "priority: a whole number from -1000 to 1000");
+  }
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("policies")
@@ -42,7 +57,9 @@ export async function createPolicy(tenantId: string, input: CreatePolicyInput): 
       name: input.name,
       description: input.description ?? null,
       policy_category: input.policyCategory,
-      scope: input.scope ?? {},
+      scope,
+      status,
+      priority: input.priority ?? 0,
       severity: input.severity ?? "medium",
       action: input.action,
       exception_process: input.exceptionProcess ?? null,
@@ -51,6 +68,54 @@ export async function createPolicy(tenantId: string, input: CreatePolicyInput): 
     .select()
     .single();
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create policy");
+  // It used to write no audit event (#11).
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: actorId ? "user" : "system",
+    action: "policy.created",
+    objectType: "policy",
+    objectId: data.id,
+    outcome: "success",
+    metadata: { name: data.name, category: data.policy_category, action: data.action, status, targets: scope.targets.length },
+  });
+  return toPolicy(data);
+}
+
+/**
+ * ACCESS-P0-12 (master P0-23) — the publish step. A draft (or a disabled
+ * policy) takes effect only when someone with `policy.publish` publishes
+ * it (checked by the caller). Publishing is a new version: the prior state
+ * is snapshotted into policy_versions, exactly as updatePolicy() does, and
+ * the publish is audited.
+ */
+export async function publishPolicy(tenantId: string, actorId: string, policyId: string): Promise<Policy> {
+  const current = await getPolicy(policyId);
+  if (!current || current.tenantId !== tenantId) throw new ApiError(404, "POLICY_NOT_FOUND");
+  if (current.status === "active") throw new ApiError(409, "ALREADY_PUBLISHED", "This policy is already in effect");
+  const supabase = await supabaseServer();
+  const { error: versionError } = await supabase.from("policy_versions").insert({ policy_id: policyId, version: current.version, snapshot: current, changed_by: actorId });
+  if (versionError) throw new ApiError(500, "CREATE_FAILED", versionError.message);
+  const { data, error } = await supabase
+    .from("policies")
+    .update({ status: "active", version: current.version + 1 })
+    .eq("id", policyId)
+    .eq("tenant_id", tenantId)
+    .eq("status", current.status) // lost-update guard
+    .select()
+    .maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data) throw new ApiError(409, "STALE_STATUS", "The policy changed while you were publishing it; reload and try again");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "policy.published",
+    objectType: "policy",
+    objectId: policyId,
+    outcome: "success",
+    metadata: { fromStatus: current.status, fromVersion: current.version, toVersion: current.version + 1 },
+  });
   return toPolicy(data);
 }
 
@@ -100,7 +165,7 @@ export async function updatePolicy(
   const update: Record<string, unknown> = { version: current.version + 1 };
   if (patch.name !== undefined) update.name = patch.name;
   if (patch.description !== undefined) update.description = patch.description;
-  if (patch.scope !== undefined) update.scope = patch.scope;
+  if (patch.scope !== undefined) update.scope = { ...patch.scope, targets: validateTargets((patch.scope as { targets?: unknown }).targets) };
   if (patch.severity !== undefined) update.severity = patch.severity;
   if (patch.action !== undefined) update.action = patch.action;
   if (patch.exceptionProcess !== undefined) update.exception_process = patch.exceptionProcess;

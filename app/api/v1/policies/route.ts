@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/shared/types/foundation";
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { createPolicy, listPolicies } from "@/modules/access-governance/service";
@@ -17,7 +18,11 @@ export async function POST(request: Request) {
   try {
     const ctx = await requirePermission("policy.create");
     const body = await request.json();
-    const policy = await createPolicy(ctx.tenantId!, body);
+    // ACCESS-P0-12: a policy that takes effect at once is a publish.
+    if ((body?.status ?? "active") !== "draft" && !ctx.permissions.includes("policy.publish")) {
+      throw new ApiError(403, "FORBIDDEN", "Creating an active policy requires policy.publish; save it as a draft instead");
+    }
+    const policy = await createPolicy(ctx.tenantId!, body, ctx.userId);
     return NextResponse.json({ ok: true, data: policy }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

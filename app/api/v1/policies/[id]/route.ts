@@ -1,3 +1,4 @@
+import { ApiError } from "@/lib/shared/types/foundation";
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getPolicy, updatePolicy } from "@/modules/access-governance/service";
@@ -22,6 +23,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const ctx = await requirePermission("policy.update");
     const { id } = await params;
     const body = (await request.json()) as UpdatePolicyInput;
+    // ACCESS-P0-12: turning a policy on is a publish, whatever route it takes.
+    if (body.status === "active" && !ctx.permissions.includes("policy.publish")) {
+      throw new ApiError(403, "FORBIDDEN", "Making a policy active requires policy.publish");
+    }
     const policy = await updatePolicy(ctx.tenantId!, ctx.userId, id, body);
     return NextResponse.json({ ok: true, data: policy });
   } catch (err) {

@@ -1,6 +1,7 @@
 import type {
   PolicyAction,
   PolicyRule,
+  PolicyTarget,
   RuntimeDecision,
   RuntimeDecisionOutcome,
   RuntimeDecisionStep,
@@ -9,6 +10,7 @@ import type {
 } from "@/lib/shared/types/access-governance";
 import { classifyAction } from "./actionGovernance";
 import { evaluateCondition } from "./conditions";
+import { policyAppliesTo } from "./policyTargets";
 
 /**
  * ACCESS-P0-11 — the deterministic runtime decision (master stories
@@ -47,6 +49,10 @@ export type RuntimePolicyFacts = {
   name: string;
   action: PolicyAction;
   rules: Pick<PolicyRule, "id" | "condition">[];
+  /** ACCESS-P0-12: what the policy applies to; empty or absent means every request. */
+  targets?: PolicyTarget[];
+  /** ACCESS-P0-12: higher runs first; among equally severe outcomes, the higher priority decides. */
+  priority?: number;
 };
 
 export type RuntimeDecisionFacts = {
@@ -304,7 +310,14 @@ export function decideRuntimeRequest(facts: RuntimeDecisionFacts): RuntimeDecisi
       "agent.risk_score": agent.riskScore ?? undefined,
     };
     let strongest: { outcome: RuntimeDecisionOutcome; policy: RuntimePolicyFacts; code: string; reason: string } | null = null;
-    for (const policy of facts.runtimePolicies) {
+    // ACCESS-P0-12: highest priority first (stable for equal priority), and
+    // only the policies whose targets match this request.
+    const ordered = facts.runtimePolicies
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => (b.p.priority ?? 0) - (a.p.priority ?? 0) || a.i - b.i)
+      .map(({ p }) => p)
+      .filter((p) => policyAppliesTo(p.targets, request));
+    for (const policy of ordered) {
       const results = policy.rules.map((r) => evaluateCondition(r.condition, policyFacts));
       let outcome: RuntimeDecisionOutcome | null = null;
       let code = "";
@@ -338,7 +351,11 @@ export function decideRuntimeRequest(facts: RuntimeDecisionFacts): RuntimeDecisi
       if (strongest.outcome === "ALLOW_WITH_RESTRICTIONS") restrictions.readOnly = true;
       step({ step: "runtime_policy", outcome: strongest.outcome, code: strongest.code, reason: strongest.reason });
     } else {
-      pass("runtime_policy", "NO_POLICY_FIRED", facts.runtimePolicies.length ? "No runtime policy fired." : "No runtime policies are active.");
+      pass(
+        "runtime_policy",
+        "NO_POLICY_FIRED",
+        ordered.length ? "No runtime policy fired." : facts.runtimePolicies.length ? "No active runtime policy targets this request." : "No runtime policies are active.",
+      );
     }
   }
 

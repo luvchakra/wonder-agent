@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { ApiError } from "@/lib/shared/types/foundation";
 import {
   addPolicyException,
   addPolicyRule,
@@ -11,6 +12,7 @@ import {
   createEntitlement,
   createManualAccessGrant,
   createPolicy,
+  publishPolicy,
   decideAccessRequest,
   evaluatePolicies,
   linkEntitlementToDataSource,
@@ -75,12 +77,39 @@ export async function decideAccessRequestAction(requestId: string, formData: For
 
 export async function createPolicyAction(formData: FormData) {
   const ctx = await requirePermission("policy.create");
-  const policy = await createPolicy(ctx.tenantId!, {
-    name: String(formData.get("name") ?? ""),
-    policyCategory: formData.get("policyCategory") as PolicyCategory,
-    action: formData.get("action") as PolicyAction,
-  });
+  // ACCESS-P0-12: "publish now" makes it take effect, which needs policy.publish.
+  const status = formData.get("status") === "active" ? "active" : "draft";
+  if (status === "active" && !ctx.permissions.includes("policy.publish")) {
+    throw new ApiError(403, "FORBIDDEN", "Publishing a policy requires policy.publish; save it as a draft instead");
+  }
+  const targetType = String(formData.get("targetType") ?? "");
+  const targetValue = String(formData.get("targetValue") ?? "").trim();
+  const policy = await createPolicy(
+    ctx.tenantId!,
+    {
+      name: String(formData.get("name") ?? ""),
+      policyCategory: formData.get("policyCategory") as PolicyCategory,
+      action: formData.get("action") as PolicyAction,
+      status,
+      priority: Number.parseInt(String(formData.get("priority") ?? "0"), 10) || 0,
+      scope: targetType && targetValue ? { targets: [{ type: targetType, value: targetValue }] } : {},
+    },
+    ctx.userId,
+  );
   redirect(`/policies/${policy.id}`);
+}
+
+/** ACCESS-P0-12 — publish a draft or disabled policy; returns the real result for the button. */
+export async function publishPolicyAction(policyId: string): Promise<{ ok: boolean; message: string }> {
+  const ctx = await requirePermission("policy.publish");
+  try {
+    const p = await publishPolicy(ctx.tenantId!, ctx.userId, policyId);
+    revalidatePath(`/policies/${policyId}`);
+    return { ok: true, message: `Published as version ${p.version}.` };
+  } catch (err) {
+    const e = err as { message?: string; code?: string };
+    return { ok: false, message: e?.message || e?.code || "Publishing failed" };
+  }
 }
 
 export async function addPolicyRuleAction(policyId: string, formData: FormData) {

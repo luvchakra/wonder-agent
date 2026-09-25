@@ -309,3 +309,29 @@ describe("filterToolsForAgent — RUNTIME-P0-18 / master P0-34", () => {
     expect(filterToolsForAgent({ ...base(), agent: null }, tools)[0].code).toBe("UNKNOWN_AGENT");
   });
 });
+
+describe("decideRuntimeRequest — ACCESS-P0-12 policy targets and priority", () => {
+  const always = { field: "request.action", op: "eq", value: "read" } as never;
+  const block = (id: string, extra: object = {}) => ({ id, version: 1, name: id, action: "block" as const, rules: [{ id: `${id}-r`, condition: always }], ...extra });
+
+  it("a targeted policy applies only when its target matches the request", () => {
+    const onTool = block("tool-policy", { targets: [{ type: "TOOL", value: "export_all" }] });
+    expect(decideRuntimeRequest(facts({ runtimePolicies: [onTool] })).decision).toBe("ALLOW");
+    expect(stepOf(decideRuntimeRequest(facts({ runtimePolicies: [onTool] })), "runtime_policy")?.reason).toBe("No active runtime policy targets this request.");
+    const onSnowflake = block("ds-policy", { targets: [{ type: "DATA_SOURCE", value: "Snowflake" }] });
+    expect(decideRuntimeRequest(facts({ runtimePolicies: [onSnowflake] })).policyId).toBe("ds-policy");
+  });
+
+  it("among equally severe outcomes, the higher-priority policy decides, whatever the load order", () => {
+    const low = block("low", { priority: 1 });
+    const high = block("high", { priority: 50 });
+    expect(decideRuntimeRequest(facts({ runtimePolicies: [low, high] })).policyId).toBe("high");
+    expect(decideRuntimeRequest(facts({ runtimePolicies: [high, low] })).policyId).toBe("high");
+  });
+
+  it("priority never lets a milder outcome override a more severe one", () => {
+    const flagHigh = { ...block("flag-high", { priority: 100 }), action: "restrict" as const };
+    const blockLow = block("block-low", { priority: 0 });
+    expect(decideRuntimeRequest(facts({ runtimePolicies: [flagHigh, blockLow] })).decision).toBe("DENY");
+  });
+});

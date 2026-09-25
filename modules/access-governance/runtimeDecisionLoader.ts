@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { getAgentRuntimeProfile } from "@/modules/agent-identity/service";
+import { targetsFromScope } from "./policyTargets";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { PolicyCondition, RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-governance";
 import { decideRuntimeRequest, filterToolsForAgent, type RuntimeContractFacts, type RuntimePolicyFacts, type ToolVisibility } from "./runtimeDecision";
@@ -76,7 +77,7 @@ async function loadRuntimePolicies(tenantId: string): Promise<RuntimePolicyFacts
   // One round trip: active runtime policies with their rules embedded.
   const { data, error } = await supabaseServiceRole()
     .from("policies")
-    .select("id, tenant_id, name, action, version, policy_rules(id, condition)")
+    .select("id, tenant_id, name, action, version, priority, scope, policy_rules(id, condition)")
     .eq("tenant_id", tenantId)
     .eq("policy_category", "runtime")
     .eq("status", "active")
@@ -87,13 +88,24 @@ async function loadRuntimePolicies(tenantId: string): Promise<RuntimePolicyFacts
         name: string;
         action: RuntimePolicyFacts["action"];
         version: number | null;
+        priority: number | null;
+        scope: unknown;
         policy_rules: Array<{ id: string; condition: PolicyCondition }> | null;
       }>
     >();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? [])
     .filter((p) => p.tenant_id === tenantId)
-    .map((p) => ({ id: p.id, version: p.version ?? 1, name: p.name, action: p.action, rules: p.policy_rules ?? [] }));
+    .map((p) => ({
+      id: p.id,
+      version: p.version ?? 1,
+      name: p.name,
+      action: p.action,
+      rules: p.policy_rules ?? [],
+      // ACCESS-P0-12
+      targets: targetsFromScope(p.scope),
+      priority: p.priority ?? 0,
+    }));
 }
 
 export async function evaluateRuntimeRequest(
