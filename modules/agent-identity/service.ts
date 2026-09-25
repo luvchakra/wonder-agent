@@ -22,7 +22,7 @@ export {
   isStructurallyAllowedTransition,
   type LifecycleActor,
 } from "./lifecycle";
-export { assignOwner, removeOwner, listOwners, listOwnersForTenant, getOwnershipIssues, type OwnerWithContext } from "./owners";
+export { assignOwner, removeOwner, listOwners, listOwnersForTenant, getOwnershipIssues, reviewOwnership, type OwnerWithContext } from "./owners";
 export { linkAgentIdentity, listAgentIdentities, listIdentitiesForTenant, type IdentityWithContext, type IdentityConfidence } from "./identities";
 export { addRelationship, listRelationships, removeRelationship } from "./relationships";
 export {

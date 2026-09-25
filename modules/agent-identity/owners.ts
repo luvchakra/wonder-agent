@@ -22,11 +22,40 @@ export async function assignOwner(
   ownerType: AgentOwnerType,
   userId: string,
   actorId: string,
+  delegation?: { expiresAt: string },
 ): Promise<AgentOwner> {
+  // IDENTITY-P0-13: a delegated owner acts for someone else for a bounded
+  // time. The person delegating is the actor, and the expiry is required
+  // (the database enforces both too).
+  let delegationFields: Record<string, unknown> = {};
+  if (ownerType === "delegated_owner") {
+    const expires = delegation?.expiresAt ? new Date(delegation.expiresAt) : null;
+    const now = Date.now();
+    if (!expires || Number.isNaN(expires.getTime()) || expires.getTime() <= now) {
+      throw new ApiError(400, "VALIDATION_FAILED", "A delegated owner needs a delegation expiry in the future");
+    }
+    if (expires.getTime() > now + 366 * 24 * 60 * 60 * 1000) {
+      throw new ApiError(400, "VALIDATION_FAILED", "A delegation can last at most a year");
+    }
+    delegationFields = { delegated_by: actorId, delegation_expires_at: expires.toISOString() };
+  }
   const supabase = await supabaseServer();
+  // IDENTITY-P0-13: an owner must be an active member of this
+  // organization; any other user id is refused (#4). The agent's own
+  // tenant is enforced by the (agent_id, tenant_id) foreign key (0075).
+  const { data: membership, error: membershipError } = await supabase
+    .from("tenant_memberships")
+    .select("status")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", userId)
+    .maybeSingle<{ status: string }>();
+  if (membershipError) throw new ApiError(500, "QUERY_FAILED", membershipError.message);
+  if (membership?.status !== "active") {
+    throw new ApiError(400, "VALIDATION_FAILED", "An owner must be an active member of this organization");
+  }
   const { data, error } = await supabase
     .from("agent_owners")
-    .insert({ tenant_id: tenantId, agent_id: agentId, owner_type: ownerType, user_id: userId })
+    .insert({ tenant_id: tenantId, agent_id: agentId, owner_type: ownerType, user_id: userId, ...delegationFields })
     .select()
     .single();
   if (error || !data) {
@@ -41,7 +70,7 @@ export async function assignOwner(
     objectType: "agent",
     objectId: agentId,
     outcome: "success",
-    metadata: { ownerType, userId, change: "assigned" },
+    metadata: { ownerType, userId, change: "assigned", delegationExpiresAt: delegationFields.delegation_expires_at ?? null },
   });
 
   return toAgentOwner(data);
@@ -133,7 +162,7 @@ export async function listOwnersForTenant(tenantId: string): Promise<OwnerWithCo
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("agent_owners")
-    .select("*, users(display_name, email), agents(agent_name)")
+    .select("*, users!agent_owners_user_id_fkey(display_name, email), agents(agent_name)")
     .eq("tenant_id", tenantId)
     .is("removed_at", null);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -159,13 +188,13 @@ export async function getOwnershipIssues(
   const supabase = await supabaseServer();
   const { data: owners, error } = await supabase
     .from("agent_owners")
-    .select("owner_type, user_id")
+    .select("owner_type, user_id, delegation_expires_at")
     .eq("tenant_id", tenantId)
     .eq("agent_id", agentId)
     .is("removed_at", null);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
 
-  const rows = (owners ?? []) as { owner_type: AgentOwnerType; user_id: string }[];
+  const rows = (owners ?? []) as { owner_type: AgentOwnerType; user_id: string; delegation_expires_at?: string | null }[];
 
   // agent_owners.user_id and tenant_memberships.user_id both FK to users.id
   // rather than to each other, so PostgREST can't auto-embed the join —
@@ -226,5 +255,56 @@ export async function getOwnershipIssues(
     }
   }
 
+  // IDENTITY-P0-13: a delegation past its expiry is an ownership gap until removed or renewed.
+  const nowIso = new Date().toISOString();
+  for (const row of rows) {
+    if (row.owner_type === "delegated_owner" && row.delegation_expires_at && row.delegation_expires_at < nowIso) {
+      issues.push({ type: "delegation_expired", userId: row.user_id, expiredAt: row.delegation_expires_at });
+    }
+  }
+
   return issues;
+}
+
+/**
+ * IDENTITY-P0-13 — an ownership review: a person confirms the agent's
+ * current owners are still right. Stamps every active owner row and is
+ * audited. It needs at least the two required owners (a review cannot
+ * confirm an incomplete ownership), and it cannot confirm an expired
+ * delegation.
+ */
+export async function reviewOwnership(tenantId: string, actorId: string, agentId: string): Promise<{ confirmed: number }> {
+  const owners = await listOwners(tenantId, agentId);
+  const types = new Set(owners.map((o) => o.ownerType));
+  const missing = REQUIRED_OWNER_TYPES.filter((t) => !types.has(t));
+  if (missing.length > 0) {
+    throw new ApiError(412, "PRECONDITION_FAILED", `Assign a ${missing.map((t) => t.replace(/_/g, " ")).join(" and ")} before confirming ownership`);
+  }
+  const nowIso = new Date().toISOString();
+  if (owners.some((o) => o.ownerType === "delegated_owner" && o.delegationExpiresAt && o.delegationExpiresAt < nowIso)) {
+    throw new ApiError(412, "PRECONDITION_FAILED", "Remove or renew the expired delegation before confirming ownership");
+  }
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("agent_owners")
+    .update({ last_reviewed_at: nowIso, last_reviewed_by: actorId })
+    .eq("tenant_id", tenantId)
+    .eq("agent_id", agentId)
+    .is("removed_at", null)
+    .select("id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  // RLS can refuse the update without an error; never report a review
+  // that did not happen (§17.5).
+  if ((data ?? []).length === 0) throw new ApiError(403, "FORBIDDEN", "You cannot confirm ownership for this agent");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "agent.ownership_reviewed",
+    objectType: "agent",
+    objectId: agentId,
+    outcome: "success",
+    metadata: { confirmedOwners: (data ?? []).length },
+  });
+  return { confirmed: (data ?? []).length };
 }

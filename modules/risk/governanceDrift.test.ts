@@ -42,6 +42,10 @@ const baseContract: AgentContract = {
   actionsRequiringApproval: [],
   requiredMonitoring: null,
   requiredComplianceControls: [],
+      approvedUsers: [],
+      approvedDelegators: [],
+      allowedEnvironments: [],
+      expiresAt: null,
 };
 
 const referenceContract: AgentContract = { ...baseContract, id: "contract-1", version: 1, createdAt: "2026-01-01T00:00:00Z" };

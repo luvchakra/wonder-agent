@@ -39,7 +39,7 @@ vi.mock("@/lib/db/supabaseServer", () => ({
   supabaseServer: async () => ({ from: () => ownersTable() }),
 }));
 
-import { removeOwner } from "./owners";
+import { assignOwner, removeOwner, reviewOwnership } from "./owners";
 
 describe("removeOwner — OPERATIONS-P0-02.2's ownership_missing trigger (2026-09-19)", () => {
   beforeEach(() => {
@@ -87,5 +87,37 @@ describe("removeOwner — OPERATIONS-P0-02.2's ownership_missing trigger (2026-0
 
     expect(writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "agent.owner_changed" }));
     expect(ownerRows.find((r) => r.id === "owner-1")?.removed_at).not.toBeNull();
+  });
+});
+
+describe("IDENTITY-P0-13 — delegated owners and the ownership review", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ownerRows = [
+      { id: "owner-1", tenant_id: "tenant-a", agent_id: "agent-1", owner_type: "business_owner", user_id: "user-1", removed_at: null },
+    ];
+  });
+
+  it("refuses a delegated owner with no expiry, a past expiry or one more than a year out, before touching the database", async () => {
+    const day = 24 * 60 * 60 * 1000;
+    await expect(assignOwner("tenant-a", "agent-1", "delegated_owner", "user-3", "actor-1")).rejects.toMatchObject({ status: 400 });
+    await expect(
+      assignOwner("tenant-a", "agent-1", "delegated_owner", "user-3", "actor-1", { expiresAt: new Date(Date.now() - day).toISOString() }),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      assignOwner("tenant-a", "agent-1", "delegated_owner", "user-3", "actor-1", { expiresAt: new Date(Date.now() + 400 * day).toISOString() }),
+    ).rejects.toMatchObject({ status: 400 });
+    await expect(
+      assignOwner("tenant-a", "agent-1", "delegated_owner", "user-3", "actor-1", { expiresAt: "not a date" }),
+    ).rejects.toMatchObject({ status: 400 });
+    expect(writeAudit).not.toHaveBeenCalled();
+  });
+
+  it("will not confirm ownership while a required owner is missing, and records nothing", async () => {
+    await expect(reviewOwnership("tenant-a", "actor-1", "agent-1")).rejects.toMatchObject({
+      status: 412,
+      message: expect.stringContaining("technical owner"),
+    });
+    expect(writeAudit).not.toHaveBeenCalled();
   });
 });

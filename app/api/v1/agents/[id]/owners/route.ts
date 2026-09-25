@@ -19,7 +19,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const ctx = await requirePermission("agent.update");
     const { id } = await params;
     const body = await request.json();
-    const owner = await assignOwner(ctx.tenantId!, id, body.ownerType, body.userId, ctx.userId);
+    const owner = await assignOwner(
+      ctx.tenantId!,
+      id,
+      body.ownerType,
+      body.userId,
+      ctx.userId,
+      typeof body.delegationExpiresAt === "string" ? { expiresAt: body.delegationExpiresAt } : undefined,
+    );
     return NextResponse.json({ ok: true, data: owner }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

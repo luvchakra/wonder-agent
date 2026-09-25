@@ -988,3 +988,136 @@ silence it; that is Experience's call.
 - Identity unit tests 41/41.
 - Full pipeline: eslint clean, vitest **513/513**, Playwright **187/187**
   (8.7 min, a fresh build).
+
+## 2026-09-25 — IDENTITY-P0-13: contract and ownership completeness (master P0-03/04/06)
+
+**Ownership:**
+
+- **Two new owner types** (migration 0073):
+  - `delegated_owner`. A delegated owner acts for someone else for a
+    bounded time. The person assigning it is recorded as `delegated_by`,
+    and an expiry is required: in the future, at most a year out. The
+    service checks both, and so does a database check.
+  - `escalation_owner`. The UI already offered it, but the database check
+    rejected it, so choosing it failed. That was a live defect.
+- **An owner must be an active member of this organization.** Before this,
+  any user id was accepted, including another tenant's user.
+- **Expired delegations** are a new ownership issue,
+  `delegation_expired`. The agent page describes it in words.
+- **Ownership review.** New `reviewOwnership()`, with a "Confirm
+  ownership" button on the agent page and
+  `POST /api/v1/agents/:id/owners/review`.
+  - It is refused (412), saying why, while a required owner (business or
+    technical) is missing or a delegation has expired.
+  - Otherwise it stamps `last_reviewed_at` and `last_reviewed_by` on every
+    active owner, and audits `agent.ownership_reviewed`.
+  - If RLS lets nothing be updated, it reports 403 rather than a success.
+- **The owners list** now shows names instead of ids, "Delegated until …"
+  or "Delegation expired …", and "Confirmed …" or "Not yet confirmed".
+
+**Contract:**
+
+- New fields: approved users, approved delegators, allowed environments
+  (production, staging, development; none means any), and an expiry. The
+  form and the contract display have all four.
+- Publishing a contract now sets `agents.next_review_at`. It is the
+  certification frequency after publication (monthly 1, quarterly 3,
+  semiannual 6, annual 12 months), and never later than the contract's
+  expiry. Before this, `next_review_at` was never written.
+
+**Lifecycle:**
+
+- Approving, assessing and going live (PROVISIONED → ACTIVE) all need an
+  active contract that has not expired and allows the agent's
+  environment. Each refusal is a 412 that says which.
+- **Production agents:** approval needs an approver role (IAM_ADMIN or
+  TENANT_SUPER_ADMIN). An agent's own owner can still approve a staging
+  or development agent, as before. Every agent already reaches ACTIVE
+  only through APPROVED, so a production agent is now always approved by
+  an approver before it goes live.
+
+### Incident: 0073 broke the owner listing for about 5 minutes (production and local)
+
+- **Cause.** 0073 as first applied gave `agent_owners.delegated_by` and
+  `last_reviewed_by` foreign keys to `users`. `agent_owners` then had
+  three relationships to `users`, so PostgREST could not resolve the
+  unqualified `users(display_name, email)` embed in
+  `listOwnersForTenant()`. That call backs the Agents list, Agent 360
+  owner names, and search, and it failed in production and locally.
+- **Fix.**
+  - Migration 0074 drops those two foreign keys. The columns stay; the
+    actor is also in the audit event.
+  - The embed now names its key, `users!agent_owners_user_id_fkey(...)`,
+    so a future foreign key cannot break it again.
+  - Verified: `/agents` and search return 200 locally. Production runs the
+    old unqualified embed, which is unambiguous again after 0074.
+- **Effect on testing.** Four `agents.spec` tests failed in the
+  ACCESS-P0-12 full suite that ran through that window. All four passed on
+  rerun.
+- **Lesson,** applied in 0075 below: never add a second foreign key to a
+  table that is embedded unqualified. Replace the key under the same
+  name, or name the key in every embed.
+
+### Cross-tenant references to agents closed (migration 0075)
+
+- **Found while writing the isolation test.** `agent_owners`,
+  `agent_identities` and `agent_relationships` (both `agent_id` and
+  `related_agent_id`) referenced `agents(id)` alone. Their RLS insert
+  checks look only at the row's own `tenant_id`.
+- **The hole.** A tenant-B member could write a tenant-B row that points
+  at tenant A's agent (non-negotiable #4). The unique key on
+  `agent_owners` would also have let them probe whether an agent id
+  exists.
+- **Live data.** No such rows existed; checked before applying.
+- **The fix.**
+  - `agents` gains `unique (id, tenant_id)`.
+  - Each foreign key is replaced by a composite `(agent_id, tenant_id)`
+    key under the **same constraint name**, still ON DELETE CASCADE. So
+    there is still one relationship per column pair, and every embed is
+    unchanged.
+- **Verified live** with `tests/identity/same-tenant-agent-refs.sql`,
+  running as an authenticated tenant-B member:
+  - owner, identity and relationship rows pointing at tenant A's agent are
+    all refused (23503);
+  - the same writes on B's own agents succeed (1 and 1);
+  - no row references A's agent (0);
+  - fixtures cleaned up.
+- **After 0075,** the agents, navigation and search specs pass (40/40).
+- **Still open:** Access's own tables with client insert policies
+  (`accounts`, `access_requests`, `policy_exceptions`) have the same
+  single-column `agent_id` key. They are recorded for the QA-P0-17 RLS
+  sweep, not changed here (#18).
+
+**Tests:**
+
+- `contracts.test.ts` (new, 2): `nextReviewAt` for every frequency, capped
+  by the contract's expiry.
+- `lifecycleContract.test.ts` (new, 5):
+  - an owner cannot approve a production agent but can approve a staging
+    one;
+  - an expired contract blocks approval;
+  - a contract that does not allow the agent's environment blocks going
+    live;
+  - no contract blocks going live;
+  - nothing is written on any refusal.
+- `owners.test.ts` +2:
+  - a delegated owner with no, past, over-a-year or unparseable expiry is
+    refused before any write;
+  - the review is refused while a required owner is missing, and nothing
+    is audited.
+- Identity unit tests 50/50.
+- E2E `ownership-contract.spec.ts` (new), on a production agent:
+  - a delegated owner without expiry is 400 through the API; a
+    non-member owner is 400;
+  - through the UI, a delegated owner shows "Delegated until …";
+  - "Confirm ownership" is refused, naming the missing owners, then
+    confirmed for 3 owners once they are assigned, with "Confirmed
+    <today>";
+  - a contract with approved users and delegators, staging only and an
+    expiry is shown, and approving the production agent is then a 412
+    naming the environment;
+  - another organization can neither assign owners to the agent nor review
+    it.
+- `agents.spec` now looks for owners by their readable labels.
+- Full pipeline: `tsc` and `eslint` clean, vitest **536/536**, Playwright
+  **194/194** (9.3 min, on a fresh build with 0075 applied live).

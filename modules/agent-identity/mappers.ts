@@ -68,6 +68,10 @@ export function toAgentContract(row: any): AgentContract {
     actionsRequiringApproval: row.actions_requiring_approval ?? [],
     requiredMonitoring: row.required_monitoring ?? null,
     requiredComplianceControls: row.required_compliance_controls ?? [],
+    approvedUsers: row.approved_users ?? [],
+    approvedDelegators: row.approved_delegators ?? [],
+    allowedEnvironments: row.allowed_environments ?? [],
+    expiresAt: row.expires_at ?? null,
   };
 }
 
@@ -80,6 +84,10 @@ export function toAgentOwner(row: any): AgentOwner {
     userId: row.user_id,
     assignedAt: row.assigned_at,
     removedAt: row.removed_at,
+    delegatedBy: row.delegated_by ?? null,
+    delegationExpiresAt: row.delegation_expires_at ?? null,
+    lastReviewedAt: row.last_reviewed_at ?? null,
+    lastReviewedBy: row.last_reviewed_by ?? null,
   };
 }
 

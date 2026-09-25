@@ -77,7 +77,9 @@ export type AgentOwnerType =
   | "iam_owner"
   | "application_owner"
   | "data_owner"
-  | "escalation_owner";
+  | "escalation_owner"
+  // IDENTITY-P0-13: acts for another owner until the delegation expires.
+  | "delegated_owner";
 
 export type AgentOwner = {
   id: string;
@@ -87,13 +89,21 @@ export type AgentOwner = {
   userId: string;
   assignedAt: string;
   removedAt: string | null;
+  /** IDENTITY-P0-13: set for a delegated owner. */
+  delegatedBy?: string | null;
+  delegationExpiresAt?: string | null;
+  /** IDENTITY-P0-13: the last ownership review that confirmed this owner. */
+  lastReviewedAt?: string | null;
+  lastReviewedBy?: string | null;
 };
 
 export type OwnershipIssue =
   | { type: "missing_owner"; ownerType: "business_owner" | "technical_owner" }
   | { type: "inactive_owner"; ownerType: AgentOwnerType; userId: string }
   | { type: "ownership_conflict"; userId: string; ownerTypes: AgentOwnerType[] }
-  | { type: "missing_recommended_owner"; ownerType: "iam_owner" | "application_owner" };
+  | { type: "missing_recommended_owner"; ownerType: "iam_owner" | "application_owner" }
+  // IDENTITY-P0-13: a delegated owner whose delegation has expired still holds the row.
+  | { type: "delegation_expired"; userId: string; expiredAt: string };
 
 export type AgentLifecycleEvent = {
   id: string;
@@ -141,6 +151,12 @@ export type AgentContract = {
   actionsRequiringApproval: string[];
   requiredMonitoring: string | null;
   requiredComplianceControls: string[];
+  // IDENTITY-P0-13 — who may use or delegate to the agent, where it may
+  // run, and until when this contract is valid. Empty means not restricted.
+  approvedUsers: string[];
+  approvedDelegators: string[];
+  allowedEnvironments: AgentEnvironment[];
+  expiresAt: string | null;
 };
 
 export type AgentRelationshipType =

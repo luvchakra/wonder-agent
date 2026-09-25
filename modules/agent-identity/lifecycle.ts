@@ -70,7 +70,38 @@ export function isStructurallyAllowedTransition(
   return (NORMAL_TRANSITIONS[fromState] ?? []).includes(toState);
 }
 
-/** An active contract, and an actor who is an approver or one of the agent's owners. */
+/**
+ * IDENTITY-P0-13 — the agent has an active contract that still authorizes
+ * it: not expired, and allowing the agent's environment (an empty list
+ * allows every environment).
+ */
+async function assertContractFitsAgent(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service-role Supabase client
+  supabase: any,
+  tenantId: string,
+  agent: Agent,
+): Promise<void> {
+  const { data: contract, error } = await supabase
+    .from("agent_contracts")
+    .select("id, allowed_environments, expires_at")
+    .eq("tenant_id", tenantId)
+    .eq("agent_id", agent.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!contract) {
+    throw new ApiError(412, "PRECONDITION_FAILED", "agent contract required");
+  }
+  if (contract.expires_at && new Date(contract.expires_at).getTime() <= Date.now()) {
+    throw new ApiError(412, "PRECONDITION_FAILED", "The agent's contract has expired; publish a new version first");
+  }
+  const envs: string[] = contract.allowed_environments ?? [];
+  if (envs.length > 0 && !envs.includes(agent.environment)) {
+    throw new ApiError(412, "PRECONDITION_FAILED", `The agent's contract does not allow the ${agent.environment} environment`);
+  }
+}
+
+/** An active contract that fits the agent, and an actor who is an approver or one of the agent's owners. */
 async function assertContractAndApprover(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service-role Supabase client
   supabase: any,
@@ -79,16 +110,12 @@ async function assertContractAndApprover(
   actor: LifecycleActor,
   what: "Approval" | "Assessment",
 ): Promise<void> {
-  const { data: contract, error } = await supabase
-    .from("agent_contracts")
-    .select("id")
-    .eq("tenant_id", tenantId)
-    .eq("agent_id", agent.id)
-    .eq("status", "active")
-    .maybeSingle();
-  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  if (!contract) {
-    throw new ApiError(412, "PRECONDITION_FAILED", "agent contract required");
+  await assertContractFitsAgent(supabase, tenantId, agent);
+
+  // IDENTITY-P0-13: a production agent's approval is an approver's call;
+  // its own owner cannot approve it for production.
+  if (what === "Approval" && agent.environment === "production" && actor.actorType === "user" && !hasAnyRole(actor, APPROVAL_ROLES)) {
+    throw new ApiError(412, "PRECONDITION_FAILED", `Approving a production agent requires one of: ${APPROVAL_ROLES.join(", ")}`);
   }
 
   if (actor.actorType === "user" && !hasAnyRole(actor, APPROVAL_ROLES)) {
@@ -204,6 +231,13 @@ async function validateTransition(
 
   if ((fromState === "REGISTERED" || fromState === "ASSESSED") && toState === "APPROVED") {
     await assertContractAndApprover(supabase, tenantId, agent, actor, "Approval");
+  }
+
+  // IDENTITY-P0-13: going live needs a contract that still authorizes the
+  // agent where it runs (a production agent reached here only through an
+  // approver's approval, above).
+  if (fromState === "PROVISIONED" && toState === "ACTIVE") {
+    await assertContractFitsAgent(supabase, tenantId, agent);
   }
 
   if (fromState === "ACTIVE" && toState === "CERTIFICATION_DUE" && actor.actorType !== "system") {

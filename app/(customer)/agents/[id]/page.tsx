@@ -30,6 +30,7 @@ import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, 
 import { DonutChart } from "@/modules/ui/charts.lazy";
 import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
 import { AgentApiKeysPanel } from "./AgentApiKeysPanel";
+import { ReviewOwnershipButton } from "./ReviewOwnershipButton";
 import { listAgentApiKeys } from "@/lib/security/agentApiKeys";
 
 /**
@@ -49,6 +50,8 @@ function describeOwnershipIssue(issue: OwnershipIssue): string {
       return `${label(issue.ownerType)} is no longer an active member`;
     case "ownership_conflict":
       return `One person holds conflicting roles: ${issue.ownerTypes.map(label).join(", ")}`;
+    case "delegation_expired":
+      return `A delegated owner's delegation expired on ${issue.expiredAt.slice(0, 10)}`;
   }
 }
 
@@ -81,7 +84,9 @@ const LIFECYCLE_STATES = [
   "RETIRED",
 ] as const;
 
-const OWNER_TYPES = ["business_owner", "technical_owner", "iam_owner", "application_owner", "data_owner", "escalation_owner"] as const;
+const OWNER_TYPES = ["business_owner", "technical_owner", "iam_owner", "application_owner", "data_owner", "escalation_owner", "delegated_owner"] as const;
+const ENVIRONMENTS = ["production", "staging", "development"] as const;
+const ownerTypeLabel = (t: string) => t.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 const AUTONOMY_LEVELS = [
   { value: 0, label: "0 — Human performs action" },
   { value: 1, label: "1 — Agent recommends" },
@@ -190,6 +195,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
     tenantOwners.filter((o) => o.agentId === id).map((o) => [o.userId, o.userDisplayName?.trim() || o.userEmail]),
   );
   const ownerName = (userId: string | undefined) => (userId ? ownerNames.get(userId) ?? userId : null);
+  const nowIso = new Date().toISOString();
 
   const applications = new Set(effectiveAccess.map((g) => g.application).filter(Boolean)).size;
   const entitlements = new Set(effectiveAccess.map((g) => g.entitlementId)).size;
@@ -530,29 +536,41 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           {owners.length === 0 ? (
             <EmptyState title="No owner assigned" description="An unowned agent is a governance gap — assign at least one owner." />
           ) : (
-            <ul className="space-y-1 text-sm text-muted-foreground">
+            <ul className="space-y-2 text-sm text-muted-foreground">
               {owners.map((o) => (
-                <li key={o.id}>
-                  <Badge tone="neutral">{o.ownerType}</Badge> <span className="ml-1">{o.userId}</span>
+                <li key={o.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <Badge tone="neutral">{ownerTypeLabel(o.ownerType)}</Badge>
+                  <span className="min-w-0 break-words text-foreground">{ownerName(o.userId)}</span>
+                  {o.delegationExpiresAt ? (
+                    <span className={o.delegationExpiresAt < nowIso ? "text-destructive" : undefined}>
+                      {o.delegationExpiresAt < nowIso ? "Delegation expired" : "Delegated until"} {o.delegationExpiresAt.slice(0, 10)}
+                    </span>
+                  ) : null}
+                  <span className="text-xs">{o.lastReviewedAt ? `Confirmed ${o.lastReviewedAt.slice(0, 10)}` : "Not yet confirmed"}</span>
                 </li>
               ))}
             </ul>
           )}
+          {owners.length > 0 ? <ReviewOwnershipButton agentId={id} /> : null}
           <form action={assignOwnerWithId} className="flex flex-wrap items-end gap-2 border-t border-border pt-3">
-            <div>
-              <label className={labelClass}>Owner type</label>
+            <label>
+              <span className={labelClass}>Owner type</span>
               <select name="ownerType" defaultValue={OWNER_TYPES[0]} className={inputClass}>
                 {OWNER_TYPES.map((t) => (
                   <option key={t} value={t}>
-                    {t}
+                    {ownerTypeLabel(t)}
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="flex-1 min-w-[12rem]">
-              <label className={labelClass}>User ID</label>
+            </label>
+            <label className="min-w-[12rem] flex-1">
+              <span className={labelClass}>User ID</span>
               <input name="userId" placeholder="user id (uuid)" required className={inputClass} />
-            </div>
+            </label>
+            <label>
+              <span className={labelClass}>Delegation ends (delegated owner only)</span>
+              <input type="date" name="delegationExpiresOn" className={inputClass} />
+            </label>
             <Button type="submit" variant="secondary">
               Assign owner
             </Button>
@@ -611,6 +629,22 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               <div>
                 <dt className="text-muted-foreground">Required compliance controls</dt>
                 <dd className="text-foreground">{contract.requiredComplianceControls?.join(", ") || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Approved users / delegators</dt>
+                <dd className="text-foreground">
+                  {contract.approvedUsers?.join(", ") || "—"} / {contract.approvedDelegators?.join(", ") || "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Allowed environments</dt>
+                <dd className="text-foreground">{contract.allowedEnvironments?.join(", ") || "Any"}</dd>
+              </div>
+              <div>
+                <dt className="text-muted-foreground">Contract expires</dt>
+                <dd className={contract.expiresAt && contract.expiresAt < nowIso ? "text-destructive" : "text-foreground"}>
+                  {contract.expiresAt ? `${contract.expiresAt < nowIso ? "Expired " : ""}${contract.expiresAt.slice(0, 10)}` : "No expiry"}
+                </dd>
               </div>
             </dl>
           ) : (
@@ -673,6 +707,29 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               <label className="sm:col-span-2">
                 <span className={labelClass}>Required compliance controls (comma-separated)</span>
                 <input name="requiredComplianceControls" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Approved users (comma-separated)</span>
+                <input name="approvedUsers" className={inputClass} />
+              </label>
+              <label>
+                <span className={labelClass}>Approved delegators (comma-separated)</span>
+                <input name="approvedDelegators" className={inputClass} />
+              </label>
+              <fieldset>
+                <legend className={labelClass}>Allowed environments (none = any)</legend>
+                <div className="flex flex-wrap gap-3 text-sm text-foreground">
+                  {ENVIRONMENTS.map((env) => (
+                    <label key={env} className="flex items-center gap-1.5">
+                      <input type="checkbox" name="allowedEnvironments" value={env} />
+                      {ownerTypeLabel(env)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <label>
+                <span className={labelClass}>Contract expires on</span>
+                <input type="date" name="expiresOn" className={inputClass} />
               </label>
               <div className="sm:col-span-2">
                 <Button type="submit" variant="secondary">

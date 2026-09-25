@@ -27,7 +27,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `audit_logs` | FA (write primitive) / OA (read, presentation, search) | Foundation owns the schema and the `writeAudit()` utility every module calls; Operations owns audit views, evidence export and search over it. No module writes to this table by hand — always through the shared utility. |
 | `agents` | IA | Canonical AI agent identity |
 | `agent_identities` | IA | Correlation to IAM/service-account/workload identities |
-| `agent_owners` | IA | Business/technical/IAM/application owner assignments |
+| `agent_owners` | IA | Business/technical/IAM/application/data/escalation/delegated owner assignments, with delegation expiry and ownership-review stamps (IDENTITY-P0-13) |
 | `agent_lifecycle_events` | IA | Audited lifecycle state transitions |
 | `agent_contracts` | IA | The Approved Agent Contract (source of SHOULD) |
 | `agent_relationships` | IA | Agent-to-agent / agent-to-tool relationships |

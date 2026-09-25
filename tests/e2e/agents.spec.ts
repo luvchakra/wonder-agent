@@ -46,7 +46,8 @@ test.describe("Identity module — agents", () => {
       await page.locator('select[name="ownerType"]').selectOption(ownerType);
       await page.locator('input[name="userId"]').fill(userId);
       await page.getByRole("button", { name: "Assign owner", exact: true }).click();
-      await expect(page.getByText(ownerType).first()).toBeVisible();
+      const label = ownerType === "business_owner" ? "Business owner" : "Technical owner";
+      await expect(page.locator("#owners").locator("..").getByRole("listitem").filter({ hasText: label })).toBeVisible();
     }
 
     await page.locator('select[name="toState"]').selectOption("REGISTERED");

@@ -122,11 +122,11 @@ isolation checks. Detail is in each module's audit log.
 | 6 | RISK-P0-12: new risk signals | Partial (attack-path factor has no source) | see Risk audit |
 | + | IDENTITY-P0-14: identity links audited with explicit confidence (D3); ASSESSED reachable (D4) | Done | `73c47b6` |
 | + | ACCESS-P0-14: separation-of-duties checks wired (D5) | Done | `1e98e94` |
-| + | ACCESS-P0-12: policy targets, priority, draft → publish | Done | see Access audit |
+| + | ACCESS-P0-12: policy targets, priority, draft → publish | Done | `6c1d9af` |
+| + | IDENTITY-P0-13: contract and ownership completeness; same-tenant agent references | Done | see Identity audit |
 
 **Still to do in this programme:**
 
-- IDENTITY-P0-13 (contract and ownership completeness).
 - EXPERIENCE-P0-16/17 (the remaining mockup screens; app-wide wording).
 - QA-P0-17/18 (RLS read sweep; the gateway security suite).
 
@@ -141,6 +141,9 @@ isolation checks. Detail is in each module's audit log.
 - The shared `Table` cell breaks words mid-letter at desktop widths, and
   the Audit and Roles tables rely on that (Experience).
 - `assignFinding()` does not check that the assignee is a member (Risk).
+- `accounts`, `access_requests` and `policy_exceptions` reference
+  `agents(id)` alone, so their RLS-allowed inserts could point at another
+  tenant's agent. Identity's tables were fixed by 0075 (Access → QA-P0-17).
 - Tenantless users' page renders log a harmless `QUERY_FAILED` before the
   redirect (Experience).
 

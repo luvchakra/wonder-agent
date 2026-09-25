@@ -4,6 +4,7 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
+  AgentEnvironment,
   AgentContract,
   AutonomyLevel,
   CertificationFrequency,
@@ -29,7 +30,28 @@ export type ContractInput = {
   actionsRequiringApproval?: string[];
   requiredMonitoring?: string;
   requiredComplianceControls?: string[];
+  // IDENTITY-P0-13 — empty lists mean "not restricted", like the fields above.
+  approvedUsers?: string[];
+  approvedDelegators?: string[];
+  allowedEnvironments?: AgentEnvironment[];
+  /** ISO date-time after which this contract no longer authorizes the agent. */
+  expiresAt?: string | null;
 };
+
+const ENVIRONMENTS: AgentEnvironment[] = ["production", "staging", "development"];
+const REVIEW_MONTHS: Record<CertificationFrequency, number> = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12 };
+
+/**
+ * IDENTITY-P0-13 — when the agent is next due for review: one
+ * certification period after the contract takes effect, or the contract's
+ * expiry if that comes first. Pure.
+ */
+export function nextReviewAt(from: Date, frequency: CertificationFrequency, contractExpiresAt: string | null): string {
+  const due = new Date(from);
+  due.setUTCMonth(due.getUTCMonth() + REVIEW_MONTHS[frequency]);
+  if (contractExpiresAt && new Date(contractExpiresAt).getTime() < due.getTime()) return new Date(contractExpiresAt).toISOString();
+  return due.toISOString();
+}
 
 /**
  * IDENTITY-P0-03.1. `agent_contracts` grants no client SELECT restriction
@@ -83,6 +105,13 @@ export async function createContractVersion(
   }
   if (input.autonomyLevel !== undefined && (input.autonomyLevel < 0 || input.autonomyLevel > 4)) {
     throw new ApiError(400, "INVALID_INPUT", "autonomyLevel must be between 0 and 4");
+  }
+  if ((input.allowedEnvironments ?? []).some((e) => !ENVIRONMENTS.includes(e))) {
+    throw new ApiError(400, "INVALID_INPUT", `allowedEnvironments: any of ${ENVIRONMENTS.join(", ")}`);
+  }
+  if (input.expiresAt) {
+    const t = new Date(input.expiresAt).getTime();
+    if (Number.isNaN(t) || t <= Date.now()) throw new ApiError(400, "INVALID_INPUT", "expiresAt: a date in the future");
   }
 
   const supabase = supabaseServiceRole();
@@ -139,12 +168,22 @@ export async function createContractVersion(
       actions_requiring_approval: input.actionsRequiringApproval ?? [],
       required_monitoring: input.requiredMonitoring ?? null,
       required_compliance_controls: input.requiredComplianceControls ?? [],
+      approved_users: input.approvedUsers ?? [],
+      approved_delegators: input.approvedDelegators ?? [],
+      allowed_environments: input.allowedEnvironments ?? [],
+      expires_at: input.expiresAt ?? null,
     })
     .select()
     .single();
   if (insertError || !newContract) {
     throw new ApiError(500, "CREATE_FAILED", insertError?.message ?? "Failed to create contract");
   }
+
+  // IDENTITY-P0-13: the agent's next review follows from this contract's
+  // certification frequency and expiry. It used to be set by nothing.
+  const reviewDue = nextReviewAt(new Date(), newContract.certification_frequency, newContract.expires_at ?? null);
+  const { error: reviewError } = await supabase.from("agents").update({ next_review_at: reviewDue }).eq("id", agentId).eq("tenant_id", tenantId);
+  if (reviewError) throw new ApiError(500, "UPDATE_FAILED", reviewError.message);
 
   await writeAudit({
     tenantId,
@@ -158,6 +197,7 @@ export async function createContractVersion(
       agentId,
       previousVersion: previousActive ? toAgentContract(previousActive) : null,
       newVersion: toAgentContract(newContract),
+      nextReviewAt: reviewDue,
     },
   });
 

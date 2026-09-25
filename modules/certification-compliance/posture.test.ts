@@ -98,6 +98,10 @@ const contract: AgentContract = {
   actionsRequiringApproval: [],
   requiredMonitoring: null,
   requiredComplianceControls: [],
+      approvedUsers: [],
+      approvedDelegators: [],
+      allowedEnvironments: [],
+      expiresAt: null,
 };
 
 function stubGoverned() {

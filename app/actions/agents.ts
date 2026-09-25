@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
@@ -11,6 +12,7 @@ import {
   linkAgentIdentity,
   mergeDuplicateCandidate,
   recordDiscoveryDecision,
+  reviewOwnership,
   transitionAgentLifecycle,
   type IdentityConfidence,
 } from "@/modules/agent-identity/service";
@@ -68,8 +70,32 @@ export async function assignOwnerAction(agentId: string, formData: FormData) {
     formData.get("ownerType") as AgentOwnerType,
     String(formData.get("userId")),
     ctx.userId,
+    // IDENTITY-P0-13 — a delegated owner carries an expiry (end of that day).
+    formData.get("ownerType") === "delegated_owner"
+      ? { expiresAt: dateField(formData, "delegationExpiresOn", true) ?? "" }
+      : undefined,
   );
   redirect(`/agents/${agentId}`);
+}
+
+/** A yyyy-mm-dd date input as an ISO timestamp, at the start or end of that UTC day. */
+function dateField(formData: FormData, name: string, endOfDay = false): string | undefined {
+  const raw = String(formData.get(name) ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return undefined;
+  return `${raw}T${endOfDay ? "23:59:59.000" : "00:00:00.000"}Z`;
+}
+
+/** IDENTITY-P0-13 — the owner confirms the agent's ownership is still right. */
+export async function reviewOwnershipAction(agentId: string): Promise<{ ok: boolean; message: string }> {
+  const ctx = await requirePermission("agent.update");
+  try {
+    const r = await reviewOwnership(ctx.tenantId!, ctx.userId, agentId);
+    revalidatePath(`/agents/${agentId}`);
+    return { ok: true, message: `Ownership confirmed for ${r.confirmed} owner${r.confirmed === 1 ? "" : "s"}.` };
+  } catch (err) {
+    const e = err as { message?: string; code?: string };
+    return { ok: false, message: e?.message || e?.code || "Confirming ownership failed" };
+  }
 }
 
 export async function transitionLifecycleAction(agentId: string, formData: FormData) {
@@ -107,6 +133,10 @@ export async function createContractAction(agentId: string, formData: FormData) 
     actionsRequiringApproval: listField("actionsRequiringApproval"),
     requiredMonitoring: String(formData.get("requiredMonitoring") ?? "") || undefined,
     requiredComplianceControls: listField("requiredComplianceControls"),
+    approvedUsers: listField("approvedUsers"),
+    approvedDelegators: listField("approvedDelegators"),
+    allowedEnvironments: formData.getAll("allowedEnvironments").map(String) as AgentEnvironment[],
+    expiresAt: dateField(formData, "expiresOn", true),
   });
   redirect(`/agents/${agentId}`);
 }
