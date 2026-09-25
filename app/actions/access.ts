@@ -1,17 +1,22 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
   addPolicyException,
   addPolicyRule,
   createApplication,
+  createDataSource,
   createEntitlement,
   createManualAccessGrant,
   createPolicy,
   decideAccessRequest,
   evaluatePolicies,
+  linkEntitlementToDataSource,
   revokeException,
+  updateDataSource,
+  validateDataSourceInput,
 } from "@/modules/access-governance/service";
 import type {
   AccessRequestStatus,
@@ -104,4 +109,60 @@ export async function revokeExceptionAction(policyId: string, exceptionId: strin
   const ctx = await requirePermission("policy.update");
   await revokeException(ctx.tenantId!, ctx.userId, exceptionId);
   redirect(`/policies/${policyId}`);
+}
+
+/**
+ * ACCESS-P0-13 — data sources. These return a state for the form to show
+ * (the real result or the real error) instead of redirecting, so a
+ * rejected input is never presented as saved (§17.5).
+ */
+export type DataSourceFormState = { status: "idle" } | { status: "saved"; message: string } | { status: "error"; message: string };
+
+function formError(err: unknown): DataSourceFormState {
+  const e = err as { message?: string; code?: string };
+  return { status: "error", message: e?.message || e?.code || "Something went wrong" };
+}
+
+export async function createDataSourceAction(_prev: DataSourceFormState, formData: FormData): Promise<DataSourceFormState> {
+  const ctx = await requirePermission("access.manage");
+  try {
+    const input = validateDataSourceInput({
+      name: formData.get("name"),
+      kind: formData.get("kind"),
+      applicationId: formData.get("applicationId") || null,
+      classification: formData.get("classification"),
+      owner: formData.get("owner"),
+      description: formData.get("description"),
+    });
+    const created = await createDataSource(ctx.tenantId!, ctx.userId, input);
+    revalidatePath("/access/data-sources");
+    return { status: "saved", message: `Added ${created.name}.` };
+  } catch (err) {
+    return formError(err);
+  }
+}
+
+export async function linkEntitlementDataSourceAction(_prev: DataSourceFormState, formData: FormData): Promise<DataSourceFormState> {
+  const ctx = await requirePermission("access.manage");
+  try {
+    const entitlementId = String(formData.get("entitlementId") ?? "");
+    const dataSourceId = String(formData.get("dataSourceId") ?? "");
+    if (!entitlementId || !dataSourceId) return { status: "error", message: "Choose an entitlement and a data source." };
+    await linkEntitlementToDataSource(ctx.tenantId!, ctx.userId, entitlementId, dataSourceId);
+    revalidatePath("/access/data-sources");
+    return { status: "saved", message: "Linked." };
+  } catch (err) {
+    return formError(err);
+  }
+}
+
+export async function reclassifyDataSourceAction(dataSourceId: string, _prev: DataSourceFormState, formData: FormData): Promise<DataSourceFormState> {
+  const ctx = await requirePermission("access.manage");
+  try {
+    await updateDataSource(ctx.tenantId!, ctx.userId, dataSourceId, { classification: String(formData.get("classification") ?? "") || null });
+    revalidatePath("/access/data-sources");
+    return { status: "saved", message: "Saved." };
+  } catch (err) {
+    return formError(err);
+  }
 }

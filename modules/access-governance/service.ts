@@ -7,6 +7,7 @@ import "server-only";
  */
 
 export { createApplication, listApplications, getApplication, createAccount, listAccountsForAgent } from "./applications";
+export { createDataSource, updateDataSource, linkEntitlementToDataSource, listDataSources, validateDataSourceInput, type DataSourceInput } from "./dataSources";
 export {
   createEntitlement,
   listEntitlementsForApplication,

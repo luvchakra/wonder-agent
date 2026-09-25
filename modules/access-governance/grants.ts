@@ -16,8 +16,29 @@ type EffectiveAccessRow = {
   granted_at: string;
   revoked_at: string | null;
   accounts: { external_account_ref: string; application_id: string } | null;
-  entitlements: { application_id: string; name: string; data_classification: string | null; privilege_level: string; applications: { name: string } | null } | null;
+  entitlements: {
+    application_id: string;
+    name: string;
+    data_classification: string | null;
+    privilege_level: string;
+    applications: { name: string } | null;
+    data_sources?: { id: string; name: string; classification: string | null } | null;
+  } | null;
 };
+
+/**
+ * ACCESS-P0-13: CAN carries the data source an entitlement opens. The
+ * entitlement's own classification wins; the data source's fills in when
+ * the entitlement has none, so an unclassified entitlement on a
+ * restricted warehouse is not read as unclassified.
+ */
+export function dataFields(e: EffectiveAccessRow["entitlements"]) {
+  const ds = e?.data_sources ?? null;
+  return {
+    dataClassification: e?.data_classification ?? ds?.classification ?? null,
+    dataSource: ds ? { id: ds.id, name: ds.name, classification: ds.classification } : null,
+  };
+}
 
 /**
  * ACCESS-P0-01.2 (higher bar). `access_grants` grants a client-facing SELECT
@@ -59,7 +80,7 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
 
   let query = supabase
     .from("access_grants")
-    .select("*, accounts(external_account_ref, application_id), entitlements(application_id, name, data_classification, privilege_level, applications(name))")
+    .select("*, accounts(external_account_ref, application_id), entitlements(application_id, name, data_classification, privilege_level, applications(name), data_sources(id, name, classification))")
     .in("account_id", accountIds);
   query = asOf === null ? query.is("revoked_at", null) : query.lte("granted_at", asOf).or(`revoked_at.is.null,revoked_at.gt.${asOf}`);
 
@@ -71,7 +92,7 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
     application: row.entitlements?.applications?.name,
     applicationId: row.entitlements?.application_id,
     entitlementName: row.entitlements?.name,
-    dataClassification: row.entitlements?.data_classification ?? null,
+    ...dataFields(row.entitlements),
     privilegeLevel: row.entitlements?.privilege_level as AccessGrant["privilegeLevel"],
   }));
 }
@@ -88,7 +109,7 @@ export async function getAccessGrant(tenantId: string, grantId: string): Promise
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("access_grants")
-    .select("*, entitlements(application_id, name, data_classification, privilege_level, applications(name))")
+    .select("*, entitlements(application_id, name, data_classification, privilege_level, applications(name), data_sources(id, name, classification))")
     .eq("id", grantId)
     .eq("tenant_id", tenantId)
     .maybeSingle<EffectiveAccessRow>();
@@ -99,7 +120,7 @@ export async function getAccessGrant(tenantId: string, grantId: string): Promise
     application: data.entitlements?.applications?.name,
     applicationId: data.entitlements?.application_id,
     entitlementName: data.entitlements?.name,
-    dataClassification: data.entitlements?.data_classification ?? null,
+    ...dataFields(data.entitlements),
     privilegeLevel: data.entitlements?.privilege_level as AccessGrant["privilegeLevel"],
   };
 }

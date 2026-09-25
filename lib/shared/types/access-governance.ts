@@ -50,6 +50,39 @@ export type Entitlement = {
   dataClassification: string | null;
   privilegeLevel: PrivilegeLevel;
   createdAt: string;
+  /** ACCESS-P0-13: the data source this entitlement grants access to, if known. */
+  dataSourceId?: string | null;
+};
+
+/**
+ * ACCESS-P0-13 (master P0-11) — where data lives: a database, warehouse,
+ * bucket, file share, SaaS object or API, optionally inside an
+ * application, with a classification. Entitlements point at the data
+ * source they open, so effective access (CAN) carries it.
+ */
+export type DataSourceKind = "database" | "warehouse" | "object_store" | "file_share" | "saas" | "api" | "other";
+export const DATA_SOURCE_KINDS: DataSourceKind[] = ["database", "warehouse", "object_store", "file_share", "saas", "api", "other"];
+
+export type DataSource = {
+  id: string;
+  tenantId: string;
+  applicationId: string | null;
+  applicationName: string | null;
+  name: string;
+  kind: DataSourceKind;
+  classification: string | null;
+  owner: string | null;
+  description: string | null;
+  externalRef: string | null;
+  status: "active" | "retired";
+  createdAt: string;
+  updatedAt: string;
+};
+
+/** A data source with what reaches it: linked entitlements and the agents that currently hold one (CAN). */
+export type DataSourceWithReach = DataSource & {
+  entitlementCount: number;
+  agentIds: string[];
 };
 
 export type GrantType =
@@ -80,6 +113,8 @@ export type AccessGrant = {
   entitlementName?: string;
   dataClassification?: string | null;
   privilegeLevel?: PrivilegeLevel;
+  /** ACCESS-P0-13: the data source the entitlement opens, when linked. */
+  dataSource?: { id: string; name: string; classification: string | null } | null;
 };
 
 export type AccessPathStep = {

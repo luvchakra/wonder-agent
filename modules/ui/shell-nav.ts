@@ -66,6 +66,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     icon: "Network",
     children: [
       { label: "Effective Access", href: "/access" },
+      { label: "Data Sources", href: "/access/data-sources" },
       { label: "Access Requests", href: "/access/requests" },
     ],
   },

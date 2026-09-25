@@ -32,6 +32,7 @@ const ROUTES = [
   "/agents/duplicates",
   "/agents/identities",
   "/access/requests",
+  "/access/data-sources",
   "/risk/rogue",
   "/integrations/jobs",
   "/integrations/mcp",

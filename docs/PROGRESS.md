@@ -14,7 +14,7 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**157 of 190 tracked stories complete — 83%**
+**158 of 190 tracked stories complete — 83%**
 
 ```
 █████████████████████████████████░░░░░░░  83%
@@ -22,10 +22,10 @@ Generated 2026-09-25 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 157 |
+| Done | 158 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 11 |
+| Not Started | 10 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -41,7 +41,7 @@ and are deliberately excluded from the counts above.
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 0 | 31 | `█████████████████░` 94% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 0 | 14 | `█████████████████░` 93% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 12 | 0 | 0 | 3 | 15 | `██████████████░░░░` 80% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
@@ -145,7 +145,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 12 done · 0 partial · 0 deferred · 3 not started (15 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 13 done · 0 partial · 0 deferred · 2 not started (15 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -162,7 +162,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-07 | Broaden `policy_exceptions` into the canonical governance-exception model | Done — 2026-09-15, migration `0053`, live-applied |
 | ACCESS-P0-11 | Deterministic runtime decision function (master P0-28–P0-32) | Done — 2026-09-25: pure `decideRuntimeRequest()` + fail-closed `evaluateRuntimeRequest()` loader (service-role, tenant-checked), 34 unit tests incl. master §21 fail-safe table and the §11 FinanceBot case; wired into the gateway by RUNTIME-P0-15; see audit log |
 | ACCESS-P0-12 | Policy targets and publish (master P0-23) | Not Started — 2026-09-25, master stories |
-| ACCESS-P0-13 | Data sources inventory (master P0-11) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-13 | Data sources inventory (master P0-11) | Done — 2026-09-25: `data_sources` (migration 0070, RLS, same-tenant composite FKs, no delete), entitlement link, CAN carries data source + classification fallback, audited service/API, `/access/data-sources` |
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Not Started — 2026-09-25, master stories |
 
 ### 05 — Runtime Agent

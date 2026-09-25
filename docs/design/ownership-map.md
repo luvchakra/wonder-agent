@@ -193,9 +193,22 @@ RUNTIME-P0-18. Members can read it; only the service role writes it,
 behind `runtime.emergency`. Controls are lifted, never deleted.
 `/api/gateway/v1/tools/filter` is RA's, like `/authorize`.
 
-Planned tables, not yet created: `investigations` and `investigation_findings` (RiskA), and
-`data_sources` (AA). Each needs `tenant_id`, RLS, and an isolation test
-before it is `Done` (§14).
+`data_sources` (AA) now exists: migration `0070`, ACCESS-P0-13. It has
+tenant-scoped RLS (select, insert, update; no delete, since sources are
+retired). Composite foreign keys keep its application reference, and
+`entitlements.data_source_id`, within the same tenant. The routes are
+`/api/v1/access/data-sources` and
+`/api/v1/access/entitlements/:id/data-source` (AA), and the page is
+`/access/data-sources`.
+
+MCP servers, tools and resources (IntA) are `integration_objects` families
+(`mcp_server` / `mcp_tool` / `mcp_resource`, migration `0069`), not new
+tables. The inventory contract is `getMcpInventory()`, and the page is
+`/integrations/mcp`.
+
+Planned tables, not yet created: `investigations` and
+`investigation_findings` (RiskA). Each needs `tenant_id`, RLS, and an
+isolation test before it is `Done` (§14).
 
 `agent-identity` (IA) and `access-governance` (AA) are deliberately separate: IA owns
 *who the agent is*; AA owns *what it can reach*. Integration (INT) owns the raw

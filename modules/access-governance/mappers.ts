@@ -48,6 +48,7 @@ export function toEntitlement(row: any): Entitlement {
     dataClassification: row.data_classification,
     privilegeLevel: row.privilege_level,
     createdAt: row.created_at,
+    dataSourceId: row.data_source_id ?? null,
   };
 }
 

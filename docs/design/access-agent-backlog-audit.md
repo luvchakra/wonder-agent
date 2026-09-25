@@ -847,3 +847,97 @@ OBSERVE_ONLY versus ENFORCE is the gateway's (RUNTIME-P0-15).
   action list. Free-text `intent.requestPurpose` is accepted but not
   interpreted; semantic intent analysis is master P2-01.
 - New policy targets (TOOL, MCP_*, DATA_*) are ACCESS-P0-12.
+
+## 2026-09-25 — ACCESS-P0-13: data sources inventory feeding CAN (master P0-11)
+
+User decision (2026-09-25): Access owns data sources beside `applications`.
+
+**What changed:**
+
+- **Migration 0070** (`0070_access_data_sources.sql`, applied live) is
+  additive.
+  - A new `data_sources` table: kind, classification, owner, optional
+    application, `active | retired`.
+  - Tenant-scoped RLS matching `applications` (select, insert, update).
+    There is **no delete policy**: a source is retired, never removed,
+    because findings and evidence reference it.
+  - A nullable `entitlements.data_source_id`.
+  - **Same-tenant references are enforced by the database.** Composite
+    foreign keys `(application_id, tenant_id)` and
+    `(data_source_id, tenant_id)` (Postgres 17 `ON DELETE SET NULL (col)`,
+    with a new `unique (id, tenant_id)` on `applications`) mean a row can
+    never point across tenants, even one the member is allowed to write.
+- **Service** (`dataSources.ts`, exported from `service.ts`):
+  - `createDataSource`, `updateDataSource` (reclassify, re-own, retire)
+    and `linkEntitlementToDataSource` run as the user and are audited.
+    The update audit records the classification before and after.
+  - `validateDataSourceInput` validates at the boundary and drops unknown
+    fields.
+  - `listDataSources` returns each source with its **reach**: how many
+    entitlements open it, and which agents currently hold one (revoked
+    grants excluded). It makes two parallel queries.
+- **CAN.** `getEffectiveAccess`, `getEffectiveAccessAsOf` and
+  `getAccessGrant` now carry `dataSource { id, name, classification }`.
+  An entitlement with no classification of its own takes its data
+  source's, so an unclassified entitlement on a restricted warehouse is
+  not read as unclassified. The entitlement's own classification still
+  wins.
+- **API:**
+  - `GET/POST /api/v1/access/data-sources` (`access.read` /
+    `access.manage`)
+  - `PATCH /api/v1/access/data-sources/:id`
+  - `PUT /api/v1/access/entitlements/:id/data-source` (UUIDs validated)
+- **UI.** `/access/data-sources` ("Data Sources" under Access
+  Intelligence):
+  - Metrics: sources, sensitive, unclassified, reachable by agents.
+  - A table with classification (editable inline by managers), the
+    agents that can reach each source (CAN), entitlements, application
+    and owner.
+  - Add and link forms that show the real result or error (§17.5). A
+    read-only user sees the table only.
+
+**Tests:**
+
+- `dataSources.test.ts` (4): validation, reach, and the
+  classification-fallback rule.
+- SQL `tests/access/data-sources-isolation.sql`, run live, **9/9**:
+  - own sources visible 1, other tenant's 0;
+  - reclassifying the other tenant's source changes 0 rows;
+  - delete affects 0 rows (no policy);
+  - inserting into the other tenant is denied (42501);
+  - pointing at the other tenant's application, and linking an
+    entitlement to the other tenant's source, are both denied by the
+    composite keys (23503);
+  - an own-tenant link succeeds;
+  - the other tenant's row is unchanged.
+  - Fixtures were cleaned up. Security advisories show no new findings.
+- E2E `data-sources.spec.ts`: add and link through the forms, then 1
+  agent reaches the source and effective access carries it; a duplicate
+  is refused with its reason; read-only gets no forms and a 403 from the
+  API; the other tenant sees nothing and gets a 404 linking to the
+  entitlement.
+
+**Left out:**
+
+- Importing data sources from connectors: a mapping for Integration's
+  objects is a follow-up.
+- Using data sources in runtime decisions: Access's `DATA_SOURCE` policy
+  target is ACCESS-P0-12.
+
+**Verified:**
+
+- eslint clean; vitest 488/488.
+- Full Playwright run: **180/181**. The one failure was `access.spec`'s
+  "adding an external-facing application shows it in the table". That
+  spec adds an "E2E App …" every run, and Tenant One had reached 28
+  applications, so the newest sorted onto the table's second page (it
+  pages at 25). This was not caused by this story.
+  - The spec now types the name into the table's filter before
+    asserting.
+  - Pruning those applications at setup was tried and dropped:
+    `access_requests` reference applications without cascading.
+  - Rerun of `access.spec` + `data-sources.spec`: **13/13**.
+- `/access/data-sources` was added to the design-review sweep and is
+  under Access Intelligence in the nav.
+- One design fix: the application name broke mid-word at desktop width;
+  it no longer does.

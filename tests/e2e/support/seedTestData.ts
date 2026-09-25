@@ -137,7 +137,8 @@ export async function pruneThrowawayAgents(tenantIds: string[]): Promise<void> {
 /**
  * Same reasoning as pruneThrowawayAgents(), for what specs create beside
  * agents (2026-09-25): integrations named "E2E …" (credentials, sync jobs,
- * objects and mappings cascade) and runtime quarantine rows. Left alone,
+ * objects and mappings cascade), data sources named "E2E …" and runtime
+ * quarantine rows. Left alone,
  * integrations piled up to 25 in Tenant One and the discovery page
  * measurably slowed, and old Shadow AI quarantine rows outlived the agents
  * registered from them. Scoped to the two `e2e-*` tenants only.
@@ -147,6 +148,9 @@ export async function pruneThrowawayIntegrationsAndQuarantine(tenantIds: string[
   for (const tenantId of tenantIds) {
     const integrations = await supabase.from("integrations").delete().eq("tenant_id", tenantId).like("name", "E2E %");
     if (integrations.error) throw new Error(`prune integrations(${tenantId}) failed: ${integrations.error.message}`);
+    // ACCESS-P0-13: throwaway data sources (entitlements pointing at one fall back to null).
+    const dataSources = await supabase.from("data_sources").delete().eq("tenant_id", tenantId).like("name", "E2E %");
+    if (dataSources.error) throw new Error(`prune data sources(${tenantId}) failed: ${dataSources.error.message}`);
     const quarantine = await supabase.from("runtime_event_quarantine").delete().eq("tenant_id", tenantId);
     if (quarantine.error) throw new Error(`prune quarantine(${tenantId}) failed: ${quarantine.error.message}`);
   }

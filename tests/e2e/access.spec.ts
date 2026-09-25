@@ -32,6 +32,8 @@ test.describe("Access module", () => {
     await page.getByRole("button", { name: "Add", exact: true }).click();
 
     await expect(page).toHaveURL("/access");
+    // The table pages at 25; filter to the new row rather than assume it is on page one.
+    await page.getByLabel("Filter by name or category…").fill(appName);
     const row = page.getByRole("row", { name: new RegExp(appName) });
     await expect(row).toBeVisible();
     // Below `md` the shared table stacks each cell and prints its column
