@@ -22,7 +22,12 @@ export type LifecycleActor = {
  */
 const NORMAL_TRANSITIONS: Partial<Record<AgentLifecycleState, AgentLifecycleState[]>> = {
   DISCOVERED: ["REGISTERED"],
-  REGISTERED: ["APPROVED"],
+  // IDENTITY-P0-14 (codebase-map D4, 2026-09-25): ASSESSED was a state no
+  // transition could reach. It is now the optional assessment step of the
+  // master lifecycle, REGISTERED -> ASSESSED -> APPROVED. The direct
+  // REGISTERED -> APPROVED path is kept, so every existing flow is unchanged.
+  REGISTERED: ["ASSESSED", "APPROVED"],
+  ASSESSED: ["APPROVED"],
   APPROVED: ["PROVISIONED"],
   PROVISIONED: ["ACTIVE"],
   ACTIVE: ["CERTIFICATION_DUE", "RESTRICTED"],
@@ -63,6 +68,43 @@ export function isStructurallyAllowedTransition(
 ): boolean {
   if (toState === "SUSPENDED") return fromState !== "RETIRED";
   return (NORMAL_TRANSITIONS[fromState] ?? []).includes(toState);
+}
+
+/** An active contract, and an actor who is an approver or one of the agent's owners. */
+async function assertContractAndApprover(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- service-role Supabase client
+  supabase: any,
+  tenantId: string,
+  agent: Agent,
+  actor: LifecycleActor,
+  what: "Approval" | "Assessment",
+): Promise<void> {
+  const { data: contract, error } = await supabase
+    .from("agent_contracts")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("agent_id", agent.id)
+    .eq("status", "active")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!contract) {
+    throw new ApiError(412, "PRECONDITION_FAILED", "agent contract required");
+  }
+
+  if (actor.actorType === "user" && !hasAnyRole(actor, APPROVAL_ROLES)) {
+    const { data: ownerRow, error: ownerError } = await supabase
+      .from("agent_owners")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .eq("agent_id", agent.id)
+      .eq("user_id", actor.actorId)
+      .is("removed_at", null)
+      .maybeSingle();
+    if (ownerError) throw new ApiError(500, "QUERY_FAILED", ownerError.message);
+    if (!ownerRow) {
+      throw new ApiError(412, "PRECONDITION_FAILED", `${what} requires an agent owner or IAM_ADMIN/TENANT_SUPER_ADMIN`);
+    }
+  }
 }
 
 /**
@@ -152,37 +194,16 @@ async function validateTransition(
     }
   }
 
-  if (fromState === "REGISTERED" && toState === "APPROVED") {
-    const { data: contract, error } = await supabase
-      .from("agent_contracts")
-      .select("id")
-      .eq("tenant_id", tenantId)
-      .eq("agent_id", agent.id)
-      .eq("status", "active")
-      .maybeSingle();
-    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-    if (!contract) {
-      throw new ApiError(412, "PRECONDITION_FAILED", "agent contract required");
-    }
+  // IDENTITY-P0-14: an assessment needs something to assess, the agent's
+  // active contract (its SHOULD), and is recorded by an approver or owner,
+  // the same people who may approve.
+  if (fromState === "REGISTERED" && toState === "ASSESSED") {
+    await assertContractAndApprover(supabase, tenantId, agent, actor, "Assessment");
+    return;
+  }
 
-    if (actor.actorType === "user" && !hasAnyRole(actor, APPROVAL_ROLES)) {
-      const { data: ownerRow, error: ownerError } = await supabase
-        .from("agent_owners")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .eq("agent_id", agent.id)
-        .eq("user_id", actor.actorId)
-        .is("removed_at", null)
-        .maybeSingle();
-      if (ownerError) throw new ApiError(500, "QUERY_FAILED", ownerError.message);
-      if (!ownerRow) {
-        throw new ApiError(
-          412,
-          "PRECONDITION_FAILED",
-          "Approval requires an agent owner or IAM_ADMIN/TENANT_SUPER_ADMIN",
-        );
-      }
-    }
+  if ((fromState === "REGISTERED" || fromState === "ASSESSED") && toState === "APPROVED") {
+    await assertContractAndApprover(supabase, tenantId, agent, actor, "Approval");
   }
 
   if (fromState === "ACTIVE" && toState === "CERTIFICATION_DUE" && actor.actorType !== "system") {

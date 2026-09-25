@@ -31,7 +31,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-11 | NHI inventory (master P0-08) | Done — 2026-09-25: `buildNhiInventory()` + `/agents/identities` (linked / unlinked with classification / orphaned / ignored; human delegates excluded; linking via discovery) |
 | IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Not Started — 2026-09-25, master stories |
-| IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
 
 ---
 

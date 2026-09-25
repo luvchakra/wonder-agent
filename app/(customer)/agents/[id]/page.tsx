@@ -756,6 +756,17 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               <label className={labelClass}>Source system</label>
               <input name="sourceSystem" placeholder="source system" defaultValue="manual" className={inputClass} />
             </div>
+            {/* IDENTITY-P0-14: the person linking says how sure they are; it is recorded and audited. */}
+            <div>
+              <label className={labelClass} htmlFor="identity-confidence">
+                Confidence
+              </label>
+              <select id="identity-confidence" name="confidence" defaultValue="unverified" className={inputClass}>
+                <option value="unverified">Unverified</option>
+                <option value="probable">Probable</option>
+                <option value="confirmed">Confirmed in the source system</option>
+              </select>
+            </div>
             <Button type="submit" variant="secondary">
               Link identity
             </Button>

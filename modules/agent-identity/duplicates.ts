@@ -270,13 +270,12 @@ export async function recordDiscoveryDecision(
 
   if (input.decisionType === "linked" && input.matchedAgentId) {
     const { linkAgentIdentity } = await import("./identities");
-    await linkAgentIdentity(
-      tenantId,
-      input.matchedAgentId,
-      input.identityType ?? "service_account",
-      input.sourceObjectId,
-      input.sourceSystem,
-    );
+    // A person reviewed the candidate and chose the agent it belongs to.
+    await linkAgentIdentity(tenantId, input.matchedAgentId, input.identityType ?? "service_account", input.sourceObjectId, input.sourceSystem, {
+      actorId,
+      confidence: "confirmed",
+      basis: `Linked from discovery candidate ${input.sourceSystem}::${input.sourceObjectId}`,
+    });
   }
 
   await writeAudit({

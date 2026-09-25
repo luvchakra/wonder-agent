@@ -12,6 +12,7 @@ import {
   mergeDuplicateCandidate,
   recordDiscoveryDecision,
   transitionAgentLifecycle,
+  type IdentityConfidence,
 } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type {
@@ -129,6 +130,11 @@ export async function linkIdentityAction(agentId: string, formData: FormData) {
     formData.get("identityType") as AgentIdentityType,
     String(formData.get("externalReference")),
     String(formData.get("sourceSystem") ?? "manual"),
+    {
+      actorId: ctx.userId,
+      confidence: (String(formData.get("confidence") ?? "unverified") as IdentityConfidence),
+      basis: "Linked manually on the agent page",
+    },
   );
   redirect(`/agents/${agentId}`);
 }
@@ -168,7 +174,12 @@ export async function registerDiscoveryCandidateAction(formData: FormData) {
   }
 
   const agent = result.agent;
-  await linkAgentIdentity(ctx.tenantId!, agent.id, identityType, sourceObjectId, sourceSystem);
+  // A person reviewed this candidate's evidence and registered it.
+  await linkAgentIdentity(ctx.tenantId!, agent.id, identityType, sourceObjectId, sourceSystem, {
+    actorId: ctx.userId,
+    confidence: "confirmed",
+    basis: `Registered from discovery candidate ${sourceSystem}::${sourceObjectId}`,
+  });
 
   if (businessOwnerUserId) {
     await assignOwner(ctx.tenantId!, agent.id, "business_owner", businessOwnerUserId, ctx.userId);

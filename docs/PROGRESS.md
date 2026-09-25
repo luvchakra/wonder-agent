@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**160 of 190 tracked stories complete — 84%**
+**161 of 190 tracked stories complete — 85%**
 
 ```
-██████████████████████████████████░░░░░░  84%
+██████████████████████████████████░░░░░░  85%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 160 |
+| Done | 161 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 8 |
+| Not Started | 7 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -39,7 +39,7 @@ and are deliberately excluded from the counts above.
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 0 | 31 | `█████████████████░` 94% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 14 | 0 | 0 | 1 | 15 | `█████████████████░` 93% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 0 | 14 | `█████████████████░` 93% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
@@ -98,7 +98,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 13 done · 0 partial · 0 deferred · 2 not started (15 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 14 done · 0 partial · 0 deferred · 1 not started (15 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -116,7 +116,7 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-11 | NHI inventory (master P0-08) | Done — 2026-09-25: `buildNhiInventory()` + `/agents/identities` (linked / unlinked with classification / orphaned / ignored; human delegates excluded; linking via discovery) |
 | IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Not Started — 2026-09-25, master stories |
-| IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
 
 ### 03 — Integration Agent
 

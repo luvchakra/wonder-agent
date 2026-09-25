@@ -939,3 +939,52 @@ silence it; that is Experience's call.
 - Full pipeline: eslint clean, vitest **476/476**, Playwright **175/175**
   (7.9 min).
 - Migrations 0067 (Runtime) and 0068 (Integration index) applied live.
+
+## 2026-09-25 — IDENTITY-P0-14: defects D3 and D4 from the codebase map
+
+### D3 — identity links were unaudited and always "confirmed"
+
+- **Before.** `linkAgentIdentity()` hard-coded `confidence: "confirmed"`
+  and wrote no audit event (#11).
+- **Now.** Every caller states the confidence and the basis for it, and
+  each link writes `agent.identity_linked`. The event records the actor,
+  agent, type, source, reference, confidence and basis. The basis lives in
+  the audit trail, so no schema change was needed.
+- **The callers:**
+  - Registering a discovery candidate, or recording a "linked" discovery
+    decision, is `confirmed`: a person reviewed the candidate's evidence.
+    This includes Shadow AI registration.
+  - The manual form on the agent page has a new "Confidence" select
+    (default Unverified). The person linking says how sure they are.
+  - `POST /api/v1/agents/:id/identities` accepts `confidence` and `basis`.
+    **The default is now `unverified`**, where it used to be an implicit
+    `confirmed`: a reference asserted through the API with no
+    verification is not confirmed.
+  - This matters to Compliance's governance posture, which counts only
+    `confirmed` or `probable` links as verified. An API caller that has
+    verified a link should say so.
+- An unknown confidence is rejected (400) before anything is written.
+
+### D4 — ASSESSED was unreachable
+
+- The transition table now has REGISTERED → ASSESSED → APPROVED, the
+  master lifecycle's assessment step. The direct REGISTERED → APPROVED
+  path is **kept**, so no existing flow changes.
+- Entering ASSESSED needs what approval needs: an active contract (the
+  SHOULD being assessed), and an approver role or one of the agent's
+  owners. Both checks moved into one helper, `assertContractAndApprover()`,
+  shared by REGISTERED/ASSESSED → APPROVED; the approval error text is
+  unchanged.
+- ASSESSED cannot be entered from DISCOVERED, cannot jump to ACTIVE, and
+  cannot go back. Emergency suspension from it still works.
+
+**Tests:**
+
+- `identities.test.ts` (new, 2): the stated confidence is stored and
+  audited with its basis; an unknown confidence is refused before any
+  write.
+- `lifecycle.test.ts` +2: the new transitions, and the ones that stay
+  forbidden.
+- Identity unit tests 41/41.
+- Full pipeline: eslint clean, vitest **513/513**, Playwright **187/187**
+  (8.7 min, a fresh build).

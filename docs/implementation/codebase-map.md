@@ -160,8 +160,8 @@ Each was re-read at the cited lines before being written down.
 |---|---|---|---|---|
 | D1 | Policy evaluation treated a **revoked** or **not-yet-started** exception as active, so a revoked exception kept suppressing a violation | High (security) | `modules/access-governance/evaluate.ts` exception lookup | **Fixed in this pass**: the query now requires `status = 'active'` and `start_date <= now`. Recorded in the Access audit log |
 | D2 | Runtime ingestion wrote a caller-supplied `identityId` through the service role without checking it belongs to the tenant and agent (§14 service-role rule) | Medium (security) | `modules/runtime-assurance/events.ts ingestRuntimeEvent()` | **Fixed in this pass**: the identity must belong to the same tenant and agent, else 404. Recorded in the Runtime audit log |
-| D3 | `linkAgentIdentity()` writes no audit event (#11) | Medium | `modules/agent-identity/identities.ts` | Open, Identity Agent |
-| D4 | Lifecycle state ASSESSED is unreachable | Low | `modules/agent-identity/lifecycle.ts` | Open, Identity Agent |
+| D3 | `linkAgentIdentity()` writes no audit event (#11) | Medium | `modules/agent-identity/identities.ts` | **Fixed 2026-09-25** (IDENTITY-P0-14): audited, explicit confidence + basis |
+| D4 | Lifecycle state ASSESSED is unreachable | Low | `modules/agent-identity/lifecycle.ts` | **Fixed 2026-09-25** (IDENTITY-P0-14): REGISTERED → ASSESSED → APPROVED |
 | D5 | `checkSoD()` has no callers | Medium (P0-25) | `modules/access-governance/sod.ts` | Open, Access Agent |
 | D6 | MCP runtime events are stored as `integration_objects` and never reach `runtime_events`, so they are invisible to SHOULD/CAN/DID and risk | Medium (P0-18) | `modules/integrations/mcpEvents.ts` | **Fixed 2026-09-25** (INTEGRATION-P0-07): bridged through Runtime's `ingestRuntimeEventByReference()` |
 | D7 | SHOULD tools always empty despite `agent_contracts.allowed_tools` | Low | `modules/runtime-assurance/compare.ts:93` | Open, Runtime Agent |

@@ -19,13 +19,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const ctx = await requirePermission("agent.update");
     const { id } = await params;
     const body = await request.json();
-    const link = await linkAgentIdentity(
-      ctx.tenantId!,
-      id,
-      body.identityType,
-      body.externalReference,
-      body.sourceSystem,
-    );
+    // IDENTITY-P0-14: an API caller states its confidence; a reference
+    // nobody verified against the source is "unverified" by default.
+    const link = await linkAgentIdentity(ctx.tenantId!, id, body.identityType, body.externalReference, body.sourceSystem, {
+      actorId: ctx.userId,
+      confidence: body.confidence ?? "unverified",
+      basis: typeof body.basis === "string" && body.basis.trim() ? body.basis : "Linked through the API",
+    });
     return NextResponse.json({ ok: true, data: link }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

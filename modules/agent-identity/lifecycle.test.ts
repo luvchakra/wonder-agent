@@ -104,6 +104,22 @@ const ALL_STATES: AgentLifecycleState[] = [
   "RETIRED",
 ];
 
+describe("isStructurallyAllowedTransition — IDENTITY-P0-14, ASSESSED is reachable (codebase-map D4)", () => {
+  it("REGISTERED -> ASSESSED -> APPROVED, and the direct REGISTERED -> APPROVED path still works", () => {
+    expect(isStructurallyAllowedTransition("REGISTERED", "ASSESSED")).toBe(true);
+    expect(isStructurallyAllowedTransition("ASSESSED", "APPROVED")).toBe(true);
+    expect(isStructurallyAllowedTransition("REGISTERED", "APPROVED")).toBe(true);
+    expect(isStructurallyAllowedTransition("ASSESSED", "SUSPENDED")).toBe(true);
+  });
+
+  it("ASSESSED cannot be skipped into or out of sideways", () => {
+    expect(isStructurallyAllowedTransition("DISCOVERED", "ASSESSED")).toBe(false);
+    expect(isStructurallyAllowedTransition("ASSESSED", "ACTIVE")).toBe(false);
+    expect(isStructurallyAllowedTransition("ASSESSED", "REGISTERED")).toBe(false);
+    expect(isStructurallyAllowedTransition("APPROVED", "ASSESSED")).toBe(false);
+  });
+});
+
 describe("isStructurallyAllowedTransition — IDENTITY-P0-02.1 transition table", () => {
   it("allows every normal forward transition in the backlog's table", () => {
     expect(isStructurallyAllowedTransition("DISCOVERED", "REGISTERED")).toBe(true);
