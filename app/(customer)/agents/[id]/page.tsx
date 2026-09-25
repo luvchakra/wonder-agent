@@ -84,6 +84,30 @@ const LIFECYCLE_STATES = [
   "RETIRED",
 ] as const;
 
+/**
+ * What a recent-activity row says happened. A gateway decision is a
+ * decision, not an action: showing it as "Succeeded" would tell an
+ * administrator a denied delete went through (§17.5). Observed-only
+ * decisions say so, as on the runtime page.
+ */
+const DECISION_EVENTS = new Set(["TOOL_ALLOWED", "TOOL_DENIED", "TOOL_APPROVAL_REQUIRED", "POLICY_DECISION"]);
+const DECISION_LABEL: Record<string, { label: string; tone: "success" | "warning" | "danger" }> = {
+  ALLOW: { label: "Allow", tone: "success" },
+  ALLOW_WITH_RESTRICTIONS: { label: "Allow, restricted", tone: "warning" },
+  REQUIRE_APPROVAL: { label: "Needs approval", tone: "warning" },
+  DENY: { label: "Deny", tone: "danger" },
+};
+function ActivityOutcome({ event }: { event: { success: boolean; eventType?: string | null; raw?: unknown } }) {
+  if (event.eventType && DECISION_EVENTS.has(event.eventType)) {
+    const raw = (event.raw ?? {}) as { decision?: string; enforced?: boolean };
+    const decision =
+      raw.decision ?? (event.eventType === "TOOL_DENIED" ? "DENY" : event.eventType === "TOOL_APPROVAL_REQUIRED" ? "REQUIRE_APPROVAL" : "ALLOW");
+    const d = DECISION_LABEL[decision] ?? DECISION_LABEL.DENY;
+    return <Badge tone={d.tone}>{`${d.label}${raw.enforced ? "" : " (observed)"}`}</Badge>;
+  }
+  return <Badge tone={event.success ? "success" : "danger"}>{event.success ? "Succeeded" : "Failed"}</Badge>;
+}
+
 const OWNER_TYPES = ["business_owner", "technical_owner", "iam_owner", "application_owner", "data_owner", "escalation_owner", "delegated_owner"] as const;
 const ENVIRONMENTS = ["production", "staging", "development"] as const;
 const ownerTypeLabel = (t: string) => t.replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
@@ -388,7 +412,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                       <span className="font-mono text-xs">{e.action}</span>
                       <span className="text-muted-foreground"> · {e.resource ?? e.application ?? e.tool ?? "—"}</span>
                     </span>
-                    <Badge tone={e.success ? "success" : "danger"}>{e.success ? "Succeeded" : "Failed"}</Badge>
+                    <ActivityOutcome event={e} />
                   </li>
                 ))}
               </ul>
@@ -502,7 +526,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             <ul className="space-y-1 text-sm text-muted-foreground">
               {lifecycleEvents.map((e) => (
                 <li key={e.id}>
-                  <span className="text-muted-foreground">{e.createdAt}:</span> {e.fromState ?? "(none)"} → <strong className="text-foreground">{e.toState}</strong> — {e.reason}
+                  <span className="text-muted-foreground tabular-nums">{e.createdAt.slice(0, 16).replace("T", " ")}:</span> {e.fromState ?? "(none)"} → <strong className="text-foreground">{e.toState}</strong> — {e.reason}
                 </li>
               ))}
             </ul>

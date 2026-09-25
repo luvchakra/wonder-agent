@@ -125,7 +125,8 @@ isolation checks. Detail is in each module's audit log.
 | + | ACCESS-P0-12: policy targets, priority, draft → publish | Done | `6c1d9af` |
 | + | IDENTITY-P0-13: contract and ownership completeness; same-tenant agent references | Done | `9da1e87` |
 | + | EXPERIENCE-P0-17: "Approved (SHOULD)" / "Effective Access (CAN)" / "Observed (DID)" / "Current Request (NOW)" wording | Done | `fc6ffb7` |
-| + | QA-P0-17: RLS-only read sweep, same-tenant keys (0076), org switcher fix, two-organization E2E | Done | see QA audit |
+| + | QA-P0-17: RLS-only read sweep, same-tenant keys (0076), org switcher fix, two-organization E2E | Done | `919d1dc` |
+| + | Demo data: `npm run seed:demo` seeded WonderArk across every module (real gateway decisions); Agent 360 decision labels fixed | Done | see Experience audit |
 
 **Still to do in this programme:**
 

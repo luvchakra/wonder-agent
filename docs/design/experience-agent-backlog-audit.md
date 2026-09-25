@@ -2596,3 +2596,91 @@ rather than typing the labels, so they cannot drift.
   1280 px (no overflow, no truncation). Colours are tokens, so dark mode
   is unaffected.
 - Full Playwright suite: **194/194** (9.3 min, fresh build).
+
+---
+
+## 2026-09-25 — Demo data seeded into WonderArk (user request: "seed initial data in WonderAgent")
+
+**What.** New `scripts/seed-demo-data.mjs`, also `npm run seed:demo --
+--tenant <slug> [--gateway <app url>]`. It seeds one organization with a
+coherent dataset that exercises every module. Run against **WonderArk**
+(`wonderark-34lm15`), the primary organization, whose welcome banner
+already says the data is seeded but whose newer screens were empty.
+
+**How it behaves:**
+
+- **One organization only.** It resolves the tenant by slug, and every
+  row carries that tenant's id (§14).
+- **Idempotent and additive.** Everything is found by a natural key
+  before it is created. A re-run reports "nothing new". Existing agents
+  are reused untouched; the only change to an existing row is linking an
+  entitlement that has no data source.
+- **Gateway decisions are real.** With `--gateway`, the script mints an
+  agent key per agent and sends requests to the app's own Runtime
+  Gateway. Decisions, timeline events and audit rows are the engine's
+  output. Fixed request ids make a re-run a replay. Each run rotates the
+  demo key: the previous one is revoked.
+- **The run is recorded** as a `demo.data_seeded` audit event (#11).
+- **It reads the service-role key from `.env.local`** and never prints it.
+
+**What WonderArk now holds:**
+
+- **Agents:** 10 in total. New: ITOpsRunbookAgent (critical, a
+  destructive MCP permission), ProcurementCopilot (no technical owner),
+  CodeReviewAgent (unapproved merges, a shared credential),
+  InvoiceReconciler (APPROVED, with a delegated owner) and
+  SalesForecastAgent (REGISTERED, no contract yet). Each has lifecycle
+  history, owners, contracts using the IDENTITY-P0-13 fields, identities
+  and relationships.
+- **Access:** 9 data sources, linked to entitlements, plus new
+  entitlements, accounts and grants.
+- **Integrations:** two MCP servers (finance-mcp, itops-mcp) with 7
+  classified tools and resources.
+- **Runtime:** 302 runtime events over 14 days, some failed; 24 real
+  gateway decisions (ALLOW, REQUIRE_APPROVAL and DENY); two Shadow AI
+  agents.
+- **Risk and governance:**
+  - 4 runtime policies with ACCESS-P0-12 targets and priorities (one a
+    draft);
+  - 5 findings with evidence, dated across the past three weeks;
+  - two investigations (INV-2026-001 and INV-2026-002);
+  - a privileged-access certification campaign;
+  - 3 control mappings.
+
+**Two product defects the data exposed, both fixed:**
+
+- **Agent 360's recent activity labelled every event by `success`.** A
+  gateway decision is a decision, not an action, so a denied `delete_vm`
+  showed as "Succeeded" (§17.5). Decision events now show their decision
+  ("Deny (observed)", "Needs approval (observed)", …), as the runtime
+  page already does. Real actions keep Succeeded or Failed.
+- **Agent 360's lifecycle history printed raw ISO timestamps.** It now
+  shows `YYYY-MM-DD HH:MM`.
+
+**Adjustments made while seeding:**
+
+- **Contracts.** The first gateway pass showed no ALLOW at all:
+  - the older FinanceBot and CustomerSupportBot contracts are at autonomy
+    level 0 (a human performs every action), so they are denied
+    everything. They are left as they are, since the script does not
+    modify existing data;
+  - ITOpsRunbookAgent's autonomy was 2, so every request needed approval.
+    It is now 3;
+  - CodeReviewAgent's contract maximum was medium, below its risk score.
+    It is now high.
+  - The last two changes were made only to contracts this seed had just
+    created. The script now writes these values. The decisions from the
+    first pass remain as history.
+- **Control mappings** are now keyed by policy, after a re-run had
+  created three duplicates (deleted).
+
+**Verified:**
+
+- A throwaway organization and admin (deleted afterwards, confirmed
+  gone) were seeded the same way and screenshotted at 1280 px: dashboard,
+  agents, data sources, MCP servers, runtime, policies, risk,
+  investigations, Shadow AI and Agent 360. There were no error
+  boundaries. The real account holder was never signed in as.
+- `tsc` and `eslint` clean.
+- Playwright agents, design-review, runtime-gateway and
+  ownership-contract specs: 42/42.
