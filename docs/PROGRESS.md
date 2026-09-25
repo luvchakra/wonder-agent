@@ -14,19 +14,19 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**166 of 190 tracked stories complete — 87%**
+**167 of 226 tracked stories complete — 74%**
 
 ```
-███████████████████████████████████░░░░░  87%
+██████████████████████████████░░░░░░░░░░  74%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 166 |
+| Done | 167 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 2 |
-| **Total tracked** | **190** |
+| Not Started | 37 |
+| **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -38,17 +38,17 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 0 | 31 | `█████████████████░` 94% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 15 | 0 | 0 | 0 | 15 | `██████████████████` 100% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 0 | 14 | `█████████████████░` 93% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 15 | 0 | 0 | 0 | 15 | `██████████████████` 100% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 15 | 0 | 0 | 5 | 20 | `██████████████░░░░` 75% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 6 | 20 | `████████████░░░░░░` 65% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 15 | 0 | 0 | 11 | 26 | `██████████░░░░░░░░` 58% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
-| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 0 | 15 | `████████████████░░` 87% |
-| 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 20 | 2 | 0 | 1 | 23 | `████████████████░░` 87% |
-| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 0 | 14 | `███████████████░░░` 86% |
-| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 0 | 12 | `█████████████████░` 92% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 12 | 12 | 0 | 1 | 25 | `█████████░░░░░░░░░` 48% |
+| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
+| 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 1 | 14 | `█████████████████░` 93% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 20 | 2 | 0 | 4 | 26 | `██████████████░░░░` 77% |
+| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 1 | 15 | `██████████████░░░░` 80% |
+| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 3 | 28 | `████████░░░░░░░░░░` 46% |
 
 ---
 
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 29 done · 2 partial · 0 deferred · 0 not started (31 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 29 done · 2 partial · 0 deferred · 3 not started (34 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -93,12 +93,15 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
 | FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Done — 2026-09-25: migration `0061` applied live; `lib/security/agentApiKeys.ts` (hash-only storage, tenant+agent-bound verify, fail-closed), API routes, Agent 360 card; 16 unit + 9 live SQL checks + 4 E2E; see audit log |
 | FOUNDATION-P0-18 | New permission keys (master P0-42) | Done — 2026-09-25: 7 keys seeded by least privilege in `0061`, `requireAnyPermission()` added; live-verified; see audit log |
+| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
 
 ### 02 — Identity Agent
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 15 done · 0 partial · 0 deferred · 0 not started (15 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 15 done · 0 partial · 0 deferred · 5 not started (20 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -117,12 +120,17 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Done — 2026-09-25: delegated and escalation owners, member-only owners, ownership review; contract approved users/delegators, environments, expiry; `next_review_at` set; production approval needs an approver; same-tenant agent references (0075) |
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
+| IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-16 | Identity attributes and relationships | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-17 | Identities directory and identity detail | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 
 ### 03 — Integration Agent
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 13 done · 1 partial · 0 deferred · 0 not started (14 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 13 done · 1 partial · 0 deferred · 6 not started (20 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -140,12 +148,18 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 | INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
+| INTEGRATION-P0-08 | Authoritative identity sources | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-10 | Application discovery and unrecognized applications | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-12 | AI-assisted onboarding proposals | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Not Started — 2026-09-26, WonderID |
 
 ### 04 — Access Agent
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 15 done · 0 partial · 0 deferred · 0 not started (15 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 15 done · 0 partial · 0 deferred · 11 not started (26 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -164,6 +178,17 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-12 | Policy targets and publish (master P0-23) | Done — 2026-09-25: targets (TOOL, MCP_SERVER, MCP_TOOL, DATA_SOURCE, DATA_RESOURCE, ACTION) in `scope.targets` decide which runtime policies apply; priority orders evaluation; drafts + `publishPolicy()` (new version, audited) behind `policy.publish`; `createPolicy` now audited |
 | ACCESS-P0-13 | Data sources inventory (master P0-11) | Done — 2026-09-25: `data_sources` (migration 0070, RLS, same-tenant composite FKs, no delete), entitlement link, CAN carries data source + classification fallback, audited service/API, `/access/data-sources` |
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Done — 2026-09-25: `enforceSoD()` on request submission, request decision and manual grant; blocking → 409 SOD_CONFLICT (audited failure), flag → proceeds and audited; `checkSoD()` now service-role + matches the agent in object or metadata |
+| ACCESS-P0-15 | Application catalog model and inventory | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-16 | Application onboarding: state machine, checklist, validate, simulate, approve, promote | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-18 | Self-service request catalog and request policies | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-20 | Access packages | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-24 | Access ledger and provenance | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 
 ### 05 — Runtime Agent
 
@@ -191,7 +216,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Risk Engine & Rogue Agent Detection  
 **Backlog status:** DORMANT — do not start until the user says "Run Risk Agent"  
-**Stories:** 13 done · 2 partial · 0 deferred · 0 not started (15 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 13 done · 2 partial · 0 deferred · 1 not started (16 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -210,12 +235,13 @@ and are deliberately excluded from the counts above.
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
 | RISK-P0-11 | Investigations as a first-class record (master P0-37) | Done — 2026-09-25: migration 0071 (investigations, investigation_findings, investigation_events; select-only RLS; composite same-tenant FKs), audited service + API, `/risk/investigations` list/detail with timeline; cannot resolve while a finding is open |
 | RISK-P0-12 | New risk signals (master P0-20/P0-21) | Partial — 2026-09-25: suspicious delegation + unapproved tool use findings (migration 0072), certification overdue / destructive capability / credential health factors sourced, Shadow AI signal on /risk; attack-path factor still has no source (needs an Access graph-traversal contract) |
+| RISK-P0-13 | Rogue Access management | Not Started — 2026-09-26, WonderID |
 
 ### 07 — Compliance Agent
 
 **Module:** Certification, Controls & Compliance  
 **Backlog status:** DORMANT — do not start until the user says "Run Compliance Agent"  
-**Stories:** 13 done · 0 partial · 0 deferred · 0 not started (13 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 13 done · 0 partial · 0 deferred · 1 not started (14 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -232,12 +258,13 @@ and are deliberately excluded from the counts above.
 | COMPLIANCE-P0-07 | Governance Posture (composite score, distinct from risk) | Done — computed read-model across 12 dimensions, `getGovernancePosture()`, `GET /api/v1/compliance/agents/[id]/posture` |
 | COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
+| COMPLIANCE-P0-10 | Certification campaigns for every identity type | Not Started — 2026-09-26, WonderID |
 
 ### 08 — Experience Agent
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 20 done · 2 partial · 0 deferred · 1 not started (23 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 20 done · 2 partial · 0 deferred · 4 not started (26 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -264,12 +291,15 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-14 | AI-Assisted Investigation UI (read-only summaries) | Done — `AiSummaryPanel` shared component wired into Rogue Agent Detail (finding + SHOULD/CAN/DID summaries); shows "not configured" until FOUNDATION-P0-16 has a provider |
 | EXPERIENCE-P0-16 | Light-console screens 4–12 and the MCP boards | Not Started — 2026-09-25, master stories |
 | EXPERIENCE-P0-17 | Access wording: friendly label with the technical term | Done — 2026-09-25: one `ACCESS_VIEW` source in `modules/ui`, applied to runtime, rogue, Agent 360, access, help, welcome, AI settings and the evidence pack |
+| EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 
 ### 09 — Platform Agent
 
 **Module:** Vendor Platform Administration  
 **Backlog status:** DORMANT — do not start until the user says "Run Platform Agent"  
-**Stories:** 12 done · 1 partial · 1 deferred · 0 not started (14 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 12 done · 1 partial · 1 deferred · 1 not started (15 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -287,12 +317,13 @@ and are deliberately excluded from the counts above.
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 | PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Partial — 2026-09-25: 13 master rollout flags seeded (`0065`, safe-rollout defaults); flags now enforced at the gateway (`runtime_observe`/`runtime_enforce`/`tool_filtering` — ENFORCE really enforces, per tenant) and at runtime ingestion, remediation, connector creation and certification launch; batched `getFeatureFlags()`. Remaining: `ai_assistant` (defaults OFF while AI summaries are live — needs a platform decision before enforcing) and the not-yet-built features' flags; see audit log |
+| PLATFORM-P0-13 | Configuration Studio | Not Started — 2026-09-26, WonderID |
 
 ### 10 — Operations Agent
 
 **Module:** Audit, Reporting, Notifications & Search  
 **Backlog status:** DORMANT — do not start until the user says "Run Operations Agent"  
-**Stories:** 11 done · 1 partial · 0 deferred · 0 not started (12 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 11 done · 1 partial · 0 deferred · 2 not started (14 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -308,12 +339,14 @@ and are deliberately excluded from the counts above.
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
 | OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
 | OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Done — 2026-09-25: enforced DENY → `runtime_alert`, enforced REQUIRE_APPROVAL → `approval_required` (mandatory, throttled per agent); search covers gateway decisions and (with RISK-P0-11) investigations |
+| OPERATIONS-P0-09 | Workflow designer and runs | Not Started — 2026-09-26, WonderID |
+| OPERATIONS-P0-10 | WonderID insights, reports and identity graph views | Not Started — 2026-09-26, WonderID |
 
 ### 11 — QA Agent
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 12 done · 12 partial · 0 deferred · 1 not started (25 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 13 done · 12 partial · 0 deferred · 3 not started (28 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -342,4 +375,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-17 | RLS-only read sweep (codebase-map D10) | Done — 2026-09-25: every tenant read filtered explicitly (≈25 sites), by-id writes check the parent, 0076 same-tenant keys on 13 references, org switcher fixed; `multi-org-isolation.spec` with a two-organization identity |
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
+| QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
+| QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
+| QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
 

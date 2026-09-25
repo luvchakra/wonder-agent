@@ -30,6 +30,7 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-07 | Governance Posture (composite score, distinct from risk) | Done — computed read-model across 12 dimensions, `getGovernancePosture()`, `GET /api/v1/compliance/agents/[id]/posture` |
 | COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
+| COMPLIANCE-P0-10 | Certification campaigns for every identity type | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -511,3 +512,14 @@ evidence-snapshot work. **Not started.**
 - Actual entitlement revocation logic (Access/Integration Agents) — Compliance
   triggers it through their published contract, never a direct table write.
 - Any UI beyond functional review screens (Experience Agent restyles).
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### COMPLIANCE-P0-10 — Certification campaigns for every identity type
+
+Extend campaigns to human, external, privileged, machine, service-account and AI-agent access and to application, entitlement, role and package owners; reviewer types (manager, application/entitlement/role owner, security, delegated); decisions CERTIFY/REVOKE/DEFER/ESCALATE/EXCEPTION; revoke creates remediation; templates, calendar and analytics. Recommendations stay advisory.

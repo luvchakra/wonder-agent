@@ -45,6 +45,9 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-17 | RLS-only read sweep (codebase-map D10) | Done — 2026-09-25: every tenant read filtered explicitly (≈25 sites), by-id writes check the parent, 0076 same-tenant keys on 13 references, org switcher fixed; `multi-org-isolation.spec` with a two-organization identity |
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
+| QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
+| QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
+| QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -581,3 +584,22 @@ The `resolved` assertion flakes under two-worker load (passes alone); wait on th
   extend scope.
 - Sweeping refactors "while I'm in there" — every change here is the smallest safe
   fix for a specific, named defect.
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### QA-P0-20 — WonderID baseline lock, contract amendment and roadmap
+
+Baseline recorded before any WonderID change (`docs/implementation/wonderid-baseline.json`), CLAUDE.md amended with the user's decisions, specification and mockups stored, roadmap written, every module backlog extended.
+
+### QA-P0-21 — WonderID security hardening pass
+
+The spec's 37A test matrix across the new surface: tenant isolation, permission and object-scope negatives, ID tampering, secret exposure, SSRF, webhook replay, connector authorization, prompt injection, audit completeness, migration checks, full suite.
+
+### QA-P0-22 — Brownfield migration fixture
+
+End-to-end fixture from HR import to certification including legitimate access, missing request IDs, stale access, orphan accounts, conflicting sources, ambiguous identity, privileged, machine, agent and external identities.

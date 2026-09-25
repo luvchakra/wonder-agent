@@ -126,7 +126,13 @@ isolation checks. Detail is in each module's audit log.
 | + | IDENTITY-P0-13: contract and ownership completeness; same-tenant agent references | Done | `9da1e87` |
 | + | EXPERIENCE-P0-17: "Approved (SHOULD)" / "Effective Access (CAN)" / "Observed (DID)" / "Current Request (NOW)" wording | Done | `fc6ffb7` |
 | + | QA-P0-17: RLS-only read sweep, same-tenant keys (0076), org switcher fix, two-organization E2E | Done | `919d1dc` |
-| + | Demo data: `npm run seed:demo` seeded WonderArk across every module (real gateway decisions); Agent 360 decision labels fixed | Done | see Experience audit |
+| + | Demo data: `npm run seed:demo` seeded WonderArk across every module (real gateway decisions); Agent 360 decision labels fixed | Done | `84e3dda` |
+| W0 | QA-P0-20: WonderID adopted, contract amended, baseline locked, roadmap written | Done | see QA audit |
+
+**WonderID (adopted 2026-09-26, explicit user decision).** The product is now
+WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
+phase, after QA-P0-20 locked the baseline. Next: EXPERIENCE-P0-18 (brand and dark
+navy shell), then Phase 1 (IDENTITY-P0-15..17).
 
 **Still to do in this programme:**
 

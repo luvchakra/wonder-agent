@@ -1,0 +1,51 @@
+{
+  "recordedAt": "2026-09-26",
+  "purpose": "WonderID Phase 0 baseline lock (spec v3, 'Phase 0 — Baseline lock'): the state of the repository before any WonderID change, so every later phase can be compared against it.",
+  "commit": "84e3dda",
+  "stack": {
+    "framework": "Next.js 16 App Router",
+    "react": "19",
+    "language": "TypeScript",
+    "styling": "Tailwind CSS v4, Radix UI + class-variance-authority",
+    "charts": "Recharts",
+    "graph": "React Flow",
+    "database": "Supabase PostgreSQL with RLS (project ekgyjwoenteadaaqakmd)",
+    "auth": "Supabase Auth (email/password, Google, SSO/JIT foundation, TOTP)",
+    "hosting": "Vercel (production alias agent.wonderapps.biz)",
+    "tests": "Vitest (unit), Playwright (E2E)"
+  },
+  "checks": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "unit": { "files": 74, "tests": 536, "passed": 536 },
+    "build": "pass",
+    "e2e": { "specFiles": 28, "lastFullRun": "201/201 passed on 919d1dc (2026-09-25); 42/42 affected specs on 84e3dda" }
+  },
+  "database": { "migrations": 76, "latest": "0076_qa_same_tenant_references.sql" },
+  "modules": [
+    "foundation (lib/*)",
+    "agent-identity",
+    "integrations",
+    "access-governance",
+    "runtime-assurance",
+    "risk",
+    "certification-compliance",
+    "ui (experience)",
+    "platform-admin",
+    "operations",
+    "qa (tests/)"
+  ],
+  "progress": "11 modules, 190 stories, 166 done before the WonderID stories were added",
+  "openItems": [
+    "ai_assistant flag defaults off",
+    "MCP connector outbound URL has no SSRF guard (now INTEGRATION-P0-11)",
+    "one integration secret serves inbound and outbound",
+    "shared Table cell word-breaking",
+    "assignFinding() does not check assignee membership",
+    "tenantless page renders log QUERY_FAILED before redirect",
+    "RISK-P0-12 attack-path factor unsourced",
+    "PLATFORM-P0-12 partial (3 broad flags not enforced)",
+    "EXPERIENCE-P0-16 remaining mockup screens",
+    "QA-P0-18 gateway security suite"
+  ]
+}

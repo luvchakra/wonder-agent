@@ -32,6 +32,11 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Done — 2026-09-25: delegated and escalation owners, member-only owners, ownership review; contract approved users/delegators, environments, expiry; `next_review_at` set; production approval needs an approver; same-tenant agent references (0075) |
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
+| IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-16 | Identity attributes and relationships | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-17 | Identities directory and identity detail | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -662,3 +667,30 @@ Delegated-owner type and ownership review; contract fields for approved users/de
 - Any risk scoring or finding generation (Risk Agent) — Identity only exposes
   ownership/lifecycle *facts*, never a severity or a finding.
 - Any connector/credential/sync logic (Integration Agent).
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### IDENTITY-P0-15 — Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent)
+
+One tenant-scoped `identities` table as the common identity reference (spec R5). Humans may link to a Foundation `users` row or exist without one; AI agents link 1:1 to `agents`, which stays canonical for every agent field; other machine identities are first-class rows. Shared fields: type, subtype, display name, status, lifecycle state, source and correlation key, owner and sponsor, risk, privileged, external. Existing agents get identity rows by migration; nothing about `agents` changes.
+
+### IDENTITY-P0-16 — Identity attributes and relationships
+
+Tenant-defined attribute definitions per identity type (data type, required, sensitive, searchable, unique, allowed values, source mapping) stored alongside typed canonical columns; identity relationships (manager_of, owns, sponsors, delegates_to, service_account_for, workload_runs_for, …) with validity windows, source and confidence.
+
+### IDENTITY-P0-17 — Identities directory and identity detail
+
+Identities overview, All Identities, Human Users (employees, contractors), External Users, Machine Identities (service accounts, application accounts, API, workload), AI Agents (links to the existing agent screens), Groups, Ownership & Sponsorship and Identity Search; identity detail with Overview, Access, Ownership, Risk, Activity, Provenance and Audit tabs. Paginated at the database, tenant-filtered, permission-checked.
+
+### IDENTITY-P0-18 — Human lifecycle: joiner, mover, leaver, rehire, ownership transfer
+
+Lifecycle states Pre-Join → Active → Leave Pending → Disabled → Terminated → Archived plus rehire and conversions. Events come from authoritative sources (INTEGRATION-P0-09) and drive governed work — birthright access, stale-access review on move, revoke and account disable on leave, ownership transfer of everything a leaver owns — never direct uncontrolled writes.
+
+### IDENTITY-P0-19 — AI agent onboarding journey, sponsor, agent access packages, lifecycle policies
+
+The spec's agent journey (discover → classify → register → owner/sponsor → tools → apps/data → access model → validate → govern → activate) as a guided flow over the existing agent registration, contracts, MCP inventory and gateway; agent sponsor; agent access packages via ACCESS-P0-20; lifecycle policies and ownership transfer.

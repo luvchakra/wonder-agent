@@ -32,6 +32,17 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-12 | Policy targets and publish (master P0-23) | Done — 2026-09-25: targets (TOOL, MCP_SERVER, MCP_TOOL, DATA_SOURCE, DATA_RESOURCE, ACTION) in `scope.targets` decide which runtime policies apply; priority orders evaluation; drafts + `publishPolicy()` (new version, audited) behind `policy.publish`; `createPolicy` now audited |
 | ACCESS-P0-13 | Data sources inventory (master P0-11) | Done — 2026-09-25: `data_sources` (migration 0070, RLS, same-tenant composite FKs, no delete), entitlement link, CAN carries data source + classification fallback, audited service/API, `/access/data-sources` |
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Done — 2026-09-25: `enforceSoD()` on request submission, request decision and manual grant; blocking → 409 SOD_CONFLICT (audited failure), flag → proceeds and audited; `checkSoD()` now service-role + matches the agent in object or metadata |
+| ACCESS-P0-15 | Application catalog model and inventory | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-16 | Application onboarding: state machine, checklist, validate, simulate, approve, promote | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-18 | Self-service request catalog and request policies | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-20 | Access packages | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-24 | Access ledger and provenance | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -585,3 +596,54 @@ User decision: Access owns data sources beside `applications` — a `data_source
 - Runtime event ingestion (Runtime Agent).
 - Certification campaigns/decisions (Compliance Agent).
 - Any connector/credential logic (Integration Agent).
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### ACCESS-P0-15 — Application catalog model and inventory
+
+Extend `applications` with type, display name, business and technical owners, environment, risk level, criticality, data classification, connector, onboarding and lifecycle status, discovered/connected; Application Catalog, Inventory and Application Details screens.
+
+### ACCESS-P0-16 — Application onboarding: state machine, checklist, validate, simulate, approve, promote
+
+Onboarding record per application with the spec's states and P0 checklist; simulation never mutates production; promotion activates exactly the approved version; a changed configuration invalidates earlier validation.
+
+### ACCESS-P0-17 — Account inventory: correlation, orphan and dormant accounts
+
+Accounts correlated to identities (not only agents), orphan accounts (no identity), dormant accounts (no use within a configured window), account reconciliation view.
+
+### ACCESS-P0-18 — Self-service request catalog and request policies
+
+Requestable applications, entitlements and packages governed by request policies (who may request, for whom, max duration, justification, risk threshold, auto-approval eligibility); requests for self and others with the spec's status machine; duplicates return the open request.
+
+### ACCESS-P0-19 — Approval engine: multi-stage chains, approver scope, no self-approval
+
+Sequential and parallel approval stages resolved from policy (manager, application owner, entitlement owner, named group), approver-scope checks, no self-approval, expiry and escalation, exact-action approval fingerprints.
+
+### ACCESS-P0-20 — Access packages
+
+Bundles of entitlements and roles with owner, policy (eligibility, approvers, duration, expiry, certification), assignment and expiry-driven revocation; usable for humans and AI agents.
+
+### ACCESS-P0-21 — Business and IT roles
+
+Business/IT/application roles with entitlements, hierarchy, owners, risk, requestability; assignments with source, provenance, start and expiry; simulation of add/remove showing access, SoD and risk impact without executing.
+
+### ACCESS-P0-22 — Preventive SoD on entitlement combinations
+
+Conflict rules over entitlements/roles with actions BLOCK, REQUIRE_EXCEPTION, REQUIRE_ADDITIONAL_APPROVAL, WARN, evaluated at request, package, role and direct grant; exceptions with owner, expiry and compensating control. Extends the existing SoD (ACCESS-P0-14), which covers conflicting actions by one person.
+
+### ACCESS-P0-23 — Delegations
+
+Approval, request and administration delegation and access-on-behalf, each with grantor, grantee, scope, start, finite expiry, reason and audit; human→agent, agent→human and agent→agent directions.
+
+### ACCESS-P0-24 — Access ledger and provenance
+
+Append-only ledger per identity-access relationship with source (request, role, package, lifecycle, import, legacy, admin, emergency, agent authorization, unknown), request and approval lineage, dates, last verified/used and status; the "why does this identity have this access?" view. Missing evidence is UNPROVEN, never fabricated.
+
+### ACCESS-P0-25 — Imported access classification and drift findings
+
+Desired vs actual reconciliation: target-only, WonderID-only, attribute, ownership, status and privilege drift; imported access classified AUTHORIZED, LEGACY, UNPROVEN or ROGUE by configurable rules so pre-go-live access is not labelled malicious.

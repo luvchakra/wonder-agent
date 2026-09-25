@@ -30,6 +30,8 @@ issued.
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
 | OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
 | OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Done — 2026-09-25: enforced DENY → `runtime_alert`, enforced REQUIRE_APPROVAL → `approval_required` (mandatory, throttled per agent); search covers gateway decisions and (with RISK-P0-11) investigations |
+| OPERATIONS-P0-09 | Workflow designer and runs | Not Started — 2026-09-26, WonderID |
+| OPERATIONS-P0-10 | WonderID insights, reports and identity graph views | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -464,3 +466,18 @@ instructions (email channel not wired, `notify()` not yet called by
 producing modules, search covering 6 of 9 object types, no dedicated
 job-status customer page) remain exactly as recorded in the existing
 tracker rows and are not restated as new items.
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### OPERATIONS-P0-09 — Workflow designer and runs
+
+Declarative workflow definitions (start, condition, fetch, evaluate policy, SoD, risk, approvals, provision, revoke, notify, task, wait, timer, retry, escalate, end) executed as idempotent runs with history, failures and retries; policy evaluation is delegated to Access.
+
+### OPERATIONS-P0-10 — WonderID insights, reports and identity graph views
+
+Identity, access, application, certification, agent and operational dashboards (spec §28), pre-built and scheduled reports, and graph explorer over the existing access graph read model.

@@ -40,6 +40,9 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-14 | AI-Assisted Investigation UI (read-only summaries) | Done — `AiSummaryPanel` shared component wired into Rogue Agent Detail (finding + SHOULD/CAN/DID summaries); shows "not configured" until FOUNDATION-P0-16 has a provider |
 | EXPERIENCE-P0-16 | Light-console screens 4–12 and the MCP boards | Not Started — 2026-09-25, master stories |
 | EXPERIENCE-P0-17 | Access wording: friendly label with the technical term | Done — 2026-09-25: one `ACCESS_VIEW` source in `modules/ui`, applied to runtime, rogue, Agent 360, access, help, welcome, AI settings and the evidence pack |
+| EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -633,3 +636,22 @@ User decision: screens say "Approved (SHOULD)", "Effective Access (CAN)", "Obser
   existing module's published API/service function.
 - Platform Admin UI (Platform Agent).
 - New database tables of any kind.
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### EXPERIENCE-P0-18 — WonderID brand and dark navy navigation shell
+
+Rename the product to WonderID in the app and replace the light-console rail with the mockups' dark navy sidebar: expanded and collapsed modes, hover flyouts to the third level, active-route highlight, mobile drawer, WonderID AI and profile at the foot. Only implemented routes appear; sections grow as phases land. Both themes, seven widths.
+
+### EXPERIENCE-P0-19 — WonderID Home and My Access self-service portal
+
+The Home dashboard of the mockups over real data (identities, agents, applications, open requests, rogue access, identity distribution, onboarding, certifications, my tasks, quick actions) and My Access (request, my requests, approvals, certifications, current access, delegations).
+
+### EXPERIENCE-P0-20 — WonderID AI assistant
+
+The global assistant (explain, search, summarize, recommend, draft, simulate) under the existing AI provider configuration, permission- and tenant-scoped, executing nothing except governed low-risk actions and saying what it did and did not do.

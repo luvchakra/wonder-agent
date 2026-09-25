@@ -33,6 +33,7 @@ this module is higher bar (see below).
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
 | RISK-P0-11 | Investigations as a first-class record (master P0-37) | Done — 2026-09-25: migration 0071 (investigations, investigation_findings, investigation_events; select-only RLS; composite same-tenant FKs), audited service + API, `/risk/investigations` list/detail with timeline; cannot resolve while a finding is open |
 | RISK-P0-12 | New risk signals (master P0-20/P0-21) | Partial — 2026-09-25: suspicious delegation + unapproved tool use findings (migration 0072), certification overdue / destructive capability / credential health factors sourced, Shadow AI signal on /risk; attack-path factor still has no source (needs an Access graph-traversal contract) |
+| RISK-P0-13 | Rogue Access management | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -617,3 +618,14 @@ Suspicious delegation (from `agent_relationships`), shadow AI (from IDENTITY-P0-
   certification review as evidence.
 - Any actual access-grant mutation — Risk always goes through Access/Integration's
   published contracts, never direct writes to their tables.
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### RISK-P0-13 — Rogue Access management
+
+Rogue Access inventory across identity types, investigation view with evidence, remediation actions (revoke, create authorization, access package, legacy recognition, owner, exception, time-bound, escalate, quarantine), severity from privilege/sensitivity/external/inactive/owner/provenance/blast radius, and trend. Builds on existing findings, evidence and investigations.

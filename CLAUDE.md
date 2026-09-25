@@ -1,11 +1,21 @@
-# WonderAgent — Root Engineering Contract
+# WonderID (repository lineage: WonderAgent) — Root Engineering Contract
 
-> **WonderAgent** is a vendor-neutral **AI Identity Governance & Runtime Assurance**
-> SaaS platform. It makes AI agents first-class enterprise identities by governing
-> their ownership, lifecycle, purpose, effective access, runtime behavior,
-> certification, risk and remediation across a customer's existing IAM platforms.
+> **WonderID** is an enterprise **Identity Governance & Security** platform: one
+> governance control plane for human, external, machine, service-account,
+> application, workload, API and AI-agent identities. Its founding principle is
+> *anything that can receive, exercise, delegate, inherit or lose access is an
+> identity*. It answers, for every identity-access relationship: who or what the
+> identity is, what access it has, why it has it, who authorized it under which
+> policy, and whether it is still appropriate.
 >
-> **Tagline:** Govern every AI agent. Verify every action.
+> WonderID grew out of **WonderAgent**, the AI Identity Governance & Runtime
+> Assurance product this repository was built as. Everything WonderAgent does
+> (agent identity, SHOULD/CAN/DID, the Runtime Gateway, rogue-agent risk,
+> certification) remains P0 and is WonderID's **AI Agents** pillar. "WonderAgent"
+> stays the repository, module and database lineage name; "WonderID" is the
+> product name users see.
+>
+> **Tagline:** Govern every identity. Verify every access.
 
 This file is the binding contract for every Claude Code agent (or human) working on
 this repository. It is read by every module agent before it does anything. Nothing in
@@ -16,6 +26,19 @@ sections requires explicit user approval — not an agent's own judgment call.
 The conceptual source of truth is the WonderAgent master PRD. The documents in
 `docs/plan/*-BACKLOG.md` are the execution-scoped derivation of that PRD and are what
 agents actually implement against.
+
+**2026-09-26 — WonderID adopted (explicit user decision).** The user supplied the
+WonderID P0 implementation specification (repository-grounded v3, stored at
+`docs/requirements/WonderID_P0_Implementation_Spec_v3.md` with its mockups) and,
+asked directly, chose to: adopt WonderID as the product contract (amending
+non-negotiable #7 and §10 below); rename the product to WonderID in the app now,
+keeping the repository, Vercel project, database and domain; and replace the light
+console navigation with the dark navy sidebar of the WonderID mockups. The
+specification is additive to this repository: it forbids a parallel application,
+database, RBAC, policy engine or agent-governance stack, and where it conflicts with
+this file the repository's security controls, ownership and working implementation
+win (spec, "Final Claude Code operating instruction"). Phase plan and story IDs:
+`docs/plan/WONDERID-ROADMAP.md`.
 
 **2026-09-14 requirements refresh:** the user supplied an updated 11-module master
 requirements package (plus an execution guide) expanding P0/P1/P2 scope per module.
@@ -50,9 +73,15 @@ log entry.
    Identity Agent. Neither module duplicates the other; see the Ownership Map.)
 6. Modules must communicate through explicit published contracts/services/types and
    must not import another module's internal implementation.
-7. WonderAgent is an AI Identity Governance and Runtime Assurance layer, not a
-   replacement IAM, IGA, PAM or SIEM platform; existing IAM remains the system of
-   record for identity and access where applicable.
+7. WonderID is an identity governance platform for human, external, machine and
+   AI-agent identities (amended 2026-09-26 by explicit user decision; it previously
+   read "not a replacement IAM, IGA, PAM or SIEM"). It governs identities and access
+   but is still not an identity provider, PAM vault, SIEM or SOC: authentication
+   of workforce users into target systems stays with the customer's IdP, and
+   authoritative HR/directory sources stay the system of record for the attributes
+   they own. Where a connected system is the source of truth for a record,
+   WonderID records provenance and reconciles against it rather than silently
+   overriding it.
 8. SHOULD, CAN and DID are separate concepts: SHOULD represents approved agent
    purpose/policy/contract, CAN represents effective technical capability, and DID
    represents observed runtime behavior.
@@ -145,6 +174,21 @@ only create/modify database tables, routes, services and shared types listed as
 | 09 | **Platform Agent** | Vendor Platform Administration | Vendor-only `/platform-admin` console, tenant management, subscriptions, feature flags, global configuration, integration catalog, usage, platform health, support access, platform audit |
 | 10 | **Operations Agent** | Audit, Reporting, Notifications & Search | Audit views, audit evidence presentation, reports, notifications, search, operational dashboards, exports, customer reporting |
 | 11 | **QA Agent** | Final Integration, QA & Security Hardening | Cross-module integration verification, end-to-end testing, security testing, tenant-isolation testing, RBAC testing, performance checks, migration validation, architecture-boundary checks, regression testing, production hardening |
+
+**WonderID extensions (2026-09-26).** Module ownership is unchanged; each module
+extends its own domain: Foundation adds the human identity foundation, WonderID
+permission model (feature/action/object/request/approval/admin scope) and
+passwordless; Identity generalizes the identity abstraction to human, external and
+machine identities while keeping `agents` the canonical agent identity; Integration
+adds authoritative identity sources, application-onboarding connectors and access
+reconciliation; Access adds human access governance, roles, access packages, the
+access ledger/provenance and rogue-access authorization comparison; Runtime extends
+machine/agent runtime authorization; Risk extends identity and access risk to every
+identity type; Compliance extends certification campaigns to every identity type;
+Experience delivers the WonderID shell; Platform adds the tenant Configuration Studio
+while keeping the vendor-only boundary; Operations extends reporting, evidence,
+notifications and search; QA gates migrations, security and tenant isolation. The
+per-story map is `docs/plan/WONDERID-ROADMAP.md`.
 
 Full table/route/API/contract-level ownership is in
 [`docs/design/ownership-map.md`](docs/design/ownership-map.md). No agent may create a
@@ -428,16 +472,21 @@ AI Agent → Ownership → Lifecycle → Purpose/Identity Contract → SHOULD
 
 ---
 
-## 10. Product Boundaries — WonderAgent is NOT
+## 10. Product Boundaries — WonderID is NOT
 
-1. A replacement IAM/IGA platform.
+(Amended 2026-09-26 with the WonderID adoption: item 1 no longer excludes IGA, and
+item 7 no longer excludes NHI governance, both of which are now in scope.)
+
+1. An identity provider or a replacement for the customer's workforce IdP,
+   directory or HR system of record.
 2. A replacement PAM platform.
 3. A replacement SIEM/SOC platform.
 4. A generic AI agent registry whose primary value is inventory alone.
 5. Another MCP server.
 6. An autonomous system that independently grants or revokes sensitive enterprise
    access without approved human/governance controls.
-7. A generic NHI (non-human identity) platform in P0.
+7. A secrets vault: machine and agent credentials are governed (ownership,
+   rotation evidence, expiry) but never stored in plaintext or revealed.
 8. A custom LLM/model platform.
 9. A proprietary graph database platform.
 10. A basis for claiming an organization is "ISO compliant" merely because
@@ -494,12 +543,19 @@ A feature is complete only when:
 
 ## 13. UI/UX Design Standards
 
-WonderAgent is enterprise software that governs security-critical AI infrastructure.
-Every screen must read as a serious, premium enterprise security product — never as
-a generic scaffolded CRUD app, a dashboard-kit template, a consumer AI chatbot, or an
-AI-generated placeholder UI. This section is binding for every module that ships UI
-(primarily Experience Agent, but also any module's own bare functional pages before
+WonderID is enterprise software that governs security-critical identity and AI
+infrastructure. Every screen must read as a serious, premium enterprise security
+product — never as a generic scaffolded CRUD app, a dashboard-kit template, a
+consumer AI chatbot, or an AI-generated placeholder UI. This section is binding for
+every module that ships UI (primarily Experience Agent, but also any module's own bare functional pages before
 Experience composes them).
+
+**Navigation (2026-09-26, explicit user decision):** the WonderID shell uses a
+**dark navy left sidebar** (collapsible, hover flyouts to the third level, mobile
+drawer) with the light content area of the WonderID mockups
+(`docs/requirements/wonderid-*.png`). This supersedes the light-console rail of
+EXPERIENCE-P0-15. Content surfaces, tokens and both themes are unchanged, and a
+sidebar item appears only when its route and capability exist.
 
 **The full, binding rule set is
 [`docs/design/UI-UX-DESIGN-RULES.md`](docs/design/UI-UX-DESIGN-RULES.md) — read it in

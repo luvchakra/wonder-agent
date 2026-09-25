@@ -32,6 +32,12 @@ for every non-"Done" row is in
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 | INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
+| INTEGRATION-P0-08 | Authoritative identity sources | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-10 | Application discovery and unrecognized applications | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-12 | AI-assisted onboarding proposals | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -492,3 +498,34 @@ MCP events ingested via `ingestMcpRuntimeEvent()` reach Runtime's `runtime_event
   contract; the owning module persists it into its own schema.
 - Any risk/finding/policy-evaluation logic.
 - Any UI beyond functional configuration/status screens (Experience Agent restyles).
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### INTEGRATION-P0-08 — Authoritative identity sources
+
+A source role on top of `integrations`: authoritative-for attributes, source precedence, object types, attribute mappings, correlation rules (immutable ID, email, username, composite), schedule, incremental and leaver strategy. Templates for CSV, SCIM, generic REST and HR-API shapes rather than a connector per vendor.
+
+### INTEGRATION-P0-09 — Identity import and reconciliation pipeline
+
+Fetch → validate → normalize → correlate → compare → stage → apply → lifecycle events → provenance → audit, recorded as reconciliation runs with counts. Ambiguous matches become pending correlations for human review and are never merged silently; a failed run never erases identities; higher-precedence sources win per attribute.
+
+### INTEGRATION-P0-10 — Application discovery and unrecognized applications
+
+Discover applications from connected IdPs/connectors, OpenAPI documents, SCIM metadata and manual registration; unmatched ones are UNRECOGNIZED with actions (assign owner, register, classify, connect, exception, ignore with reason — ignored ones stay in audit).
+
+### INTEGRATION-P0-11 — Connector capability model, write interface with idempotency, SSRF guard
+
+Explicit capability declarations (read identities/accounts/entitlements/access, create/update/disable/delete account, grant/revoke, usage, webhooks, bulk), a write interface that takes idempotency keys, and the outbound-URL guard for every customer-supplied URL (closes the MCP SSRF open item).
+
+### INTEGRATION-P0-12 — AI-assisted onboarding proposals
+
+From an OpenAPI document or sample payload, propose account/entitlement schema, correlation, mappings, owner, risk and requestability as a schema-validated proposal with assumptions, confidence and evidence. Never activates anything; external content is data, never instructions.
+
+### INTEGRATION-P0-13 — Provisioning and deprovisioning pipeline
+
+Authorization → plan → pre-checks → connector execution with idempotency key → read-back verification → access ledger → audit, as background jobs with retry. Never FULFILLED from an API call alone where verification is possible; a read-only connector can never write.

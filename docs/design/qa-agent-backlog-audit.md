@@ -863,3 +863,52 @@ reading the code before it was changed.
   compliance specs pass (54/54).
 - Full pipeline: `tsc` and `eslint` clean, vitest **536/536**, Playwright
   **201/201** (9.9 min, fresh build, with 0076 applied live).
+
+---
+
+## 2026-09-26 — QA-P0-20: WonderID adopted; baseline locked before any change
+
+**What happened.** The user supplied the WonderID P0 implementation
+specification: v2, then a repository-grounded v3 with 5 mockup boards. Its
+scope contradicts the contract: an identity governance (IGA) platform for
+human, external, machine and AI-agent identities, where non-negotiable #7 and
+§10 said "not a replacement IAM/IGA". Asked directly, the user chose to:
+
+- adopt WonderID and amend the contract;
+- rename the product in the app now, keeping the repo, Vercel project,
+  database and domain;
+- replace the light-console rail with the dark navy sidebar.
+
+v3 settles the fourth question, which went unanswered: v2 §25 named
+`agent_runs`, households and similar, which do not exist here. v3 makes this
+repository the only implementation source, and "WonderAgent" means its own
+agent governance.
+
+**What changed:**
+
+- **`CLAUDE.md`:**
+  - the header now describes WonderID, with WonderAgent kept as the
+    repository lineage;
+  - a dated adoption note;
+  - non-negotiable #7 rewritten: WonderID governs identities and access, but
+    is not an IdP, vault, SIEM or SOC, and HR/directory sources stay the
+    system of record for what they own;
+  - §10 items 1 and 7 replaced;
+  - a WonderID extension line per module under the ownership table;
+  - the navigation decision recorded in §13.
+- **The specification and mockups** are stored in `docs/requirements/`.
+- **`docs/plan/WONDERID-ROADMAP.md`** lists 36 stories across 12 phases,
+  each owned by an existing module. It also records five planning decisions
+  taken by the spec's autonomy rule: the identity reference model, three
+  separate kinds of role, where the workflow engine lives, passwordless on
+  Supabase Auth, and brownfield access defaulting to UNPROVEN.
+- **Every affected backlog** gained Progress Tracker rows and a
+  "WonderID (2026-09-26)" section defining its stories.
+
+**Baseline** (`docs/implementation/wonderid-baseline.json`), at `84e3dda`:
+
+- typecheck and lint clean;
+- vitest 74 files, 536/536;
+- `next build` passes;
+- 76 migrations (latest 0076);
+- 28 E2E spec files, last full run 201/201.

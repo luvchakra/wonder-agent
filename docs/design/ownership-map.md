@@ -1,4 +1,9 @@
-# WonderAgent — Module Ownership Map
+# WonderID (WonderAgent lineage) — Module Ownership Map
+
+> **2026-09-26 — WonderID.** Ownership is unchanged by the WonderID adoption: every
+> WonderID capability is owned by the existing module that owns its domain (see
+> `CLAUDE.md` §2 and `docs/plan/WONDERID-ROADMAP.md`). New tables are added to the
+> list below by the story that creates them, in the same commit.
 
 This is the authoritative map of who owns what. Before creating a table, route,
 service, API contract or shared type, check here first — if it already exists (or is

@@ -48,6 +48,9 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
 | FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Done — 2026-09-25: migration `0061` applied live; `lib/security/agentApiKeys.ts` (hash-only storage, tenant+agent-bound verify, fail-closed), API routes, Agent 360 card; 16 unit + 9 live SQL checks + 4 E2E; see audit log |
 | FOUNDATION-P0-18 | New permission keys (master P0-42) | Done — 2026-09-25: 7 keys seeded by least privilege in `0061`, `requireAnyPermission()` added; live-verified; see audit log |
+| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
 
 ---
 
@@ -841,3 +844,22 @@ Add only the genuinely new keys (user decision — existing 35 are not renamed):
 - Platform-admin *feature* screens (tenant list UI, subscription management UI) —
   Platform Agent owns those; Foundation only owns the authorization boundary they run
   inside.
+
+---
+
+## WonderID (2026-09-26)
+
+Adopted by explicit user decision; see `CLAUDE.md` and `docs/plan/WONDERID-ROADMAP.md`.
+These stories extend this module's own tables, services and routes.
+
+### FOUNDATION-P0-19 — WonderID permissioning: object, request, approval and admin scope; default roles
+
+Extend `roles`/`permissions`/`user_roles` and `requirePermission()` (no second system) with scoped role assignments: object scope (tenant, application, identity group, self, direct reports, assigned objects), request scope, approval scope and administration scope, plus field-level data visibility. Seed the spec's default roles (§19.10) as templates alongside the existing ones. Deny by default; approval authority cannot be self-assigned; every change audited.
+
+### FOUNDATION-P0-20 — Permission simulation and the Permissions (WonderID) screens
+
+"Can this person do this action on this object, and why?" — deterministic simulation over the same evaluation `requirePermission()` uses, with the matching role and scope as the explanation. Screens: WonderID Roles, Functional Permissions, Data & Object Scope, Administrative Delegation, User Management.
+
+### FOUNDATION-P0-21 — Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery
+
+WebAuthn Level 3 passkeys and security keys on top of the existing Supabase Auth session (no parallel session stack): enrollment, sign-in, authenticator management, authentication policies, step-up for high-risk actions, and recovery that cannot silently bypass policy. Challenges are single-use and origin-bound; only public credential material is stored.
