@@ -145,9 +145,11 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
                         <span className="block truncate font-mono text-xs text-muted-foreground">{e.externalReference}</span>
                       ) : null}
                     </Td>
-                    <Td>{humanize(e.identityType)}</Td>
                     <Td>
-                      <Badge tone={STATUS_BADGE[e.status].tone}>{STATUS_BADGE[e.status].label}</Badge>
+                      <span className="md:whitespace-nowrap">{humanize(e.identityType)}</span>
+                    </Td>
+                    <Td>
+                      <Badge tone={STATUS_BADGE[e.status].tone} className="whitespace-nowrap">{STATUS_BADGE[e.status].label}</Badge>
                     </Td>
                     <Td>
                       {e.agent ? (
@@ -169,7 +171,7 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
                       )}
                     </Td>
                     <Td hideBelow="xl">{e.sourceName}</Td>
-                    <Td hideBelow="xl">{e.owner ?? <span className="text-muted-foreground">Unknown</span>}</Td>
+                    <Td hideBelow="xl">{e.owner ?? <span className="text-muted-foreground md:whitespace-nowrap">Unknown</span>}</Td>
                   </Tr>
                 ))}
               </tbody>

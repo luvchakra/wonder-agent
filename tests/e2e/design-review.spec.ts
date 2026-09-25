@@ -34,6 +34,7 @@ const ROUTES = [
   "/access/requests",
   "/risk/rogue",
   "/integrations/jobs",
+  "/integrations/mcp",
   "/settings/roles",
 ];
 

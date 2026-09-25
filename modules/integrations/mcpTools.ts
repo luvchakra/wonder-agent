@@ -8,27 +8,22 @@ import { toIntegrationObject } from "./mappers";
 import type { IntegrationObject } from "@/lib/shared/types/integrations";
 
 /**
- * INTEGRATION-P0-04.1. Discovers an MCP server's declared tools and
- * persists them as integration_objects (object_type 'entitlement' — closest
- * fit among the existing enum values for "a capability the agent may be
- * granted"). This question was originally left flagged pending Runtime
- * Agent's own runtime_tools model; now that it exists
- * (modules/runtime-assurance/events.ts), it's confirmed to be a different
- * concept entirely — runtime_tools is populated only from observed runtime
- * events (DID: a tool the agent actually invoked), never from a
- * capability-discovery step, so it was never the right destination for
- * pre-usage MCP discovery data. 'entitlement' remains the correct
- * classification; see the Integration Agent audit log for the resolution.
+ * INTEGRATION-P0-04.1, extended by INTEGRATION-P0-06. Discovers an MCP
+ * server's identity, declared tools and resources (read-only: nothing is
+ * executed) and persists them as the integration_objects families
+ * `mcp_server`, `mcp_tool` and `mcp_resource`. Tools used to be stored as
+ * the generic `entitlement`; migration 0069 reclassified any such rows.
  *
- * Tool -> agent association is deliberately NOT implemented here: per this
- * module's "consumes Identity Agent's agents list read-only; does not
- * create/modify agents rows itself," the actual link is created via
- * Identity's own linkAgentIdentity()
- * (POST /api/v1/agents/:id/identities, identityType: 'mcp_server') — a human
- * (or, later, Experience Agent's UI) reads the discovered tools from here
- * and pastes the chosen tool's externalId into Identity's existing
- * endpoint. Building a second "link" mutation here would duplicate a write
- * path Identity already owns.
+ * `runtime_tools` (Runtime) is a different concept: tools an agent was
+ * observed invoking (DID). This is what a server declares it offers.
+ *
+ * Tool -> agent association is deliberately NOT implemented here: the
+ * link is Identity's (linkAgentIdentity, identityType 'mcp_server'). A
+ * second link mutation here would duplicate a write path Identity owns.
+ *
+ * The server record is written first, so every tool and resource of this
+ * discovery is at least as new as it; `getMcpInventory()` uses that to
+ * mark anything older as no longer declared.
  */
 export async function discoverMcpTools(
   tenantId: string,
@@ -53,7 +48,9 @@ export async function discoverMcpTools(
 
   const admin = supabaseServiceRole();
   const rows = [];
-  for (const tool of tools) {
+  // Server first (see above).
+  const ordered = [...tools.filter((t) => t.objectType === "mcp_server"), ...tools.filter((t) => t.objectType !== "mcp_server")];
+  for (const tool of ordered) {
     const { data, error: upsertError } = await admin
       .from("integration_objects")
       .upsert(
@@ -64,6 +61,7 @@ export async function discoverMcpTools(
           external_id: tool.externalRef,
           raw: tool.summary,
           normalized: tool.summary,
+          imported_at: new Date().toISOString(),
         },
         { onConflict: "integration_id,object_type,external_id" },
       )

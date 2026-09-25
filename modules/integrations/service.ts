@@ -26,5 +26,6 @@ export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs, listLatestComplete
 export { getNormalizedObjects, getNormalizedObjectsForTenant } from "./objects";
 export { createMapping, listMappings } from "./mappings";
 export { discoverMcpTools } from "./mcpTools";
+export { getMcpInventory } from "./mcpInventory";
 export { receiveWebhook, type WebhookResult } from "./webhooks";
 export { ingestMcpRuntimeEvent, parseMcpEvent, type McpEventResult, type McpRuntimeOutcome } from "./mcpEvents";

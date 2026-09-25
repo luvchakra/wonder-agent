@@ -78,7 +78,11 @@ export type IntegrationObjectType =
   | "entitlement"
   | "access_grant"
   | "policy"
-  | "activity";
+  | "activity"
+  // INTEGRATION-P0-06: MCP object families.
+  | "mcp_server"
+  | "mcp_tool"
+  | "mcp_resource";
 
 export type IntegrationObject = {
   id: string;
@@ -166,4 +170,49 @@ export type AccessRequestInput = {
   accountExternalRef: string;
   entitlementExternalRef: string;
   justification: string;
+};
+
+/**
+ * INTEGRATION-P0-06 (master P0-10) — the MCP inventory Integration
+ * publishes: each MCP integration's server, its declared tools and its
+ * resources, from `integration_objects` families `mcp_server` /
+ * `mcp_tool` / `mcp_resource`. `operation` is derived deterministically
+ * from the tool's own annotations first, then its name (never by a
+ * model); "unknown" when neither says.
+ */
+export type McpToolOperation = "read" | "write" | "unknown";
+
+export type McpTool = {
+  integrationId: string;
+  name: string;
+  description: string | null;
+  operation: McpToolOperation;
+  /** How the operation was decided: the server's annotation, or the tool name. */
+  operationBasis: "annotation" | "name" | "none";
+  destructive: boolean;
+  inputSchema: Record<string, unknown> | null;
+  discoveredAt: string;
+  /** False when the latest discovery no longer listed it (kept as evidence, never deleted). */
+  stillDeclared: boolean;
+};
+
+export type McpResource = {
+  integrationId: string;
+  uri: string;
+  name: string | null;
+  mimeType: string | null;
+  discoveredAt: string;
+  stillDeclared: boolean;
+};
+
+export type McpServerInventory = {
+  integrationId: string;
+  integrationName: string;
+  endpoint: string | null;
+  serverName: string | null;
+  serverVersion: string | null;
+  protocolVersion: string | null;
+  lastDiscoveredAt: string | null;
+  tools: McpTool[];
+  resources: McpResource[];
 };

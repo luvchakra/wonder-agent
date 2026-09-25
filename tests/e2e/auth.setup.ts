@@ -1,6 +1,6 @@
 import { test as setup, expect } from "@playwright/test";
 import { mkdirSync } from "node:fs";
-import { clearAuthRateLimits, pruneThrowawayAgents, seedTestData } from "./support/seedTestData";
+import { clearAuthRateLimits, pruneThrowawayAgents, pruneThrowawayIntegrationsAndQuarantine, seedTestData } from "./support/seedTestData";
 import { TEST_USERS, authFile, type TestUserKey } from "./support/testUsers";
 
 mkdirSync("tests/e2e/.auth", { recursive: true });
@@ -24,6 +24,7 @@ setup.beforeAll(async () => {
   expect(seeded.userIds.adminTwo).toBeTruthy();
   // Start from a known agent population — see pruneThrowawayAgents().
   await pruneThrowawayAgents([seeded.tenantIds.one, seeded.tenantIds.two]);
+  await pruneThrowawayIntegrationsAndQuarantine([seeded.tenantIds.one, seeded.tenantIds.two]);
 });
 
 function signInAndSaveState(key: TestUserKey) {

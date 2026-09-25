@@ -106,6 +106,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     icon: "Plug",
     children: [
       { label: "Connectors", href: "/integrations" },
+      { label: "MCP Servers", href: "/integrations/mcp" },
       { label: "Sync Jobs", href: "/integrations/jobs" },
     ],
   },

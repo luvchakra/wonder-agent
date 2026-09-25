@@ -2,6 +2,7 @@ import "server-only";
 
 import type { ConnectorAdapter, ConnectorConfig } from "../connector";
 import type { ConnectorCapabilities, DiscoveredObject } from "@/lib/shared/types/integrations";
+import { normalizeMcpDeclarations } from "../mcpNormalize";
 
 /**
  * INTEGRATION-P0-04.1. Speaks the MCP "Streamable HTTP" transport directly
@@ -60,13 +61,23 @@ export class McpConnector implements ConnectorAdapter {
     return this.testConnection();
   }
 
+  /**
+   * INTEGRATION-P0-06: the server's identity (`initialize`), its tools
+   * (`tools/list`) and its resources (`resources/list`), normalized into
+   * the mcp_server / mcp_tool / mcp_resource families. Read-only: no tool
+   * is ever called. A server that does not implement resources simply
+   * has none; any other failure propagates.
+   */
   async discover(): Promise<DiscoveredObject[]> {
-    const result = (await this.rpc("tools/list")) as { tools?: Record<string, unknown>[] };
-    const tools = result.tools ?? [];
-    return tools.map((tool) => ({
-      externalRef: String(tool.name),
-      objectType: "entitlement",
-      summary: tool,
-    }));
+    const initialize = await this.rpc("initialize", {
+      protocolVersion: "2025-06-18",
+      capabilities: {},
+      clientInfo: { name: "WonderAgent", version: "1.0" },
+    }).catch(() => null);
+    const tools = ((await this.rpc("tools/list")) as { tools?: unknown[] })?.tools ?? [];
+    const resources = await this.rpc("resources/list")
+      .then((r) => ((r as { resources?: unknown[] })?.resources ?? []))
+      .catch(() => []);
+    return normalizeMcpDeclarations({ endpoint: this.baseUrl, initialize, tools, resources });
   }
 }

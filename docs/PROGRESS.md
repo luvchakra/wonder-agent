@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**156 of 190 tracked stories complete — 82%**
+**157 of 190 tracked stories complete — 83%**
 
 ```
-█████████████████████████████████░░░░░░░  82%
+█████████████████████████████████░░░░░░░  83%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 156 |
+| Done | 157 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 12 |
+| Not Started | 11 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 0 | 31 | `█████████████████░` 94% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 12 | 1 | 0 | 1 | 14 | `███████████████░░░` 86% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 0 | 14 | `█████████████████░` 93% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 12 | 0 | 0 | 3 | 15 | `██████████████░░░░` 80% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
@@ -122,7 +122,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 12 done · 1 partial · 0 deferred · 1 not started (14 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 13 done · 1 partial · 0 deferred · 0 not started (14 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -138,7 +138,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
-| INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Not Started — 2026-09-25, master stories |
+| INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
 
 ### 04 — Access Agent

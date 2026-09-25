@@ -30,7 +30,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
-| INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Not Started — 2026-09-25, master stories |
+| INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
 
 ---

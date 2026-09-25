@@ -135,6 +135,24 @@ export async function pruneThrowawayAgents(tenantIds: string[]): Promise<void> {
 }
 
 /**
+ * Same reasoning as pruneThrowawayAgents(), for what specs create beside
+ * agents (2026-09-25): integrations named "E2E …" (credentials, sync jobs,
+ * objects and mappings cascade) and runtime quarantine rows. Left alone,
+ * integrations piled up to 25 in Tenant One and the discovery page
+ * measurably slowed, and old Shadow AI quarantine rows outlived the agents
+ * registered from them. Scoped to the two `e2e-*` tenants only.
+ */
+export async function pruneThrowawayIntegrationsAndQuarantine(tenantIds: string[]): Promise<void> {
+  const supabase = adminClient();
+  for (const tenantId of tenantIds) {
+    const integrations = await supabase.from("integrations").delete().eq("tenant_id", tenantId).like("name", "E2E %");
+    if (integrations.error) throw new Error(`prune integrations(${tenantId}) failed: ${integrations.error.message}`);
+    const quarantine = await supabase.from("runtime_event_quarantine").delete().eq("tenant_id", tenantId);
+    if (quarantine.error) throw new Error(`prune quarantine(${tenantId}) failed: ${quarantine.error.message}`);
+  }
+}
+
+/**
  * Generates a real Supabase Auth recovery link for `email` without sending
  * any mail — bypasses the project's built-in-SMTP quota entirely (see the
  * "fresh, valid email" sign-up test's own comment on that quota), and lets
