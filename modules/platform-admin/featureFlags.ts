@@ -18,19 +18,50 @@ import { recordConfigVersion } from "./configVersions";
  * calling user's own permissions, since it only ever returns a boolean.
  */
 export async function isFeatureEnabled(tenantId: string, flagKey: string): Promise<boolean> {
-  const supabase = supabaseServiceRole();
-  const { data: override, error: overrideError } = await supabase
-    .from("feature_flags")
-    .select("enabled")
-    .eq("tenant_id", tenantId)
-    .eq("flag_key", flagKey)
-    .maybeSingle();
-  if (overrideError) throw new ApiError(500, "QUERY_FAILED", overrideError.message);
-  if (override) return override.enabled;
+  return (await getFeatureFlags(tenantId, [flagKey]))[flagKey];
+}
 
-  const { data: catalogEntry, error: catalogError } = await supabase.from("platform_feature_flags").select("default_enabled").eq("key", flagKey).maybeSingle();
-  if (catalogError) throw new ApiError(500, "QUERY_FAILED", catalogError.message);
-  return catalogEntry?.default_enabled ?? false;
+/**
+ * PLATFORM-P0-12 — several flags for one tenant in one parallel round trip:
+ * the tenant's overrides and the catalog defaults are read together. A key
+ * with no override takes its catalog default; a key missing from the
+ * catalog is off. Any read failure throws, and the caller must treat that
+ * as "not enabled", never as permission.
+ */
+export async function getFeatureFlags(tenantId: string, flagKeys: string[]): Promise<Record<string, boolean>> {
+  const supabase = supabaseServiceRole();
+  const [overrides, catalog] = await Promise.all([
+    supabase.from("feature_flags").select("tenant_id, flag_key, enabled").eq("tenant_id", tenantId).in("flag_key", flagKeys),
+    supabase.from("platform_feature_flags").select("key, default_enabled").in("key", flagKeys),
+  ]);
+  if (overrides.error) throw new ApiError(500, "QUERY_FAILED", overrides.error.message);
+  if (catalog.error) throw new ApiError(500, "QUERY_FAILED", catalog.error.message);
+  return resolveFlags(
+    flagKeys,
+    ((overrides.data ?? []) as Array<{ tenant_id: string; flag_key: string; enabled: boolean }>).filter((o) => o.tenant_id === tenantId),
+    (catalog.data ?? []) as Array<{ key: string; default_enabled: boolean }>,
+  );
+}
+
+/** Pure: an override wins, else the catalog default, else off. */
+export function resolveFlags(
+  flagKeys: string[],
+  overrides: Array<{ flag_key: string; enabled: boolean }>,
+  catalog: Array<{ key: string; default_enabled: boolean }>,
+): Record<string, boolean> {
+  const out: Record<string, boolean> = {};
+  for (const key of flagKeys) {
+    const override = overrides.find((o) => o.flag_key === key);
+    out[key] = override ? override.enabled : (catalog.find((c) => c.key === key)?.default_enabled ?? false);
+  }
+  return out;
+}
+
+/** Throws 403 FEATURE_DISABLED unless the flag is on for the tenant. */
+export async function requireFeature(tenantId: string, flagKey: string): Promise<void> {
+  if (!(await isFeatureEnabled(tenantId, flagKey))) {
+    throw new ApiError(403, "FEATURE_DISABLED", `The ${flagKey} feature is not enabled for this organization`);
+  }
 }
 
 export async function listFlagCatalog(): Promise<FeatureFlag[]> {

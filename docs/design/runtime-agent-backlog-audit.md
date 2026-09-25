@@ -765,3 +765,18 @@ Master stories P0-34 and P0-35.
     failure.
 - Re-run of the API-key, emergency and gateway specs after the fix:
   **25/25**.
+
+---
+
+## 2026-09-25 — Gateway modes now come from flags (with PLATFORM-P0-12)
+
+- `getGatewayMode(tenantId)` reads `runtime_observe`, `runtime_enforce`
+  and `tool_filtering` in one batched read inside the request's existing
+  parallel wave.
+- **ENFORCE is live** for any tenant a platform admin switches it on for:
+  `effectiveDecision` is the real decision, and `/tools/filter` returns
+  only visible tools.
+- A tenant without `runtime_observe` gets 403 `GATEWAY_DISABLED` and no
+  record. It never gets an ALLOW.
+- Runtime ingestion honours `runtime_monitoring` (on by default).
+- Tests are listed in the Platform audit log, same date.

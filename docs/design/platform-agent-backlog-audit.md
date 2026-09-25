@@ -687,3 +687,84 @@ No code in this module changed. See
 `docs/design/qa-agent-backlog-audit.md` (both dated 2026-09-16) for the full
 account, including what remains blocked (raw Postgres; a complete Playwright
 E2E run, which needs credentials this environment does not have).
+
+---
+
+## 2026-09-25 — PLATFORM-P0-12: feature flags are enforced (Partial)
+
+Codebase-map defect D8: `isFeatureEnabled()` had no callers, so flags were
+stored but meant nothing.
+
+**Migration `0065_platform_master_rollout_flags.sql`** (applied live)
+seeds the 13 flags from master stories §26 with its "initial safe rollout"
+defaults. On: `agent_discovery`, `access_graph`, `runtime_observe`,
+`tool_filtering`. Off: `runtime_enforce`, and every flag for a capability
+not built yet (NHI, shadow AI, runtime approvals, JIT, credential
+brokering, data authorization, behavioural detection, simulation), so
+switching one on early changes nothing. It is additive; existing flags and
+overrides are untouched.
+
+**Contract**
+
+- `getFeatureFlags(tenantId, keys)` reads several flags in **one parallel
+  round trip** (overrides and catalog together) and is tenant-filtered.
+- `resolveFlags()` (pure): an override wins, else the catalog default,
+  else off.
+- `requireFeature()` throws 403 `FEATURE_DISABLED`.
+- `isFeatureEnabled()` now delegates to them.
+- A failed flag read throws, and callers treat that as not enabled, never
+  as permission.
+
+**Now enforced**
+
+- **Runtime Gateway** (user decision, 2026-09-25):
+  - `runtime_observe` lets a tenant's agents use the gateway at all.
+    Without it: 403 `GATEWAY_DISABLED` and no record.
+  - `runtime_enforce` switches the tenant to **ENFORCE**, where
+    `effectiveDecision` is the real decision and the tool filter really
+    hides tools.
+  - `tool_filtering` gates `/tools/filter`.
+  - The flags are read inside the gateway's existing parallel wave, so
+    there is no added round trip.
+- The existing default-on flags are now honoured where their capability
+  lives: `runtime_monitoring` (runtime ingestion), `remediation`
+  (`remediateFinding`), `saviynt_connector` / `custom_api_connector` /
+  `mcp_integration` / `sailpoint_connector` (creating that connector
+  type), and `certifications` (`launchCampaign`). Every one defaults on,
+  so no current tenant loses anything.
+
+**Deliberately not enforced (why Partial)**
+
+- `ai_assistant` defaults **off**, yet AI summaries and the help
+  assistant are live. Enforcing it would silently switch them off for
+  every tenant. It needs a platform decision: flip the default on and
+  then enforce, or keep the AI features ungated. It is recorded, not
+  guessed.
+- `agent_governance`, `compliance_mappings` and `advanced_analytics` gate
+  broad existing areas with no single entry point. Enforcing them is a
+  follow-up with its own UI states.
+
+**Hardening found on the way.** `PUT/GET
+/api/platform/v1/tenants/:id/features` passed an unvalidated id to the
+database, so a malformed id produced a 500 (`invalid input syntax for
+type uuid`). It now answers 400 through `assertUuid`.
+
+**Verified**
+
+- Unit: `featureFlags.test.ts`, 3 cases (default, override either way,
+  unknown flag off). Gateway flag cases: ENFORCE tells the caller DENY;
+  enforce without observe means off (403, no record); tool filtering in
+  ENFORCE hides; disabled filtering gives 403.
+- Existing unit suites gained a default-flags mock; 440/440.
+- E2E `tests/e2e/gateway-enforcement.spec.ts`, 2/2. A platform admin
+  turns `runtime_enforce` on for **E2E Tenant Two only**: that tenant's
+  agent is told DENY (`mode ENFORCE`) while Tenant One's agent still gets
+  observe-only ALLOW. After the reset Tenant Two is observe-only again.
+  With `runtime_observe` off the gateway gives 403 `GATEWAY_DISABLED`,
+  never ALLOW. Flags are restored in `finally`.
+- Full pipeline on the final build (§17.8: flags gate ingestion,
+  connectors, certifications and remediation, so the whole suite ran):
+  eslint clean, vitest 440/440, Playwright **164/164** (7.7 min).
+- Migration 0065 applied to the live project. Its 13 flag rows were
+  checked; no tenant has an override row, so every tenant runs on the
+  defaults.

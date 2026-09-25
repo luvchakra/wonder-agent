@@ -8,6 +8,7 @@ import type { ConnectorCapabilities, Integration, IntegrationType } from "@/lib/
 import { toIntegration, toIntegrationType } from "./mappers";
 import { createConnector } from "./registry";
 import { getDecryptedCredential } from "./credentials";
+import { requireFeature } from "@/modules/platform-admin/service";
 
 export type CreateIntegrationInput = {
   integrationTypeId: string;
@@ -40,12 +41,23 @@ export async function listIntegrationTypes(): Promise<IntegrationType[]> {
  * tenant check on `integrations` is the isolation backstop; integration.create
  * permission is enforced by the caller via requirePermission().
  */
+/** PLATFORM-P0-12 — the platform flag that gates each connector type. */
+const CONNECTOR_FLAGS: Record<string, string> = {
+  saviynt: "saviynt_connector",
+  sailpoint: "sailpoint_connector",
+  generic_rest: "custom_api_connector",
+  mcp: "mcp_integration",
+};
+
 export async function createIntegration(
   tenantId: string,
   actorId: string,
   input: CreateIntegrationInput,
 ): Promise<Integration> {
   if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
+  // PLATFORM-P0-12: each connector type is flag-gated per tenant.
+  const connectorFlag = CONNECTOR_FLAGS[input.integrationTypeId];
+  if (connectorFlag) await requireFeature(tenantId, connectorFlag);
 
   const supabase = await supabaseServer();
   const { data: typeRow, error: typeError } = await supabase

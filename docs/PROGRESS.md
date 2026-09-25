@@ -23,9 +23,9 @@ Generated 2026-09-25 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 153 |
-| Partial | 19 |
+| Partial | 20 |
 | Deferred | 1 |
-| Not Started | 17 |
+| Not Started | 16 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -46,7 +46,7 @@ and are deliberately excluded from the counts above.
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
-| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 1 | 14 | `███████████████░░░` 86% |
+| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 0 | 14 | `███████████████░░░` 86% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 1 | 0 | 1 | 12 | `███████████████░░░` 83% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 11 | 12 | 0 | 2 | 25 | `████████░░░░░░░░░░` 44% |
 
@@ -269,7 +269,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Vendor Platform Administration  
 **Backlog status:** DORMANT — do not start until the user says "Run Platform Agent"  
-**Stories:** 12 done · 0 partial · 1 deferred · 1 not started (14 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 12 done · 1 partial · 1 deferred · 0 not started (14 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -286,7 +286,7 @@ and are deliberately excluded from the counts above.
 | PLATFORM-P0-05.2 | AI Provider Configuration | Done — resolved 2026-09-16 via `AskUserQuestion` (provider = OpenAI; key scope = both platform-wide default and per-tenant BYOK, tenant chooses). Gemini added the same day per a follow-up user request. `platform_ai_provider_configs` (migrations `0057`/`0058`), `modules/platform-admin/aiProviderConfig.ts`, `/settings/ai` UI (provider selector), and `lib/ai/summarize.ts` now call the real OpenAI or Gemini REST API depending on the tenant's configured provider |
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
-| PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Not Started — 2026-09-25, master stories |
+| PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Partial — 2026-09-25: 13 master rollout flags seeded (`0065`, safe-rollout defaults); flags now enforced at the gateway (`runtime_observe`/`runtime_enforce`/`tool_filtering` — ENFORCE really enforces, per tenant) and at runtime ingestion, remediation, connector creation and certification launch; batched `getFeatureFlags()`. Remaining: `ai_assistant` (defaults OFF while AI summaries are live — needs a platform decision before enforcing) and the not-yet-built features' flags; see audit log |
 
 ### 10 — Operations Agent
 

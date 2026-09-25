@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { EvidenceType, FindingFilter, FindingStatus, ResolutionType, RiskFinding, RogueCategory } from "@/lib/shared/types/risk";
 import type { ShouldCanDidComparison } from "@/lib/shared/types/runtime";
 import { toRiskEvidence, toRiskFinding } from "./mappers";
+import { requireFeature } from "@/modules/platform-admin/service";
 
 /**
  * OPERATIONS-P0-02.2's own worked example, wired here per that story's
@@ -319,6 +320,8 @@ export async function remediateFinding(
   actorId: string,
   findingId: string,
 ): Promise<{ finding: RiskFinding; wired: boolean; revokedGrantIds: string[] }> {
+  // PLATFORM-P0-12: remediation is a flag-gated capability (on by default).
+  await requireFeature(tenantId, "remediation");
   const supabase = supabaseServiceRole();
   const { data: findingRow, error } = await supabase.from("risk_findings").select().eq("id", findingId).eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

@@ -10,7 +10,7 @@ import "server-only";
 
 export { createTenant, listTenants, getTenant, suspendTenant, activateTenant, decommissionTenant, type CreateTenantInput } from "./tenants";
 export { createSubscription, getSubscription, updateSubscriptionStatus, PLAN_DEFAULTS } from "./subscriptions";
-export { isFeatureEnabled, listFlagCatalog, listTenantFlagOverrides, setFeatureFlag } from "./featureFlags";
+export { isFeatureEnabled, getFeatureFlags, requireFeature, resolveFlags, listFlagCatalog, listTenantFlagOverrides, setFeatureFlag } from "./featureFlags";
 export { grantPlatformAdmin, revokePlatformAdmin, listPlatformAdmins } from "./admins";
 export { getBranding, updateBranding, type UpdateBrandingInput } from "./branding";
 export { getPlatformHealth } from "./health";

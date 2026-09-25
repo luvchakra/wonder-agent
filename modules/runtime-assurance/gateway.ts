@@ -9,6 +9,7 @@ import type { RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-
 import type { GatewayDecision, GatewayDecisionRecord, GatewayMode, RuntimeEventType } from "@/lib/shared/types/runtime";
 import { evaluateRuntimeRequest, evaluateToolVisibility, type RuntimePrincipal, type ToolVisibility } from "@/modules/access-governance/service";
 import { loadActiveEmergencyState } from "./emergency";
+import { getFeatureFlags } from "@/modules/platform-admin/service";
 
 /**
  * RUNTIME-P0-15 — the Runtime Gateway (master stories P0-26/P0-27/P0-33).
@@ -94,13 +95,20 @@ export function parseGatewayRequest(raw: unknown): RuntimeRequest {
 }
 
 /**
- * The gateway mode. Every tenant is OBSERVE_ONLY until the
- * per-tenant ENFORCE switch ships behind its feature flag (PLATFORM-P0-12).
- * That is a deliberate constant, not a stub that silently allows: the
- * computed decision is still recorded on every request.
+ * The tenant's gateway state, from its feature flags (PLATFORM-P0-12, user
+ * decision 2026-09-25): `runtime_observe` lets agents use the gateway at
+ * all (on by default), and `runtime_enforce` switches the tenant from
+ * OBSERVE_ONLY to ENFORCE (off by default, turned on per tenant by a
+ * platform administrator after validation). A flag read that fails throws,
+ * and the request errors rather than being allowed.
  */
-export async function getGatewayMode(): Promise<GatewayMode> {
-  return "OBSERVE_ONLY";
+export async function getGatewayMode(tenantId: string): Promise<{ enabled: boolean; mode: GatewayMode; toolFiltering: boolean }> {
+  const flags = await getFeatureFlags(tenantId, ["runtime_observe", "runtime_enforce", "tool_filtering"]);
+  return {
+    enabled: flags.runtime_observe,
+    mode: flags.runtime_observe && flags.runtime_enforce ? "ENFORCE" : "OBSERVE_ONLY",
+    toolFiltering: flags.tool_filtering,
+  };
 }
 
 type DecisionRow = {
@@ -169,15 +177,18 @@ export async function authorizeRuntimeRequest(
   // the evaluation rather than before it, so a fresh request (the common
   // case) pays one round trip for both. On a replay the fresh evaluation
   // is discarded.
-  const [existing, mode, decision] = await Promise.all([
+  const [existing, gatewayState, decision] = await Promise.all([
     findExisting(principal, request.requestId),
-    getGatewayMode(),
+    getGatewayMode(principal.tenantId),
     // The key already proved the tenant is active (verifyAgentApiKey).
     // Emergency controls load inside the decision's own parallel wave.
     evaluateRuntimeRequest(principal, request, { tenantActive: true, emergency: loadActiveEmergencyState(principal.tenantId) }),
   ]);
+  // A tenant without the gateway gets an error, never a decision to act on.
+  if (!gatewayState.enabled) throw new ApiError(403, "GATEWAY_DISABLED", "The Runtime Gateway is not enabled for this organization");
   if (existing) return toGatewayDecision(existing, true);
 
+  const { mode } = gatewayState;
   const enforced = mode === "ENFORCE";
   const correlationId = request.correlationId ?? randomUUID();
 
@@ -358,12 +369,18 @@ export async function filterGatewayTools(
   });
   const mcpServer = optionalString(body, "mcpServer");
 
-  const mode = await getGatewayMode();
-  const results = await evaluateToolVisibility(principal, tools, {
+  const [gatewayState, results] = await Promise.all([
+    getGatewayMode(principal.tenantId),
+    evaluateToolVisibility(principal, tools, {
     tenantActive: true,
-    emergency: loadActiveEmergencyState(principal.tenantId),
-    mcpServer,
-  });
+      emergency: loadActiveEmergencyState(principal.tenantId),
+      mcpServer,
+    }),
+  ]);
+  if (!gatewayState.enabled || !gatewayState.toolFiltering) {
+    throw new ApiError(403, "FEATURE_DISABLED", "Tool filtering is not enabled for this organization");
+  }
+  const { mode } = gatewayState;
   const hidden = results.filter((r) => !r.visible);
   const enforced = mode === "ENFORCE";
   return {

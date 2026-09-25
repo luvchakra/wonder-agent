@@ -12,6 +12,7 @@ import type { CampaignCadence, CampaignScopeType, CampaignMetrics, Certification
 import type { RiskSeverity } from "@/lib/shared/types/risk";
 import { toCertificationCampaign, toCertificationItem } from "./mappers";
 import { computeUsageForApplication, computeWorstSeverity, shapeCertificationSnapshot } from "./snapshot";
+import { requireFeature } from "@/modules/platform-admin/service";
 
 export type LaunchCampaignInput = {
   name: string;
@@ -119,6 +120,8 @@ async function populateCertificationItems(
  * invalid scope never leaves behind an empty, orphaned campaign.
  */
 export async function launchCampaign(tenantId: string, actorId: string, input: LaunchCampaignInput): Promise<CertificationCampaign> {
+  // PLATFORM-P0-12: certification campaigns are a flag-gated capability (on by default).
+  await requireFeature(tenantId, "certifications");
   if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
 
   let applicationId: string | null = null;

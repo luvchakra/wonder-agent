@@ -2,6 +2,15 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const writeAudit = vi.fn();
+// PLATFORM-P0-12 — feature flags: defaults (every gated capability on,
+// gateway observe-only). Flag behaviour itself is tested in
+// modules/platform-admin/featureFlags.test.ts and gateway.test.ts.
+vi.mock("@/modules/platform-admin/service", () => ({
+  requireFeature: async () => undefined,
+  getFeatureFlags: async (_t: string, keys: string[]) =>
+    Object.fromEntries(keys.map((k) => [k, k !== "runtime_enforce"])),
+}));
+
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: (event: unknown) => writeAudit(event) }));
 
 const revokeAccessGrant = vi.fn();

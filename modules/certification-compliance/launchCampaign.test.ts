@@ -3,6 +3,15 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockListAgents = vi.fn();
 const mockGetAgentContract = vi.fn();
+// PLATFORM-P0-12 — feature flags: defaults (every gated capability on,
+// gateway observe-only). Flag behaviour itself is tested in
+// modules/platform-admin/featureFlags.test.ts and gateway.test.ts.
+vi.mock("@/modules/platform-admin/service", () => ({
+  requireFeature: async () => undefined,
+  getFeatureFlags: async (_t: string, keys: string[]) =>
+    Object.fromEntries(keys.map((k) => [k, k !== "runtime_enforce"])),
+}));
+
 vi.mock("@/modules/agent-identity/service", () => ({
   listAgents: (...a: unknown[]) => mockListAgents(...a),
   getAgentContract: (...a: unknown[]) => mockGetAgentContract(...a),

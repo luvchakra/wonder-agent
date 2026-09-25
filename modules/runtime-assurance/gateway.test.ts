@@ -38,6 +38,16 @@ function query(table: string) {
   return chain;
 }
 
+// PLATFORM-P0-12 — feature flags: defaults (every gated capability on,
+// gateway observe-only). Flag behaviour itself is tested in
+// modules/platform-admin/featureFlags.test.ts and gateway.test.ts.
+let flags: Record<string, boolean> = {};
+const DEFAULT_FLAGS = { runtime_observe: true, runtime_enforce: false, tool_filtering: true };
+vi.mock("@/modules/platform-admin/service", () => ({
+  requireFeature: async () => undefined,
+  getFeatureFlags: async (_t: string, keys: string[]) => Object.fromEntries(keys.map((k) => [k, flags[k] ?? false])),
+}));
+
 vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ from: query }), supabaseServer: async () => ({ from: query }) }));
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: async (e: Row) => void audits.push(e) }));
 const evaluate = vi.fn();
@@ -58,6 +68,7 @@ beforeEach(() => {
   audits = [];
   forceConflict = false;
   events = [];
+  flags = { ...DEFAULT_FLAGS };
   evaluate.mockReset();
   evaluate.mockResolvedValue({
     decision: "DENY",
@@ -201,5 +212,40 @@ describe("filterGatewayTools (RUNTIME-P0-18)", () => {
     await expect(filterGatewayTools(principal, { tools: [] })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     await expect(filterGatewayTools(principal, { tools: [7] })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     await expect(filterGatewayTools(principal, { tools: Array(201).fill("t") })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+  });
+});
+
+describe("gateway feature flags (PLATFORM-P0-12)", () => {
+  it("ENFORCE (runtime_enforce on): the caller is told the real decision", async () => {
+    flags.runtime_enforce = true;
+    const d = await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "enf-1", action: "READ" }));
+    expect(d.mode).toBe("ENFORCE");
+    expect(d.enforced).toBe(true);
+    expect(d.decision).toBe("DENY");
+    expect(d.effectiveDecision).toBe("DENY");
+    expect(decisions.at(-1)).toMatchObject({ mode: "ENFORCE", enforced: true });
+  });
+
+  it("runtime_enforce without runtime_observe is not enforcement: the gateway is off", async () => {
+    flags = { ...DEFAULT_FLAGS, runtime_observe: false, runtime_enforce: true };
+    await expect(authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "off-1", action: "READ" }))).rejects.toMatchObject({
+      status: 403,
+      code: "GATEWAY_DISABLED",
+    });
+    expect(decisions).toHaveLength(0);
+  });
+
+  it("tool filtering in ENFORCE hides what it would hide; disabled filtering is a 403", async () => {
+    visibility.mockResolvedValue([
+      { tool: "a", visible: true, code: "VISIBLE", reason: "ok" },
+      { tool: "b", visible: false, code: "TOOL_NOT_APPROVED", reason: "no" },
+    ]);
+    flags.runtime_enforce = true;
+    const r = await filterGatewayTools(principal, { tools: ["a", "b"] });
+    expect(r.enforced).toBe(true);
+    expect(r.visible).toEqual(["a"]);
+
+    flags.tool_filtering = false;
+    await expect(filterGatewayTools(principal, { tools: ["a"] })).rejects.toMatchObject({ status: 403, code: "FEATURE_DISABLED" });
   });
 });

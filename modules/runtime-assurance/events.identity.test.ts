@@ -33,6 +33,15 @@ function query(table: string) {
   return chain;
 }
 
+// PLATFORM-P0-12 — feature flags: defaults (every gated capability on,
+// gateway observe-only). Flag behaviour itself is tested in
+// modules/platform-admin/featureFlags.test.ts and gateway.test.ts.
+vi.mock("@/modules/platform-admin/service", () => ({
+  requireFeature: async () => undefined,
+  getFeatureFlags: async (_t: string, keys: string[]) =>
+    Object.fromEntries(keys.map((k) => [k, k !== "runtime_enforce"])),
+}));
+
 vi.mock("@/lib/db/supabaseServer", () => ({
   supabaseServer: async () => ({ from: query }),
   supabaseServiceRole: () => ({ from: query }),
