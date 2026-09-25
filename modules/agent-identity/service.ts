@@ -36,3 +36,22 @@ export {
 export { buildDiscoveryInbox, getDiscoveryCandidate } from "./discovery";
 export { buildNhiInventory } from "./nhi";
 export { getAgentRuntimeProfile, getAgentDisplayName, resolveAgentReference, type AgentRuntimeProfile, type AgentReferenceResolution } from "./runtimeProfile";
+export {
+  listIdentities,
+  countIdentitiesByType,
+  getIdentityHealth,
+  getIdentity,
+  getIdentityNames,
+  listAccountableHumans,
+  createIdentity,
+  updateIdentity,
+  listIdentityRelationships,
+  addIdentityRelationship,
+  endIdentityRelationship,
+  listAttributeDefinitions,
+  createAttributeDefinition,
+  setAttributeDefinitionActive,
+  type IdentityListFilter,
+  type IdentityListRow,
+  type RelationshipView,
+} from "./directory";

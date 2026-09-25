@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**168 of 226 tracked stories complete — 74%**
+**170 of 226 tracked stories complete — 75%**
 
 ```
-██████████████████████████████░░░░░░░░░░  74%
+██████████████████████████████░░░░░░░░░░  75%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 168 |
-| Partial | 21 |
+| Done | 170 |
+| Partial | 22 |
 | Deferred | 1 |
-| Not Started | 36 |
+| Not Started | 33 |
 | **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -39,7 +39,7 @@ and are deliberately excluded from the counts above.
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 15 | 0 | 0 | 5 | 20 | `██████████████░░░░` 75% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 1 | 0 | 2 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 6 | 20 | `████████████░░░░░░` 65% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 15 | 0 | 0 | 11 | 26 | `██████████░░░░░░░░` 58% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
@@ -101,7 +101,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 15 done · 0 partial · 0 deferred · 5 not started (20 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 17 done · 1 partial · 0 deferred · 2 not started (20 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -120,9 +120,9 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Done — 2026-09-25: delegated and escalation owners, member-only owners, ownership review; contract approved users/delegators, environments, expiry; `next_review_at` set; production approval needs an approver; same-tenant agent references (0075) |
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
-| IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Not Started — 2026-09-26, WonderID |
-| IDENTITY-P0-16 | Identity attributes and relationships | Not Started — 2026-09-26, WonderID |
-| IDENTITY-P0-17 | Identities directory and identity detail | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Done — 2026-09-26, migrations 0077–0079 |
+| IDENTITY-P0-16 | Identity attributes and relationships | Done — 2026-09-26 |
+| IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
 | IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Not Started — 2026-09-26, WonderID |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 

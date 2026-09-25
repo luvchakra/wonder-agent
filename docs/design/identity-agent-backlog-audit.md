@@ -1134,3 +1134,172 @@ agent/parent references `(col, tenant_id)` foreign keys under their
 existing names. For a member of two organizations, RLS alone admitted
 both. The full list, tests and live SQL verification are in the QA audit
 log's QA-P0-17 entry.
+
+---
+
+## 2026-09-26 — IDENTITY-P0-15/16 (Done), IDENTITY-P0-17 (Partial): the WonderID identity directory
+
+WonderID Phase 1 (`docs/plan/WONDERID-ROADMAP.md`). This is one common
+identity reference for every identity type, following spec rule R5 and
+roadmap decision 1: a reference model, not a second source of truth.
+
+### Schema (migrations 0077, 0078, 0079; applied live)
+
+- **`identities`**:
+  - One tenant-scoped row per identity. The types are HUMAN, EXTERNAL,
+    MACHINE, SERVICE_ACCOUNT, APPLICATION, WORKLOAD, API and AI_AGENT.
+  - Columns: status, human lifecycle state, source and correlation
+    references, owner/sponsor/manager, HR fields, privileged/external flags,
+    typed `attributes` jsonb.
+  - Owner, sponsor, manager and agent are same-tenant composite foreign
+    keys (the 0075/0076 pattern).
+  - RLS on select, insert and update. There is no delete policy: an
+    identity is disabled or archived, never deleted.
+- **AI agents stay canonical in `agents`.** A SECURITY DEFINER trigger
+  mirrors each agent 1:1:
+  - it copies name, type, lifecycle as status, purpose, risk and last seen
+    on insert or update;
+  - deleting the agent cascades to its identity row.
+  - The mirror row is kept out of the source-reference unique index,
+    because `agents` has no uniqueness there and the mirror must never
+    make an agent insert fail.
+  - Nothing about `agents` changed.
+- **Members are HUMAN identities.** A trigger on `tenant_memberships` (a
+  Foundation table; read only here, nothing about it changed) does the
+  following:
+  - creates the member's identity on insert;
+  - on a status change or delete, makes the identity inactive or active
+    again;
+  - keeps the row after the membership ends, because history and
+    relationships matter after someone leaves.
+  - Only rows it created (`source_system = 'wonderid'`) follow the
+    membership.
+- **Backfill:** 43/43 agents and 17/17 memberships got their identity rows.
+- **`identity_attribute_definitions`**:
+  - typed (string/number/boolean/date/enum), with required, sensitive,
+    searchable and unique flags, allowed values and a format rule;
+  - scoped to one identity type or all;
+  - retired rather than deleted.
+- **`identity_relationships`**:
+  - manager_of, owns, sponsors, delegates_to, service_account_for,
+    workload_runs_for and member_of;
+  - valid_from/valid_to, source and confidence;
+  - one current edge per (source, target, type).
+- **Permissions:**
+  - `identity.read` for TENANT_SUPER_ADMIN, IAM_ADMIN, IAM_ARCHITECT,
+    SECURITY_ADMIN, READ_ONLY, AUDITOR, CERTIFICATION_MANAGER and the
+    owner roles;
+  - `identity.manage` for TENANT_SUPER_ADMIN and IAM_ADMIN.
+  - REQUESTER gets neither.
+- **0078** revokes EXECUTE on the three trigger functions from
+  anon/authenticated. The security advisor had listed them as RPC-callable
+  (0077's `revoke ... from public` does not remove Supabase's default
+  grants). Postgres refuses to run a trigger function outside a trigger,
+  so this was exposure, not exploitability. Re-checked with
+  `has_function_privilege`: anon and authenticated now have no EXECUTE on
+  any of the three. The triggers still fire for member writes (the SQL
+  test below ran after 0078).
+- **0079** adds covering `(col, tenant_id)` indexes for every new
+  composite foreign key, replacing single-column and tenant-first ones,
+  plus `created_by` indexes. The performance advisor had listed them
+  (§15). Re-checked with a catalog query: 0 foreign keys on the three
+  tables lack a covering index.
+
+### Rules (`modules/agent-identity/identityRules.ts`, pure, #9)
+
+- AI agents are not created in the directory; they are registered under
+  AI Agents.
+- An external identity needs a sponsor, an organization and a future end
+  date.
+- Every machine identity type needs an owner.
+- Owner, sponsor and manager must be active people in this organization,
+  never the identity itself (checked in the service; the foreign keys hold
+  the tenant rule).
+- On update:
+  - the type never changes;
+  - an AI agent's identity accepts only owner, sponsor and attributes,
+    because everything else comes from the agent;
+  - a member's name and email come from their sign-in account;
+  - an expired external identity can still be disabled, but not re-dated
+    into the past.
+- Attributes:
+  - unknown keys are refused;
+  - values are coerced to their type;
+  - choice lists and format rules are enforced;
+  - required ones must be present;
+  - unique ones are checked against the tenant.
+
+### Service, API and UI
+
+- **Service:** `modules/agent-identity/directory.ts`, published through
+  `service.ts`.
+  - Every read and write filters on the request's tenant as well as RLS
+    (the QA-P0-17 rule for two-organization members).
+  - List and count are paged at the database, and counts run in parallel
+    (§15).
+  - 23503 maps to 404, 23505 to 409 and 23514 to 400.
+  - Audit events: `identity.created`, `identity.updated`,
+    `identity.status_changed`, `identity.relationship_added`,
+    `identity.relationship_ended`, `identity.attribute_defined`,
+    `identity.attribute_retired` and `identity.attribute_restored`. They
+    carry field names only, never values (#10, §17.7).
+- **API:** `/api/v1/identities` (GET, POST), `/:id` (GET, PATCH),
+  `/:id/relationships` (GET, POST), `/relationships/:id` (DELETE, which
+  ends the edge), `/attributes` (GET, POST) and `/attributes/:id` (PATCH
+  `active`). A body `tenantId` is ignored.
+- **UI:**
+  - `/identities` overview: counts by type, plus the "needs attention"
+    gaps (machines without an owner, external access ending in 30 days or
+    already past its end date).
+  - Lists: `/identities/all`, `/humans`, `/external` and `/machines`, with
+    search, status filter and database paging.
+  - `/identities/new`, whose fields follow the chosen type.
+  - `/identities/[id]` with Overview, Relationships, Attributes and Edit
+    tabs. An AI agent's identity links to the agent.
+  - `/identities/attributes` (Administration → Identity Attributes).
+  - Sensitive attribute values are hidden from viewers without
+    `identity.manage`.
+  - Navigation: the Identities section now lists Overview, All, People,
+    External, Machine and Non-human Identities.
+
+### Deliberately left out (IDENTITY-P0-17 stays Partial)
+
+- **Groups:** there is no group model yet; that is Phase 2/4 data.
+- **Detail tabs Access, Risk and Activity** for non-agent identities: they
+  need the account/access correlation of ACCESS-P0-17/24.
+- **Identity search** beyond the list's name/email/account search.
+- **Provenance** beyond source and audit.
+- **Deferred to IDENTITY-P0-18:** the "past end date" count is shown but
+  not acted on; lifecycle transitions (joiner/mover/leaver) belong to that
+  story.
+
+### Verified
+
+- `tsc` and `eslint` clean.
+- Unit tests: `identityRules.test.ts` 20/20. vitest total **556/556**; `eslint .` clean.
+- Live SQL (`tests/identity/unified-identities-isolation.sql`), 18/18:
+  - the negative cases: a tenant-A member sees 0 tenant-B identities and
+    definitions, and inserts into B are denied (42501);
+  - updates of B rows affect 0 rows, and deletes affect 0 rows;
+  - cross-tenant owner and relationship references are 23503;
+  - an AI_AGENT row with no agent is 23514, and a duplicate current edge
+    is 23505;
+  - the mirror and the membership sync work for a member write.
+- E2E `identities.spec.ts`, 16/16:
+  - the type rules through the API;
+  - a machine cannot be owned by a machine;
+  - the AI agent mirror (not renameable here, owner settable);
+  - attribute enforcement;
+  - relationships (add, 409 on a duplicate, 400 on a self-edge, end, 404
+    on a second end);
+  - UI create;
+  - overview links;
+  - another organization: 404 on read, update and reference, absent from
+    the list, "not found" page;
+  - read-only can browse but cannot create (403), and REQUESTER gets 403.
+- design-review (5 new routes at 8 widths and both themes) and
+  navigation-smoke: 51/51.
+- Screenshots checked: overview (light), machines (dark), detail edit
+  (light), new-external and all-identities at 390 px. One fix came from
+  them: the search box got a visible label so it lines up with the status
+  filter.

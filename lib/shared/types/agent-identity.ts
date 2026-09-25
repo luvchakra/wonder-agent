@@ -302,3 +302,101 @@ export type NhiInventoryEntry = {
   /** Where to review it: the agent, or the discovery candidate. */
   href: string;
 };
+
+// ---------------------------------------------------------------------------
+// WonderID unified identity reference (IDENTITY-P0-15/16, 2026-09-26).
+// One row per identity of any type. AI_AGENT rows mirror `agents` 1:1
+// (agents stays canonical for every agent field); HUMAN rows may link to a
+// Foundation `users` row.
+// ---------------------------------------------------------------------------
+
+export const IDENTITY_TYPES = ["HUMAN", "EXTERNAL", "MACHINE", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API", "AI_AGENT"] as const;
+export type IdentityType = (typeof IDENTITY_TYPES)[number];
+
+/** Types a person creates by hand. AI agents are registered under AI Agents. */
+export const MANUAL_IDENTITY_TYPES = ["HUMAN", "EXTERNAL", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API", "MACHINE"] as const satisfies readonly IdentityType[];
+
+/** Non-human, non-agent identities: each needs an accountable owner. */
+export const MACHINE_IDENTITY_TYPES = ["MACHINE", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API"] as const satisfies readonly IdentityType[];
+
+export const IDENTITY_STATUSES = ["pending", "active", "inactive", "disabled", "terminated", "archived"] as const;
+export type IdentityStatus = (typeof IDENTITY_STATUSES)[number];
+
+export const HUMAN_LIFECYCLE_STATES = ["PRE_JOIN", "ACTIVE", "LEAVE_PENDING", "DISABLED", "TERMINATED", "ARCHIVED"] as const;
+export type HumanLifecycleState = (typeof HUMAN_LIFECYCLE_STATES)[number];
+
+export type Identity = {
+  id: string;
+  tenantId: string;
+  identityType: IdentityType;
+  subtype: string | null;
+  displayName: string;
+  username: string | null;
+  email: string | null;
+  status: IdentityStatus;
+  lifecycleState: HumanLifecycleState | null;
+  userId: string | null;
+  agentId: string | null;
+  sourceSystem: string | null;
+  sourceNativeId: string | null;
+  correlationKey: string | null;
+  ownerIdentityId: string | null;
+  sponsorIdentityId: string | null;
+  managerIdentityId: string | null;
+  department: string | null;
+  title: string | null;
+  businessUnit: string | null;
+  location: string | null;
+  employmentType: string | null;
+  organization: string | null;
+  purpose: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  riskScore: number | null;
+  privileged: boolean;
+  external: boolean;
+  attributes: Record<string, unknown>;
+  createdBy: string | null;
+  lastSeenAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export const IDENTITY_RELATIONSHIP_TYPES = ["manager_of", "owns", "sponsors", "delegates_to", "service_account_for", "workload_runs_for", "member_of"] as const;
+export type IdentityRelationshipType = (typeof IDENTITY_RELATIONSHIP_TYPES)[number];
+
+export type IdentityRelationship = {
+  id: string;
+  tenantId: string;
+  sourceIdentityId: string;
+  targetIdentityId: string;
+  relationshipType: IdentityRelationshipType;
+  validFrom: string;
+  validTo: string | null;
+  source: string;
+  confidence: "unverified" | "probable" | "confirmed";
+  createdBy: string | null;
+  createdAt: string;
+};
+
+export const ATTRIBUTE_DATA_TYPES = ["string", "number", "boolean", "date", "enum"] as const;
+export type AttributeDataType = (typeof ATTRIBUTE_DATA_TYPES)[number];
+
+export type IdentityAttributeDefinition = {
+  id: string;
+  tenantId: string;
+  /** Null: every identity type. */
+  identityType: IdentityType | null;
+  name: string;
+  displayName: string;
+  dataType: AttributeDataType;
+  required: boolean;
+  sensitive: boolean;
+  searchable: boolean;
+  uniqueValue: boolean;
+  allowedValues: string[];
+  validationRegex: string | null;
+  sourceMapping: string | null;
+  active: boolean;
+  createdAt: string;
+};

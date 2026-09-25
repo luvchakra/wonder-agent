@@ -38,6 +38,12 @@ const ROUTES = [
   "/integrations/jobs",
   "/integrations/mcp",
   "/settings/roles",
+  // WonderID identity directory (IDENTITY-P0-17).
+  "/identities",
+  "/identities/all",
+  "/identities/external",
+  "/identities/new",
+  "/identities/attributes",
 ];
 
 /** The widths §32 names, plus the two the shell switches layout at. */
@@ -64,7 +70,7 @@ async function settle(page: Page, route: string) {
 }
 
 /** Routes whose tables drop low-priority columns instead of scrolling. */
-const FIT_TABLES = ["/", "/agents", "/agents/identities", "/audit", "/settings/roles"];
+const FIT_TABLES = ["/", "/agents", "/agents/identities", "/identities/all", "/audit", "/settings/roles"];
 
 /** Labelled table regions whose content is wider than the region itself. */
 async function scrollingTables(page: Page): Promise<string[]> {

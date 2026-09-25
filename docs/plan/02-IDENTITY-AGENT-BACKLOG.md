@@ -32,9 +32,9 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Done — 2026-09-25: delegated and escalation owners, member-only owners, ownership review; contract approved users/delegators, environments, expiry; `next_review_at` set; production approval needs an approver; same-tenant agent references (0075) |
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
-| IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Not Started — 2026-09-26, WonderID |
-| IDENTITY-P0-16 | Identity attributes and relationships | Not Started — 2026-09-26, WonderID |
-| IDENTITY-P0-17 | Identities directory and identity detail | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Done — 2026-09-26, migrations 0077–0079 |
+| IDENTITY-P0-16 | Identity attributes and relationships | Done — 2026-09-26 |
+| IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
 | IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Not Started — 2026-09-26, WonderID |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 

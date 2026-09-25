@@ -54,9 +54,16 @@ export const SHELL_NAV: ShellNavItem[] = [
   { label: "Home", href: "/", icon: "Home" },
   {
     label: "Identities",
-    href: "/agents/identities",
+    href: "/identities",
     icon: "Users",
-    children: [link("Non-human Identities", "/agents/identities")],
+    children: [
+      link("Overview", "/identities"),
+      link("All Identities", "/identities/all"),
+      link("People", "/identities/humans"),
+      link("External Identities", "/identities/external"),
+      link("Machine Identities", "/identities/machines"),
+      link("Non-human Identities", "/agents/identities"),
+    ],
   },
   {
     label: "Applications",
@@ -141,6 +148,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     icon: "Settings",
     children: [
       link("Organization", "/settings"),
+      link("Identity Attributes", "/identities/attributes"),
       link("Notifications", "/settings/notifications"),
       link("AI Assistance", "/settings/ai"),
     ],

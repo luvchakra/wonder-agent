@@ -36,6 +36,9 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `agent_lifecycle_events` | IA | Audited lifecycle state transitions |
 | `agent_contracts` | IA | The Approved Agent Contract (source of SHOULD) |
 | `agent_relationships` | IA | Agent-to-agent / agent-to-tool relationships |
+| `identities` | IA | WonderID common identity reference, one row per identity of any type (IDENTITY-P0-15). AI_AGENT rows mirror `agents` 1:1 by trigger (`agents` stays canonical); HUMAN rows for members are created by trigger on `tenant_memberships` (FA's table, read only) |
+| `identity_attribute_definitions` | IA | Tenant-defined, typed identity attributes (IDENTITY-P0-16) |
+| `identity_relationships` | IA | Relationships between identities (manager_of, owns, sponsors, …) with validity windows (IDENTITY-P0-16) |
 | `applications` | AA | Canonical application registry (governed access-graph entity) |
 | `accounts` | AA | Accounts an agent/identity holds on an application |
 | `entitlements` | AA | Roles/permissions/entitlements on an application |
@@ -234,6 +237,7 @@ consume and persist into their own tables.
 |---|---|
 | `/api/v1/auth`, `/api/v1/users`, `/api/v1/roles`, `/api/v1/tenant`, `/api/v1/sso` | FA |
 | `/api/v1/agents`, `/api/v1/agents/:id` | IA |
+| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `relationships/:id`, `attributes`) | IA |
 | `/api/v1/integrations` | INT |
 | `/api/v1/access`, `/api/v1/policies` | AA |
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |
