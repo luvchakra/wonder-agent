@@ -28,8 +28,8 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
 | IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Done — 2026-09-15, unit-tested |
 | IDENTITY-P0-07 | Contract autonomy/oversight fields (autonomy level, allowed tools, human approval requirements, required monitoring) | Done — 2026-09-15, migration `0052`, live-applied |
-| IDENTITY-P0-11 | NHI inventory (master P0-08) | Not Started — 2026-09-25, master stories |
-| IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-11 | NHI inventory (master P0-08) | Done — 2026-09-25: `buildNhiInventory()` + `/agents/identities` (linked / unlinked with classification / orphaned / ignored; human delegates excluded; linking via discovery) |
+| IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Not Started — 2026-09-25, master stories |
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Not Started — 2026-09-25, master stories |
 

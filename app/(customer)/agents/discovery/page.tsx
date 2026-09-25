@@ -12,6 +12,7 @@ import { DiscoveryCandidatesTable } from "./DiscoveryCandidatesTable";
 const TABS = [
   { key: "all", label: "All" },
   { key: "new", label: "New" },
+  { key: "shadow_ai", label: "Shadow AI" },
   { key: "needs_review", label: "Needs Review" },
   { key: "duplicates", label: "Potential Duplicates" },
   { key: "changed", label: "Recently Changed" },
@@ -24,6 +25,8 @@ function filterByTab(entries: DiscoveryInboxEntry[], tab: TabKey): DiscoveryInbo
   switch (tab) {
     case "new":
       return entries.filter((e) => e.category === "new" && e.candidateStatus === "open");
+    case "shadow_ai":
+      return entries.filter((e) => e.category === "shadow_ai" && e.candidateStatus === "open");
     case "needs_review":
       return entries.filter((e) => e.candidateStatus === "open" && (e.confidenceLevel !== "HIGH" || e.category === "orphaned_identity"));
     case "duplicates":
@@ -98,8 +101,14 @@ export default async function DiscoveryInboxPage({ searchParams }: { searchParam
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
         <StatCard label="New Candidates" value={tabCounts.new} href="/agents/discovery?tab=new" />
+        <StatCard
+          label="Shadow AI"
+          value={tabCounts.shadow_ai}
+          href="/agents/discovery?tab=shadow_ai"
+          tone={tabCounts.shadow_ai > 0 ? "danger" : "neutral"}
+        />
         <StatCard label="High Confidence" value={highConfidenceCount} />
         <StatCard
           label="Needs Review"

@@ -192,7 +192,8 @@ export type CreateAgentResult =
   | { kind: "duplicate_candidate"; candidate: DuplicateCandidate };
 
 // IDENTITY-P0-05 — Discovery Reconciliation & Orphaned Identity Detection.
-export type DiscoveryCategory = "new" | "likely_duplicate" | "orphaned_identity";
+/** "shadow_ai" (IDENTITY-P0-12): runtime activity from an agent nobody registered. */
+export type DiscoveryCategory = "new" | "likely_duplicate" | "orphaned_identity" | "shadow_ai";
 
 /**
  * Fully Functional Agent Discovery (2026-09-15 extension of IDENTITY-P0-05).
@@ -256,4 +257,32 @@ export type DiscoveryInboxEntry = {
   linkedAgentId?: string;
   lastSeenAt: string;
   raw: Record<string, unknown>;
+};
+
+/**
+ * IDENTITY-P0-11 (master P0-08) — one row of the non-human identity (NHI)
+ * inventory. An NHI is a service account, workload, OAuth client, API key
+ * or MCP server identity — never assumed to be an AI agent. `agent` is set
+ * only when the identity is linked to a registered agent; an unlinked
+ * identity carries the deterministic detection classification from
+ * discovery instead, which says how likely it is to be an agent.
+ */
+export type NhiStatus = "linked" | "unlinked" | "ignored" | "orphaned";
+
+export type NhiInventoryEntry = {
+  /** `${sourceSystem}::${externalReference}` — unique per tenant. */
+  key: string;
+  externalReference: string;
+  displayName: string;
+  identityType: AgentIdentityType;
+  sourceSystem: string;
+  sourceName: string;
+  status: NhiStatus;
+  agent: { id: string; name: string; lifecycleState: string } | null;
+  classification: DetectionClassification | null;
+  confidenceLevel: ConfidenceLevel | null;
+  owner: string | null;
+  lastSeenAt: string;
+  /** Where to review it: the agent, or the discovery candidate. */
+  href: string;
 };

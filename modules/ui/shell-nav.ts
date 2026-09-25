@@ -7,7 +7,7 @@
  * mockups and the master requirements' DISCOVER → UNDERSTAND → GOVERN →
  * PROTECT → ASSURE grouping): ten sections, each with the sub-pages that
  * actually exist today. The mockups also show sub-pages with no backing
- * route yet (NHI Inventory, Shadow AI, Runtime Gateway, JIT & Credentials,
+ * route yet (Shadow AI, Runtime Gateway, JIT & Credentials,
  * Emergency Controls, ...). Those are deliberately NOT listed — a nav link
  * to an empty shell would be a fabricated capability. They are tracked as
  * gaps in docs/implementation/codebase-map.md and get a link here in the
@@ -44,9 +44,10 @@ export const SHELL_NAV: ShellNavItem[] = [
     href: "/agents/discovery",
     icon: "Search",
     badge: "discovery",
-    match: ["/agents/discovery", "/agents/duplicates"],
+    match: ["/agents/discovery", "/agents/duplicates", "/agents/identities"],
     children: [
       { label: "Agent Discovery", href: "/agents/discovery" },
+      { label: "Non-human Identities", href: "/agents/identities" },
       { label: "Duplicates", href: "/agents/duplicates" },
     ],
   },

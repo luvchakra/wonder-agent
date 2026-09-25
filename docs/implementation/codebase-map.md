@@ -90,8 +90,8 @@ registries, engines or stores. These are the concrete extension points:
 | P0-05 Lifecycle | **Partial** | Enum matches the master list exactly; `NORMAL_TRANSITIONS`, `validateTransition()`, role gates, `agent_lifecycle_events`, audit | **ASSESSED is unreachable** (no transition in or out). Suspension does not affect runtime authorization because there is none (see P0-26). Retirement does not remove access | Identity |
 | P0-06 Ownership | **Partial** | Owners with soft-delete history plus `agent.owner_changed` audit; `ownership_violation` findings | Delegated owner; ownership review; history is audit-only | Identity / Risk |
 | P0-07 Agent discovery | **Built** | `buildDiscoveryInbox()` (new / likely_duplicate / orphaned_identity), deterministic detection with confidence and signals, candidate decisions, duplicate merge | MATCHED and UNKNOWN are implicit, not categories; sources are integration identities only (no runtime-telemetry discovery) | Identity |
-| P0-08 NHI discovery & inventory | **Gap** | `agent_identities.identity_type` covers service_account / workload_identity / oauth_client / api_key / mcp_server, but only as links *to an agent* | An inventory of non-human identities that are not agents | Identity (proposed) |
-| P0-09 Shadow AI | **Gap** | Discovery inbox covers unregistered agents from IAM | Detection from runtime telemetry (events for unknown agents are quarantined, not surfaced as shadow AI) | Identity + Runtime (proposed) |
+| P0-08 NHI discovery & inventory | **Built** (2026-09-25, IDENTITY-P0-11) | `buildNhiInventory()` + `/agents/identities`: linked, unlinked (with discovery's classification), orphaned and ignored non-human identities; human delegates excluded | — | Identity |
+| P0-09 Shadow AI | **Built** (2026-09-25, IDENTITY-P0-12) | Events for an unregistered agent (`agentId` or `agentRef`) are quarantined as `UNREGISTERED_AGENT` and surface as `shadow_ai` discovery candidates with evidence; registering links the reference so later events are recorded | Risk score for shadow AI (RISK-P0-12); MCP events need the bridge (INTEGRATION-P0-07) | Identity + Runtime |
 | P0-10 MCP server & tool discovery | **Partial** | MCP connector; `discoverMcpTools()` calls `tools/list` and stores tools as `integration_objects` (object_type `entitlement`) with the raw schema; MCP runtime events via bearer-token route | No server inventory beyond the integration row; no resources or prompts; no operation type (read/write); no agent↔tool link; **MCP events land in `integration_objects`, never in `runtime_events`**; no UI for discovered tools | Integration |
 | P0-11 Applications & data sources | **Partial** | `applications` (Access), `is_external`; `runtime_resources` observed | No data-source inventory; applications not discovered as their own family | Access / Integration |
 | P0-12 Agent↔IAM mapping | **Partial** | `agent_identities` with confidence enum | `linkAgentIdentity()` hard-codes `confirmed`, **writes no audit** (#11); no evidence column; detection evidence not persisted on the link | Identity |
@@ -122,10 +122,16 @@ registries, engines or stores. These are the concrete extension points:
 | P0-40 AI-assisted explanation | **Built** | `summarize()` for findings, evidence, SHOULD/CAN/DID, cert items; help assistant; never decides | Only one screen uses the summary panel | Platform / Experience |
 | P0-41 Notifications, reports, search | **Built** | 7 notification types, 8 reports, search over 9 object types | Runtime alerts and approval notifications await the gateway | Operations |
 | P0-42 Customer RBAC | **Partial** | 35 keys, RLS | Master names differ; per its own rule ("use existing naming conventions") only genuinely new keys should be added: `agent.suspend`, `discovery.*`, `access.simulate`, `policy.publish`, `runtime.enforce`, `runtime.emergency` | Foundation |
-| P0-43 Platform admin | **Built** | Tenants, subscriptions, flags, branding, health, usage, announcements, AI provider | **Feature flags are never enforced** (`isFeatureEnabled()` has no callers); no platform-audit viewer | Platform |
+| P0-43 Platform admin | **Built** | Tenants, subscriptions, flags, branding, health, usage, announcements, AI provider | ~~Feature flags are never enforced~~ (fixed 2026-09-25, PLATFORM-P0-12: 13 rollout flags enforced); no platform-audit viewer | Platform |
 
 **Tally:** 11 Built, 21 Partial, 11 Gap. The 11 gaps are the NHI and shadow-AI
 inventories plus the whole PROTECT pillar (P0-26 to P0-34). P0-35 is Partial.
+
+*Status since this map was written (2026-09-25):* the Runtime Gateway
+stories (FOUNDATION-P0-17/18, ACCESS-P0-11, RUNTIME-P0-15..18) closed most
+of the PROTECT gaps; PLATFORM-P0-12 enforces feature flags (the P0-43 gap
+below); IDENTITY-P0-11/12 built P0-08 and P0-09. The rows above are
+updated per story; each module's audit log has the detail.
 
 ---
 
@@ -157,7 +163,7 @@ Each was re-read at the cited lines before being written down.
 | D3 | `linkAgentIdentity()` writes no audit event (#11) | Medium | `modules/agent-identity/identities.ts` | Open, Identity Agent |
 | D4 | Lifecycle state ASSESSED is unreachable | Low | `modules/agent-identity/lifecycle.ts` | Open, Identity Agent |
 | D5 | `checkSoD()` has no callers | Medium (P0-25) | `modules/access-governance/sod.ts` | Open, Access Agent |
-| D6 | MCP runtime events are stored as `integration_objects` and never reach `runtime_events`, so they are invisible to SHOULD/CAN/DID and risk | Medium (P0-18) | `modules/integrations/mcpEvents.ts` | Open, Integration + Runtime (bridge contract needed) |
+| D6 | MCP runtime events are stored as `integration_objects` and never reach `runtime_events`, so they are invisible to SHOULD/CAN/DID and risk | Medium (P0-18) | `modules/integrations/mcpEvents.ts` | **Fixed 2026-09-25** (INTEGRATION-P0-07): bridged through Runtime's `ingestRuntimeEventByReference()` |
 | D7 | SHOULD tools always empty despite `agent_contracts.allowed_tools` | Low | `modules/runtime-assurance/compare.ts:93` | Open, Runtime Agent |
 | D8 | Feature flags stored but never enforced | Low | `modules/platform-admin/featureFlags.ts` | Open, Platform Agent |
 | D9 | MFA enrolment exists but is not enforced for anyone | Medium | Foundation | Open, needs a policy decision on who must use MFA |

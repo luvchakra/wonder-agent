@@ -11,6 +11,7 @@ export { ingestRuntimeEvent, listRuntimeEvents, countRuntimeEvents, computeDedup
 export { getDid } from "./did";
 export { compareShouldCanDid } from "./compare";
 export { quarantineEvent, listQuarantinedEvents } from "./quarantine";
+export { listUnregisteredAgentActivity, ingestRuntimeEventByReference, UNREGISTERED_AGENT, AMBIGUOUS_AGENT } from "./unregistered";
 export { getDataQualityMetrics } from "./dataQuality";
 
 // RUNTIME-P0-15 — the Runtime Gateway.

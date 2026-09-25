@@ -22,9 +22,9 @@ export {
   type CreateIntegrationInput,
 } from "./integrations";
 export { setCredential } from "./credentials";
-export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs } from "./syncJobs";
-export { getNormalizedObjects } from "./objects";
+export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs, listLatestCompletedSyncStarts } from "./syncJobs";
+export { getNormalizedObjects, getNormalizedObjectsForTenant } from "./objects";
 export { createMapping, listMappings } from "./mappings";
 export { discoverMcpTools } from "./mcpTools";
 export { receiveWebhook, type WebhookResult } from "./webhooks";
-export { ingestMcpRuntimeEvent, type McpEventResult } from "./mcpEvents";
+export { ingestMcpRuntimeEvent, parseMcpEvent, type McpEventResult, type McpRuntimeOutcome } from "./mcpEvents";

@@ -30,6 +30,7 @@ const ROUTES = [
   // Added in the 2026-09-25 responsive pass: sub-pages with their own
   // tables and forms, which the top-level sweep never visited.
   "/agents/duplicates",
+  "/agents/identities",
   "/access/requests",
   "/risk/rogue",
   "/integrations/jobs",
@@ -60,7 +61,7 @@ async function settle(page: Page, route: string) {
 }
 
 /** Routes whose tables drop low-priority columns instead of scrolling. */
-const FIT_TABLES = ["/", "/agents", "/audit", "/settings/roles"];
+const FIT_TABLES = ["/", "/agents", "/agents/identities", "/audit", "/settings/roles"];
 
 /** Labelled table regions whose content is wider than the region itself. */
 async function scrollingTables(page: Page): Promise<string[]> {

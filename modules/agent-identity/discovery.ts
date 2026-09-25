@@ -3,10 +3,12 @@ import "server-only";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AgentIdentityType, DiscoveryInboxEntry } from "@/lib/shared/types/agent-identity";
-import { listIntegrations, listIntegrationTypes, getNormalizedObjects, listSyncJobs } from "@/modules/integrations/service";
+import { listIntegrations, listIntegrationTypes, getNormalizedObjectsForTenant, listLatestCompletedSyncStarts } from "@/modules/integrations/service";
 import { computeDuplicateScore, listDiscoveryDecisions } from "./duplicates";
 import { classifyAgentSignal } from "./detection";
 import { toAgent } from "./mappers";
+import { listUnregisteredAgentActivity } from "@/modules/runtime-assurance/service";
+import { RUNTIME_SOURCE, shadowAiEntry } from "./shadowAi";
 
 const KNOWN_IDENTITY_TYPES: AgentIdentityType[] = [
   "service_account",
@@ -42,8 +44,9 @@ function normalizeIdentityType(value: unknown): AgentIdentityType {
  * Fully Functional Agent Discovery — extension of IDENTITY-P0-05's
  * `buildDiscoveryInbox()`. Still reads Integration Agent's published,
  * normalized "identity" objects through its sanctioned contract
- * (`listIntegrations`/`getNormalizedObjects`/`listIntegrationTypes`/
- * `listSyncJobs` — modules/integrations/service.ts) and reconciles each one
+ * (`listIntegrations`/`getNormalizedObjectsForTenant`/`listIntegrationTypes`/
+ * `listLatestCompletedSyncStarts` — modules/integrations/service.ts, the
+ * tenant-wide reads since 2026-09-25) and reconciles each one
  * against Identity's own `agents`/`agent_identities` tables; never queries
  * `integration_objects` directly (spec §55 gate). The three original
  * categories (`new` / `likely_duplicate` / `orphaned_identity`) are
@@ -54,14 +57,27 @@ function normalizeIdentityType(value: unknown): AgentIdentityType {
  * reuse), instead of replacing this reconciliation model with a new one.
  */
 export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryInboxEntry[]> {
-  const integrations = await listIntegrations(tenantId);
-  if (integrations.length === 0) return [];
-
-  const [integrationTypes, decisions, supabase] = await Promise.all([
+  // IDENTITY-P0-12: runtime telemetry is a discovery source of its own, so
+  // an organization with no integration still sees its Shadow AI.
+  // Every read is tenant-wide and runs in one parallel wave: a fixed
+  // number of queries however many integrations the tenant has (§15; it
+  // used to be two sequential queries per integration).
+  const [integrations, integrationTypes, decisions, supabase, unregistered, identityObjects, latestCompletedSync] = await Promise.all([
+    listIntegrations(tenantId),
     listIntegrationTypes(),
     listDiscoveryDecisions(tenantId),
     supabaseServer(),
+    listUnregisteredAgentActivity(tenantId),
+    getNormalizedObjectsForTenant(tenantId, "identity"),
+    listLatestCompletedSyncStarts(tenantId),
   ]);
+  if (integrations.length === 0 && unregistered.length === 0) return [];
+  const objectsByIntegration = new Map<string, typeof identityObjects>();
+  for (const obj of identityObjects) {
+    const list = objectsByIntegration.get(obj.integrationId) ?? [];
+    list.push(obj);
+    objectsByIntegration.set(obj.integrationId, list);
+  }
   const categoryById = new Map(integrationTypes.map((t) => [t.id, t.category]));
 
   const [{ data: linkedRows, error: linkedError }, { data: agentRows, error: agentsError }] = await Promise.all([
@@ -79,18 +95,13 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
   const entries: DiscoveryInboxEntry[] = [];
 
   for (const integration of integrations) {
-    const [objects, syncJobs] = await Promise.all([
-      getNormalizedObjects(tenantId, integration.id, "identity"),
-      listSyncJobs(tenantId, integration.id),
-    ]);
+    const objects = objectsByIntegration.get(integration.id) ?? [];
 
     // Removal safety (spec §27/§28): a source object is flagged "stale"
     // (not seen in the latest completed sync) rather than silently
     // retired — derived honestly from Integration's own sync job history,
     // with no new history table required.
-    const latestCompleted = syncJobs
-      .filter((j) => (j.status === "succeeded" || j.status === "partial") && j.startedAt)
-      .sort((a, b) => (b.startedAt as string).localeCompare(a.startedAt as string))[0];
+    const latestCompletedStart = latestCompletedSync.get(integration.id);
 
     const category = categoryById.get(integration.integrationTypeId);
 
@@ -138,7 +149,7 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
         confidenceScore: detection.confidenceScore,
         confidenceLevel: detection.confidenceLevel,
         signals: detection.signals,
-        changeType: latestCompleted && obj.importedAt < latestCompleted.startedAt! ? "STALE" : "NEW",
+        changeType: latestCompletedStart && obj.importedAt < latestCompletedStart ? "STALE" : "NEW",
         candidateStatus: decision ? (decision.status === "linked" ? "linked" : "ignored") : "open",
         linkedAgentId: decision?.status === "linked" ? (decision.matchedAgentId ?? undefined) : undefined,
         lastSeenAt: obj.importedAt,
@@ -175,6 +186,18 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
         raw: {},
       });
     }
+  }
+
+  // Shadow AI: one entry per unregistered agent reference seen at runtime.
+  // Event ingestion resolves a reference against every linked identity,
+  // whatever its source, so any link resolves it here too.
+  const linkedReferences = new Set((linkedRows ?? []).map((r) => r.external_reference));
+  // A reference already linked to an agent is resolved (its events are now
+  // recorded normally), so it is not an inbox item any more.
+  for (const activity of unregistered) {
+    const key = `${RUNTIME_SOURCE}::${activity.agentRef}`;
+    if (linkedReferences.has(activity.agentRef)) continue;
+    entries.push(shadowAiEntry(activity, decisions.get(key)));
   }
 
   return entries;

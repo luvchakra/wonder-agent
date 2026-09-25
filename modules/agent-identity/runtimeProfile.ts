@@ -72,3 +72,54 @@ export async function getAgentDisplayName(tenantId: string, agentId: string): Pr
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return data && data.tenant_id === tenantId ? data.agent_name : null;
 }
+
+/**
+ * IDENTITY-P0-12 — which registered agent a runtime event's agent
+ * reference names, for Runtime's ingestion (no user session). Entity
+ * resolution by authoritative identifier only (CLAUDE.md §17.6):
+ * - a UUID is matched against this tenant's agent ids;
+ * - any other reference is matched exactly against this tenant's linked
+ *   identities' external references (e.g. a service account or OAuth
+ *   client id).
+ * No fuzzy or name matching: a reference that matches nothing is
+ * "none" (the event becomes Shadow AI evidence), and one whose linked
+ * identities belong to more than one agent is "ambiguous" (a person
+ * decides; the system never picks the closest match).
+ */
+export type AgentReferenceResolution =
+  | { kind: "unique"; agentId: string; identityId: string | null }
+  | { kind: "none" }
+  | { kind: "ambiguous"; agentIds: string[] };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export async function resolveAgentReference(tenantId: string, reference: string): Promise<AgentReferenceResolution> {
+  const ref = reference.trim();
+  if (!ref) return { kind: "none" };
+  const supabase = supabaseServiceRole();
+
+  if (UUID.test(ref)) {
+    const { data, error } = await supabase
+      .from("agents")
+      .select("id, tenant_id")
+      .eq("id", ref)
+      .eq("tenant_id", tenantId)
+      .maybeSingle<{ id: string; tenant_id: string }>();
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    return data && data.tenant_id === tenantId ? { kind: "unique", agentId: data.id, identityId: null } : { kind: "none" };
+  }
+
+  const { data, error } = await supabase
+    .from("agent_identities")
+    .select("id, agent_id, tenant_id")
+    .eq("tenant_id", tenantId)
+    .eq("external_reference", ref)
+    .neq("status", "removed")
+    .limit(20);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = ((data ?? []) as Array<{ id: string; agent_id: string; tenant_id: string }>).filter((r) => r.tenant_id === tenantId);
+  const agentIds = [...new Set(rows.map((r) => r.agent_id))];
+  if (agentIds.length === 0) return { kind: "none" };
+  if (agentIds.length > 1) return { kind: "ambiguous", agentIds };
+  return { kind: "unique", agentId: agentIds[0], identityId: rows.length === 1 ? rows[0].id : null };
+}

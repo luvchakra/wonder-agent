@@ -25,3 +25,26 @@ export async function getNormalizedObjects(
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toIntegrationObject);
 }
+
+/**
+ * The tenant-wide counterpart of `getNormalizedObjects()`: every object of
+ * one type across all of the tenant's integrations, in one query, for a
+ * consumer that reconciles them all at once (Identity's discovery inbox).
+ * Replaces one query per integration (CLAUDE.md §15). Reads as the user
+ * under RLS, with the tenant filtered explicitly (§14). Capped: a tenant
+ * with more imported objects than this sees the newest.
+ */
+export const TENANT_OBJECTS_CAP = 5000;
+
+export async function getNormalizedObjectsForTenant(tenantId: string, objectType: IntegrationObjectType): Promise<IntegrationObject[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("integration_objects")
+    .select()
+    .eq("tenant_id", tenantId)
+    .eq("object_type", objectType)
+    .order("imported_at", { ascending: false })
+    .limit(TENANT_OBJECTS_CAP);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map(toIntegrationObject);
+}

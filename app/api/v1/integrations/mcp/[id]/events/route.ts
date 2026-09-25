@@ -4,7 +4,8 @@ import { ingestMcpRuntimeEvent } from "@/modules/integrations/service";
 /**
  * INTEGRATION-P0-04.2 (higher bar). Machine-to-machine endpoint — no user
  * session, authenticated only by the integration's shared secret as a
- * bearer token (see modules/integrations/mcpEvents.ts).
+ * bearer token (see modules/integrations/mcpEvents.ts). INTEGRATION-P0-07:
+ * accepted events are bridged into Runtime's runtime_events.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,5 +23,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: { code: "REJECTED", message: result.reason } }, { status: result.status });
   }
-  return NextResponse.json({ ok: true, data: null }, { status: 202 });
+  // 202: the event was accepted. `runtime` says what happened to it —
+  // recorded as runtime activity, a duplicate, or quarantined and why.
+  return NextResponse.json({ ok: true, data: { runtime: result.runtime } }, { status: 202 });
 }

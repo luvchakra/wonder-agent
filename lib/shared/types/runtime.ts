@@ -110,7 +110,27 @@ export type RuntimeEventQuarantineEntry = {
   action: string | null;
   submittedEventTime: string | null;
   attemptedDedupeKey: string | null;
+  /** IDENTITY-P0-12: what an unregistered agent called itself (id or reference). */
+  observedAgentRef: string | null;
+  application: string | null;
+  tool: string | null;
   receivedAt: string;
+};
+
+/**
+ * IDENTITY-P0-12 (master P0-09) — AI activity from an agent that is not
+ * registered in this tenant, grouped by the reference it presented.
+ * Evidence only: none of it was recorded as runtime activity (DID).
+ */
+export type UnregisteredAgentActivity = {
+  agentRef: string;
+  eventCount: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  sources: string[];
+  applications: string[];
+  tools: string[];
+  actions: string[];
 };
 
 export type RuntimeEventFilter = {

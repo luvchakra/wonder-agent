@@ -64,6 +64,9 @@ export function toRuntimeEventQuarantineEntry(row: any): RuntimeEventQuarantineE
     action: row.action,
     submittedEventTime: row.submitted_event_time,
     attemptedDedupeKey: row.attempted_dedupe_key,
+    observedAgentRef: row.observed_agent_ref ?? null,
+    application: row.application ?? null,
+    tool: row.tool ?? null,
     receivedAt: row.received_at,
   };
 }

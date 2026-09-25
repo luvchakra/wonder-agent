@@ -16,6 +16,8 @@ import { toRuntimeEventQuarantineEntry } from "./mappers";
  * Evidentiary data — service-role write, client SELECT only (migration
  * 0043), same pattern as risk_findings.
  */
+const clip = (v: string | null | undefined) => (typeof v === "string" && v ? v.slice(0, 200) : null);
+
 export async function quarantineEvent(
   tenantId: string,
   reason: string,
@@ -25,6 +27,9 @@ export async function quarantineEvent(
     action?: string | null;
     submittedEventTime?: string | null;
     attemptedDedupeKey?: string | null;
+    observedAgentRef?: string | null;
+    application?: string | null;
+    tool?: string | null;
   },
 ): Promise<RuntimeEventQuarantineEntry> {
   const supabase = supabaseServiceRole();
@@ -38,6 +43,9 @@ export async function quarantineEvent(
       action: details.action ?? null,
       submitted_event_time: details.submittedEventTime ?? null,
       attempted_dedupe_key: details.attemptedDedupeKey ?? null,
+      observed_agent_ref: clip(details.observedAgentRef),
+      application: clip(details.application),
+      tool: clip(details.tool),
     })
     .select()
     .single();

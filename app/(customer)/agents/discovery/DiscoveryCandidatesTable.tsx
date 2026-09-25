@@ -11,11 +11,13 @@ const STATUS_LABEL: Record<string, string> = {
   new: "New — not yet registered",
   likely_duplicate: "Likely duplicate",
   orphaned_identity: "Orphaned identity",
+  shadow_ai: "Shadow AI — unregistered, active at runtime",
 };
 const STATUS_TONE: Record<string, BadgeTone> = {
   new: "neutral",
   likely_duplicate: "warning",
   orphaned_identity: "danger",
+  shadow_ai: "danger",
 };
 
 function candidateHref(e: DiscoveryInboxEntry): string {

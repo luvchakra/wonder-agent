@@ -142,7 +142,14 @@ export default async function DiscoveryCandidatePage({
       </Card>
 
       <Card>
-        <CardHeader title="Source Evidence" description="Raw record as imported by Integration Agent — retained for historical traceability." />
+        <CardHeader
+          title="Source Evidence"
+          description={
+            candidate.category === "shadow_ai"
+              ? "A summary of the quarantined runtime events. None of them was recorded as this organization's runtime activity."
+              : "Raw record as imported by Integration Agent — retained for historical traceability."
+          }
+        />
         <CardBody>
           <details>
             <summary className="cursor-pointer text-sm font-medium text-foreground">Raw source data</summary>

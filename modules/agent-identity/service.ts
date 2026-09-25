@@ -34,4 +34,5 @@ export {
   DUPLICATE_MATCH_THRESHOLD,
 } from "./duplicates";
 export { buildDiscoveryInbox, getDiscoveryCandidate } from "./discovery";
-export { getAgentRuntimeProfile, getAgentDisplayName, type AgentRuntimeProfile } from "./runtimeProfile";
+export { buildNhiInventory } from "./nhi";
+export { getAgentRuntimeProfile, getAgentDisplayName, resolveAgentReference, type AgentRuntimeProfile, type AgentReferenceResolution } from "./runtimeProfile";

@@ -498,3 +498,75 @@ So `RestHttpClient` + `testConnection()`'s error handling behave against a
 real network exactly as the mocked tests assert. The mocked tests remain the
 committed ones; this is a one-off live confirmation, not new permanent
 coverage.
+
+## 2026-09-25 — INTEGRATION-P0-07: MCP runtime events reach `runtime_events` (codebase-map D6, master P0-18)
+
+**What changed** (`modules/integrations/mcpEvents.ts`, the MCP events
+route):
+
+- **Bridge.** Each authenticated MCP event is still buffered in
+  `integration_objects` (`activity`) as this module's evidence record. It
+  is then handed to Runtime's published `ingestRuntimeEventByReference()`
+  (see the Runtime audit log). Runtime owns the rest: dedupe, the replay
+  window, the `runtime_monitoring` flag, and resolving the event's
+  `agentIdentityRef` through Identity by exact identifier.
+  - A recorded event now counts toward DID, the SHOULD/CAN/DID comparison
+    and risk.
+  - The tenant is always the integration's (§14).
+  - `mcp_server` is the integration's name.
+  - The dedupe key is `mcp:<integration>:<externalId>`, so a redelivery
+    is one runtime event, not two.
+- **Truthful outcome (§17.5).** The route still answers 202 (accepted),
+  but `data.runtime` now states what happened: `recorded`, `duplicate`,
+  `quarantined_unregistered_agent` (which then shows as Shadow AI),
+  `quarantined_ambiguous_agent`, `quarantined_replay_window`,
+  `quarantined_missing_agent_reference` or `monitoring_disabled`. A
+  failure is a 500 that says to retry, never a success.
+- **Hardening found on the way:**
+  - The bearer secret was compared with `!==`. It is now constant-time
+    (`timingSafeEqual`).
+  - The body was stored unvalidated. `parseMcpEvent()` now validates it
+    at the boundary, drops unknown fields and forces `source: "mcp"`. It
+    runs only *after* authentication, so an unauthenticated caller learns
+    nothing about the expected shape.
+  - A non-UUID integration id now gives 404, not a database error.
+  - A failed buffer write used to answer 401. It now answers 500.
+- **Performance fix for Identity's discovery inbox (§15).** There are two
+  new tenant-wide published reads:
+  - `getNormalizedObjectsForTenant(tenant, type)`, with index
+    migration 0068 `(tenant_id, object_type, imported_at desc)`, applied
+    live;
+  - `listLatestCompletedSyncStarts(tenant)`.
+  They replace two sequential queries per integration.
+  - **Measured on E2E Tenant One** (25 integrations): the discovery page
+    went from **~9.0 s to ~1.45 s**, and `/agents/identities` from
+    ~8.8 s to ~1.47 s (warm, same build).
+  - Under two test workers the 9 s page had been timing out at 30 s.
+
+**Tests:**
+
+- `mcpEvents.test.ts` (new, 7 cases): parsing; authentication before
+  body; recorded under the integration's tenant with the dedupe key;
+  duplicate; each quarantine outcome stated; missing reference
+  quarantined; failures never reported as success.
+- E2E `mcp-bridge.spec.ts`. It runs a local stub MCP server, because
+  saving an MCP credential verifies it with `tools/list`. It covers: 401
+  without the secret; an unregistered agent's event accepted but
+  quarantined, and it appears as Shadow AI; after registration, the event
+  is recorded once (a redelivery is a duplicate) and appears in the
+  agent's DID; the other tenant sees none of it.
+
+**Open, recorded, not fixed here:**
+
+- The MCP connector's outbound `baseUrl` has no SSRF guard: any URL,
+  including private addresses, is fetched when a credential is saved or
+  synced. It needs an allow/deny policy decision (P1 hardening; flagged
+  to QA-P0-18's security suite).
+- The integration's single stored secret serves as both the outbound MCP
+  credential and the inbound event bearer token. Separating them is a
+  design change for later.
+
+**Verified:** in the same full run as IDENTITY-P0-11/12, since the bridge
+uses the Runtime entry point that story introduced. `mcp-bridge.spec.ts`
+passed 5/5 plus setup. Full pipeline: eslint clean, vitest 476/476,
+Playwright 175/175.

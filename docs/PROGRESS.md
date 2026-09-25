@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**153 of 190 tracked stories complete — 81%**
+**156 of 190 tracked stories complete — 82%**
 
 ```
-████████████████████████████████░░░░░░░░  81%
+█████████████████████████████████░░░░░░░  82%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 153 |
+| Done | 156 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 15 |
+| Not Started | 12 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -39,8 +39,8 @@ and are deliberately excluded from the counts above.
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 0 | 31 | `█████████████████░` 94% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 4 | 15 | `█████████████░░░░░` 73% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 12 | 1 | 0 | 1 | 14 | `███████████████░░░` 86% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 12 | 0 | 0 | 3 | 15 | `██████████████░░░░` 80% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
@@ -98,7 +98,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 11 done · 0 partial · 0 deferred · 4 not started (15 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 13 done · 0 partial · 0 deferred · 2 not started (15 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -113,8 +113,8 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
 | IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Done — 2026-09-15, unit-tested |
 | IDENTITY-P0-07 | Contract autonomy/oversight fields (autonomy level, allowed tools, human approval requirements, required monitoring) | Done — 2026-09-15, migration `0052`, live-applied |
-| IDENTITY-P0-11 | NHI inventory (master P0-08) | Not Started — 2026-09-25, master stories |
-| IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-11 | NHI inventory (master P0-08) | Done — 2026-09-25: `buildNhiInventory()` + `/agents/identities` (linked / unlinked with classification / orphaned / ignored; human delegates excluded; linking via discovery) |
+| IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Done — 2026-09-25: unregistered-agent events quarantined by Runtime and surfaced as `shadow_ai` candidates with evidence; exact-identifier `resolveAgentReference()`; registering links the reference |
 | IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Not Started — 2026-09-25, master stories |
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Not Started — 2026-09-25, master stories |
 
@@ -122,7 +122,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 11 done · 1 partial · 0 deferred · 2 not started (14 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 12 done · 1 partial · 0 deferred · 1 not started (14 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -139,7 +139,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 | INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Not Started — 2026-09-25, master stories |
-| INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Not Started — 2026-09-25, master stories |
+| INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
 
 ### 04 — Access Agent
 

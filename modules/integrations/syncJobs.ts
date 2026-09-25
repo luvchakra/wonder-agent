@@ -59,6 +59,30 @@ export async function listSyncJobs(tenantId: string, integrationId: string): Pro
   return (data ?? []).map(toSyncJob);
 }
 
+/**
+ * When each of the tenant's integrations last started a sync that
+ * completed (succeeded or partial), in one query. The discovery inbox uses
+ * it to flag an object not seen in the latest completed sync, instead of
+ * listing every integration's jobs one integration at a time (§15).
+ */
+export async function listLatestCompletedSyncStarts(tenantId: string): Promise<Map<string, string>> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("integration_sync_jobs")
+    .select("integration_id, started_at")
+    .eq("tenant_id", tenantId)
+    .in("status", ["succeeded", "partial"])
+    .not("started_at", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(1000);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const latest = new Map<string, string>();
+  for (const row of (data ?? []) as Array<{ integration_id: string; started_at: string }>) {
+    if (!latest.has(row.integration_id)) latest.set(row.integration_id, row.started_at);
+  }
+  return latest;
+}
+
 const IMPORTERS: {
   capabilityKey: keyof ConnectorCapabilities;
   objectType: IntegrationObjectType;

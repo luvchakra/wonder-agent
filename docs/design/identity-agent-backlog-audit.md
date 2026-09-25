@@ -833,3 +833,109 @@ exported from `service.ts`.
   `tenant_id`, and re-checks the returned row's tenant (§14). It returns
   null for an agent outside the tenant.
 - **Compatibility.** No existing contract changed.
+
+## 2026-09-25 — IDENTITY-P0-11 (NHI inventory) and IDENTITY-P0-12 (Shadow AI)
+
+### IDENTITY-P0-11 — non-human identity inventory (master P0-08)
+
+`buildNhiInventory()` (`modules/agent-identity/nhi.ts`, exported from
+`service.ts`) and the page `/agents/identities`, listed under Discover in
+the nav. It is a read over what Identity already owns, not a parallel
+registry:
+
+- **Linked NHIs.** `agent_identities` rows (not removed), with their
+  agent. A link whose agent is retired or gone is **orphaned**.
+- **Unlinked NHIs.** Integration's normalized identity objects that
+  discovery has not correlated (`buildDiscoveryInbox()`), with
+  discovery's deterministic classification.
+  - The page never implies an NHI is an agent. Each unlinked row shows
+    its classification ("Not an agent", "Probable agent", …), and a
+    "Likely AI agents" view filters to confirmed or probable ones.
+  - An ignore decision shows as **ignored**.
+- **Human delegates are excluded.** They are people's accounts, not
+  non-human identities.
+- **Linking** goes through the existing candidate page: each unlinked row
+  links to `/agents/discovery/<source>/<id>`. The inventory itself has
+  no write path.
+- **Paging.** The page pages at 50 rows, URL-driven. The builder reads up
+  to 2,000 links plus the inbox, which is the same cost the discovery
+  page already pays.
+
+### IDENTITY-P0-12 — Shadow AI from runtime telemetry (master P0-09)
+
+- **Resolution.** `resolveAgentReference()` is a new published contract,
+  service-role and tenant-checked.
+  - A runtime event may name its agent by WonderAgent id or by
+    `agentRef`, meaning a linked identity's external reference.
+  - It resolves by authoritative identifier only (§17.6): exact agent id,
+    or exact external reference. It returns
+    `unique | none | ambiguous` and never picks the closest match.
+- **Unresolved events.** Runtime quarantines an event whose agent
+  resolves to *none* as `UNREGISTERED_AGENT`, and one whose agent is
+  *ambiguous* as `AMBIGUOUS_AGENT`. The event is never recorded as DID
+  and never dropped. See the Runtime audit log for migration 0067 and
+  the gates.
+- **Inbox entries.** `buildDiscoveryInbox()` adds one `shadow_ai` entry
+  per unregistered reference, from Runtime's published
+  `listUnregisteredAgentActivity()` (90 days). This happens even when
+  the tenant has no integration.
+  - The entry carries source, evidence (event count, sources, tools,
+    applications, first and last seen), a deterministic classification
+    (`shadowAi.ts`, pure), and its register, link or ignore status.
+  - Owner is never guessed.
+- **Registering.** This reuses the existing candidate flow. The reference
+  becomes the new agent's linked identity (source `runtime`), so its
+  next event resolves and is recorded. A reference linked by any route
+  resolves the inbox entry.
+- **UI.** The discovery page has a "Shadow AI" tab and metric, and the
+  candidate page explains that the evidence is quarantined, not
+  recorded.
+
+**Deliberately left out:**
+
+- A risk score on the Shadow AI entry. That is Risk's to compute
+  (RISK-P0-12 names shadow AI as a risk signal).
+- The MCP bridge (INTEGRATION-P0-07). Once MCP events reach the event
+  route with an `agentRef`, they feed Shadow AI with no further change
+  here.
+
+**Performance fix (§15), found while testing this story.**
+`buildDiscoveryInbox()` ran two sequential queries per integration
+(`getNormalizedObjects` + `listSyncJobs`). E2E Tenant One has 25
+integrations, so the discovery page took ~9 s, and under two test workers
+the new Shadow AI spec timed out at 30 s. The inbox now makes one parallel
+wave over Integration's new tenant-wide reads
+(`getNormalizedObjectsForTenant`, `listLatestCompletedSyncStarts`): a
+fixed number of queries whatever the integration count. The discovery
+page went from **~9.0 s to ~1.45 s**, and `/agents/identities` from
+~8.8 s to ~1.47 s (warm, same build).
+
+**Observed, not changed.** A signed-in user with no organization, such as
+the platform admin, who opens a customer page is redirected to
+/onboarding by the layout. The page's own server component still runs in
+parallel and logs a `QUERY_FAILED` (a tenant id of `null`) before the
+redirect wins. Nothing is shown or leaked, but the log noise predates
+this work. An early `if (!ctx.tenantId) redirect(...)` in each page would
+silence it; that is Experience's call.
+
+**Verified (IDENTITY-P0-11/12, with INTEGRATION-P0-07 in the same run):**
+
+- Unit tests:
+  - `shadowAi.test.ts` (3)
+  - `nhi.test.ts` (4)
+  - `runtimeProfile.test.ts` (4: resolution by id and by reference; the
+    other tenant's never; ambiguous; removed; every query
+    tenant-filtered)
+  - Runtime `unregistered.test.ts` (8)
+- E2E `shadow-ai.spec.ts`, 4/4:
+  - refusal and quarantine;
+  - shape validation;
+  - the Shadow AI tab for its own tenant only;
+  - registration, after which the next event is recorded and the entry
+    is gone;
+  - the NHI inventory shows it linked, for its own tenant only.
+- `/agents/identities` was added to the design-review sweep (every named
+  width, both themes, and the column-priority fit check).
+- Full pipeline: eslint clean, vitest **476/476**, Playwright **175/175**
+  (7.9 min).
+- Migrations 0067 (Runtime) and 0068 (Integration index) applied live.

@@ -813,3 +813,47 @@ database, for Operations' search (see that audit log).
   alert, for that tenant only; the other tenant's observe-only decision
   produces none; the enforced decision can be found by request id in its
   own tenant only.
+
+## 2026-09-25 — Unregistered-agent events are quarantined as Shadow AI evidence (for IDENTITY-P0-12)
+
+- **Migration 0067** (`0067_runtime_unregistered_agent_activity.sql`,
+  applied live) is additive. It adds three nullable, length-checked
+  columns to `runtime_event_quarantine` (`observed_agent_ref`,
+  `application`, `tool`) and a partial index for the discovery read. RLS
+  and the select-only policy are unchanged; writes stay service-role.
+  - `agent_id` there is a foreign key, so an unregistered agent's claimed
+    id or name goes in `observed_agent_ref`.
+- **Event route.** `POST /api/v1/runtime/events` now takes exactly one of
+  `agentId` (must be a UUID) or `agentRef`, and hands it to the new
+  published entry point `ingestRuntimeEventByReference()`. The MCP bridge
+  (INTEGRATION-P0-07) will use the same entry point. It resolves the
+  reference through Identity's `resolveAgentReference()`, and the route's
+  replay-window quarantine moved into it.
+  - A unique match is ingested as before, and a resolved identity fills
+    `identityId` when the caller sent none.
+  - Otherwise `quarantineUnresolvedAgentEvent()` runs, which always
+    throws, so nothing is recorded. It applies the same gates as normal
+    ingestion, in order: `runtime_monitoring` must be on (403
+    otherwise), and an event outside the replay window is quarantined
+    as `REPLAY_WINDOW_VIOLATION`. After that, an unregistered agent is
+    quarantined as `UNREGISTERED_AGENT` (404 `AGENT_NOT_REGISTERED`) and
+    an ambiguous one as `AMBIGUOUS_AGENT` (409
+    `AGENT_REFERENCE_AMBIGUOUS`).
+- **Behaviour changes, deliberate.**
+  - An unknown `agentId` used to answer 404 `AGENT_NOT_FOUND` and leave
+    no record. It now answers 404 `AGENT_NOT_REGISTERED` and leaves
+    quarantined evidence.
+  - A non-UUID `agentId` used to reach the database and fail with 500.
+    It is now 400, and quarantined.
+  - A shape-invalid event's claimed agent goes in `observed_agent_ref`,
+    not the `agent_id` foreign key: an unknown id there used to make the
+    quarantine insert itself fail.
+- **Published read.** `listUnregisteredAgentActivity(tenantId)` reads as
+  the user under RLS, over 90 days and at most 2,000 rows. Grouping by
+  reference is pure (`groupUnregisteredActivity`, unit-tested).
+- **Tests.** `unregistered.test.ts` (8 cases) covers the four gates, the
+  grouping, and the entry point: a resolved reference is ingested as its
+  agent and identity; an unresolved one never is; a replay is quarantined
+  against the resolved agent. E2E `shadow-ai.spec.ts` covers the refusal, quarantine,
+  inbox, registration and the event recorded afterwards, with tenant
+  isolation.
