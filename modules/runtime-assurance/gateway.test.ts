@@ -58,6 +58,8 @@ vi.mock("@/modules/access-governance/service", () => ({
 }));
 const emergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [] };
 vi.mock("./emergency", () => ({ loadActiveEmergencyState: vi.fn(async () => emergencyState) }));
+const notified = vi.fn(async () => undefined);
+vi.mock("./decisionNotifications", () => ({ notifyForDecision: (...a: unknown[]) => notified(...(a as [])) }));
 
 import { authorizeRuntimeRequest, decisionEventType, filterGatewayTools, parseGatewayRequest } from "./gateway";
 
@@ -70,6 +72,7 @@ beforeEach(() => {
   events = [];
   flags = { ...DEFAULT_FLAGS };
   evaluate.mockReset();
+  notified.mockClear();
   evaluate.mockResolvedValue({
     decision: "DENY",
     code: "DATA_PROHIBITED",
@@ -105,6 +108,19 @@ describe("parseGatewayRequest", () => {
 });
 
 describe("authorizeRuntimeRequest", () => {
+  it("OPERATIONS-P0-08: hands each new decision to the notifier once, never a replay", async () => {
+    await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "n-1", action: "READ", tool: "delete_customer" }));
+    await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "n-1", action: "READ" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(notified).toHaveBeenCalledTimes(1);
+    expect(notified).toHaveBeenCalledWith(
+      "tenant-a",
+      "agent-a",
+      expect.objectContaining({ decision: "DENY", enforced: false, effectiveDecision: "ALLOW" }),
+      expect.objectContaining({ tool: "delete_customer" }),
+    );
+  });
+
   it("records the computed decision but tells the caller to proceed in OBSERVE_ONLY mode", async () => {
     const d = await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "r-1", action: "READ", application: "Snowflake" }));
     expect(d.mode).toBe("OBSERVE_ONLY");
@@ -247,5 +263,16 @@ describe("gateway feature flags (PLATFORM-P0-12)", () => {
 
     flags.tool_filtering = false;
     await expect(filterGatewayTools(principal, { tools: ["a"] })).rejects.toMatchObject({ status: 403, code: "FEATURE_DISABLED" });
+  });
+});
+
+describe("searchTerm (OPERATIONS-P0-08)", () => {
+  it("keeps identifier characters and drops anything that could change the filter", async () => {
+    const { searchTerm } = await import("./gateway");
+    expect(searchTerm("  req-42 ")).toBe("req-42");
+    expect(searchTerm("delete customer")).toBe("delete_customer");
+    expect(searchTerm("x,tenant_id.eq.other)")).toBe("xtenant_id.eq.other");
+    expect(searchTerm("a*%\"(b)")).toBe("ab");
+    expect(searchTerm("(),*")).toBe("");
   });
 });

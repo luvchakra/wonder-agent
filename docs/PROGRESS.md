@@ -23,9 +23,9 @@ Generated 2026-09-25 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 153 |
-| Partial | 20 |
+| Partial | 21 |
 | Deferred | 1 |
-| Not Started | 16 |
+| Not Started | 15 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -47,7 +47,7 @@ and are deliberately excluded from the counts above.
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 0 | 14 | `███████████████░░░` 86% |
-| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 1 | 0 | 1 | 12 | `███████████████░░░` 83% |
+| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 2 | 0 | 0 | 12 | `███████████████░░░` 83% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 11 | 12 | 0 | 2 | 25 | `████████░░░░░░░░░░` 44% |
 
 ---
@@ -292,7 +292,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Audit, Reporting, Notifications & Search  
 **Backlog status:** DORMANT — do not start until the user says "Run Operations Agent"  
-**Stories:** 10 done · 1 partial · 0 deferred · 1 not started (12 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 10 done · 2 partial · 0 deferred · 0 not started (12 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -307,7 +307,7 @@ and are deliberately excluded from the counts above.
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
 | OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
-| OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Not Started — 2026-09-25, master stories |
+| OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Partial — 2026-09-25: enforced DENY → `runtime_alert`, enforced REQUIRE_APPROVAL → `approval_required` (mandatory, throttled per agent); search covers gateway decisions. Search over investigations waits on RISK-P0-11 |
 
 ### 11 — QA Agent
 

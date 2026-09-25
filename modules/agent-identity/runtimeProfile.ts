@@ -55,3 +55,20 @@ export async function getAgentRuntimeProfile(tenantId: string, agentId: string):
     identityIds: ((identitiesRes.data ?? []) as Array<{ id: string; tenant_id: string }>).filter((i) => i.tenant_id === tenantId).map((i) => i.id),
   };
 }
+
+/**
+ * OPERATIONS-P0-08 — the agent's display name for a runtime notification
+ * raised after a gateway decision, where no user session exists. Same
+ * service-role discipline as above: filtered by tenant and re-checked.
+ * Returns null if the agent is not in this tenant.
+ */
+export async function getAgentDisplayName(tenantId: string, agentId: string): Promise<string | null> {
+  const { data, error } = await supabaseServiceRole()
+    .from("agents")
+    .select("agent_name, tenant_id")
+    .eq("id", agentId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle<{ agent_name: string; tenant_id: string }>();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return data && data.tenant_id === tenantId ? data.agent_name : null;
+}

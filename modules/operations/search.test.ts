@@ -34,6 +34,11 @@ vi.mock("@/modules/integrations/service", () => ({
   listIntegrations: (...a: unknown[]) => mockListIntegrations(...a),
 }));
 
+const mockListRuntimeDecisions = vi.fn();
+vi.mock("@/modules/runtime-assurance/service", () => ({
+  listRuntimeDecisions: (...a: unknown[]) => mockListRuntimeDecisions(...a),
+}));
+
 import { search, maskRiskField } from "./search";
 
 describe("maskRiskField — OPERATIONS-P0-03.2", () => {
@@ -77,7 +82,44 @@ describe("search — OPERATIONS-P0-03.1/03.2", () => {
     mockGetFindings.mockResolvedValue([]);
     mockListCampaigns.mockResolvedValue([]);
     mockListIntegrations.mockResolvedValue([]);
+    mockListRuntimeDecisions.mockReset();
+    mockListRuntimeDecisions.mockResolvedValue([]);
   }
+
+  it("OPERATIONS-P0-08: finds Runtime Gateway decisions through Runtime's own contract, only with runtime.read", async () => {
+    stubEmpty();
+    mockListRuntimeDecisions.mockResolvedValue([
+      {
+        decisionId: "dec-1",
+        requestId: "req-42",
+        agentId: "agent-1",
+        decision: "DENY",
+        enforced: false,
+        action: "READ",
+        tool: null,
+        application: "Snowflake",
+        resource: "CustomerDB",
+        code: "APPLICATION_NOT_APPROVED",
+        createdAt: "2026-09-25T00:00:00Z",
+      },
+    ]);
+
+    expect(await search("tenant-a", ALL_PERMISSIONS, "req-42")).toEqual([]);
+    expect(mockListRuntimeDecisions).not.toHaveBeenCalled();
+
+    const results = await search("tenant-a", ["runtime.read"], "req-42");
+    expect(mockListRuntimeDecisions).toHaveBeenCalledWith("tenant-a", { query: "req-42", limit: 25 });
+    expect(results).toEqual([
+      {
+        objectType: "runtime_decision",
+        id: "dec-1",
+        title: "DENY (observed): READ on Snowflake",
+        subtitle: "APPLICATION_NOT_APPROVED · request req-42",
+        href: "/runtime/agents/agent-1",
+        freshness: "2026-09-25T00:00:00Z",
+      },
+    ]);
+  });
 
   it("returns nothing for an empty/whitespace query without calling any dependency", async () => {
     stubEmpty();

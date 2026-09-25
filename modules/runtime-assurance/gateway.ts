@@ -9,6 +9,7 @@ import type { RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-
 import type { GatewayDecision, GatewayDecisionRecord, GatewayMode, RuntimeEventType } from "@/lib/shared/types/runtime";
 import { evaluateRuntimeRequest, evaluateToolVisibility, type RuntimePrincipal, type ToolVisibility } from "@/modules/access-governance/service";
 import { loadActiveEmergencyState } from "./emergency";
+import { notifyForDecision } from "./decisionNotifications";
 import { getFeatureFlags } from "@/modules/platform-admin/service";
 
 /**
@@ -195,8 +196,9 @@ export async function authorizeRuntimeRequest(
   const row = await insertDecision(principal, request, decision, { mode, enforced, correlationId });
   if (!row.replayed) {
     // The decision row above is the durable, synchronous record. The audit
-    // entry and the timeline event are written after the response so they
-    // add no latency; both log any failure and never throw.
+    // entry, the timeline event and any notification are written after the
+    // response so they add no latency; each logs any failure and never
+    // throws.
     const decisionRow = row.data;
     runAfterResponse(() =>
       Promise.all([
@@ -223,6 +225,8 @@ export async function authorizeRuntimeRequest(
           },
         }),
         recordDecisionEvent(principal, request, decisionRow, correlationId),
+        // OPERATIONS-P0-08: an enforced DENY or REQUIRE_APPROVAL notifies.
+        notifyForDecision(principal.tenantId, principal.agentId, toGatewayDecision(decisionRow, false), request),
       ]),
     );
   }
@@ -324,9 +328,16 @@ async function recordDecisionEvent(
 }
 
 /** Decision history for the customer UI: the signed-in user's own tenant, RLS plus an explicit filter. */
+const DECISION_SEARCH_COLUMNS = ["request_id", "action", "tool", "application", "resource", "code"] as const;
+
+/** Keeps letters, digits and `_ . : / @ -` (spaces become `_`, a one-character wildcard); drops anything else. */
+export function searchTerm(raw: string): string {
+  return raw.trim().replace(/\s+/g, "_").replace(/[^A-Za-z0-9_.:/@-]/g, "").slice(0, MAX_FIELD);
+}
+
 export async function listRuntimeDecisions(
   tenantId: string,
-  filter: { agentId?: string; limit?: number } = {},
+  filter: { agentId?: string; limit?: number; query?: string } = {},
 ): Promise<GatewayDecisionRecord[]> {
   const supabase = await supabaseServer();
   let query = supabase
@@ -336,6 +347,13 @@ export async function listRuntimeDecisions(
     .order("created_at", { ascending: false })
     .limit(Math.min(filter.limit ?? 50, 200));
   if (filter.agentId) query = query.eq("agent_id", filter.agentId);
+  if (filter.query !== undefined) {
+    // OPERATIONS-P0-08 search, done in the database (RLS applies). The
+    // term is reduced to characters that cannot alter the filter syntax.
+    const term = searchTerm(filter.query);
+    if (!term) return [];
+    query = query.or(DECISION_SEARCH_COLUMNS.map((c) => `${c}.ilike.*${term}*`).join(","));
+  }
   const { data, error } = await query;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return ((data ?? []) as DecisionRow[]).map((row) => ({

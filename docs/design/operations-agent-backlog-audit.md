@@ -716,3 +716,76 @@ real caller's tests, matching this module's existing pattern for thin
 query helpers). `npm run build` (fresh `.next`) clean.
 
 **Progress Tracker:** OPERATIONS-P0-02.2 moved from `Partial` to `Done`.
+
+## 2026-09-25 — OPERATIONS-P0-08: runtime and approval notifications (master P0-41)
+
+**What changed.**
+
+- Two new mandatory notification types, `runtime_alert` and
+  `approval_required` (`lib/shared/types/operations.ts`), with migration
+  `0066_operations_runtime_notification_types.sql`. The migration is
+  additive: it widens the type check constraints on `notifications` and
+  `notification_preferences` from 0048, removes nothing, and leaves RLS and
+  policies unchanged. It also adds the index
+  `(tenant_id, type, reference_id, created_at desc)` for the throttle
+  lookup. It was applied to the live project.
+- The trigger is Runtime Agent's, per this module's rule that producing
+  modules call `notify()` at their own event. See
+  `modules/runtime-assurance/decisionNotifications.ts` and the Runtime
+  audit log. The rules:
+  - Only a decision that actually stopped the agent notifies: DENY or
+    REQUIRE_APPROVAL *as enforced*.
+  - An observe-only decision told the agent to proceed. Notifying on it
+    would imply something was blocked or is waiting on a person when
+    nothing is (§17.5), so it stays on the Runtime page only.
+  - One notification per agent and type per 15 minutes, via the existing
+    `wasRecentlyNotified()`. It is called with a fraction of a day; no
+    signature change was needed.
+- Search now covers Runtime Gateway decisions (`runtime_decision`, only for
+  callers with `runtime.read`):
+  - Operations' `search()` goes through Runtime's published
+    `listRuntimeDecisions(tenantId, { query })`, never the table directly
+    (#6).
+  - The match runs in the database under RLS against request id, action,
+    tool, application, resource and decision code, newest 25.
+  - Before it reaches the PostgREST `or()` filter, the term is reduced to
+    `[A-Za-z0-9_.:/@-]`, so it cannot change the filter's structure.
+    `searchTerm()` has a unit test for this.
+- The notification settings page lists the two new types as locked-on,
+  with no code change: it renders `MANDATORY_NOTIFICATION_TYPES`.
+
+**Deliberately left out.**
+
+- "Search covers investigations": the investigations record does not exist
+  yet (RISK-P0-12, Risk-owned). It will be added to `search()` in that
+  story.
+- Approval-required notifications go to the whole tenant, like every other
+  P0 type. There is no approval queue behind REQUIRE_APPROVAL yet, so the
+  notification points to the Runtime page. Routing to approvers only
+  belongs with that queue (P1, per master P1 approvals).
+- The throttle check and the insert are not atomic. Two denials for the
+  same agent in the same instant can both notify. That is a duplicate
+  alert, never a missed one, so it was accepted.
+
+**Verified:**
+
+- `decisionNotifications.test.ts` (new): 7 cases, covering the three
+  outcome rules, the throttle, no lookups when nothing is raised, never
+  throwing, and the unknown-agent fallback.
+- `gateway.test.ts`: the notifier is called once per new decision and
+  never on a replay; `searchTerm()` sanitising.
+- `search.test.ts`: decisions only with `runtime.read`, through Runtime's
+  contract.
+- E2E `gateway-enforcement.spec.ts`, 4/4 plus setup:
+  - With ENFORCE on for E2E Tenant Two only, its DENY raised exactly one
+    `runtime_alert`, visible to Tenant Two and not Tenant One.
+  - Tenant One's observe-only decision raised none.
+  - The enforced decision is found by request id in Tenant Two's search
+    and not in Tenant One's.
+- Live check: the stored row is `runtime_alert`, broadcast (`user_id`
+  null), `reference_type` agent, and holds no key material.
+- Full pipeline (§17.8: notifications and a migration): eslint clean,
+  vitest 450/450, Playwright **166/166** (7.9 min).
+
+**Progress Tracker:** `Partial`. Search over investigations is waiting on
+RISK-P0-11, where the record is created.

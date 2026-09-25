@@ -820,3 +820,16 @@ contract addition only; no existing export changed.
   come from a verified agent API key.
 - **Verified** through `runtimeDecisionLoader.test.ts` (tenant filters and
   unknown-agent handling) and the full suite, 405/405.
+
+## 2026-09-25 — New published contract: `getAgentDisplayName()`
+
+This is additive, in `modules/agent-identity/runtimeProfile.ts`, and
+exported from `service.ts`.
+
+- **Why.** The Runtime Gateway's notifications (OPERATIONS-P0-08) are
+  raised with no user session, so the RLS-scoped `getAgent()` cannot be
+  used.
+- **How.** It reads `agent_name` with the service role, filters by
+  `tenant_id`, and re-checks the returned row's tenant (§14). It returns
+  null for an agent outside the tenant.
+- **Compatibility.** No existing contract changed.

@@ -780,3 +780,36 @@ Master stories P0-34 and P0-35.
   record. It never gets an ALLOW.
 - Runtime ingestion honours `runtime_monitoring` (on by default).
 - Tests are listed in the Platform audit log, same date.
+
+## 2026-09-25 — Gateway decisions raise notifications (for OPERATIONS-P0-08)
+
+`modules/runtime-assurance/decisionNotifications.ts` is Runtime's producer
+side of OPERATIONS-P0-08.
+
+- **Where it runs.** `authorizeRuntimeRequest()` hands each *newly
+  recorded* decision to `notifyForDecision()`. It runs in the same
+  after-response task as the audit row and the timeline event, so it adds
+  no latency to the agent's answer.
+- **What notifies.**
+  - A replay never reaches it.
+  - The pure `notificationForDecision()` returns a `runtime_alert` for an
+    enforced DENY, `approval_required` for an enforced REQUIRE_APPROVAL,
+    and nothing otherwise (observe-only, ALLOW, ALLOW_WITH_RESTRICTIONS).
+- **Order of work.** The throttle lookup, then the agent's display name
+  (Identity's new published `getAgentDisplayName()`), then `notify()`.
+  The throttle is one per agent per type per 15 minutes, and a decision
+  that raises nothing makes no lookups at all.
+- **Failure.** It never throws.
+
+`listRuntimeDecisions()` gained an optional `query` filter, matched in the
+database, for Operations' search (see that audit log).
+
+**Tests:**
+
+- `decisionNotifications.test.ts` (new, 7 cases).
+- `gateway.test.ts`: the notifier is called once per new decision and
+  never on a replay; `searchTerm()` sanitising.
+- E2E `gateway-enforcement.spec.ts`: an enforced DENY produces exactly one
+  alert, for that tenant only; the other tenant's observe-only decision
+  produces none; the enforced decision can be found by request id in its
+  own tenant only.

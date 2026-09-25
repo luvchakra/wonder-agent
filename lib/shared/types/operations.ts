@@ -41,9 +41,16 @@ export type NotificationType =
   | "rogue_agent"
   | "ownership_missing"
   | "integration_failure"
-  | "lifecycle_expiry";
+  | "lifecycle_expiry"
+  // OPERATIONS-P0-08 (master P0-41): raised from Runtime Gateway decisions.
+  | "runtime_alert"
+  | "approval_required";
 
-/** The seven P0 notification types are always mandatory — never suppressible via preferences (OPERATIONS-P0-05.1). */
+/**
+ * Every P0 notification type is mandatory — never suppressible via
+ * preferences (OPERATIONS-P0-05.1). The two runtime types added by
+ * OPERATIONS-P0-08 are security notifications and are mandatory too.
+ */
 export const MANDATORY_NOTIFICATION_TYPES: NotificationType[] = [
   "certification_due",
   "certification_overdue",
@@ -52,6 +59,8 @@ export const MANDATORY_NOTIFICATION_TYPES: NotificationType[] = [
   "ownership_missing",
   "integration_failure",
   "lifecycle_expiry",
+  "runtime_alert",
+  "approval_required",
 ];
 
 export type Notification = {
@@ -95,7 +104,9 @@ export type SearchObjectType =
   | "integration"
   | "identity"
   | "owner"
-  | "entitlement";
+  | "entitlement"
+  // OPERATIONS-P0-08: a Runtime Gateway decision.
+  | "runtime_decision";
 
 /**
  * OPERATIONS-P0-03.1/03.2. `riskSeverity`/`riskMasked` are present only on

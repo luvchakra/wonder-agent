@@ -5,6 +5,7 @@ import { listApplications, listPolicies, listEntitlementsForTenant } from "@/mod
 import { getFindings } from "@/modules/risk/service";
 import { listCampaigns } from "@/modules/certification-compliance/service";
 import { listIntegrations } from "@/modules/integrations/service";
+import { listRuntimeDecisions } from "@/modules/runtime-assurance/service";
 import type { RiskSeverity } from "@/lib/shared/types/risk";
 import type { SearchResult } from "@/lib/shared/types/operations";
 
@@ -187,6 +188,24 @@ export async function search(tenantId: string, permissions: string[], query: str
         subtitle: i.status,
         href: `/integrations/${i.id}`,
         freshness: i.lastSyncAt ?? i.createdAt,
+      });
+    }
+  }
+
+  // OPERATIONS-P0-08: Runtime Gateway decisions, matched in the database
+  // by Runtime's own list contract (request id, action, tool, application,
+  // resource or decision code), newest first.
+  if (permissions.includes("runtime.read")) {
+    const decisions = await listRuntimeDecisions(tenantId, { query: q, limit: 25 });
+    for (const d of decisions) {
+      const target = d.tool ?? d.application ?? d.resource;
+      results.push({
+        objectType: "runtime_decision",
+        id: d.decisionId,
+        title: `${d.decision.replace(/_/g, " ")}${d.enforced ? "" : " (observed)"}: ${d.action}${target ? ` on ${target}` : ""}`,
+        subtitle: `${d.code} · request ${d.requestId}`,
+        href: `/runtime/agents/${d.agentId}`,
+        freshness: d.createdAt,
       });
     }
   }

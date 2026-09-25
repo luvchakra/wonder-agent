@@ -9,6 +9,8 @@ import { TENANT_TWO, authFile } from "./support/testUsers";
  * - Tenant One stays observe-only throughout.
  * - With `runtime_observe` off, the gateway refuses the tenant outright
  *   (403); it never answers ALLOW.
+ * - OPERATIONS-P0-08: the enforced DENY raises one runtime alert for that
+ *   tenant only, and the decision is searchable there only.
  * Every flag is restored in `finally`, so a failure cannot leave Tenant
  * Two enforcing.
  */
@@ -36,22 +38,33 @@ test.describe.serial("gateway enforcement flags", () => {
   let platform: APIRequestContext;
   let anon: APIRequestContext;
   let tenantTwoId = "";
+  let enforceAgent = "";
+  let observeAgent = "";
+  const enforcedRequestId = `enf-${Date.now()}`;
   let keyTwo = "";
   let keyOne = "";
+  let adminOne: APIRequestContext;
+  let adminTwo: APIRequestContext;
 
   test.beforeAll(async ({ baseURL, browser }) => {
     platform = await playwrightRequest.newContext({ baseURL, storageState: authFile("platformAdmin") });
     anon = await playwrightRequest.newContext({ baseURL });
+    adminOne = await playwrightRequest.newContext({ baseURL, storageState: authFile("adminOne") });
+    adminTwo = await playwrightRequest.newContext({ baseURL, storageState: authFile("adminTwo") });
     const tenants = (await (await platform.get("/api/platform/v1/tenants")).json()).data as Array<{ tenantId: string; slug?: string }>;
     tenantTwoId = tenants.find((t) => t.slug === TENANT_TWO.slug)!.tenantId;
     expect(tenantTwoId).toMatch(/^[0-9a-f-]{36}$/);
-    keyTwo = await agentKey(authFile("adminTwo"), browser, `E2E Enforce Agent ${Date.now()}`);
-    keyOne = await agentKey(authFile("adminOne"), browser, `E2E Observe Agent ${Date.now()}`);
+    enforceAgent = `E2E Enforce Agent ${Date.now()}`;
+    observeAgent = `E2E Observe Agent ${Date.now()}`;
+    keyTwo = await agentKey(authFile("adminTwo"), browser, enforceAgent);
+    keyOne = await agentKey(authFile("adminOne"), browser, observeAgent);
   });
 
   test.afterAll(async () => {
     await platform?.dispose();
     await anon?.dispose();
+    await adminOne?.dispose();
+    await adminTwo?.dispose();
   });
 
   const setFlag = async (flagKey: string, enabled: boolean) => {
@@ -64,7 +77,7 @@ test.describe.serial("gateway enforcement flags", () => {
   test("runtime_enforce on for one tenant: its agent is told DENY; the other tenant still observes", async () => {
     await setFlag("runtime_enforce", true);
     try {
-      const enforced = (await (await authorize(keyTwo, `enf-${Date.now()}`)).json()).data;
+      const enforced = (await (await authorize(keyTwo, enforcedRequestId)).json()).data;
       expect(enforced.mode).toBe("ENFORCE");
       expect(enforced.enforced).toBe(true);
       // A fresh agent may not act (not in an operating lifecycle state).
@@ -79,6 +92,28 @@ test.describe.serial("gateway enforcement flags", () => {
     }
     const back = (await (await authorize(keyTwo, `enf-after-${Date.now()}`)).json()).data;
     expect(back.mode).toBe("OBSERVE_ONLY");
+  });
+
+  // OPERATIONS-P0-08 — the enforced DENY above raised one runtime alert for
+  // Tenant Two; the observe-only decision for Tenant One raised none.
+  const titles = async (ctx: APIRequestContext) =>
+    ((await (await ctx.get("/api/v1/notifications")).json()).data as Array<{ type: string; title: string }>).map((n) => `${n.type}|${n.title}`);
+
+  test("an enforced DENY notifies its own organization only; observe-only decisions notify nobody", async () => {
+    // Written after the gateway's response, so poll briefly.
+    await expect
+      .poll(async () => (await titles(adminTwo)).filter((t) => t.startsWith("runtime_alert|") && t.includes(enforceAgent)).length, { timeout: 15_000 })
+      .toBe(1);
+    const one = await titles(adminOne);
+    expect(one.some((t) => t.includes(enforceAgent))).toBe(false);
+    expect(one.some((t) => t.includes(observeAgent))).toBe(false);
+  });
+
+  test("the enforced decision is searchable by request id, in its own organization only", async () => {
+    const found = (await (await adminTwo.get(`/api/v1/search?q=${enforcedRequestId}`)).json()).data as Array<{ objectType: string; subtitle: string }>;
+    expect(found.filter((r) => r.objectType === "runtime_decision").map((r) => r.subtitle)).toEqual([expect.stringContaining(enforcedRequestId)]);
+    const other = (await (await adminOne.get(`/api/v1/search?q=${enforcedRequestId}`)).json()).data as Array<{ objectType: string }>;
+    expect(other.filter((r) => r.objectType === "runtime_decision")).toEqual([]);
   });
 
   test("runtime_observe off: the gateway refuses the tenant, never answering ALLOW", async () => {
