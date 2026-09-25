@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
+import { listUnregisteredAgentActivity } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardHeader, CardBody, LinkButton } from "@/modules/ui";
 import { RiskAgentsTable } from "./RiskAgentsTable";
@@ -21,7 +22,14 @@ export default async function RiskIndexPage() {
     throw err;
   }
 
-  const [agents, findings] = await Promise.all([listAgents(ctx.tenantId!), getFindings(ctx.tenantId!, { status: "open" })]);
+  // RISK-P0-12: Shadow AI is a tenant-level signal (an unregistered agent
+  // has no agent record for a finding to hang on), so it is shown here and
+  // resolved through discovery, not as a per-agent finding.
+  const [agents, findings, shadowAi] = await Promise.all([
+    listAgents(ctx.tenantId!),
+    getFindings(ctx.tenantId!, { status: "open" }),
+    listUnregisteredAgentActivity(ctx.tenantId!),
+  ]);
   const findingCountByAgent = new Map<string, number>();
   const worstSeverityByAgent = new Map<string, string>();
   const rank: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 };
@@ -79,6 +87,18 @@ export default async function RiskIndexPage() {
           </LinkButton>
         </div>
       </div>
+
+      {shadowAi.length > 0 ? (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-destructive/30 bg-destructive/[0.06] px-4 py-3">
+          <p className="text-sm text-foreground">
+            <span className="font-semibold">Shadow AI:</span> {shadowAi.length} unregistered agent{shadowAi.length === 1 ? " is" : "s are"} active at
+            runtime ({shadowAi.reduce((n, a) => n + a.eventCount, 0)} quarantined events in 90 days). None of it is governed until registered.
+          </p>
+          <LinkButton href="/agents/discovery?tab=shadow_ai" variant="outline" size="sm">
+            Review Shadow AI
+          </LinkButton>
+        </div>
+      ) : null}
 
       <FindingsList findings={findingRows} now={renderedAt} />
 

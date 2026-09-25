@@ -52,7 +52,12 @@ test.describe.serial("shadow AI discovery", () => {
     await expect(otherPage.getByText(ref)).toHaveCount(0);
     await other.close();
 
-    await row.click();
+    // RISK-P0-12: it is also a signal on the Risk page, linking to discovery.
+    await page.goto("/risk");
+    await expect(page.getByText(/Shadow AI:/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Review Shadow AI" })).toHaveAttribute("href", "/agents/discovery?tab=shadow_ai");
+
+    await (await shadowRow(page)).click();
     await expect(page.getByRole("heading", { name: ref })).toBeVisible();
     await expect(page.getByText("Runtime activity from an unregistered agent")).toBeVisible();
     await expect(page.getByText(/2 events via mcp/)).toBeVisible();

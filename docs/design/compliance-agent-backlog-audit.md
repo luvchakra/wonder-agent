@@ -1003,3 +1003,17 @@ narrower type without a cast.
 
 **Verification:** covered by Operations' own full pipeline run — see that
 module's audit log entry.
+
+## 2026-09-25 — New published contract: `countOverdueCertificationItems()`
+
+This is additive, in `modules/certification-compliance/overdue.ts`, and
+exported from `service.ts`.
+
+- **What it counts.** An agent's certification items still pending past
+  their due date: the same rule `escalateOverdueItems()` uses, escalated
+  or not.
+- **How it reads.** As the calling user under RLS, with the tenant
+  filtered explicitly (§14). It is a count query only.
+- **Consumer.** The Risk engine's "Certification overdue" factor
+  (RISK-P0-12), which had no source until now.
+- **Compatibility.** No existing contract changed.

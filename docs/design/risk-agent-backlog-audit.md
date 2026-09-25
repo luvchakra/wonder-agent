@@ -878,3 +878,61 @@ recorded here rather than changed within this story.
   were rebuilt and re-verified with `investigations.spec.ts` plus
   `risk.spec.ts`: **14/14**.
 - Migration 0071 applied live; the SQL isolation test passed 11/11.
+
+## 2026-09-25 — RISK-P0-12: new risk signals (master P0-20/P0-21)
+
+**What changed.** The engine is now evaluator **v2**. Each new rule is a
+pure function in `signals.ts`, fed by another module's published contract.
+
+- **New findings.** Migration 0072 (applied live) is additive: two
+  categories and one evidence type.
+  - `suspicious_delegation`, from Identity's `listRelationships`:
+    sharing a credential with any agent, or delegating to or
+    orchestrating an agent that is DISCOVERED, SUSPENDED, RETIRED or not
+    visible. The evidence is each `agent_relationships` row.
+  - `unapproved_tool_use`, from Runtime's SHOULD-vs-DID tool comparison
+    (RUNTIME-P0-17's `unapproved_tool` outcome). The evidence is the
+    newest recorded event that used each tool.
+- **Factors that were always false now have sources:**
+  - **Certification overdue** (15): Compliance's new published
+    `countOverdueCertificationItems(tenant, agent)`, meaning items pending
+    past due (the escalation rule), escalated or not.
+  - **Destructive capability** (20): CAN-based like its siblings. The
+    agent holds an entitlement whose name starts with a destructive verb
+    (delete, drop, purge, truncate, destroy, wipe, erase, remove,
+    overwrite), or an MCP tool permission for a tool its server declares
+    destructive (INTEGRATION-P0-06's inventory, still-declared tools
+    only).
+  - **Credential status unhealthy** (15): the agent's own Runtime Gateway
+    API keys (FOUNDATION-P0-17). An active key older than 90 days with no
+    expiry (rotation overdue), or more than 3 active keys (sprawl).
+    Revoked keys do not count.
+- **Shadow AI** is a tenant-level signal. An unregistered agent has no
+  agent record for a finding to reference, so `/risk` shows a banner
+  (count and quarantined events over 90 days) linking to the discovery
+  inbox's Shadow AI tab.
+- The new loads join `evaluateAgentRisk()`'s single parallel wave. The
+  related agents' states come in one further parallel wave.
+
+**Not done, recorded.** "Position on a high-value attack path" still has
+no source. It needs an Access graph-traversal contract (paths from the
+agent's identities to high-value resources), which Access has not
+published. This story is therefore `Partial` rather than `Done`.
+
+**Tests:**
+
+- `signals.test.ts` (9): each rule, including the negatives (operating
+  delegate, dependency only, expiring old key, revoked keys, destructive
+  tool held without a tool permission).
+- `rules.test.ts` +4: the overdue factor scores 15; a destructive MCP
+  tool permission scores 20; an unhealthy credential scores 15;
+  delegation to a retired agent and an unapproved tool raise their own
+  findings with evidence at evaluator v2.
+- The "factors never trigger" test is now "with no data for them, the
+  newly sourced factors add nothing".
+- E2E `shadow-ai.spec.ts`: the Risk page shows the Shadow AI signal and
+  links to discovery.
+
+**Verified:** eslint clean, vitest **509/509**, Playwright **187/187**
+(8.6 min, a fresh build containing this story). Migration 0072 applied
+live.

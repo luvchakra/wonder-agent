@@ -15,6 +15,10 @@ const mockCompareShouldCanDid = vi.fn();
 const mockGetDid = vi.fn();
 const mockListRuntimeEvents = vi.fn();
 const mockCreateOrUpdateFinding = vi.fn();
+const mockListRelationships = vi.fn();
+const mockCountOverdue = vi.fn();
+const mockListAgentApiKeys = vi.fn();
+const mockGetMcpInventory = vi.fn();
 
 vi.mock("@/modules/agent-identity/service", () => ({
   getAgent: (...a: unknown[]) => mockGetAgent(...a),
@@ -24,7 +28,12 @@ vi.mock("@/modules/agent-identity/service", () => ({
   listLifecycleEvents: (...a: unknown[]) => mockListLifecycleEvents(...a),
   transitionAgentLifecycle: (...a: unknown[]) => mockTransitionAgentLifecycle(...a),
   updateAgentRiskScore: (...a: unknown[]) => mockUpdateAgentRiskScore(...a),
+  listRelationships: (...a: unknown[]) => mockListRelationships(...a),
 }));
+// RISK-P0-12's sources; each defaults to "nothing" so earlier cases are unchanged.
+vi.mock("@/modules/certification-compliance/service", () => ({ countOverdueCertificationItems: (...a: unknown[]) => mockCountOverdue(...a) }));
+vi.mock("@/modules/integrations/service", () => ({ getMcpInventory: (...a: unknown[]) => mockGetMcpInventory(...a) }));
+vi.mock("@/lib/security/agentApiKeys", () => ({ listAgentApiKeys: (...a: unknown[]) => mockListAgentApiKeys(...a) }));
 vi.mock("@/modules/access-governance/service", () => ({
   listPolicyEvaluations: (...a: unknown[]) => mockListPolicyEvaluations(...a),
   listApplications: (...a: unknown[]) => mockListApplications(...a),
@@ -55,6 +64,10 @@ describe("evaluateAgentRisk — the central FinanceBot/CustomerDB acceptance sce
     }));
     mockListApplications.mockResolvedValue([]);
     mockGetEffectiveAccess.mockResolvedValue([]);
+    mockListRelationships.mockResolvedValue([]);
+    mockCountOverdue.mockResolvedValue(0);
+    mockListAgentApiKeys.mockResolvedValue([]);
+    mockGetMcpInventory.mockResolvedValue([]);
   });
 
   it("generates a CRITICAL sensitive_data_violation finding, excessive_access, and behavioral_deviation with evidence, and auto-restricts the agent", async () => {
@@ -328,16 +341,79 @@ describe("evaluateAgentRisk — RISK-P1-05, additional deterministic risk factor
     expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 0);
   });
 
-  it("the other three RISK-P1-05 factors never trigger yet — no published data source (documented, not a silent gap)", async () => {
-    // An admin-privilege grant alone should contribute exactly 15
-    // (its own weight) and nothing more — if "Destructive capability
-    // present" (20), "Credential status unhealthy" (15), or "Position on
-    // a high-value attack path" (15) ever silently started triggering,
-    // this score would jump well past 15 and this test would catch it.
+  it("with no data for them, the RISK-P0-12-sourced factors add nothing (attack path is still unsourced)", async () => {
+    // An admin-privilege grant alone should contribute exactly 15 (its own
+    // weight) and nothing more. "Destructive capability present" (20) and
+    // "Credential status unhealthy" (15) now have sources (RISK-P0-12) but
+    // nothing here feeds them; "Position on a high-value attack path" (15)
+    // still has none. Any silent trigger would push the score past 15.
     mockGetEffectiveAccess.mockResolvedValue([{ id: "grant-1", application: "SAP", privilegeLevel: "admin" }]);
 
     await evaluateAgentRisk("tenant-a", "a5");
 
     expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a5", 15);
+  });
+});
+
+describe("evaluateAgentRisk — RISK-P0-12, new signals", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateOrUpdateFinding.mockImplementation(async (_tenantId, agentId, category, fields) => ({
+      finding: { id: `finding-${category}`, tenantId: "tenant-a", agentId, category, ...fields, status: "open" },
+      created: true,
+    }));
+    mockListApplications.mockResolvedValue([]);
+    mockGetAgent.mockImplementation(async (_t: string, id: string) =>
+      id === "a6" ? { id: "a6", agentName: "SignalBot", environment: "staging", criticality: "low", lifecycleState: "ACTIVE" } : { id, agentName: "OldBot", lifecycleState: "RETIRED" },
+    );
+    mockGetAgentContract.mockResolvedValue({ approvedApplications: [], approvedData: [], prohibitedData: [], approvedActions: [], prohibitedActions: [], allowedTools: ["query_ledger"] });
+    mockCompareShouldCanDid.mockResolvedValue({ can: [], outcomes: [] });
+    mockGetDid.mockResolvedValue({ tuples: [] });
+    mockListRuntimeEvents.mockResolvedValue({ events: [] });
+    mockGetOwnershipIssues.mockResolvedValue([]);
+    mockListAgentIdentities.mockResolvedValue([]);
+    mockListLifecycleEvents.mockResolvedValue([]);
+    mockListPolicyEvaluations.mockResolvedValue([]);
+    mockGetEffectiveAccess.mockResolvedValue([]);
+    mockListRelationships.mockResolvedValue([]);
+    mockCountOverdue.mockResolvedValue(0);
+    mockListAgentApiKeys.mockResolvedValue([]);
+    mockGetMcpInventory.mockResolvedValue([]);
+  });
+
+  it("an overdue certification now scores (15), from Compliance's count", async () => {
+    mockCountOverdue.mockResolvedValue(2);
+    await evaluateAgentRisk("tenant-a", "a6");
+    expect(mockCountOverdue).toHaveBeenCalledWith("tenant-a", "a6");
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a6", 15);
+  });
+
+  it("a destructive MCP tool permission scores (20), from the MCP inventory", async () => {
+    mockGetEffectiveAccess.mockResolvedValue([{ id: "g", entitlementName: "post_journal_entry", grantType: "mcp_tool_permission", privilegeLevel: "standard" }]);
+    mockGetMcpInventory.mockResolvedValue([{ tools: [{ name: "post_journal_entry", destructive: true, stillDeclared: true }] }]);
+    await evaluateAgentRisk("tenant-a", "a6");
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a6", 20);
+  });
+
+  it("an unhealthy credential scores (15), from the agent's API keys", async () => {
+    mockListAgentApiKeys.mockResolvedValue([{ status: "active", createdAt: "2025-01-01T00:00:00Z", expiresAt: null }]);
+    await evaluateAgentRisk("tenant-a", "a6");
+    expect(mockUpdateAgentRiskScore).toHaveBeenCalledWith("tenant-a", "a6", 15);
+  });
+
+  it("delegating to a retired agent and using an unapproved tool raise their own findings", async () => {
+    mockListRelationships.mockResolvedValue([{ id: "r1", agentId: "a6", relatedAgentId: "a7", relationshipType: "delegates_to" }]);
+    mockCompareShouldCanDid.mockResolvedValue({ can: [], outcomes: [{ type: "unapproved_tool", evidence: { tool: "delete_customer", allowedTools: ["query_ledger"] } }] });
+    mockListRuntimeEvents.mockResolvedValue({ events: [{ id: "e1", tool: "delete_customer", eventTime: "2026-09-25T10:00:00Z" }] });
+
+    await evaluateAgentRisk("tenant-a", "a6");
+
+    const categories = mockCreateOrUpdateFinding.mock.calls.map((c) => c[2]);
+    expect(categories).toEqual(expect.arrayContaining(["suspicious_delegation", "unapproved_tool_use"]));
+    const delegationCall = mockCreateOrUpdateFinding.mock.calls.find((c) => c[2] === "suspicious_delegation")!;
+    expect(delegationCall[4]).toEqual([{ evidenceType: "agent_relationship", referenceId: "r1", summary: "delegates to → OldBot" }]);
+    const toolCall = mockCreateOrUpdateFinding.mock.calls.find((c) => c[2] === "unapproved_tool_use")!;
+    expect(toolCall[3].evaluatorVersion).toBe(2);
+    expect(toolCall[4]).toEqual([{ evidenceType: "runtime_event", referenceId: "e1", summary: "delete_customer at 2026-09-25T10:00:00Z" }]);
   });
 });

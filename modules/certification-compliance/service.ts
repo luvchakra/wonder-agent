@@ -34,3 +34,4 @@ export {
   type RecordAttestationInput,
 } from "./attestations";
 export { assembleGovernanceEvidencePack } from "./evidencePack";
+export { countOverdueCertificationItems } from "./overdue";

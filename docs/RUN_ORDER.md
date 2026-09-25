@@ -100,6 +100,49 @@ Agent 360 were rebuilt to the mockups, and three defects were fixed:
 
 See each module's audit log, 2026-09-25.
 
+### Progress on the suggested order (2026-09-25, same day)
+
+Built on autopilot after the user's go-ahead ("yes, don't ask … all
+safe"). Each story below was committed separately, pushed to `main`, and
+verified by the full pipeline (eslint, vitest, the **full** Playwright
+suite per §17.8). Its migration was applied to the live project with
+isolation checks. Detail is in each module's audit log.
+
+| Step | Story | Status | Commit |
+|---|---|---|---|
+| 1 | FOUNDATION-P0-17/18: agent API keys, permission keys | Done | (earlier) |
+| 2 | ACCESS-P0-11: runtime decision function | Done | (earlier) |
+| 3 | RUNTIME-P0-15..18: gateway, timeline, NOW, emergency controls | Done | (earlier) |
+| 4 | PLATFORM-P0-12: feature flags enforced, per-tenant ENFORCE | Partial (3 broad flags not yet enforced) | `8914e67` |
+| 4 | OPERATIONS-P0-08: runtime and approval notifications, search | Done | `6e4c0db`, `9694cb7` |
+| 5 | IDENTITY-P0-11/12 + INTEGRATION-P0-07: NHI inventory, Shadow AI, MCP events reach runtime | Done | `b505520` |
+| 5 | INTEGRATION-P0-06: MCP servers, tools and resources | Done | `eaff624` |
+| 5 | ACCESS-P0-13: data sources inventory feeding CAN | Done | `d3208ea` |
+| 6 | RISK-P0-11: investigations | Done | `9694cb7` |
+| 6 | RISK-P0-12: new risk signals | Partial (attack-path factor has no source) | see Risk audit |
+
+**Still to do in this programme:**
+
+- ACCESS-P0-12 (policy targets and publish) and ACCESS-P0-14 (wire SoD,
+  D5).
+- IDENTITY-P0-13/14 (contract and ownership completeness; D3, D4).
+- EXPERIENCE-P0-16/17 (the remaining mockup screens; app-wide wording).
+- QA-P0-17/18 (RLS read sweep; the gateway security suite).
+
+**Open items recorded, not decided:**
+
+- The `ai_assistant` flag defaults off while AI features are live
+  (Platform).
+- The MCP connector's outbound URL has no SSRF guard (Integration → QA
+  security suite).
+- The integration's one secret serves as both the outbound credential and
+  the inbound bearer token (Integration).
+- The shared `Table` cell breaks words mid-letter at desktop widths, and
+  the Audit and Roles tables rely on that (Experience).
+- `assignFinding()` does not check that the assignee is a member (Risk).
+- Tenantless users' page renders log a harmless `QUERY_FAILED` before the
+  redirect (Experience).
+
 ## Notes
 
 - **Waves 2, 3, and 4 pairs can run in either order within the pair**

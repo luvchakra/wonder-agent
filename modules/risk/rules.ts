@@ -1,6 +1,10 @@
 import "server-only";
 
-import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, transitionAgentLifecycle, updateAgentRiskScore } from "@/modules/agent-identity/service";
+import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, listRelationships, transitionAgentLifecycle, updateAgentRiskScore } from "@/modules/agent-identity/service";
+import { countOverdueCertificationItems } from "@/modules/certification-compliance/service";
+import { getMcpInventory } from "@/modules/integrations/service";
+import { listAgentApiKeys } from "@/lib/security/agentApiKeys";
+import { credentialHealth, destructiveCapability, suspiciousDelegation, unapprovedToolUse } from "./signals";
 import { getEffectiveAccess, listApplications, listPolicyEvaluations } from "@/modules/access-governance/service";
 import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { writeAudit } from "@/lib/audit/writeAudit";
@@ -20,7 +24,7 @@ const SENSITIVE_KEYWORDS = ["pii", "financial", "confidential"];
  * 1 via the column default (migration 0044) rather than a separate data
  * migration, per the story's own documented allowance.
  */
-export const EVALUATOR_VERSION = 1;
+export const EVALUATOR_VERSION = 2; // 2026-09-25, RISK-P0-12: new signals and three factors given real sources
 
 /**
  * Same case-insensitive-substring vocabulary bridge Runtime Agent's own
@@ -62,7 +66,23 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const agent = await getAgent(tenantId, agentId);
   if (!agent) throw new ApiError(404, "AGENT_NOT_FOUND");
 
-  const [contract, comparison, ownershipIssues, policyEvaluations, identities, lifecycleEvents, did, eventsPage, weights, applications, effectiveAccess] = await Promise.all([
+  const [
+    contract,
+    comparison,
+    ownershipIssues,
+    policyEvaluations,
+    identities,
+    lifecycleEvents,
+    did,
+    eventsPage,
+    weights,
+    applications,
+    effectiveAccess,
+    relationships,
+    overdueCertifications,
+    apiKeys,
+    mcpInventory,
+  ] = await Promise.all([
     getAgentContract(agentId),
     compareShouldCanDid(tenantId, agentId),
     getOwnershipIssues(tenantId, agentId, agent.criticality),
@@ -81,7 +101,20 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     // for it keeps this a same-module addition, not a cross-module type
     // change (non-negotiable #6/#14).
     getEffectiveAccess(tenantId, agentId),
+    // RISK-P0-12 — each from its owning module's published contract.
+    listRelationships(tenantId, agentId),
+    countOverdueCertificationItems(tenantId, agentId),
+    listAgentApiKeys(tenantId, agentId),
+    getMcpInventory(tenantId),
   ]);
+  // The agents this one delegates to, shares a credential with, or
+  // orchestrates: their names and lifecycle states, in one parallel wave.
+  const relatedIds = [...new Set(relationships.map((r) => r.relatedAgentId))];
+  const relatedAgents = new Map(
+    (await Promise.all(relatedIds.map((id) => getAgent(tenantId, id))))
+      .filter((a): a is NonNullable<typeof a> => Boolean(a))
+      .map((a) => [a.id, { name: a.agentName, lifecycleState: a.lifecycleState }]),
+  );
   const externalApplicationNames = new Set(applications.filter((a) => a.isExternal).map((a) => a.name.toLowerCase()));
 
   const approvedApplications = contract?.approvedApplications ?? [];
@@ -250,6 +283,14 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     }
   }
 
+  // RISK-P0-12 — suspicious delegation (Identity's relationships) and
+  // unapproved tool use (Runtime's SHOULD-vs-DID tool comparison).
+  const delegation = suspiciousDelegation(agent.agentName, relationships, relatedAgents);
+  if (delegation) triggers.push(delegation);
+  const unapprovedTools = comparison.outcomes.filter((o) => o.type === "unapproved_tool").map((o) => String(o.evidence.tool));
+  const toolUse = unapprovedToolUse(agent.agentName, unapprovedTools, eventsPage.events, contract?.allowedTools ?? []);
+  if (toolUse) triggers.push(toolUse);
+
   // governance_drift — RISK-P0-04, a separate cross-module diff signal,
   // not a duplicate of any category above (those compare current state
   // against the *current* contract; this compares current state against
@@ -267,6 +308,9 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   // access is itself the exposure, independent of whether it has been
   // exercised yet.
   const hasElevatedOrAdminAccess = effectiveAccess.some((g) => g.privilegeLevel === "elevated" || g.privilegeLevel === "admin");
+  const destructiveMcpTools = new Set(mcpInventory.flatMap((server) => server.tools.filter((t) => t.destructive && t.stillDeclared).map((t) => t.name.toLowerCase())));
+  const destructive = destructiveCapability(effectiveAccess, destructiveMcpTools);
+  const credentials = credentialHealth(apiKeys, new Date());
 
   // RISK-P0-02.2 — weights come from this tenant's configured overrides
   // (falling back to the deterministic defaults), never hard-coded
@@ -284,7 +328,8 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
       // actual-usage one.
       triggered: comparison.can.some((c) => externalApplicationNames.has(c.application.toLowerCase())),
     },
-    { name: "Certification overdue", weight: w("Certification overdue"), triggered: false }, // Compliance Agent doesn't exist yet
+    // RISK-P0-12: Compliance's published count of this agent's certification items pending past due.
+    { name: "Certification overdue", weight: w("Certification overdue"), triggered: overdueCertifications > 0 },
     { name: "Active policy violation", weight: w("Active policy violation"), triggered: policyEvaluations.some((e) => e.result === "violation") },
     { name: "Runtime/behavioral anomaly present", weight: w("Runtime/behavioral anomaly present"), triggered: behavioralOrIdentityAnomalyPresent },
     { name: "Business criticality high/critical", weight: w("Business criticality high/critical"), triggered: agent.criticality === "high" || agent.criticality === "critical" },
@@ -313,7 +358,10 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     // above), so DID's action isn't a substitute. Recording the
     // dependency here rather than inventing Access Agent's representation
     // of it, per this story's own acceptance note.
-    { name: "Destructive capability present", weight: w("Destructive capability present"), triggered: false },
+    // RISK-P0-12: now sourced. CAN-based like its siblings: an entitlement
+    // whose name starts with a destructive verb, or an MCP tool permission
+    // for a tool its server declares destructive (INTEGRATION-P0-06).
+    { name: "Destructive capability present", weight: w("Destructive capability present"), triggered: destructive.present },
     // Credential status: needs credential/secret health (expiry, weak,
     // shared, rotation-overdue) for the AGENT's own runtime identity —
     // distinct from Integration Agent's connector credentials (which
@@ -321,7 +369,9 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     // the monitored agent's). No such contract is published by Identity
     // Agent yet (AgentIdentityLink tracks confidence/status, not
     // credential hygiene).
-    { name: "Credential status unhealthy", weight: w("Credential status unhealthy"), triggered: false },
+    // RISK-P0-12: now sourced from the agent's own Runtime Gateway API keys
+    // (FOUNDATION-P0-17): rotation overdue or key sprawl.
+    { name: "Credential status unhealthy", weight: w("Credential status unhealthy"), triggered: credentials.unhealthy },
     // Attack path: needs the agent's position on a path to a higher-
     // value/blast-radius resource in the effective-access graph — a
     // graph-traversal contract Access Agent hasn't published (distinct

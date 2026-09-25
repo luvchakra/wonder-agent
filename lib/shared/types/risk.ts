@@ -14,7 +14,10 @@ export type RogueCategory =
   | "identity_anomaly"
   | "ownership_violation"
   | "lifecycle_violation"
-  | "governance_drift";
+  | "governance_drift"
+  // RISK-P0-12: delegation or credential sharing with an ungoverned agent; tools used outside the contract.
+  | "suspicious_delegation"
+  | "unapproved_tool_use";
 
 export type RiskSeverity = "info" | "low" | "medium" | "high" | "critical";
 
@@ -34,7 +37,7 @@ export type FindingStatus =
   | "false_positive"
   | "exception";
 
-export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event" | "governance_baseline";
+export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event" | "governance_baseline" | "agent_relationship";
 
 export type RiskEvidence = {
   id: string;
