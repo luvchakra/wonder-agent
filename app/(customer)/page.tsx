@@ -19,6 +19,7 @@ import {
   Tr,
 } from "@/modules/ui";
 import { DonutChart, TrendChart } from "@/modules/ui/charts.lazy";
+import { eventResult } from "./runtime/eventLabels";
 
 // EXPERIENCE-P0-02 / P0-16, rebuilt 2026-09-25 to the light-console
 // "AI Agent Security Overview" mockup. Every number is a real query
@@ -300,7 +301,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                         <Td className="font-mono text-xs">{e.action}</Td>
                         <Td hideBelow="2xl" className="text-muted-foreground">{e.resource ?? e.application ?? e.tool ?? "—"}</Td>
                         <Td>
-                          <Badge tone={e.success ? "success" : "danger"}>{e.success ? "Succeeded" : "Failed"}</Badge>
+                          <Badge tone={eventResult(e).tone}>{eventResult(e).label}</Badge>
                         </Td>
                       </Tr>
                     );

@@ -58,6 +58,7 @@ export default async function RuntimeIndexPage() {
     dataClassification: e.dataClassification,
     success: e.success,
     raw: e.raw,
+    eventType: e.eventType,
   }));
 
   return (

@@ -17,7 +17,30 @@ vi.mock("./did", () => ({
   getDid: (...args: unknown[]) => mockGetDid(...args),
 }));
 
-import { compareShouldCanDid } from "./compare";
+// RUNTIME-P0-17 — the two reads compare.ts makes itself: observed tools
+// (runtime_tools) and the latest gateway decision (runtime_decisions).
+let toolRows: Array<{ name: string }> = [];
+let latestDecision: Record<string, unknown> | null = null;
+const readFilters: Array<{ table: string; filters: Array<[string, unknown]> }> = [];
+vi.mock("@/lib/db/supabaseServer", () => ({
+  supabaseServer: async () => ({
+    from: (table: string) => {
+      const filters: Array<[string, unknown]> = [];
+      readFilters.push({ table, filters });
+      const chain: Record<string, unknown> = {
+        select: () => chain,
+        eq: (c: string, v: unknown) => (filters.push([c, v]), chain),
+        order: () => chain,
+        limit: () => chain,
+        maybeSingle: async () => ({ data: latestDecision, error: null }),
+        then: (resolve: (v: unknown) => void) => resolve({ data: toolRows, error: null }),
+      };
+      return chain;
+    },
+  }),
+}));
+
+import { compareShouldCanDid, nowFromDecision } from "./compare";
 import { SHOULD_CAN_DID_CORPUS, corpusCase } from "@/tests/runtime/should-can-did-corpus";
 
 /** Feeds one corpus case's inputs into this file's mocked dependencies. */
@@ -187,5 +210,84 @@ describe("compareShouldCanDid — QA-P0-08, the shared runtime event corpus", ()
     expect(categories).toEqual(
       ["allowed", "can_only_unused", "did_only_unexpected", "sensitive_data", "unauthorized_resource", "unmappable"].sort(),
     );
+  });
+});
+
+describe("compareShouldCanDid — RUNTIME-P0-17: tools and NOW", () => {
+  const withTools = (allowedTools: string[]) => {
+    const c = corpusCase("allowed");
+    mockFromCase(c);
+    mockGetAgentContract.mockResolvedValue({ ...c.contract, allowedTools });
+  };
+
+  it("SHOULD carries the contract's allowed tools", async () => {
+    toolRows = [];
+    withTools(["get_account"]);
+    const result = await compareShouldCanDid("tenant-a", "agent");
+    expect(result.should.every((s) => (s.tools ?? []).includes("get_account"))).toBe(true);
+  });
+
+  it("a used tool outside the allowed list is an unapproved_tool outcome, and not healthy", async () => {
+    toolRows = [{ name: "get_account" }, { name: "Delete_Account" }];
+    withTools(["get_account"]);
+    const result = await compareShouldCanDid("tenant-a", "agent");
+    const unapproved = result.outcomes.filter((o) => o.type === "unapproved_tool");
+    expect(unapproved.map((o) => o.evidence.tool)).toEqual(["Delete_Account"]);
+    expect(result.outcomes.some((o) => o.type === "healthy")).toBe(false);
+    expect(result.didTools).toEqual(["Delete_Account", "get_account"]);
+  });
+
+  it("an empty allowed list does not restrict tools (same rule as the gateway)", async () => {
+    toolRows = [{ name: "anything" }];
+    withTools([]);
+    const result = await compareShouldCanDid("tenant-a", "agent");
+    expect(result.outcomes.some((o) => o.type === "unapproved_tool")).toBe(false);
+  });
+
+  it("reads tools and NOW for this tenant and agent only", async () => {
+    toolRows = [];
+    readFilters.length = 0;
+    withTools([]);
+    await compareShouldCanDid("tenant-a", "agent-x");
+    for (const table of ["runtime_tools", "runtime_decisions"]) {
+      const f = readFilters.find((r) => r.table === table)!;
+      expect(f.filters, table).toContainEqual(["tenant_id", "tenant-a"]);
+      expect(f.filters, table).toContainEqual(["agent_id", "agent-x"]);
+    }
+  });
+
+  it("NOW is the latest decision; an as-of comparison has none", async () => {
+    toolRows = [];
+    latestDecision = {
+      id: "d1",
+      request_id: "r1",
+      action: "READ",
+      application: "Snowflake",
+      tool: null,
+      decision: "DENY",
+      code: "DATA_PROHIBITED",
+      reason: "x",
+      enforced: false,
+      created_at: "2026-09-25T00:00:00Z",
+      steps: [
+        { step: "approved_access", outcome: "DENY" },
+        { step: "effective_access", outcome: "PASS" },
+      ],
+    };
+    withTools([]);
+    const now = (await compareShouldCanDid("tenant-a", "agent")).now;
+    expect(now).toMatchObject({ decisionId: "d1", decision: "DENY", approved: "not_approved", effective: "within", enforced: false });
+
+    mockGetEffectiveAccessAsOf.mockResolvedValue([]);
+    expect((await compareShouldCanDid("tenant-a", "agent", "2026-09-01T00:00:00Z")).now).toBeNull();
+    latestDecision = null;
+  });
+
+  it("maps decision steps to NOW's SHOULD/CAN standing", () => {
+    const base = { id: "d", request_id: "r", action: "A", application: null, tool: null, decision: "ALLOW" as const, code: "c", reason: "r", enforced: false, created_at: "t" };
+    expect(nowFromDecision({ ...base, steps: [{ step: "approved_access", outcome: "REQUIRE_APPROVAL" }] }).approved).toBe("requires_approval");
+    expect(nowFromDecision({ ...base, steps: [{ step: "approved_access", outcome: "SKIPPED" }] }).approved).toBe("not_evaluated");
+    expect(nowFromDecision({ ...base, steps: [{ step: "effective_access", outcome: "DENY" }] }).effective).toBe("outside");
+    expect(nowFromDecision({ ...base, steps: null }).effective).toBe("not_evaluated");
   });
 });

@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 import { Badge, Card, CardHeader, CardBody, EmptyState, Tabs, TabPanel } from "@/modules/ui";
 import { SelectField, fieldInputClass } from "@/modules/ui/Field";
 import { cn } from "@/lib/utils";
+import { eventResult, humanizeEventType } from "./eventLabels";
 
 export type ActivityRow = {
   id: string;
@@ -19,12 +20,17 @@ export type ActivityRow = {
   dataClassification: string | null;
   success: boolean;
   raw: Record<string, unknown>;
+  eventType: string;
 };
 
+// RUNTIME-P0-16: an observed action succeeded or failed; a gateway
+// decision is its own kind. Nothing is "blocked" while the gateway only
+// observes (§17.5).
 const RESULTS = [
   { value: "all", label: "All results" },
-  { value: "success", label: "Allowed" },
-  { value: "blocked", label: "Blocked" },
+  { value: "success", label: "Succeeded" },
+  { value: "failed", label: "Failed" },
+  { value: "decision", label: "Gateway decisions" },
 ];
 
 function timeOf(iso: string): string {
@@ -64,8 +70,10 @@ export function RuntimeActivity({ rows, windowLabel }: { rows: ActivityRow[]; wi
     const needle = query.trim().toLowerCase();
     return rows.filter((row) => {
       if (agentId !== "all" && row.agentId !== agentId) return false;
-      if (result === "success" && !row.success) return false;
-      if (result === "blocked" && row.success) return false;
+      const kind = eventResult(row);
+      if (result === "success" && (kind.isDecision || !row.success)) return false;
+      if (result === "failed" && (kind.isDecision || row.success)) return false;
+      if (result === "decision" && !kind.isDecision) return false;
       if (!needle) return true;
       return [row.agentName, row.action, row.application, row.resource]
         .filter(Boolean)
@@ -152,7 +160,7 @@ export function RuntimeActivity({ rows, windowLabel }: { rows: ActivityRow[]; wi
                         ) : (
                           <span className="hidden text-xs text-muted-foreground sm:inline sm:w-56">—</span>
                         )}
-                        <Badge tone={row.success ? "success" : "danger"}>{row.success ? "Allowed" : "Blocked"}</Badge>
+                        <Badge tone={eventResult(row).tone}>{eventResult(row).label}</Badge>
                       </button>
                     </li>
                   );
@@ -183,9 +191,10 @@ export function RuntimeActivity({ rows, windowLabel }: { rows: ActivityRow[]; wi
                     ["Application", selected.application ?? "—"],
                     ["Resource", selected.resource ?? "—"],
                     ["Data classification", selected.dataClassification ?? "—"],
+                    ["Event type", humanizeEventType(selected.eventType)],
                     ["Source", selected.source],
                     ["Time", new Date(selected.eventTime).toLocaleString()],
-                    ["Result", selected.success ? "Allowed" : "Blocked"],
+                    ["Result", eventResult(selected).label],
                   ].map(([label, value]) => (
                     <div key={label} className="flex items-baseline gap-3">
                       <dt className="w-32 shrink-0 text-xs text-muted-foreground">{label}</dt>

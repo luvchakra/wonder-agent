@@ -538,3 +538,121 @@ recorded for QA-P0-18.
 **Full-suite regression** (§17.8, because `proxy.ts`, a migration and the
 authentication path changed): `eslint` exit 0; `vitest` 55 files / 412
 tests; **full Playwright 154/154**, the first fully green run of the day.
+
+---
+
+## 2026-09-25 — RUNTIME-P0-16: event types, sessions and decision fields
+
+Master stories P0-18.
+
+**Migration `0063_runtime_event_types.sql`** (applied live; additive):
+
+- `runtime_events.event_type`: one of AUTHENTICATION, SESSION_STARTED,
+  SESSION_ENDED, TOOL_REQUEST, TOOL_ALLOWED, TOOL_DENIED,
+  TOOL_APPROVAL_REQUIRED, TOOL_EXECUTED, API_CALL, DATA_ACCESS, DELEGATION,
+  POLICY_DECISION.
+- Existing rows were **backfilled** from what they recorded: a tool means
+  TOOL_EXECUTED, a resource or data classification means DATA_ACCESS,
+  anything else is API_CALL. Every existing row was an observed action,
+  so DID is unchanged. Live result: 8 TOOL_EXECUTED, 7 API_CALL,
+  1 DATA_ACCESS.
+- New columns: `session_id`, `decision_id` (FK to `runtime_decisions`) and
+  `mcp_server`. MCP metadata is now first-class instead of living only in
+  `raw`.
+- `source` gains `gateway`. The public ingest route still refuses it, so
+  only the gateway can claim it.
+- Indexes: `decision_id`; (tenant, session) partial; and (tenant, agent,
+  event_type, event_time) for the DID read.
+
+**Code**
+
+- **`OBSERVED_EVENT_TYPES`** (TOOL_EXECUTED, API_CALL, DATA_ACCESS,
+  DELEGATION) is the contract for "what an agent actually DID".
+  `getDid()` now reads only those, so a tool *request* or a gateway
+  *decision* never counts as DID, and SHOULD/CAN/DID stays honest.
+- **Ingestion** accepts `eventType` (validated against the list),
+  `sessionId` and `mcpServer`. With no type it applies
+  `inferEventType()`, the same rule as the backfill.
+- `computeDedupeKey()` includes an explicit type, so a TOOL_REQUEST and
+  its TOOL_EXECUTED are two events. When no type is sent the key is
+  byte-for-byte unchanged, so existing sources keep their dedupe
+  behaviour.
+- `runtime_tools` and `runtime_resources` sightings update only for
+  observed types.
+- **Gateway decisions go on the timeline.** After the response, each new
+  decision writes one `runtime_events` row: source `gateway`, type
+  TOOL_ALLOWED, TOOL_DENIED or TOOL_APPROVAL_REQUIRED when a tool was
+  named and POLICY_DECISION otherwise, linked by `decision_id` and
+  idempotent on `gateway:<decisionId>`. This is the part moved here from
+  RUNTIME-P0-15.
+- **Truthful labels (§17.5).**
+  - The activity stream said "Allowed" and "Blocked" for success and
+    failure. Nothing was blocked, and nothing is while the gateway only
+    observes. The labels are now "Succeeded" and "Failed" for observed
+    actions.
+  - Gateway events show their decision, e.g. "Deny (observed)".
+  - The Result filter has Succeeded, Failed and Gateway decisions.
+  - The event detail shows its type.
+  - The shared helper is `app/(customer)/runtime/eventLabels.ts`, also
+    used by the dashboard's activity table.
+
+**Verified**
+
+- Unit: 4 new cases (inferred types; legacy dedupe keys unchanged;
+  explicit types separate; the decision-to-type map), plus a gateway
+  timeline-event test (linked, typed, written once, not repeated on
+  replay). Runtime module 39/39.
+- E2E: a new gateway case (the decision is listed under "Gateway
+  decisions" as "Deny (observed)", and the agent's DID stays `[]`); the
+  runtime spec updated to the new filters. 17/17.
+- Live SQL: gateway events 3/3 carry `decision_id`; every legacy row has
+  an observed type.
+
+---
+
+## 2026-09-25 — RUNTIME-P0-17: SHOULD tools, unapproved tool use, and NOW
+
+Master stories P0-19; codebase-map defect D7.
+
+**What changed**
+
+- **SHOULD tools.** SHOULD now carries `agent_contracts.allowed_tools`; it
+  was hard-coded to `[]`. Old contracts without the field count as an
+  empty list.
+- **Observed tools.** `compareShouldCanDid()` reads the agent's distinct
+  observed tools from `runtime_tools`, a registry that since RUNTIME-P0-16
+  updates only for observed event types. The comparison exposes them as
+  `didTools`.
+- **New outcome `unapproved_tool`.** It fires for a used tool that is
+  absent from a **non-empty** allowed list (case-insensitive), with the
+  tool and the allowed list as evidence. An empty list does not restrict
+  tools, the same rule as the gateway's decision (ACCESS-P0-11), so the
+  two never disagree. Risk can turn this into a finding: RISK-P0-12,
+  "unapproved tool usage".
+- **NOW** (`now: NowEntry | null`): the agent's latest gateway decision,
+  with its standing against SHOULD (approved, requires approval, not
+  approved, not evaluated) and CAN (within, outside, not evaluated). It is
+  read from the decision's own recorded steps (`nowFromDecision()`), so it
+  never re-derives a verdict. An as-of historical comparison has no NOW.
+- Both new reads go through the user session plus explicit tenant and
+  agent filters.
+- **UI** (`/runtime/agents/:id`): four columns in the user's wording
+  (EXPERIENCE-P0-17): "Approved (SHOULD)", "Effective Access (CAN)",
+  "Observed (DID)" and "Current Request (NOW)". SHOULD lists the allowed
+  tools, DID lists the tools used, NOW shows the request, its standing and
+  the decision ("… (observed)" when it was not enforced). The card title is
+  "Approved vs Effective vs Observed vs Now".
+
+**Verified**
+
+- `compare.test.ts`, 6 new cases (45/45 in the module): SHOULD carries
+  tools; an unapproved tool is flagged and the result is not healthy; an
+  empty allowed list does not restrict; both reads are filtered to the
+  tenant and agent; NOW is the latest decision and none for as-of; the
+  step-to-standing mapping.
+- E2E gateway spec: the comparison page shows NOW with "deny (observed)".
+- Runtime, risk and FinanceBot specs: 22/22 under two workers.
+
+**Full-suite regression** for P0-16 and P0-17 (§17.8, because ingestion
+and the comparison changed): `eslint` exit 0; `vitest` 55 files / 422;
+**full Playwright 156/156**.

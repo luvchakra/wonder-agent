@@ -6,7 +6,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-governance";
-import type { GatewayDecision, GatewayDecisionRecord, GatewayMode } from "@/lib/shared/types/runtime";
+import type { GatewayDecision, GatewayDecisionRecord, GatewayMode, RuntimeEventType } from "@/lib/shared/types/runtime";
 import { evaluateRuntimeRequest, type RuntimePrincipal } from "@/modules/access-governance/service";
 
 /**
@@ -107,6 +107,7 @@ type DecisionRow = {
   agent_id: string;
   request_id: string;
   correlation_id: string;
+  identity_id: string | null;
   action: string;
   application: string | null;
   resource: string | null;
@@ -180,30 +181,36 @@ export async function authorizeRuntimeRequest(
   const row = await insertDecision(principal, request, decision, { mode, enforced, correlationId });
   if (!row.replayed) {
     // The decision row above is the durable, synchronous record. The audit
-    // entry is written after the response so it adds no latency; writeAudit
-    // logs any failure and never throws.
-    runAfterResponse(() => writeAudit({
-      tenantId: principal.tenantId,
-      actorId: null,
-      actorType: "integration",
-      action: "runtime.decision",
-      objectType: "runtime_decision",
-      objectId: row.data.id,
-      outcome: "success",
-      correlationId,
-      metadata: {
-        agentId: principal.agentId,
-        apiKeyId: principal.keyId,
-        requestId: request.requestId,
-        action: request.action,
-        application: request.application ?? null,
-        tool: request.tool ?? null,
-        decision: decision.decision,
-        code: decision.code,
-        mode,
-        enforced,
-      },
-    }));
+    // entry and the timeline event are written after the response so they
+    // add no latency; both log any failure and never throw.
+    const decisionRow = row.data;
+    runAfterResponse(() =>
+      Promise.all([
+        writeAudit({
+          tenantId: principal.tenantId,
+          actorId: null,
+          actorType: "integration",
+          action: "runtime.decision",
+          objectType: "runtime_decision",
+          objectId: decisionRow.id,
+          outcome: "success",
+          correlationId,
+          metadata: {
+            agentId: principal.agentId,
+            apiKeyId: principal.keyId,
+            requestId: request.requestId,
+            action: request.action,
+            application: request.application ?? null,
+            tool: request.tool ?? null,
+            decision: decision.decision,
+            code: decision.code,
+            mode,
+            enforced,
+          },
+        }),
+        recordDecisionEvent(principal, request, decisionRow, correlationId),
+      ]),
+    );
   }
   return toGatewayDecision(row.data, row.replayed);
 }
@@ -255,6 +262,51 @@ async function insertDecision(
     throw new ApiError(500, "CREATE_FAILED", error.message);
   }
   return { data, replayed: false };
+}
+
+/** The timeline event type for a gateway decision (RUNTIME-P0-16). */
+export function decisionEventType(decision: GatewayDecision["decision"], tool: string | undefined): RuntimeEventType {
+  if (!tool) return "POLICY_DECISION";
+  if (decision === "DENY") return "TOOL_DENIED";
+  if (decision === "REQUIRE_APPROVAL") return "TOOL_APPROVAL_REQUIRED";
+  return "TOOL_ALLOWED";
+}
+
+/**
+ * Puts the decision on the agent's runtime timeline, linked to its
+ * decision row. Its type is a decision type, never an observed one, so DID
+ * does not count it. Idempotent on the decision id.
+ */
+async function recordDecisionEvent(
+  principal: RuntimePrincipal,
+  request: RuntimeRequest,
+  row: DecisionRow,
+  correlationId: string,
+): Promise<void> {
+  const { error } = await supabaseServiceRole()
+    .from("runtime_events")
+    .insert({
+      tenant_id: principal.tenantId,
+      agent_id: principal.agentId,
+      identity_id: row.identity_id,
+      event_time: row.created_at,
+      source: "gateway",
+      tool: request.tool ?? null,
+      application: request.application ?? null,
+      resource: request.resource ?? null,
+      action: request.action,
+      data_classification: request.dataClassification ?? null,
+      success: true,
+      raw: { requestId: request.requestId, decision: row.decision, code: row.code, mode: row.mode, enforced: row.enforced },
+      dedupe_key: `gateway:${row.id}`,
+      correlation_id: correlationId,
+      event_type: decisionEventType(row.decision, request.tool),
+      session_id: request.context?.sessionId ?? null,
+      decision_id: row.id,
+    });
+  if (error && error.code !== "23505") {
+    console.error("gateway decision event insert failed", { decisionId: row.id, error: error.message });
+  }
 }
 
 /** Decision history for the customer UI: the signed-in user's own tenant, RLS plus an explicit filter. */

@@ -3,8 +3,10 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ingestRuntimeEvent, listRuntimeEvents, quarantineEvent } from "@/modules/runtime-assurance/service";
 import { errorResponse } from "@/modules/runtime-assurance/http";
 import { ApiError } from "@/lib/shared/types/foundation";
-import type { RuntimeEventInput, RuntimeEventSource } from "@/lib/shared/types/runtime";
+import { RUNTIME_EVENT_TYPES, type RuntimeEventInput, type RuntimeEventSource, type RuntimeEventType } from "@/lib/shared/types/runtime";
 
+// "gateway" is deliberately absent: only the Runtime Gateway itself writes
+// gateway events (RUNTIME-P0-16); a client may not claim that source.
 const VALID_SOURCES: RuntimeEventSource[] = ["mcp", "rest", "webhook"];
 
 /**
@@ -78,6 +80,9 @@ export async function POST(request: NextRequest) {
       dataClassification: body.dataClassification ?? null,
       success: body.success,
       raw: body.raw ?? {},
+      eventType: body.eventType,
+      sessionId: body.sessionId ?? null,
+      mcpServer: body.mcpServer ?? null,
       correlationId: body.correlationId ?? null,
       dedupeKey: body.dedupeKey,
     };
@@ -108,5 +113,10 @@ function validateShape(body: Record<string, unknown>): string | null {
   if (!VALID_SOURCES.includes(body.source as RuntimeEventSource)) return "source must be one of mcp, rest, webhook";
   if (!body.action || typeof body.action !== "string") return "action is required";
   if (typeof body.success !== "boolean") return "success (boolean) is required";
+  if (body.eventType !== undefined && !RUNTIME_EVENT_TYPES.includes(body.eventType as RuntimeEventType)) {
+    return `eventType must be one of ${RUNTIME_EVENT_TYPES.join(", ")}`;
+  }
+  if (body.sessionId !== undefined && (typeof body.sessionId !== "string" || body.sessionId.length > 200)) return "sessionId must be a string of at most 200 characters";
+  if (body.mcpServer !== undefined && (typeof body.mcpServer !== "string" || body.mcpServer.length > 200)) return "mcpServer must be a string of at most 200 characters";
   return null;
 }

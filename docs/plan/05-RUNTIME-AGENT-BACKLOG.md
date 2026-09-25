@@ -27,8 +27,8 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
 | RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Done — 2026-09-25: `POST /api/gateway/v1/authorize` (agent-key auth, OBSERVE_ONLY, idempotent), migration `0062` `runtime_decisions` applied live, decisions panel on /runtime; 7 unit + 6 live SQL + 8 E2E security cases; p50 1,953 → 859 ms locally after cutting to 3 round trips; see audit log. The per-request runtime *event* moved to RUNTIME-P0-16, where event types exist |
-| RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Not Started — 2026-09-25, master stories |
-| RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Done — 2026-09-25: migration `0063` (12 event types, backfill, `session_id`/`decision_id`/`mcp_server`, `gateway` source) applied live; DID reads observed types only; gateway decisions on the timeline; truthful result labels; see audit log |
+| RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Done — 2026-09-25: SHOULD carries `allowedTools`; new `unapproved_tool` outcome from observed tools; NOW from the latest gateway decision; four-column comparison with EXPERIENCE-P0-17 wording; see audit log |
 | RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
 
 ---

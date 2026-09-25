@@ -115,6 +115,28 @@ test.describe.serial("runtime gateway", () => {
     await other.close();
   });
 
+  test("RUNTIME-P0-16: a decision is on the timeline as a decision, and never counts as DID", async ({ page }) => {
+    await page.goto("/runtime");
+    await page.getByLabel("Result").selectOption("decision");
+    const stream = page.getByRole("list", { name: "Activity events" });
+    await expect(stream.getByText(agentName).first()).toBeVisible();
+    await expect(stream.getByText(/Deny \(observed\)/).first()).toBeVisible();
+
+    // The agent has only gateway decisions, no observed actions: DID is empty.
+    const did = await page.request.get(`/api/v1/runtime/agents/${agentId}/did`);
+    expect(did.status()).toBe(200);
+    const body = await did.json();
+    expect(body.data.tuples ?? body.data).toEqual([]);
+  });
+
+  test("RUNTIME-P0-17: the comparison shows the latest request as NOW", async ({ page }) => {
+    await page.goto(`/runtime/agents/${agentId}`);
+    await expect(page.getByText("Current Request (NOW)", { exact: true })).toBeVisible();
+    await expect(page.getByText("Approved (SHOULD)", { exact: true })).toBeVisible();
+    // The newest decision for this agent is a DENY recorded in observe-only mode.
+    await expect(page.getByText(/deny \(observed\)/i)).toBeVisible();
+  });
+
   test("a revoked key stops working at once", async ({ page }) => {
     const revoke = await page.request.delete(`/api/v1/agents/${agentId}/api-keys/${keyId}`, { data: { reason: "e2e" } });
     expect(revoke.status()).toBe(200);

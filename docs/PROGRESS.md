@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**149 of 190 tracked stories complete — 78%**
+**152 of 190 tracked stories complete — 80%**
 
 ```
-███████████████████████████████░░░░░░░░░  78%
+████████████████████████████████░░░░░░░░  80%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 149 |
+| Done | 152 |
 | Partial | 19 |
 | Deferred | 1 |
-| Not Started | 21 |
+| Not Started | 18 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -42,13 +42,13 @@ and are deliberately excluded from the counts above.
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 4 | 15 | `█████████████░░░░░` 73% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 12 | 0 | 0 | 3 | 15 | `██████████████░░░░` 80% |
-| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 10 | 0 | 0 | 3 | 13 | `██████████████░░░░` 77% |
+| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 12 | 0 | 0 | 1 | 13 | `█████████████████░` 92% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 1 | 14 | `███████████████░░░` 86% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 1 | 0 | 1 | 12 | `███████████████░░░` 83% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 10 | 12 | 0 | 3 | 25 | `███████░░░░░░░░░░░` 40% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 11 | 12 | 0 | 2 | 25 | `████████░░░░░░░░░░` 44% |
 
 ---
 
@@ -169,7 +169,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Runtime Assurance & SHOULD/CAN/DID  
 **Backlog status:** DORMANT — do not start until the user says "Run Runtime Agent"  
-**Stories:** 10 done · 0 partial · 0 deferred · 3 not started (13 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 12 done · 0 partial · 0 deferred · 1 not started (13 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -183,8 +183,8 @@ and are deliberately excluded from the counts above.
 | RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
 | RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Done — 2026-09-25: `POST /api/gateway/v1/authorize` (agent-key auth, OBSERVE_ONLY, idempotent), migration `0062` `runtime_decisions` applied live, decisions panel on /runtime; 7 unit + 6 live SQL + 8 E2E security cases; p50 1,953 → 859 ms locally after cutting to 3 round trips; see audit log. The per-request runtime *event* moved to RUNTIME-P0-16, where event types exist |
-| RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Not Started — 2026-09-25, master stories |
-| RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Done — 2026-09-25: migration `0063` (12 event types, backfill, `session_id`/`decision_id`/`mcp_server`, `gateway` source) applied live; DID reads observed types only; gateway decisions on the timeline; truthful result labels; see audit log |
+| RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Done — 2026-09-25: SHOULD carries `allowedTools`; new `unapproved_tool` outcome from observed tools; NOW from the latest gateway decision; four-column comparison with EXPERIENCE-P0-17 wording; see audit log |
 | RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
 
 ### 06 — Risk Agent
@@ -313,7 +313,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 10 done · 12 partial · 0 deferred · 3 not started (25 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 11 done · 12 partial · 0 deferred · 2 not started (25 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -341,5 +341,5 @@ and are deliberately excluded from the counts above.
 | QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16 (later): the sandbox's Supabase egress blocker is gone, so the suite was pointed at the live production deployment and **the framework is now proven against a real server** — `authenticate as platformAdmin` signed in end-to-end through real Supabase Auth and saved storage state. The four tenant-user logins failed on a **genuine product bug the suite existed to catch**: `getTenantContext()` returned every colleague's `tenant_memberships` row (RLS there is tenant-scoped, not user-scoped), so a single-tenant user resolved as a member of three organizations and was bounced to `/onboarding`; fixed in Foundation + Experience, proven at the data layer (3 rows → 1). A full run is still blocked, but on **credentials, not the network**: Vercel's Supabase env vars are Production-scoped so every preview 500s, and all five GitHub Actions secrets resolve empty in the job log. Needs `SUPABASE_SERVICE_ROLE_KEY` + `SECRET_ENCRYPTION_KEY` as repo secrets or Preview env vars — see `docs/design/qa-agent-backlog-audit.md` |
 | QA-P0-17 | RLS-only read sweep (codebase-map D10) | Not Started — 2026-09-25, master stories |
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
-| QA-P0-19 | Harden the FinanceBot scenario's final step | Not Started — 2026-09-25, master stories |
+| QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 

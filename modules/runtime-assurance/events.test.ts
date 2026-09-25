@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { computeDedupeKey, isWithinReplayWindow, REPLAY_WINDOW_MAX_FUTURE_MS, REPLAY_WINDOW_MAX_PAST_MS } from "./events";
+import { computeDedupeKey, inferEventType, isWithinReplayWindow, REPLAY_WINDOW_MAX_FUTURE_MS, REPLAY_WINDOW_MAX_PAST_MS } from "./events";
 import type { RuntimeEventInput } from "@/lib/shared/types/runtime";
 
 describe("computeDedupeKey — RUNTIME-P0-01.2", () => {
@@ -60,5 +60,30 @@ describe("isWithinReplayWindow — RUNTIME-P0-11", () => {
 
   it("rejects an unparseable timestamp", () => {
     expect(isWithinReplayWindow("not-a-date", now)).toBe(false);
+  });
+});
+
+describe("event types — RUNTIME-P0-16", () => {
+  const base: RuntimeEventInput = {
+    agentId: "facebeef-0000-0000-0000-000000000001",
+    eventTime: "2026-09-25T10:00:00Z",
+    source: "mcp",
+    action: "read",
+    success: true,
+  };
+
+  it("infers a type when a source sends none, as migration 0063 backfilled", () => {
+    expect(inferEventType({ ...base, tool: "query" })).toBe("TOOL_EXECUTED");
+    expect(inferEventType({ ...base, resource: "customer_db" })).toBe("DATA_ACCESS");
+    expect(inferEventType({ ...base, dataClassification: "pii" })).toBe("DATA_ACCESS");
+    expect(inferEventType(base)).toBe("API_CALL");
+    expect(inferEventType({ ...base, tool: "query", eventType: "TOOL_REQUEST" })).toBe("TOOL_REQUEST");
+  });
+
+  it("keeps existing dedupe keys unchanged, and separates explicit types", () => {
+    const legacy = computeDedupeKey(base);
+    expect(computeDedupeKey({ ...base })).toBe(legacy);
+    expect(computeDedupeKey({ ...base, eventType: "TOOL_REQUEST" })).not.toBe(computeDedupeKey({ ...base, eventType: "TOOL_EXECUTED" }));
+    expect(computeDedupeKey({ ...base, eventType: "TOOL_REQUEST" })).not.toBe(legacy);
   });
 });

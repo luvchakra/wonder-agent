@@ -23,6 +23,10 @@ export function toRuntimeEvent(row: any): RuntimeEvent {
     dedupeKey: row.dedupe_key,
     correlationId: row.correlation_id,
     createdAt: row.created_at,
+    eventType: row.event_type ?? "API_CALL",
+    sessionId: row.session_id ?? null,
+    decisionId: row.decision_id ?? null,
+    mcpServer: row.mcp_server ?? null,
   };
 }
 

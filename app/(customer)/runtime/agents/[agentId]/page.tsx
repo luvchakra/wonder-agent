@@ -33,6 +33,19 @@ const OUTCOME_TONE: Record<ComparisonOutcomeType, BadgeTone> = {
   insufficient_access: "warning",
   unused_capability: "warning",
   unscored_unknown: "neutral",
+  unapproved_tool: "danger",
+};
+
+const NOW_APPROVED: Record<string, string> = {
+  approved: "Within approved purpose",
+  requires_approval: "Needs approval",
+  not_approved: "Outside approved purpose",
+  not_evaluated: "Not evaluated",
+};
+const NOW_EFFECTIVE: Record<string, string> = {
+  within: "Within effective access",
+  outside: "Outside effective access",
+  not_evaluated: "Not evaluated",
 };
 
 /** Agent Detail — Runtime (DID) tab, including the SHOULD/CAN/DID comparison
@@ -76,29 +89,57 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
 
       <Card>
         <CardHeader
-          title="SHOULD vs CAN vs DID"
-          description="The canonical comparison: approved purpose vs. technical capability vs. observed behavior (CLAUDE.md §9)."
+          title="Approved vs Effective vs Observed vs Now"
+          description="Approved purpose (SHOULD), technical capability (CAN), observed behavior (DID) and the current request (NOW), per CLAUDE.md §9."
           actions={comparison.shouldUnknown ? <Badge tone="warning">SHOULD undefined</Badge> : <Badge tone={overallHealthy ? "success" : "danger"}>{overallHealthy ? "Healthy" : "Deviation detected"}</Badge>}
         />
         <CardBody className="space-y-4">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {/* EXPERIENCE-P0-17 wording (user decision, 2026-09-25): the
+              friendly term with the model term beside it. */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">SHOULD</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Approved (SHOULD)</p>
               <p className="mt-1 text-sm text-foreground">
                 {comparison.should.map((s) => `${s.application}${s.data ? `:${s.data}` : ""}`).join(", ") || "(none)"}
               </p>
+              {comparison.should[0]?.tools?.length ? (
+                <p className="mt-1 text-xs text-muted-foreground">Tools: {comparison.should[0].tools.join(", ")}</p>
+              ) : null}
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">CAN</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Effective Access (CAN)</p>
               <p className="mt-1 text-sm text-foreground">
                 {comparison.can.map((c) => `${c.application}${c.entitlementName ? `:${c.entitlementName}` : ""}`).join(", ") || "(none)"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">DID</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observed (DID)</p>
               <p className="mt-1 text-sm text-foreground">
                 {comparison.did.map((d) => `${d.application ?? "?"}${d.resource ? `:${d.resource}` : ""}`).join(", ") || "(none)"}
               </p>
+              {comparison.didTools.length ? (
+                <p className="mt-1 text-xs text-muted-foreground">Tools used: {comparison.didTools.join(", ")}</p>
+              ) : null}
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current Request (NOW)</p>
+              {comparison.now ? (
+                <div className="mt-1 space-y-1 text-sm">
+                  <p className="text-foreground">
+                    <span className="font-mono text-xs">{comparison.now.action}</span>
+                    {comparison.now.application || comparison.now.tool ? ` · ${[comparison.now.application, comparison.now.tool].filter(Boolean).join(" · ")}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {NOW_APPROVED[comparison.now.approved]} · {NOW_EFFECTIVE[comparison.now.effective]}
+                  </p>
+                  <Badge tone={comparison.now.decision === "DENY" ? "danger" : comparison.now.decision === "REQUIRE_APPROVAL" ? "warning" : "success"}>
+                    {comparison.now.decision.replace(/_/g, " ").toLowerCase()}
+                    {comparison.now.enforced ? "" : " (observed)"}
+                  </Badge>
+                </div>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">No gateway request yet.</p>
+              )}
             </div>
           </div>
           <div>

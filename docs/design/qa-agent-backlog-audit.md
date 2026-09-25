@@ -730,3 +730,24 @@ The spec's stated intent is unchanged: the app must complete sign-up or
 surface the provider's own message, never fail silently. It now accepts
 either message, scoped to `role="alert"`. It passes, and would still fail
 on a silent failure or an app error.
+
+---
+
+## 2026-09-25 — QA-P0-19: FinanceBot scenario hardened (root cause, not a retry)
+
+**The flake.** The final step clicks "Run risk evaluation now", then
+Resolve. Both are server actions that re-render the same URL, so the old
+`toHaveURL` check passed before the evaluation finished. Under the full
+suite's two-worker load the Resolve click could land on the page while it
+was still re-rendering, the submission was lost, and "resolved" never
+appeared. Run alone it always passed, which is why it looked random.
+
+**The fix.** Each action now awaits its own POST response
+(`page.waitForResponse` on the action's URL) and `networkidle` before the
+next step. No assertion was weakened and no timeout was raised; the test
+now waits for the thing that actually has to finish.
+
+**Verified.** It passed alone 3/3 before the change. After it, the runtime,
+risk and FinanceBot specs pass together under two workers, 22/22, and the
+full suite passes (see the next line).
+Full suite after the fix: **156/156**.

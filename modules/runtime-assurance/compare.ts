@@ -2,8 +2,78 @@ import "server-only";
 
 import { getAgentContract } from "@/modules/agent-identity/service";
 import { getEffectiveAccess, getEffectiveAccessAsOf } from "@/modules/access-governance/service";
-import type { CanEntry, ComparisonOutcome, DidEntry, ShouldCanDidComparison, ShouldEntry } from "@/lib/shared/types/runtime";
+import type { CanEntry, ComparisonOutcome, DidEntry, NowEntry, ShouldCanDidComparison, ShouldEntry } from "@/lib/shared/types/runtime";
+import { supabaseServer } from "@/lib/db/supabaseServer";
+import { ApiError } from "@/lib/shared/types/foundation";
 import { getDid } from "./did";
+
+/** Distinct tools this agent was observed using (runtime_tools only records observed event types). */
+async function loadDidTools(tenantId: string, agentId: string): Promise<string[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("runtime_tools").select("name").eq("tenant_id", tenantId).eq("agent_id", agentId);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return [...new Set(((data ?? []) as Array<{ name: string }>).map((t) => t.name))].sort();
+}
+
+type DecisionStepRow = { step: string; outcome: string };
+
+/** How a recorded decision stood against SHOULD and CAN, read from its own evaluated steps. */
+export function nowFromDecision(row: {
+  id: string;
+  request_id: string;
+  action: string;
+  application: string | null;
+  tool: string | null;
+  decision: NowEntry["decision"];
+  code: string;
+  reason: string;
+  enforced: boolean;
+  created_at: string;
+  steps: DecisionStepRow[] | null;
+}): NowEntry {
+  const step = (name: string) => (row.steps ?? []).find((s) => s.step === name)?.outcome;
+  const approvedStep = step("approved_access");
+  const effectiveStep = step("effective_access");
+  return {
+    decisionId: row.id,
+    requestId: row.request_id,
+    action: row.action,
+    application: row.application,
+    tool: row.tool,
+    decision: row.decision,
+    code: row.code,
+    reason: row.reason,
+    approved:
+      approvedStep === "PASS"
+        ? "approved"
+        : approvedStep === "REQUIRE_APPROVAL"
+          ? "requires_approval"
+          : approvedStep === "DENY"
+            ? "not_approved"
+            : "not_evaluated",
+    effective: effectiveStep === "PASS" ? "within" : effectiveStep === "DENY" ? "outside" : "not_evaluated",
+    enforced: row.enforced,
+    at: row.created_at,
+  };
+}
+
+async function loadNow(tenantId: string, agentId: string): Promise<NowEntry | null> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("runtime_decisions")
+    .select("id, request_id, action, application, tool, decision, code, reason, enforced, created_at, steps")
+    .eq("tenant_id", tenantId)
+    .eq("agent_id", agentId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return data ? nowFromDecision(data as Parameters<typeof nowFromDecision>[0]) : null;
+}
+
+function sameTool(a: string, b: string): boolean {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
 
 /**
  * Two free-text vocabularies are being compared here: an Agent Contract's
@@ -80,19 +150,22 @@ function isCanExercisedInDid(did: DidEntry[], can: CanEntry): boolean {
  * unaffected.
  */
 export async function compareShouldCanDid(tenantId: string, agentId: string, asOf?: string): Promise<ShouldCanDidComparison> {
-  const [contract, canGrants, did] = await Promise.all([
+  const [contract, canGrants, did, didTools, now] = await Promise.all([
     getAgentContract(agentId),
     asOf ? getEffectiveAccessAsOf(tenantId, agentId, asOf) : getEffectiveAccess(tenantId, agentId),
     getDid(tenantId, agentId),
+    loadDidTools(tenantId, agentId),
+    // NOW is the current request; a historical comparison has none.
+    asOf ? Promise.resolve(null) : loadNow(tenantId, agentId),
   ]);
 
   const should: ShouldEntry[] = contract
     ? contract.approvedApplications.flatMap((application): ShouldEntry[] =>
         contract.approvedData.length > 0
           ? contract.approvedData.map(
-              (data): ShouldEntry => ({ application, data, actions: contract.approvedActions, tools: [] }),
+              (data): ShouldEntry => ({ application, data, actions: contract.approvedActions, tools: contract.allowedTools ?? [] }),
             )
-          : [{ application, data: null, actions: contract.approvedActions, tools: [] }],
+          : [{ application, data: null, actions: contract.approvedActions, tools: contract.allowedTools ?? [] }],
       )
     : [];
 
@@ -168,6 +241,18 @@ export async function compareShouldCanDid(tenantId: string, agentId: string, asO
       });
     }
   }
+  // RUNTIME-P0-17 — tools. An empty allowed-tools list means the contract
+  // does not restrict tools (the same rule as the gateway's decision), so
+  // only a non-empty list can make a used tool unapproved.
+  const allowedTools = contract?.allowedTools ?? [];
+  if (contract && allowedTools.length > 0) {
+    for (const tool of didTools) {
+      if (!allowedTools.some((t) => sameTool(t, tool))) {
+        outcomes.push({ type: "unapproved_tool", evidence: { tool, allowedTools } });
+      }
+    }
+  }
+
   if (
     !shouldUnknown &&
     outcomes.length === 0 &&
@@ -176,5 +261,5 @@ export async function compareShouldCanDid(tenantId: string, agentId: string, asO
     outcomes.push({ type: "healthy", evidence: {} });
   }
 
-  return { agentId, should, can, did: didEntries, outcomes, evaluatedAt: new Date().toISOString(), shouldUnknown };
+  return { agentId, should, can, did: didEntries, outcomes, evaluatedAt: new Date().toISOString(), shouldUnknown, didTools, now };
 }

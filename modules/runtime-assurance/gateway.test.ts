@@ -5,6 +5,7 @@ type Row = Record<string, unknown>;
 let decisions: Row[] = [];
 let audits: Row[] = [];
 let forceConflict = false;
+let events: Row[] = [];
 
 function query(table: string) {
   const filters: Array<[string, unknown]> = [];
@@ -14,7 +15,14 @@ function query(table: string) {
     select: () => chain,
     eq: (c: string, v: unknown) => (filters.push([c, v]), chain),
     maybeSingle: async () => ({ data: table === "runtime_decisions" ? match() : null, error: null }),
-    insert: (row: Row) => ((pending = row), chain),
+    insert: (row: Row) => {
+      if (table === "runtime_events") {
+        events.push(row);
+        return Promise.resolve({ error: null });
+      }
+      pending = row;
+      return chain;
+    },
     single: async () => {
       if (forceConflict) {
         forceConflict = false;
@@ -35,7 +43,7 @@ vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: async (e: Row) => void au
 const evaluate = vi.fn();
 vi.mock("@/modules/access-governance/service", () => ({ evaluateRuntimeRequest: (...a: unknown[]) => evaluate(...a) }));
 
-import { authorizeRuntimeRequest, parseGatewayRequest } from "./gateway";
+import { authorizeRuntimeRequest, decisionEventType, parseGatewayRequest } from "./gateway";
 
 const principal = { tenantId: "tenant-a", agentId: "agent-a", keyId: "key-a" };
 
@@ -43,6 +51,7 @@ beforeEach(() => {
   decisions = [];
   audits = [];
   forceConflict = false;
+  events = [];
   evaluate.mockReset();
   evaluate.mockResolvedValue({
     decision: "DENY",
@@ -125,5 +134,37 @@ describe("authorizeRuntimeRequest", () => {
     const other = await authorizeRuntimeRequest({ ...principal, agentId: "agent-b" }, parseGatewayRequest({ requestId: "r-5", action: "READ" }));
     expect(other.replayed).toBe(false);
     expect(decisions).toHaveLength(2);
+  });
+});
+
+describe("decision events (RUNTIME-P0-16)", () => {
+  it("records each decision once on the timeline, as a decision type DID ignores, linked to its row", async () => {
+    const d = await authorizeRuntimeRequest(
+      principal,
+      parseGatewayRequest({ requestId: "r-ev", action: "READ", tool: "query_db", context: { sessionId: "s-1" } }),
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      tenant_id: "tenant-a",
+      agent_id: "agent-a",
+      source: "gateway",
+      event_type: "TOOL_DENIED",
+      decision_id: d.decisionId,
+      session_id: "s-1",
+      dedupe_key: `gateway:${d.decisionId}`,
+    });
+    // A replay records nothing new.
+    await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "r-ev", action: "READ", tool: "query_db" }));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(events).toHaveLength(1);
+  });
+
+  it("maps decisions to event types", () => {
+    expect(decisionEventType("DENY", "t")).toBe("TOOL_DENIED");
+    expect(decisionEventType("REQUIRE_APPROVAL", "t")).toBe("TOOL_APPROVAL_REQUIRED");
+    expect(decisionEventType("ALLOW", "t")).toBe("TOOL_ALLOWED");
+    expect(decisionEventType("ALLOW_WITH_RESTRICTIONS", "t")).toBe("TOOL_ALLOWED");
+    expect(decisionEventType("DENY", undefined)).toBe("POLICY_DECISION");
   });
 });

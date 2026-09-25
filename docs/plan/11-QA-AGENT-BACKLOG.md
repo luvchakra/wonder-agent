@@ -44,7 +44,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16 (later): the sandbox's Supabase egress blocker is gone, so the suite was pointed at the live production deployment and **the framework is now proven against a real server** — `authenticate as platformAdmin` signed in end-to-end through real Supabase Auth and saved storage state. The four tenant-user logins failed on a **genuine product bug the suite existed to catch**: `getTenantContext()` returned every colleague's `tenant_memberships` row (RLS there is tenant-scoped, not user-scoped), so a single-tenant user resolved as a member of three organizations and was bounced to `/onboarding`; fixed in Foundation + Experience, proven at the data layer (3 rows → 1). A full run is still blocked, but on **credentials, not the network**: Vercel's Supabase env vars are Production-scoped so every preview 500s, and all five GitHub Actions secrets resolve empty in the job log. Needs `SUPABASE_SERVICE_ROLE_KEY` + `SECRET_ENCRYPTION_KEY` as repo secrets or Preview env vars — see `docs/design/qa-agent-backlog-audit.md` |
 | QA-P0-17 | RLS-only read sweep (codebase-map D10) | Not Started — 2026-09-25, master stories |
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
-| QA-P0-19 | Harden the FinanceBot scenario's final step | Not Started — 2026-09-25, master stories |
+| QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 
 ---
 

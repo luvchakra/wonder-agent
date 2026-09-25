@@ -110,13 +110,28 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     await expect(page.getByRole("row", { name: /CustomerDB_READ/ })).toHaveCount(0);
 
     // 9. Re-evaluate, then resolve the finding now that its evidence is gone.
+    //
+    // QA-P0-19 (2026-09-25): both steps are server actions that re-render
+    // this same URL, so a URL check passes before they finish. Under the
+    // full suite's two-worker load the Resolve click used to land on the
+    // still-updating page and be lost, and the "resolved" assertion then
+    // flaked. Each action now waits for its own server response.
     await page.goto(`/risk/agents/${agentId}`);
-    await page.getByRole("button", { name: "Run risk evaluation now" }).click();
-    await expect(page).toHaveURL(`/risk/agents/${agentId}`);
+    const isActionPost = (r: import("@playwright/test").Response) =>
+      r.request().method() === "POST" && new URL(r.url()).pathname === `/risk/agents/${agentId}`;
+    await Promise.all([
+      page.waitForResponse(isActionPost),
+      page.getByRole("button", { name: "Run risk evaluation now" }).click(),
+    ]);
+    await page.waitForLoadState("networkidle");
 
     const resolvedFindingItem = page.locator("li", { has: page.getByRole("heading", { level: 3, name: `${agentName} has effective access beyond its approved contract` }) });
     await resolvedFindingItem.locator('select[name="resolutionType"]').selectOption("verified_fixed");
-    await resolvedFindingItem.getByRole("button", { name: "Resolve", exact: true }).click();
+    await Promise.all([
+      page.waitForResponse(isActionPost),
+      resolvedFindingItem.getByRole("button", { name: "Resolve", exact: true }).click(),
+    ]);
+    await page.waitForLoadState("networkidle");
 
     await expect(page.getByText(/an unexpected error occurred/i)).not.toBeVisible();
     await expect(resolvedFindingItem.getByText("resolved")).toBeVisible();

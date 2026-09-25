@@ -17,7 +17,8 @@ test.describe("Runtime module", () => {
     const agentId = await registerAgent(page, `E2E Runtime Agent ${Date.now()}`);
     await page.goto(`/runtime/agents/${agentId}`);
 
-    await expect(page.getByText("SHOULD vs CAN vs DID")).toBeVisible();
+    // Retitled with EXPERIENCE-P0-17's wording and RUNTIME-P0-17's NOW column.
+    await expect(page.getByText("Approved vs Effective vs Observed vs Now")).toBeVisible();
     await expect(page.getByText("No comparison outcomes yet.")).toBeVisible();
     await expect(page.getByText("No events yet.")).toBeVisible();
   });
@@ -54,8 +55,12 @@ test.describe("runtime activity — design rebuild", () => {
     await expect(page.getByRole("heading", { name: "Runtime activity" })).toBeVisible();
 
     // Selecting a result that nothing in the window matches empties the list
-    // rather than silently showing everything.
-    await page.getByLabel("Result").selectOption("blocked");
+    // rather than silently showing everything. (RUNTIME-P0-16 renamed the
+    // results truthfully: "Failed", never "Blocked", while nothing is
+    // enforced; gateway decisions are their own filter.)
+    await page.getByLabel("Result").selectOption("failed");
+    await expect(page.getByRole("heading", { name: "Activity", exact: true })).toBeVisible();
+    await page.getByLabel("Result").selectOption("decision");
     await expect(page.getByRole("heading", { name: "Activity", exact: true })).toBeVisible();
 
     await page.getByLabel("Result").selectOption("all");
