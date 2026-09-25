@@ -12,3 +12,6 @@ export { getDid } from "./did";
 export { compareShouldCanDid } from "./compare";
 export { quarantineEvent, listQuarantinedEvents } from "./quarantine";
 export { getDataQualityMetrics } from "./dataQuality";
+
+// RUNTIME-P0-15 — the Runtime Gateway.
+export { authorizeRuntimeRequest, parseGatewayRequest, getGatewayMode, listRuntimeDecisions } from "./gateway";

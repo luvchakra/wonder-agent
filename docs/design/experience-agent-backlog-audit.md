@@ -2521,3 +2521,18 @@ values use `overflow-wrap: anywhere`, so a long unbroken id wraps inside a
   is **handed to QA Agent as a timing flake to harden**: wait on the
   re-evaluation result rather than a fixed timeout. Per §17.8 this is not
   claimed as "known flaky, ignore". It is an open item.
+
+---
+
+## 2026-09-25 — Runtime page: "Authorization decisions" card (with RUNTIME-P0-15)
+
+A card above the runtime activity stream lists the gateway's last 10
+decisions: time, agent, action, target, decision and reason. Each
+decision's badge is labelled in words ("Allow", "Allow, restricted",
+"Needs approval", "Deny"), never by colour alone. An "observed" note shows
+that nothing was enforced, so the screen never implies a block happened
+(§17.5). The empty state says how agents call the gateway.
+
+The card uses the shared `TableContainer` with column priorities (Target
+from xl, Reason from lg) and is covered by the gateway E2E spec, including
+its invisibility to another organization.

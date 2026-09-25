@@ -419,3 +419,122 @@ changed.
   `runtime_events`.
 - D7: SHOULD tools are always empty.
 - There is no event-type enum (P0-18).
+
+---
+
+## 2026-09-25 — RUNTIME-P0-15: the Runtime Gateway (observe-only)
+
+This is master stories P0-26, P0-27 and P0-33, built to the user's
+2026-09-25 decisions:
+
+- it lives in this app, at `/api/gateway/v1`
+- agents authenticate with per-agent API keys (FOUNDATION-P0-17)
+- Access owns the decision (ACCESS-P0-11) and Runtime owns the endpoint
+  and its records
+- the default mode is OBSERVE_ONLY
+
+**`POST /api/gateway/v1/authorize`** (`app/api/gateway/v1/authorize/route.ts`)
+
+1. **Authenticate first.** The route requires
+   `Authorization: Bearer <agent API key>` and calls
+   `verifyAgentApiKey()`. A missing, malformed, unknown or revoked key
+   gets 401, and so does a signed-in user's session, which is not an agent
+   credential. An unreachable key store gets 503 `AUTH_UNAVAILABLE`, never
+   permission. Nothing about an unauthenticated request is stored.
+2. **Validate.** The body is capped at 16 KB and must be valid JSON.
+   `parseGatewayRequest()` requires `requestId` and `action`, bounds every
+   string at 200 characters, requires `identityId` to be a UUID, and
+   **keeps only the known fields**, so a smuggled `tenantId` or `agentId`
+   is dropped. The key decides both (#2).
+3. **Decide** (`modules/runtime-assurance/gateway.ts
+   authorizeRuntimeRequest()`). Three things run in parallel: the
+   idempotency lookup on (tenant, agent, requestId), the mode, and
+   Access's `evaluateRuntimeRequest()`. A request id already decided
+   returns the stored answer (`replayed: true`) with no new record or audit
+   event. A concurrent duplicate that loses the insert race on the unique
+   constraint (23505) returns the winner's decision (§17.6).
+4. **Record.** An immutable `runtime_decisions` row: request, decision,
+   code, reason, all evaluated steps, policy id and version, restrictions,
+   risk score, mode and `enforced`. Written synchronously; it is the
+   durable evidence.
+5. **Answer** in the master §12 contract, plus `mode`, `enforced`,
+   `effectiveDecision`, `steps` and `replayed`. **OBSERVE_ONLY**:
+   `decision` is what enforcement would do, `effectiveDecision` is
+   `ALLOW`, and nothing is blocked. Every tenant stays OBSERVE_ONLY until
+   the per-tenant ENFORCE switch ships behind its flag (PLATFORM-P0-12).
+   `getGatewayMode()` is a deliberate constant, not a stub that allows,
+   since the real decision is recorded every time.
+6. **Audit** `runtime.decision` (#11): actor type integration, the key id,
+   request id, decision, code and mode, never the key. It is written after
+   the response through `next/server` `after()`
+   (`lib/shared/afterResponse.ts`).
+
+**Independent of dashboard handling** (master §25): `proxy.ts` returns
+immediately for `/api/gateway/*`. There is no session refresh and no
+GoTrue round trip, and no cookie is read or written. No model is on the
+path (#9).
+
+**Migration `0062_runtime_gateway_decisions.sql`**, applied live:
+
+- `runtime_decisions` has `tenant_id` and RLS. Its one policy is
+  **select-only** for tenant members; there are no client insert, update
+  or delete policies.
+- Unique on (tenant_id, agent_id, request_id).
+- Indexes on (tenant, time) and (tenant, agent, time), and on every FK
+  (agent, api_key, identity, policy). The advisor shows no unindexed FK.
+
+**UI.** `/runtime` has an "Authorization decisions" card listing the last
+10 decisions: time, agent, action, target, decision badge with an
+"observed" note, and reason. It uses `listRuntimeDecisions()` (RLS plus an
+explicit tenant filter) and column priorities, per the responsive pass.
+
+**Performance, measured locally** against the ap-southeast-1 database
+(about 270 ms per round trip from this sandbox), 12 calls:
+
+- The first build took about 7 sequential round trips: p50 1,953 ms.
+- It now takes three:
+  1. key verification, as **one** query with the tenant status and agent
+     embedded through their FKs
+  2. the idempotency lookup, agent profile, effective applications
+     (**one** query, `accounts!inner`) and runtime policies with rules
+     embedded (**one** query), all in parallel
+  3. the decision insert
+- The `last_used_at` stamp and the audit row moved after the response.
+- Result: **p50 859 ms, max 930 ms.** In production (Vercel sin1, next to
+  the database) each round trip is a few ms.
+- Checked in SQL after the run: 12 decisions, 12 audit rows, 0 secrets in
+  audit metadata, `last_used_at` stamped.
+
+**Verified**
+
+- `gateway.test.ts`, 7 cases: unknown fields dropped; validation;
+  OBSERVE_ONLY records DENY and answers ALLOW; audited once with no key
+  material; idempotent replay; a lost insert race returns the winner with
+  no second audit; the same request id from another agent is a separate
+  request.
+- Live SQL `tests/runtime/gateway-decisions-isolation.sql`, 6/6: a member
+  sees 1 own-tenant and 0 other-tenant decisions; update and delete touch
+  0 rows; insert is denied (42501); the rows are intact. Fixtures cleaned
+  up.
+- E2E `tests/e2e/runtime-gateway.spec.ts`, 8/8:
+  - 401 for no key, a malformed key, an unknown key, and a user session
+  - 400 validation
+  - the observe-only DENY answered as ALLOW, with steps
+  - an idempotent replay with the same decision id
+  - forged body ids ignored
+  - the decision shown on `/runtime`, and invisible to Tenant Two
+  - a revoked key refused at once
+- The API-key spec was re-run after the verify refactor: 4/4.
+
+**Moved, not dropped.** A runtime *event* per gateway request belongs to
+RUNTIME-P0-16, where TOOL_REQUEST/ALLOWED/DENIED event types exist. A
+request is not an observed action, and writing it into DID now would
+distort SHOULD/CAN/DID. The backlog row and story text say so.
+
+**Not in scope.** The ENFORCE switch (with PLATFORM-P0-12), emergency
+controls and tool filtering (RUNTIME-P0-18), and per-key rate limiting,
+recorded for QA-P0-18.
+
+**Full-suite regression** (§17.8, because `proxy.ts`, a migration and the
+authentication path changed): `eslint` exit 0; `vitest` 55 files / 412
+tests; **full Playwright 154/154**, the first fully green run of the day.

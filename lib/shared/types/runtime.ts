@@ -196,3 +196,38 @@ export type ShouldCanDidComparison = {
    */
   shouldUnknown: boolean;
 };
+
+// RUNTIME-P0-15 — the Runtime Gateway's answer (master stories §12, plus
+// the operating mode). In OBSERVE_ONLY mode (the default, per the user's
+// 2026-09-25 decision) `decision` is what enforcement WOULD do, and
+// `effectiveDecision` is what the caller must actually do: ALLOW. Nothing
+// is blocked until a tenant is moved to ENFORCE.
+export type GatewayMode = "OBSERVE_ONLY" | "ENFORCE";
+
+export type GatewayDecision = {
+  decisionId: string;
+  requestId: string;
+  correlationId: string;
+  mode: GatewayMode;
+  enforced: boolean;
+  decision: "ALLOW" | "DENY" | "REQUIRE_APPROVAL" | "ALLOW_WITH_RESTRICTIONS";
+  effectiveDecision: "ALLOW" | "DENY" | "REQUIRE_APPROVAL" | "ALLOW_WITH_RESTRICTIONS";
+  code: string;
+  reason: string;
+  policyId: string | null;
+  policyVersion: number | null;
+  restrictions: Record<string, unknown> | null;
+  riskScore: number | null;
+  steps: Array<{ step: string; outcome: string; code: string; reason: string }>;
+  /** True when this is the stored answer to a request id already decided. */
+  replayed: boolean;
+  createdAt: string;
+};
+
+export type GatewayDecisionRecord = GatewayDecision & {
+  agentId: string;
+  action: string;
+  application: string | null;
+  resource: string | null;
+  tool: string | null;
+};

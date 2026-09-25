@@ -26,7 +26,7 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
 | RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
-| RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Done — 2026-09-25: `POST /api/gateway/v1/authorize` (agent-key auth, OBSERVE_ONLY, idempotent), migration `0062` `runtime_decisions` applied live, decisions panel on /runtime; 7 unit + 6 live SQL + 8 E2E security cases; p50 1,953 → 859 ms locally after cutting to 3 round trips; see audit log. The per-request runtime *event* moved to RUNTIME-P0-16, where event types exist |
 | RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Not Started — 2026-09-25, master stories |
 | RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Not Started — 2026-09-25, master stories |
 | RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
@@ -482,7 +482,7 @@ Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (
 
 ### RUNTIME-P0-15 — Runtime Gateway endpoint (master P0-26/P0-27/P0-33)
 
-User decisions: runs inside this app as the `/api/gateway/v1/*` subtree; agents authenticate with per-agent API keys (FOUNDATION-P0-17); **default mode is OBSERVE_ONLY** (decisions are evaluated and recorded, nothing blocked) with ENFORCE enabled per tenant/environment later. Independent of dashboard rendering; calls Access's `evaluateRuntimeRequest()` (ACCESS-P0-11); persists a decision record (new `runtime_decisions`, tenant_id + RLS) and a runtime event per request, idempotent on request id; never runs an LLM in the request path. Security tests: forged tenant/agent/identity/resource ids, replay, duplicate requests, cross-tenant key.
+User decisions: runs inside this app as the `/api/gateway/v1/*` subtree; agents authenticate with per-agent API keys (FOUNDATION-P0-17); **default mode is OBSERVE_ONLY** (decisions are evaluated and recorded, nothing blocked) with ENFORCE enabled per tenant/environment later. Independent of dashboard rendering; calls Access's `evaluateRuntimeRequest()` (ACCESS-P0-11); persists a decision record (new `runtime_decisions`, tenant_id + RLS), idempotent on request id (the matching runtime *event* — TOOL_REQUEST/ALLOWED/DENIED — is recorded by RUNTIME-P0-16, which introduces those event types; a gateway request is not yet an observed action, so writing it into DID now would be inaccurate); never runs an LLM in the request path. Security tests: forged tenant/agent/identity/resource ids, replay, duplicate requests, cross-tenant key.
 
 ### RUNTIME-P0-16 — Event types, sessions and decision fields (master P0-18)
 

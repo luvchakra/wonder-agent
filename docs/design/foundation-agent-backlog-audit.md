@@ -1369,3 +1369,15 @@ changed):
     already accepted.
   - The assertion now accepts either provider message, scoped to the
     `alert` role, and passes. Recorded in the QA log.
+
+**Follow-up, same day (RUNTIME-P0-15 performance):**
+
+- `verifyAgentApiKey()` now checks the key, its tenant's status and its
+  agent's tenant in **one** query, embedding `tenants` and `agents`
+  through their FKs, instead of two round trips.
+- The `last_used_at` stamp runs after the response through the new
+  `lib/shared/afterResponse.ts` (`next/server` `after()`, with a
+  background fallback outside a request scope).
+- Behaviour is unchanged, and it still fails closed. The unit tests were
+  updated for the embedded shape (16/16), and the live API-key and gateway
+  specs pass (12/12).

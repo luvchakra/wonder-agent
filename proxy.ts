@@ -44,8 +44,18 @@ const UNENFORCED_PATHS = [
  * (FOUNDATION-P0-09) on top of Supabase Auth's own JWT expiry/refresh.
  */
 export async function proxy(request: NextRequest) {
-  const response = NextResponse.next({ request });
   const { pathname } = request.nextUrl;
+
+  // RUNTIME-P0-15 — the Runtime Gateway is a separate boundary: agents
+  // authenticate every call with their own API key inside the route, and
+  // master stories §25 require the runtime path not to depend on dashboard
+  // request handling. So it skips the session refresh and its GoTrue round
+  // trip entirely; no cookie is read or written for it.
+  if (pathname.startsWith("/api/gateway/")) {
+    return NextResponse.next();
+  }
+
+  const response = NextResponse.next({ request });
 
   // The proxy runs ahead of EVERY route, so anything it throws becomes a
   // 500 on every URL in the deployment — including /welcome, which is a

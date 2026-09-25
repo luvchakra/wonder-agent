@@ -68,7 +68,7 @@ import {
 const NOW = new Date("2026-09-25T12:00:00Z");
 
 function keyRow(secret: string, over: Row = {}): Row {
-  return {
+  const base: Row = {
     id: "k1",
     tenant_id: "tenant-a",
     agent_id: "agent-a",
@@ -83,6 +83,10 @@ function keyRow(secret: string, over: Row = {}): Row {
     revoked_reason: null,
     ...over,
   };
+  // verifyAgentApiKey() embeds the key's tenant and agent through their FKs.
+  const tenant = tables.tenants.find((t) => t.id === base.tenant_id);
+  const agent = tables.agents.find((a) => a.id === base.agent_id);
+  return { ...base, tenants: tenant ? { status: tenant.status } : null, agents: agent ? { tenant_id: agent.tenant_id } : null };
 }
 
 beforeEach(() => {
@@ -179,6 +183,8 @@ describe("verifyAgentApiKey — fails closed", () => {
     const { secret } = generateAgentApiKey();
     tables.agent_api_keys = [keyRow(secret)];
     await verifyAgentApiKey(secret, NOW);
+    // The stamp runs after the response (runAfterResponse); let it settle.
+    await new Promise((r) => setTimeout(r, 0));
     const touch = updates.find((u) => u.table === "agent_api_keys");
     expect(touch?.values).toEqual({ last_used_at: NOW.toISOString() });
     expect(touch?.filters).toContainEqual(["tenant_id", "tenant-a"]);

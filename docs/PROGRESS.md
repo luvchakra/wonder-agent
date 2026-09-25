@@ -14,7 +14,7 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**148 of 190 tracked stories complete — 78%**
+**149 of 190 tracked stories complete — 78%**
 
 ```
 ███████████████████████████████░░░░░░░░░  78%
@@ -22,10 +22,10 @@ Generated 2026-09-25 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 148 |
+| Done | 149 |
 | Partial | 19 |
 | Deferred | 1 |
-| Not Started | 22 |
+| Not Started | 21 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -42,7 +42,7 @@ and are deliberately excluded from the counts above.
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 4 | 15 | `█████████████░░░░░` 73% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 12 | 0 | 0 | 3 | 15 | `██████████████░░░░` 80% |
-| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 9 | 0 | 0 | 4 | 13 | `████████████░░░░░░` 69% |
+| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 10 | 0 | 0 | 3 | 13 | `██████████████░░░░` 77% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
@@ -169,7 +169,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Runtime Assurance & SHOULD/CAN/DID  
 **Backlog status:** DORMANT — do not start until the user says "Run Runtime Agent"  
-**Stories:** 9 done · 0 partial · 0 deferred · 4 not started (13 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 10 done · 0 partial · 0 deferred · 3 not started (13 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -182,7 +182,7 @@ and are deliberately excluded from the counts above.
 | RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
 | RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
-| RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Done — 2026-09-25: `POST /api/gateway/v1/authorize` (agent-key auth, OBSERVE_ONLY, idempotent), migration `0062` `runtime_decisions` applied live, decisions panel on /runtime; 7 unit + 6 live SQL + 8 E2E security cases; p50 1,953 → 859 ms locally after cutting to 3 round trips; see audit log. The per-request runtime *event* moved to RUNTIME-P0-16, where event types exist |
 | RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Not Started — 2026-09-25, master stories |
 | RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Not Started — 2026-09-25, master stories |
 | RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |

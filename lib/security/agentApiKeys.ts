@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { runAfterResponse } from "@/lib/shared/afterResponse";
 import { ApiError, type AgentApiKey, type AgentApiKeyStatus, type AgentKeyPrincipal } from "@/lib/shared/types/foundation";
 
 /**
@@ -222,11 +223,18 @@ export async function verifyAgentApiKey(presented: string | null | undefined, no
   const hash = hashAgentApiKey(presented);
   const supabase = supabaseServiceRole();
 
+  // One round trip: the key row with its tenant's status and its agent
+  // embedded through their foreign keys. This is the gateway's hot path.
   const { data: row, error } = await supabase
     .from("agent_api_keys")
-    .select("id, tenant_id, agent_id, key_hash, expires_at, last_used_at, revoked_at")
+    .select("id, tenant_id, agent_id, key_hash, expires_at, last_used_at, revoked_at, tenants(status), agents(tenant_id)")
     .eq("key_hash", hash)
-    .maybeSingle<Pick<KeyRow, "id" | "tenant_id" | "agent_id" | "key_hash" | "expires_at" | "last_used_at" | "revoked_at">>();
+    .maybeSingle<
+      Pick<KeyRow, "id" | "tenant_id" | "agent_id" | "key_hash" | "expires_at" | "last_used_at" | "revoked_at"> & {
+        tenants: { status: string } | null;
+        agents: { tenant_id: string } | null;
+      }
+    >();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!row) return null;
   // Belt and braces: the index lookup already matched, but compare in
@@ -236,28 +244,21 @@ export async function verifyAgentApiKey(presented: string | null | undefined, no
 
   // The key's tenant must still be active, and its agent must still exist
   // in that same tenant (a suspended tenant's keys stop working at once).
-  const [{ data: tenant, error: tenantError }, { data: agent, error: agentError }] = await Promise.all([
-    supabase.from("tenants").select("id, status").eq("id", row.tenant_id).maybeSingle<{ id: string; status: string }>(),
-    supabase
-      .from("agents")
-      .select("id, tenant_id")
-      .eq("id", row.agent_id)
-      .eq("tenant_id", row.tenant_id)
-      .maybeSingle<{ id: string; tenant_id: string }>(),
-  ]);
-  if (tenantError) throw new ApiError(500, "QUERY_FAILED", tenantError.message);
-  if (agentError) throw new ApiError(500, "QUERY_FAILED", agentError.message);
-  if (!tenant || tenant.status !== "active") return null;
-  if (!agent || agent.tenant_id !== row.tenant_id) return null;
+  if (!row.tenants || row.tenants.status !== "active") return null;
+  if (!row.agents || row.agents.tenant_id !== row.tenant_id) return null;
 
   if (!row.last_used_at || now.getTime() - new Date(row.last_used_at).getTime() > LAST_USED_REFRESH_MS) {
-    const { error: touchError } = await supabase
-      .from("agent_api_keys")
-      .update({ last_used_at: now.toISOString() })
-      .eq("id", row.id)
-      .eq("tenant_id", row.tenant_id);
-    // Bookkeeping only: a failed touch must not turn a valid key into a denial.
-    if (touchError) console.error("agent_api_keys last_used_at update failed", { keyId: row.id, error: touchError.message });
+    // Bookkeeping, off the request's critical path. A failed touch must
+    // never turn a valid key into a denial.
+    const touch = async () => {
+      const { error: touchError } = await supabase
+        .from("agent_api_keys")
+        .update({ last_used_at: now.toISOString() })
+        .eq("id", row.id)
+        .eq("tenant_id", row.tenant_id);
+      if (touchError) console.error("agent_api_keys last_used_at update failed", { keyId: row.id, error: touchError.message });
+    };
+    runAfterResponse(touch);
   }
 
   return { keyId: row.id, tenantId: row.tenant_id, agentId: row.agent_id };

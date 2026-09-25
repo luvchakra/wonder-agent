@@ -9,9 +9,14 @@ const filtersSeen: Array<{ table: string; filters: Array<[string, unknown]> }> =
 function query(table: string) {
   const filters: Array<[string, unknown]> = [];
   filtersSeen.push({ table, filters });
+  // Dotted filters ("accounts.agent_id") address an embedded relation, as in PostgREST.
+  const get = (r: Row, path: string) => path.split(".").reduce<unknown>((o, k) => (o as Row | undefined)?.[k], r);
   const rows = () =>
     (tables[table] ?? []).filter((r) =>
-      filters.every(([c, v]) => (Array.isArray(v) ? v.includes(r[c]) : v === null ? r[c] == null : r[c] === v)),
+      filters.every(([c, v]) => {
+        const actual = get(r, c);
+        return Array.isArray(v) ? v.includes(actual) : v === null ? actual == null : actual === v;
+      }),
     );
   const result = () => (failTable === table ? { data: null, error: { message: `${table} unavailable` } } : { data: rows(), error: null });
   const chain: Record<string, unknown> = {
@@ -60,8 +65,11 @@ beforeEach(() => {
       { id: "acc-b", tenant_id: "tenant-b", agent_id: "agent-a" },
     ],
     access_grants: [
-      { tenant_id: "tenant-a", account_id: "acc-a", revoked_at: null, entitlements: { applications: { name: "Snowflake" } } },
-      { tenant_id: "tenant-b", account_id: "acc-b", revoked_at: null, entitlements: { applications: { name: "SAP" } } },
+      { tenant_id: "tenant-a", accounts: { agent_id: "agent-a", tenant_id: "tenant-a" }, revoked_at: null, entitlements: { applications: { name: "Snowflake" } } },
+      // Same agent id, another tenant: must never count.
+      { tenant_id: "tenant-b", accounts: { agent_id: "agent-a", tenant_id: "tenant-b" }, revoked_at: null, entitlements: { applications: { name: "SAP" } } },
+      // Revoked: must never count.
+      { tenant_id: "tenant-a", accounts: { agent_id: "agent-a", tenant_id: "tenant-a" }, revoked_at: "2026-09-01T00:00:00Z", entitlements: { applications: { name: "Workday" } } },
     ],
     policies: [],
     policy_rules: [],
@@ -73,13 +81,15 @@ describe("evaluateRuntimeRequest", () => {
     const d = await evaluateRuntimeRequest(principal, { requestId: "r1", action: "READ", application: "Snowflake" }, { tenantActive: true });
     expect(d.decision).toBe("ALLOW");
     expect(profile).toHaveBeenCalledWith("tenant-a", "agent-a");
-    for (const table of ["accounts", "access_grants", "policies"]) {
+    for (const table of ["access_grants", "policies"]) {
       const f = filtersSeen.find((x) => x.table === table)!;
       expect(f.filters, table).toContainEqual(["tenant_id", "tenant-a"]);
     }
   });
 
-  it("does not count another tenant's grants as effective access", async () => {
+  it("does not count another tenant's or a revoked grant as effective access", async () => {
+    const revoked = await evaluateRuntimeRequest(principal, { requestId: "r2b", action: "READ", application: "Workday" }, { tenantActive: true });
+    expect(revoked.steps.find((s) => s.step === "effective_access")?.code).toBe("NO_EFFECTIVE_ACCESS");
     const d = await evaluateRuntimeRequest(principal, { requestId: "r2", action: "READ", application: "SAP" }, { tenantActive: true });
     expect(d.decision).toBe("DENY");
     // SAP isn't in this agent's approved applications either; both steps must refuse it.
@@ -108,8 +118,18 @@ describe("evaluateRuntimeRequest", () => {
   });
 
   it("applies an active runtime policy loaded for the tenant", async () => {
-    tables.policies = [{ id: "p1", tenant_id: "tenant-a", name: "No Snowflake", action: "block", version: 2, policy_category: "runtime", status: "active" }];
-    tables.policy_rules = [{ id: "r1", policy_id: "p1", condition: { field: "request.application", op: "eq", value: "snowflake" } }];
+    tables.policies = [
+      {
+        id: "p1",
+        tenant_id: "tenant-a",
+        name: "No Snowflake",
+        action: "block",
+        version: 2,
+        policy_category: "runtime",
+        status: "active",
+        policy_rules: [{ id: "r1", condition: { field: "request.application", op: "eq", value: "snowflake" } }],
+      },
+    ];
     const d = await evaluateRuntimeRequest(principal, { requestId: "r7", action: "READ", application: "Snowflake" }, { tenantActive: true });
     expect(d.decision).toBe("DENY");
     expect(d.policyId).toBe("p1");

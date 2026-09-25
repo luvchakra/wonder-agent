@@ -184,8 +184,11 @@ and no client policies, and is reached only through
 `/api/v1/agents/:id/api-keys[/:keyId]`: FA-owned sub-routes under IA's
 agent prefix.
 
-Planned tables, not yet created: `runtime_decisions`
-(RA), `investigations` and `investigation_findings` (RiskA), and
+`runtime_decisions` (RA) now exists: migration `0062`, RUNTIME-P0-15, done
+2026-09-25. It is immutable decision evidence. Members can read it
+through RLS; only the gateway writes it, through the service role.
+
+Planned tables, not yet created: `investigations` and `investigation_findings` (RiskA), and
 `data_sources` (AA). Each needs `tenant_id`, RLS, and an isolation test
 before it is `Done` (§14).
 
@@ -208,7 +211,7 @@ consume and persist into their own tables.
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |
 | `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
-| `/api/gateway/v1/*` (planned, RUNTIME-P0-15) | RA — the endpoint, which authenticates agents with API keys (FA) and calls AA's `evaluateRuntimeRequest()` for the decision |
+| `/api/gateway/v1/*` (`/authorize` live since RUNTIME-P0-15) | RA — the endpoint, which authenticates agents with API keys (FA) and calls AA's `evaluateRuntimeRequest()` for the decision |
 | `/api/v1/ai/summarize` | FA — pure passthrough wrapper over `lib/ai/summarize.ts` (FOUNDATION-P0-16); added by Experience Agent to unblock `EXPERIENCE-P0-14`, since no domain module owns this cross-cutting primitive |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 

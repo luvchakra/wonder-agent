@@ -25,58 +25,53 @@ export type RuntimePrincipal = { tenantId: string; agentId: string };
 export type RuntimeEmergencyState = { killSwitch: boolean; suspendedTools: string[] };
 
 async function loadEffectiveApplications(tenantId: string, agentId: string): Promise<string[]> {
-  const supabase = supabaseServiceRole();
-  const { data: accounts, error: accountsError } = await supabase
-    .from("accounts")
-    .select("id, tenant_id")
-    .eq("tenant_id", tenantId)
-    .eq("agent_id", agentId);
-  if (accountsError) throw new ApiError(500, "QUERY_FAILED", accountsError.message);
-  const accountIds = ((accounts ?? []) as Array<{ id: string; tenant_id: string }>).filter((a) => a.tenant_id === tenantId).map((a) => a.id);
-  if (accountIds.length === 0) return [];
-
-  const { data, error } = await supabase
+  // One round trip: active grants on this agent's accounts, joined through
+  // to application names. `accounts!inner` makes the agent filter apply to
+  // the join; both tables are filtered to the key's tenant.
+  const { data, error } = await supabaseServiceRole()
     .from("access_grants")
-    .select("tenant_id, entitlements(applications(name))")
+    .select("tenant_id, accounts!inner(agent_id, tenant_id), entitlements(applications(name))")
     .eq("tenant_id", tenantId)
-    .in("account_id", accountIds)
+    .eq("accounts.agent_id", agentId)
+    .eq("accounts.tenant_id", tenantId)
     .is("revoked_at", null)
-    .returns<Array<{ tenant_id: string; entitlements: { applications: { name: string } | null } | null }>>();
+    .returns<
+      Array<{
+        tenant_id: string;
+        accounts: { agent_id: string; tenant_id: string } | null;
+        entitlements: { applications: { name: string } | null } | null;
+      }>
+    >();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   const names = (data ?? [])
-    .filter((g) => g.tenant_id === tenantId)
+    .filter((g) => g.tenant_id === tenantId && g.accounts?.agent_id === agentId && g.accounts?.tenant_id === tenantId)
     .map((g) => g.entitlements?.applications?.name)
     .filter((n): n is string => Boolean(n));
   return [...new Set(names)];
 }
 
 async function loadRuntimePolicies(tenantId: string): Promise<RuntimePolicyFacts[]> {
-  const supabase = supabaseServiceRole();
-  const { data: policies, error } = await supabase
+  // One round trip: active runtime policies with their rules embedded.
+  const { data, error } = await supabaseServiceRole()
     .from("policies")
-    .select("id, tenant_id, name, action, version")
+    .select("id, tenant_id, name, action, version, policy_rules(id, condition)")
     .eq("tenant_id", tenantId)
     .eq("policy_category", "runtime")
-    .eq("status", "active");
+    .eq("status", "active")
+    .returns<
+      Array<{
+        id: string;
+        tenant_id: string;
+        name: string;
+        action: RuntimePolicyFacts["action"];
+        version: number | null;
+        policy_rules: Array<{ id: string; condition: PolicyCondition }> | null;
+      }>
+    >();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  const own = ((policies ?? []) as Array<{ id: string; tenant_id: string; name: string; action: RuntimePolicyFacts["action"]; version: number | null }>).filter(
-    (p) => p.tenant_id === tenantId,
-  );
-  if (own.length === 0) return [];
-
-  const { data: rules, error: rulesError } = await supabase
-    .from("policy_rules")
-    .select("id, policy_id, condition")
-    .in(
-      "policy_id",
-      own.map((p) => p.id),
-    );
-  if (rulesError) throw new ApiError(500, "QUERY_FAILED", rulesError.message);
-  const byPolicy = new Map<string, Array<{ id: string; condition: PolicyCondition }>>();
-  for (const r of (rules ?? []) as Array<{ id: string; policy_id: string; condition: PolicyCondition }>) {
-    byPolicy.set(r.policy_id, [...(byPolicy.get(r.policy_id) ?? []), { id: r.id, condition: r.condition }]);
-  }
-  return own.map((p) => ({ id: p.id, version: p.version ?? 1, name: p.name, action: p.action, rules: byPolicy.get(p.id) ?? [] }));
+  return (data ?? [])
+    .filter((p) => p.tenant_id === tenantId)
+    .map((p) => ({ id: p.id, version: p.version ?? 1, name: p.name, action: p.action, rules: p.policy_rules ?? [] }));
 }
 
 export async function evaluateRuntimeRequest(
