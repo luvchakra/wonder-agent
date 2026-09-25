@@ -802,3 +802,21 @@ Found during the light-console rebuild (codebase-map D10).
 - **Also recorded, not fixed** (codebase-map §5):
   - D3: `linkAgentIdentity()` writes no audit event.
   - D4: lifecycle state ASSESSED is unreachable.
+
+---
+
+## 2026-09-25 — New published contract: `getAgentRuntimeProfile()`
+
+This was added for the Runtime Gateway decision (ACCESS-P0-11 and
+RUNTIME-P0-15), under the user's ownership decision of 2026-09-25. It is a
+contract addition only; no existing export changed.
+
+- **Why.** A gateway call carries an agent API key, not a user session, so
+  `getAgent()` and `getAgentContract()` would see nothing under RLS.
+- **What it returns.** The agent's lifecycle, environment, criticality and
+  risk score; its active contract; and its non-removed identity ids.
+- **How it reads.** Through the service role. Every query filters by
+  `tenant_id` and every row is re-checked (§14). The tenant and agent must
+  come from a verified agent API key.
+- **Verified** through `runtimeDecisionLoader.test.ts` (tenant filters and
+  unknown-agent handling) and the full suite, 405/405.

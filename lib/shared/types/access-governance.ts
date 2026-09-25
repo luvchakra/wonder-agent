@@ -269,3 +269,65 @@ export type ContractComparisonRow = {
   path: AccessPathStep[] | null;
   agentContractId: string;
 };
+
+// ACCESS-P0-11 — the deterministic runtime decision (master P0-28–P0-32,
+// runtime authorization/decision contracts §11–§12). Access Agent owns the
+// decision; Runtime Agent's gateway (RUNTIME-P0-15) calls it and records
+// the result (user decision, 2026-09-25). Tenant and agent never come from
+// this request: the gateway takes them from the verified agent API key.
+export type RuntimeDecisionOutcome = "ALLOW" | "DENY" | "REQUIRE_APPROVAL" | "ALLOW_WITH_RESTRICTIONS";
+
+export type RuntimeRequest = {
+  /** Caller's idempotency id for this request. */
+  requestId: string;
+  correlationId?: string;
+  action: string;
+  application?: string;
+  resource?: string;
+  tool?: string;
+  dataClassification?: string;
+  /** Optional: which of the agent's linked identities is acting. Must belong to the agent. */
+  identityId?: string;
+  intent?: { requestPurpose?: string };
+  context?: { environment?: string; sessionId?: string; userId?: string; source?: string; timestamp?: string };
+};
+
+export type RuntimeDecisionStepName =
+  | "tenant"
+  | "identity"
+  | "lifecycle"
+  | "emergency"
+  | "approved_access"
+  | "effective_access"
+  | "context"
+  | "risk"
+  | "runtime_policy";
+
+export type RuntimeDecisionStep = {
+  step: RuntimeDecisionStepName;
+  /** PASS: this step raised nothing. SKIPPED: an earlier step made it meaningless. */
+  outcome: RuntimeDecisionOutcome | "PASS" | "SKIPPED";
+  code: string;
+  reason: string;
+};
+
+export type RuntimeRestrictions = {
+  readOnly?: boolean;
+  maxAmount?: number;
+  recordScope?: string[];
+  fieldScope?: string[];
+  expiresAt?: string;
+};
+
+export type RuntimeDecision = {
+  decision: RuntimeDecisionOutcome;
+  /** Machine-readable code of the step that set the decision. */
+  code: string;
+  reason: string;
+  policyId?: string;
+  policyVersion?: number;
+  restrictions?: RuntimeRestrictions;
+  riskScore?: number;
+  /** Every step in evaluation order, so each decision is explainable. */
+  steps: RuntimeDecisionStep[];
+};

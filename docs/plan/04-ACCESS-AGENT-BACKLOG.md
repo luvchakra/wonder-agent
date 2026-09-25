@@ -28,7 +28,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-05 | Policy Versioning, Priority & Change History (extends ACCESS-P0-02.1) | Done — 2026-09-14, live RLS-verified |
 | ACCESS-P0-06 | Action governance enforcement (4-state model, uses Identity's autonomy fields) | Done — 2026-09-15, unit-tested, no migration needed |
 | ACCESS-P0-07 | Broaden `policy_exceptions` into the canonical governance-exception model | Done — 2026-09-15, migration `0053`, live-applied |
-| ACCESS-P0-11 | Deterministic runtime decision function (master P0-28–P0-32) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-11 | Deterministic runtime decision function (master P0-28–P0-32) | Done — 2026-09-25: pure `decideRuntimeRequest()` + fail-closed `evaluateRuntimeRequest()` loader (service-role, tenant-checked), 34 unit tests incl. master §21 fail-safe table and the §11 FinanceBot case; wired into the gateway by RUNTIME-P0-15; see audit log |
 | ACCESS-P0-12 | Policy targets and publish (master P0-23) | Not Started — 2026-09-25, master stories |
 | ACCESS-P0-13 | Data sources inventory (master P0-11) | Not Started — 2026-09-25, master stories |
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Not Started — 2026-09-25, master stories |

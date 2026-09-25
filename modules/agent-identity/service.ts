@@ -34,3 +34,4 @@ export {
   DUPLICATE_MATCH_THRESHOLD,
 } from "./duplicates";
 export { buildDiscoveryInbox, getDiscoveryCandidate } from "./discovery";
+export { getAgentRuntimeProfile, type AgentRuntimeProfile } from "./runtimeProfile";

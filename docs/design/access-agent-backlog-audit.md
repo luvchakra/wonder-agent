@@ -750,3 +750,100 @@ re-read at the cited lines before changing anything.
   yet started, expired, and a pre-0053 row. The full vitest suite passes
   (352/352).
 - **Still open** (codebase-map D5): `checkSoD()` has no callers.
+
+---
+
+## 2026-09-25 — ACCESS-P0-11: the deterministic runtime decision
+
+This is master stories P0-28 to P0-32. The user decided on 2026-09-25 that
+Access owns the decision and Runtime owns the gateway endpoint that calls it.
+
+**`decideRuntimeRequest(facts)`** (`runtimeDecision.ts`) is a pure function
+with no I/O and no model (#9). It evaluates in the master order, and every
+step is recorded as PASS, SKIPPED or an outcome, so each decision explains
+itself:
+
+1. **Tenant**: an inactive tenant gives DENY.
+2. **Identity**: an unknown agent gives DENY, and so does an `identityId`
+   not linked to this agent.
+3. **Lifecycle**: an agent may act only in ACTIVE, CERTIFICATION_DUE or
+   RESTRICTED. A RESTRICTED agent is read-only: a read gets
+   ALLOW_WITH_RESTRICTIONS `{readOnly}`, a state change gets DENY.
+4. **Emergency controls**: kill switch or a suspended tool gives DENY.
+   Their storage comes with RUNTIME-P0-18; the loader passes "none" until
+   then.
+5. **Approved access (SHOULD)**, reusing `classifyAction()`:
+   - No active contract gives DENY.
+   - DENY for a prohibited action or data, autonomy level 0, or an
+     unapproved application, tool or data.
+   - An action the contract never names gives DENY: it is never silently
+     allowed.
+   - REQUIRE_APPROVAL for an action that requires approval, or for
+     autonomy levels 1–2.
+6. **Effective access (CAN)**: DENY if the agent holds no access to the
+   named application. It is also DENY if effective access could not be
+   established. The gateway never grants beyond IAM.
+7. **Context**: a request environment different from the agent's
+   registration gives DENY.
+8. **Risk** (master P0-31) gives REQUIRE_APPROVAL for:
+   - a critical-risk agent making any state change
+   - a high-risk agent making a state change in production
+   - a risk band above the contract's `maximumRisk`
+
+   "State change" is a deterministic verb list that handles snake_case
+   tool names such as `delete_customer`.
+9. **Runtime policies**: active `runtime` policies are evaluated through the
+   existing `evaluateCondition()` against `request.*` and `agent.*` facts.
+   - block gives DENY.
+   - restrict means read-only: a read gets ALLOW_WITH_RESTRICTIONS and a
+     write gets DENY.
+   - flag records only.
+   - A block policy that cannot be evaluated gives REQUIRE_APPROVAL, never
+     ALLOW.
+
+The final decision is the most restrictive step. `policyId` and
+`policyVersion` are reported when a policy set it.
+
+**`evaluateRuntimeRequest(principal, request, gateway)`**
+(`runtimeDecisionLoader.ts`) gathers the facts. The principal is the
+tenant and agent from a **verified agent API key**. A gateway call has no
+user session, so the reads use the service role, filter by `tenant_id`,
+and re-check every row (§14):
+
+- agent, contract and identities via Identity's new published
+  `getAgentRuntimeProfile()`
+- effective applications from `accounts` and `access_grants`
+- active runtime policies with their rules
+
+**Any load failure gives DENY `EVALUATION_FAILED`.** The failure is logged
+and never swallowed (§17.4 and §17.5). Operating mode is not decided here:
+OBSERVE_ONLY versus ENFORCE is the gateway's (RUNTIME-P0-15).
+
+**Verified**
+
+- `runtimeDecision.test.ts`, 28 cases:
+  - the allow path, with all nine steps in order
+  - case-insensitivity
+  - the master §21 fail-safe table: unknown identity, unknown resource,
+    suspended agent or tool, explicit deny, approval required, inactive
+    tenant with later steps skipped
+  - contract edge cases and autonomy levels 0–4
+  - **CLAUDE.md §11 FinanceBot**: a Snowflake CustomerDB (PII) read is
+    DENIED by the contract, even though effective access passes
+  - RESTRICTED read and write
+  - environment mismatch
+  - all three risk rules
+  - block, restrict, flag and unevaluable policies
+  - the strongest outcome winning
+- `runtimeDecisionLoader.test.ts`, 6 cases: every read is filtered to the
+  key's tenant; another tenant's grants never count; a foreign identity
+  and an unknown agent are denied; a load failure fails closed; a tenant
+  runtime policy applies.
+- Full vitest 54 files / 405 tests; lint clean.
+
+**Not in scope**
+
+- Intent (master P0-29) is enforced deterministically through the approved
+  action list. Free-text `intent.requestPurpose` is accepted but not
+  interpreted; semantic intent analysis is master P2-01.
+- New policy targets (TOOL, MCP_*, DATA_*) are ACCESS-P0-12.
