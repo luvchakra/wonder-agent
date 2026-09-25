@@ -1299,6 +1299,8 @@ roadmap decision 1: a reference model, not a second source of truth.
   - read-only can browse but cannot create (403), and REQUESTER gets 403.
 - design-review (5 new routes at 8 widths and both themes) and
   navigation-smoke: 51/51.
+- Full Playwright suite (§17.8: migrations, RLS and the shell changed):
+  **212/212 passed** (10.5 min, fresh build, with 0077–0079 live).
 - Screenshots checked: overview (light), machines (dark), detail edit
   (light), new-external and all-identities at 390 px. One fix came from
   them: the search box got a visible label so it lines up with the status
