@@ -105,8 +105,9 @@ export type SearchObjectType =
   | "identity"
   | "owner"
   | "entitlement"
-  // OPERATIONS-P0-08: a Runtime Gateway decision.
-  | "runtime_decision";
+  // OPERATIONS-P0-08: a Runtime Gateway decision, and a Risk investigation.
+  | "runtime_decision"
+  | "investigation";
 
 /**
  * OPERATIONS-P0-03.1/03.2. `riskSeverity`/`riskMasked` are present only on

@@ -206,9 +206,15 @@ MCP servers, tools and resources (IntA) are `integration_objects` families
 tables. The inventory contract is `getMcpInventory()`, and the page is
 `/integrations/mcp`.
 
-Planned tables, not yet created: `investigations` and
-`investigation_findings` (RiskA). Each needs `tenant_id`, RLS, and an
-isolation test before it is `Done` (§14).
+`investigations`, `investigation_findings` and `investigation_events`
+(RiskA) now exist: migration `0071`, RISK-P0-11.
+
+- Members read them through RLS; only the service role writes, behind
+  `risk.manage`.
+- Composite foreign keys keep an investigation to its own tenant's
+  findings.
+- The routes are `/api/v1/risk/investigations/*` (RiskA), and the pages
+  are `/risk/investigations` and `/risk/investigations/:id`.
 
 `agent-identity` (IA) and `access-governance` (AA) are deliberately separate: IA owns
 *who the agent is*; AA owns *what it can reach*. Integration (INT) owns the raw

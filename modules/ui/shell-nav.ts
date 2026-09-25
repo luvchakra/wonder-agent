@@ -88,6 +88,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     badge: "risk",
     children: [
       { label: "Risk Overview", href: "/risk" },
+      { label: "Investigations", href: "/risk/investigations" },
       { label: "Rogue Agents", href: "/risk/rogue" },
     ],
   },

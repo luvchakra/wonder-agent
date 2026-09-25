@@ -8,3 +8,15 @@ import "server-only";
 
 export { getFindings, getFinding, getFindingAsOfDetection, assignFinding, remediateFinding, resolveFinding, transitionFindingStatus } from "./findings";
 export { evaluateAgentRisk } from "./rules";
+export {
+  createInvestigation,
+  validateCreateInvestigation,
+  changeInvestigationStatus,
+  assignInvestigation,
+  addFindingToInvestigation,
+  removeFindingFromInvestigation,
+  addInvestigationNote,
+  listInvestigations,
+  getInvestigation,
+  type CreateInvestigationInput,
+} from "./investigations";

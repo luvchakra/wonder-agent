@@ -86,3 +86,50 @@ export type FindingFilter = {
   category?: RogueCategory;
   severity?: RiskSeverity;
 };
+
+/**
+ * RISK-P0-11 (master P0-37) — an investigation groups one or more findings
+ * under a human reference (INV-2026-001), with status, priority, an
+ * assignee and a timeline. It never changes a finding's own state: the
+ * findings are remediated and resolved through their own flow, and an
+ * investigation can only be marked resolved once none of them is still
+ * open.
+ */
+export type InvestigationStatus = "open" | "in_progress" | "awaiting_remediation" | "resolved" | "closed";
+export type InvestigationPriority = "critical" | "high" | "medium" | "low";
+export type InvestigationEventType = "created" | "status_changed" | "priority_changed" | "assigned" | "finding_added" | "finding_removed" | "note";
+
+export type Investigation = {
+  id: string;
+  tenantId: string;
+  reference: string;
+  title: string;
+  summary: string | null;
+  status: InvestigationStatus;
+  priority: InvestigationPriority;
+  assigneeId: string | null;
+  createdBy: string | null;
+  resolution: string | null;
+  createdAt: string;
+  updatedAt: string;
+  resolvedAt: string | null;
+};
+
+export type InvestigationSummary = Investigation & {
+  findingCount: number;
+  openFindingCount: number;
+  worstSeverity: RiskSeverity | null;
+};
+
+export type InvestigationEvent = {
+  id: string;
+  eventType: InvestigationEventType;
+  actorId: string | null;
+  detail: Record<string, unknown>;
+  createdAt: string;
+};
+
+export type InvestigationDetail = Investigation & {
+  findings: RiskFinding[];
+  events: InvestigationEvent[];
+};

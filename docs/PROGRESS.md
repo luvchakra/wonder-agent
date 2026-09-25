@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**158 of 190 tracked stories complete — 83%**
+**160 of 190 tracked stories complete — 84%**
 
 ```
-█████████████████████████████████░░░░░░░  83%
+██████████████████████████████████░░░░░░  84%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 158 |
-| Partial | 21 |
+| Done | 160 |
+| Partial | 20 |
 | Deferred | 1 |
-| Not Started | 10 |
+| Not Started | 9 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -43,11 +43,11 @@ and are deliberately excluded from the counts above.
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 0 | 14 | `█████████████████░` 93% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
-| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
+| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 1 | 0 | 1 | 15 | `████████████████░░` 87% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 0 | 14 | `███████████████░░░` 86% |
-| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 2 | 0 | 0 | 12 | `███████████████░░░` 83% |
+| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 0 | 12 | `█████████████████░` 92% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 11 | 12 | 0 | 2 | 25 | `████████░░░░░░░░░░` 44% |
 
 ---
@@ -191,7 +191,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Risk Engine & Rogue Agent Detection  
 **Backlog status:** DORMANT — do not start until the user says "Run Risk Agent"  
-**Stories:** 12 done · 1 partial · 0 deferred · 2 not started (15 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 13 done · 1 partial · 0 deferred · 1 not started (15 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -208,7 +208,7 @@ and are deliberately excluded from the counts above.
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
 | RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Partial — 2026-09-19: "Privilege level" fully wired (real data via `getEffectiveAccess()`'s `privilegeLevel`, triggers on elevated/admin); the other three have real names/weights but always contribute 0, each with its own documented missing-contract dependency, per this story's own explicit acceptance allowance — see audit log |
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
-| RISK-P0-11 | Investigations as a first-class record (master P0-37) | Not Started — 2026-09-25, master stories |
+| RISK-P0-11 | Investigations as a first-class record (master P0-37) | Done — 2026-09-25: migration 0071 (investigations, investigation_findings, investigation_events; select-only RLS; composite same-tenant FKs), audited service + API, `/risk/investigations` list/detail with timeline; cannot resolve while a finding is open |
 | RISK-P0-12 | New risk signals (master P0-20/P0-21) | Not Started — 2026-09-25, master stories |
 
 ### 07 — Compliance Agent
@@ -292,7 +292,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Audit, Reporting, Notifications & Search  
 **Backlog status:** DORMANT — do not start until the user says "Run Operations Agent"  
-**Stories:** 10 done · 2 partial · 0 deferred · 0 not started (12 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 11 done · 1 partial · 0 deferred · 0 not started (12 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -307,7 +307,7 @@ and are deliberately excluded from the counts above.
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
 | OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
-| OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Partial — 2026-09-25: enforced DENY → `runtime_alert`, enforced REQUIRE_APPROVAL → `approval_required` (mandatory, throttled per agent); search covers gateway decisions. Search over investigations waits on RISK-P0-11 |
+| OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Done — 2026-09-25: enforced DENY → `runtime_alert`, enforced REQUIRE_APPROVAL → `approval_required` (mandatory, throttled per agent); search covers gateway decisions and (with RISK-P0-11) investigations |
 
 ### 11 — QA Agent
 

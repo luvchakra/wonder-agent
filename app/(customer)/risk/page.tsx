@@ -70,9 +70,14 @@ export default async function RiskIndexPage() {
           <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Risks &amp; alerts</h1>
           <p className="mt-1 text-sm text-muted-foreground">Every open finding, most severe first.</p>
         </div>
-        <LinkButton href="/risk/rogue" variant="outline" size="sm">
-          Rogue agents
-        </LinkButton>
+        <div className="flex flex-wrap gap-2">
+          <LinkButton href="/risk/investigations" variant="outline" size="sm">
+            Investigations
+          </LinkButton>
+          <LinkButton href="/risk/rogue" variant="outline" size="sm">
+            Rogue agents
+          </LinkButton>
+        </div>
       </div>
 
       <FindingsList findings={findingRows} now={renderedAt} />

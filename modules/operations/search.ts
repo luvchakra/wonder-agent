@@ -2,7 +2,7 @@ import "server-only";
 
 import { listAgents, listOwnersForTenant, listIdentitiesForTenant } from "@/modules/agent-identity/service";
 import { listApplications, listPolicies, listEntitlementsForTenant } from "@/modules/access-governance/service";
-import { getFindings } from "@/modules/risk/service";
+import { getFindings, listInvestigations } from "@/modules/risk/service";
 import { listCampaigns } from "@/modules/certification-compliance/service";
 import { listIntegrations } from "@/modules/integrations/service";
 import { listRuntimeDecisions } from "@/modules/runtime-assurance/service";
@@ -188,6 +188,24 @@ export async function search(tenantId: string, permissions: string[], query: str
         subtitle: i.status,
         href: `/integrations/${i.id}`,
         freshness: i.lastSyncAt ?? i.createdAt,
+      });
+    }
+  }
+
+  // OPERATIONS-P0-08 / RISK-P0-11: investigations, matched in the database
+  // by reference or title through Risk's own list contract.
+  if (canViewRisk) {
+    const investigations = await listInvestigations(tenantId, { query: q, limit: 25 });
+    for (const i of investigations) {
+      results.push({
+        objectType: "investigation",
+        id: i.id,
+        title: `${i.reference}: ${i.title}`,
+        subtitle: `${i.status.replace(/_/g, " ")} · ${i.priority} priority · ${i.openFindingCount} open of ${i.findingCount} findings`,
+        href: `/risk/investigations/${i.id}`,
+        freshness: i.updatedAt,
+        riskSeverity: i.worstSeverity,
+        riskMasked: false,
       });
     }
   }

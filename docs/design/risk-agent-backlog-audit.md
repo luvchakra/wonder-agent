@@ -780,3 +780,101 @@ source; the other three are honestly stubbed pending contracts from
 other modules, which is the acceptance criterion's own explicitly
 allowed state ("contributes 0 until its data source is actually
 available"), not a shortfall against it.
+
+## 2026-09-25 — RISK-P0-11: investigations as a first-class record (master P0-37)
+
+User decision (2026-09-25): a new Risk-owned grouped record.
+
+**What changed:**
+
+- **Migration 0071** (applied live) is additive.
+  - `investigations`: an `INV-<year>-<n>` reference unique per tenant,
+    title, summary, status, priority, assignee, resolution and
+    `resolved_at`.
+  - `investigation_findings`: the link table.
+  - `investigation_events`: the timeline (created, status changed,
+    assigned, finding added or removed, note).
+  - Same model as `risk_findings`: select-only RLS for members, and
+    service-role writes behind `risk.manage`.
+  - **Composite `(id, tenant_id)` foreign keys**, with a new unique
+    constraint on `risk_findings`, mean even the service role cannot
+    group another tenant's finding.
+- **Rules** (`investigationRules.ts`, pure, #9):
+  - The allowed transitions. Resolved and closed reopen to in progress.
+  - **"Resolved" is refused while any grouped finding is still open**,
+    with a count in the message (§17.5), and it needs a resolution.
+    "Open" means *not closed*: every status outside `resolved`,
+    `false_positive`, `exception` and `mitigated` (the Agents page's closed
+    set). A first draft listed open statuses explicitly and missed
+    `acknowledged` and `investigating`, which exist in the live check
+    constraint. The rule is now written so a future status can never
+    silently allow a resolve. The open-investigation form offers every
+    non-closed finding, not only status `open`.
+  - "Closed" (no action, duplicate) needs a reason.
+  - The default priority is the worst grouped severity.
+  - Reference allocation: the next number for the year, retried on a
+    unique-constraint conflict.
+- **Service** (`investigations.ts`):
+  - Operations: create, change status, assign, add or remove a finding,
+    and add a note.
+  - Every change writes a timeline row and an audit event (#11).
+  - Service-role writes filter by tenant and re-check every referenced
+    row (findings, assignee membership), per §14.
+  - A status change is guarded against lost updates: it only applies if
+    the status is still what was read, otherwise 409 `STALE_STATUS`.
+  - An investigation never changes a finding's own state. Findings are
+    remediated and resolved through their own audited flow.
+  - Its last finding cannot be removed: close the investigation instead.
+- **API.** `/api/v1/risk/investigations` (GET list, POST create), `/:id`
+  (GET, PATCH assignee), `/:id/status` (POST) and `/:id/findings`
+  (POST, DELETE).
+- **UI:**
+  - `/risk/investigations`: metrics (active, critical priority, awaiting
+    remediation, unassigned), views, a table, and an "Open an
+    investigation" form choosing among open findings.
+  - `/risk/investigations/:id`: findings with evidence and the
+    recommended remediation (linking to each finding's page); status,
+    assignee and note forms that show the real result or error; and the
+    timeline.
+  - It is linked from the Risk page and the nav.
+- **Search.** Investigations are searchable by reference or title for
+  `risk.read` (OPERATIONS-P0-08's remainder, now Done).
+
+**Tests:**
+
+- `investigationRules.test.ts` (5) and `investigations.test.ts` (2).
+- Operations `search.test.ts`: the investigations case.
+- SQL `tests/risk/investigations-isolation.sql`, run live, **11/11**:
+  - the service role cannot group another tenant's finding (23503);
+  - a member sees only their own tenant's investigations, links and
+    timeline;
+  - a member can update or delete nothing, and cannot create an
+    investigation or forge a timeline entry (42501);
+  - all rows remain intact.
+  - Fixtures cleaned up.
+- E2E `investigations.spec.ts`, **10/10** plus setup:
+  - create with the reference and the default critical priority;
+  - searchable by reference;
+  - resolving refused with "2 findings are still open";
+  - assign and add a note, both on the timeline;
+  - resolved once the findings are resolved;
+  - read-only can read but gets 403 on change;
+  - the other tenant gets 404 on read and on change, sees nothing in
+    list or search, and gets 404 grouping Tenant One's findings.
+  - Findings are seeded directly for this spec
+    (`support/seedFindings.ts`); the rule engine producing them is
+    covered by the FinanceBot spec.
+
+**Observed, not changed.** `assignFinding()` (older, RISK-P0-03) does not
+check that the assignee is a tenant member. Investigations do check. It is
+recorded here rather than changed within this story.
+
+**Verified:**
+
+- eslint clean; vitest 496/496, then 5/5 for the rules after the
+  open-status fix.
+- Full Playwright run: **187/187** (8.6 min).
+- The open-status fix and the form change came after that build. They
+  were rebuilt and re-verified with `investigations.spec.ts` plus
+  `risk.spec.ts`: **14/14**.
+- Migration 0071 applied live; the SQL isolation test passed 11/11.

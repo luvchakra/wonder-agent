@@ -789,3 +789,8 @@ query helpers). `npm run build` (fresh `.next`) clean.
 
 **Progress Tracker:** `Partial`. Search over investigations is waiting on
 RISK-P0-11, where the record is created.
+
+**2026-09-25 follow-up:** search now also covers investigations
+(RISK-P0-11), through Risk's `listInvestigations({ query })`, matched in
+the database by reference or title and only for `risk.read`.
+OPERATIONS-P0-08 is `Done`.

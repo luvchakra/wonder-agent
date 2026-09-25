@@ -20,8 +20,10 @@ vi.mock("@/modules/access-governance/service", () => ({
 }));
 
 const mockGetFindings = vi.fn();
+const mockListInvestigations = vi.fn();
 vi.mock("@/modules/risk/service", () => ({
   getFindings: (...a: unknown[]) => mockGetFindings(...a),
+  listInvestigations: (...a: unknown[]) => mockListInvestigations(...a),
 }));
 
 const mockListCampaigns = vi.fn();
@@ -84,7 +86,33 @@ describe("search — OPERATIONS-P0-03.1/03.2", () => {
     mockListIntegrations.mockResolvedValue([]);
     mockListRuntimeDecisions.mockReset();
     mockListRuntimeDecisions.mockResolvedValue([]);
+    mockListInvestigations.mockReset();
+    mockListInvestigations.mockResolvedValue([]);
   }
+
+  it("OPERATIONS-P0-08 / RISK-P0-11: finds investigations by reference through Risk's contract, only with risk.read", async () => {
+    stubEmpty();
+    mockListInvestigations.mockResolvedValue([
+      { id: "inv-1", reference: "INV-2026-004", title: "FinanceBot reached CustomerDB", status: "in_progress", priority: "critical", openFindingCount: 1, findingCount: 2, worstSeverity: "critical", updatedAt: "2026-09-25T00:00:00Z" },
+    ]);
+    expect(await search("tenant-a", ["agent.read"], "inv-2026-004")).toEqual([]);
+    expect(mockListInvestigations).not.toHaveBeenCalled();
+
+    const results = await search("tenant-a", ["risk.read"], "INV-2026-004");
+    expect(mockListInvestigations).toHaveBeenCalledWith("tenant-a", { query: "inv-2026-004", limit: 25 });
+    expect(results).toEqual([
+      {
+        objectType: "investigation",
+        id: "inv-1",
+        title: "INV-2026-004: FinanceBot reached CustomerDB",
+        subtitle: "in progress · critical priority · 1 open of 2 findings",
+        href: "/risk/investigations/inv-1",
+        freshness: "2026-09-25T00:00:00Z",
+        riskSeverity: "critical",
+        riskMasked: false,
+      },
+    ]);
+  });
 
   it("OPERATIONS-P0-08: finds Runtime Gateway decisions through Runtime's own contract, only with runtime.read", async () => {
     stubEmpty();
