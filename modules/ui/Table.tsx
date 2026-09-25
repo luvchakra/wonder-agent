@@ -98,9 +98,35 @@ export function Thead({ children }: { children: ReactNode }) {
   );
 }
 
-export function Th({ children, className, ...rest }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+/**
+ * Column priority. A column marked `hideBelow="xl"` is dropped from the
+ * table layout between `md` and `xl` rather than making the table scroll
+ * sideways on a tablet or laptop. Below `md` the row is a stacked card with
+ * room for every field, so the cell shows again there. Literal class
+ * strings, so Tailwind can see them.
+ */
+export type HideBelow = "lg" | "xl" | "2xl";
+
+const TH_HIDE: Record<HideBelow, string> = {
+  lg: "hidden lg:table-cell",
+  xl: "hidden xl:table-cell",
+  "2xl": "hidden 2xl:table-cell",
+};
+
+const TD_HIDE: Record<HideBelow, string> = {
+  lg: "md:hidden lg:table-cell",
+  xl: "md:hidden xl:table-cell",
+  "2xl": "md:hidden 2xl:table-cell",
+};
+
+export function Th({
+  children,
+  className,
+  hideBelow,
+  ...rest
+}: React.ThHTMLAttributes<HTMLTableCellElement> & { hideBelow?: HideBelow }) {
   return (
-    <th className={cn("px-4 py-2 font-medium whitespace-nowrap", className)} {...rest}>
+    <th className={cn("px-4 py-2 font-medium whitespace-nowrap", hideBelow && TH_HIDE[hideBelow], className)} {...rest}>
       {children}
     </th>
   );
@@ -109,8 +135,9 @@ export function Th({ children, className, ...rest }: React.ThHTMLAttributes<HTML
 export function Td({
   children,
   className,
+  hideBelow,
   ...rest
-}: { children: ReactNode; className?: string } & React.TdHTMLAttributes<HTMLTableCellElement>) {
+}: { children: ReactNode; className?: string; hideBelow?: HideBelow } & React.TdHTMLAttributes<HTMLTableCellElement>) {
   const label = (rest as { "data-label"?: string })["data-label"];
   return (
     <td
@@ -123,7 +150,8 @@ export function Td({
         // used to hide. `min-w-0` lets it shrink; `max-w-full` stops it
         // outgrowing the cell.
         "[&_input]:min-w-0 [&_input]:max-w-full [&_select]:min-w-0 [&_select]:max-w-full",
-        "md:table-cell md:py-2",
+        hideBelow ? TD_HIDE[hideBelow] : "md:table-cell",
+        "md:py-2",
         className,
       )}
       {...rest}
@@ -133,7 +161,9 @@ export function Td({
           {label}
         </span>
       ) : null}
-      <span className="min-w-0 flex-1 text-right md:contents md:text-left">{children}</span>
+      {/* overflow-wrap:anywhere lets a long unbroken value (an id, a URL)
+          wrap inside a phone-width stacked card instead of widening it. */}
+      <span className="min-w-0 flex-1 text-right [overflow-wrap:anywhere] md:contents md:text-left">{children}</span>
     </td>
   );
 }

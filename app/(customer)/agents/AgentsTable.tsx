@@ -98,7 +98,7 @@ function lastSeen(iso: string | null, nowMs: number): string {
 function AgentCell({ agent }: { agent: AgentRow }) {
   const name = nameOf(agent);
   return (
-    <Link href={`/agents/${agent.id}`} className="group flex min-w-0 items-center gap-3">
+    <Link href={`/agents/${agent.id}`} className="group flex min-w-0 max-w-[18rem] items-center gap-3">
       <span
         aria-hidden="true"
         className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-semibold uppercase text-primary"
@@ -121,6 +121,12 @@ const selectClass =
  * segment tabs with counts, a search box beside lifecycle and environment
  * filters, and a column per question an administrator asks of an agent
  * (where it runs, who owns it, how risky it is, when it was last seen).
+ *
+ * Column priority (2026-09-25 responsive pass): Name, Status and Risk
+ * always show; Owner and Findings join at `xl`, and Last seen, Platform,
+ * Framework and Environment at `2xl` — so the table fits its card
+ * at every width instead of scrolling sideways. The search box still
+ * matches the hidden fields.
  *
  * `listAgents()` (Identity Agent's published contract) still has no
  * pagination/sort parameters of its own, so segment, filters, search, sort
@@ -173,9 +179,9 @@ export function AgentsTable({ agents, nowMs }: { agents: AgentRow[]; nowMs: numb
 
   const columns: DataTableColumn<AgentRow>[] = [
     { key: "agentName", header: "Name", sortable: true, render: (a) => <AgentCell agent={a} /> },
-    { key: "sourceSystem", header: "Platform", sortable: true, render: (a) => <span className="text-muted-foreground">{a.sourceSystem ?? "—"}</span> },
-    { key: "framework", header: "Framework", sortable: true, render: (a) => <span className="text-muted-foreground">{a.framework ?? "—"}</span> },
-    { key: "environment", header: "Environment", sortable: true, render: (a) => <span className="text-muted-foreground">{humanize(a.environment)}</span> },
+    { key: "sourceSystem", header: "Platform", sortable: true, hideBelow: "2xl", render: (a) => <span className="text-muted-foreground">{a.sourceSystem ?? "—"}</span> },
+    { key: "framework", header: "Framework", sortable: true, hideBelow: "2xl", render: (a) => <span className="text-muted-foreground">{a.framework ?? "—"}</span> },
+    { key: "environment", header: "Environment", sortable: true, hideBelow: "2xl", render: (a) => <span className="text-muted-foreground">{humanize(a.environment)}</span> },
     {
       key: "lifecycleState",
       header: "Status",
@@ -183,17 +189,19 @@ export function AgentsTable({ agents, nowMs }: { agents: AgentRow[]; nowMs: numb
       render: (a) => <StatusBadge tone={LIFECYCLE_TONE[a.lifecycleState] ?? "neutral"}>{humanize(a.lifecycleState)}</StatusBadge>,
     },
     { key: "riskScore", header: "Risk", sortable: true, render: (a) => <RiskCell score={a.riskScore} /> },
-    { key: "openFindings", header: "Findings", sortable: true, render: (a) => <span className="tabular-nums">{a.openFindings}</span> },
+    { key: "openFindings", header: "Findings", sortable: true, hideBelow: "xl", render: (a) => <span className="tabular-nums">{a.openFindings}</span> },
     {
       key: "owner",
       header: "Owner",
       sortable: true,
+      hideBelow: "xl",
       render: (a) => (a.owner ? <span className="whitespace-nowrap">{a.owner}</span> : <span className="text-muted-foreground">Unassigned</span>),
     },
     {
       key: "lastSeenAt",
       header: "Last seen",
       sortable: true,
+      hideBelow: "2xl",
       render: (a) => <span className="whitespace-nowrap text-muted-foreground">{lastSeen(a.lastSeenAt, nowMs)}</span>,
     },
     {

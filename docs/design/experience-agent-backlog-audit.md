@@ -2464,3 +2464,60 @@ rebuilt to mockup 2.
 - Screenshots were compared against the mockups at 1440 px light, 1440 px
   dark and 390 px: Dashboard, Agents, Agent 360 and Administration. No
   horizontal overflow at 390 px (shell spec).
+
+---
+
+## 2026-09-25 — Responsive pass (user request: "make sure ui is responsive")
+
+**Method.** A scripted sweep of 24 customer routes at seven widths (360,
+390, 768, 834, 1024, 1280, 1440). The routes include Agent 360 and every
+sub-page the automated design review had never visited. For each page it
+recorded any page-level horizontal overflow and any table region wider than
+its container. Screenshots were then taken at 360, 834, 1024 and 1440 px,
+in light and dark mode.
+
+**Found and fixed**
+
+| Problem | Where | Fix |
+|---|---|---|
+| Page scrolled 265 px sideways at 360 px | Agent 360: the primary action bar sat in a `shrink-0` wrapper, so its buttons never wrapped | The bar is full-width (and wraps) below `xl`, and sits beside the title from `xl` (`max-w-[50%]`). Agent section tabs scroll inside their own strip |
+| Agents table 1,346 px wide, scrolling sideways at every width from 768 to 1280 | `AgentsTable` | Column priority: Name, Status and Risk always; Owner and Findings from `xl`; Last seen, Platform, Framework and Environment from `2xl`. Name cell capped at 18 rem. Search still matches hidden fields |
+| Audit table 940 px wide at 768–1280 px, and one stacked card too wide at 360 px | `/audit`: full ISO timestamps and full UUIDs | Timestamp shown as `YYYY-MM-DD HH:MM:SS` (full value in `<time dateTime>`/title). Actor and object ids shortened to 8 characters, with the full id on hover, in the Actor ID filter and in the CSV export. The Object column drops out between `md` and `lg` |
+| Roles table 739 px wide at 768/1024 px | `/settings/roles` assign form | The form wraps; the select is capped at 12 rem and has an accessible name |
+| Dashboard activity table 9 px too wide at 1280 px | `/` | The Resource column is shown from `2xl` |
+| **Every Tailwind border-colour utility was ignored app-wide** | `app/globals.css`: an *unlayered* `* { border-color: var(--border) }` outranked the layered utilities | Moved into `@layer base`. Inactive tabs no longer show grey underlines; tinted cards, active tabs, badges and hover rings now get the border colours they were written with |
+
+**New primitive support.** `Th` and `Td` take `hideBelow="lg" | "xl" |
+"2xl"`, and `DataTableColumn` has `hideBelow`. A low-priority column
+leaves the table layout between `md` and that breakpoint. It still shows in
+the stacked phone card below `md`, where every field has room. Stacked cell
+values use `overflow-wrap: anywhere`, so a long unbroken id wraps inside a
+360 px card.
+
+**Guarded in CI.** `design-review.spec.ts` changes:
+
+- A 360 px "small phone" width, now eight widths.
+- Five more routes: `/agents/duplicates`, `/access/requests`,
+  `/risk/rogue`, `/integrations/jobs`, `/settings/roles`.
+- Agent 360, resolved from the list at run time.
+- A new assertion: on `/`, `/agents`, `/audit` and `/settings/roles`, no
+  table may scroll sideways at 768 px and up.
+
+**Verified**
+
+- `tsc` clean; `eslint` exit 0; `vitest` 352/352.
+- The final sweep of `/`, `/agents`, `/audit` and `/settings/roles` at
+  1024, 1280 and 1440 px found no overflow and no scrolling table. Earlier
+  in this pass, the 24-route sweep found every other route clean at all
+  seven widths.
+- **Full Playwright suite: 141/142.** Every design-review case passed: all
+  eight widths across 17 routes plus Agent 360, and the new table-fit
+  assertion. The fresh sign-up test also passed this run.
+- The one failure was the FinanceBot central scenario's final `resolved`
+  assertion. Re-run alone it passed 3 of 3 (once, then `--repeat-each=2`).
+  It fails only under the full suite's two-worker load, and it has failed
+  intermittently at this same step before (see the QA log). Nothing this
+  pass changed is on its path (CSS, table columns, audit formatting), so it
+  is **handed to QA Agent as a timing flake to harden**: wait on the
+  re-evaluation result rather than a fixed timeout. Per §17.8 this is not
+  claimed as "known flaky, ignore". It is an open item.

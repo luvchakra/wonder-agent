@@ -240,7 +240,10 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             {agent.description?.trim() || agent.purpose?.trim() || `${agent.agentType}${agent.sourceSystem ? ` · ${agent.sourceSystem}` : ""}`}
           </p>
         </div>
-        <div className="shrink-0">
+        {/* Full width below xl so the buttons wrap onto the next line on a
+            phone or tablet, instead of one unbreakable row pushing the page
+            sideways; beside the title from xl. */}
+        <div className="w-full xl:w-auto xl:max-w-[50%]">
           <AgentPrimaryActionBar agentId={id} agentName={agent.agentName} />
         </div>
       </div>

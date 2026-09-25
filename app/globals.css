@@ -206,8 +206,15 @@ body {
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-* {
-  border-color: var(--border);
+/* The default border colour lives in the base layer. Unlayered, this rule
+   outranked every Tailwind border-colour utility (utilities are layered),
+   so `border-transparent`, `border-primary`, `border-destructive/25` and
+   the rest were silently ignored app-wide — found 2026-09-25 when the
+   inventory tabs showed grey underlines on inactive tabs. */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
 }
 
 /*

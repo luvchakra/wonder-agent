@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { TableContainer, Thead, Th, Td, Tr } from "./Table";
+import { TableContainer, Thead, Th, Td, Tr, type HideBelow } from "./Table";
 import { Button } from "./Button";
 import { EmptyState, TableSkeleton } from "./States";
 
@@ -75,6 +75,8 @@ export type DataTableColumn<T> = {
   render: (row: T) => React.ReactNode;
   /** Rendered in the narrow-viewport card transform's label position; defaults to `header`. */
   cardLabel?: string;
+  /** Column priority: drop this column below the breakpoint instead of scrolling sideways. */
+  hideBelow?: HideBelow;
 };
 
 /**
@@ -168,6 +170,7 @@ export function DataTable<T>({
                   {columns.map((col) => (
                     <Th
                       key={col.key}
+                      hideBelow={col.hideBelow}
                       aria-sort={col.sortable ? (state.sortKey === col.key ? (state.sortDir === "asc" ? "ascending" : "descending") : "none") : undefined}
                     >
                       {col.sortable ? (
@@ -190,7 +193,7 @@ export function DataTable<T>({
                 {rows.map((row) => (
                   <Tr key={getRowId(row)}>
                     {columns.map((col) => (
-                      <Td key={col.key}>
+                      <Td key={col.key} hideBelow={col.hideBelow}>
                         {onRowClick ? (
                           <button
                             type="button"

@@ -282,7 +282,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                     <Th>Time</Th>
                     <Th>Agent</Th>
                     <Th>Action</Th>
-                    <Th>Resource</Th>
+                    <Th hideBelow="2xl">Resource</Th>
                     <Th>Result</Th>
                   </tr>
                 </Thead>
@@ -298,7 +298,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                           </Link>
                         </Td>
                         <Td className="font-mono text-xs">{e.action}</Td>
-                        <Td className="text-muted-foreground">{e.resource ?? e.application ?? e.tool ?? "—"}</Td>
+                        <Td hideBelow="2xl" className="text-muted-foreground">{e.resource ?? e.application ?? e.tool ?? "—"}</Td>
                         <Td>
                           <Badge tone={e.success ? "success" : "danger"}>{e.success ? "Succeeded" : "Failed"}</Badge>
                         </Td>

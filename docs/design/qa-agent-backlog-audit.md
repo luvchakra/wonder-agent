@@ -713,3 +713,9 @@ add a two-membership isolation case to the E2E suite.
 Full Playwright run, same date: 140/141 passed. The one failure is the
 known GoTrue rejection of `@example.com` in the sign-up spec, unrelated to
 this change.
+
+Later the same day, after the responsive pass, a full run went 141/142.
+The FinanceBot scenario's final `resolved` assertion failed under the
+two-worker load, then passed 3 of 3 when run alone. **Handed to QA:**
+harden that step to wait on the re-evaluation outcome instead of a fixed
+10-second visibility timeout.

@@ -27,6 +27,13 @@ const ROUTES = [
   "/reports",
   "/integrations",
   "/settings",
+  // Added in the 2026-09-25 responsive pass: sub-pages with their own
+  // tables and forms, which the top-level sweep never visited.
+  "/agents/duplicates",
+  "/access/requests",
+  "/risk/rogue",
+  "/integrations/jobs",
+  "/settings/roles",
 ];
 
 /** The widths §32 names, plus the two the shell switches layout at. */
@@ -38,6 +45,7 @@ const WIDTHS = [
   { name: "tablet", width: 834, height: 1100 },
   { name: "large phone", width: 430, height: 932 },
   { name: "phone", width: 390, height: 844 },
+  { name: "small phone", width: 360, height: 780 },
 ];
 
 /**
@@ -49,6 +57,18 @@ async function settle(page: Page, route: string) {
   await page.goto(route, { waitUntil: "domcontentloaded" });
   await page.locator("h1").first().waitFor({ state: "visible", timeout: 15_000 }).catch(() => {});
   await page.waitForTimeout(150);
+}
+
+/** Routes whose tables drop low-priority columns instead of scrolling. */
+const FIT_TABLES = ["/", "/agents", "/audit", "/settings/roles"];
+
+/** Labelled table regions whose content is wider than the region itself. */
+async function scrollingTables(page: Page): Promise<string[]> {
+  return page.evaluate(() =>
+    Array.from(document.querySelectorAll('[role="region"]'))
+      .filter((r) => r.getBoundingClientRect().width > 0 && r.scrollWidth > r.clientWidth + 1)
+      .map((r) => `${r.getAttribute("aria-label")}: ${r.scrollWidth}px in ${r.clientWidth}px`),
+  );
 }
 
 async function horizontalOverflow(page: Page): Promise<number> {
@@ -92,12 +112,18 @@ test.describe("design review — layout holds at every width", () => {
 
   for (const { name, width, height } of WIDTHS) {
     test(`no horizontal overflow at ${name} (${width}px)`, async ({ page }) => {
-      // Twelve routes in one test — this is a sweep, not a unit check.
-      test.setTimeout(180_000);
+      // Seventeen routes plus an agent's detail page in one test — this is
+      // a sweep, not a unit check.
+      test.setTimeout(300_000);
       await page.setViewportSize({ width, height });
       const problems: string[] = [];
 
-      for (const route of ROUTES) {
+      // Agent 360 has a dynamic URL, so resolve it from the list first.
+      await settle(page, "/agents");
+      const agentHref = await page.locator('a[href^="/agents/"][href*="-"]').first().getAttribute("href");
+      const routes = agentHref ? [...ROUTES, agentHref] : ROUTES;
+
+      for (const route of routes) {
         await settle(page, route);
 
         const overflow = await horizontalOverflow(page);
@@ -105,6 +131,12 @@ test.describe("design review — layout holds at every width", () => {
 
         for (const clipped of await clippedElements(page)) {
           problems.push(`${route}: ${clipped}`);
+        }
+
+        // Screens rebuilt with column priorities must fit their tables to
+        // the card at tablet-and-up widths rather than scroll sideways.
+        if (width >= 768 && FIT_TABLES.includes(route)) {
+          for (const region of await scrollingTables(page)) problems.push(`${route}: table scrolls sideways (${region})`);
         }
       }
 

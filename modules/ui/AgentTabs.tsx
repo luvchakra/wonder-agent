@@ -21,7 +21,10 @@ const TABS: { key: AgentTabKey; label: string; href: (agentId: string) => string
  */
 export function AgentTabs({ agentId, active }: { agentId: string; active: AgentTabKey }) {
   return (
-    <nav aria-label="Agent sections" className="flex gap-1 border-b border-border">
+    <nav
+      aria-label="Agent sections"
+      className="flex gap-1 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+    >
       {TABS.map((tab) => {
         const isActive = tab.key === active;
         return (
@@ -29,7 +32,7 @@ export function AgentTabs({ agentId, active }: { agentId: string; active: AgentT
             key={tab.key}
             href={tab.href(agentId)}
             aria-current={isActive ? "page" : undefined}
-            className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               isActive
                 ? "border-primary text-primary"
                 : "border-transparent text-muted-foreground hover:border-border hover:text-foreground"

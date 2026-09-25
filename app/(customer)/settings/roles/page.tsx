@@ -59,9 +59,9 @@ export default async function RolesSettingsPage() {
                       </div>
                     </Td>
                     <Td>
-                      <form action={assignRoleAction} className="flex items-center gap-2">
+                      <form action={assignRoleAction} className="flex flex-wrap items-center gap-2">
                         <input type="hidden" name="userId" value={m.userId} />
-                        <select name="role" required className="rounded border border-border bg-background px-2 py-1 text-sm text-foreground">
+                        <select name="role" required aria-label="Role to assign" className="max-w-[12rem] rounded border border-border bg-background px-2 py-1 text-sm text-foreground">
                           {roles.map((r) => (
                             <option key={r.id} value={r.name}>
                               {r.name}
