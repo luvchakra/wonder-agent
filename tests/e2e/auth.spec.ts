@@ -209,7 +209,12 @@ test.describe("unauthenticated", () => {
       .then(() => true)
       .catch(() => false);
     if (!left) {
-      await expect(page.getByText(/email rate limit exceeded/i)).toBeVisible();
+      // The provider's two throttling/validation answers, surfaced verbatim.
+      // GoTrue also validates the address's domain on this project and now
+      // rejects example.com ("Email address … is invalid") on most runs —
+      // same category as the rate limit: the provider refusing, shown to
+      // the user, not an app defect (QA audit log, 2026-09-25).
+      await expect(page.getByRole("alert").filter({ hasText: /email rate limit exceeded|email address .* is invalid/i })).toBeVisible();
     }
   });
 });

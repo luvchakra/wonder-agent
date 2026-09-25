@@ -177,7 +177,14 @@ These are the current assignments. The stories are in each module's
 - **Investigations are a new grouped record owned by Risk:** the
   `investigations` and `investigation_findings` tables (RISK-P0-11).
 
-Planned tables, not yet created: `agent_api_keys` (FA), `runtime_decisions`
+`agent_api_keys` (FA) now exists: migration `0061`, FOUNDATION-P0-17, done
+2026-09-25. It is locked down like `integration_credentials`, with RLS on
+and no client policies, and is reached only through
+`lib/security/agentApiKeys.ts`. Its HTTP wrappers are
+`/api/v1/agents/:id/api-keys[/:keyId]`: FA-owned sub-routes under IA's
+agent prefix.
+
+Planned tables, not yet created: `runtime_decisions`
 (RA), `investigations` and `investigation_findings` (RiskA), and
 `data_sources` (AA). Each needs `tenant_id`, RLS, and an isolation test
 before it is `Done` (§14).

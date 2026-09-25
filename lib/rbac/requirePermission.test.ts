@@ -7,7 +7,7 @@ vi.mock("@/lib/tenant/getTenantContext", () => ({
   getTenantContext: () => getTenantContextMock(),
 }));
 
-const { requirePermission } = await import("./requirePermission");
+const { requirePermission, requireAnyPermission } = await import("./requirePermission");
 
 describe("requirePermission", () => {
   beforeEach(() => {
@@ -55,5 +55,34 @@ describe("requirePermission", () => {
     getTenantContextMock.mockResolvedValue(ctx);
 
     await expect(requirePermission("agent.create")).resolves.toEqual(ctx);
+  });
+});
+
+describe("requireAnyPermission", () => {
+  const ctx = (permissions: string[], tenantId: string | null = "t1"): TenantContext => ({
+    userId: "u1",
+    tenantId,
+    tenantSlug: tenantId ? "acme" : null,
+    roles: [],
+    permissions,
+  });
+
+  beforeEach(() => {
+    getTenantContextMock.mockReset();
+  });
+
+  it("passes when the user holds any one of the permissions", async () => {
+    getTenantContextMock.mockResolvedValue(ctx(["runtime.emergency"]));
+    await expect(requireAnyPermission(["agent.update", "runtime.emergency"])).resolves.toMatchObject({ tenantId: "t1" });
+  });
+
+  it("throws 403 when the user holds none of them", async () => {
+    getTenantContextMock.mockResolvedValue(ctx(["agent.read"]));
+    await expect(requireAnyPermission(["agent.update", "runtime.emergency"])).rejects.toMatchObject({ status: 403, code: "FORBIDDEN" });
+  });
+
+  it("throws 401 without a tenant, whatever the permissions", async () => {
+    getTenantContextMock.mockResolvedValue(ctx(["agent.update"], null));
+    await expect(requireAnyPermission(["agent.update"])).rejects.toMatchObject({ status: 401, code: "NO_TENANT" });
   });
 });

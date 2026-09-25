@@ -719,3 +719,14 @@ The FinanceBot scenario's final `resolved` assertion failed under the
 two-worker load, then passed 3 of 3 when run alone. **Handed to QA:**
 harden that step to wait on the re-evaluation outcome instead of a fixed
 10-second visibility timeout.
+
+**Later on 2026-09-25: sign-up spec adjusted, not skipped.** GoTrue on
+this project rejects `@example.com` sign-ups ("Email address … is
+invalid") on most runs. That is provider-side domain validation, the same
+category as the "email rate limit exceeded" answer the spec already
+accepted.
+
+The spec's stated intent is unchanged: the app must complete sign-up or
+surface the provider's own message, never fail silently. It now accepts
+either message, scoped to `role="alert"`. It passes, and would still fail
+on a silent failure or an app error.

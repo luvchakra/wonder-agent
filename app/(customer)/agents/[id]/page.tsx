@@ -29,6 +29,8 @@ import type { OwnershipIssue } from "@/lib/shared/types/agent-identity";
 import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, NavIcon } from "@/modules/ui";
 import { DonutChart } from "@/modules/ui/charts.lazy";
 import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
+import { AgentApiKeysPanel } from "./AgentApiKeysPanel";
+import { listAgentApiKeys } from "@/lib/security/agentApiKeys";
 
 /**
  * Ownership issues were being rendered as raw JSON.stringify output —
@@ -156,6 +158,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
     recentEvents,
     findings,
     tenantOwners,
+    apiKeys,
   ] = await Promise.all([
       listOwners(ctx.tenantId!, id),
       getOwnershipIssues(ctx.tenantId!, id, agent.criticality),
@@ -179,6 +182,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       getFindings(ctx.tenantId!, { agentId: id }),
       // Owner names (listOwners carries only user ids).
       listOwnersForTenant(ctx.tenantId!),
+      // FOUNDATION-P0-17 — Runtime Gateway credentials (prefixes only).
+      listAgentApiKeys(ctx.tenantId!, id),
     ]);
 
   const ownerNames = new Map(
@@ -757,6 +762,13 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           </form>
         </CardBody>
       </Card>
+
+      <AgentApiKeysPanel
+        agentId={id}
+        keys={apiKeys}
+        canCreate={ctx.permissions.includes("agent.update")}
+        canRevoke={ctx.permissions.includes("agent.update") || ctx.permissions.includes("runtime.emergency")}
+      />
     </div>
   );
 }

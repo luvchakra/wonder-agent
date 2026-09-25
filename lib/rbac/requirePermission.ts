@@ -18,3 +18,20 @@ export async function requirePermission(permission: string): Promise<TenantConte
   }
   return ctx;
 }
+
+/**
+ * Like requirePermission(), but satisfied by any one of `permissions`. For
+ * an action two roles legitimately reach by different routes, e.g. revoking
+ * an agent's API key as its owner (`agent.update`) or as an incident
+ * responder (`runtime.emergency`, FOUNDATION-P0-18).
+ */
+export async function requireAnyPermission(permissions: string[]): Promise<TenantContext> {
+  const ctx = await getTenantContext();
+  if (!ctx.tenantId) {
+    throw new ApiError(401, "NO_TENANT", "No active tenant membership");
+  }
+  if (!permissions.some((p) => ctx.permissions.includes(p))) {
+    throw new ApiError(403, "FORBIDDEN", `Missing one of: ${permissions.join(", ")}`);
+  }
+  return ctx;
+}

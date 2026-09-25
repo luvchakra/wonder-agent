@@ -86,3 +86,31 @@ export type SsoConnectionInput = {
   defaultRole?: string;
   claimsMapping?: ClaimsMapping;
 };
+
+// FOUNDATION-P0-17 — agent API keys (machine credential for the Runtime
+// Gateway). The secret itself never appears in any of these types: it is
+// returned once, as a separate string, by createAgentApiKey().
+export type AgentApiKeyStatus = "active" | "revoked" | "expired";
+
+export type AgentApiKey = {
+  id: string;
+  tenantId: string;
+  agentId: string;
+  name: string;
+  /** Non-secret display prefix, e.g. "wa_ak_3F9x…". */
+  keyPrefix: string;
+  status: AgentApiKeyStatus;
+  createdBy: string | null;
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  revokedReason: string | null;
+};
+
+/** Who a verified agent API key proves the caller is. Tenant and agent come from the key, never the request. */
+export type AgentKeyPrincipal = {
+  keyId: string;
+  tenantId: string;
+  agentId: string;
+};
