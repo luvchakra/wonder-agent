@@ -14,4 +14,13 @@ export { quarantineEvent, listQuarantinedEvents } from "./quarantine";
 export { getDataQualityMetrics } from "./dataQuality";
 
 // RUNTIME-P0-15 — the Runtime Gateway.
-export { authorizeRuntimeRequest, parseGatewayRequest, getGatewayMode, listRuntimeDecisions } from "./gateway";
+export { authorizeRuntimeRequest, parseGatewayRequest, getGatewayMode, listRuntimeDecisions, filterGatewayTools } from "./gateway";
+// RUNTIME-P0-18 — emergency controls.
+export {
+  engageEmergencyControl,
+  liftEmergencyControl,
+  listEmergencyControls,
+  loadActiveEmergencyState,
+  toEmergencyState,
+  EMERGENCY_CONTROL_TYPES,
+} from "./emergency";

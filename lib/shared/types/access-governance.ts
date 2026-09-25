@@ -285,6 +285,8 @@ export type RuntimeRequest = {
   application?: string;
   resource?: string;
   tool?: string;
+  /** RUNTIME-P0-18: the MCP server a tool call goes through, when it does. */
+  mcpServer?: string;
   dataClassification?: string;
   /** Optional: which of the agent's linked identities is acting. Must belong to the agent. */
   identityId?: string;

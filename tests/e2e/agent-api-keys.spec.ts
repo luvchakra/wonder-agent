@@ -44,7 +44,7 @@ test.describe.serial("agent API keys", () => {
     await expect(page.getByText(`${secret.slice(0, 12)}…`)).toBeVisible();
     await expect(page.getByText("Active", { exact: true }).last()).toBeVisible();
 
-    await page.getByRole("button", { name: "Revoke" }).click();
+    await page.getByRole("button", { name: "Revoke", exact: true }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByRole("textbox").fill("E2E rotation");
     await dialog.getByRole("button", { name: "Revoke key" }).click();

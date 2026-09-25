@@ -7,7 +7,8 @@ import { runAfterResponse } from "@/lib/shared/afterResponse";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-governance";
 import type { GatewayDecision, GatewayDecisionRecord, GatewayMode, RuntimeEventType } from "@/lib/shared/types/runtime";
-import { evaluateRuntimeRequest, type RuntimePrincipal } from "@/modules/access-governance/service";
+import { evaluateRuntimeRequest, evaluateToolVisibility, type RuntimePrincipal, type ToolVisibility } from "@/modules/access-governance/service";
+import { loadActiveEmergencyState } from "./emergency";
 
 /**
  * RUNTIME-P0-15 — the Runtime Gateway (master stories P0-26/P0-27/P0-33).
@@ -78,6 +79,7 @@ export function parseGatewayRequest(raw: unknown): RuntimeRequest {
     application: optionalString(body, "application"),
     resource: optionalString(body, "resource"),
     tool: optionalString(body, "tool"),
+    mcpServer: optionalString(body, "mcpServer"),
     dataClassification: optionalString(body, "dataClassification"),
     identityId,
     intent: { requestPurpose: optionalString(intent, "requestPurpose") },
@@ -171,7 +173,8 @@ export async function authorizeRuntimeRequest(
     findExisting(principal, request.requestId),
     getGatewayMode(),
     // The key already proved the tenant is active (verifyAgentApiKey).
-    evaluateRuntimeRequest(principal, request, { tenantActive: true }),
+    // Emergency controls load inside the decision's own parallel wave.
+    evaluateRuntimeRequest(principal, request, { tenantActive: true, emergency: loadActiveEmergencyState(principal.tenantId) }),
   ]);
   if (existing) return toGatewayDecision(existing, true);
 
@@ -332,4 +335,41 @@ export async function listRuntimeDecisions(
     resource: row.resource,
     tool: row.tool,
   }));
+}
+
+/**
+ * RUNTIME-P0-18 / master P0-34 — which tools the agent may be shown.
+ * In OBSERVE_ONLY mode nothing is hidden: every tool comes back visible,
+ * and `wouldHide` lists what enforcement would remove and why. Filtering
+ * never replaces authorization; every call still goes through /authorize.
+ */
+export async function filterGatewayTools(
+  principal: RuntimePrincipal,
+  raw: unknown,
+): Promise<{ mode: GatewayMode; enforced: boolean; visible: string[]; wouldHide: ToolVisibility[] }> {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) throw new ApiError(400, "VALIDATION_FAILED", "body: must be a JSON object");
+  const body = raw as Record<string, unknown>;
+  if (!Array.isArray(body.tools) || body.tools.length === 0 || body.tools.length > 200) {
+    throw new ApiError(400, "VALIDATION_FAILED", "tools: must be a list of 1 to 200 tool names");
+  }
+  const tools = body.tools.map((t, i) => {
+    if (typeof t !== "string" || !t.trim() || t.length > MAX_FIELD) throw new ApiError(400, "VALIDATION_FAILED", `tools[${i}]: must be a tool name`);
+    return t.trim();
+  });
+  const mcpServer = optionalString(body, "mcpServer");
+
+  const mode = await getGatewayMode();
+  const results = await evaluateToolVisibility(principal, tools, {
+    tenantActive: true,
+    emergency: loadActiveEmergencyState(principal.tenantId),
+    mcpServer,
+  });
+  const hidden = results.filter((r) => !r.visible);
+  const enforced = mode === "ENFORCE";
+  return {
+    mode,
+    enforced,
+    visible: enforced ? results.filter((r) => r.visible).map((r) => r.tool) : tools,
+    wouldHide: hidden,
+  };
 }

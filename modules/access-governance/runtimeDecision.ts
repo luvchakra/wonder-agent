@@ -65,7 +65,14 @@ export type RuntimeDecisionFacts = {
   contract: RuntimeContractFacts | null;
   /** Application names the agent can technically reach (CAN), or null if that could not be established. */
   effectiveApplications: string[] | null;
-  emergency: { killSwitch: boolean; suspendedTools: string[] };
+  emergency: {
+    killSwitch: boolean;
+    suspendedTools: string[];
+    /** RUNTIME-P0-18 */
+    suspendedMcpServers?: string[];
+    /** RUNTIME-P0-18: agent sessions terminated by an administrator. */
+    terminatedSessions?: string[];
+  };
   runtimePolicies: RuntimePolicyFacts[];
 };
 
@@ -164,6 +171,10 @@ export function decideRuntimeRequest(facts: RuntimeDecisionFacts): RuntimeDecisi
     step({ step: "emergency", outcome: "DENY", code: "KILL_SWITCH", reason: "The emergency kill switch is engaged." });
   } else if (request.tool && inList(facts.emergency.suspendedTools, request.tool)) {
     step({ step: "emergency", outcome: "DENY", code: "TOOL_SUSPENDED", reason: `Tool ${request.tool} is suspended.` });
+  } else if (request.mcpServer && inList(facts.emergency.suspendedMcpServers ?? [], request.mcpServer)) {
+    step({ step: "emergency", outcome: "DENY", code: "MCP_SERVER_SUSPENDED", reason: `MCP server ${request.mcpServer} is suspended.` });
+  } else if (request.context?.sessionId && (facts.emergency.terminatedSessions ?? []).includes(request.context.sessionId)) {
+    step({ step: "emergency", outcome: "DENY", code: "SESSION_TERMINATED", reason: "This agent session was terminated by an administrator." });
   } else {
     pass("emergency", "NO_EMERGENCY_CONTROL", "No emergency control applies.");
   }
@@ -355,4 +366,42 @@ export function decideRuntimeRequest(facts: RuntimeDecisionFacts): RuntimeDecisi
   }
   if (decision === "ALLOW_WITH_RESTRICTIONS" && Object.keys(restrictions).length > 0) result.restrictions = restrictions;
   return result;
+}
+
+export type ToolVisibility = { tool: string; visible: boolean; code: string; reason: string };
+
+/**
+ * RUNTIME-P0-18 / master P0-34 — which of a set of tools this agent may
+ * be shown. It uses the same facts and rules as the decision itself, but
+ * per tool rather than per request: the kill switch, a suspended tool or
+ * MCP server, an agent that may not act, no contract, or a tool outside a
+ * non-empty allowed list all hide it. Filtering never replaces
+ * authorization: every call is still decided by decideRuntimeRequest().
+ */
+export function filterToolsForAgent(
+  facts: Pick<RuntimeDecisionFacts, "tenantActive" | "agent" | "contract" | "emergency">,
+  tools: string[],
+  mcpServer?: string,
+): ToolVisibility[] {
+  const blanket = (() => {
+    if (!facts.tenantActive) return { code: "TENANT_INACTIVE", reason: "The organization is not active." };
+    if (!facts.agent) return { code: "UNKNOWN_AGENT", reason: "The agent is not known in this organization." };
+    if (facts.emergency.killSwitch) return { code: "KILL_SWITCH", reason: "The emergency kill switch is engaged." };
+    if (!OPERATING_STATES.has(facts.agent.lifecycleState)) {
+      return { code: "AGENT_NOT_OPERATING", reason: `An agent in lifecycle state ${facts.agent.lifecycleState} may not act.` };
+    }
+    if (!facts.contract) return { code: "NO_ACTIVE_CONTRACT", reason: "The agent has no active contract." };
+    if (mcpServer && inList(facts.emergency.suspendedMcpServers ?? [], mcpServer)) {
+      return { code: "MCP_SERVER_SUSPENDED", reason: `MCP server ${mcpServer} is suspended.` };
+    }
+    return null;
+  })();
+
+  return tools.map((tool) => {
+    if (blanket) return { tool, visible: false, ...blanket };
+    if (inList(facts.emergency.suspendedTools, tool)) return { tool, visible: false, code: "TOOL_SUSPENDED", reason: `Tool ${tool} is suspended.` };
+    const allowed = facts.contract!.allowedTools;
+    if (allowed.length > 0 && !inList(allowed, tool)) return { tool, visible: false, code: "TOOL_NOT_APPROVED", reason: `Tool ${tool} is not approved.` };
+    return { tool, visible: true, code: "VISIBLE", reason: "Approved and not suspended." };
+  });
 }

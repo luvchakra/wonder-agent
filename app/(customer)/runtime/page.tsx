@@ -2,7 +2,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
-import { listRuntimeDecisions, listRuntimeEvents } from "@/modules/runtime-assurance/service";
+import { listEmergencyControls, listRuntimeDecisions, listRuntimeEvents } from "@/modules/runtime-assurance/service";
+import { EmergencyControlsPanel } from "./EmergencyControlsPanel";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
 import { RuntimeActivity, type ActivityRow } from "./RuntimeActivity";
@@ -37,12 +38,14 @@ export default async function RuntimeIndexPage() {
   }
 
   const tenantId = ctx.tenantId!;
-  const [agents, page, decisions] = await Promise.all([
+  const [agents, page, decisions, controls] = await Promise.all([
     listAgents(tenantId),
     // Server-side limit, per CLAUDE.md §15 — never the whole table.
     listRuntimeEvents(tenantId, { limit: WINDOW_SIZE }),
     // RUNTIME-P0-15 — the gateway's most recent authorization decisions.
     listRuntimeDecisions(tenantId, { limit: 10 }),
+    // RUNTIME-P0-18 — active emergency controls.
+    listEmergencyControls(tenantId, { activeOnly: true }),
   ]);
 
   const nameById = new Map(agents.map((a) => [a.id, a.displayName?.trim() || a.agentName]));
@@ -82,6 +85,8 @@ export default async function RuntimeIndexPage() {
           Reports &amp; export
         </LinkButton>
       </div>
+
+      <EmergencyControlsPanel controls={controls} canManage={ctx.permissions.includes("runtime.emergency")} />
 
       <Card className="min-w-0">
         <CardHeader

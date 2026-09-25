@@ -1381,3 +1381,10 @@ changed):
 - Behaviour is unchanged, and it still fails closed. The unit tests were
   updated for the embedded shape (16/16), and the live API-key and gateway
   specs pass (12/12).
+
+**Addition (RUNTIME-P0-18):** `revokeAllAgentApiKeys(tenantId, actorId,
+agentId, reason)` is emergency credential revocation. It checks the agent
+is in the tenant, revokes every active key in one tenant-filtered update,
+and writes one audit event, `agent_api_key.revoked_all`, with the count
+and key ids. It is covered by the emergency E2E spec: the next gateway
+call gets 401.

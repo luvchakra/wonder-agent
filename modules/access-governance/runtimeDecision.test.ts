@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { decideRuntimeRequest, isMutatingAction, type RuntimeDecisionFacts } from "./runtimeDecision";
+import { decideRuntimeRequest, filterToolsForAgent, isMutatingAction, type RuntimeDecisionFacts } from "./runtimeDecision";
 
 /**
  * ACCESS-P0-11 — every branch of the deterministic runtime decision,
@@ -251,5 +251,61 @@ describe("isMutatingAction", () => {
   it("recognises state-changing verbs only", () => {
     for (const a of ["UPDATE", "delete_customer", "refund order", "Export", "create_case"]) expect(isMutatingAction(a), a).toBe(true);
     for (const a of ["READ", "get_account", "search_cases", "REPORT", "list"]) expect(isMutatingAction(a), a).toBe(false);
+  });
+});
+
+describe("decideRuntimeRequest — RUNTIME-P0-18 emergency controls", () => {
+  const em = (over: Partial<RuntimeDecisionFacts["emergency"]>) => ({ killSwitch: false, suspendedTools: [], ...over });
+
+  it("a suspended MCP server denies calls through it", () => {
+    const d = decideRuntimeRequest(facts({ emergency: em({ suspendedMcpServers: ["Salesforce MCP"] }) }, { mcpServer: "salesforce mcp" }));
+    expect(d.code).toBe("MCP_SERVER_SUSPENDED");
+  });
+
+  it("a terminated session denies requests in it, and only in it", () => {
+    const f = facts({ emergency: em({ terminatedSessions: ["sess-1"] }) }, { context: { sessionId: "sess-1" } });
+    expect(decideRuntimeRequest(f).code).toBe("SESSION_TERMINATED");
+    const other = facts({ emergency: em({ terminatedSessions: ["sess-1"] }) }, { context: { sessionId: "sess-2" } });
+    expect(decideRuntimeRequest(other).decision).toBe("ALLOW");
+  });
+});
+
+describe("filterToolsForAgent — RUNTIME-P0-18 / master P0-34", () => {
+  const base = () => facts();
+  const withAllowed = (tools: string[]) => {
+    const f = base();
+    f.contract!.allowedTools = tools;
+    return f;
+  };
+
+  it("shows approved tools and hides the rest, with reasons", () => {
+    const r = filterToolsForAgent(withAllowed(["get_customer", "search_customer"]), ["get_customer", "delete_customer"]);
+    expect(r).toEqual([
+      { tool: "get_customer", visible: true, code: "VISIBLE", reason: expect.any(String) },
+      { tool: "delete_customer", visible: false, code: "TOOL_NOT_APPROVED", reason: expect.any(String) },
+    ]);
+  });
+
+  it("an empty allowed list restricts nothing; a suspended tool is still hidden", () => {
+    const f = withAllowed([]);
+    f.emergency = { killSwitch: false, suspendedTools: ["export_customer_data"] };
+    const r = filterToolsForAgent(f, ["get_customer", "export_customer_data"]);
+    expect(r.map((t) => t.visible)).toEqual([true, false]);
+    expect(r[1].code).toBe("TOOL_SUSPENDED");
+  });
+
+  it("hides everything for a kill switch, a suspended server, a non-operating agent, no contract, or an unknown agent", () => {
+    const tools = ["a", "b"];
+    const ks = base();
+    ks.emergency = { killSwitch: true, suspendedTools: [] };
+    expect(filterToolsForAgent(ks, tools).every((t) => !t.visible && t.code === "KILL_SWITCH")).toBe(true);
+
+    const srv = base();
+    srv.emergency = { killSwitch: false, suspendedTools: [], suspendedMcpServers: ["crm"] };
+    expect(filterToolsForAgent(srv, tools, "CRM").every((t) => t.code === "MCP_SERVER_SUSPENDED")).toBe(true);
+
+    expect(filterToolsForAgent({ ...base(), agent: { ...base().agent!, lifecycleState: "SUSPENDED" } }, tools)[0].code).toBe("AGENT_NOT_OPERATING");
+    expect(filterToolsForAgent({ ...base(), contract: null }, tools)[0].code).toBe("NO_ACTIVE_CONTRACT");
+    expect(filterToolsForAgent({ ...base(), agent: null }, tools)[0].code).toBe("UNKNOWN_AGENT");
   });
 });

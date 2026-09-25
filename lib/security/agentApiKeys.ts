@@ -263,3 +263,34 @@ export async function verifyAgentApiKey(presented: string | null | undefined, no
 
   return { keyId: row.id, tenantId: row.tenant_id, agentId: row.agent_id };
 }
+
+/**
+ * Emergency credential revocation (RUNTIME-P0-18, master P0-35): revokes
+ * every active key of one agent at once, in one audited action. Returns
+ * how many keys were revoked.
+ */
+export async function revokeAllAgentApiKeys(tenantId: string, actorId: string, agentId: string, reason: string): Promise<number> {
+  const why = reason.trim();
+  if (!why) throw new ApiError(400, "VALIDATION_FAILED", "A reason is required");
+  await assertAgentInTenant(tenantId, agentId);
+  const { data, error } = await supabaseServiceRole()
+    .from("agent_api_keys")
+    .update({ revoked_at: new Date().toISOString(), revoked_by: actorId, revoked_reason: why })
+    .eq("tenant_id", tenantId)
+    .eq("agent_id", agentId)
+    .is("revoked_at", null)
+    .select("id, tenant_id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  const revoked = ((data ?? []) as Array<{ id: string; tenant_id: string }>).filter((r) => r.tenant_id === tenantId);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "agent_api_key.revoked_all",
+    objectType: "agent",
+    objectId: agentId,
+    outcome: "success",
+    metadata: { count: revoked.length, keyIds: revoked.map((r) => r.id), reason: why },
+  });
+  return revoked.length;
+}

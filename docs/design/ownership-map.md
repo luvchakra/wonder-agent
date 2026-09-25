@@ -188,6 +188,11 @@ agent prefix.
 2026-09-25. It is immutable decision evidence. Members can read it
 through RLS; only the gateway writes it, through the service role.
 
+`runtime_emergency_controls` (RA) now exists: migration `0064`,
+RUNTIME-P0-18. Members can read it; only the service role writes it,
+behind `runtime.emergency`. Controls are lifted, never deleted.
+`/api/gateway/v1/tools/filter` is RA's, like `/authorize`.
+
 Planned tables, not yet created: `investigations` and `investigation_findings` (RiskA), and
 `data_sources` (AA). Each needs `tenant_id`, RLS, and an isolation test
 before it is `Done` (§14).

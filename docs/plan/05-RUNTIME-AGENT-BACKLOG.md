@@ -29,7 +29,7 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Done — 2026-09-25: `POST /api/gateway/v1/authorize` (agent-key auth, OBSERVE_ONLY, idempotent), migration `0062` `runtime_decisions` applied live, decisions panel on /runtime; 7 unit + 6 live SQL + 8 E2E security cases; p50 1,953 → 859 ms locally after cutting to 3 round trips; see audit log. The per-request runtime *event* moved to RUNTIME-P0-16, where event types exist |
 | RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Done — 2026-09-25: migration `0063` (12 event types, backfill, `session_id`/`decision_id`/`mcp_server`, `gateway` source) applied live; DID reads observed types only; gateway decisions on the timeline; truthful result labels; see audit log |
 | RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Done — 2026-09-25: SHOULD carries `allowedTools`; new `unapproved_tool` outcome from observed tools; NOW from the latest gateway decision; four-column comparison with EXPERIENCE-P0-17 wording; see audit log |
-| RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Done — 2026-09-25: migration `0064` `runtime_emergency_controls` applied live (kill switch, tool/MCP-server suspension, session termination); gateway decisions honour them; revoke-all-keys; `POST /api/gateway/v1/tools/filter` (observe-only reports `wouldHide`); controls card on /runtime; 5 decision + 3 filter + 5 service unit cases, 6/6 live SQL, 6/6 E2E; see audit log |
 
 ---
 

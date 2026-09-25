@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**152 of 190 tracked stories complete — 80%**
+**153 of 190 tracked stories complete — 81%**
 
 ```
-████████████████████████████████░░░░░░░░  80%
+████████████████████████████████░░░░░░░░  81%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 152 |
+| Done | 153 |
 | Partial | 19 |
 | Deferred | 1 |
-| Not Started | 18 |
+| Not Started | 17 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -42,7 +42,7 @@ and are deliberately excluded from the counts above.
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 4 | 15 | `█████████████░░░░░` 73% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 12 | 0 | 0 | 3 | 15 | `██████████████░░░░` 80% |
-| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 12 | 0 | 0 | 1 | 13 | `█████████████████░` 92% |
+| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
@@ -169,7 +169,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Runtime Assurance & SHOULD/CAN/DID  
 **Backlog status:** DORMANT — do not start until the user says "Run Runtime Agent"  
-**Stories:** 12 done · 0 partial · 0 deferred · 1 not started (13 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 13 done · 0 partial · 0 deferred · 0 not started (13 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -185,7 +185,7 @@ and are deliberately excluded from the counts above.
 | RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Done — 2026-09-25: `POST /api/gateway/v1/authorize` (agent-key auth, OBSERVE_ONLY, idempotent), migration `0062` `runtime_decisions` applied live, decisions panel on /runtime; 7 unit + 6 live SQL + 8 E2E security cases; p50 1,953 → 859 ms locally after cutting to 3 round trips; see audit log. The per-request runtime *event* moved to RUNTIME-P0-16, where event types exist |
 | RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Done — 2026-09-25: migration `0063` (12 event types, backfill, `session_id`/`decision_id`/`mcp_server`, `gateway` source) applied live; DID reads observed types only; gateway decisions on the timeline; truthful result labels; see audit log |
 | RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Done — 2026-09-25: SHOULD carries `allowedTools`; new `unapproved_tool` outcome from observed tools; NOW from the latest gateway decision; four-column comparison with EXPERIENCE-P0-17 wording; see audit log |
-| RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Done — 2026-09-25: migration `0064` `runtime_emergency_controls` applied live (kill switch, tool/MCP-server suspension, session termination); gateway decisions honour them; revoke-all-keys; `POST /api/gateway/v1/tools/filter` (observe-only reports `wouldHide`); controls card on /runtime; 5 decision + 3 filter + 5 service unit cases, 6/6 live SQL, 6/6 E2E; see audit log |
 
 ### 06 — Risk Agent
 

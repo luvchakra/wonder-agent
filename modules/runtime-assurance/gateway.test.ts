@@ -41,9 +41,15 @@ function query(table: string) {
 vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ from: query }), supabaseServer: async () => ({ from: query }) }));
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: async (e: Row) => void audits.push(e) }));
 const evaluate = vi.fn();
-vi.mock("@/modules/access-governance/service", () => ({ evaluateRuntimeRequest: (...a: unknown[]) => evaluate(...a) }));
+const visibility = vi.fn();
+vi.mock("@/modules/access-governance/service", () => ({
+  evaluateRuntimeRequest: (...a: unknown[]) => evaluate(...a),
+  evaluateToolVisibility: (...a: unknown[]) => visibility(...a),
+}));
+const emergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [] };
+vi.mock("./emergency", () => ({ loadActiveEmergencyState: vi.fn(async () => emergencyState) }));
 
-import { authorizeRuntimeRequest, decisionEventType, parseGatewayRequest } from "./gateway";
+import { authorizeRuntimeRequest, decisionEventType, filterGatewayTools, parseGatewayRequest } from "./gateway";
 
 const principal = { tenantId: "tenant-a", agentId: "agent-a", keyId: "key-a" };
 
@@ -96,7 +102,13 @@ describe("authorizeRuntimeRequest", () => {
     expect(d.effectiveDecision).toBe("ALLOW");
     expect(d.replayed).toBe(false);
     expect(decisions[0]).toMatchObject({ tenant_id: "tenant-a", agent_id: "agent-a", api_key_id: "key-a", decision: "DENY", enforced: false });
-    expect(evaluate).toHaveBeenCalledWith({ tenantId: "tenant-a", agentId: "agent-a", keyId: "key-a" }, expect.anything(), { tenantActive: true });
+    expect(evaluate).toHaveBeenCalledWith(
+      { tenantId: "tenant-a", agentId: "agent-a", keyId: "key-a" },
+      expect.anything(),
+      { tenantActive: true, emergency: expect.any(Promise) },
+    );
+    // The emergency controls handed to the decision are the key's tenant's.
+    await expect(evaluate.mock.calls[0][2].emergency).resolves.toEqual(emergencyState);
   });
 
   it("audits each decision once, with no secret material", async () => {
@@ -166,5 +178,28 @@ describe("decision events (RUNTIME-P0-16)", () => {
     expect(decisionEventType("ALLOW", "t")).toBe("TOOL_ALLOWED");
     expect(decisionEventType("ALLOW_WITH_RESTRICTIONS", "t")).toBe("TOOL_ALLOWED");
     expect(decisionEventType("DENY", undefined)).toBe("POLICY_DECISION");
+  });
+});
+
+describe("filterGatewayTools (RUNTIME-P0-18)", () => {
+  beforeEach(() => {
+    visibility.mockReset();
+    visibility.mockResolvedValue([
+      { tool: "get_account", visible: true, code: "VISIBLE", reason: "ok" },
+      { tool: "delete_account", visible: false, code: "TOOL_NOT_APPROVED", reason: "no" },
+    ]);
+  });
+
+  it("observe-only hides nothing, and reports what enforcement would hide", async () => {
+    const r = await filterGatewayTools(principal, { tools: ["get_account", "delete_account"] });
+    expect(r.mode).toBe("OBSERVE_ONLY");
+    expect(r.visible).toEqual(["get_account", "delete_account"]);
+    expect(r.wouldHide).toEqual([{ tool: "delete_account", visible: false, code: "TOOL_NOT_APPROVED", reason: "no" }]);
+  });
+
+  it("validates the tool list", async () => {
+    await expect(filterGatewayTools(principal, { tools: [] })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(filterGatewayTools(principal, { tools: [7] })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    await expect(filterGatewayTools(principal, { tools: Array(201).fill("t") })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
   });
 });

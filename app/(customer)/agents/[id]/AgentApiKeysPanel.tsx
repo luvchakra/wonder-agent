@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { AgentApiKey } from "@/lib/shared/types/foundation";
 import { createAgentApiKeyAction, revokeAgentApiKeyAction, type CreateAgentKeyState } from "@/app/actions/agentApiKeys";
+import { revokeAllAgentKeysAction } from "@/app/actions/runtime";
 import { Badge, Button, Card, CardBody, CardHeader, ConfirmActionDialog, EmptyState } from "@/modules/ui";
 
 /**
@@ -75,6 +76,23 @@ export function AgentApiKeysPanel({
       <CardHeader
         title="API keys"
         description="Credentials this agent presents to the Runtime Gateway. Each key is bound to this agent and this organization."
+        actions={
+          canRevoke && keys.some((k) => k.status === "active") ? (
+            <ConfirmActionDialog
+              trigger={
+                <Button variant="destructive" size="sm">
+                  Revoke all keys
+                </Button>
+              }
+              title="Revoke every key for this agent"
+              description="Emergency credential revocation: the agent is refused on its next request with any of its keys."
+              reasonRequired
+              confirmLabel="Revoke all keys"
+              onConfirm={async (reason) => ({ kind: "single", ...(await revokeAllAgentKeysAction(agentId, reason)) })}
+              onDone={(result) => result.kind === "single" && result.success && router.refresh()}
+            />
+          ) : null
+        }
       />
       <CardBody className="space-y-4">
         {state.status === "created" ? <NewKeyNotice secret={state.secret} name={state.name} /> : null}

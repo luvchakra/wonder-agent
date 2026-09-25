@@ -656,3 +656,112 @@ Master stories P0-19; codebase-map defect D7.
 **Full-suite regression** for P0-16 and P0-17 (§17.8, because ingestion
 and the comparison changed): `eslint` exit 0; `vitest` 55 files / 422;
 **full Playwright 156/156**.
+
+---
+
+## 2026-09-25 — RUNTIME-P0-18: emergency controls and tool filtering
+
+Master stories P0-34 and P0-35.
+
+**Migration `0064_runtime_emergency_controls.sql`** (applied live)
+
+- `runtime_emergency_controls` holds four kinds of control:
+  - `kill_switch`: every request in the tenant is denied
+  - `tool_suspension`: requests naming the tool are denied
+  - `mcp_server_suspension`: requests through the server are denied
+  - `session_termination`: requests in the session are denied
+- A control stays active until it is lifted. Rows are never deleted, so
+  who engaged or lifted what, when and why is kept.
+- A check makes the target null exactly when the control is the kill
+  switch.
+- A partial unique index allows only one active control per (type,
+  target), so a second engage gets 409 `ALREADY_ENGAGED`.
+- RLS: members can select; there are no client write policies.
+- Indexes: the active controls per tenant (read on every gateway request),
+  history, and both user FKs.
+
+**Engine**
+
+- `decideRuntimeRequest()`'s emergency step now also denies
+  `MCP_SERVER_SUSPENDED` (for the new optional `request.mcpServer`) and
+  `SESSION_TERMINATED` (for `context.sessionId`), besides `KILL_SWITCH` and
+  `TOOL_SUSPENDED`.
+- The gateway passes `loadActiveEmergencyState()` (service role, the key's
+  tenant) into the decision as a promise. It resolves inside the same
+  parallel wave, adding no round trip, and a failure fails closed.
+
+**Tool filtering (P0-34)**
+
+- `POST /api/gateway/v1/tools/filter`, agent-key auth, takes up to 200
+  tool names.
+- `filterToolsForAgent()` uses the same facts and rules as a decision. A
+  tool is hidden for: kill switch, suspended tool or MCP server, an agent
+  that may not act, no contract, or a tool outside a non-empty allowed
+  list.
+- **Observe-only: nothing is hidden.** `visible` is every tool, and
+  `wouldHide` lists what enforcement would remove, with reasons.
+- Filtering never replaces authorization: every call still goes through
+  `/authorize`.
+- A failed evaluation hides everything (fail closed).
+
+**Emergency actions**
+
+- Engaging or lifting a control needs `runtime.emergency` (server
+  actions), a reason (enforced by the service and the database) and the
+  UI's `ConfirmActionDialog`. Both are audited:
+  `runtime.emergency_control_engaged` and `.lifted`.
+- **Credential revocation:** `revokeAllAgentApiKeys()` (Foundation) plus a
+  "Revoke all keys" button on Agent 360, with `runtime.emergency` or
+  `agent.update`. It revokes every active key in one audited action,
+  `agent_api_key.revoked_all`.
+- Agent suspension already existed (lifecycle SUSPENDED gives DENY).
+
+**UI.** An "Emergency controls" card on `/runtime`:
+
+- An engage or release kill switch button. The card tints red while the
+  switch is engaged.
+- The active controls, each with a Lift button.
+- A form to suspend a tool or MCP server, or to terminate a session.
+- It says plainly that in observe-only mode the controls change the
+  recorded decision and block nothing (§17.5).
+- Read-only users see the card but no controls.
+
+**Verified**
+
+- **Unit:**
+  - decisions: MCP server suspended; session terminated only for that
+    session
+  - `filterToolsForAgent`: approved and not approved; an empty list;
+    suspended; every blanket reason
+  - `filterGatewayTools`: observe-only hides nothing; validation
+  - emergency service: state folding; engage validation and audit; 409 on
+    a duplicate; the gateway reads only its tenant; lift is tenant-scoped,
+    needs a reason and is audited
+- **Live SQL** `tests/runtime/emergency-controls-isolation.sql`, 6/6: a
+  member sees 1 own and 0 other controls; lift and delete touch 0 rows;
+  engage is denied (42501); controls stay intact. Cleaned up.
+- **E2E** `tests/e2e/emergency-controls.spec.ts`, 6/6:
+  - the kill switch is engaged through the UI and the decision's emergency
+    step reads KILL_SWITCH, with `effectiveDecision` still ALLOW; after
+    release it reads NO_EMERGENCY_CONTROL
+  - a tool suspension gives TOOL_SUSPENDED, and the filter lists the tool
+    in `wouldHide` but still visible; after lifting it is gone from the
+    list
+  - the filter returns 401 without a key
+  - a read-only user sees no controls
+  - revoke-all gives 401 on the next call
+- An aborted early run left the E2E tenant's kill switch engaged. It was
+  lifted in SQL with a stated reason, and the spec now releases a leftover
+  switch first. No active control remains anywhere.
+
+**Full-suite regression**
+
+- `eslint` exit 0; `vitest` 56 files / 434.
+- **Full Playwright:** 158 passed, 1 failed, 3 did not run.
+  - The failure was a strict-mode locator in `agent-api-keys.spec.ts`:
+    "Revoke" also matched the new "Revoke all keys" button. It was fixed
+    with `exact: true`.
+  - The three tests that did not run are serial dependants of that
+    failure.
+- Re-run of the API-key, emergency and gateway specs after the fix:
+  **25/25**.

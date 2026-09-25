@@ -4,7 +4,22 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { getAgentRuntimeProfile } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { PolicyCondition, RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-governance";
-import { decideRuntimeRequest, type RuntimePolicyFacts } from "./runtimeDecision";
+import { decideRuntimeRequest, filterToolsForAgent, type RuntimeContractFacts, type RuntimePolicyFacts, type ToolVisibility } from "./runtimeDecision";
+import type { AgentContract } from "@/lib/shared/types/agent-identity";
+
+function contractFacts(c: AgentContract): RuntimeContractFacts {
+  return {
+    approvedApplications: c.approvedApplications,
+    approvedData: c.approvedData,
+    prohibitedData: c.prohibitedData,
+    approvedActions: c.approvedActions,
+    prohibitedActions: c.prohibitedActions,
+    actionsRequiringApproval: c.actionsRequiringApproval,
+    allowedTools: c.allowedTools ?? [],
+    autonomyLevel: c.autonomyLevel,
+    maximumRisk: c.maximumRisk,
+  };
+}
 
 /**
  * ACCESS-P0-11 — gathers the facts for decideRuntimeRequest() and returns
@@ -21,8 +36,15 @@ import { decideRuntimeRequest, type RuntimePolicyFacts } from "./runtimeDecision
 
 export type RuntimePrincipal = { tenantId: string; agentId: string };
 
-/** Emergency controls the gateway knows about. Their storage arrives with RUNTIME-P0-18. */
-export type RuntimeEmergencyState = { killSwitch: boolean; suspendedTools: string[] };
+const NO_EMERGENCY: RuntimeEmergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [] };
+
+/** Emergency controls in force for the tenant (RUNTIME-P0-18, owned and loaded by Runtime). */
+export type RuntimeEmergencyState = {
+  killSwitch: boolean;
+  suspendedTools: string[];
+  suspendedMcpServers: string[];
+  terminatedSessions: string[];
+};
 
 async function loadEffectiveApplications(tenantId: string, agentId: string): Promise<string[]> {
   // One round trip: active grants on this agent's accounts, joined through
@@ -77,13 +99,18 @@ async function loadRuntimePolicies(tenantId: string): Promise<RuntimePolicyFacts
 export async function evaluateRuntimeRequest(
   principal: RuntimePrincipal,
   request: RuntimeRequest,
-  gateway: { tenantActive: boolean; emergency?: RuntimeEmergencyState },
+  gateway: {
+    tenantActive: boolean;
+    /** The gateway's emergency controls. A promise is awaited in the same parallel wave; if it fails, the decision fails closed. */
+    emergency?: RuntimeEmergencyState | Promise<RuntimeEmergencyState>;
+  },
 ): Promise<RuntimeDecision> {
   try {
-    const [profile, effectiveApplications, runtimePolicies] = await Promise.all([
+    const [profile, effectiveApplications, runtimePolicies, emergency] = await Promise.all([
       getAgentRuntimeProfile(principal.tenantId, principal.agentId),
       loadEffectiveApplications(principal.tenantId, principal.agentId),
       loadRuntimePolicies(principal.tenantId),
+      Promise.resolve(gateway.emergency ?? NO_EMERGENCY),
     ]);
 
     return decideRuntimeRequest({
@@ -91,21 +118,9 @@ export async function evaluateRuntimeRequest(
       tenantActive: gateway.tenantActive,
       agent: profile?.agent ?? null,
       identityBelongsToAgent: request.identityId ? Boolean(profile?.identityIds.includes(request.identityId)) : null,
-      contract: profile?.contract
-        ? {
-            approvedApplications: profile.contract.approvedApplications,
-            approvedData: profile.contract.approvedData,
-            prohibitedData: profile.contract.prohibitedData,
-            approvedActions: profile.contract.approvedActions,
-            prohibitedActions: profile.contract.prohibitedActions,
-            actionsRequiringApproval: profile.contract.actionsRequiringApproval,
-            allowedTools: profile.contract.allowedTools,
-            autonomyLevel: profile.contract.autonomyLevel,
-            maximumRisk: profile.contract.maximumRisk,
-          }
-        : null,
+      contract: profile?.contract ? contractFacts(profile.contract) : null,
       effectiveApplications,
-      emergency: gateway.emergency ?? { killSwitch: false, suspendedTools: [] },
+      emergency,
       runtimePolicies,
     });
   } catch (err) {
@@ -117,5 +132,35 @@ export async function evaluateRuntimeRequest(
       reason: "The decision could not be evaluated, so the request is denied.",
       steps: [],
     };
+  }
+}
+
+/**
+ * RUNTIME-P0-18 — tool visibility for a verified agent, from the same
+ * facts as a decision. Any load failure hides every tool (fail closed).
+ */
+export async function evaluateToolVisibility(
+  principal: RuntimePrincipal,
+  tools: string[],
+  gateway: { tenantActive: boolean; emergency: RuntimeEmergencyState | Promise<RuntimeEmergencyState>; mcpServer?: string },
+): Promise<ToolVisibility[]> {
+  try {
+    const [profile, emergency] = await Promise.all([
+      getAgentRuntimeProfile(principal.tenantId, principal.agentId),
+      Promise.resolve(gateway.emergency),
+    ]);
+    return filterToolsForAgent(
+      {
+        tenantActive: gateway.tenantActive,
+        agent: profile?.agent ?? null,
+        contract: profile?.contract ? { ...contractFacts(profile.contract) } : null,
+        emergency,
+      },
+      tools,
+      gateway.mcpServer,
+    );
+  } catch (err) {
+    console.error("evaluateToolVisibility failed; hiding all tools", { tenantId: principal.tenantId, error: err instanceof Error ? err.message : String(err) });
+    return tools.map((tool) => ({ tool, visible: false, code: "EVALUATION_FAILED", reason: "Tool visibility could not be evaluated." }));
   }
 }
