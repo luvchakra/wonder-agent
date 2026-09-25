@@ -54,6 +54,36 @@ Each module backlog's own dated "Requirements Refresh" section records the speci
 new/expanded P0/P1/P2 stories this package added; P1/P2 items must not destabilize
 the releases above (see `CLAUDE.md` §3 "Priority tiers").
 
+## 2026-09-25 — Master P0/P1/P2 stories and the light-console mockups
+
+The user supplied *WonderAgent Master P0/P1/P2 Implementation Stories*: 43 P0
+stories under DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE, with MCP
+folded in rather than a separate product. It came with light-console
+mockups.
+
+[`docs/implementation/codebase-map.md`](implementation/codebase-map.md) maps
+every P0 story onto the code: 11 Built, 21 Partial, 11 Gap.
+
+- **The gaps are mainly the whole PROTECT pillar**, the Runtime Gateway and
+  real-time authorization (P0-26 to P0-34), plus the NHI and shadow-AI
+  inventories.
+- **Five decisions are open for the user** (codebase-map §6). They are
+  architecture and security choices, so no agent should guess them:
+  1. Where the gateway runs, who owns it, and how agents authenticate.
+  2. Customer-facing wording for SHOULD/CAN/DID.
+  3. Owners of the new inventories.
+  4. Permission keys.
+  5. Whether an investigation is a first-class object.
+
+No Wave table status changes. The UI shell, Dashboard, Agent inventory and
+Agent 360 were rebuilt to the mockups, and three defects were fixed:
+
+- D1: revoked policy exceptions still suppressed violations (Access).
+- D2: the runtime identity was not tenant-checked (Runtime).
+- D10: `listAgents()` spanned every tenant the user belongs to (Identity).
+
+See each module's audit log, 2026-09-25.
+
 ## Notes
 
 - **Waves 2, 3, and 4 pairs can run in either order within the pair**

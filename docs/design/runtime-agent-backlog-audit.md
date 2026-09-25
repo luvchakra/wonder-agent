@@ -388,3 +388,34 @@ No code in this module changed. See
 `docs/design/qa-agent-backlog-audit.md` (both dated 2026-09-16) for the full
 account, including what remains blocked (raw Postgres; a complete Playwright
 E2E run, which needs credentials this environment does not have).
+
+---
+
+## 2026-09-25 — Ingestion identity check, and `countRuntimeEvents()`
+
+**Fix (codebase-map D2).**
+
+- **Bug.** `ingestRuntimeEvent()` writes through the service role. It
+  verified the agent belonged to the tenant, but stored a caller-supplied
+  `identityId` unchecked. That breaks the §14 rule that a service-role
+  write must prove every referenced row is the tenant's.
+- **Fix.** The identity must now belong to the same tenant **and** the same
+  agent, otherwise `404 IDENTITY_NOT_FOUND` and nothing is written.
+- **Verified.** New `events.identity.test.ts` (4 cases): another tenant's
+  identity is rejected with no write; another agent's identity in the same
+  tenant is rejected; the agent's own identity is accepted; no identity is
+  accepted. Module suite 28/28, full suite 352/352.
+
+**New contract.** `countRuntimeEvents(tenantId, { from?, to?, success? })`
+is exported from `service.ts`. It is a head-only exact-count query in
+[`from`, `to`) and returns no rows. It was added for the dashboard's
+"Failed actions" headline and its change against the previous period
+(Experience audit log, same date). It is additive: no existing export
+changed.
+
+**Still open.**
+
+- D6: MCP events land in `integration_objects` and never in
+  `runtime_events`.
+- D7: SHOULD tools are always empty.
+- There is no event-type enum (P0-18).

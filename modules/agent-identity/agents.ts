@@ -161,7 +161,16 @@ export async function listAgents(tenantId: string, filter?: AgentFilter): Promis
   }
 
   const supabase = await supabaseServer();
-  let query = supabase.from("agents").select().order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
+  // Explicit tenant filter, not RLS alone (CLAUDE.md §14): RLS admits every
+  // tenant the user is an active member of, so without this a member of two
+  // organizations saw both organizations' agents in whichever one was
+  // selected (found 2026-09-25, codebase-map D10).
+  let query = supabase
+    .from("agents")
+    .select()
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(DEFAULT_LIST_LIMIT);
   if (filter?.lifecycleState) {
     query = query.eq("lifecycle_state", filter.lifecycleState);
   }

@@ -103,6 +103,8 @@ export function DataTable<T>({
   filterPlaceholder = "Filter…",
   onRowClick,
   renderCard,
+  toolbar,
+  bare = false,
 }: {
   columns: DataTableColumn<T>[];
   rows: T[];
@@ -123,6 +125,10 @@ export function DataTable<T>({
    * as a debug dump rather than a designed list.
    */
   renderCard?: (row: T) => React.ReactNode;
+  /** Extra filters/actions shown beside the search box (selects, an export link). */
+  toolbar?: React.ReactNode;
+  /** The table already sits inside a card: drop its own outline. */
+  bare?: boolean;
 }) {
   const totalPages = Math.max(1, Math.ceil(totalCount / state.pageSize));
 
@@ -132,14 +138,17 @@ export function DataTable<T>({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <input
-          type="search"
-          value={state.filter}
-          onChange={(e) => state.setFilter(e.target.value)}
-          placeholder={filterPlaceholder}
-          aria-label={filterPlaceholder}
-          className="w-full max-w-xs rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-        />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={state.filter}
+            onChange={(e) => state.setFilter(e.target.value)}
+            placeholder={filterPlaceholder}
+            aria-label={filterPlaceholder}
+            className="h-9 w-full max-w-xs rounded-lg border border-border bg-card px-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+          />
+          {toolbar}
+        </div>
         <p className="text-xs text-muted-foreground">
           {totalCount === 0 ? "0 results" : `${rangeStart}-${rangeEnd} of ${totalCount}`}
         </p>
@@ -153,7 +162,7 @@ export function DataTable<T>({
         <>
           {/* Desktop/tablet: real table, md+ only. */}
           <div className="hidden md:block">
-            <TableContainer>
+            <TableContainer bare={bare}>
               <Thead>
                 <tr>
                   {columns.map((col) => (

@@ -725,3 +725,28 @@ change — reads the same `policy_exceptions` table `listGovernanceExceptions()`
 already reads, via the service-role client (consistent with every other
 cron-triggered sweep in this codebase, which has no user session to run
 as).
+
+---
+
+## 2026-09-25 — Fix: revoked or not-yet-started policy exceptions suppressed violations
+
+Found while writing `docs/implementation/codebase-map.md` (defect D1) and
+re-read at the cited lines before changing anything.
+
+- **Bug.** `evaluatePolicies()` (`modules/access-governance/evaluate.ts`)
+  decided whether an exception applied by looking only at `expires_at`. It
+  ignored the `status` and `start_date` columns migration `0053` added.
+  A **revoked** exception with a future expiry therefore kept turning a
+  violation into `exempted`, and so did an exception whose start date had
+  not arrived.
+- **Fix.** A new exported pure function, `isExceptionInForce(row, now)`,
+  requires `status = 'active'`, `start_date <= now` and an unexpired or null
+  `expires_at`. Anything else is not in force, so the violation is reported
+  (fail-safe, §17.4). Rows from before 0053 carry the backfilled defaults
+  and behave as before.
+- No schema change and no contract change.
+- **Verified.** Six new cases in `evaluate.test.ts` (11/11 in the file):
+  active, no expiry, revoked with future expiry, revoked with no dates, not
+  yet started, expired, and a pre-0053 row. The full vitest suite passes
+  (352/352).
+- **Still open** (codebase-map D5): `checkSoD()` has no callers.

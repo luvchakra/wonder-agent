@@ -137,9 +137,8 @@ export async function evaluatePolicies(tenantId: string, agentId: string): Promi
       .eq("policy_id", policy.id)
       .or(`agent_id.eq.${agentId},agent_id.is.null`);
     if (exceptionError) throw new ApiError(500, "QUERY_FAILED", exceptionError.message);
-    const hasActiveException = (exceptionRows ?? []).some(
-      (e: { expires_at: string | null }) => !e.expires_at || new Date(e.expires_at) > new Date(),
-    );
+    const now = new Date();
+    const hasActiveException = (exceptionRows ?? []).some((e: ExceptionWindow) => isExceptionInForce(e, now));
 
     const result = !violated ? "pass" : hasActiveException ? "exempted" : "violation";
 
@@ -202,4 +201,26 @@ function evaluatePolicyRules(
   }
 
   return { violated: false, evidence: {} };
+}
+
+/** The columns of a `policy_exceptions` row that decide whether it applies right now. */
+export type ExceptionWindow = {
+  status?: string | null;
+  start_date?: string | null;
+  expires_at: string | null;
+};
+
+/**
+ * Whether an exception suppresses a violation at `now`. It must be active
+ * (a revoked exception never applies, however far off its expiry), already
+ * started, and not yet expired. Rows from before migration 0053 have the
+ * backfilled defaults (status 'active', start_date = creation time), so they
+ * behave exactly as before. Fail-safe: anything else counts as not in force,
+ * so the violation is reported.
+ */
+export function isExceptionInForce(e: ExceptionWindow, now: Date): boolean {
+  if ((e.status ?? "active") !== "active") return false;
+  if (e.start_date && new Date(e.start_date) > now) return false;
+  if (e.expires_at && new Date(e.expires_at) <= now) return false;
+  return true;
 }

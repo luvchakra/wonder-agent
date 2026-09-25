@@ -48,23 +48,23 @@
   --success: oklch(0.62 0.15 148);
   --warning: oklch(0.75 0.15 75);
   --info: oklch(0.52 0.14 245);
+  --violet: oklch(0.55 0.2 292);
 
   --border: oklch(0 0 0 / 8%);
   --input: oklch(0 0 0 / 10%);
   --ring: oklch(0.546 0.215 260 / 50%);
 
-  /* The primary navigation is a deep navy surface in BOTH themes — it is
-     the product's fixed frame, not a themed content surface, so these
-     tokens are deliberately declared once here and NOT re-declared in the
-     dark blocks below. Everything inside the sidebar must be coloured
-     from these tokens (never from --foreground/--muted-foreground, which
-     invert with the theme and would go dark-on-dark in light mode). */
-  --sidebar: oklch(0.212 0.032 264);
-  --sidebar-foreground: oklch(0.965 0.004 250);
-  --sidebar-muted-foreground: oklch(0.7 0.018 258);
-  --sidebar-accent: oklch(0.312 0.055 264);
-  --sidebar-accent-foreground: oklch(0.985 0.003 250);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  /* The primary navigation rail. Light-console redesign (2026-09-25,
+     user-supplied mockups): a white rail with a hairline border in light
+     mode, re-derived for dark mode in the blocks below — it is a themed
+     surface again, so these tokens ARE re-declared there. The active
+     section is a filled --primary pill; its sub-pages use --accent. */
+  --sidebar: oklch(1 0 0);
+  --sidebar-foreground: oklch(0.26 0.02 258);
+  --sidebar-muted-foreground: oklch(0.45 0.02 256);
+  --sidebar-accent: oklch(0.962 0.008 255);
+  --sidebar-accent-foreground: oklch(0.22 0.02 258);
+  --sidebar-border: oklch(0 0 0 / 8%);
 
   --radius: 0.625rem;
   --shadow-sm: 0 1px 3px oklch(0.16 0.015 257 / 0.06);
@@ -99,11 +99,18 @@
     --success: oklch(0.72 0.15 155);
     --warning: oklch(0.76 0.14 75);
     --info: oklch(0.72 0.13 245);
+    --violet: oklch(0.72 0.15 292);
 
     --border: oklch(0.29 0.016 257);
     --input: oklch(0.5 0.025 257);
     --ring: oklch(0.72 0.17 262);
 
+    --sidebar: oklch(0.185 0.016 257);
+    --sidebar-foreground: oklch(0.93 0.005 250);
+    --sidebar-muted-foreground: oklch(0.7 0.016 250);
+    --sidebar-accent: oklch(0.25 0.018 257);
+    --sidebar-accent-foreground: oklch(0.97 0.004 250);
+    --sidebar-border: oklch(0.29 0.016 257);
 
     --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
@@ -137,11 +144,18 @@
   --success: oklch(0.72 0.15 155);
   --warning: oklch(0.76 0.14 75);
   --info: oklch(0.72 0.13 245);
+  --violet: oklch(0.72 0.15 292);
 
   --border: oklch(0.29 0.016 257);
   --input: oklch(0.5 0.025 257);
   --ring: oklch(0.72 0.17 262);
 
+  --sidebar: oklch(0.185 0.016 257);
+  --sidebar-foreground: oklch(0.93 0.005 250);
+  --sidebar-muted-foreground: oklch(0.7 0.016 250);
+  --sidebar-accent: oklch(0.25 0.018 257);
+  --sidebar-accent-foreground: oklch(0.97 0.004 250);
+  --sidebar-border: oklch(0.29 0.016 257);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
   --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
@@ -167,6 +181,7 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-info: var(--info);
+  --color-violet: var(--violet);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);

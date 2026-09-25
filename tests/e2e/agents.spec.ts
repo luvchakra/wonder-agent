@@ -95,19 +95,20 @@ test.describe("Identity module — agents", () => {
 
 /**
  * EXPERIENCE-P0-15 — the agents list and agent detail, rebuilt to the
- * supplied design: count pills above the list, and an identity header with
- * a governance-posture panel on the detail page.
+ * supplied design: segment tabs above the list (underline tabs since the
+ * 2026-09-25 light-console redesign, still a radio group), and an identity
+ * header with a governance-posture panel on the detail page.
  */
 test.describe("agents — design rebuild", () => {
   test.use({ storageState: authFile("adminOne") });
 
-  test("the count pills filter the list", async ({ page }) => {
+  test("the segment tabs filter the list", async ({ page }) => {
     await page.goto("/agents");
     const pills = page.getByRole("radiogroup", { name: "Filter agents" });
     await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "true");
 
-    await pills.getByRole("radio", { name: /^Approved/ }).click();
-    await expect(pills.getByRole("radio", { name: /^Approved/ })).toHaveAttribute("aria-checked", "true");
+    await pills.getByRole("radio", { name: /^Unowned/ }).click();
+    await expect(pills.getByRole("radio", { name: /^Unowned/ })).toHaveAttribute("aria-checked", "true");
     await expect(pills.getByRole("radio", { name: /^All/ })).toHaveAttribute("aria-checked", "false");
   });
 

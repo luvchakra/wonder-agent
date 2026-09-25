@@ -51,7 +51,16 @@ function labelBody(body: ReactElement<{ children?: ReactNode; className?: string
   return cloneElement(body, { className: cn("block md:table-row-group", body.props.className) }, rows);
 }
 
-export function TableContainer({ children, label = "Table" }: { children: ReactNode; label?: string }) {
+export function TableContainer({
+  children,
+  label = "Table",
+  bare = false,
+}: {
+  children: ReactNode;
+  label?: string;
+  /** Drop the outline, for a table that already sits inside a card. */
+  bare?: boolean;
+}) {
   const items = Children.toArray(children);
   const head = items.find((item) => isValidElement(item) && item.type === Thead);
   const labels = head ? columnLabels(head) : [];
@@ -71,7 +80,10 @@ export function TableContainer({ children, label = "Table" }: { children: ReactN
       role="region"
       aria-label={label}
       tabIndex={0}
-      className="overflow-x-auto rounded-2xl border border-border focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+      className={cn(
+        "overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+        bare ? "rounded-md" : "rounded-2xl border border-border",
+      )}
     >
       <table className="block w-full min-w-full text-left text-sm md:table">{content}</table>
     </div>
@@ -80,7 +92,7 @@ export function TableContainer({ children, label = "Table" }: { children: ReactN
 
 export function Thead({ children }: { children: ReactNode }) {
   return (
-    <thead className="hidden border-b border-border bg-muted text-xs uppercase tracking-wide text-muted-foreground md:table-header-group">
+    <thead className="hidden border-b border-border bg-muted/60 text-xs text-muted-foreground md:table-header-group">
       {children}
     </thead>
   );

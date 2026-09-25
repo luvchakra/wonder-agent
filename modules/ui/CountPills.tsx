@@ -32,14 +32,49 @@ export function CountPills({
   value,
   onChange,
   ariaLabel,
+  variant = "pills",
   className,
 }: {
   pills: CountPill[];
   value: string;
   onChange: (value: string) => void;
   ariaLabel: string;
+  /** "tabs": the light-console underline strip ("All Agents (184) · At risk (12)"). Same radio semantics. */
+  variant?: "pills" | "tabs";
   className?: string;
 }) {
+  if (variant === "tabs") {
+    return (
+      <div
+        role="radiogroup"
+        aria-label={ariaLabel}
+        // The baseline is an inset shadow, not a border: the strip scrolls, so
+        // a child's -1px overlap onto a border would be clipped.
+        className={cn("flex gap-5 overflow-x-auto shadow-[inset_0_-1px_0_var(--color-border)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden", className)}
+      >
+        {pills.map((pill) => {
+          const selected = pill.value === value;
+          return (
+            <button
+              key={pill.value}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              onClick={() => onChange(pill.value)}
+              className={cn(
+                "flex shrink-0 items-center gap-1 border-b-2 px-0.5 pb-2.5 pt-1 text-[13px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring",
+                selected ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {pill.label}
+              <span className="tabular-nums">({pill.count})</span>
+            </button>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div
       role="radiogroup"

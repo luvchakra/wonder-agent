@@ -3,14 +3,15 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronsUpDown, LifeBuoy, LogOut, Shield, SunMoon, User } from "lucide-react";
+import { ChevronDown, LifeBuoy, LogOut, Shield, SunMoon, User } from "lucide-react";
 import { ThemeToggle } from "./theme";
 import { Avatar } from "./Avatar";
 
 export type TenantOption = { id: string; name: string; slug: string; current: boolean };
 
 /**
- * Account menu pinned to the bottom of the nav drawer — ported
+ * Account menu in the page header, top right (moved from the foot of the
+ * nav rail on 2026-09-25 to match the light-console mockups) — ported
  * structurally from WonderArk's SidebarAccountMenu (packages/core/src/
  * components/shell/sidebar-account-menu.tsx, luvchakra/founder-collab):
  * a compact avatar+name(+chevron) trigger row (no email until expanded),
@@ -44,28 +45,28 @@ export function AccountPanel({
   const [, startTransition] = useTransition();
 
   return (
-    <div className="border-t border-sidebar-border">
-      <DropdownMenu.Root>
+    <DropdownMenu.Root>
         <DropdownMenu.Trigger asChild>
           <button
             type="button"
-            className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sidebar-foreground hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            aria-label={`Account menu for ${name}`}
+            className="flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-foreground transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           >
             <Avatar name={displayName} email={email} size="sm" />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">{name}</span>
+            <span className="hidden min-w-0 max-w-[12rem] md:block">
+              <span className="block truncate text-[13px] font-semibold leading-tight">{name}</span>
               {subtitle ? (
-                <span className="block truncate text-xs text-sidebar-muted-foreground">{subtitle}</span>
+                <span className="block truncate text-[11px] leading-tight text-muted-foreground">{subtitle}</span>
               ) : null}
             </span>
-            <ChevronsUpDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />
+            <ChevronDown className="hidden size-4 shrink-0 text-muted-foreground md:block" aria-hidden="true" />
           </button>
         </DropdownMenu.Trigger>
 
         <DropdownMenu.Portal>
           <DropdownMenu.Content
-            side="top"
-            align="start"
+            side="bottom"
+            align="end"
             sideOffset={4}
             className="z-[60] w-64 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
           >
@@ -120,6 +121,5 @@ export function AccountPanel({
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
-    </div>
   );
 }

@@ -2,20 +2,32 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
 
-export type KpiTone = "neutral" | "primary" | "success" | "warning" | "danger";
+export type KpiTone = "neutral" | "primary" | "success" | "warning" | "danger" | "violet";
 
 const TILE: Record<KpiTone, string> = {
   neutral: "bg-muted text-muted-foreground",
   primary: "bg-primary/10 text-primary",
-  success: "bg-success/10 text-success",
-  warning: "bg-warning/10 text-warning",
+  success: "bg-success/12 text-success",
+  warning: "bg-warning/15 text-warning",
   danger: "bg-destructive/10 text-destructive",
+  violet: "bg-violet/12 text-violet",
+};
+
+/** The tinted card surface used when a metric is flagged for attention. */
+const EMPHASIS: Record<KpiTone, string> = {
+  neutral: "",
+  primary: "border-primary/20 bg-primary/[0.04]",
+  success: "border-success/25 bg-success/[0.05]",
+  warning: "border-warning/30 bg-warning/[0.07]",
+  danger: "border-destructive/25 bg-destructive/[0.05]",
+  violet: "border-violet/25 bg-violet/[0.05]",
 };
 
 /**
- * The dashboard's headline metric card: a tinted icon tile, the number,
- * what it counts, and an optional secondary figure (a share of the total,
- * or a period-over-period change).
+ * A headline metric card, laid out as in the 2026-09-25 light-console
+ * mockups: a tinted icon tile on the left; beside it the label, the number
+ * with its change, and one line of context. `emphasis` tints the whole card
+ * for metrics that need attention (high risk, unregistered, blocked).
  *
  * `delta` is rendered as text with an explicit sign, not as a bare
  * coloured arrow — colour is never the only carrier of meaning
@@ -26,6 +38,8 @@ export function KpiCard({
   label,
   value,
   tone = "neutral",
+  emphasis = false,
+  size = "md",
   delta,
   footnote,
   href,
@@ -34,35 +48,56 @@ export function KpiCard({
   label: string;
   value: string | number;
   tone?: KpiTone;
+  emphasis?: boolean;
+  /** "sm": the inventory screens' compact strip — smaller tile and number. */
+  size?: "sm" | "md";
   delta?: { direction: "up" | "down"; text: string; good?: boolean } | null;
   footnote?: string | null;
   href?: string;
 }) {
   const body = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", TILE[tone])}>
-          <NavIcon name={icon} className="size-5" />
-        </span>
-        {delta ? (
+    <div className="flex items-start gap-3">
+      <span
+        className={cn(
+          "flex shrink-0 items-center justify-center rounded-xl",
+          size === "sm" ? "size-9" : "size-11",
+          TILE[tone],
+        )}
+      >
+        <NavIcon name={icon} className={size === "sm" ? "size-[18px]" : "size-[22px]"} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-xs font-medium text-muted-foreground">{label}</p>
+        <div className="mt-1 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           <span
             className={cn(
-              "shrink-0 text-xs font-medium tabular-nums",
-              delta.good === false ? "text-destructive" : delta.good ? "text-success" : "text-muted-foreground",
+              "font-semibold leading-none tracking-[-0.02em] tabular-nums text-card-foreground",
+              size === "sm" ? "text-xl" : "text-[26px]",
             )}
           >
-            {delta.direction === "up" ? "▲" : "▼"} {delta.text}
+            {value}
           </span>
-        ) : null}
+          {delta ? (
+            <span
+              className={cn(
+                "text-xs font-medium tabular-nums",
+                delta.good === false ? "text-destructive" : delta.good ? "text-success" : "text-muted-foreground",
+              )}
+            >
+              {delta.direction === "up" ? "↑" : "↓"} {delta.text}
+            </span>
+          ) : null}
+        </div>
+        {footnote ? <p className="mt-1.5 truncate text-xs text-muted-foreground">{footnote}</p> : null}
       </div>
-      <p className="mt-3 text-[28px] font-semibold leading-none tabular-nums text-card-foreground">{value}</p>
-      <p className="mt-1.5 text-sm text-muted-foreground">{label}</p>
-      {footnote ? <p className="mt-0.5 text-xs text-muted-foreground/80">{footnote}</p> : null}
-    </>
+    </div>
   );
 
-  const className =
-    "block rounded-xl border border-border/60 bg-card p-4 text-card-foreground shadow-md transition-colors";
+  const className = cn(
+    "block min-w-0 rounded-xl border border-border/70 bg-card text-card-foreground shadow-sm transition-colors",
+    size === "sm" ? "p-3" : "p-4",
+    emphasis && EMPHASIS[tone],
+  );
 
   if (href) {
     return (

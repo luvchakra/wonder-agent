@@ -130,7 +130,7 @@ test.describe("design review — structure and theming", () => {
     await expect(tabs).toBeVisible();
   });
 
-  test("the rail stays a dark surface in light mode as well as dark", async ({ page }) => {
+  test("the rail follows the theme: a light console surface in light mode, dark in dark", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
 
@@ -160,12 +160,14 @@ test.describe("design review — structure and theming", () => {
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
     const light = await readSurfaces();
     expect(light.body, "light mode page background should be light").toBeGreaterThan(0.7);
-    expect(light.rail, "the navigation rail must stay dark in light mode").toBeLessThan(0.35);
+    // 2026-09-25 light-console redesign: the rail is a white surface in
+    // light mode (it was a fixed navy before), and themed in dark mode.
+    expect(light.rail, "the navigation rail should be a light surface in light mode").toBeGreaterThan(0.85);
 
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     const dark = await readSurfaces();
     expect(dark.body, "dark mode page background should be dark").toBeLessThan(0.3);
-    expect(dark.rail, "the navigation rail must stay dark in dark mode too").toBeLessThan(0.35);
+    expect(dark.rail, "the navigation rail should be dark in dark mode").toBeLessThan(0.3);
   });
 
   test("every screen has exactly one top-level heading", async ({ page }) => {

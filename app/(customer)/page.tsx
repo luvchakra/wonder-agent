@@ -1,368 +1,359 @@
 import Link from "next/link";
-import { Suspense } from "react";
-import { ArrowRight, ClipboardCheck, Plus, Search, Siren } from "lucide-react";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
-import { getProfile } from "@/lib/tenant/session";
 import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
-import { listRuntimeEvents } from "@/modules/runtime-assurance/service";
-import type { Agent } from "@/lib/shared/types/agent-identity";
-import { Card, CardHeader, CardBody, KpiCard, SeverityBadge, Badge, EmptyState, Tabs, TabPanel } from "@/modules/ui";
-import { TrendChart } from "@/modules/ui/charts.lazy";
-import { Greeting } from "./Greeting";
+import { countRuntimeEvents, listRuntimeEvents } from "@/modules/runtime-assurance/service";
+import type { Agent, AgentLifecycleState } from "@/lib/shared/types/agent-identity";
 import {
-  KpiSkeleton,
-  OverdueCertificationsCard,
-  PanelSkeleton,
-  PendingCertifications,
-  PosturePanels,
-  UnownedKpi,
-} from "./dashboard-panels";
+  Badge,
+  Card,
+  CardBody,
+  CardHeader,
+  EmptyState,
+  KpiCard,
+  PeriodSelect,
+  TableContainer,
+  Td,
+  Th,
+  Thead,
+  Tr,
+} from "@/modules/ui";
+import { DonutChart, TrendChart } from "@/modules/ui/charts.lazy";
 
-// EXPERIENCE-P0-02 / P0-16. Every number on this page is a real query
+// EXPERIENCE-P0-02 / P0-16, rebuilt 2026-09-25 to the light-console
+// "AI Agent Security Overview" mockup. Every number is a real query
 // against the owning module's published contract — never a hardcoded
-// figure, and never an LLM's guess (CLAUDE.md non-negotiable #9).
+// figure, never an LLM's guess (non-negotiable #9), and never a metric the
+// product cannot actually measure yet (the mockup's "Shadow AI" and
+// "Blocked actions" became "Unregistered" and "Failed actions": nothing is
+// blocked at runtime until the Runtime Gateway exists — see
+// docs/implementation/codebase-map.md §6.1, and CLAUDE.md §17.5).
 //
-// Two tiers of data. The first wave — agents, open findings, recent
-// events, the greeting's profile — is four parallel queries and drives the
-// header, the KPI row, the risk trend and the activity list; the page
-// paints as soon as it lands. Everything that then fans out per agent or
-// per campaign (governance posture, ownership issues, certification
-// items) lives in ./dashboard-panels.tsx behind Suspense boundaries and
-// streams in behind a skeleton, so a slow read-model never delays the
-// numbers an administrator came for.
+// One parallel wave of five cheap queries, no per-agent fan-out, so the
+// page renders in one round trip after the layout's.
 
-const TREND_DAYS = 14;
+const RANGES = [
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+];
+const DEFAULT_RANGE = 30;
+const DAY_MS = 86_400_000;
 
-const APPROVED_STATES = new Set(["APPROVED", "PROVISIONED", "ACTIVE", "CERTIFICATION_DUE"]);
-const PENDING_STATES = new Set(["DISCOVERED", "REGISTERED", "ASSESSED"]);
+/** Findings that still need someone: everything short of a closing status. */
+const CLOSED_FINDING_STATUSES = new Set(["resolved", "false_positive", "exception", "mitigated"]);
+const APPROVED_STATES = new Set<AgentLifecycleState>(["APPROVED", "PROVISIONED", "ACTIVE", "CERTIFICATION_DUE"]);
+
+/** The mockup's lifecycle ring, over the ten real lifecycle states. */
+const LIFECYCLE_SLICES: Array<{ label: string; states: AgentLifecycleState[]; color: string }> = [
+  { label: "Active", states: ["ACTIVE", "CERTIFICATION_DUE"], color: "var(--color-success)" },
+  { label: "Onboarding", states: ["REGISTERED", "ASSESSED", "APPROVED", "PROVISIONED"], color: "var(--color-warning)" },
+  { label: "Restricted", states: ["RESTRICTED"], color: "var(--color-destructive)" },
+  { label: "Suspended", states: ["SUSPENDED"], color: "var(--color-violet)" },
+  { label: "Retired", states: ["RETIRED"], color: "var(--color-muted-foreground)" },
+  { label: "Discovered", states: ["DISCOVERED"], color: "var(--color-info)" },
+];
+
+const SEVERITY_SERIES = [
+  { key: "critical", label: "Critical", color: "var(--color-destructive)" },
+  { key: "high", label: "High", color: "var(--color-warning)" },
+  { key: "medium", label: "Medium", color: "var(--color-violet)" },
+  { key: "low", label: "Low", color: "var(--color-info)" },
+];
 
 function agentLabel(agent: Agent): string {
   return agent.displayName?.trim() || agent.agentName;
 }
 
-function dayKey(iso: string): string {
-  return iso.slice(0, 10);
+function pct(n: number, of: number): string {
+  return of === 0 ? "0%" : `${Math.round((n / of) * 100)}%`;
 }
 
-/** Last N days, oldest first, as {key, label} for the trend chart's x axis. */
-function lastDays(today: Date, n: number): Array<{ key: string; label: string }> {
+/** "5 min ago" — rendered on the server at request time. */
+function relativeTime(iso: string, now: number): string {
+  const mins = Math.max(0, Math.round((now - Date.parse(iso)) / 60_000));
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
+/** Risk-score band, matching the Risk Agent's severity bands (modules/risk/scoring.ts). */
+function scoreTone(score: number): "danger" | "warning" | "info" | "neutral" {
+  if (score >= 75) return "danger";
+  if (score >= 50) return "warning";
+  if (score >= 25) return "info";
+  return "neutral";
+}
+
+/** Day buckets from `from` to today (UTC), for the trend's x axis. */
+function dayBuckets(fromMs: number, nowMs: number): Array<{ key: string; label: string }> {
   const out: Array<{ key: string; label: string }> = [];
-  for (let i = n - 1; i >= 0; i -= 1) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
+  for (let t = fromMs; t <= nowMs; t += DAY_MS) {
+    const d = new Date(t);
     out.push({
       key: d.toISOString().slice(0, 10),
-      label: d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" }),
+      label: d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }),
     });
   }
   return out;
 }
 
-export default async function OverviewPage() {
+export default async function OverviewPage({ searchParams }: { searchParams: Promise<{ range?: string }> }) {
+  const { range: rangeParam } = await searchParams;
+  const rangeDays = RANGES.some((r) => r.value === rangeParam) ? Number(rangeParam) : DEFAULT_RANGE;
+
   const ctx = await getTenantContext();
   const tenantId = ctx.tenantId!;
 
-  const [agents, openFindings, runtimePage, profile] = await Promise.all([
+  const nowMs = new Date().getTime();
+  const from = new Date(nowMs - rangeDays * DAY_MS).toISOString();
+  const previousFrom = new Date(nowMs - 2 * rangeDays * DAY_MS).toISOString();
+
+  const [agents, findings, recent, failed, failedBefore] = await Promise.all([
     listAgents(tenantId),
-    getFindings(tenantId, { status: "open" }),
-    listRuntimeEvents(tenantId, { limit: 100 }),
-    getProfile(),
+    getFindings(tenantId),
+    listRuntimeEvents(tenantId, { limit: 6 }),
+    countRuntimeEvents(tenantId, { from, success: false }),
+    countRuntimeEvents(tenantId, { from: previousFrom, to: from, success: false }),
   ]);
 
-  const now = new Date();
-  const nowIso = now.toISOString();
-
-  // --- KPI row ------------------------------------------------------------
-  const weekAgo = new Date(now.getTime() - 7 * 86_400_000).toISOString();
-  const newThisWeek = agents.filter((a) => a.createdAt >= weekAgo).length;
-  const approved = agents.filter((a) => APPROVED_STATES.has(a.lifecycleState)).length;
-  const pendingApproval = agents.filter((a) => PENDING_STATES.has(a.lifecycleState)).length;
-  const atRiskAgentIds = new Set(
-    openFindings.filter((f) => f.severity === "critical" || f.severity === "high").map((f) => f.agentId),
-  );
-  const share = (n: number) => (agents.length === 0 ? "—" : `${Math.round((n / agents.length) * 100)}% of all agents`);
-
-  // --- Risk trend ---------------------------------------------------------
-  const days = lastDays(now, TREND_DAYS);
-  const trendData = days.map(({ key, label }) => {
-    const findingsThatDay = openFindings.filter((f) => dayKey(f.createdAt) === key);
-    return {
-      label,
-      findings: findingsThatDay.length,
-      severe: findingsThatDay.filter((f) => f.severity === "critical" || f.severity === "high").length,
-      agents: agents.filter((a) => dayKey(a.createdAt) === key).length,
-    };
-  });
-
-  // --- Activity panels ----------------------------------------------------
+  const unresolved = findings.filter((f) => !CLOSED_FINDING_STATUSES.has(f.status));
   const agentById = new Map(agents.map((a) => [a.id, a]));
-  const events = runtimePage.events;
-  const activityByAgent = [...agentById.values()]
-    .map((a) => ({ agent: a, count: events.filter((e) => e.agentId === a.id).length }))
-    .filter((row) => row.count > 0)
-    .sort((a, b) => b.count - a.count)
+
+  // --- Headline metrics ---------------------------------------------------
+  const newInRange = agents.filter((a) => a.createdAt >= from).length;
+  const priorTotal = agents.length - newInRange;
+  const approved = agents.filter((a) => APPROVED_STATES.has(a.lifecycleState)).length;
+  const highRiskIds = new Set(
+    unresolved.filter((f) => f.severity === "critical" || f.severity === "high").map((f) => f.agentId),
+  );
+  const unregistered = agents.filter((a) => a.lifecycleState === "DISCOVERED").length;
+  const failedChange = failedBefore === 0 ? null : Math.round(((failed - failedBefore) / failedBefore) * 100);
+
+  // --- Lifecycle ring -----------------------------------------------------
+  const lifecycleSlices = LIFECYCLE_SLICES.map((s) => ({
+    label: s.label,
+    value: agents.filter((a) => s.states.includes(a.lifecycleState)).length,
+    color: s.color,
+  }));
+
+  // --- Risk trend: findings detected per day, by severity -----------------
+  const buckets = dayBuckets(Date.parse(from), nowMs);
+  const byDay = new Map<string, Record<string, number>>();
+  for (const f of findings) {
+    if (f.createdAt < from) continue;
+    const key = f.createdAt.slice(0, 10);
+    const row = byDay.get(key) ?? {};
+    row[f.severity] = (row[f.severity] ?? 0) + 1;
+    byDay.set(key, row);
+  }
+  const trendData = buckets.map(({ key, label }) => ({
+    label,
+    critical: byDay.get(key)?.critical ?? 0,
+    high: byDay.get(key)?.high ?? 0,
+    medium: byDay.get(key)?.medium ?? 0,
+    low: byDay.get(key)?.low ?? 0,
+  }));
+
+  // --- Top risky agents ---------------------------------------------------
+  const openByAgent = new Map<string, number>();
+  for (const f of unresolved) openByAgent.set(f.agentId, (openByAgent.get(f.agentId) ?? 0) + 1);
+  const topRisky = agents
+    .filter((a) => (a.riskScore ?? 0) > 0)
+    .sort((a, b) => (b.riskScore ?? 0) - (a.riskScore ?? 0))
     .slice(0, 5);
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <Greeting name={profile?.displayName?.trim() || "there"} />
-          <p className="mt-1 text-sm text-muted-foreground">
-            Here&rsquo;s what&rsquo;s happening with your AI agents today.
-          </p>
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">AI Agent Security Overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Discover. Understand. Govern. Protect. Assure.</p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {agents.length} agent{agents.length === 1 ? "" : "s"} in {ctx.tenantSlug}
-        </p>
+        <PeriodSelect options={RANGES} value={String(rangeDays)} label="Reporting period" />
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="min-w-0 space-y-5">
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
-            <KpiCard
-              icon="Bot"
-              tone="primary"
-              label="Total agents"
-              value={agents.length}
-              delta={newThisWeek > 0 ? { direction: "up", text: `+${newThisWeek} this week` } : null}
-              href="/agents"
-            />
-            <KpiCard
-              icon="ShieldCheck"
-              tone="success"
-              label="Approved"
-              value={approved}
-              footnote={share(approved)}
-              href="/agents"
-            />
-            <KpiCard
-              icon="Clock"
-              tone="warning"
-              label="Pending approval"
-              value={pendingApproval}
-              footnote={share(pendingApproval)}
-              href="/agents"
-            />
-            <Suspense fallback={<KpiSkeleton />}>
-              <UnownedKpi tenantId={tenantId} agents={agents} />
-            </Suspense>
-            <KpiCard
-              icon="ShieldAlert"
-              tone="danger"
-              label="At risk"
-              value={atRiskAgentIds.size}
-              footnote={`${openFindings.length} open finding${openFindings.length === 1 ? "" : "s"}`}
-              href="/risk"
-            />
-          </div>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
+        <KpiCard
+          icon="Bot"
+          tone="primary"
+          label="Total agents"
+          value={agents.length}
+          delta={
+            newInRange > 0 && priorTotal > 0
+              ? { direction: "up", text: pct(newInRange, priorTotal), good: true }
+              : null
+          }
+          footnote={`+${newInRange} in the last ${rangeDays} days`}
+          href="/agents"
+        />
+        <KpiCard
+          icon="ShieldCheck"
+          tone="success"
+          label="Approved agents"
+          value={approved}
+          footnote={`${pct(approved, agents.length)} of total`}
+          href="/agents"
+        />
+        <KpiCard
+          icon="TriangleAlert"
+          tone="danger"
+          emphasis
+          label="High-risk agents"
+          value={highRiskIds.size}
+          footnote={`${pct(highRiskIds.size, agents.length)} of total`}
+          href="/risk"
+        />
+        <KpiCard
+          icon="UserSearch"
+          tone="violet"
+          emphasis
+          label="Unregistered agents"
+          value={unregistered}
+          footnote="Discovered, awaiting registration"
+          href="/agents/discovery"
+        />
+        <KpiCard
+          icon="Ban"
+          tone="warning"
+          emphasis
+          label="Failed actions"
+          value={failed}
+          delta={
+            failedChange === null || failedChange === 0
+              ? null
+              : { direction: failedChange > 0 ? "up" : "down", text: `${Math.abs(failedChange)}%`, good: failedChange < 0 }
+          }
+          footnote={`vs previous ${rangeDays} days`}
+          href="/runtime"
+        />
+      </div>
 
-          <div className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-            {/* Order matters for the grid: posture, trend, coverage. The
-                trend card is rendered eagerly between the two streamed
-                panels, so the streamed pair is split around it by the
-                Suspense boundary's fragment — both halves fill in
-                together once the posture fan-out completes. */}
-            <Suspense
-              fallback={
-                <>
-                  <PanelSkeleton title="Agent governance posture" description="Every agent, scored across 12 dimensions" />
-                  <RiskTrendCard data={trendData} />
-                  <PanelSkeleton title="Compliance coverage" description="Share of applicable agents governed on each dimension" />
-                </>
-              }
-            >
-              <PosturePanelsWithTrend tenantId={tenantId} agents={agents} trendData={trendData} />
-            </Suspense>
-          </div>
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.45fr)]">
+        <Card>
+          <CardHeader
+            title="Agent lifecycle"
+            actions={
+              <Link href="/agents" className="text-xs font-medium text-primary hover:underline">
+                View all
+              </Link>
+            }
+          />
+          <CardBody className="flex flex-1 items-center py-5">
+            <DonutChart
+              slices={lifecycleSlices}
+              centerValue={agents.length}
+              centerLabel={agents.length === 1 ? "Agent" : "Agents"}
+              size={168}
+              showCounts
+              className="w-full"
+            />
+          </CardBody>
+        </Card>
 
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            <Card className="min-w-0 px-4 pb-3 pt-1">
-              <Tabs
-                ariaLabel="Activity"
-                tabs={[
-                  { value: "activity", label: "Recent activity" },
-                  { value: "findings", label: "Open findings", count: openFindings.length },
-                  { value: "certifications", label: "Pending approvals" },
-                ]}
-              >
-                <TabPanel value="activity" className="pt-1">
-                  {events.length === 0 ? (
-                    <EmptyState title="No runtime activity recorded yet" />
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {events.slice(0, 6).map((e) => (
-                        <li key={e.id} className="flex items-center gap-3 py-2.5 text-sm">
-                          <span className="w-16 shrink-0 tabular-nums text-xs text-muted-foreground">
-                            {new Date(e.eventTime).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate">
-                            <Link
-                              href={`/runtime/agents/${e.agentId}`}
-                              className="font-medium text-foreground hover:text-primary"
-                            >
-                              {agentById.get(e.agentId) ? agentLabel(agentById.get(e.agentId)!) : "Unknown agent"}
-                            </Link>
-                            <span className="text-muted-foreground"> · {e.resource ?? e.application ?? "—"}</span>
-                          </span>
-                          <span className="hidden shrink-0 font-mono text-[11px] uppercase tracking-wide text-muted-foreground sm:inline">
-                            {e.action}
-                          </span>
-                          <Badge tone={e.success ? "success" : "danger"}>{e.success ? "Allowed" : "Blocked"}</Badge>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </TabPanel>
+        <Card>
+          <CardHeader title="Risk trend" description={`Findings detected per day, last ${rangeDays} days`} />
+          <CardBody>
+            <TrendChart data={trendData} series={SEVERITY_SERIES} variant="stacked-area" height={236} />
+          </CardBody>
+        </Card>
+      </div>
 
-                <TabPanel value="findings" className="pt-1">
-                  {openFindings.length === 0 ? (
-                    <EmptyState title="No open findings" />
-                  ) : (
-                    <ul className="divide-y divide-border">
-                      {openFindings.slice(0, 6).map((f) => (
-                        <li key={f.id} className="flex items-center gap-3 py-2.5 text-sm">
-                          <Link
-                            href={`/risk/agents/${f.agentId}`}
-                            className="min-w-0 flex-1 truncate text-foreground hover:text-primary"
-                          >
-                            {f.title}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+        <Card className="min-w-0">
+          <CardHeader
+            title="Recent agent activity"
+            actions={
+              <Link href="/runtime" className="text-xs font-medium text-primary hover:underline">
+                View all
+              </Link>
+            }
+          />
+          <CardBody className="pt-0">
+            {recent.events.length === 0 ? (
+              <EmptyState title="No runtime activity recorded yet" />
+            ) : (
+              <TableContainer label="Recent agent activity" bare>
+                <Thead>
+                  <tr>
+                    <Th>Time</Th>
+                    <Th>Agent</Th>
+                    <Th>Action</Th>
+                    <Th>Resource</Th>
+                    <Th>Result</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {recent.events.map((e) => {
+                    const agent = agentById.get(e.agentId);
+                    return (
+                      <Tr key={e.id}>
+                        <Td className="whitespace-nowrap text-muted-foreground">{relativeTime(e.eventTime, nowMs)}</Td>
+                        <Td>
+                          <Link href={`/runtime/agents/${e.agentId}`} className="font-medium text-foreground hover:text-primary">
+                            {agent ? agentLabel(agent) : "Unknown agent"}
                           </Link>
-                          <SeverityBadge severity={f.severity} />
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </TabPanel>
+                        </Td>
+                        <Td className="font-mono text-xs">{e.action}</Td>
+                        <Td className="text-muted-foreground">{e.resource ?? e.application ?? e.tool ?? "—"}</Td>
+                        <Td>
+                          <Badge tone={e.success ? "success" : "danger"}>{e.success ? "Succeeded" : "Failed"}</Badge>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </TableContainer>
+            )}
+          </CardBody>
+        </Card>
 
-                <TabPanel value="certifications" className="pt-1">
-                  <Suspense fallback={<div aria-hidden="true" className="my-2 h-24 animate-pulse rounded-lg bg-muted" />}>
-                    <PendingCertifications tenantId={tenantId} agentById={agentById} nowIso={nowIso} />
-                  </Suspense>
-                </TabPanel>
-              </Tabs>
-            </Card>
-
-            <Card className="min-w-0">
-              <CardHeader
-                title="Top agents by activity"
-                description={`Across the last ${events.length} events`}
-                actions={
-                  <Link href="/runtime" className="text-xs font-medium text-primary hover:underline">
-                    View all
-                  </Link>
-                }
-              />
-              <CardBody>
-                {activityByAgent.length === 0 ? (
-                  <EmptyState title="No activity to rank yet" />
-                ) : (
-                  <ul className="space-y-2.5">
-                    {activityByAgent.map(({ agent, count }) => (
-                      <li key={agent.id} className="flex items-center gap-3 text-sm">
-                        <Link
-                          href={`/runtime/agents/${agent.id}`}
-                          className="min-w-0 flex-1 truncate text-foreground hover:text-primary"
-                        >
-                          {agentLabel(agent)}
+        <Card className="min-w-0">
+          <CardHeader
+            title="Top risky agents"
+            actions={
+              <Link href="/risk" className="text-xs font-medium text-primary hover:underline">
+                View all
+              </Link>
+            }
+          />
+          <CardBody className="pt-0">
+            {topRisky.length === 0 ? (
+              <EmptyState title="No agent has a risk score yet" description="Scores appear once the risk engine evaluates an agent." />
+            ) : (
+              <TableContainer label="Top risky agents" bare>
+                <Thead>
+                  <tr>
+                    <Th>Agent</Th>
+                    <Th className="text-right">Risk score</Th>
+                    <Th className="text-right">Open findings</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {topRisky.map((a) => (
+                    <Tr key={a.id}>
+                      <Td>
+                        <Link href={`/risk/agents/${a.id}`} className="font-medium text-foreground hover:text-primary">
+                          {agentLabel(a)}
                         </Link>
-                        <span className="shrink-0 tabular-nums text-muted-foreground">{count}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardBody>
-            </Card>
-          </div>
-        </div>
-
-        <aside className="space-y-4">
-          {/* Uses the rail's own navy in both themes, so it reads as the
-              same "product frame" surface rather than another card. In dark
-              mode that navy sits close to --card, hence the explicit ring
-              to keep it a distinct panel. */}
-          <div className="rounded-xl bg-sidebar p-5 text-sidebar-foreground shadow-md ring-1 ring-sidebar-border">
-            <h2 className="text-lg font-semibold leading-snug tracking-[-0.01em]">
-              Turn AI agents into a force for good.
-            </h2>
-            <p className="mt-2 text-sm text-sidebar-muted-foreground">Discover. Govern. Monitor. Prove.</p>
-            <Link
-              href="/welcome#how-it-works"
-              className="mt-4 inline-flex items-center gap-2 rounded-full bg-primary px-3.5 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              See how it works
-              <ArrowRight className="size-4" aria-hidden="true" />
-            </Link>
-          </div>
-
-          <Card>
-            <CardHeader title="Quick actions" />
-            <CardBody className="grid grid-cols-2 gap-2">
-              {[
-                { href: "/agents/new", icon: Plus, title: "Register agent", sub: "Onboard and define governance" },
-                { href: "/compliance/campaigns", icon: ClipboardCheck, title: "Run certification", sub: "Validate access and ownership" },
-                { href: "/agents/discovery", icon: Search, title: "Review discoveries", sub: "Unregistered agents found" },
-                { href: "/risk/rogue", icon: Siren, title: "Rogue agents", sub: "Suspend or restrict agents" },
-              ].map(({ href, icon: Icon, title, sub }) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex flex-col gap-1.5 rounded-lg border border-border/60 p-3 transition-colors hover:border-ring/50 hover:bg-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
-                >
-                  <Icon className="size-4 text-primary" aria-hidden="true" />
-                  <span className="text-sm font-medium text-card-foreground">{title}</span>
-                  <span className="text-xs leading-snug text-muted-foreground">{sub}</span>
-                </Link>
-              ))}
-            </CardBody>
-          </Card>
-
-          <Suspense fallback={null}>
-            <OverdueCertificationsCard tenantId={tenantId} nowIso={nowIso} />
-          </Suspense>
-        </aside>
+                      </Td>
+                      <Td className="md:text-right">
+                        <Badge tone={scoreTone(a.riskScore ?? 0)} className="tabular-nums">
+                          {Math.round(a.riskScore ?? 0)}
+                        </Badge>
+                      </Td>
+                      <Td className="tabular-nums md:text-right">{openByAgent.get(a.id) ?? 0}</Td>
+                    </Tr>
+                  ))}
+                </tbody>
+              </TableContainer>
+            )}
+          </CardBody>
+        </Card>
       </div>
     </div>
-  );
-}
-
-function RiskTrendCard({ data }: { data: Array<Record<string, string | number>> }) {
-  return (
-    <Card>
-      <CardHeader title="Risk trend" description={`Last ${TREND_DAYS} days`} />
-      <CardBody>
-        <TrendChart
-          data={data}
-          series={[
-            { key: "findings", label: "Findings opened", color: "var(--color-primary)" },
-            { key: "severe", label: "Critical & high", color: "var(--color-destructive)" },
-            { key: "agents", label: "Agents registered", color: "var(--color-warning)" },
-          ]}
-        />
-      </CardBody>
-    </Card>
-  );
-}
-
-/**
- * The posture pair with the trend card slotted between them, so the grid
- * order (posture, trend, coverage) survives the Suspense boundary. The
- * trend card needs nothing beyond the first wave, but rendering it here
- * keeps it in its designed column without a second boundary.
- */
-async function PosturePanelsWithTrend({
-  tenantId,
-  agents,
-  trendData,
-}: {
-  tenantId: string;
-  agents: Agent[];
-  trendData: Array<Record<string, string | number>>;
-}) {
-  return (
-    <>
-      <PosturePanels tenantId={tenantId} agents={agents} trendCard={<RiskTrendCard data={trendData} />} />
-    </>
   );
 }

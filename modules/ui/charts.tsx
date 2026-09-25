@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Area,
+  AreaChart,
   CartesianGrid,
   Cell,
   Line,
@@ -44,12 +46,15 @@ export function DonutChart({
   centerValue,
   centerLabel,
   size = 176,
+  showCounts = false,
   className,
 }: {
   slices: Slice[];
   centerValue: string | number;
   centerLabel: string;
   size?: number;
+  /** Also list each slice's count beside its share, as the lifecycle legend does. */
+  showCounts?: boolean;
   className?: string;
 }) {
   const total = slices.reduce((sum, s) => sum + s.value, 0);
@@ -88,7 +93,10 @@ export function DonutChart({
           <li key={s.label} className="flex items-center gap-2.5 text-sm">
             <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ background: s.color }} />
             <span className="min-w-0 flex-1 truncate text-muted-foreground">{s.label}</span>
-            <span className="shrink-0 font-medium tabular-nums text-card-foreground">
+            {showCounts ? (
+              <span className="w-10 shrink-0 text-right font-medium tabular-nums text-card-foreground">{s.value}</span>
+            ) : null}
+            <span className={cn("shrink-0 tabular-nums", showCounts ? "w-10 text-right text-muted-foreground" : "font-medium text-card-foreground")}>
               {total === 0 ? "0%" : `${Math.round((s.value / total) * 100)}%`}
             </span>
           </li>
@@ -105,10 +113,13 @@ export function TrendChart({
   data,
   series,
   height = 220,
+  variant = "line",
 }: {
   data: Array<Record<string, string | number>>;
   series: TrendSeries[];
   height?: number;
+  /** "stacked-area": series stack into one filled total (e.g. findings by severity). */
+  variant?: "line" | "stacked-area";
 }) {
   const hasData = data.some((row) => series.some((s) => Number(row[s.key] ?? 0) > 0));
 
@@ -117,6 +128,42 @@ export function TrendChart({
       <div style={{ height }}>
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
+            {variant === "stacked-area" ? (
+              <AreaChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
+              <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
+              <XAxis
+                dataKey="label"
+                stroke="var(--color-muted-foreground)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                minTickGap={16}
+              />
+              <YAxis
+                stroke="var(--color-muted-foreground)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                allowDecimals={false}
+                width={36}
+              />
+              <Tooltip contentStyle={TOOLTIP_STYLE} />
+                {series.map((s) => (
+                  <Area
+                    key={s.key}
+                    type="monotone"
+                    dataKey={s.key}
+                    name={s.label}
+                    stackId="total"
+                    stroke={s.color}
+                    fill={s.color}
+                    fillOpacity={0.18}
+                    strokeWidth={1.5}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </AreaChart>
+            ) : (
             <LineChart data={data} margin={{ top: 4, right: 8, bottom: 0, left: -18 }}>
               <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
               <XAxis
@@ -149,6 +196,7 @@ export function TrendChart({
                 />
               ))}
             </LineChart>
+            )}
           </ResponsiveContainer>
         ) : (
           <div className="flex h-full items-center justify-center">

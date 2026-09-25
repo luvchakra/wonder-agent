@@ -8,7 +8,7 @@ import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { getFindings } from "@/modules/risk/service";
 import { AppSidebar, MobileNavDrawer, MobileNavTrigger } from "@/modules/ui/AppSidebar";
 import { MobileTabBar } from "@/modules/ui/MobileTabBar";
-import { Avatar } from "@/modules/ui/Avatar";
+import { AccountPanel } from "@/modules/ui/AccountPanel";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
 import { getActiveAnnouncements } from "@/modules/platform-admin/service";
@@ -34,11 +34,13 @@ function humanizeRole(role: string | undefined): string | null {
 // "Admin console" link (UX-004), matching the same never-a-customer-role
 // check /platform-admin's own routes already enforce.
 //
-// Layout: a permanent navy navigation rail from `lg` up with a slim page
-// header beside it (search, notifications, help, account), and below `lg`
-// a bottom tab bar whose "More" slot opens the same rail as a drawer. See
-// modules/ui/AppSidebar.tsx. Organization switching lives only at the foot
-// of the rail (user decision, 2026-09-18: the header chip duplicated it).
+// Layout (2026-09-25 light-console mockups): a permanent white navigation
+// rail from `lg` up, grouped into sections with their sub-pages, and a
+// slim page header beside it (search, notifications, help, then the
+// account menu with name and role). Below `lg` a bottom tab bar whose
+// "More" slot opens the same rail as a drawer. See modules/ui/AppSidebar.tsx.
+// Organization switching lives only at the foot of the rail (user
+// decision, 2026-09-18: a header chip duplicated it).
 //
 // Data: the session check is local (lib/tenant/session.ts) and the tenant
 // context, membership list and platform-admin check are all request-cached,
@@ -88,9 +90,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const shellProps = {
     badges,
     tenants: tenantOptions,
-    user: sidebarUser,
     onSelectTenant: selectTenantAction,
-    onSignOut: signOutAction,
   };
 
   return (
@@ -108,7 +108,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       <MobileNavDrawer {...shellProps} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background px-4 sm:gap-3 lg:px-6">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:gap-3 lg:px-6">
           <MobileNavTrigger />
           <div className="min-w-0 max-w-xl flex-1">
             <ShellGlobalSearch />
@@ -122,9 +122,14 @@ export default async function CustomerLayout({ children }: { children: React.Rea
             >
               <CircleHelp className="size-5" aria-hidden="true" />
             </Link>
-            <span className="hidden lg:inline-flex">
-              <Avatar name={sidebarUser.displayName} email={sidebarUser.email} size="sm" />
-            </span>
+            <span aria-hidden="true" className="mx-1 hidden h-6 w-px bg-border sm:block" />
+            <AccountPanel
+              email={sidebarUser.email}
+              displayName={sidebarUser.displayName}
+              subtitle={sidebarUser.roleLabel}
+              isPlatformAdmin={sidebarUser.isPlatformAdmin}
+              onSignOut={signOutAction}
+            />
           </div>
         </header>
 

@@ -9,8 +9,13 @@ import {
   listContractVersions,
   listLifecycleEvents,
   listOwners,
+  listOwnersForTenant,
   listRelationships,
 } from "@/modules/agent-identity/service";
+import { compareAccessToContract, getEffectiveAccess } from "@/modules/access-governance/service";
+import { listRuntimeEvents } from "@/modules/runtime-assurance/service";
+import { getFindings } from "@/modules/risk/service";
+import type { ContractComparisonRow } from "@/lib/shared/types/access-governance";
 import {
   addRelationshipAction,
   assignOwnerAction,
@@ -21,7 +26,7 @@ import {
 import { getGovernancePosture } from "@/modules/certification-compliance/service";
 import type { GovernancePosture } from "@/lib/shared/types/compliance";
 import type { OwnershipIssue } from "@/lib/shared/types/agent-identity";
-import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
+import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, NavIcon } from "@/modules/ui";
 import { DonutChart } from "@/modules/ui/charts.lazy";
 import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
 
@@ -98,6 +103,30 @@ const LIFECYCLE_TONE: Record<string, "neutral" | "success" | "warning" | "danger
   RETIRED: "neutral",
 };
 
+const CLOSED_FINDING_STATUSES = new Set(["resolved", "false_positive", "exception", "mitigated"]);
+
+function humanize(value: string): string {
+  const s = value.toLowerCase().replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function scoreBand(score: number): { label: string; tone: "danger" | "warning" | "info" | "neutral" } {
+  if (score >= 75) return { label: "Critical risk", tone: "danger" };
+  if (score >= 50) return { label: "High risk", tone: "warning" };
+  if (score >= 25) return { label: "Medium risk", tone: "info" };
+  return { label: "Low risk", tone: "neutral" };
+}
+
+function Metric({ icon, value, label, tone }: { icon: string; value: number; label: string; tone: string }) {
+  return (
+    <div className="rounded-lg border border-border/70 p-3">
+      <NavIcon name={icon} className={`size-5 ${tone}`} />
+      <p className="mt-2 text-xl font-semibold tabular-nums text-card-foreground">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
 const inputClass =
   "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
 const labelClass = "block text-sm font-medium text-muted-foreground";
@@ -113,8 +142,21 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const agent = await getAgent(ctx.tenantId!, id);
   if (!agent) notFound();
 
-  const [owners, ownershipIssues, contract, contractVersions, lifecycleEvents, relationships, identities, posture] =
-    await Promise.all([
+  const [
+    owners,
+    ownershipIssues,
+    contract,
+    contractVersions,
+    lifecycleEvents,
+    relationships,
+    identities,
+    posture,
+    effectiveAccess,
+    comparison,
+    recentEvents,
+    findings,
+    tenantOwners,
+  ] = await Promise.all([
       listOwners(ctx.tenantId!, id),
       getOwnershipIssues(ctx.tenantId!, id, agent.criticality),
       getAgentContract(id),
@@ -127,7 +169,32 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       // the whole agent page if one of the modules it consults is
       // unavailable — the panel says so instead.
       getGovernancePosture(ctx.tenantId!, id).catch(() => null as GovernancePosture | null),
+      // Agent 360 panels (2026-09-25 light-console rebuild) — each from its
+      // owning module's published contract, in the same parallel wave.
+      getEffectiveAccess(ctx.tenantId!, id),
+      // Throws NO_ACTIVE_CONTRACT when there is nothing to compare against;
+      // the panel then says so rather than inventing SHOULD.
+      compareAccessToContract(ctx.tenantId!, id).catch(() => null as ContractComparisonRow[] | null),
+      listRuntimeEvents(ctx.tenantId!, { agentId: id, limit: 5 }),
+      getFindings(ctx.tenantId!, { agentId: id }),
+      // Owner names (listOwners carries only user ids).
+      listOwnersForTenant(ctx.tenantId!),
     ]);
+
+  const ownerNames = new Map(
+    tenantOwners.filter((o) => o.agentId === id).map((o) => [o.userId, o.userDisplayName?.trim() || o.userEmail]),
+  );
+  const ownerName = (userId: string | undefined) => (userId ? ownerNames.get(userId) ?? userId : null);
+
+  const applications = new Set(effectiveAccess.map((g) => g.application).filter(Boolean)).size;
+  const entitlements = new Set(effectiveAccess.map((g) => g.entitlementId)).size;
+  const dataClasses = new Set(effectiveAccess.map((g) => g.dataClassification).filter(Boolean)).size;
+  const privileged = effectiveAccess.filter((g) => g.privilegeLevel === "elevated" || g.privilegeLevel === "admin").length;
+
+  const openFindings = findings.filter((f) => !CLOSED_FINDING_STATUSES.has(f.status));
+  const findingsByCategory = new Map<string, number>();
+  for (const f of openFindings) findingsByCategory.set(f.category, (findingsByCategory.get(f.category) ?? 0) + 1);
+  const unapproved = (comparison ?? []).filter((r) => r.classification === "excessive" || r.classification === "unknown");
 
   const dimensions = posture?.dimensions ?? [];
   const applicableDimensions = dimensions.filter((d) => d.status !== "not_applicable");
@@ -165,7 +232,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">{agentDisplayName}</h1>
-            <StatusBadge tone={LIFECYCLE_TONE[agent.lifecycleState] ?? "neutral"}>{agent.lifecycleState}</StatusBadge>
+            <StatusBadge tone={LIFECYCLE_TONE[agent.lifecycleState] ?? "neutral"}>{humanize(agent.lifecycleState)}</StatusBadge>
             <SeverityBadge severity={agent.criticality} />
             <Badge tone="neutral">{agent.environment}</Badge>
           </div>
@@ -180,48 +247,175 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
 
       <AgentTabs agentId={id} active="overview" />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {/* EXPERIENCE-P0-12 — PRD §35's worked layout header fields, now the
             design's "Agent Information" panel. */}
         <Card>
           <CardHeader title="Agent information" />
           <CardBody>
-            <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-xs text-muted-foreground">Business owner</dt>
-                <dd className="truncate text-foreground">{owners.find((o) => o.ownerType === "business_owner")?.userId ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Technical owner</dt>
-                <dd className="truncate text-foreground">{owners.find((o) => o.ownerType === "technical_owner")?.userId ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Type</dt>
-                <dd className="truncate text-foreground">{agent.agentType}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Source</dt>
-                <dd className="truncate text-foreground">{agent.sourceSystem ?? "Registered directly"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">IAM identity</dt>
-                <dd className="truncate text-foreground">
-                  {identities.length > 0 ? `${identities[0].identityType}: ${identities[0].externalReference}` : "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Created</dt>
-                <dd className="truncate text-foreground">{agent.createdAt.slice(0, 10)}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Last activity</dt>
-                <dd className="truncate text-foreground">{agent.lastSeenAt ?? "Never observed"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Next certification</dt>
-                <dd className="truncate text-foreground">{agent.nextReviewAt ?? "Not scheduled"}</dd>
-              </div>
+            <dl className="grid grid-cols-[8.5rem_minmax(0,1fr)] gap-x-4 gap-y-2.5 text-sm">
+              <dt className="text-muted-foreground">Name</dt>
+              <dd className="truncate text-foreground">{agent.agentName}</dd>
+              <dt className="text-muted-foreground">Description</dt>
+              <dd className="text-foreground">{agent.description?.trim() || "—"}</dd>
+              <dt className="text-muted-foreground">Type</dt>
+              <dd className="truncate text-foreground">{agent.agentType}{agent.agentFramework ? ` (${agent.agentFramework})` : ""}</dd>
+              <dt className="text-muted-foreground">Business owner</dt>
+              <dd className="truncate text-foreground">{ownerName(owners.find((o) => o.ownerType === "business_owner")?.userId) ?? "—"}</dd>
+              <dt className="text-muted-foreground">Technical owner</dt>
+              <dd className="truncate text-foreground">{ownerName(owners.find((o) => o.ownerType === "technical_owner")?.userId) ?? "—"}</dd>
+              <dt className="text-muted-foreground">Source</dt>
+              <dd className="truncate text-foreground">{agent.sourceSystem ?? "Registered directly"}</dd>
+              <dt className="text-muted-foreground">IAM identity</dt>
+              <dd className="truncate text-foreground">
+                {identities.length > 0 ? `${identities[0].identityType}: ${identities[0].externalReference}` : "—"}
+              </dd>
+              <dt className="text-muted-foreground">Created</dt>
+              <dd className="truncate text-foreground">{agent.createdAt.slice(0, 10)}</dd>
+              <dt className="text-muted-foreground">Last activity</dt>
+              <dd className="truncate text-foreground">{agent.lastSeenAt?.slice(0, 16).replace("T", " ") ?? "Never observed"}</dd>
+              <dt className="text-muted-foreground">Next certification</dt>
+              <dd className="truncate text-foreground">{agent.nextReviewAt?.slice(0, 10) ?? "Not scheduled"}</dd>
             </dl>
+          </CardBody>
+        </Card>
+
+        {/* Effective access (CAN) at a glance — Access Agent's contract. */}
+        <Card>
+          <CardHeader
+            title="Key metrics"
+            description="Effective access (CAN), from connected IAM data"
+            actions={
+              <Link href={`/access/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
+                View access
+              </Link>
+            }
+          />
+          <CardBody className="grid grid-cols-2 gap-3">
+            <Metric icon="LayoutDashboard" tone="text-primary" value={applications} label="Applications" />
+            <Metric icon="KeyRound" tone="text-violet" value={entitlements} label="Entitlements" />
+            <Metric icon="ScrollText" tone="text-success" value={dataClasses} label="Data classifications" />
+            <Metric icon="ShieldAlert" tone="text-destructive" value={privileged} label="Privileged grants" />
+          </CardBody>
+        </Card>
+
+        {/* SHOULD beside CAN: the approved purpose and actions, then the
+            effective access the contract does not cover. */}
+        <Card className="lg:col-span-2 xl:col-span-1">
+          <CardHeader title="Purpose & approved access" description="The agent contract (SHOULD) against effective access (CAN)" />
+          <CardBody className="space-y-4">
+            {contract ? (
+              <>
+                <div className="rounded-lg border border-success/25 bg-success/[0.06] p-3">
+                  <p className="flex items-start gap-2 text-sm font-medium text-foreground">
+                    <span aria-hidden="true" className="text-success">✓</span>
+                    {contract.purpose}
+                  </p>
+                  {contract.approvedActions?.length ? (
+                    <ul className="mt-2 space-y-1 pl-6 text-sm text-muted-foreground">
+                      {contract.approvedActions.slice(0, 5).map((a) => (
+                        <li key={a}>
+                          <span className="sr-only">Approved: </span>
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+                <div className={unapproved.length ? "rounded-lg border border-destructive/25 bg-destructive/[0.05] p-3" : "rounded-lg border border-border p-3"}>
+                  <p className="text-sm font-medium text-foreground">
+                    {unapproved.length
+                      ? `${unapproved.length} effective grant${unapproved.length === 1 ? "" : "s"} outside the contract`
+                      : "All effective access is covered by the contract"}
+                  </p>
+                  {unapproved.length ? (
+                    <ul className="mt-2 space-y-1 text-sm text-muted-foreground">
+                      {unapproved.slice(0, 4).map((r, i) => (
+                        <li key={i} className="flex items-center gap-2">
+                          <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-destructive" />
+                          <span className="min-w-0 truncate">
+                            {r.application ?? "Unknown application"} · {r.entitlement ?? "—"}
+                          </span>
+                          <Badge tone={r.classification === "excessive" ? "danger" : "neutral"} className="ml-auto">
+                            {r.classification === "excessive" ? "Excessive" : "Unclassified"}
+                          </Badge>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              </>
+            ) : (
+              <EmptyState title="No active contract" description="Approved purpose (SHOULD) is undefined until a contract is published below." />
+            )}
+          </CardBody>
+        </Card>
+
+        <Card className="min-w-0">
+          <CardHeader
+            title="Recent activity"
+            actions={
+              <Link href={`/runtime/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
+                View all
+              </Link>
+            }
+          />
+          <CardBody>
+            {recentEvents.events.length === 0 ? (
+              <EmptyState title="No runtime activity observed" />
+            ) : (
+              <ul className="divide-y divide-border">
+                {recentEvents.events.map((e) => (
+                  <li key={e.id} className="flex items-center gap-3 py-2 text-sm">
+                    <span className="w-24 shrink-0 text-xs tabular-nums text-muted-foreground">
+                      {e.eventTime.slice(5, 16).replace("T", " ")}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="font-mono text-xs">{e.action}</span>
+                      <span className="text-muted-foreground"> · {e.resource ?? e.application ?? e.tool ?? "—"}</span>
+                    </span>
+                    <Badge tone={e.success ? "success" : "danger"}>{e.success ? "Succeeded" : "Failed"}</Badge>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+
+        <Card>
+          <CardHeader
+            title="Risk summary"
+            actions={
+              <Link href={`/risk/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
+                View findings
+              </Link>
+            }
+          />
+          <CardBody className="space-y-3">
+            {agent.riskScore === null ? (
+              <p className="text-sm text-muted-foreground">This agent has not been risk-evaluated yet.</p>
+            ) : (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                <Badge tone={scoreBand(agent.riskScore).tone}>{scoreBand(agent.riskScore).label}</Badge>
+                <span className="text-right">
+                  <span className="block text-xs text-muted-foreground">Risk score</span>
+                  <span className="text-lg font-semibold tabular-nums text-card-foreground">{Math.round(agent.riskScore)}/100</span>
+                </span>
+              </div>
+            )}
+            {openFindings.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No open findings.</p>
+            ) : (
+              <ul className="space-y-1.5 text-sm">
+                {[...findingsByCategory.entries()].map(([category, n]) => (
+                  <li key={category} className="flex items-center gap-2">
+                    <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-destructive" />
+                    <span className="min-w-0 flex-1 truncate text-muted-foreground">{humanize(category)}</span>
+                    <span className="tabular-nums text-foreground">{n}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </CardBody>
         </Card>
 
@@ -273,6 +467,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           </CardBody>
         </Card>
       </div>
+
+      <h2 className="pt-2 text-base font-semibold text-foreground">Governance &amp; configuration</h2>
 
       <Card>
         <CardHeader title="Lifecycle" description="State transition history and pending ownership issues." />

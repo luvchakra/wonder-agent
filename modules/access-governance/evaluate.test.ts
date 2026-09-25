@@ -23,7 +23,7 @@ vi.mock("@/lib/db/supabaseServer", () => ({
   supabaseServiceRole: () => ({ from: (t: string) => makeFrom(t) }),
 }));
 
-import { hasOpenPolicyViolation } from "./evaluate";
+import { hasOpenPolicyViolation, isExceptionInForce } from "./evaluate";
 
 describe("hasOpenPolicyViolation — COMPLIANCE-P0-02.2's published dependency", () => {
   beforeEach(() => {
@@ -61,5 +61,34 @@ describe("hasOpenPolicyViolation — COMPLIANCE-P0-02.2's published dependency",
   it("does not count an 'exempted' result as a violation", async () => {
     evaluationRows = [{ agent_id: "agent-1", result: "exempted" }];
     expect(await hasOpenPolicyViolation("tenant-a", "policy-1")).toBe(false);
+  });
+});
+
+describe("isExceptionInForce — which policy exceptions may suppress a violation", () => {
+  const now = new Date("2026-09-25T12:00:00Z");
+
+  it("applies an active, started, unexpired exception", () => {
+    expect(isExceptionInForce({ status: "active", start_date: "2026-09-01T00:00:00Z", expires_at: "2026-12-01T00:00:00Z" }, now)).toBe(true);
+  });
+
+  it("applies an active exception with no expiry", () => {
+    expect(isExceptionInForce({ status: "active", start_date: "2026-09-01T00:00:00Z", expires_at: null }, now)).toBe(true);
+  });
+
+  it("never applies a revoked exception, even one that has not expired", () => {
+    expect(isExceptionInForce({ status: "revoked", start_date: "2026-09-01T00:00:00Z", expires_at: "2027-01-01T00:00:00Z" }, now)).toBe(false);
+    expect(isExceptionInForce({ status: "revoked", start_date: null, expires_at: null }, now)).toBe(false);
+  });
+
+  it("does not apply an exception before its start date", () => {
+    expect(isExceptionInForce({ status: "active", start_date: "2026-10-01T00:00:00Z", expires_at: null }, now)).toBe(false);
+  });
+
+  it("does not apply an expired exception", () => {
+    expect(isExceptionInForce({ status: "active", start_date: "2026-01-01T00:00:00Z", expires_at: "2026-09-25T11:59:59Z" }, now)).toBe(false);
+  });
+
+  it("treats a row without the 0053 columns as the backfilled default (active)", () => {
+    expect(isExceptionInForce({ expires_at: null }, now)).toBe(true);
   });
 });

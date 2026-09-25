@@ -779,3 +779,26 @@ composition) and resolves cleanly because nothing here reads another
 module's export at top-level module-initialization time, only inside
 async function bodies called later — confirmed empirically (typecheck,
 build, and the full test suite all pass) rather than assumed safe.
+
+---
+
+## 2026-09-25 — Fix: `listAgents()` returned every tenant the user belongs to
+
+Found during the light-console rebuild (codebase-map D10).
+
+- **Bug.** `listAgents()` filtered by RLS alone. RLS admits every tenant in
+  `current_tenant_ids()`, which is *all* of the user's active memberships.
+  A member of two organizations therefore saw both organizations' agents
+  in the list, and in every dashboard count built on it, whichever
+  organization was selected. It is not a leak to a stranger, but it breaks
+  §14 (application-level tenant filtering as defense in depth) and shows
+  wrong data.
+- **Fix.** An explicit `.eq("tenant_id", tenantId)`.
+- **Verified.** Typecheck, lint, the unit suite (352/352) and the full
+  Playwright suite (140/141; the one failure is the unrelated sign-up
+  provider check, see the Experience entry).
+- **Handed to QA Agent.** Sweep the other service reads that take a
+  `tenantId` but rely on RLS alone.
+- **Also recorded, not fixed** (codebase-map §5):
+  - D3: `linkAgentIdentity()` writes no audit event.
+  - D4: lifecycle state ASSESSED is unreachable.

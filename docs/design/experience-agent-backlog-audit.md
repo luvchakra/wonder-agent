@@ -2333,3 +2333,134 @@ tracked widths, both themes, plus structural checks) and `welcome.spec.ts`
 (5 cases) both re-run against this change: 23/23 passing. Full vitest
 suite unaffected (342/342, no unit test references the old placeholder
 string).
+
+---
+
+## 2026-09-25 — Light-console redesign: shell, Dashboard, Agent inventory, Agent 360
+
+**Trigger.** The user supplied the *WonderAgent Master P0/P1/P2
+Implementation Stories* plus four boards of light-console mockups (12
+product screens and 4 MCP screens). The master stories' own first step
+(§14, §33) is a codebase map before any major change. That is
+`docs/implementation/codebase-map.md`, written first in the same commit.
+This entry covers the UI half.
+
+**Shell (`modules/ui/AppSidebar.tsx`, `shell-nav.ts`, `AccountPanel.tsx`,
+`app/(customer)/layout.tsx`, `app/globals.css`)**
+
+- The rail is now white. It had been fixed navy since 2026-09-18; the
+  mockups supersede that. The `--sidebar*` tokens are themed again and are
+  re-declared in both dark blocks.
+- The nav is grouped into the master stories' ten sections: Dashboard,
+  Discover, Agents, Access Intelligence, Governance, Runtime Protection,
+  Risk & Investigations, Audit & Compliance, Integrations, Administration.
+- The current section is a filled primary pill with `aria-current="true"`.
+  Its sub-pages are listed beneath it on a hairline guide, and the current
+  sub-page has `aria-current="page"`.
+- Active state is now the longest matching prefix across sections, so
+  `/agents/discovery` belongs to Discover and not Agents.
+- **Only sub-pages with a real route are linked.** The mockups also show NHI
+  Inventory, Shadow AI, MCP & Tools, Models, Runtime Gateway, JIT &
+  Credentials, Emergency Controls and others. None of those exist, and a nav
+  link to an empty shell would fabricate a capability. They are gaps in
+  codebase-map §3.
+- The account menu moved from the rail foot to the header (avatar, name,
+  role, chevron), as in the mockups. The organization switcher stays at the
+  rail foot (user decision, 2026-09-18). The rail is `sticky` at full height.
+- Added a `--violet` token (light and dark), a WonderAgent extension beside
+  success/warning/info, for the discovery/unregistered colour in the mockups.
+
+**Shared primitives**
+
+- `KpiCard` uses the mockup layout: icon tile on the left; label, number and
+  change on the right. It gains an `emphasis` tint, a `violet` tone and
+  `size="sm"`.
+- `CountPills` gains `variant="tabs"`, an underline strip. It keeps radio
+  semantics.
+- `DataTable` gains a `toolbar` slot and `bare`.
+- `TableContainer` gains `bare` for tables inside cards. Table headers are
+  sentence case on a lighter band.
+- `DonutChart` gains `showCounts`. `TrendChart` gains
+  `variant="stacked-area"`.
+- New `PeriodSelect`: a URL-driven period picker with a pending spinner.
+
+**Dashboard (`app/(customer)/page.tsx`)**, rebuilt to mockup 1: "AI Agent
+Security Overview".
+
+- Five headline cards: Total, Approved, High-risk, Unregistered, and Failed
+  actions (with the change against the previous period).
+- An Agent lifecycle ring with count and share.
+- A Risk trend: findings detected per day, stacked by severity, over the
+  selected 7/30/90 days.
+- A Recent agent activity table and a Top risky agents table.
+
+It is one parallel wave of five queries. The per-agent posture fan-out, and
+the Suspense streaming it needed, is gone from the dashboard, so
+`dashboard-panels.tsx` and `Greeting.tsx` were deleted. Two mockup metrics
+were **renamed to what the product can truthfully measure** (§17.5):
+
+- "Shadow AI" became Unregistered (lifecycle DISCOVERED).
+- "Blocked actions" became Failed actions (runtime events with
+  `success = false`). Nothing is blocked at runtime until a Runtime Gateway
+  exists (codebase-map §6.1).
+
+Failed actions uses a new additive Runtime contract, `countRuntimeEvents()`,
+a head-only count query. It is recorded in the Runtime audit log.
+
+**Agent inventory (`app/(customer)/agents/page.tsx`, `AgentsTable.tsx`)**,
+rebuilt to mockup 2.
+
+- A six-card compact strip: Total, Active, Discovered, At risk, Mapped to
+  owners, Unowned.
+- One card holds underline tabs (All / At risk / Unowned / Discovered), then
+  search with Status and Environment filters and an Export link (the Agent
+  Inventory report).
+- Columns: Name, Platform, Framework, Environment, Status, Risk (band and
+  score), Findings, Owner, Last seen.
+- Owner comes from Identity's bulk `listOwnersForTenant()`: one query, not
+  one per agent.
+
+**Agent 360 (`app/(customer)/agents/[id]/page.tsx`)**, rebuilt to mockup 3.
+
+- A three-column grid at xl:
+  - Agent information, now with owner *names* instead of user UUIDs.
+  - Key metrics: applications, entitlements, data classifications and
+    privileged grants, from `getEffectiveAccess()`.
+  - Purpose & approved access: contract purpose and approved actions, then
+    the effective grants `compareAccessToContract()` classes as excessive or
+    unclassified.
+  - Recent activity.
+  - Risk summary: score band plus open findings by category.
+  - Governance posture.
+- The editing forms follow under a "Governance & configuration" heading.
+- All reads are in one parallel wave.
+
+**Deliberately not done this pass**
+
+- Mockups 4–12 and the MCP boards: the Access graph, Policies, Runtime
+  Gateway, Risk & Investigations, Audit & Compliance, Integrations catalog,
+  Administration, Investigation detail, Authorization request, MCP servers,
+  tools and mapping.
+- Several of those depend on the PROTECT pillar and the new inventories,
+  which are architecture decisions put to the user in codebase-map §6. The
+  rest are UI restyles of existing pages and are the next Experience pass.
+- `listAgents()` still has no server-side pagination (stopgap unchanged).
+
+**Verified**
+
+- `npx tsc --noEmit` clean; `npx eslint` clean (exit 0); `npx vitest run`
+  51 files / 352 tests passing.
+- `next build` clean.
+- **Full Playwright suite** (shared shell changed, §17.8): 140 / 141 passed.
+  The one failure is `auth.spec.ts` "sign-up with a fresh, valid email":
+  GoTrue answers `Email address "…@example.com" is invalid`. That is the
+  existing, already-recorded provider validation issue on this project, and
+  it is independent of this change.
+- Specs updated for the new structure: `shell.spec.ts` (new sub-page case),
+  `design-review.spec.ts` (the rail is now light in light mode and dark in
+  dark mode), `agents.spec.ts` (tabs), and the Overview heading in
+  `auth.spec.ts`, `auth.setup.ts`, `navigation-smoke.spec.ts` and
+  `welcome.spec.ts`.
+- Screenshots were compared against the mockups at 1440 px light, 1440 px
+  dark and 390 px: Dashboard, Agents, Agent 360 and Administration. No
+  horizontal overflow at 390 px (shell spec).

@@ -6,7 +6,7 @@ import { MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
 import { openMobileNav } from "./AppSidebar";
-import { MOBILE_TABS, SHELL_NAV, isNavItemActive, type ShellBadgeCounts } from "./shell-nav";
+import { MOBILE_TABS, isNavItemActive, type ShellBadgeCounts } from "./shell-nav";
 
 /**
  * Bottom tab bar, below `lg`. Four destinations plus "More", which opens
@@ -27,7 +27,7 @@ export function MobileTabBar({ badges }: { badges: ShellBadgeCounts }) {
     >
       <ul className="flex items-stretch">
         {MOBILE_TABS.map((item) => {
-          const active = isNavItemActive(item, pathname, SHELL_NAV);
+          const active = isNavItemActive(item, pathname, MOBILE_TABS);
           const count = item.badge ? badges[item.badge] : undefined;
           return (
             <li key={item.href} className="flex-1">

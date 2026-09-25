@@ -696,3 +696,20 @@ secrets/Vercel Preview env vars, a Lighthouse/timing run against a loaded
 tenant) or are explicitly another module's own scope per non-negotiable #18
 (the Risk regression matrix, QA-P0-10) — recorded, not silently worked
 around.
+
+---
+
+## 2026-09-25 — Handed over: RLS-only tenant reads
+
+`listAgents()` was found relying on RLS alone. `current_tenant_ids()` admits
+every tenant the user belongs to, so a member of two organizations saw both
+organizations' agents in whichever one was selected. It was fixed in
+Identity (codebase-map D10).
+
+**Handed to QA Agent:** sweep every service read that takes a `tenantId`
+and queries a tenant table without an explicit `.eq("tenant_id", …)`, and
+add a two-membership isolation case to the E2E suite.
+
+Full Playwright run, same date: 140/141 passed. The one failure is the
+known GoTrue rejection of `@example.com` in the sign-up spec, unrelated to
+this change.
