@@ -1,6 +1,10 @@
 import {
   Activity,
+  BarChart3,
   Bot,
+  Box,
+  FileText,
+  UserCog,
   CircleAlert,
   Clock,
   ClipboardCheck,
@@ -29,6 +33,9 @@ import {
   ShieldCheck,
   Siren,
   UserX,
+  Globe,
+  Server,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 
@@ -39,8 +46,15 @@ import {
  * layout can pass it straight into client components.
  */
 const ICONS: Record<string, LucideIcon> = {
+  Globe,
+  Server,
+  UserPlus,
   Activity,
+  BarChart3,
   Bot,
+  Box,
+  FileText,
+  UserCog,
   CircleAlert,
   Clock,
   ClipboardCheck,

@@ -117,7 +117,7 @@ export default async function SsoSettingsPage() {
       </Card>
 
       <p className="text-xs text-muted-foreground">
-        Note: this admin console configures WonderAgent&apos;s own record of the
+        Note: this admin console configures WonderID&apos;s own record of the
         connection and JIT provisioning rules. The underlying IdP handshake also
         requires a matching SSO provider to be registered on the Supabase project
         itself (an Enterprise/Pro-tier, project-level setup step) — see

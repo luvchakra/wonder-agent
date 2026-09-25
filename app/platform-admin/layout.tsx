@@ -30,7 +30,7 @@ export default async function PlatformAdminLayout({ children }: { children: Reac
   return (
     <div style={{ display: "flex", fontFamily: "sans-serif", minHeight: "100vh" }}>
       <nav style={{ width: 220, borderRight: "1px solid #ccc", padding: "1rem" }}>
-        <p style={{ fontWeight: "bold" }}>WonderAgent Platform</p>
+        <p style={{ fontWeight: "bold" }}>WonderID Platform</p>
         <ul style={{ listStyle: "none", padding: 0 }}>
           {NAV.map((item) => (
             <li key={item.href} style={{ margin: "0.5rem 0" }}>

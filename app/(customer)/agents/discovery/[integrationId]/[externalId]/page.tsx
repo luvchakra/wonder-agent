@@ -210,7 +210,7 @@ export default async function DiscoveryCandidatePage({
         <Card>
           <CardHeader
             title="Register Agent"
-            description="Registration creates a WonderAgent governance identity. It does not grant or revoke access in the IAM system."
+            description="Registration creates a WonderID governance identity. It does not grant or revoke access in the IAM system."
           />
           <CardBody>
             <form action={registerDiscoveryCandidateAction} className="grid grid-cols-1 gap-4 sm:grid-cols-2">

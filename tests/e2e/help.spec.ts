@@ -49,7 +49,7 @@ test.describe("help centre (signed out)", () => {
 
   test("the assistant answers a question anonymously, retrieval-only", async ({ page }) => {
     await page.goto("/help");
-    await page.getByLabel("Ask a question about WonderAgent").fill("how do I connect Saviynt?");
+    await page.getByLabel("Ask a question about WonderID").fill("how do I connect Saviynt?");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
 
     const answers = page.getByRole("list", { name: "Assistant answers" });
@@ -118,7 +118,7 @@ test.describe("help centre (signed in)", () => {
 
   test("the assistant answers a question and links the matching guide section", async ({ page }) => {
     await page.goto("/help");
-    await page.getByLabel("Ask a question about WonderAgent").fill("how do I connect Saviynt?");
+    await page.getByLabel("Ask a question about WonderID").fill("how do I connect Saviynt?");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
 
     // The answer's own section link is what retrieval chose — assert it
@@ -142,7 +142,7 @@ test.describe("help centre (signed in)", () => {
 
   test("a question the guide doesn't cover says so instead of inventing an answer", async ({ page }) => {
     await page.goto("/help");
-    await page.getByLabel("Ask a question about WonderAgent").fill("kubernetes helm chart rollout");
+    await page.getByLabel("Ask a question about WonderID").fill("kubernetes helm chart rollout");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText(/couldn't find anything in the user guide/i)).toBeVisible({
       timeout: 15_000,

@@ -118,7 +118,7 @@ export function HelpAssistant() {
         className="mt-4 flex gap-2"
       >
         <label htmlFor="help-question" className="sr-only">
-          Ask a question about WonderAgent
+          Ask a question about WonderID
         </label>
         <div className="relative flex-1">
           <input
@@ -126,7 +126,7 @@ export function HelpAssistant() {
             ref={inputRef}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            placeholder="Ask a question about WonderAgent…"
+            placeholder="Ask a question about WonderID…"
             className="block h-10 w-full rounded-md border border-input bg-background px-3 pr-9 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
           />
           <CornerDownLeft

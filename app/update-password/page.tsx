@@ -27,7 +27,7 @@ export default async function UpdatePasswordPage() {
   }
 
   return (
-    <AuthShell title="Set a new password" subtitle="Choose a new password for your WonderAgent account." footer={null}>
+    <AuthShell title="Set a new password" subtitle="Choose a new password for your WonderID account." footer={null}>
       <UpdatePasswordForm />
     </AuthShell>
   );

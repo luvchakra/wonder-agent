@@ -36,7 +36,7 @@ export function AuthShell({
 
       <main className="relative flex flex-1 items-center justify-center px-4 py-12 sm:py-16">
         <div className="w-full max-w-sm">
-          <Link href="/" aria-label="WonderAgent" className="mx-auto flex w-fit items-center">
+          <Link href="/" aria-label="WonderID" className="mx-auto flex w-fit items-center">
             <Logo variant="full" height={56} priority />
           </Link>
 

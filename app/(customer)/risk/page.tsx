@@ -67,7 +67,7 @@ export default async function RiskIndexPage() {
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground hover:underline">
-          Dashboard
+          Home
         </Link>
         <span aria-hidden> / </span>
         <span className="text-foreground">Risk &amp; Compliance</span>

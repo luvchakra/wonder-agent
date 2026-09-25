@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CircleHelp } from "lucide-react";
@@ -12,7 +13,7 @@ import { AccountPanel } from "@/modules/ui/AccountPanel";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
 import { getActiveAnnouncements } from "@/modules/platform-admin/service";
-import type { ShellBadgeCounts } from "@/modules/ui/shell-nav";
+import { NAV_COOKIE, type ShellBadgeCounts } from "@/modules/ui/shell-nav";
 
 /** `TENANT_SUPER_ADMIN` → `Tenant Super Admin`, for the sidebar's user block. */
 function humanizeRole(role: string | undefined): string | null {
@@ -34,11 +35,12 @@ function humanizeRole(role: string | undefined): string | null {
 // "Admin console" link (UX-004), matching the same never-a-customer-role
 // check /platform-admin's own routes already enforce.
 //
-// Layout (2026-09-25 light-console mockups): a permanent white navigation
-// rail from `lg` up, grouped into sections with their sub-pages, and a
-// slim page header beside it (search, notifications, help, then the
+// Layout (WonderID, EXPERIENCE-P0-18, 2026-09-26): a dark navy sidebar
+// from `lg` up (expanded accordion or collapsed icon rail with flyouts),
+// and a slim page header beside it (search, notifications, help, then the
 // account menu with name and role). Below `lg` a bottom tab bar whose
-// "More" slot opens the same rail as a drawer. See modules/ui/AppSidebar.tsx.
+// "More" slot opens the same navigation as a drawer. See
+// modules/ui/AppSidebar.tsx.
 // Organization switching lives only at the foot of the rail (user
 // decision, 2026-09-18: a header chip duplicated it).
 //
@@ -53,7 +55,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const ctx = await getTenantContext();
   if (!ctx.tenantId) redirect("/onboarding");
 
-  const [profile, memberships, isAdmin, announcements, openFindings] = await Promise.all([
+  const [profile, memberships, isAdmin, announcements, openFindings, cookieStore] = await Promise.all([
     getProfile(),
     // Already resolved by getTenantContext() above — the cache hands back
     // the same promise, so this costs nothing.
@@ -71,6 +73,9 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // needs a cheap count contract from the Identity Agent first —
     // recorded in the Experience audit log rather than worked around.
     getFindings(ctx.tenantId, { status: "open" }),
+    // EXPERIENCE-P0-18: the sidebar's collapsed/expanded choice, so the
+    // server renders the width the user left it at.
+    cookies(),
   ]);
 
   const tenantOptions = memberships.map((m) => ({
@@ -104,7 +109,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
         Skip to content
       </a>
 
-      <AppSidebar {...shellProps} />
+      <AppSidebar {...shellProps} initialCollapsed={cookieStore.get(NAV_COOKIE)?.value === "collapsed"} />
       <MobileNavDrawer {...shellProps} />
 
       <div className="flex min-w-0 flex-1 flex-col">

@@ -768,3 +768,17 @@ type uuid`). It now answers 400 through `assertUuid`.
 - Migration 0065 applied to the live project. Its 13 flag rows were
   checked; no tenant has an override row, so every tenant runs on the
   defaults.
+
+---
+
+## 2026-09-26 — Global announcement renamed for WonderID (data change, no code)
+
+With the product renamed WonderID (user decision), the one global notice
+`d6469d00-…`, created by the platform administrator on 2026-09-15, still said
+"Welcome to WonderAgent". Its title and body were changed to "Welcome to
+WonderID" / "Thanks for trying WonderID — your governance data is seeded and
+ready to explore." The change used a service-role SQL update scoped to that id
+and guarded on the old title. It was **not** written to
+`platform_audit_logs`: that table requires a human `actor_id`, and attributing
+the change to the administrator would record an action they did not take.
+This entry is its record.

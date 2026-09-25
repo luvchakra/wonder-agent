@@ -126,7 +126,7 @@ export function guideOnlyAnswer(question: string): HelpAnswer {
 }
 
 const SYSTEM_PROMPT =
-  "You answer questions about the WonderAgent product using ONLY the documentation excerpts provided in the " +
+  "You answer questions about the WonderID product using ONLY the documentation excerpts provided in the " +
   "user message. Never state anything the excerpts do not support, and never invent features, screens, URLs or " +
   "links — the interface adds the section links itself, so do not write any. If the excerpts do not answer the " +
   "question, say plainly that the guide does not cover it and point to the closest excerpt topic instead of " +

@@ -22,9 +22,9 @@ import riskDesktopDark from "@/assets/product/risk-desktop-dark.png";
 import riskDesktopLight from "@/assets/product/risk-desktop-light.png";
 
 export const metadata: Metadata = {
-  title: "WonderAgent — Govern every AI agent. Verify every action.",
+  title: "WonderID — Govern every identity. Verify every access.",
   description:
-    "WonderAgent makes AI agents first-class enterprise identities: their owner, their approved purpose, the access they actually hold, and what they actually did — across the IAM platforms you already run.",
+    "WonderID makes AI agents first-class enterprise identities: their owner, their approved purpose, the access they actually hold, and what they actually did — across the IAM platforms you already run.",
 };
 
 /**
@@ -89,7 +89,7 @@ const STEPS = [
   {
     n: "03",
     title: "Watch the three diverge",
-    body: "WonderAgent continuously compares approved purpose, effective access and observed behaviour, and raises an evidence-backed finding the moment they stop agreeing.",
+    body: "WonderID continuously compares approved purpose, effective access and observed behaviour, and raises an evidence-backed finding the moment they stop agreeing.",
   },
   {
     n: "04",
@@ -125,17 +125,17 @@ export default function WelcomePage() {
       <section className="relative overflow-hidden border-b border-border">
         <GridBackdrop />
         <div className="mx-auto max-w-5xl px-4 pb-20 pt-16 text-center sm:px-6 sm:pb-24 sm:pt-24">
-          <SectionLabel>AI Identity Governance &amp; Runtime Assurance</SectionLabel>
+          <SectionLabel>Identity Governance &amp; Security</SectionLabel>
 
           <h1 className="mx-auto mt-5 max-w-4xl text-balance text-[2.25rem] font-semibold leading-[1.05] tracking-[-0.03em] text-foreground sm:text-5xl lg:text-6xl">
-            Govern every AI agent.{" "}
-            <span className="block text-primary">Verify every action.</span>
+            Govern every identity.{" "}
+            <span className="block text-primary">Verify every access.</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-pretty text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Your AI agents already hold real access to real systems. WonderAgent makes each one a
-            first-class enterprise identity — with an owner, an approved purpose, the access it
-            actually holds, and a record of what it actually did.
+            People, service accounts and AI agents all hold real access to real systems. WonderID
+            makes each one a governed identity — starting with AI agents: an owner, an approved
+            purpose, the access it actually holds, and a record of what it actually did.
           </p>
 
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
@@ -165,7 +165,7 @@ export default function WelcomePage() {
             <BrowserFrame
               light={overviewDesktopLight}
               dark={overviewDesktopDark}
-              alt="The WonderAgent overview dashboard: agent counts, risk by severity, an action queue and recent findings for a tenant called Northwind Financial."
+              alt="The WonderID overview dashboard: agent counts, risk by severity, an action queue and recent findings for a tenant called Northwind Financial."
               priority
               sizes="(min-width: 1280px) 1100px, 100vw"
             />
@@ -239,7 +239,7 @@ export default function WelcomePage() {
               Close the gap by holding all three answers at once.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              WonderAgent keeps an agent&rsquo;s approved purpose, its effective access and its
+              WonderID keeps an agent&rsquo;s approved purpose, its effective access and its
               observed behaviour side by side, and treats any divergence between them as a finding
               with evidence attached.
             </p>
@@ -484,7 +484,7 @@ export default function WelcomePage() {
       {/* ---------------------------------------------------------- footer */}
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <Logo variant="lockup" height={26} alt="WonderAgent" className="flex items-center" />
+          <Logo variant="lockup" height={26} alt="WonderID" className="flex items-center" />
           <p className="text-sm text-muted-foreground">
             AI Identity Governance &amp; Runtime Assurance
           </p>

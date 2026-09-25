@@ -37,9 +37,12 @@ import type { TenantOption } from "./AccountPanel";
 export function WorkspaceSwitcher({
   tenants,
   onSelectTenant,
+  compact = false,
 }: {
   tenants: TenantOption[];
   onSelectTenant: (formData: FormData) => void | Promise<void>;
+  /** The collapsed sidebar: the building icon alone, its name as the label. */
+  compact?: boolean;
 }) {
   const current = tenants.find((t) => t.current);
   const [, startTransition] = useTransition();
@@ -58,23 +61,28 @@ export function WorkspaceSwitcher({
         <button
           type="button"
           aria-label="Switch organization"
-          className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-left text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+          title={compact ? current?.name ?? "Select organization" : undefined}
+          className={cn(
+            "flex min-w-0 items-center gap-2.5 rounded-lg text-left text-sidebar-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-sidebar-ring",
+            compact ? "mx-auto size-11 justify-center" : "w-full px-2 py-2",
+          )}
         >
           <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-accent text-sidebar-accent-foreground">
             <Building2 className="size-4" aria-hidden="true" />
           </span>
-          <span className="min-w-0 flex-1">
+          <span className={cn("min-w-0 flex-1", compact && "sr-only")}>
             <span className="block truncate text-sm font-medium">{current?.name ?? "Select organization"}</span>
             <span className="block truncate text-xs text-sidebar-muted-foreground">
               {current?.slug ? `wonderagent.app/${current.slug}` : "No organization selected"}
             </span>
           </span>
-          <ChevronDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />
+          {compact ? null : <ChevronDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />}
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
           align="start"
+          side={compact ? "right" : "top"}
           sideOffset={6}
           className="z-[60] w-64 rounded-md border border-border bg-popover p-1 text-sm text-popover-foreground shadow-lg"
         >

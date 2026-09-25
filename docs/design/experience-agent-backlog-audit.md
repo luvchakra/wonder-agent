@@ -2684,3 +2684,90 @@ already says the data is seeded but whose newer screens were empty.
 - `tsc` and `eslint` clean.
 - Playwright agents, design-review, runtime-gateway and
   ownership-contract specs: 42/42.
+
+---
+
+## 2026-09-26 — EXPERIENCE-P0-18: WonderID brand and dark navy navigation shell
+
+The user decided (2026-09-26, recorded in `CLAUDE.md`) to rename the product
+WonderID in the app and to replace the light-console rail of EXPERIENCE-P0-15
+with the dark navy sidebar of the WonderID mockups
+(`docs/requirements/wonderid-*.png`).
+
+### Navigation
+
+- **Information architecture** (`modules/ui/shell-nav.ts`):
+  - the spec's section order: Home, Identities, Applications, Access
+    Governance, Certifications, Governance & Policies, Risk & Security, AI
+    Agents, Authentication, Insights, Integrations, Permissions (WonderID),
+    Administration;
+  - three levels: section → page, or section → group → page;
+  - every existing route is listed exactly once, so exactly one page is
+    current;
+  - My Access and Workflows & Automation are omitted until they have
+    pages, per the spec's "do not expose menu items whose underlying
+    capability is not implemented". Each WonderID story adds its pages in
+    the same commit.
+- **Sidebar** (`modules/ui/AppSidebar.tsx`), one body in three modes:
+  - **Expanded:** an accordion. The current section opens by itself and
+    any section opens on click; groups nest inline, each collapsible.
+  - **Collapsed:** an icon rail. Sections open a flyout on hover, click or
+    keyboard (Radix DropdownMenu), and a group opens a third-level
+    flyout. A red dot marks a section with a count.
+  - **Below `lg`:** the same accordion in the drawer opened from the tab
+    bar's "More".
+- **Collapse is remembered** in the `wa_nav` cookie, which the layout
+  reads so the server renders the right width.
+- **Bug caught by the spec.** The cookie constant was first exported from
+  the `"use client"` sidebar. Imported into the Server Component layout, it
+  arrived as a client reference, not the string, so the setting was never
+  read. It now lives in `shell-nav.ts`.
+- **Foot of the sidebar:** a "WonderID AI" entry that promises only what
+  exists ("Ask a question", the help assistant; the full assistant is
+  EXPERIENCE-P0-20), and the organization switcher, which gained a compact
+  form for the icon rail.
+- **Tokens:** `--sidebar*` are navy in both themes. New tokens are
+  `--sidebar-primary` (the active section pill), `--sidebar-primary-
+  foreground` and `--sidebar-ring`; content tokens are unchanged.
+
+### Brand
+
+- `Logo` draws the WonderID W as inline SVG: two strokes and their lighter
+  overlap. It uses solid colours, because an id-referenced gradient breaks
+  when its first instance is hidden. The wordmark is live text, and the
+  tagline is "Govern every identity. Verify every access."
+- New `app/icon.png`, `apple-icon.png` and `favicon.ico`, rendered from
+  the same SVG with the bundled Chromium.
+- User-visible "WonderAgent" is now "WonderID" throughout: sign-in and
+  sign-up, the help centre, settings copy, the welcome page, the
+  platform-admin header, page titles, the MCP client name and the help
+  assistant prompt.
+- The help centre's "What WonderAgent is" article is rewritten as "What
+  WonderID is". It had said the product is "deliberately not a replacement
+  for your IAM, IGA", which is no longer true, and it now states what
+  exists today (AI agent governance) versus what is being added.
+- The welcome page hero now uses the WonderID tagline. Breadcrumb roots
+  say "Home".
+- The global announcement's text was updated in the database (see the
+  Platform audit log).
+
+### Tests
+
+- `shell.spec` was rewritten for the new navigation:
+  - the current page;
+  - the auto-opened current section;
+  - a page inside a group;
+  - collapsed flyout → third-level flyout → navigation, with the choice
+    remembered across a reload;
+  - the mobile drawer.
+- `design-review` now asserts that the sidebar is navy in both themes.
+- `welcome` and `help` specs use the new brand strings.
+
+### Verified
+
+- tsc and eslint clean.
+- Shell, design-review, welcome, help and navigation-smoke specs pass.
+- Screenshots at 1440 px (expanded, collapsed with a third-level flyout,
+  dark) and 390 px (drawer).
+- Full Playwright suite (§17.8, the shell changed): **202/202 passed**
+  (9.5 min).

@@ -14,7 +14,7 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**167 of 226 tracked stories complete — 74%**
+**168 of 226 tracked stories complete — 74%**
 
 ```
 ██████████████████████████████░░░░░░░░░░  74%
@@ -22,10 +22,10 @@ Generated 2026-09-25 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 167 |
+| Done | 168 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 37 |
+| Not Started | 36 |
 | **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -45,7 +45,7 @@ and are deliberately excluded from the counts above.
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 1 | 14 | `█████████████████░` 93% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 20 | 2 | 0 | 4 | 26 | `██████████████░░░░` 77% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 21 | 2 | 0 | 3 | 26 | `███████████████░░░` 81% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 1 | 15 | `██████████████░░░░` 80% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 3 | 28 | `████████░░░░░░░░░░` 46% |
@@ -264,7 +264,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 20 done · 2 partial · 0 deferred · 4 not started (26 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 21 done · 2 partial · 0 deferred · 3 not started (26 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -291,7 +291,7 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-14 | AI-Assisted Investigation UI (read-only summaries) | Done — `AiSummaryPanel` shared component wired into Rogue Agent Detail (finding + SHOULD/CAN/DID summaries); shows "not configured" until FOUNDATION-P0-16 has a provider |
 | EXPERIENCE-P0-16 | Light-console screens 4–12 and the MCP boards | Not Started — 2026-09-25, master stories |
 | EXPERIENCE-P0-17 | Access wording: friendly label with the technical term | Done — 2026-09-25: one `ACCESS_VIEW` source in `modules/ui`, applied to runtime, rogue, Agent 360, access, help, welcome, AI settings and the evidence pack |
-| EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Done — 2026-09-26: WonderID brand (SVG mark, live wordmark, icons); dark navy sidebar with accordion, collapsed icon rail with section and third-level flyouts, remembered collapse, mobile drawer; only implemented routes listed |
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 

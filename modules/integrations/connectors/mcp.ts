@@ -72,7 +72,7 @@ export class McpConnector implements ConnectorAdapter {
     const initialize = await this.rpc("initialize", {
       protocolVersion: "2025-06-18",
       capabilities: {},
-      clientInfo: { name: "WonderAgent", version: "1.0" },
+      clientInfo: { name: "WonderID", version: "1.0" },
     }).catch(() => null);
     const tools = ((await this.rpc("tools/list")) as { tools?: unknown[] })?.tools ?? [];
     const resources = await this.rpc("resources/list")

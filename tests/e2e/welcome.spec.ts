@@ -12,7 +12,7 @@ test.describe("landing page (signed out)", () => {
   test('"/" serves the landing page, not a redirect to sign-in', async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: /Govern every AI agent/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Govern every identity/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Close the gap by holding all three answers/i })).toBeVisible();
   });
 
@@ -20,12 +20,12 @@ test.describe("landing page (signed out)", () => {
     await page.goto("/");
     await page.getByRole("link", { name: "Get started", exact: true }).first().click();
     await expect(page).toHaveURL(/\/sign-up/);
-    await expect(page.getByRole("heading", { name: "Create your WonderAgent account" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Create your WonderID account" })).toBeVisible();
 
     await page.goto("/");
     await page.getByRole("link", { name: "Sign in", exact: true }).first().click();
     await expect(page).toHaveURL(/\/sign-in/);
-    await expect(page.getByRole("heading", { name: "Sign in to WonderAgent" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Sign in to WonderID" })).toBeVisible();
   });
 
   test("renders without horizontal overflow at mobile width", async ({ page }) => {
@@ -44,7 +44,7 @@ test.describe("landing page (signed in)", () => {
   test('"/" still serves the authenticated Overview', async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Govern every AI agent/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /Govern every identity/i })).toHaveCount(0);
   });
 
   test("/welcome redirects a signed-in user into the app", async ({ page }) => {

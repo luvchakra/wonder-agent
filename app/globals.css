@@ -54,17 +54,21 @@
   --input: oklch(0 0 0 / 10%);
   --ring: oklch(0.546 0.215 260 / 50%);
 
-  /* The primary navigation rail. Light-console redesign (2026-09-25,
-     user-supplied mockups): a white rail with a hairline border in light
-     mode, re-derived for dark mode in the blocks below — it is a themed
-     surface again, so these tokens ARE re-declared there. The active
-     section is a filled --primary pill; its sub-pages use --accent. */
-  --sidebar: oklch(1 0 0);
-  --sidebar-foreground: oklch(0.26 0.02 258);
-  --sidebar-muted-foreground: oklch(0.45 0.02 256);
-  --sidebar-accent: oklch(0.962 0.008 255);
-  --sidebar-accent-foreground: oklch(0.22 0.02 258);
-  --sidebar-border: oklch(0 0 0 / 8%);
+  /* The primary navigation. WonderID (EXPERIENCE-P0-18, 2026-09-26,
+     user decision): a dark navy sidebar in BOTH themes, as in the
+     WonderID mockups, beside the themed content area. The active section
+     is a --sidebar-primary pill (a brighter navy-blue); hover and the
+     current page use --sidebar-accent. Dark mode re-declares these a
+     step deeper so the sidebar still sits apart from a dark page. */
+  --sidebar: oklch(0.225 0.07 266);
+  --sidebar-foreground: oklch(0.975 0.006 260);
+  --sidebar-muted-foreground: oklch(0.8 0.035 262);
+  --sidebar-accent: oklch(0.3 0.08 266);
+  --sidebar-accent-foreground: oklch(0.985 0.004 260);
+  --sidebar-border: oklch(1 0 0 / 9%);
+  --sidebar-primary: oklch(0.42 0.14 264);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-ring: oklch(0.72 0.14 270);
 
   --radius: 0.625rem;
   --shadow-sm: 0 1px 3px oklch(0.16 0.015 257 / 0.06);
@@ -105,12 +109,15 @@
     --input: oklch(0.5 0.025 257);
     --ring: oklch(0.72 0.17 262);
 
-    --sidebar: oklch(0.185 0.016 257);
-    --sidebar-foreground: oklch(0.93 0.005 250);
-    --sidebar-muted-foreground: oklch(0.7 0.016 250);
-    --sidebar-accent: oklch(0.25 0.018 257);
-    --sidebar-accent-foreground: oklch(0.97 0.004 250);
-    --sidebar-border: oklch(0.29 0.016 257);
+    --sidebar: oklch(0.19 0.055 266);
+    --sidebar-foreground: oklch(0.96 0.006 260);
+    --sidebar-muted-foreground: oklch(0.76 0.03 262);
+    --sidebar-accent: oklch(0.26 0.065 266);
+    --sidebar-accent-foreground: oklch(0.98 0.004 260);
+    --sidebar-border: oklch(1 0 0 / 8%);
+    --sidebar-primary: oklch(0.4 0.13 264);
+    --sidebar-primary-foreground: oklch(0.99 0 0);
+    --sidebar-ring: oklch(0.72 0.14 270);
 
     --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
     --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
@@ -150,12 +157,15 @@
   --input: oklch(0.5 0.025 257);
   --ring: oklch(0.72 0.17 262);
 
-  --sidebar: oklch(0.185 0.016 257);
-  --sidebar-foreground: oklch(0.93 0.005 250);
-  --sidebar-muted-foreground: oklch(0.7 0.016 250);
-  --sidebar-accent: oklch(0.25 0.018 257);
-  --sidebar-accent-foreground: oklch(0.97 0.004 250);
-  --sidebar-border: oklch(0.29 0.016 257);
+  --sidebar: oklch(0.19 0.055 266);
+  --sidebar-foreground: oklch(0.96 0.006 260);
+  --sidebar-muted-foreground: oklch(0.76 0.03 262);
+  --sidebar-accent: oklch(0.26 0.065 266);
+  --sidebar-accent-foreground: oklch(0.98 0.004 260);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-primary: oklch(0.4 0.13 264);
+  --sidebar-primary-foreground: oklch(0.99 0 0);
+  --sidebar-ring: oklch(0.72 0.14 270);
 
   --shadow-sm: 0 1px 2px oklch(0 0 0 / 0.4);
   --shadow-md: 0 8px 24px oklch(0 0 0 / 0.5);
@@ -191,6 +201,9 @@
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-ring: var(--sidebar-ring);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);

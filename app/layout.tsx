@@ -13,8 +13,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], dis
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
 
 export const metadata: Metadata = {
-  title: "WonderAgent",
-  description: "AI Identity Governance & Runtime Assurance",
+  title: "WonderID",
+  description: "Identity governance and security for human, machine and AI-agent identities",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

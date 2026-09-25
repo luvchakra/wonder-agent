@@ -1,5 +1,5 @@
 /**
- * The WonderAgent user guide, as structured data rather than prose pages.
+ * The WonderID user guide, as structured data rather than prose pages.
  *
  * Structured because two surfaces read it: `/help` renders it, and the help
  * assistant (`lib/ai/helpAnswer.ts`) retrieves against it. Keeping one
@@ -41,14 +41,15 @@ export type GuideSection = {
 
 export const GUIDE_SECTIONS: GuideSection[] = [
   {
-    id: "what-is-wonderagent",
-    title: "What WonderAgent is",
+    id: "what-is-wonderid",
+    title: "What WonderID is",
     category: "Getting started",
     summary:
-      "WonderAgent governs AI agents as enterprise identities — their ownership, purpose, effective access, runtime behaviour and risk — on top of the IAM you already run.",
+      "WonderID is an identity governance platform. It governs who and what holds access — people, machines and AI agents — and why. Today its most complete part is AI agent governance: ownership, purpose, effective access, runtime behaviour and risk.",
     body: [
-      "WonderAgent is an AI Identity Governance and Runtime Assurance platform. It makes every AI agent in your organization a first-class identity with an owner, an approved purpose, a known set of permissions, and an observable record of what it actually did.",
-      "It is deliberately not a replacement for your IAM, IGA, PAM or SIEM. Those remain the system of record; WonderAgent reads from them, builds a vendor-neutral picture of each agent, and tells you where approved purpose, technical capability and real behaviour disagree.",
+      "WonderID treats anything that can receive, use, delegate or lose access as an identity: employees, contractors, external users, service accounts, workloads, APIs and AI agents. For each one it aims to answer who it is, what access it has, why it has it, who approved it, and whether it is still appropriate.",
+      "WonderID grew out of WonderID, and its AI agent governance is complete today: every agent gets an owner, an approved purpose, a known set of permissions and an observable record of what it actually did. Governance for people and other machine identities is being added area by area; the navigation shows only what is available now.",
+      "WonderID is not an identity provider, a secrets vault or a SIEM. Your IdP still signs people in, and your HR and directory systems remain the source of truth for what they own. WonderID reads from them, keeps a vendor-neutral picture, and shows where approved access, actual capability and real behaviour disagree.",
     ],
     keywords: ["overview", "introduction", "what is", "purpose", "product", "about"],
   },
@@ -59,8 +60,8 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     summary:
       "Create an organization, connect a source system, let it import agents, define each agent's approved purpose, then review the risk findings that result.",
     body: [
-      "1. Create or select an organization when you first sign in. Everything in WonderAgent is scoped to that organization (tenant) — data is never shared between them.",
-      "2. Connect a source system under Integrations so WonderAgent can import the agents and permissions your IAM already knows about.",
+      "1. Create or select an organization when you first sign in. Everything in WonderID is scoped to that organization (tenant) — data is never shared between them.",
+      "2. Connect a source system under Integrations so WonderID can import the agents and permissions your IAM already knows about.",
       "3. Review imported agents under Agents → Discovery and register the ones that matter.",
       "4. Give each registered agent an owner and an agent contract — its approved purpose, applications, data and actions. This is what Approved (SHOULD) means for that agent.",
       "5. Open Risks & Alerts. Findings appear where an agent can do, or did, something its contract does not approve.",
@@ -118,7 +119,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     summary:
       "Discovery surfaces agent-like identities found in connected systems so you can register, link or ignore each one.",
     body: [
-      "After an integration syncs, WonderAgent looks for identities that behave like AI agents — service accounts, tokens and non-human identities with agent characteristics — and lists them in the Discovery inbox with the evidence behind each candidate and a confidence signal.",
+      "After an integration syncs, WonderID looks for identities that behave like AI agents — service accounts, tokens and non-human identities with agent characteristics — and lists them in the Discovery inbox with the evidence behind each candidate and a confidence signal.",
       "From there you can register a candidate as a governed agent, link it to an agent you already registered, or ignore it. Ignoring is recorded, not silent, so the same candidate does not reappear as noise.",
       "Duplicate detection runs alongside this and proposes merges when the same real agent appears under several identities.",
     ],
@@ -132,7 +133,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     summary:
       "Integrations import identities, permissions and runtime events from your existing systems; credentials are encrypted and connectors are read-only unless explicitly granted write access.",
     body: [
-      "Integrations → New connects a source. WonderAgent ships a Saviynt read integration, a generic REST connector, and MCP runtime ingestion, plus webhook endpoints for push-style sources.",
+      "Integrations → New connects a source. WonderID ships a Saviynt read integration, a generic REST connector, and MCP runtime ingestion, plus webhook endpoints for push-style sources.",
       "Credentials are encrypted at rest and are never returned by any API, logged, or shown back to you after saving.",
       "A connector declares its capabilities explicitly. One configured read-only cannot perform writes or remediation — that boundary is enforced, not merely documented.",
       "Sync runs appear under Integrations → Jobs with their status and any errors, so a failed import is visible rather than silent.",
@@ -148,7 +149,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "The effective access view computes what an agent can technically do today, including access inherited through roles and groups, and shows the path that grants it.",
     body: [
       "Access shows each agent's computed capability: entitlements, application roles, groups, OAuth scopes and tool permissions, resolved across every identity that agent owns.",
-      "Access paths matter as much as the totals. WonderAgent shows how a permission was granted — directly, through a role, through nested group membership, or through delegation — so you can remove the right grant rather than guessing.",
+      "Access paths matter as much as the totals. WonderID shows how a permission was granted — directly, through a role, through nested group membership, or through delegation — so you can remove the right grant rather than guessing.",
       "This is the CAN half of the model, and it is computed from imported IAM data rather than asserted by hand.",
     ],
     keywords: ["access", "effective", "entitlement", "permission", "can", "role", "group", "scope", "path", "graph"],
@@ -162,7 +163,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Policies express organization-wide rules that agents are evaluated against, independently of any single agent's contract.",
     body: [
       "Where a contract is per-agent, a policy applies across agents — for example forbidding any agent from holding write access to a production financial system, or requiring human approval for a class of action.",
-      "Policy evaluation is deterministic. No policy decision in WonderAgent depends on a language model.",
+      "Policy evaluation is deterministic. No policy decision in WonderID depends on a language model.",
       "Violations surface as findings in Risks & Alerts alongside contract-based findings.",
     ],
     keywords: ["policy", "policies", "rule", "violation", "guardrail", "evaluation"],
@@ -177,7 +178,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     body: [
       "Runtime events arrive from MCP runtime observation and other configured sources, and build a timeline per agent of tools invoked, resources touched and actions taken.",
       "The comparison view puts Approved (SHOULD), Effective Access (CAN) and Observed (DID) next to each other for one agent, which is usually the fastest way to explain a finding to someone who did not configure the agent.",
-      "Activity WonderAgent cannot attribute to a governed agent is itself signal, and feeds discovery rather than being discarded.",
+      "Activity WonderID cannot attribute to a governed agent is itself signal, and feeds discovery rather than being discarded.",
     ],
     keywords: ["runtime", "activity", "events", "did", "timeline", "mcp", "observed", "behaviour", "behavior"],
     href: "/runtime",
@@ -256,11 +257,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     title: "Roles and permissions",
     category: "Settings",
     summary:
-      "Access inside WonderAgent is role-based; roles grant granular permissions and are managed per organization under Settings → Roles.",
+      "Access inside WonderID is role-based; roles grant granular permissions and are managed per organization under Settings → Roles.",
     body: [
       "Built-in roles range from a full tenant super administrator down to read-only and requester roles that can see agents but not policies.",
       "Permissions are checked server-side on every route and action — the UI hides what you cannot do, but the enforcement is not the hiding.",
-      "Platform administration is a separate boundary entirely. It belongs to the vendor operating WonderAgent and is never reachable by a customer role, no matter how privileged.",
+      "Platform administration is a separate boundary entirely. It belongs to the vendor operating WonderID and is never reachable by a customer role, no matter how privileged.",
     ],
     keywords: ["role", "permission", "rbac", "admin", "read only", "requester", "access control", "who can"],
     href: "/settings/roles",
@@ -287,7 +288,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     summary:
       "AI summaries are advisory only; a tenant can bring its own OpenAI or Gemini key, otherwise the deployment's platform default key is used.",
     body: [
-      "AI in WonderAgent writes prose summaries of data that has already been computed. It never makes an authorization, risk, policy or remediation decision — those are always deterministic.",
+      "AI in WonderID writes prose summaries of data that has already been computed. It never makes an authorization, risk, policy or remediation decision — those are always deterministic.",
       "Settings → AI selects the provider and, optionally, your own API key. If you do not bring a key, the platform-wide default key is used when the deployment has one configured.",
       "If neither exists, AI features say so and tell you how to fix it rather than failing silently. Setting the platform default is currently a deployment environment-variable change; there is no platform admin screen for it yet.",
     ],
@@ -323,12 +324,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   },
   {
     id: "faq-remediation",
-    title: "Can WonderAgent revoke access automatically?",
+    title: "Can WonderID revoke access automatically?",
     category: "FAQ",
     summary:
       "No — consequential changes require a human to initiate them, and a read-only connector cannot write at all.",
     body: [
-      "WonderAgent recommends remediation and can hand it to your IAM workflow, but a human initiates consequential grants, revocations, policy overrides and destructive actions.",
+      "WonderID recommends remediation and can hand it to your IAM workflow, but a human initiates consequential grants, revocations, policy overrides and destructive actions.",
       "This is deliberate. An autonomous system that silently revokes production access is a bigger risk than the one it is trying to manage.",
     ],
     keywords: ["remediation", "revoke", "automatic", "automation", "fix", "remove access", "approval"],

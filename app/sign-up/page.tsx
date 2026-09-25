@@ -30,7 +30,7 @@ export default function SignUpPage() {
 
   return (
     <AuthShell
-      title="Create your WonderAgent account"
+      title="Create your WonderID account"
       subtitle="Start governing your AI agents in minutes."
       footer={
         <>

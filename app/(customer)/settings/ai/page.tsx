@@ -31,7 +31,7 @@ export default async function AiProviderSettingsPage() {
       <p className="text-sm text-muted-foreground">
         Powers the AI-Assisted Investigation summaries (findings, evidence bundles,
         Approved (SHOULD) / Effective Access (CAN) / Observed (DID) comparisons, certification items). Summaries are advisory prose
-        only — no authorization, risk, or remediation decision in WonderAgent ever
+        only — no authorization, risk, or remediation decision in WonderID ever
         depends on an AI output (non-negotiable #9). Supports OpenAI and Google Gemini.
       </p>
 
@@ -105,7 +105,7 @@ export default async function AiProviderSettingsPage() {
 
       <p className="text-xs text-muted-foreground">
         Your key is encrypted at rest (lib/security/encryptSecret.ts, AES-256-GCM) and
-        is never returned by any API response, logged, or visible to WonderAgent staff.
+        is never returned by any API response, logged, or visible to WonderID staff.
         Only a user with the ai.manage permission (TENANT_SUPER_ADMIN by default) can
         view this page or change this setting. Switching provider never reuses a
         previously stored key for a different provider — you must supply a fresh key

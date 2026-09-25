@@ -68,7 +68,7 @@ export default async function RuntimeIndexPage() {
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
         <Link href="/" className="hover:text-foreground hover:underline">
-          Dashboard
+          Home
         </Link>
         <span aria-hidden> / </span>
         <span className="text-foreground">Runtime Assurance</span>

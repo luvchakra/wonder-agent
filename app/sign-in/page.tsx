@@ -78,8 +78,8 @@ function SignInForm() {
 
   return (
     <AuthShell
-      title="Sign in to WonderAgent"
-      subtitle="Govern every AI agent. Verify every action."
+      title="Sign in to WonderID"
+      subtitle="Govern every identity. Verify every access."
       footer={
         <>
           Need an account?{" "}

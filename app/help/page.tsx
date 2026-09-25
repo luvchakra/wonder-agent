@@ -4,8 +4,8 @@ import { GUIDE_CATEGORIES, GUIDE_SECTIONS, sectionsByCategory } from "@/modules/
 import { HelpAssistant } from "@/modules/ui/help/HelpAssistant";
 
 export const metadata = {
-  title: "Get Help — WonderAgent",
-  description: "User guide, FAQ and help assistant for WonderAgent.",
+  title: "Get Help — WonderID",
+  description: "User guide, FAQ and help assistant for WonderID.",
 };
 
 /**
@@ -27,7 +27,7 @@ export default function HelpPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Get Help</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          How WonderAgent works, how to set it up, and answers to the questions that come up most.
+          How WonderID works, how to set it up, and answers to the questions that come up most.
           Ask the assistant below, or browse the guide.
         </p>
       </header>

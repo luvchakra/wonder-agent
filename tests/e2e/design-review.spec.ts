@@ -166,7 +166,7 @@ test.describe("design review — structure and theming", () => {
     await expect(tabs).toBeVisible();
   });
 
-  test("the rail follows the theme: a light console surface in light mode, dark in dark", async ({ page }) => {
+  test("the sidebar is dark navy in both themes, beside a themed page", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
 
@@ -196,14 +196,14 @@ test.describe("design review — structure and theming", () => {
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "light"));
     const light = await readSurfaces();
     expect(light.body, "light mode page background should be light").toBeGreaterThan(0.7);
-    // 2026-09-25 light-console redesign: the rail is a white surface in
-    // light mode (it was a fixed navy before), and themed in dark mode.
-    expect(light.rail, "the navigation rail should be a light surface in light mode").toBeGreaterThan(0.85);
+    // EXPERIENCE-P0-18 (WonderID, 2026-09-26): the sidebar is dark navy in
+    // light mode too, as in the WonderID mockups.
+    expect(light.rail, "the sidebar should be dark navy in light mode").toBeLessThan(0.3);
 
     await page.evaluate(() => document.documentElement.setAttribute("data-theme", "dark"));
     const dark = await readSurfaces();
     expect(dark.body, "dark mode page background should be dark").toBeLessThan(0.3);
-    expect(dark.rail, "the navigation rail should be dark in dark mode").toBeLessThan(0.3);
+    expect(dark.rail, "the sidebar should be dark navy in dark mode").toBeLessThan(0.3);
   });
 
   test("every screen has exactly one top-level heading", async ({ page }) => {

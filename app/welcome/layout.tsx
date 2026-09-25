@@ -27,7 +27,7 @@ export default function WelcomeLayout({ children }: { children: React.ReactNode 
 
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
-          <Link href="/" aria-label="WonderAgent" className="flex items-center">
+          <Link href="/" aria-label="WonderID" className="flex items-center">
             <Logo variant="lockup" height={30} priority />
           </Link>
 

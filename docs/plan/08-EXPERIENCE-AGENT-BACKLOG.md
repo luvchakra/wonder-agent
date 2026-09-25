@@ -40,7 +40,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-14 | AI-Assisted Investigation UI (read-only summaries) | Done — `AiSummaryPanel` shared component wired into Rogue Agent Detail (finding + SHOULD/CAN/DID summaries); shows "not configured" until FOUNDATION-P0-16 has a provider |
 | EXPERIENCE-P0-16 | Light-console screens 4–12 and the MCP boards | Not Started — 2026-09-25, master stories |
 | EXPERIENCE-P0-17 | Access wording: friendly label with the technical term | Done — 2026-09-25: one `ACCESS_VIEW` source in `modules/ui`, applied to runtime, rogue, Agent 360, access, help, welcome, AI settings and the evidence pack |
-| EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Done — 2026-09-26: WonderID brand (SVG mark, live wordmark, icons); dark navy sidebar with accordion, collapsed icon rail with section and third-level flyouts, remembered collapse, mobile drawer; only implemented routes listed |
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 
