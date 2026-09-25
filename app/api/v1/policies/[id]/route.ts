@@ -7,9 +7,9 @@ import type { UpdatePolicyInput } from "@/lib/shared/types/access-governance";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermission("policy.read");
+    const ctx = await requirePermission("policy.read");
     const { id } = await params;
-    const policy = await getPolicy(id);
+    const policy = await getPolicy(id, ctx.tenantId!);
     if (!policy) return NextResponse.json({ ok: false, error: { code: "POLICY_NOT_FOUND" } }, { status: 404 });
     return NextResponse.json({ ok: true, data: policy });
   } catch (err) {

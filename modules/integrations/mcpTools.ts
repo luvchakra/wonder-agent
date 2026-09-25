@@ -34,6 +34,7 @@ export async function discoverMcpTools(
     .from("integrations")
     .select()
     .eq("id", integrationId)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!integration) throw new ApiError(404, "INTEGRATION_NOT_FOUND");

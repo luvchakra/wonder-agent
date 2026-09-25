@@ -124,12 +124,13 @@ isolation checks. Detail is in each module's audit log.
 | + | ACCESS-P0-14: separation-of-duties checks wired (D5) | Done | `1e98e94` |
 | + | ACCESS-P0-12: policy targets, priority, draft → publish | Done | `6c1d9af` |
 | + | IDENTITY-P0-13: contract and ownership completeness; same-tenant agent references | Done | `9da1e87` |
-| + | EXPERIENCE-P0-17: "Approved (SHOULD)" / "Effective Access (CAN)" / "Observed (DID)" / "Current Request (NOW)" wording | Done | see Experience audit |
+| + | EXPERIENCE-P0-17: "Approved (SHOULD)" / "Effective Access (CAN)" / "Observed (DID)" / "Current Request (NOW)" wording | Done | `fc6ffb7` |
+| + | QA-P0-17: RLS-only read sweep, same-tenant keys (0076), org switcher fix, two-organization E2E | Done | see QA audit |
 
 **Still to do in this programme:**
 
 - EXPERIENCE-P0-16 (the remaining mockup screens).
-- QA-P0-17/18 (RLS read sweep; the gateway security suite).
+- QA-P0-18 (the gateway security suite).
 
 **Open items recorded, not decided:**
 
@@ -142,9 +143,6 @@ isolation checks. Detail is in each module's audit log.
 - The shared `Table` cell breaks words mid-letter at desktop widths, and
   the Audit and Roles tables rely on that (Experience).
 - `assignFinding()` does not check that the assignee is a member (Risk).
-- `accounts`, `access_requests` and `policy_exceptions` reference
-  `agents(id)` alone, so their RLS-allowed inserts could point at another
-  tenant's agent. Identity's tables were fixed by 0075 (Access → QA-P0-17).
 - Tenantless users' page renders log a harmless `QUERY_FAILED` before the
   redirect (Experience).
 

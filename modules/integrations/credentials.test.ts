@@ -14,21 +14,23 @@ vi.mock("@/lib/security/encryptSecret", () => ({
 const writeAudit = vi.fn();
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: (event: unknown) => writeAudit(event) }));
 
-const updateFn = vi.fn(() => ({ eq: vi.fn(async () => ({ error: null })) }));
+// Every read and write in setCredential is filtered by id and tenant
+// (QA-P0-17), so each chain has two .eq() calls before its terminal.
+const updateFn = vi.fn(() => ({ eq: () => ({ eq: vi.fn(async () => ({ error: null })) }) }));
 const insertFn = vi.fn(async () => ({ error: null }));
 let existingCredentialRow: { integration_id: string } | null = { integration_id: "int-1" };
 
-function makeQuery() {
+function makeQuery(table: string) {
+  const row =
+    table === "integration_credentials"
+      ? () => existingCredentialRow
+      : () => ({ id: "int-1", integration_type_id: "generic_rest", config: {} });
   return {
     select: () => ({
       eq: () => ({
         eq: () => ({
-          maybeSingle: async () => ({
-            data: { id: "int-1", integration_type_id: "generic_rest", config: {} },
-            error: null,
-          }),
+          maybeSingle: async () => ({ data: row(), error: null }),
         }),
-        maybeSingle: async () => ({ data: existingCredentialRow, error: null }),
       }),
     }),
     update: updateFn,
@@ -37,7 +39,7 @@ function makeQuery() {
 }
 
 vi.mock("@/lib/db/supabaseServer", () => ({
-  supabaseServiceRole: () => ({ from: () => makeQuery() }),
+  supabaseServiceRole: () => ({ from: (table: string) => makeQuery(table) }),
 }));
 
 import { setCredential } from "./credentials";

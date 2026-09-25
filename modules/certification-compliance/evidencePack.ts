@@ -38,7 +38,7 @@ export async function assembleGovernanceEvidencePack(tenantId: string, agentId: 
   const agent = await getAgent(tenantId, agentId);
   if (!agent) throw new ApiError(404, "NOT_FOUND", "Agent not found");
 
-  const contract = await getAgentContract(agentId);
+  const contract = await getAgentContract(agentId, tenantId);
 
   const [
     owners,

@@ -21,10 +21,10 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
     throw err;
   }
 
-  const policy = await getPolicy(id);
+  const policy = await getPolicy(id, ctx.tenantId!);
   if (!policy) notFound();
 
-  const [rules, exceptions] = await Promise.all([listPolicyRules(id), listPolicyExceptions(id)]);
+  const [rules, exceptions] = await Promise.all([listPolicyRules(id, ctx.tenantId!), listPolicyExceptions(id, ctx.tenantId!)]);
   const targets = targetsFromScope(policy.scope);
   const canPublish = ctx.permissions.includes("policy.publish");
   const addRuleWithId = addPolicyRuleAction.bind(null, id);

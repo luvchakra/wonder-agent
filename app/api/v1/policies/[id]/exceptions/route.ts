@@ -5,9 +5,9 @@ import { errorResponse } from "@/modules/access-governance/http";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermission("policy.read");
+    const ctx = await requirePermission("policy.read");
     const { id } = await params;
-    const exceptions = await listPolicyExceptions(id);
+    const exceptions = await listPolicyExceptions(id, ctx.tenantId!);
     return NextResponse.json({ ok: true, data: exceptions });
   } catch (err) {
     return errorResponse(err);

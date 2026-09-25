@@ -151,7 +151,7 @@ function isCanExercisedInDid(did: DidEntry[], can: CanEntry): boolean {
  */
 export async function compareShouldCanDid(tenantId: string, agentId: string, asOf?: string): Promise<ShouldCanDidComparison> {
   const [contract, canGrants, did, didTools, now] = await Promise.all([
-    getAgentContract(agentId),
+    getAgentContract(agentId, tenantId),
     asOf ? getEffectiveAccessAsOf(tenantId, agentId, asOf) : getEffectiveAccess(tenantId, agentId),
     getDid(tenantId, agentId),
     loadDidTools(tenantId, agentId),

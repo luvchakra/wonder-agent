@@ -10,13 +10,13 @@ import { errorResponse } from "@/modules/access-governance/http";
 // contract itself names.
 export async function GET(request: NextRequest, { params }: { params: Promise<{ agentId: string }> }) {
   try {
-    await requirePermission("access.read");
+    const ctx = await requirePermission("access.read");
     const { agentId } = await params;
     const actionsParam = request.nextUrl.searchParams.get("actions");
     const actions = actionsParam
       ? actionsParam.split(",").map((a) => a.trim()).filter(Boolean)
       : undefined;
-    const results = await classifyActionsForAgent(agentId, actions);
+    const results = await classifyActionsForAgent(ctx.tenantId!, agentId, actions);
     return NextResponse.json({ ok: true, data: results });
   } catch (err) {
     return errorResponse(err);

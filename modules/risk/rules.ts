@@ -83,7 +83,7 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     apiKeys,
     mcpInventory,
   ] = await Promise.all([
-    getAgentContract(agentId),
+    getAgentContract(agentId, tenantId),
     compareShouldCanDid(tenantId, agentId),
     getOwnershipIssues(tenantId, agentId, agent.criticality),
     listPolicyEvaluations(tenantId, agentId),

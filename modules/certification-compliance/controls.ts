@@ -32,11 +32,26 @@ export async function listControls(frameworkId: string): Promise<Control[]> {
 
 export async function createControlMapping(tenantId: string, actorId: string, controlId: string, policyId?: string, ownerId?: string): Promise<ControlMapping> {
   const supabase = supabaseServiceRole();
+  // QA-P0-17: this is a service-role write, so nothing but these checks and
+  // 0076's (policy_id, tenant_id) foreign key stops it pointing at another
+  // tenant's policy or naming a non-member as owner (§14).
+  if (ownerId) {
+    const { data: member, error: memberError } = await supabase
+      .from("tenant_memberships")
+      .select("user_id")
+      .eq("tenant_id", tenantId)
+      .eq("user_id", ownerId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (memberError) throw new ApiError(500, "QUERY_FAILED", memberError.message);
+    if (!member) throw new ApiError(400, "VALIDATION_FAILED", "A control owner must be an active member of this organization");
+  }
   const { data, error } = await supabase
     .from("control_mappings")
     .insert({ tenant_id: tenantId, control_id: controlId, policy_id: policyId ?? null, owner_id: ownerId ?? null })
     .select()
     .single();
+  if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That control or policy is not in this organization");
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create control mapping");
 
   await writeAudit({

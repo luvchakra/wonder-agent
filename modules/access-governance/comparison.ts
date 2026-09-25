@@ -83,7 +83,7 @@ export async function compareAccessToContract(
   tenantId: string,
   agentId: string,
 ): Promise<ContractComparisonRow[]> {
-  const contract = await getAgentContract(agentId);
+  const contract = await getAgentContract(agentId, tenantId);
   if (!contract) throw new ApiError(404, "NO_ACTIVE_CONTRACT", "Agent has no active contract to compare against");
 
   const effectiveAccess = await getEffectiveAccess(tenantId, agentId);

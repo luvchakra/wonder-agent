@@ -1017,3 +1017,16 @@ exported from `service.ts`.
 - **Consumer.** The Risk engine's "Certification overdue" factor
   (RISK-P0-12), which had no source until now.
 - **Compatibility.** No existing contract changed.
+
+---
+
+## 2026-09-25 — Tenant filters and same-tenant keys (with QA-P0-17)
+
+QA-P0-17's sweep changed this module's code and schema. It added
+explicit `tenant_id` filters to reads that relied on RLS alone, required
+`tenantId` on by-id reads that lacked it, and checked parents on by-id
+writes. Migration 0076 (or 0075 for Identity) gave this module's
+agent/parent references `(col, tenant_id)` foreign keys under their
+existing names. For a member of two organizations, RLS alone admitted
+both. The full list, tests and live SQL verification are in the QA audit
+log's QA-P0-17 entry.

@@ -639,3 +639,16 @@ Playwright 175/175.
 **Verified:** eslint clean, vitest 484/484, Playwright **177/177** (7.7
 min), including `mcp-inventory.spec.ts` 2/2 and the design review over
 `/integrations/mcp`. Migration 0069 applied live.
+
+---
+
+## 2026-09-25 — Tenant filters and same-tenant keys (with QA-P0-17)
+
+QA-P0-17's sweep changed this module's code and schema. It added
+explicit `tenant_id` filters to reads that relied on RLS alone, required
+`tenantId` on by-id reads that lacked it, and checked parents on by-id
+writes. Migration 0076 (or 0075 for Identity) gave this module's
+agent/parent references `(col, tenant_id)` foreign keys under their
+existing names. For a member of two organizations, RLS alone admitted
+both. The full list, tests and live SQL verification are in the QA audit
+log's QA-P0-17 entry.

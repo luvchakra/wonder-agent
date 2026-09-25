@@ -167,7 +167,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   ] = await Promise.all([
       listOwners(ctx.tenantId!, id),
       getOwnershipIssues(ctx.tenantId!, id, agent.criticality),
-      getAgentContract(id),
+      getAgentContract(id, ctx.tenantId!),
       listContractVersions(ctx.tenantId!, id),
       listLifecycleEvents(ctx.tenantId!, id),
       listRelationships(ctx.tenantId!, id),

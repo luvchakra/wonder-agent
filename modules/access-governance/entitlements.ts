@@ -26,6 +26,9 @@ export async function createEntitlement(
     })
     .select()
     .single();
+  // QA-P0-17: 0076's same-tenant foreign keys refuse a reference to another
+  // organization's row (23503). Say so, rather than a generic 500.
+  if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That application is not in this organization");
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create entitlement");
   return toEntitlement(data);
 }

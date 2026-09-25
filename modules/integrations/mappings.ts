@@ -11,12 +11,24 @@ import { toIntegrationMapping } from "./mappers";
  * migration 0024), so this runs as the calling user.
  */
 export async function createMapping(
+  tenantId: string,
   integrationId: string,
   objectType: string,
   sourceField: string,
   targetField: string,
 ): Promise<IntegrationMapping> {
   const supabase = await supabaseServer();
+  // QA-P0-17: integration_mappings has no tenant_id, and its RLS admits an
+  // integration in ANY of the caller's organizations, where their
+  // permission was never checked. The integration must be in this one.
+  const { data: integration, error: integrationError } = await supabase
+    .from("integrations")
+    .select("id")
+    .eq("id", integrationId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  if (integrationError) throw new ApiError(500, "QUERY_FAILED", integrationError.message);
+  if (!integration) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
   const { data, error } = await supabase
     .from("integration_mappings")
     .insert({ integration_id: integrationId, object_type: objectType, source_field: sourceField, target_field: targetField })
@@ -28,9 +40,16 @@ export async function createMapping(
   return toIntegrationMapping(data);
 }
 
-export async function listMappings(integrationId: string, objectType?: string): Promise<IntegrationMapping[]> {
+export async function listMappings(integrationId: string, tenantId: string, objectType?: string): Promise<IntegrationMapping[]> {
   const supabase = await supabaseServer();
-  let query = supabase.from("integration_mappings").select().eq("integration_id", integrationId);
+  // QA-P0-17: integration_mappings has no tenant_id; filter through its
+  // integration, since RLS alone admits every organization a multi-org
+  // user belongs to.
+  let query = supabase
+    .from("integration_mappings")
+    .select("*, integrations!inner(tenant_id)")
+    .eq("integration_id", integrationId)
+    .eq("integrations.tenant_id", tenantId);
   if (objectType) query = query.eq("object_type", objectType);
   const { data, error } = await query;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

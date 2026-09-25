@@ -40,7 +40,7 @@ export async function getGovernancePosture(tenantId: string, agentId: string): P
   const agent = await getAgent(tenantId, agentId);
   if (!agent) throw new ApiError(404, "NOT_FOUND", "Agent not found");
 
-  const contract = await getAgentContract(agentId);
+  const contract = await getAgentContract(agentId, tenantId);
   const dimensions: GovernanceDimensionResult[] = [];
 
   // 1. Identity
@@ -105,7 +105,7 @@ export async function getGovernancePosture(tenantId: string, agentId: string): P
     if (observedActions.length === 0) {
       dimensions.push(na("action_authority", "No observed runtime actions to classify yet"));
     } else {
-      const classified = await classifyActionsForAgent(agentId, observedActions);
+      const classified = await classifyActionsForAgent(tenantId, agentId, observedActions);
       const disallowed = classified.filter((c) => c.state === "prohibited" || c.state === "restricted");
       dimensions.push(
         disallowed.length === 0

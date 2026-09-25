@@ -69,7 +69,7 @@ async function populateCertificationItems(
   const svc = supabaseServiceRole();
   for (const agent of agents) {
     const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
-      getAgentContract(agent.id),
+      getAgentContract(agent.id, tenantId),
       getEffectiveAccess(tenantId, agent.id),
       listPolicyEvaluations(tenantId, agent.id),
       getFindings(tenantId, { agentId: agent.id, status: "open" }),

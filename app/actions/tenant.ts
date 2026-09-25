@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
+import { getSessionUser } from "@/lib/tenant/session";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
 
 function slugify(name: string): string {
@@ -59,12 +60,19 @@ export async function createTenantAction(formData: FormData) {
  */
 export async function selectTenantAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "");
+  const user = await getSessionUser();
+  if (!user) redirect("/sign-in");
   const supabase = await supabaseServer();
 
+  // QA-P0-17: the caller's OWN membership. The tenant_memberships policy
+  // lets every member read the tenant's membership rows, so without the
+  // user filter an organization with two or more members returned several
+  // rows, maybeSingle() gave no data, and switching failed as "Not a member".
   const { data: membership } = await supabase
     .from("tenant_memberships")
     .select("tenant_id")
     .eq("tenant_id", tenantId)
+    .eq("user_id", user.id)
     .eq("status", "active")
     .maybeSingle();
 

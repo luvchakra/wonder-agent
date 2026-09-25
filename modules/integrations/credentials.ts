@@ -68,6 +68,7 @@ export async function setCredential(
     .from("integration_credentials")
     .select("integration_id")
     .eq("integration_id", integrationId)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   const { error } = existing
@@ -75,6 +76,7 @@ export async function setCredential(
         .from("integration_credentials")
         .update({ auth_type: authType, encrypted_secret: encrypted, rotated_at: new Date().toISOString() })
         .eq("integration_id", integrationId)
+        .eq("tenant_id", tenantId)
     : await supabase
         .from("integration_credentials")
         .insert({ integration_id: integrationId, tenant_id: tenantId, auth_type: authType, encrypted_secret: encrypted });

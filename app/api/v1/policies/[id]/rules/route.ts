@@ -5,9 +5,9 @@ import { errorResponse } from "@/modules/access-governance/http";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermission("policy.read");
+    const ctx = await requirePermission("policy.read");
     const { id } = await params;
-    const rules = await listPolicyRules(id);
+    const rules = await listPolicyRules(id, ctx.tenantId!);
     return NextResponse.json({ ok: true, data: rules });
   } catch (err) {
     return errorResponse(err);
@@ -16,10 +16,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requirePermission("policy.update");
+    const ctx = await requirePermission("policy.update");
     const { id } = await params;
     const body = await request.json();
-    const rule = await addPolicyRule(id, body.ruleType, body.condition);
+    const rule = await addPolicyRule(ctx.tenantId!, id, body.ruleType, body.condition);
     return NextResponse.json({ ok: true, data: rule }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

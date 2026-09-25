@@ -14,7 +14,7 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**165 of 190 tracked stories complete — 87%**
+**166 of 190 tracked stories complete — 87%**
 
 ```
 ███████████████████████████████████░░░░░  87%
@@ -22,10 +22,10 @@ Generated 2026-09-25 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 165 |
+| Done | 166 |
 | Partial | 21 |
 | Deferred | 1 |
-| Not Started | 3 |
+| Not Started | 2 |
 | **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 20 | 2 | 0 | 1 | 23 | `████████████████░░` 87% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 0 | 14 | `███████████████░░░` 86% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 0 | 12 | `█████████████████░` 92% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 11 | 12 | 0 | 2 | 25 | `████████░░░░░░░░░░` 44% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 12 | 12 | 0 | 1 | 25 | `█████████░░░░░░░░░` 48% |
 
 ---
 
@@ -313,7 +313,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 11 done · 12 partial · 0 deferred · 2 not started (25 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 12 done · 12 partial · 0 deferred · 1 not started (25 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -339,7 +339,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
 | QA-P1-07 | Release record completeness standard | Done — 2026-09-19: `INTEGRATION_STATUS.md` now opens with a Release identifier (commit + date) and an explicit P0/P1/P2 status summary (P0 detail is the table-level status below; P1/P2 are the modules' own prose `## P1`/`## P2` bullets, ~52/32 combined, overwhelmingly Not Started by design per CLAUDE.md §3) — see audit log |
 | QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16 (later): the sandbox's Supabase egress blocker is gone, so the suite was pointed at the live production deployment and **the framework is now proven against a real server** — `authenticate as platformAdmin` signed in end-to-end through real Supabase Auth and saved storage state. The four tenant-user logins failed on a **genuine product bug the suite existed to catch**: `getTenantContext()` returned every colleague's `tenant_memberships` row (RLS there is tenant-scoped, not user-scoped), so a single-tenant user resolved as a member of three organizations and was bounced to `/onboarding`; fixed in Foundation + Experience, proven at the data layer (3 rows → 1). A full run is still blocked, but on **credentials, not the network**: Vercel's Supabase env vars are Production-scoped so every preview 500s, and all five GitHub Actions secrets resolve empty in the job log. Needs `SUPABASE_SERVICE_ROLE_KEY` + `SECRET_ENCRYPTION_KEY` as repo secrets or Preview env vars — see `docs/design/qa-agent-backlog-audit.md` |
-| QA-P0-17 | RLS-only read sweep (codebase-map D10) | Not Started — 2026-09-25, master stories |
+| QA-P0-17 | RLS-only read sweep (codebase-map D10) | Done — 2026-09-25: every tenant read filtered explicitly (≈25 sites), by-id writes check the parent, 0076 same-tenant keys on 13 references, org switcher fixed; `multi-org-isolation.spec` with a two-organization identity |
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 

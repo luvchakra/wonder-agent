@@ -219,6 +219,11 @@ export async function seedTestData(): Promise<SeededTestData> {
       await ensureMembership(supabase, tenantId, userId);
       await ensureRole(supabase, tenantId, userId, spec.role);
     }
+    if (spec.alsoIn) {
+      const tenantId = spec.alsoIn.tenant.slug === TENANT_ONE.slug ? tenantOneId : tenantTwoId;
+      await ensureMembership(supabase, tenantId, userId);
+      await ensureRole(supabase, tenantId, userId, spec.alsoIn.role);
+    }
     if (spec.isPlatformAdmin) {
       await ensurePlatformAdmin(supabase, userId);
     }

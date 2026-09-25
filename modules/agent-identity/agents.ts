@@ -135,6 +135,7 @@ export async function getAgent(tenantId: string, agentId: string): Promise<Agent
     .from("agents")
     .select()
     .eq("id", agentId)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
 
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

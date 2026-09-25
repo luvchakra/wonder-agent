@@ -20,6 +20,7 @@ export async function getNormalizedObjects(
     .from("integration_objects")
     .select()
     .eq("integration_id", integrationId)
+    .eq("tenant_id", tenantId)
     .eq("object_type", objectType)
     .order("imported_at", { ascending: false });
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

@@ -45,6 +45,9 @@ export async function createPolicy(tenantId: string, input: CreatePolicyInput, a
   if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
   const status = input.status ?? "active";
   if (status !== "draft" && status !== "active") throw new ApiError(400, "VALIDATION_FAILED", "status: draft or active");
+  // An unknown action used to reach the database's check and come back as
+  // a 500; it is the caller's input, so say so.
+  if (!["flag", "restrict", "block"].includes(input.action)) throw new ApiError(400, "VALIDATION_FAILED", "action: flag, restrict or block");
   const scope = { ...(input.scope ?? {}), targets: validateTargets((input.scope as { targets?: unknown } | undefined)?.targets) };
   if (input.priority !== undefined && (!Number.isInteger(input.priority) || input.priority < -1000 || input.priority > 1000)) {
     throw new ApiError(400, "VALIDATION_FAILED", "priority: a whole number from -1000 to 1000");
@@ -90,7 +93,7 @@ export async function createPolicy(tenantId: string, input: CreatePolicyInput, a
  * the publish is audited.
  */
 export async function publishPolicy(tenantId: string, actorId: string, policyId: string): Promise<Policy> {
-  const current = await getPolicy(policyId);
+  const current = await getPolicy(policyId, tenantId);
   if (!current || current.tenantId !== tenantId) throw new ApiError(404, "POLICY_NOT_FOUND");
   if (current.status === "active") throw new ApiError(409, "ALREADY_PUBLISHED", "This policy is already in effect");
   const supabase = await supabaseServer();
@@ -126,9 +129,14 @@ export async function listPolicies(tenantId: string): Promise<Policy[]> {
   return (data ?? []).map(toPolicy);
 }
 
-export async function getPolicy(policyId: string): Promise<Policy | null> {
+/**
+ * QA-P0-17: every by-id read here also filters by the active tenant. RLS
+ * alone admits every organization a multi-org user belongs to, so an id
+ * from their other organization would otherwise resolve.
+ */
+export async function getPolicy(policyId: string, tenantId: string): Promise<Policy | null> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("policies").select().eq("id", policyId).maybeSingle();
+  const { data, error } = await supabase.from("policies").select().eq("id", policyId).eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return data ? toPolicy(data) : null;
 }
@@ -149,7 +157,7 @@ export async function updatePolicy(
   policyId: string,
   patch: UpdatePolicyInput,
 ): Promise<Policy> {
-  const current = await getPolicy(policyId);
+  const current = await getPolicy(policyId, tenantId);
   if (!current || current.tenantId !== tenantId) throw new ApiError(404, "POLICY_NOT_FOUND");
 
   const supabase = await supabaseServer();
@@ -191,22 +199,29 @@ export async function updatePolicy(
   return toPolicy(data);
 }
 
-export async function listPolicyVersions(policyId: string): Promise<PolicyVersionRecord[]> {
+export async function listPolicyVersions(policyId: string, tenantId: string): Promise<PolicyVersionRecord[]> {
   const supabase = await supabaseServer();
+  // policy_versions has no tenant_id; filter through its policy.
   const { data, error } = await supabase
     .from("policy_versions")
-    .select()
+    .select("*, policies!inner(tenant_id)")
     .eq("policy_id", policyId)
+    .eq("policies.tenant_id", tenantId)
     .order("version", { ascending: false });
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyVersionRecord);
 }
 
 export async function addPolicyRule(
+  tenantId: string,
   policyId: string,
   ruleType: PolicyRuleType,
   condition: PolicyCondition,
 ): Promise<PolicyRule> {
+  // QA-P0-17: the policy must be in the active organization. RLS would
+  // also admit the user's other organizations, where the caller's
+  // permission was never checked.
+  if (!(await getPolicy(policyId, tenantId))) throw new ApiError(404, "POLICY_NOT_FOUND");
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("policy_rules")
@@ -217,9 +232,14 @@ export async function addPolicyRule(
   return toPolicyRule(data);
 }
 
-export async function listPolicyRules(policyId: string): Promise<PolicyRule[]> {
+export async function listPolicyRules(policyId: string, tenantId: string): Promise<PolicyRule[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("policy_rules").select().eq("policy_id", policyId);
+  // policy_rules has no tenant_id; filter through its policy.
+  const { data, error } = await supabase
+    .from("policy_rules")
+    .select("*, policies!inner(tenant_id)")
+    .eq("policy_id", policyId)
+    .eq("policies.tenant_id", tenantId);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyRule);
 }
@@ -290,6 +310,9 @@ export async function createGovernanceException(
     })
     .select()
     .single();
+  // QA-P0-17: 0076's same-tenant foreign keys refuse a reference to another
+  // organization's row (23503). Say so, rather than a generic 500.
+  if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That policy or agent is not in this organization");
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to add governance exception");
 
   await writeAudit({
@@ -306,9 +329,9 @@ export async function createGovernanceException(
   return toPolicyException(data);
 }
 
-export async function listPolicyExceptions(policyId: string): Promise<PolicyException[]> {
+export async function listPolicyExceptions(policyId: string, tenantId: string): Promise<PolicyException[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("policy_exceptions").select().eq("policy_id", policyId);
+  const { data, error } = await supabase.from("policy_exceptions").select().eq("policy_id", policyId).eq("tenant_id", tenantId);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toPolicyException);
 }

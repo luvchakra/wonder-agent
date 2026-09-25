@@ -58,12 +58,15 @@ export function nextReviewAt(from: Date, frequency: CertificationFrequency, cont
  * beyond tenant scoping (see migration 0016), so this can safely use the
  * request-scoped, RLS-respecting client.
  */
-export async function getAgentContract(agentId: string): Promise<AgentContract | null> {
+export async function getAgentContract(agentId: string, tenantId: string): Promise<AgentContract | null> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("agent_contracts")
     .select()
     .eq("agent_id", agentId)
+    // QA-P0-17: RLS alone admits every organization a multi-org user
+    // belongs to.
+    .eq("tenant_id", tenantId)
     .eq("status", "active")
     .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

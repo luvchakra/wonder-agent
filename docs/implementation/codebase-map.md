@@ -167,7 +167,7 @@ Each was re-read at the cited lines before being written down.
 | D7 | SHOULD tools always empty despite `agent_contracts.allowed_tools` | Low | `modules/runtime-assurance/compare.ts:93` | Open, Runtime Agent |
 | D8 | Feature flags stored but never enforced | Low | `modules/platform-admin/featureFlags.ts` | Open, Platform Agent |
 | D9 | MFA enrolment exists but is not enforced for anyone | Medium | Foundation | Open, needs a policy decision on who must use MFA |
-| D10 | `listAgents()` relied on RLS alone. RLS admits *every* tenant the user belongs to, so a member of two organizations saw both organizations' agents in whichever one was selected | Medium (tenancy, §14) | `modules/agent-identity/agents.ts` | **Fixed in this pass**: explicit `tenant_id` filter. QA Agent to sweep the other RLS-only reads |
+| D10 | `listAgents()` relied on RLS alone. RLS admits *every* tenant the user belongs to, so a member of two organizations saw both organizations' agents in whichever one was selected | Medium (tenancy, §14) | `modules/agent-identity/agents.ts` | **Fixed in this pass**: explicit `tenant_id` filter. QA Agent to sweep the other RLS-only reads  QA-P0-17 (2026-09-25) then swept every other read and by-id write the same way, added same-tenant keys (0075/0076), and proved it with a two-organization E2E identity; see the QA audit. |
 
 ---
 

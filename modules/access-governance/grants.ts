@@ -82,7 +82,8 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
   let query = supabase
     .from("access_grants")
     .select("*, accounts(external_account_ref, application_id), entitlements(application_id, name, data_classification, privilege_level, applications(name), data_sources(id, name, classification))")
-    .in("account_id", accountIds);
+    .in("account_id", accountIds)
+    .eq("tenant_id", tenantId);
   query = asOf === null ? query.is("revoked_at", null) : query.lte("granted_at", asOf).or(`revoked_at.is.null,revoked_at.gt.${asOf}`);
 
   const { data, error } = await query.returns<EffectiveAccessRow[]>();
@@ -160,6 +161,7 @@ export async function explainAccessPath(
       "account_id",
       matchingAccounts.map((a) => a.id),
     )
+    .eq("tenant_id", tenantId)
     .is("revoked_at", null)
     .returns<EffectiveAccessRow[]>();
   if (grantsError) throw new ApiError(500, "QUERY_FAILED", grantsError.message);

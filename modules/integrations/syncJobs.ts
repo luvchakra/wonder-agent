@@ -34,6 +34,9 @@ export async function createSyncJob(
     .insert({ tenant_id: tenantId, integration_id: integrationId, trigger })
     .select()
     .single();
+  // QA-P0-17: 0076's same-tenant foreign keys refuse a reference to another
+  // organization's row (23503). Say so, rather than a generic 500.
+  if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That integration is not in this organization");
   if (error || !data) {
     throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create sync job");
   }
@@ -42,7 +45,7 @@ export async function createSyncJob(
 
 export async function getSyncJob(tenantId: string, jobId: string): Promise<IntegrationSyncJob | null> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("integration_sync_jobs").select().eq("id", jobId).maybeSingle();
+  const { data, error } = await supabase.from("integration_sync_jobs").select().eq("id", jobId).eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return data ? toSyncJob(data) : null;
 }
@@ -53,6 +56,7 @@ export async function listSyncJobs(tenantId: string, integrationId: string): Pro
     .from("integration_sync_jobs")
     .select()
     .eq("integration_id", integrationId)
+    .eq("tenant_id", tenantId)
     .order("created_at", { ascending: false })
     .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -165,7 +169,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
             let normalized = record.normalized as Record<string, unknown> | undefined;
             if (!normalized) {
               if (mappings.length === 0) {
-                mappings = await listMappings(integration.id, objectType);
+                mappings = await listMappings(integration.id, tenantId, objectType);
               }
               normalized = applyMappings(record.raw, mappings);
             }

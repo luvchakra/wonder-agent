@@ -74,7 +74,7 @@ export function shapeCertificationSnapshot(input: {
  */
 export async function buildFreshSnapshot(tenantId: string, agentId: string, accessGrantId: string | null): Promise<CertificationSnapshot> {
   const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
-    getAgentContract(agentId),
+    getAgentContract(agentId, tenantId),
     getEffectiveAccess(tenantId, agentId),
     listPolicyEvaluations(tenantId, agentId),
     getFindings(tenantId, { agentId, status: "open" }),

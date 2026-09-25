@@ -21,6 +21,17 @@ export async function createApplication(
 ): Promise<Application> {
   if (!name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
   const supabase = await supabaseServer();
+  // QA-P0-17: source_integration_id has no foreign key, so check it here.
+  if (sourceIntegrationId) {
+    const { data: integration, error: integrationError } = await supabase
+      .from("integrations")
+      .select("id")
+      .eq("id", sourceIntegrationId)
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+    if (integrationError) throw new ApiError(500, "QUERY_FAILED", integrationError.message);
+    if (!integration) throw new ApiError(404, "NOT_FOUND", "That integration is not in this organization");
+  }
   const { data, error } = await supabase
     .from("applications")
     .insert({ tenant_id: tenantId, name, category: category ?? null, source_integration_id: sourceIntegrationId ?? null, is_external: isExternal })
@@ -39,7 +50,7 @@ export async function listApplications(tenantId: string): Promise<Application[]>
 
 export async function getApplication(tenantId: string, applicationId: string): Promise<Application | null> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("applications").select().eq("id", applicationId).maybeSingle();
+  const { data, error } = await supabase.from("applications").select().eq("id", applicationId).eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return data ? toApplication(data) : null;
 }
@@ -57,6 +68,9 @@ export async function createAccount(
     .insert({ tenant_id: tenantId, agent_id: agentId, application_id: applicationId, external_account_ref: externalAccountRef, status })
     .select()
     .single();
+  // QA-P0-17: 0076's same-tenant foreign keys refuse a reference to another
+  // organization's row (23503). Say so, rather than a generic 500.
+  if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That agent or application is not in this organization");
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create account");
   return toAccount(data);
 }

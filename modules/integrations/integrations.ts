@@ -103,6 +103,7 @@ export async function getIntegration(tenantId: string, integrationId: string): P
     .from("integrations")
     .select()
     .eq("id", integrationId)
+    .eq("tenant_id", tenantId)
     .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!data) return null;
@@ -150,7 +151,8 @@ export async function testIntegrationConnection(
   await supabase
     .from("integrations")
     .update({ status: result.ok ? "connected" : "error" })
-    .eq("id", integrationId);
+    .eq("id", integrationId)
+    .eq("tenant_id", tenantId);
 
   return result;
 }

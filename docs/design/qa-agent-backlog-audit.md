@@ -751,3 +751,115 @@ now waits for the thing that actually has to finish.
 risk and FinanceBot specs pass together under two workers, 22/22, and the
 full suite passes (see the next line).
 Full suite after the fix: **156/156**.
+
+---
+
+## 2026-09-25 — QA-P0-17: RLS-only read sweep (codebase-map D10), and the writes it led to
+
+**Why it matters.** RLS admits every organization a user belongs to
+(`current_tenant_ids()`). A member of two organizations therefore gets
+both organizations' rows from any query that relies on RLS alone. Writes
+are worse: the caller's permission is checked only in the active
+organization, but an RLS write can land in the other one.
+
+**Method.** A read-only search agent walked every one of the 337
+`.from(...)` chains in `modules/`, `lib/` and `app/`, checking for a
+`tenant_id` filter. A second pass covered writes: any RLS-client write
+that trusts a caller-supplied parent id. Every hit was then confirmed by
+reading the code before it was changed.
+
+### Reads fixed (an explicit `tenant_id` filter; RLS stays underneath)
+
+- **Mixed organizations with no filter at all:**
+  - `GET /api/v1/users`: the member list of every organization;
+  - Identity's discovery inbox (agents and identities);
+  - the duplicate check at registration: registering in organization B
+    could be diverted to "duplicate review" against organization A's
+    agent;
+  - the duplicate-candidate list.
+- **By id, with `tenantId` already in scope:**
+  - `getAgent`, `getApplication`, `getIntegration`, `discoverMcpTools`;
+  - `getSyncJob`, `listSyncJobs`, `getNormalizedObjects`;
+  - the integration status update in `testIntegrationConnection`;
+  - the credential read and update in `setCredential`.
+- **By id, now taking a required `tenantId`, so the type checker found
+  every caller:**
+  - `getPolicy`, `listPolicyExceptions`, `getAgentContract` (8 callers
+    across Access, Risk, Runtime and Compliance);
+  - `classifyActionsForAgent`;
+  - the child tables with no `tenant_id` column, filtered through their
+    parent with an `!inner` embed: `listPolicyRules`,
+    `listPolicyVersions` and `listMappings`.
+- **Low-risk, filtered for consistency:** effective-access grants, the
+  access-path explanation, and policy-exception evaluation.
+- **Correctly unfiltered, left as they are:**
+  - the user's own memberships and roles (by `user_id`);
+  - SSO domain lookup and API-key verification (they identify the tenant);
+  - the platform-admin console, which is platform-wide by design.
+
+### Writes fixed
+
+- **`addPolicyRule` and `createMapping`** now take the tenant and confirm
+  the parent is in it first. `integration_mappings` has no `tenant_id`,
+  so this check is its only guard.
+- **`createControlMapping`** is a service-role write, so it could point at
+  any tenant's policy. It now also requires the owner to be an active
+  member.
+- **`createApplication`** checks its `sourceIntegrationId`, which has no
+  foreign key.
+- **Migration 0076** replaces 13 single-column foreign keys with
+  `(col, tenant_id)` keys to the parent's `(id, tenant_id)`:
+  - Access: `accounts`, `entitlements`, `access_grants`,
+    `access_requests`, `policy_exceptions`;
+  - Compliance: `control_mappings`;
+  - Integration: `integration_sync_jobs`.
+  - Each key keeps its name and its ON DELETE rule, the lesson of the
+    0073/0074 incident, so every PostgREST embed resolves as before.
+  - No live row crossed tenants beforehand (checked).
+  - A refused reference now answers 404 ("… is not in this organization"),
+    not 500.
+- **`selectTenantAction` (the organization switcher) was broken.** It
+  looked up the membership without the user's id, so in any organization
+  with two or more members it got several rows, `maybeSingle()` returned
+  nothing, and switching failed with "Not a member". It now filters by
+  the signed-in user.
+- **`createPolicy`** now answers 400 for an unknown action; before, the
+  database check turned it into a 500. The new spec found this.
+
+### Tests
+
+- **New E2E `multi-org-isolation.spec.ts`**, with a new seeded identity
+  `multiOrg`: READ_ONLY in Tenant One, TENANT_SUPER_ADMIN in Tenant Two.
+  It switches organization through the real sidebar switcher.
+  - In Tenant Two, registering an agent with a Tenant One agent's name is
+    201, not a 202 duplicate. The list shows only Tenant Two's agent.
+  - In Tenant One:
+    - the list holds only Tenant One;
+    - Tenant Two's agent and policy are 404 by id;
+    - their rules and versions are empty;
+    - the Agent 360 page renders not-found;
+    - duplicates hold nothing from Tenant Two.
+  - In Tenant One, the Tenant Two admin role does not carry over:
+    creating an agent is 403, adding a rule to Tenant Two's policy is
+    refused, and `/api/v1/users` is 403.
+  - In Tenant Two:
+    - an exception on its policy for Tenant One's agent is 404, while the
+      same exception for its own agent is 201;
+    - an access request for Tenant One's agent is 404;
+    - the member list is Tenant Two's only;
+    - Tenant One's agent is 404.
+- **SQL `tests/qa/same-tenant-references.sql`,** run live as a member of
+  both fixture tenants:
+  - an entitlement, account, access request and two policy exceptions
+    pointing across tenants are all denied with 23503;
+  - the service-role control mapping to another tenant's policy is also
+    denied with 23503;
+  - own-tenant writes are 1, 1 and 1;
+  - forged rows are 0;
+  - fixtures cleaned up.
+- **Unit:** `credentials.test.ts`'s mock now follows the tenant-filtered
+  chains. Vitest 536/536.
+- **After 0076,** the navigation, access, data-sources, FinanceBot and
+  compliance specs pass (54/54).
+- Full pipeline: `tsc` and `eslint` clean, vitest **536/536**, Playwright
+  **201/201** (9.9 min, fresh build, with 0076 applied live).

@@ -135,6 +135,7 @@ export async function evaluatePolicies(tenantId: string, agentId: string): Promi
       .from("policy_exceptions")
       .select()
       .eq("policy_id", policy.id)
+      .eq("tenant_id", tenantId)
       .or(`agent_id.eq.${agentId},agent_id.is.null`);
     if (exceptionError) throw new ApiError(500, "QUERY_FAILED", exceptionError.message);
     const now = new Date();

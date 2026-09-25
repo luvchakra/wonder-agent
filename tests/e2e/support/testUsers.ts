@@ -12,7 +12,7 @@ export const E2E_PASSWORD = "E2E-Test-Passw0rd!1";
 export const TENANT_ONE = { name: "E2E Tenant One", slug: "e2e-tenant-one" };
 export const TENANT_TWO = { name: "E2E Tenant Two", slug: "e2e-tenant-two" };
 
-export type TestUserKey = "adminOne" | "readOnly" | "requester" | "adminTwo" | "platformAdmin" | "signOutOnly" | "passwordResetOnly";
+export type TestUserKey = "adminOne" | "readOnly" | "requester" | "adminTwo" | "platformAdmin" | "signOutOnly" | "passwordResetOnly" | "multiOrg";
 
 export type TestUserSpec = {
   email: string;
@@ -21,6 +21,8 @@ export type TestUserSpec = {
   role: string | null;
   tenant: typeof TENANT_ONE | typeof TENANT_TWO | null;
   isPlatformAdmin: boolean;
+  /** A second membership, for the one identity that belongs to two organizations. */
+  alsoIn?: { tenant: typeof TENANT_ONE | typeof TENANT_TWO; role: string };
 };
 
 export const TEST_USERS: Record<TestUserKey, TestUserSpec> = {
@@ -47,6 +49,18 @@ export const TEST_USERS: Record<TestUserKey, TestUserSpec> = {
   // other spec's stored auth state or fresh sign-in depends on. Excluded
   // from auth.setup.ts's signInAndSaveState loop for the same reason.
   passwordResetOnly: { email: "e2e-password-reset@e2e.wonderagent.test", password: E2E_PASSWORD, role: "READ_ONLY", tenant: TENANT_ONE, isPlatformAdmin: false },
+  // QA-P0-17 — a member of BOTH organizations, with a different role in
+  // each: READ_ONLY in Tenant One, TENANT_SUPER_ADMIN in Tenant Two. Used
+  // only by multi-org-isolation.spec.ts, which proves the active
+  // organization alone decides what is seen and what the role allows.
+  multiOrg: {
+    email: "e2e-multi-org@e2e.wonderagent.test",
+    password: E2E_PASSWORD,
+    role: "READ_ONLY",
+    tenant: TENANT_ONE,
+    isPlatformAdmin: false,
+    alsoIn: { tenant: TENANT_TWO, role: "TENANT_SUPER_ADMIN" },
+  },
 };
 
 export function authFile(key: TestUserKey): string {

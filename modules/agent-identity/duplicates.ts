@@ -57,7 +57,9 @@ export async function findDuplicateCandidate(
   input: Pick<CreateAgentInput, "agentName" | "sourceSystem" | "sourceObjectId">,
 ): Promise<{ agent: Agent; score: number; matchedKeys: string[] } | null> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("agents").select();
+  // QA-P0-17: this tenant's agents only (RLS alone spans every
+  // organization a multi-org user belongs to).
+  const { data, error } = await supabase.from("agents").select().eq("tenant_id", tenantId);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
 
   let best: { agent: Agent; score: number; matchedKeys: string[] } | null = null;
@@ -122,7 +124,7 @@ export async function listDuplicateCandidates(
   status?: DuplicateCandidate["status"],
 ): Promise<DuplicateCandidate[]> {
   const supabase = await supabaseServer();
-  let query = supabase.from("agent_duplicate_candidates").select().order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
+  let query = supabase.from("agent_duplicate_candidates").select().eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (status) query = query.eq("status", status);
   const { data, error } = await query;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

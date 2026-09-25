@@ -34,7 +34,7 @@ export default async function IntegrationDetailPage({ params }: { params: Promis
   const integration = await getIntegration(ctx.tenantId!, id);
   if (!integration) notFound();
 
-  const [jobs, mappings] = await Promise.all([listSyncJobs(ctx.tenantId!, id), listMappings(id)]);
+  const [jobs, mappings] = await Promise.all([listSyncJobs(ctx.tenantId!, id), listMappings(id, ctx.tenantId!)]);
 
   const setCredentialWithId = setCredentialAction.bind(null, id);
   const testConnectionWithId = testConnectionAction.bind(null, id);

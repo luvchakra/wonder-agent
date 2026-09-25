@@ -53,8 +53,9 @@ export async function triggerSyncAction(integrationId: string) {
 }
 
 export async function createMappingAction(integrationId: string, formData: FormData) {
-  await requirePermission("integration.update");
+  const ctx = await requirePermission("integration.update");
   await createMapping(
+    ctx.tenantId!,
     integrationId,
     String(formData.get("objectType") ?? ""),
     String(formData.get("sourceField") ?? ""),

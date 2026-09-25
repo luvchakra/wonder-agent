@@ -81,8 +81,10 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
   const categoryById = new Map(integrationTypes.map((t) => [t.id, t.category]));
 
   const [{ data: linkedRows, error: linkedError }, { data: agentRows, error: agentsError }] = await Promise.all([
-    supabase.from("agent_identities").select("external_reference, source_system, agent_id, identity_type, created_at"),
-    supabase.from("agents").select(),
+    // QA-P0-17: explicit tenant filters; RLS alone spans every
+    // organization a multi-org user belongs to.
+    supabase.from("agent_identities").select("external_reference, source_system, agent_id, identity_type, created_at").eq("tenant_id", tenantId),
+    supabase.from("agents").select().eq("tenant_id", tenantId),
   ]);
   if (linkedError) throw new ApiError(500, "QUERY_FAILED", linkedError.message);
   if (agentsError) throw new ApiError(500, "QUERY_FAILED", agentsError.message);

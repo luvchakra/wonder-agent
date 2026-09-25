@@ -40,8 +40,8 @@ export function classifyAction(contract: ActionGovernanceContract, action: strin
  * picture of the agent's declared action governance without the caller
  * needing to already know which actions matter.
  */
-export async function classifyActionsForAgent(agentId: string, actions?: string[]): Promise<ActionGovernanceResult[]> {
-  const contract = await getAgentContract(agentId);
+export async function classifyActionsForAgent(tenantId: string, agentId: string, actions?: string[]): Promise<ActionGovernanceResult[]> {
+  const contract = await getAgentContract(agentId, tenantId);
   if (!contract) throw new ApiError(404, "NO_ACTIVE_CONTRACT", "Agent has no active contract to evaluate actions against");
 
   const list =

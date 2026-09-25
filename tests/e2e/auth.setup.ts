@@ -49,8 +49,10 @@ function signInAndSaveState(key: TestUserKey) {
       await expect(page).toHaveURL(/\/onboarding/);
       await expect(page.getByRole("heading", { name: "Create a new organization" })).toBeVisible();
     } else {
-      // Exactly one tenant membership each (seedTestData) — getTenantContext()
-      // resolves it with no ambiguity, so sign-in lands straight on Overview.
+      // One tenant membership each (seedTestData), so getTenantContext()
+      // resolves it with no ambiguity and sign-in lands straight on
+      // Overview. multiOrg has two; it lands on Overview in whichever one
+      // resolves first, and its spec switches explicitly.
       await expect(page).toHaveURL("/");
       await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
     }

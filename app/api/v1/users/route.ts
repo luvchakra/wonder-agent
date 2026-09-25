@@ -4,8 +4,9 @@ import { supabaseServer } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 
 export async function GET() {
+  let tenantId: string;
   try {
-    await requirePermission("user.manage");
+    tenantId = (await requirePermission("user.manage")).tenantId!;
   } catch (err) {
     if (err instanceof ApiError) {
       return NextResponse.json(
@@ -20,6 +21,9 @@ export async function GET() {
   const { data, error } = await supabase
     .from("tenant_memberships")
     .select("user_id, status, users(email, display_name)")
+    // QA-P0-17: the active organization only. RLS alone returns the
+    // members of every organization the caller belongs to.
+    .eq("tenant_id", tenantId)
     .eq("status", "active");
 
   if (error) {
