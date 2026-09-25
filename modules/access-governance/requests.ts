@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { AccessRequest, AccessRequestStatus, AccessRequestType } from "@/lib/shared/types/access-governance";
 import { toAccessRequest } from "./mappers";
+import { enforceSoD } from "./sod";
 
 /**
  * ACCESS-P0-01.3. `access_requests` grants a client-facing INSERT, but its
@@ -22,6 +23,9 @@ export async function createAccessRequest(
   requestType: AccessRequestType = "grant",
 ): Promise<AccessRequest> {
   if (!justification.trim()) throw new ApiError(400, "INVALID_INPUT", "justification is required");
+  // ACCESS-P0-14: separation of duties, before anything is written.
+  const requestAction = requestType === "modify" ? "access.modify_request_submitted" : "access.request_submitted";
+  await enforceSoD(tenantId, requestedBy, requestAction, agentId);
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("access_requests")
@@ -42,7 +46,7 @@ export async function createAccessRequest(
     tenantId,
     actorId: requestedBy,
     actorType: "user",
-    action: requestType === "modify" ? "access.modify_request_submitted" : "access.request_submitted",
+    action: requestAction,
     objectType: "access_request",
     objectId: data.id,
     outcome: "success",
@@ -99,6 +103,8 @@ export async function decideAccessRequest(
   if (!allowed.includes(decision)) {
     throw new ApiError(409, "INVALID_TRANSITION", `Cannot move from ${existing.status} to ${decision}`);
   }
+  // ACCESS-P0-14: e.g. the person who requested access may not also approve it.
+  await enforceSoD(tenantId, actorId, `access.request_${decision}`, existing.agent_id);
 
   const { data, error } = await supabase
     .from("access_requests")
@@ -116,7 +122,8 @@ export async function decideAccessRequest(
     objectType: "access_request",
     objectId: requestId,
     outcome: "success",
-    metadata: { previousStatus: existing.status },
+    // agentId lets a later separation-of-duties check see this decision.
+    metadata: { previousStatus: existing.status, agentId: existing.agent_id },
   });
 
   return toAccessRequest(data);

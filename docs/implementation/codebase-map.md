@@ -162,7 +162,7 @@ Each was re-read at the cited lines before being written down.
 | D2 | Runtime ingestion wrote a caller-supplied `identityId` through the service role without checking it belongs to the tenant and agent (§14 service-role rule) | Medium (security) | `modules/runtime-assurance/events.ts ingestRuntimeEvent()` | **Fixed in this pass**: the identity must belong to the same tenant and agent, else 404. Recorded in the Runtime audit log |
 | D3 | `linkAgentIdentity()` writes no audit event (#11) | Medium | `modules/agent-identity/identities.ts` | **Fixed 2026-09-25** (IDENTITY-P0-14): audited, explicit confidence + basis |
 | D4 | Lifecycle state ASSESSED is unreachable | Low | `modules/agent-identity/lifecycle.ts` | **Fixed 2026-09-25** (IDENTITY-P0-14): REGISTERED → ASSESSED → APPROVED |
-| D5 | `checkSoD()` has no callers | Medium (P0-25) | `modules/access-governance/sod.ts` | Open, Access Agent |
+| D5 | `checkSoD()` has no callers | Medium (P0-25) | `modules/access-governance/sod.ts` | **Fixed 2026-09-25** (ACCESS-P0-14): wired into request, decision and grant paths |
 | D6 | MCP runtime events are stored as `integration_objects` and never reach `runtime_events`, so they are invisible to SHOULD/CAN/DID and risk | Medium (P0-18) | `modules/integrations/mcpEvents.ts` | **Fixed 2026-09-25** (INTEGRATION-P0-07): bridged through Runtime's `ingestRuntimeEventByReference()` |
 | D7 | SHOULD tools always empty despite `agent_contracts.allowed_tools` | Low | `modules/runtime-assurance/compare.ts:93` | Open, Runtime Agent |
 | D8 | Feature flags stored but never enforced | Low | `modules/platform-admin/featureFlags.ts` | Open, Platform Agent |

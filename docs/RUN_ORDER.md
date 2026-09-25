@@ -120,12 +120,13 @@ isolation checks. Detail is in each module's audit log.
 | 5 | ACCESS-P0-13: data sources inventory feeding CAN | Done | `d3208ea` |
 | 6 | RISK-P0-11: investigations | Done | `9694cb7` |
 | 6 | RISK-P0-12: new risk signals | Partial (attack-path factor has no source) | see Risk audit |
+| + | IDENTITY-P0-14: identity links audited with explicit confidence (D3); ASSESSED reachable (D4) | Done | `73c47b6` |
+| + | ACCESS-P0-14: separation-of-duties checks wired (D5) | Done | see Access audit |
 
 **Still to do in this programme:**
 
-- ACCESS-P0-12 (policy targets and publish) and ACCESS-P0-14 (wire SoD,
-  D5).
-- IDENTITY-P0-13/14 (contract and ownership completeness; D3, D4).
+- ACCESS-P0-12 (policy targets and publish).
+- IDENTITY-P0-13 (contract and ownership completeness).
 - EXPERIENCE-P0-16/17 (the remaining mockup screens; app-wide wording).
 - QA-P0-17/18 (RLS read sweep; the gateway security suite).
 

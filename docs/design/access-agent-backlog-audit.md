@@ -941,3 +941,54 @@ User decision (2026-09-25): Access owns data sources beside `applications`.
   under Access Intelligence in the nav.
 - One design fix: the application name broke mid-word at desktop width;
   it no longer does.
+
+## 2026-09-25 — ACCESS-P0-14: separation-of-duties checks wired (codebase-map D5, master P0-25)
+
+- **Before.** `checkSoD()` (ACCESS-P0-02.3) had no callers. Even if
+  called, it could not have caught the classic conflict, "requested, then
+  approved, by the same person". It matched prior audit rows only by
+  `object_id = agentId`, but requests and grants are audited against their
+  own ids.
+- **Changes to `checkSoD()`:**
+  - It matches a prior action whether the agent is the audit row's object
+    or its `metadata.agentId`.
+  - It reads with the **service role**, filtered by tenant and re-checked,
+    because a security control must not depend on whether the acting user
+    can read the audit log (§14).
+  - It considers only `rbac` rules, and never builds a filter from a
+    malformed id.
+- **New `enforceSoD()`** is the one call made at the decision points.
+  - Every conflict is audited as `access.sod_conflict`.
+  - A **blocking** policy (`action: block`) refuses the action with 409
+    `SOD_CONFLICT`, audited as a failure. It runs before anything is
+    written, so nothing changes.
+  - A **flag** policy lets the action proceed and records the conflict.
+- **Wired into:**
+  - `createAccessRequest()` (submission);
+  - `decideAccessRequest()` (every decision: approve, reject, fulfil);
+  - `createManualAccessGrant()`.
+  - Their audit rows now also carry `metadata.agentId`, so later checks
+    can see them.
+- **No change for tenants without an SoD policy.** SoD rules are opt-in:
+  active `identity` policies with an `rbac` rule of
+  `{ conflictingActions: [...] }`.
+
+**Tests:**
+
+- `sod.test.ts` (new, 6): conflict matched by object or metadata with
+  tenant, actor and action filters; non-rbac rules, other-tenant policies
+  and unrelated actions ignored; malformed ids never reach a filter;
+  blocking → 409 plus an audited failure; flag → proceeds plus an audited
+  conflict; no conflict → nothing recorded.
+- E2E `sod.spec.ts` (Tenant Two; policy disabled in `finally`): with a
+  blocking policy the requester's approval gets 409 `SOD_CONFLICT` and the
+  request stays pending; switched to flag, the same approval goes through.
+- Live: both `access.sod_conflict` rows were checked, one failure and one
+  success, with the right actions.
+
+**Left out.** Turning a flagged conflict into a Risk finding. Risk's
+finding writer is not a published contract, so the audit event is the
+record for now. It is flagged to Risk as a candidate signal.
+
+**Verified:** eslint clean, vitest **519/519**, Playwright **188/188**
+(8.6 min, a fresh build containing this story).

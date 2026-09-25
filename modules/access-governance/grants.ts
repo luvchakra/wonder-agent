@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessGrant, AccessPath, GrantType } from "@/lib/shared/types/access-governance";
 import { toAccessGrant } from "./mappers";
+import { enforceSoD } from "./sod";
 
 type EffectiveAccessRow = {
   id: string;
@@ -202,10 +203,10 @@ export async function createManualAccessGrant(
 
   const { data: account, error: accountError } = await supabase
     .from("accounts")
-    .select("id")
+    .select("id, agent_id")
     .eq("id", accountId)
     .eq("tenant_id", tenantId)
-    .maybeSingle();
+    .maybeSingle<{ id: string; agent_id: string }>();
   if (accountError) throw new ApiError(500, "QUERY_FAILED", accountError.message);
   if (!account) throw new ApiError(404, "ACCOUNT_NOT_FOUND");
 
@@ -217,6 +218,9 @@ export async function createManualAccessGrant(
     .maybeSingle();
   if (entitlementError) throw new ApiError(500, "QUERY_FAILED", entitlementError.message);
   if (!entitlement) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+
+  // ACCESS-P0-14: separation of duties, before the grant exists.
+  await enforceSoD(tenantId, actorId, "access.grant_created", account.agent_id);
 
   const { data, error } = await supabase
     .from("access_grants")
@@ -233,7 +237,7 @@ export async function createManualAccessGrant(
     objectType: "access_grant",
     objectId: data.id,
     outcome: "success",
-    metadata: { accountId, entitlementId, grantType },
+    metadata: { accountId, entitlementId, grantType, agentId: account.agent_id },
   });
 
   return toAccessGrant(data);

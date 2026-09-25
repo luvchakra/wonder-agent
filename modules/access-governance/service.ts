@@ -37,7 +37,7 @@ export {
   type GovernanceExceptionInput,
 } from "./policies";
 export { evaluatePolicies, listPolicyEvaluations, hasOpenPolicyViolation } from "./evaluate";
-export { checkSoD, type SoDCheckResult } from "./sod";
+export { checkSoD, enforceSoD, type SoDCheckResult } from "./sod";
 export { getAccessGraph } from "./graph";
 export { compareAccessToContract } from "./comparison";
 export { classifyAction, classifyActionsForAgent } from "./actionGovernance";
