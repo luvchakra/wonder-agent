@@ -30,6 +30,8 @@ for every non-"Done" row is in
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
+| INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Not Started — 2026-09-25, master stories |
+| INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -465,6 +467,23 @@ reuse this module's existing adapter contract, which is already the case
 everywhere else in the backlog. `INTEGRATION-P0-05.1` (verified credential
 rotation, flagged in the 2026-09-14 refresh) remains the one open,
 `Not started` item; not duplicated here.
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### INTEGRATION-P0-06 — MCP servers, tools and resources as normalized object families (master P0-10)
+
+User decision: Integration owns them as `integration_objects` families (no separate MCP tables unless they prove insufficient). Adds MCP resources, tool operation type (read/write), schema, server version/endpoint metadata, and a published inventory contract the MCP screens and Access can consume. MCP tools stop being typed as generic `entitlement`.
+
+### INTEGRATION-P0-07 — Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18)
+
+MCP events ingested via `ingestMcpRuntimeEvent()` reach Runtime's `runtime_events` through Runtime's published ingestion contract (dedupe, replay window, quarantine), so they count toward DID, SHOULD/CAN/DID and risk.
+
+
+---
 
 ## DO NOT IMPLEMENT
 

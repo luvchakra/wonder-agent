@@ -67,13 +67,29 @@ every P0 story onto the code: 11 Built, 21 Partial, 11 Gap.
 - **The gaps are mainly the whole PROTECT pillar**, the Runtime Gateway and
   real-time authorization (P0-26 to P0-34), plus the NHI and shadow-AI
   inventories.
-- **Five decisions are open for the user** (codebase-map §6). They are
-  architecture and security choices, so no agent should guess them:
-  1. Where the gateway runs, who owns it, and how agents authenticate.
-  2. Customer-facing wording for SHOULD/CAN/DID.
-  3. Owners of the new inventories.
-  4. Permission keys.
-  5. Whether an investigation is a first-class object.
+- **The five decisions were resolved by the user the same day**
+  (codebase-map §6, and the ownership map's "Master stories decisions"):
+  1. The gateway runs in this app and ships in observe-only mode. Access
+     owns the decision function, Runtime owns the endpoint, and agents
+     authenticate with per-agent API keys.
+  2. Screens show both terms, e.g. "Approved (SHOULD)".
+  3. Inventories: Identity owns NHI and shadow AI, Integration owns MCP,
+     Access owns data sources.
+  4. Only the missing permission keys are added.
+  5. Investigations are a new grouped record owned by Risk.
+
+  There are 25 new `Not Started` stories across ten backlogs.
+
+  **Suggested order**, which follows the dependency chain:
+  1. FOUNDATION-P0-17/18 (agent keys, permissions).
+  2. ACCESS-P0-11 (the decision function).
+  3. RUNTIME-P0-15 to 18 (the gateway, observe-only first).
+  4. PLATFORM-P0-12 (flags) and OPERATIONS-P0-08 (notifications).
+  5. The inventories (IDENTITY-P0-11/12, INTEGRATION-P0-06/07,
+     ACCESS-P0-13).
+  6. RISK-P0-11/12.
+  7. EXPERIENCE-P0-16/17 alongside, as each backend lands.
+  8. QA-P0-17 to 19 last.
 
 No Wave table status changes. The UI shell, Dashboard, Agent inventory and
 Agent 360 were rebuilt to the mockups, and three defects were fixed:

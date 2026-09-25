@@ -29,6 +29,7 @@ issued.
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
 | OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
+| OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -376,6 +377,19 @@ directly (non-negotiable #6). Confirm whether a PDF renderer already
 exists anywhere in this codebase before assuming one does (currently
 believed not to — no PDF library appears in any module's dependencies).
 **Not started.**
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### OPERATIONS-P0-08 — Runtime and approval notifications (master P0-41)
+
+Runtime alerts and approval-required notifications from the gateway's decisions (REQUIRE_APPROVAL, DENY in enforce mode), reusing `notify()`; search covers investigations and decisions.
+
+
+---
 
 ## DO NOT IMPLEMENT
 

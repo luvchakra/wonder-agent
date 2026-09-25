@@ -26,6 +26,10 @@ for every row is in `docs/design/runtime-agent-backlog-audit.md`.
 | RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
 | RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
+| RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -469,6 +473,31 @@ near-identically to what this module's own 2026-09-14 round-2 refresh
 already reconciled ("nothing new," confirmed against a live codebase
 check) — trusted rather than re-derived in this pass. No new Runtime-owned
 story added.
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### RUNTIME-P0-15 — Runtime Gateway endpoint (master P0-26/P0-27/P0-33)
+
+User decisions: runs inside this app as the `/api/gateway/v1/*` subtree; agents authenticate with per-agent API keys (FOUNDATION-P0-17); **default mode is OBSERVE_ONLY** (decisions are evaluated and recorded, nothing blocked) with ENFORCE enabled per tenant/environment later. Independent of dashboard rendering; calls Access's `evaluateRuntimeRequest()` (ACCESS-P0-11); persists a decision record (new `runtime_decisions`, tenant_id + RLS) and a runtime event per request, idempotent on request id; never runs an LLM in the request path. Security tests: forged tenant/agent/identity/resource ids, replay, duplicate requests, cross-tenant key.
+
+### RUNTIME-P0-16 — Event types, sessions and decision fields (master P0-18)
+
+A normalized event-type vocabulary (AUTHENTICATION, SESSION_STARTED/ENDED, TOOL_REQUEST/ALLOWED/DENIED/APPROVAL_REQUIRED/EXECUTED, API_CALL, DATA_ACCESS, DELEGATION, POLICY_DECISION), session id and decision fields on runtime events, MCP metadata as first-class fields — additive to the existing free-text `action`.
+
+### RUNTIME-P0-17 — SHOULD tools and NOW (codebase-map D7, master P0-19)
+
+SHOULD includes `agent_contracts.allowed_tools` (currently always empty); the comparison gains NOW (the current request) — current request vs approved purpose and vs effective access.
+
+### RUNTIME-P0-18 — Emergency controls and tool filtering at the gateway (master P0-34/P0-35)
+
+Suspended agents, MCP servers and tools resolve to DENY at the gateway; kill switch and session termination; tool filtering returns only permitted tools where the integration supports it (filtering never replaces authorization). Every emergency action requires `runtime.emergency`, confirmation and audit.
+
+
+---
 
 ## DO NOT IMPLEMENT
 

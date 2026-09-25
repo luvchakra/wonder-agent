@@ -8,16 +8,16 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-09-19 from 11 module backlogs.
+Generated 2026-09-25 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**145 of 165 tracked stories complete — 88%**
+**145 of 190 tracked stories complete — 76%**
 
 ```
-███████████████████████████████████░░░░░  88%
+███████████████████████████████░░░░░░░░░  76%
 ```
 
 | Status | Stories |
@@ -25,8 +25,8 @@ Generated 2026-09-19 from 11 module backlogs.
 | Done | 145 |
 | Partial | 19 |
 | Deferred | 1 |
-| Not Started | 0 |
-| **Total tracked** | **165** |
+| Not Started | 25 |
+| **Total tracked** | **190** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -38,17 +38,17 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 27 | 2 | 0 | 0 | 29 | `█████████████████░` 93% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 0 | 11 | `██████████████████` 100% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 0 | 12 | `█████████████████░` 92% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 11 | 0 | 0 | 0 | 11 | `██████████████████` 100% |
-| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 9 | 0 | 0 | 0 | 9 | `██████████████████` 100% |
-| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 0 | 13 | `█████████████████░` 92% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 27 | 2 | 0 | 2 | 31 | `████████████████░░` 87% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 11 | 0 | 0 | 4 | 15 | `█████████████░░░░░` 73% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 11 | 0 | 0 | 4 | 15 | `█████████████░░░░░` 73% |
+| 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 9 | 0 | 0 | 4 | 13 | `████████████░░░░░░` 69% |
+| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 12 | 1 | 0 | 2 | 15 | `██████████████░░░░` 80% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 0 | 21 | `████████████████░░` 90% |
-| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 0 | 13 | `█████████████████░` 92% |
-| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 1 | 0 | 0 | 11 | `████████████████░░` 91% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 10 | 12 | 0 | 0 | 22 | `████████░░░░░░░░░░` 45% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 19 | 2 | 0 | 2 | 23 | `███████████████░░░` 83% |
+| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 0 | 1 | 1 | 14 | `███████████████░░░` 86% |
+| 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 10 | 1 | 0 | 1 | 12 | `███████████████░░░` 83% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 10 | 12 | 0 | 3 | 25 | `███████░░░░░░░░░░░` 40% |
 
 ---
 
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 27 done · 2 partial · 0 deferred · 0 not started (29 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 27 done · 2 partial · 0 deferred · 2 not started (31 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -91,12 +91,14 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
 | FOUNDATION-P1-05 | CSRF protection verification & hardening for state-changing `/api/v1/*` routes | Done — 2026-09-19: confirmed from `@supabase/ssr`'s own installed source (`DEFAULT_COOKIE_OPTIONS`, unoverridden by `proxy.ts`/`lib/db/supabaseServer.ts`) that every session cookie is genuinely `SameSite=Lax`; added `tests/e2e/csrf.spec.ts`, a real-browser positive/negative proof (a cross-site page's authenticated-looking fetch is rejected — the auth-token cookie is withheld, confirmed by inspecting the actual outgoing request) run live against this session's dev server — see audit log |
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
+| FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Not Started — 2026-09-25, master stories |
+| FOUNDATION-P0-18 | New permission keys (master P0-42) | Not Started — 2026-09-25, master stories |
 
 ### 02 — Identity Agent
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 11 done · 0 partial · 0 deferred · 0 not started (11 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 11 done · 0 partial · 0 deferred · 4 not started (15 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -111,12 +113,16 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-05 | Discovery reconciliation & orphaned identity detection | Done — 2026-09-14; also resolves IDENTITY-P0-01.3's dependency now that Integration Agent's contract exists. Extended 2026-09-15 into the fully functional Agent Discovery feature (detection/confidence/evidence, candidate review, ignore/link, registration wired to the existing lifecycle service) — see the audit log's 2026-09-15 entry |
 | IDENTITY-P0-06 | Suspension restoration path (lifecycle state machine gap) | Done — 2026-09-15, unit-tested |
 | IDENTITY-P0-07 | Contract autonomy/oversight fields (autonomy level, allowed tools, human approval requirements, required monitoring) | Done — 2026-09-15, migration `0052`, live-applied |
+| IDENTITY-P0-11 | NHI inventory (master P0-08) | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-12 | Shadow AI discovery from runtime telemetry (master P0-09) | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-13 | Contract and ownership completeness (master P0-03/04/06) | Not Started — 2026-09-25, master stories |
+| IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Not Started — 2026-09-25, master stories |
 
 ### 03 — Integration Agent
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 11 done · 1 partial · 0 deferred · 0 not started (12 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 11 done · 1 partial · 0 deferred · 2 not started (14 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -132,12 +138,14 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-04.2 | Runtime event ingestion via MCP (higher bar) | Done |
 | INTEGRATION-P0-04.3 | Webhooks (generic inbound) | Done |
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
+| INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Not Started — 2026-09-25, master stories |
+| INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Not Started — 2026-09-25, master stories |
 
 ### 04 — Access Agent
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 11 done · 0 partial · 0 deferred · 0 not started (11 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 11 done · 0 partial · 0 deferred · 4 not started (15 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -152,12 +160,16 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-05 | Policy Versioning, Priority & Change History (extends ACCESS-P0-02.1) | Done — 2026-09-14, live RLS-verified |
 | ACCESS-P0-06 | Action governance enforcement (4-state model, uses Identity's autonomy fields) | Done — 2026-09-15, unit-tested, no migration needed |
 | ACCESS-P0-07 | Broaden `policy_exceptions` into the canonical governance-exception model | Done — 2026-09-15, migration `0053`, live-applied |
+| ACCESS-P0-11 | Deterministic runtime decision function (master P0-28–P0-32) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-12 | Policy targets and publish (master P0-23) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-13 | Data sources inventory (master P0-11) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Not Started — 2026-09-25, master stories |
 
 ### 05 — Runtime Agent
 
 **Module:** Runtime Assurance & SHOULD/CAN/DID  
 **Backlog status:** DORMANT — do not start until the user says "Run Runtime Agent"  
-**Stories:** 9 done · 0 partial · 0 deferred · 0 not started (9 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 9 done · 0 partial · 0 deferred · 4 not started (13 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -170,12 +182,16 @@ and are deliberately excluded from the counts above.
 | RUNTIME-P0-12 | SHOULD Normalization Model (unknown-safe) | Done — 2026-09-14, unit-tested |
 | RUNTIME-P0-13 | Point-in-Time CAN Resolution & Historical Accuracy | Done — 2026-09-16: Risk Agent adopted it. `getFindingAsOfDetection()` (`modules/risk/findings.ts`) calls `compareShouldCanDid(tenantId, agentId, finding.createdAt)`, reconstructing CAN as of when a finding was first detected — the real, non-speculative caller this row was waiting on. Exposed via `GET /api/v1/findings/[id]/historical-context` and a "Show access as of detection time" panel in the Risk finding evidence drawer, see Risk Agent's own audit log |
 | RUNTIME-P0-14 | Runtime Data Quality Tracking | Done — 2026-09-14, live-verified against real fixture data |
+| RUNTIME-P0-15 | Runtime Gateway endpoint (master P0-26/P0-27/P0-33) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-16 | Event types, sessions and decision fields (master P0-18) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-17 | SHOULD tools and NOW (codebase-map D7, master P0-19) | Not Started — 2026-09-25, master stories |
+| RUNTIME-P0-18 | Emergency controls and tool filtering at the gateway (master P0-34/P0-35) | Not Started — 2026-09-25, master stories |
 
 ### 06 — Risk Agent
 
 **Module:** Risk Engine & Rogue Agent Detection  
 **Backlog status:** DORMANT — do not start until the user says "Run Risk Agent"  
-**Stories:** 12 done · 1 partial · 0 deferred · 0 not started (13 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 12 done · 1 partial · 0 deferred · 2 not started (15 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -192,6 +208,8 @@ and are deliberately excluded from the counts above.
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
 | RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Partial — 2026-09-19: "Privilege level" fully wired (real data via `getEffectiveAccess()`'s `privilegeLevel`, triggers on elevated/admin); the other three have real names/weights but always contribute 0, each with its own documented missing-contract dependency, per this story's own explicit acceptance allowance — see audit log |
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
+| RISK-P0-11 | Investigations as a first-class record (master P0-37) | Not Started — 2026-09-25, master stories |
+| RISK-P0-12 | New risk signals (master P0-20/P0-21) | Not Started — 2026-09-25, master stories |
 
 ### 07 — Compliance Agent
 
@@ -219,7 +237,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 19 done · 2 partial · 0 deferred · 0 not started (21 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 19 done · 2 partial · 0 deferred · 2 not started (23 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -244,12 +262,14 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-14 | Public landing page + restyled auth screens | **Done** — 2026-09-17: `app/welcome/*` (hero, SHOULD/CAN/DID model with a worked FinanceBot finding, six-capability grid, four-step how-it-works, closing CTA, footer), served at `/` for signed-out visitors via a rewrite in `proxy.ts` so the marketing page and the authenticated Overview share the root path without two route groups declaring it. `/sign-in` and `/sign-up` moved off raw inline-styled scaffolding onto `AuthShell` + `TextField`/`Button`. Also wired the Geist fonts the tokens already referenced but nothing defined. Verified: 0px horizontal overflow at 320/390/430/768/1024/1440/1920 in both themes, and `tests/e2e/welcome.spec.ts` (10 assertions) plus the full auth + navigation-smoke specs (48) pass |
 | EXPERIENCE-P0-15 | Landing page product imagery, problem/solution narrative, animated flow | **Done** — 2026-09-17: real desktop + mobile screenshots of the running app (`assets/product/*`, regenerated by `scripts/capture-landing-shots.mjs`, captured against a purpose-seeded Northwind Financial demo tenant), framed by new `BrowserFrame`/`PhoneFrame` primitives with layered OKLCH shadows; every shot captured light AND dark and swapped by new `.theme-light-only`/`.theme-dark-only` CSS guards that mirror the token blocks; new `FlowDiagram` animating contract/entitlements/runtime → deterministic comparison → finding (CSS stroke-dash + pulse ring, both disabled under `prefers-reduced-motion`); explicit problem section preceding the re-framed solution. 0px overflow at all seven widths; 53 E2E passing |
 | EXPERIENCE-P0-14 | AI-Assisted Investigation UI (read-only summaries) | Done — `AiSummaryPanel` shared component wired into Rogue Agent Detail (finding + SHOULD/CAN/DID summaries); shows "not configured" until FOUNDATION-P0-16 has a provider |
+| EXPERIENCE-P0-16 | Light-console screens 4–12 and the MCP boards | Not Started — 2026-09-25, master stories |
+| EXPERIENCE-P0-17 | Access wording: friendly label with the technical term | Not Started — 2026-09-25, master stories |
 
 ### 09 — Platform Agent
 
 **Module:** Vendor Platform Administration  
 **Backlog status:** DORMANT — do not start until the user says "Run Platform Agent"  
-**Stories:** 12 done · 0 partial · 1 deferred · 0 not started (13 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 12 done · 0 partial · 1 deferred · 1 not started (14 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -266,12 +286,13 @@ and are deliberately excluded from the counts above.
 | PLATFORM-P0-05.2 | AI Provider Configuration | Done — resolved 2026-09-16 via `AskUserQuestion` (provider = OpenAI; key scope = both platform-wide default and per-tenant BYOK, tenant chooses). Gemini added the same day per a follow-up user request. `platform_ai_provider_configs` (migrations `0057`/`0058`), `modules/platform-admin/aiProviderConfig.ts`, `/settings/ai` UI (provider selector), and `lib/ai/summarize.ts` now call the real OpenAI or Gemini REST API depending on the tenant's configured provider |
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
+| PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Not Started — 2026-09-25, master stories |
 
 ### 10 — Operations Agent
 
 **Module:** Audit, Reporting, Notifications & Search  
 **Backlog status:** DORMANT — do not start until the user says "Run Operations Agent"  
-**Stories:** 10 done · 1 partial · 0 deferred · 0 not started (11 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 10 done · 1 partial · 0 deferred · 1 not started (12 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -286,12 +307,13 @@ and are deliberately excluded from the counts above.
 | OPERATIONS-P0-05.1 | Notification preferences | Partial — schema/CRUD and mandatory-type enforcement done and live-verified; every P0 notification type is mandatory in this build, so there is no actual optional preference to toggle yet (not a bug — documented) |
 | OPERATIONS-P0-06.1 | Operational job reporting (connector/sync/job status) | Done — customer-facing `/integrations/jobs` page built, composing `getJobStatusSummary()`, added to the Integrations nav group |
 | OPERATIONS-P0-07 | Governance Evidence Pack export (PDF/CSV/JSON delivery) | Done — 2026-09-16: PDF renderer added (`pdf-lib`, user-approved new dependency); `exportGovernanceEvidencePack()` now produces all 3 formats, all sharing the same SHA-256 content hash. The narrower campaign-scoped `exportCampaignEvidencePackage()` (COMPLIANCE-P0-06) intentionally stays JSON/CSV-only — its format parameter type now explicitly excludes "pdf" |
+| OPERATIONS-P0-08 | Runtime and approval notifications (master P0-41) | Not Started — 2026-09-25, master stories |
 
 ### 11 — QA Agent
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 10 done · 12 partial · 0 deferred · 0 not started (22 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 10 done · 12 partial · 0 deferred · 3 not started (25 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -317,4 +339,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
 | QA-P1-07 | Release record completeness standard | Done — 2026-09-19: `INTEGRATION_STATUS.md` now opens with a Release identifier (commit + date) and an explicit P0/P1/P2 status summary (P0 detail is the table-level status below; P1/P2 are the modules' own prose `## P1`/`## P2` bullets, ~52/32 combined, overwhelmingly Not Started by design per CLAUDE.md §3) — see audit log |
 | QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16 (later): the sandbox's Supabase egress blocker is gone, so the suite was pointed at the live production deployment and **the framework is now proven against a real server** — `authenticate as platformAdmin` signed in end-to-end through real Supabase Auth and saved storage state. The four tenant-user logins failed on a **genuine product bug the suite existed to catch**: `getTenantContext()` returned every colleague's `tenant_memberships` row (RLS there is tenant-scoped, not user-scoped), so a single-tenant user resolved as a member of three organizations and was bounced to `/onboarding`; fixed in Foundation + Experience, proven at the data layer (3 rows → 1). A full run is still blocked, but on **credentials, not the network**: Vercel's Supabase env vars are Production-scoped so every preview 500s, and all five GitHub Actions secrets resolve empty in the job log. Needs `SUPABASE_SERVICE_ROLE_KEY` + `SECRET_ENCRYPTION_KEY` as repo secrets or Preview env vars — see `docs/design/qa-agent-backlog-audit.md` |
+| QA-P0-17 | RLS-only read sweep (codebase-map D10) | Not Started — 2026-09-25, master stories |
+| QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
+| QA-P0-19 | Harden the FinanceBot scenario's final step | Not Started — 2026-09-25, master stories |
 

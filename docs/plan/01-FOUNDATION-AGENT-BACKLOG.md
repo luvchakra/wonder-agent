@@ -46,6 +46,8 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-15 | Tenant Lifecycle (provisioning/active/suspended/closed) | Done — `tenants.status` existed since FOUNDATION-P0-02.1; enforcement gap closed by migration `0039` (2026-09-14) |
 | FOUNDATION-P1-05 | CSRF protection verification & hardening for state-changing `/api/v1/*` routes | Done — 2026-09-19: confirmed from `@supabase/ssr`'s own installed source (`DEFAULT_COOKIE_OPTIONS`, unoverridden by `proxy.ts`/`lib/db/supabaseServer.ts`) that every session cookie is genuinely `SameSite=Lax`; added `tests/e2e/csrf.spec.ts`, a real-browser positive/negative proof (a cross-site page's authenticated-looking fetch is rejected — the auth-token cookie is withheld, confirmed by inspecting the actual outgoing request) run live against this session's dev server — see audit log |
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
+| FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Not Started — 2026-09-25, master stories |
+| FOUNDATION-P0-18 | New permission keys (master P0-42) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -811,6 +813,23 @@ provider/credential decision (which LLM API, stored via the existing
 `encryptSecret()` pattern, server-only, never in client code — non-
 negotiable #10) before the first real call; stub/interface can be built
 without one. **Not started.**
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### FOUNDATION-P0-17 — Agent API keys — machine credential for the Runtime Gateway (master P0-27)
+
+Per-agent API keys (user decision): generated once and shown once; stored only as a hash; bound to exactly one tenant and one agent; revocable instantly; listed without the secret; create/revoke audited (#11); a shared `lib/security` verifier returns the tenant + agent it proves, never trusting a caller-supplied tenant/agent id (#2). New table `agent_api_keys` (tenant_id, RLS). Isolation test: tenant A's key never resolves to tenant B.
+
+### FOUNDATION-P0-18 — New permission keys (master P0-42)
+
+Add only the genuinely new keys (user decision — existing 35 are not renamed): `agent.suspend`, `discovery.read`, `discovery.manage`, `access.simulate`, `policy.publish`, `runtime.enforce`, `runtime.emergency`; seed them onto the existing system roles by least privilege, in one additive migration, with an RBAC test per key.
+
+
+---
 
 ## DO NOT IMPLEMENT (out of scope for this module, ever)
 

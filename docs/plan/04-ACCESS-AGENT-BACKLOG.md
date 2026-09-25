@@ -28,6 +28,10 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-05 | Policy Versioning, Priority & Change History (extends ACCESS-P0-02.1) | Done — 2026-09-14, live RLS-verified |
 | ACCESS-P0-06 | Action governance enforcement (4-state model, uses Identity's autonomy fields) | Done — 2026-09-15, unit-tested, no migration needed |
 | ACCESS-P0-07 | Broaden `policy_exceptions` into the canonical governance-exception model | Done — 2026-09-15, migration `0053`, live-applied |
+| ACCESS-P0-11 | Deterministic runtime decision function (master P0-28–P0-32) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-12 | Policy targets and publish (master P0-23) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-13 | Data sources inventory (master P0-11) | Not Started — 2026-09-25, master stories |
+| ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -548,6 +552,31 @@ compensating control, residual risk, status per the governance doc's P0-14
 field list — cross-check against the current schema and add whatever's
 missing). Must not become a second, competing model — this *is* the
 canonical one now. **Not started.**
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### ACCESS-P0-11 — Deterministic runtime decision function (master P0-28–P0-32)
+
+User decision: Access owns the decision logic, Runtime owns the endpoint. A pure, deterministic `evaluateRuntimeRequest()` returning ALLOW / DENY / REQUIRE_APPROVAL / ALLOW_WITH_RESTRICTIONS with reason, policy id + version and restrictions, in the master order: tenant → identity → lifecycle → emergency controls → approved access → effective access → context → risk → runtime policy. Fail-safe defaults: unknown identity/resource, suspended agent/resource, explicit deny, expired JIT → DENY; a missing or failing policy is never permission (§17.4). No LLM in the path (#9). Exhaustive unit tests per branch.
+
+### ACCESS-P0-12 — Policy targets and publish (master P0-23)
+
+Policy scope/facts for TOOL, MCP_SERVER, MCP_TOOL, DATA_SOURCE, DATA_RESOURCE and ACTION targets, plus a publish step (draft → published version) guarded by the new `policy.publish` permission; `priority` actually orders evaluation.
+
+### ACCESS-P0-13 — Data sources inventory (master P0-11)
+
+User decision: Access owns data sources beside `applications` — a `data_sources` table (tenant_id, RLS) with classification, linked to entitlements/applications, feeding CAN.
+
+### ACCESS-P0-14 — Wire SoD checks (codebase-map D5, master P0-25)
+
+`checkSoD()` is called where conflicting access or actions are granted/requested, producing findings or blocking per policy; it currently has no callers.
+
+
+---
 
 ## DO NOT IMPLEMENT
 

@@ -42,6 +42,9 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-14 | Observability sweep | Partial — schema-level correlation/status/timestamp fields confirmed present; no field-by-field checklist run against every async operation type |
 | QA-P1-07 | Release record completeness standard | Done — 2026-09-19: `INTEGRATION_STATUS.md` now opens with a Release identifier (commit + date) and an explicit P0/P1/P2 status summary (P0 detail is the table-level status below; P1/P2 are the modules' own prose `## P1`/`## P2` bullets, ~52/32 combined, overwhelmingly Not Started by design per CLAUDE.md §3) — see audit log |
 | QA-P0-16 | Playwright E2E suite (browser-driven, real Supabase Auth) | Partial — 2026-09-16 (later): the sandbox's Supabase egress blocker is gone, so the suite was pointed at the live production deployment and **the framework is now proven against a real server** — `authenticate as platformAdmin` signed in end-to-end through real Supabase Auth and saved storage state. The four tenant-user logins failed on a **genuine product bug the suite existed to catch**: `getTenantContext()` returned every colleague's `tenant_memberships` row (RLS there is tenant-scoped, not user-scoped), so a single-tenant user resolved as a member of three organizations and was bounced to `/onboarding`; fixed in Foundation + Experience, proven at the data layer (3 rows → 1). A full run is still blocked, but on **credentials, not the network**: Vercel's Supabase env vars are Production-scoped so every preview 500s, and all five GitHub Actions secrets resolve empty in the job log. Needs `SUPABASE_SERVICE_ROLE_KEY` + `SECRET_ENCRYPTION_KEY` as repo secrets or Preview env vars — see `docs/design/qa-agent-backlog-audit.md` |
+| QA-P0-17 | RLS-only read sweep (codebase-map D10) | Not Started — 2026-09-25, master stories |
+| QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
+| QA-P0-19 | Harden the FinanceBot scenario's final step | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -550,6 +553,27 @@ this way (build everything, validate via CI) rather than stop at a
 framework skeleton. Expect the first real CI run to surface a small number
 of selector/timing fixes; that is the genuine first live signal for this
 story, not this pass.
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### QA-P0-17 — RLS-only read sweep (codebase-map D10)
+
+Find every service read that queries a tenant table without an explicit tenant filter; add a two-membership isolation case to the E2E suite proving a member of two organizations sees only the selected one's data.
+
+### QA-P0-18 — Runtime Gateway security suite (master §24)
+
+Forged tenant/agent/identity/resource ids, cross-tenant API key, replay and duplicate requests, policy bypass, observe-only never blocking, enforce mode blocking, fail-safe DENY on policy failure.
+
+### QA-P0-19 — Harden the FinanceBot scenario's final step
+
+The `resolved` assertion flakes under two-worker load (passes alone); wait on the re-evaluation outcome rather than a fixed timeout.
+
+
+---
 
 ## DO NOT IMPLEMENT
 

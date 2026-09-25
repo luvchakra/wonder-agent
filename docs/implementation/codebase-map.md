@@ -165,44 +165,30 @@ Each was re-read at the cited lines before being written down.
 
 ---
 
-## 6. Decisions for the user (not guessed)
+## 6. Decisions: resolved 2026-09-25
 
-These follow `CLAUDE.md` §4 and `docs/ORCHESTRATION.md` §7: stop and report
-when a real architecture or security decision is unspecified.
+The user answered all five questions, plus the three sub-choices under
+question 1, via `AskUserQuestion` on 2026-09-25:
 
-1. **The Runtime Gateway (P0-26 to P0-35).** The master stories require "a
-   dedicated runtime enforcement boundary … independent from normal dashboard
-   request handling" that is "independently scalable". Open questions:
-   - **Where it runs:** an `/api/gateway/v1/*` subtree in this Next.js app on
-     Vercel (the locked stack), or a separately deployed service? The second
-     changes `CLAUDE.md` §2.
-   - **Who owns it:** Runtime Agent (events) or Access Agent (policy
-     evaluation), or a new split: Access owns the decision function, Runtime
-     owns the endpoint and the decision records?
-   - **How agents authenticate:** today runtime ingestion needs a human
-     session. The gateway needs machine credentials (per-agent keys, workload
-     identity or OAuth client credentials). That is a new authentication model
-     (#14) and belongs to Foundation.
-   - **Default mode:** the master stories recommend Runtime Enforce OFF (observe
-     only) at first. Confirm that as the default.
-2. **Customer-facing SHOULD/CAN/DID wording.** The master stories rename them
-   on screen to *Approved / Effective Access / Observed / Current Request*.
-   `CLAUDE.md` §9 and UI rules §11 prescribe SHOULD/CAN/DID. Switch the
-   labels, keep both ("Approved (SHOULD)"), or keep the current wording?
-3. **Owners of the new inventories.** NHI, shadow AI, models and data sources
-   need owners. Proposal:
-   - Identity owns NHI and shadow AI, as extensions of discovery.
-   - Integration owns MCP servers, tools and resources as normalized object
-     families, per master §16/§17 (no separate MCP tables unless
-     `integration_objects` cannot hold them).
-   - Access owns data sources beside `applications`.
-4. **Permission names.** Add only the missing keys listed under P0-42, and do
-   not rename existing ones (the master stories allow this).
-5. **Investigations as a first-class object (P0-37).** Is an investigation a
-   new Risk-owned table grouping findings, or a workspace view over one
-   finding?
+1. **Runtime Gateway:**
+   - It runs **inside this app** (`/api/gateway/v1/*`).
+   - Ownership is **split**: Access owns the deterministic decision
+     function and Runtime owns the endpoint, sessions and decision records.
+   - Agents authenticate with **per-agent API keys** (Foundation).
+   - The default mode is **OBSERVE_ONLY**; ENFORCE is switched on per
+     tenant or environment through a feature flag.
+2. **Wording:** show **both terms**: "Approved (SHOULD)", "Effective Access
+   (CAN)", "Observed (DID)", "Current Request (NOW)".
+3. **Inventories:** as proposed. Identity owns NHI and shadow AI.
+   Integration owns MCP servers, tools and resources as normalized
+   families. Access owns data sources.
+4. **Permissions:** add only the missing keys, and rename nothing.
+5. **Investigations:** a **new grouped record** owned by Risk.
 
----
+Each became a tracked `Not Started` story in its owning module's backlog
+(see the 2026-09-25 Requirements Refresh sections, and the ownership map's
+"Master stories decisions"). `docs/PROGRESS.md` now tracks 190 stories
+(145 done).
 
 ## 7. What changed in this pass
 

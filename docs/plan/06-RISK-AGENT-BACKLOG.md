@@ -31,6 +31,8 @@ this module is higher bar (see below).
 | RISK-P0-03.5 | False positive disposition with reason & expiry | Done |
 | RISK-P1-05 | Additional deterministic risk factors (privilege level, destructive capability, credential status, attack path) | Partial — 2026-09-19: "Privilege level" fully wired (real data via `getEffectiveAccess()`'s `privilegeLevel`, triggers on elevated/admin); the other three have real names/weights but always contribute 0, each with its own documented missing-contract dependency, per this story's own explicit acceptance allowance — see audit log |
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
+| RISK-P0-11 | Investigations as a first-class record (master P0-37) | Not Started — 2026-09-25, master stories |
+| RISK-P0-12 | New risk signals (master P0-20/P0-21) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -590,6 +592,23 @@ current state against the contract) — reuses `risk_findings`/
 trigger Compliance's re-certification path once that trigger exists
 (`CERT-P1-01`, currently P1 — do not build the trigger wiring itself
 ahead of that). **Not started.**
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### RISK-P0-11 — Investigations as a first-class record (master P0-37)
+
+User decision: a new Risk-owned investigation (e.g. INV-2026-001) grouping one or more findings, with status, priority, assignee, timeline, evidence, remediation and related findings — new `investigations` + `investigation_findings` tables (tenant_id + RLS), audited transitions.
+
+### RISK-P0-12 — New risk signals (master P0-20/P0-21)
+
+Suspicious delegation (from `agent_relationships`), shadow AI (from IDENTITY-P0-12), unapproved tool usage (SHOULD tools vs DID), and the four factors that are currently always false (certification overdue, destructive capability, credential health, attack path) where the data now exists.
+
+
+---
 
 ## DO NOT IMPLEMENT
 

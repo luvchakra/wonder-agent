@@ -139,6 +139,49 @@ module's own `## Requirements Refresh — 2026-09-15` section):
   `lib/audit/writeAudit()` is a Foundation-owned cross-module primitive);
   Experience Agent owns the UI surface (`EXPERIENCE-P0-14`).
 
+### Master stories decisions (2026-09-25, resolved the same day via `AskUserQuestion`)
+
+The user answered every open question in
+[`docs/implementation/codebase-map.md`](../implementation/codebase-map.md) §6.
+These are the current assignments. The stories are in each module's
+`## Requirements Refresh — 2026-09-25` section.
+
+- **Runtime Gateway: inside this app.** It is the `/api/gateway/v1/*`
+  subtree of this Next.js app on Vercel, not a separate service, so there
+  is no change to `CLAUDE.md` §2.
+- **Gateway ownership is split between Access and Runtime.**
+  - **Access Agent** owns the deterministic decision function
+    `evaluateRuntimeRequest()` (ACCESS-P0-11). There is one policy engine,
+    not two.
+  - **Runtime Agent** owns the endpoint, the sessions and the decision
+    records (RUNTIME-P0-15/16/18).
+- **Agent authentication uses per-agent API keys.** Foundation Agent owns
+  the credential primitive and the `agent_api_keys` table
+  (FOUNDATION-P0-17), as part of the authentication model (#14).
+- **The gateway ships in OBSERVE_ONLY mode.** Decisions are evaluated and
+  recorded, but nothing is blocked. ENFORCE is switched on per tenant or
+  environment through a Platform feature flag (PLATFORM-P0-12).
+- **Customer-facing wording shows both terms:** "Approved (SHOULD)",
+  "Effective Access (CAN)", "Observed (DID)" and "Current Request (NOW)"
+  (EXPERIENCE-P0-17). SHOULD/CAN/DID remain the canonical model terms in
+  `CLAUDE.md` §9.
+- **New inventories:**
+  - **Identity** owns NHI and Shadow AI as extensions of discovery
+    (IDENTITY-P0-11/12).
+  - **Integration** owns MCP servers, tools and resources as
+    `integration_objects` families, with no separate MCP tables unless
+    they prove insufficient (INTEGRATION-P0-06).
+  - **Access** owns `data_sources` beside `applications` (ACCESS-P0-13).
+- **Permission keys:** add only the missing keys; none of the existing 35
+  are renamed (FOUNDATION-P0-18).
+- **Investigations are a new grouped record owned by Risk:** the
+  `investigations` and `investigation_findings` tables (RISK-P0-11).
+
+Planned tables, not yet created: `agent_api_keys` (FA), `runtime_decisions`
+(RA), `investigations` and `investigation_findings` (RiskA), and
+`data_sources` (AA). Each needs `tenant_id`, RLS, and an isolation test
+before it is `Done` (§14).
+
 `agent-identity` (IA) and `access-governance` (AA) are deliberately separate: IA owns
 *who the agent is*; AA owns *what it can reach*. Integration (INT) owns the raw
 imported objects and the mapping layer that correlates them into IA's/AA's canonical
@@ -158,6 +201,7 @@ consume and persist into their own tables.
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |
 | `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
+| `/api/gateway/v1/*` (planned, RUNTIME-P0-15) | RA — the endpoint, which authenticates agents with API keys (FA) and calls AA's `evaluateRuntimeRequest()` for the decision |
 | `/api/v1/ai/summarize` | FA — pure passthrough wrapper over `lib/ai/summarize.ts` (FOUNDATION-P0-16); added by Experience Agent to unblock `EXPERIENCE-P0-14`, since no domain module owns this cross-cutting primitive |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 

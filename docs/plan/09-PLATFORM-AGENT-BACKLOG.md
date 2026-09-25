@@ -30,6 +30,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-05.2 | AI Provider Configuration | Done — resolved 2026-09-16 via `AskUserQuestion` (provider = OpenAI; key scope = both platform-wide default and per-tenant BYOK, tenant chooses). Gemini added the same day per a follow-up user request. `platform_ai_provider_configs` (migrations `0057`/`0058`), `modules/platform-admin/aiProviderConfig.ts`, `/settings/ai` UI (provider selector), and `lib/ai/summarize.ts` now call the real OpenAI or Gemini REST API depending on the tenant's configured provider |
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
+| PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Not Started — 2026-09-25, master stories |
 
 ---
 
@@ -549,6 +550,19 @@ the first concrete use case that would need `PLATFORM-P0-05.2` (AI Provider
 Configuration), already `Deferred` here as a genuine open product/
 architecture question. Not re-opened or re-scoped unilaterally — still
 waiting on the same answer it was waiting on before.
+
+---
+
+## Requirements Refresh — 2026-09-25 (master P0/P1/P2 implementation stories)
+
+Source: the user-supplied *WonderAgent Master P0/P1/P2 Implementation Stories* (MCP folded into the five pillars DISCOVER → UNDERSTAND → GOVERN → PROTECT → ASSURE), mapped story by story in [`docs/implementation/codebase-map.md`](../implementation/codebase-map.md). Ownership and architecture choices were decided by the user on 2026-09-25 (see `docs/design/ownership-map.md`, "Master stories decisions"). Nothing already `Done` is reopened; the rows below are added to this module's Progress Tracker as `Not Started`.
+
+### PLATFORM-P0-12 — Enforce feature flags (codebase-map D8, master §26)
+
+`isFeatureEnabled()` gets real callers; add the master rollout flags (`runtime_observe` on, `runtime_enforce` off by default, `tool_filtering`, `jit_access`, `shadow_ai`, `nhi_discovery`, `access_graph`, …) so enforcement is switched on per tenant only after validation.
+
+
+---
 
 ## DO NOT IMPLEMENT
 
