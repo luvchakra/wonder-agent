@@ -17,8 +17,9 @@ test.describe("Runtime module", () => {
     const agentId = await registerAgent(page, `E2E Runtime Agent ${Date.now()}`);
     await page.goto(`/runtime/agents/${agentId}`);
 
-    // Retitled with EXPERIENCE-P0-17's wording and RUNTIME-P0-17's NOW column.
-    await expect(page.getByText("Approved vs Effective vs Observed vs Now")).toBeVisible();
+    // EXPERIENCE-P0-17's wording: the friendly label with the model term.
+    await expect(page.getByRole("heading", { name: "Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)" })).toBeVisible();
+    await expect(page.getByText("Current Request (NOW)", { exact: true })).toBeVisible();
     await expect(page.getByText("No comparison outcomes yet.")).toBeVisible();
     await expect(page.getByText("No events yet.")).toBeVisible();
   });

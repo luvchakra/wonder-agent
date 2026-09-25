@@ -5,7 +5,7 @@ import { listAgents } from "@/modules/agent-identity/service";
 import { listEmergencyControls, listRuntimeDecisions, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { EmergencyControlsPanel } from "./EmergencyControlsPanel";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
+import { ACCESS_VIEW, Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
 import { RuntimeActivity, type ActivityRow } from "./RuntimeActivity";
 
 const WINDOW_SIZE = 200;
@@ -78,7 +78,7 @@ export default async function RuntimeIndexPage() {
         <div>
           <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Runtime activity</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            What your AI agents actually did — the DID half of SHOULD vs CAN vs DID.
+            What your AI agents actually did: {ACCESS_VIEW.did}, compared with {ACCESS_VIEW.should} and {ACCESS_VIEW.can}.
           </p>
         </div>
         <LinkButton href="/reports" variant="outline" size="sm">

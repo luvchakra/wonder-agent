@@ -48,7 +48,7 @@ test.describe("Access module", () => {
     await page.goto(`/access/agents/${agentId}`);
 
     await expect(page.getByText("Access Graph")).toBeVisible();
-    await expect(page.getByText(/Effective Access \(CAN\)/)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Effective Access (CAN)" })).toBeVisible();
     // A freshly registered agent has no accounts/grants yet from this
     // manual-registration path (accounts come from an integration sync).
     await expect(page.getByText("0 grants")).toBeVisible();

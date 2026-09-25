@@ -62,7 +62,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "1. Create or select an organization when you first sign in. Everything in WonderAgent is scoped to that organization (tenant) — data is never shared between them.",
       "2. Connect a source system under Integrations so WonderAgent can import the agents and permissions your IAM already knows about.",
       "3. Review imported agents under Agents → Discovery and register the ones that matter.",
-      "4. Give each registered agent an owner and an agent contract — its approved purpose, applications, data and actions. This is what SHOULD means for that agent.",
+      "4. Give each registered agent an owner and an agent contract — its approved purpose, applications, data and actions. This is what Approved (SHOULD) means for that agent.",
       "5. Open Risks & Alerts. Findings appear where an agent can do, or did, something its contract does not approve.",
     ],
     keywords: ["setup", "start", "onboarding", "quick start", "begin", "first", "walkthrough"],
@@ -70,14 +70,14 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   },
   {
     id: "should-can-did",
-    title: "SHOULD vs CAN vs DID",
+    title: "Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)",
     category: "Core model",
     summary:
-      "SHOULD is what an agent is approved to do, CAN is what its access technically permits, and DID is what it actually did — findings come from the gaps between them.",
+      "Approved (SHOULD) is what an agent is approved to do, Effective Access (CAN) is what its access technically permits, and Observed (DID) is what it actually did — findings come from the gaps between them.",
     body: [
-      "SHOULD comes from the agent's contract: the purpose, applications, data classes and actions you approved.",
-      "CAN is computed from IAM data — the entitlements, roles, groups, OAuth scopes and tool permissions that agent's identities actually hold. An agent frequently CAN do far more than it SHOULD.",
-      "DID comes from observed runtime activity: the tools, resources and actions the agent really used.",
+      "Approved (SHOULD) comes from the agent's contract: the purpose, applications, data classes and actions you approved.",
+      "Effective Access (CAN) is computed from IAM data — the entitlements, roles, groups, OAuth scopes and tool permissions that agent's identities actually hold. An agent frequently CAN do far more than it SHOULD.",
+      "Observed (DID) comes from observed runtime activity: the tools, resources and actions the agent really used.",
       "The product's whole value is the comparison. Access it CAN use but SHOULD not have is excessive access. Something it DID that it SHOULD not have done is a violation. The Runtime and Risk sections show these side by side.",
     ],
     keywords: ["should", "can", "did", "model", "comparison", "concept", "gap", "excessive"],
@@ -85,7 +85,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   },
   {
     id: "agent-contract",
-    title: "Agent contracts (defining SHOULD)",
+    title: "Agent contracts (defining Approved (SHOULD))",
     category: "Agents",
     summary:
       "An agent contract records the approved purpose, applications, data and actions for one agent — it is the baseline every risk check compares against.",
@@ -142,7 +142,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   },
   {
     id: "effective-access",
-    title: "Effective access (CAN)",
+    title: "Effective Access (CAN)",
     category: "Access",
     summary:
       "The effective access view computes what an agent can technically do today, including access inherited through roles and groups, and shows the path that grants it.",
@@ -170,13 +170,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   },
   {
     id: "runtime",
-    title: "Runtime activity (DID)",
+    title: "Runtime activity — Observed (DID)",
     category: "Runtime",
     summary:
       "Runtime shows what each agent actually did — the tools, resources and actions observed — and compares it against SHOULD and CAN.",
     body: [
       "Runtime events arrive from MCP runtime observation and other configured sources, and build a timeline per agent of tools invoked, resources touched and actions taken.",
-      "The comparison view puts SHOULD, CAN and DID next to each other for one agent, which is usually the fastest way to explain a finding to someone who did not configure the agent.",
+      "The comparison view puts Approved (SHOULD), Effective Access (CAN) and Observed (DID) next to each other for one agent, which is usually the fastest way to explain a finding to someone who did not configure the agent.",
       "Activity WonderAgent cannot attribute to a governed agent is itself signal, and feeds discovery rather than being discarded.",
     ],
     keywords: ["runtime", "activity", "events", "did", "timeline", "mcp", "observed", "behaviour", "behavior"],

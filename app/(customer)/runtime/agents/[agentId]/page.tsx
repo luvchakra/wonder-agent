@@ -22,6 +22,8 @@ import {
   Tr,
   SelectField,
   TextField,
+  ACCESS_VIEW,
+  ACCESS_VIEWS_COMPARED,
 } from "@/modules/ui";
 import { RuntimeEventEvidenceTrigger, RuntimeEventEvidenceDrawer } from "./RuntimeEventEvidenceDrawer";
 
@@ -78,7 +80,7 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Runtime Assurance — what this agent actually DID, and how it compares to SHOULD and CAN.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Runtime Assurance — {ACCESS_VIEW.did}: what this agent actually did, compared with {ACCESS_VIEW.should} and {ACCESS_VIEW.can}.</p>
       </div>
 
       <AgentTabs agentId={agentId} active="runtime" />
@@ -89,16 +91,16 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
 
       <Card>
         <CardHeader
-          title="Approved vs Effective vs Observed vs Now"
-          description="Approved purpose (SHOULD), technical capability (CAN), observed behavior (DID) and the current request (NOW), per CLAUDE.md §9."
-          actions={comparison.shouldUnknown ? <Badge tone="warning">SHOULD undefined</Badge> : <Badge tone={overallHealthy ? "success" : "danger"}>{overallHealthy ? "Healthy" : "Deviation detected"}</Badge>}
+          title={ACCESS_VIEWS_COMPARED}
+          description={`What the agent is approved to do, can technically do and did, and its ${ACCESS_VIEW.now}.`}
+          actions={comparison.shouldUnknown ? <Badge tone="warning">No approved contract</Badge> : <Badge tone={overallHealthy ? "success" : "danger"}>{overallHealthy ? "Healthy" : "Deviation detected"}</Badge>}
         />
         <CardBody className="space-y-4">
           {/* EXPERIENCE-P0-17 wording (user decision, 2026-09-25): the
               friendly term with the model term beside it. */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Approved (SHOULD)</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{ACCESS_VIEW.should}</p>
               <p className="mt-1 text-sm text-foreground">
                 {comparison.should.map((s) => `${s.application}${s.data ? `:${s.data}` : ""}`).join(", ") || "(none)"}
               </p>
@@ -107,13 +109,13 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
               ) : null}
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Effective Access (CAN)</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{ACCESS_VIEW.can}</p>
               <p className="mt-1 text-sm text-foreground">
                 {comparison.can.map((c) => `${c.application}${c.entitlementName ? `:${c.entitlementName}` : ""}`).join(", ") || "(none)"}
               </p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Observed (DID)</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{ACCESS_VIEW.did}</p>
               <p className="mt-1 text-sm text-foreground">
                 {comparison.did.map((d) => `${d.application ?? "?"}${d.resource ? `:${d.resource}` : ""}`).join(", ") || "(none)"}
               </p>
@@ -122,7 +124,7 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
               ) : null}
             </div>
             <div>
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Current Request (NOW)</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{ACCESS_VIEW.now}</p>
               {comparison.now ? (
                 <div className="mt-1 space-y-1 text-sm">
                   <p className="text-foreground">
@@ -161,7 +163,7 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
       </Card>
 
       <Card>
-        <CardHeader title="DID — Observed Activity" description="Aggregated runtime activity, last 90 days." />
+        <CardHeader title={`${ACCESS_VIEW.did} activity`} description="Aggregated runtime activity, last 90 days." />
         <CardBody>
           {did.tuples.length === 0 ? (
             <EmptyState title="No runtime activity recorded yet" />

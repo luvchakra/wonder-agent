@@ -2536,3 +2536,63 @@ that nothing was enforced, so the screen never implies a block happened
 The card uses the shared `TableContainer` with column priorities (Target
 from xl, Reason from lg) and is covered by the gateway E2E spec, including
 its invisibility to another organization.
+
+---
+
+## 2026-09-25 — EXPERIENCE-P0-17: access wording, friendly label with the model term
+
+User decision: screens say "Approved (SHOULD)", "Effective Access (CAN)",
+"Observed (DID)" and "Current Request (NOW)". `CLAUDE.md` §9 and UI rules
+§11 are unchanged; SHOULD/CAN/DID stay the model's terms.
+
+**One source.** New `modules/ui/accessViews.ts` exports `ACCESS_VIEW` and
+`ACCESS_VIEWS_COMPARED`, from the `modules/ui` barrel. Screens use it
+rather than typing the labels, so they cannot drift.
+
+**Where it applies:**
+
+- **Runtime comparison** (`/runtime/agents/:id`):
+  - the card title is "Approved (SHOULD) vs Effective Access (CAN) vs
+    Observed (DID)", and the four columns use the constants;
+  - the page subtitle and the activity card title use the labels;
+  - "SHOULD undefined" became "No approved contract". The label wrapped
+    inside the badge at 360 px, and the plain words say the same thing.
+- **Runtime activity:** the page subtitle, and the drawer's link to the
+  comparison.
+- **Rogue agent detail:** the deviation card title, and its "no contract"
+  badge.
+- **Agent 360:** the effective-access panel, the "no contract" empty
+  states, and the contract card title ("Agent contract — Approved
+  (SHOULD)").
+- **Access agent page:** the subtitle and the grants card title.
+- **Other screens:** the AI settings copy, the help centre (the model
+  article's title, summary and definitions, and the Effective Access and
+  Runtime article titles) and a help-assistant suggested question.
+- **Welcome page:** the capability cards, the three model columns and the
+  finding sentence.
+- **Pipeline diagram (`FlowDiagram`):** the label now sits over its model
+  term. At 1280 px the longer terms truncated "Agent contract" and "IAM
+  entitlements" to "Agent …" and "I…", which was caught on the
+  screenshot.
+- **The evidence pack PDF** section heading and lines.
+
+**Deliberately unchanged:**
+
+- The agent section tabs "Access (CAN)" and "Runtime (DID)". They already
+  pair a friendly word with the model term, and they name module pages,
+  not the views.
+- Code comments, API field names and the AI prompt text in
+  `lib/ai/summarize.ts`. None are screens.
+
+**Verified:**
+
+- `tsc` and `eslint` clean; vitest 536/536.
+- Affected specs (help, access, runtime, risk, design-review, welcome,
+  agents): 55/55 after updating three assertions to the new wording
+  (`help.spec` heading, `runtime.spec` heading plus the NOW column,
+  `access.spec` heading by role).
+- Screenshots: runtime comparison at 360 px (no horizontal overflow);
+  welcome model columns at 360 px; pipeline diagram at 360, 768 and
+  1280 px (no overflow, no truncation). Colours are tokens, so dark mode
+  is unaffected.
+- Full Playwright suite: **194/194** (9.3 min, fresh build).

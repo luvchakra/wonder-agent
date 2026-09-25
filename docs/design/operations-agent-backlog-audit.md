@@ -794,3 +794,13 @@ RISK-P0-11, where the record is created.
 (RISK-P0-11), through Risk's `listInvestigations({ query })`, matched in
 the database by reference or title and only for `risk.read`.
 OPERATIONS-P0-08 is `Done`.
+
+---
+
+## 2026-09-25 — Evidence pack PDF wording (with EXPERIENCE-P0-17)
+
+The evidence pack PDF's comparison section now uses the product's
+wording: its heading is "Approved (SHOULD) vs Effective Access (CAN) vs
+Observed (DID)", and each line leads with its label. It is a text change
+only. The pack's data and structure are unchanged, and the operations
+unit tests pass. Recorded in full in the Experience audit.

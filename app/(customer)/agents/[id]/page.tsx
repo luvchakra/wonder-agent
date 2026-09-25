@@ -26,7 +26,7 @@ import {
 import { getGovernancePosture } from "@/modules/certification-compliance/service";
 import type { GovernancePosture } from "@/lib/shared/types/compliance";
 import type { OwnershipIssue } from "@/lib/shared/types/agent-identity";
-import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, NavIcon } from "@/modules/ui";
+import { ACCESS_VIEW, Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, NavIcon } from "@/modules/ui";
 import { DonutChart } from "@/modules/ui/charts.lazy";
 import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
 import { AgentApiKeysPanel } from "./AgentApiKeysPanel";
@@ -298,7 +298,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         <Card>
           <CardHeader
             title="Key metrics"
-            description="Effective access (CAN), from connected IAM data"
+            description={`${ACCESS_VIEW.can}, from connected IAM data`}
             actions={
               <Link href={`/access/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
                 View access
@@ -360,7 +360,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
                 </div>
               </>
             ) : (
-              <EmptyState title="No active contract" description="Approved purpose (SHOULD) is undefined until a contract is published below." />
+              <EmptyState title="No active contract" description={`${ACCESS_VIEW.should} is undefined until a contract is published below.`} />
             )}
           </CardBody>
         </Card>
@@ -580,7 +580,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
 
       <Card className="scroll-mt-4">
         <div id="contract" />
-        <CardHeader title="Agent Contract (SHOULD)" description="Approved purpose, applications, data and actions — the contract SHOULD is measured against." />
+        <CardHeader title={`Agent contract — ${ACCESS_VIEW.should}`} description="Approved purpose, applications, data and actions: what effective access and observed activity are measured against." />
         <CardBody className="space-y-3">
           {contract ? (
             <dl className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -648,7 +648,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
               </div>
             </dl>
           ) : (
-            <EmptyState title="No active contract" description="SHOULD is undefined until a contract is published — see the Risk tab for how this affects findings." />
+            <EmptyState title="No active contract" description={`${ACCESS_VIEW.should} is undefined until a contract is published — see the Risk tab for how this affects findings.`} />
           )}
           <p className="text-xs text-muted-foreground">{contractVersions.length} version{contractVersions.length === 1 ? "" : "s"} published.</p>
           <details className="border-t border-border pt-3">

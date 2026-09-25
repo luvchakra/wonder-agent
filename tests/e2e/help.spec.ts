@@ -42,7 +42,7 @@ test.describe("help centre (signed out)", () => {
 
   test("renders the guide sections and the FAQ", async ({ page }) => {
     await page.goto("/help");
-    await expect(page.getByRole("heading", { name: "SHOULD vs CAN vs DID" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Connecting source systems" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Why do I have no findings?" })).toBeVisible();
   });
@@ -97,7 +97,7 @@ test.describe("help centre (signed in)", () => {
 
   test("renders the guide sections and the FAQ", async ({ page }) => {
     await page.goto("/help");
-    await expect(page.getByRole("heading", { name: "SHOULD vs CAN vs DID" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Connecting source systems" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Why do I have no findings?" })).toBeVisible();
   });

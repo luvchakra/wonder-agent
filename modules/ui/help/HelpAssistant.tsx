@@ -15,7 +15,7 @@ type Turn = {
 const SUGGESTIONS = [
   "How do I connect Saviynt?",
   "Why do I have no findings?",
-  "What is the difference between CAN and DID?",
+  "What is the difference between Effective Access (CAN) and Observed (DID)?",
   "How do I reset my password?",
 ];
 

@@ -1,4 +1,5 @@
 import { Activity, FileCheck2, KeyRound, ScanLine, ShieldAlert } from "lucide-react";
+import { ACCESS_VIEW } from "./accessViews";
 
 /**
  * The evaluation pipeline, animated: three sources flow into the
@@ -13,9 +14,9 @@ import { Activity, FileCheck2, KeyRound, ScanLine, ShieldAlert } from "lucide-re
  */
 
 const SOURCES = [
-  { icon: FileCheck2, label: "Agent contract", meta: "SHOULD" },
-  { icon: KeyRound, label: "IAM entitlements", meta: "CAN" },
-  { icon: Activity, label: "Runtime events", meta: "DID" },
+  { icon: FileCheck2, label: "Agent contract", meta: ACCESS_VIEW.should },
+  { icon: KeyRound, label: "IAM entitlements", meta: ACCESS_VIEW.can },
+  { icon: Activity, label: "Runtime events", meta: ACCESS_VIEW.did },
 ] as const;
 
 function Connector({ orientation }: { orientation: "horizontal" | "vertical" }) {
@@ -61,9 +62,13 @@ export function FlowDiagram() {
             className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5 shadow-[var(--shadow-sm)]"
           >
             <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            <span className="min-w-0 flex-1 truncate text-sm text-foreground">{label}</span>
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-              {meta}
+            {/* Label over its model term: the EXPERIENCE-P0-17 terms are
+                too long to share one line with the label at md widths. */}
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-sm text-foreground">{label}</span>
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {meta}
+              </span>
             </span>
           </div>
         ))}

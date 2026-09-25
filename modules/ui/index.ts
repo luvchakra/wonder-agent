@@ -38,3 +38,4 @@ export { DonutChart, TrendChart } from "./charts.lazy";
 export type { Slice, TrendSeries } from "./charts";
 export { CoverageBars } from "./CoverageBars";
 export { PeriodSelect, type PeriodOption } from "./PeriodSelect";
+export { ACCESS_VIEW, ACCESS_VIEWS_COMPARED } from "./accessViews";

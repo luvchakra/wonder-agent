@@ -50,12 +50,12 @@ const CAPABILITIES = [
   },
   {
     icon: KeyRound,
-    title: "Effective access (CAN)",
+    title: "Effective Access (CAN)",
     body: "Resolve what an agent can technically reach today by walking real entitlements, roles, groups, OAuth scopes and tool permissions from your IAM.",
   },
   {
     icon: Activity,
-    title: "Runtime assurance (DID)",
+    title: "Runtime assurance — Observed (DID)",
     body: "Observe what the agent actually did — every tool call, resource and action — and compare it against what it was approved to do.",
   },
   {
@@ -84,7 +84,7 @@ const STEPS = [
   {
     n: "02",
     title: "Declare the agent's purpose",
-    body: "Name an owner, the approved applications, the approved data and the approved actions. That contract becomes SHOULD.",
+    body: "Name an owner, the approved applications, the approved data and the approved actions. That contract becomes Approved (SHOULD).",
   },
   {
     n: "03",
@@ -248,7 +248,7 @@ export default function WelcomePage() {
           <div className="mt-10 grid gap-px overflow-hidden rounded-xl border border-border bg-border md:grid-cols-3">
             {[
               {
-                key: "SHOULD",
+                key: "Approved (SHOULD)",
                 tone: "text-info",
                 dot: "bg-info",
                 q: "What is it approved to do?",
@@ -256,7 +256,7 @@ export default function WelcomePage() {
                 value: "Financial reporting data · READ, REPORT",
               },
               {
-                key: "CAN",
+                key: "Effective Access (CAN)",
                 tone: "text-warning",
                 dot: "bg-warning",
                 q: "What can it technically do?",
@@ -264,7 +264,7 @@ export default function WelcomePage() {
                 value: "SAP · Snowflake/Finance · Snowflake/CustomerDB",
               },
               {
-                key: "DID",
+                key: "Observed (DID)",
                 tone: "text-destructive",
                 dot: "bg-destructive",
                 q: "What did it actually do?",
@@ -302,7 +302,7 @@ export default function WelcomePage() {
             <div className="grid gap-6 p-5 sm:grid-cols-[1.4fr_1fr]">
               <div>
                 <p className="text-sm font-medium text-foreground">
-                  CAN exceeds SHOULD, and DID confirms the gap was used.
+                  Effective Access (CAN) exceeds Approved (SHOULD), and Observed (DID) confirms the gap was used.
                 </p>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                   FinanceBot is approved for financial reporting data only, but holds an entitlement

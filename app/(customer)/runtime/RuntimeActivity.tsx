@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
-import { Badge, Card, CardHeader, CardBody, EmptyState, Tabs, TabPanel } from "@/modules/ui";
+import { ACCESS_VIEWS_COMPARED, Badge, Card, CardHeader, CardBody, EmptyState, Tabs, TabPanel } from "@/modules/ui";
 import { SelectField, fieldInputClass } from "@/modules/ui/Field";
 import { cn } from "@/lib/utils";
 import { eventResult, humanizeEventType } from "./eventLabels";
@@ -206,7 +206,7 @@ export function RuntimeActivity({ rows, windowLabel }: { rows: ActivityRow[]; wi
                   href={`/runtime/agents/${selected.agentId}`}
                   className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
                 >
-                  SHOULD vs CAN vs DID for this agent
+                  {ACCESS_VIEWS_COMPARED} for this agent
                 </Link>
               </TabPanel>
 

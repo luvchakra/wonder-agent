@@ -47,10 +47,10 @@ export async function renderEvidencePackPdf(pack: GovernanceEvidencePack): Promi
   pack.access.exceptions.forEach((e) => writer.line(`Exception: ${e.scopeType} — ${e.status} (${e.reason})`));
   writer.gap();
 
-  writer.heading("SHOULD vs CAN vs DID");
-  writer.line(`SHOULD: ${pack.shouldCanDid.should.length} approved resource(s)`);
-  writer.line(`CAN: ${pack.shouldCanDid.can.length} technically-accessible resource(s)`);
-  writer.line(`DID: ${pack.shouldCanDid.did.length} observed-activity resource(s)`);
+  writer.heading("Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)");
+  writer.line(`Approved (SHOULD): ${pack.shouldCanDid.should.length} approved resource(s)`);
+  writer.line(`Effective Access (CAN): ${pack.shouldCanDid.can.length} technically-accessible resource(s)`);
+  writer.line(`Observed (DID): ${pack.shouldCanDid.did.length} observed-activity resource(s)`);
   pack.shouldCanDid.outcomes.forEach((o) => writer.line(`Outcome: ${o.type}`));
   writer.gap();
 

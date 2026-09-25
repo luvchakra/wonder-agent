@@ -26,6 +26,7 @@ import {
   SelectField,
   TextField,
   AccessGraphView,
+  ACCESS_VIEW,
 } from "@/modules/ui";
 import { AccessPathEvidenceTrigger, AccessPathEvidenceDrawer } from "./AccessPathEvidenceDrawer";
 import { RevokeGrantButton } from "./RevokeGrantButton";
@@ -65,7 +66,7 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold text-foreground">{agent.agentName}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Effective access — what this agent CAN technically do, derived from IAM data.</p>
+        <p className="mt-1 text-sm text-muted-foreground">{ACCESS_VIEW.can}: what this agent can technically do, derived from IAM data.</p>
       </div>
 
       <AgentTabs agentId={agentId} active="access" />
@@ -82,7 +83,7 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
       </Card>
 
       <Card>
-        <CardHeader title="Effective Access (CAN)" description={`${effectiveAccess.length} grant${effectiveAccess.length === 1 ? "" : "s"}`} />
+        <CardHeader title={ACCESS_VIEW.can} description={`${effectiveAccess.length} grant${effectiveAccess.length === 1 ? "" : "s"}`} />
         <CardBody>
           {effectiveAccess.length === 0 ? (
             <EmptyState title="No effective access recorded yet" description="This agent has no grants derived from any connected system or manual entry." />

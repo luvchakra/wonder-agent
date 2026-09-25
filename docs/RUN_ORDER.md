@@ -123,11 +123,12 @@ isolation checks. Detail is in each module's audit log.
 | + | IDENTITY-P0-14: identity links audited with explicit confidence (D3); ASSESSED reachable (D4) | Done | `73c47b6` |
 | + | ACCESS-P0-14: separation-of-duties checks wired (D5) | Done | `1e98e94` |
 | + | ACCESS-P0-12: policy targets, priority, draft → publish | Done | `6c1d9af` |
-| + | IDENTITY-P0-13: contract and ownership completeness; same-tenant agent references | Done | see Identity audit |
+| + | IDENTITY-P0-13: contract and ownership completeness; same-tenant agent references | Done | `9da1e87` |
+| + | EXPERIENCE-P0-17: "Approved (SHOULD)" / "Effective Access (CAN)" / "Observed (DID)" / "Current Request (NOW)" wording | Done | see Experience audit |
 
 **Still to do in this programme:**
 
-- EXPERIENCE-P0-16/17 (the remaining mockup screens; app-wide wording).
+- EXPERIENCE-P0-16 (the remaining mockup screens).
 - QA-P0-17/18 (RLS read sweep; the gateway security suite).
 
 **Open items recorded, not decided:**

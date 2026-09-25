@@ -6,7 +6,7 @@ import { getFindings } from "@/modules/risk/service";
 import { compareShouldCanDid } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RogueCategory } from "@/lib/shared/types/risk";
-import { Badge, SeverityBadge, Card, CardHeader, CardBody, EmptyState, AiSummaryPanel } from "@/modules/ui";
+import { ACCESS_VIEW, ACCESS_VIEWS_COMPARED, Badge, SeverityBadge, Card, CardHeader, CardBody, EmptyState, AiSummaryPanel } from "@/modules/ui";
 import { RogueAgentActionBar } from "./RogueAgentActionBar";
 import { FindingActions } from "./FindingActions";
 
@@ -110,11 +110,11 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
 
       <Card>
         <CardHeader
-          title="SHOULD vs CAN vs DID deviation"
+          title={`${ACCESS_VIEWS_COMPARED}: deviations`}
           description="The runtime comparison behind the behavioral-deviation findings above (CLAUDE.md §9)."
         />
         <CardBody>
-          {comparison.shouldUnknown && <Badge tone="warning">SHOULD undefined — no active contract to compare against</Badge>}
+          {comparison.shouldUnknown && <Badge tone="warning">{ACCESS_VIEW.should} undefined — no active contract to compare against</Badge>}
           {!comparison.shouldUnknown && deviations.length > 0 && (
             <div className="mb-3">
               <AiSummaryPanel kind="should_can_did_comparison" data={comparison} label="Summarize this comparison" />

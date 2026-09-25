@@ -30,7 +30,7 @@ export default async function AiProviderSettingsPage() {
       <h1 className="text-xl font-semibold text-foreground">AI Provider</h1>
       <p className="text-sm text-muted-foreground">
         Powers the AI-Assisted Investigation summaries (findings, evidence bundles,
-        SHOULD/CAN/DID comparisons, certification items). Summaries are advisory prose
+        Approved (SHOULD) / Effective Access (CAN) / Observed (DID) comparisons, certification items). Summaries are advisory prose
         only — no authorization, risk, or remediation decision in WonderAgent ever
         depends on an AI output (non-negotiable #9). Supports OpenAI and Google Gemini.
       </p>
