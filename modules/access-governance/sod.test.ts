@@ -72,6 +72,14 @@ describe("checkSoD (ACCESS-P0-14, codebase-map D5)", () => {
     expect(auditQueries).toEqual([]);
   });
 
+  it("an advisory policy never hides a blocking one that also matches", async () => {
+    policies = [{ ...sodPolicy("alert"), id: "flag" }, { ...sodPolicy("block"), id: "block" }];
+    priorAudit = { action: "access.request_submitted", tenant_id: T };
+    expect(await checkSoD(T, U, "access.request_approved", A)).toMatchObject({ conflict: true, policyId: "block", blocking: true });
+    policies = [{ ...sodPolicy("alert"), id: "flag" }];
+    expect(await checkSoD(T, U, "access.request_approved", A)).toMatchObject({ conflict: true, policyId: "flag", blocking: false });
+  });
+
   it("never builds a filter from a malformed id", async () => {
     policies = [sodPolicy("block")];
     expect(await checkSoD(T, U, "access.request_approved", "x,tenant_id.eq.other")).toEqual({ conflict: false });

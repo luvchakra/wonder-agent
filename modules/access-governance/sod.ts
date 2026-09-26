@@ -44,6 +44,11 @@ export async function checkSoD(tenantId: string, userId: string, action: string,
     .returns<{ id: string; tenant_id: string; action: string; policy_rules: { rule_type: string; condition: unknown }[] }[]>();
   if (policyError) throw new ApiError(500, "QUERY_FAILED", policyError.message);
 
+  // Every matching policy is checked: an advisory policy must never hide a
+  // blocking one that also matches (found 2026-09-26, when a leftover flag
+  // policy let an approval through a blocking policy). The first blocking
+  // conflict wins; otherwise the first advisory one is reported.
+  let advisory: SoDCheckResult | null = null;
   for (const policy of (policyRows ?? []).filter((p) => p.tenant_id === tenantId)) {
     for (const rule of policy.policy_rules ?? []) {
       if (rule.rule_type !== "rbac") continue;
@@ -64,12 +69,14 @@ export async function checkSoD(tenantId: string, userId: string, action: string,
       if (auditError) throw new ApiError(500, "QUERY_FAILED", auditError.message);
 
       if (prior && prior.tenant_id === tenantId) {
-        return { conflict: true, policyId: policy.id, blocking: policy.action === "block", conflictingAction: prior.action };
+        const found = { conflict: true as const, policyId: policy.id, blocking: policy.action === "block", conflictingAction: prior.action };
+        if (found.blocking) return found;
+        advisory ??= found;
       }
     }
   }
 
-  return { conflict: false };
+  return advisory ?? { conflict: false };
 }
 
 /**
