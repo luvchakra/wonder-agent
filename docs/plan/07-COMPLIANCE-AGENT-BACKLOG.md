@@ -31,6 +31,7 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
 | COMPLIANCE-P0-10 | Certification campaigns for every identity type | Not Started — 2026-09-26, WonderID |
+| COMPLIANCE-P0-11 | Access certification of WonderID users' role assignments | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ---
 
@@ -523,3 +524,16 @@ These stories extend this module's own tables, services and routes.
 ### COMPLIANCE-P0-10 — Certification campaigns for every identity type
 
 Extend campaigns to human, external, privileged, machine, service-account and AI-agent access and to application, entitlement, role and package owners; reviewer types (manager, application/entitlement/role owner, security, delegated); decisions CERTIFY/REVOKE/DEFER/ESCALATE/EXCEPTION; revoke creates remediation; templates, calendar and analytics. Recommendations stay advisory.
+
+## Tenant & user permissioning — Phase 4b (2026-09-26)
+
+### COMPLIANCE-P0-11 — Access certification of WonderID users' role assignments
+
+- Campaigns over WonderID role assignments: privileged first, then all;
+  direct and group.
+- Each item shows the user, role, scope and source, with Certify or
+  Revoke.
+- A revoke removes the assignment through Foundation's published
+  role-assignment service (never a direct write).
+- Decisions are audit evidence (ACCESS_CERTIFIED / ACCESS_REVOKED).
+- Reviewers never certify their own assignments.

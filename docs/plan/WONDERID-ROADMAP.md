@@ -88,3 +88,91 @@ option and can be revisited:
 
 Already scheduled and still open: EXPERIENCE-P0-16 (remaining mockup screens,
 now folded into the WonderID screens) and QA-P0-18 (gateway security suite).
+
+---
+
+## Phase 4b — Tenant & user permissioning (added 2026-09-26)
+
+**Source:** two further user-supplied specifications, stored with their mockups:
+
+- `docs/requirements/WonderID_Tenant_User_Permissioning_Model.md` — the tenant
+  and user permissioning model (TENANT-001…004, IAM-001…010);
+- `docs/requirements/WonderID_User_Role_Permission_Management_Requirements.md`
+  — the detailed user, role and permission management requirements (P0
+  acceptance §54, implementation sequence §58);
+- `docs/requirements/wonderid-tenants-roles-mockups.png` (platform tenants,
+  tenant creation, tenant login, tenant administration, users, roles, role
+  designer, permission catalog);
+- `docs/requirements/wonderid-users-roles-mockups.png` (users, add-user wizard,
+  role details, custom role wizard, scope and conditions, user detail and
+  effective permissions).
+
+It runs **next**, ahead of Phase 4's remaining stories. Every later tenant
+administration and self-service screen depends on it, and both specifications
+say it must be implemented once and consumed by every module.
+
+**Gap analysis (2026-09-26, read-only survey of the repository).** These
+already exist and are extended, not replaced:
+
+- `tenants` (uuid, unique slug, status) and `tenant_memberships`
+  (active, invited, suspended, removed); `current_tenant_ids()` requires an
+  active membership in an active tenant (0039).
+- `roles` / `permissions` / `role_permissions` / `user_roles`: 11 system
+  roles and 44 permission keys; `requirePermission()` over a per-request
+  permission list.
+- The `/settings/roles` screen; audit of role changes; platform suspend,
+  activate and decommission; SSO connections; per-user TOTP; hard-coded
+  session timeouts.
+
+These are missing and are what this phase builds: hostname resolution and
+`tenant_domains`; a tenant security profile; member invite, suspend and
+remove; custom roles; groups; scope; conditions; deny rules; decisions and
+explanations; audit of refusals; certification of WonderID users; and the
+Users, Groups, Roles and Permissions screens.
+
+| Phase | Story | Title | Module | Spec |
+|---|---|---|---|---|
+| 4b | FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry: slug policy, `tenant_domains`, hostname resolution, suspended-tenant sign-in, tenant-branded sign-in page, tenant context in the shell | Foundation | TENANT-001/002/003 |
+| 4b | PLATFORM-P0-14 | Platform tenant list with tenant URLs and the create-tenant wizard (organization, domain & URL, security & identity, subscription, review, success) | Platform | mockups 1–3 |
+| 4b | FOUNDATION-P0-23 | Users and membership lifecycle: invite/create (wizard), activate, suspend, deactivate, remove, session revocation, last-administrator and self-escalation protection; Users list and User detail (roles & groups, effective permissions, access history, sessions) | Foundation | IAM-001; §5–8, 23–24, 30–34 |
+| 4b | FOUNDATION-P0-24 | Permission catalog: resource, action, module (Discover/Understand/Govern/Protect/Assure/Administration), sensitivity and labels on the existing stable keys; administrative permissions; catalog screen | Foundation | IAM-002; §13–14, 28 |
+| 4b | FOUNDATION-P0-25 | System and custom roles: the spec's system roles, protected definitions, role lifecycle, custom role designer (basic details, permissions by module, scope & conditions, review; copy an existing role), role details | Foundation | IAM-003; §15–22, 53 |
+| 4b | FOUNDATION-P0-26 | Groups: groups, members, group role assignments; effective permissions include group roles | Foundation | IAM-004; §11–12 |
+| 4b | FOUNDATION-P0-19 | (re-scoped) Scoped assignments and the authorization engine: assignment scope (tenant, environment, application, agent, resource), source, start/expiry, conditions, explicit deny rules; `authorize()` → ALLOW / DENY / REQUIRE_APPROVAL with reason codes; `requirePermission()` built on it | Foundation | IAM-005/006; §18–20, 26, 40–41 |
+| 4b | FOUNDATION-P0-20 | (re-scoped) Authorization explanation and effective permissions with provenance ("why can / why can't"), access audit including refusals | Foundation | IAM-007/008; §25, 36, 49–50 |
+| 4b | FOUNDATION-P0-27 | Tenant security profile: SSO/password/MFA requirements, session and idle timeouts, AI-agent security defaults, audit retention — enforced, not only stored | Foundation | TENANT-004; spec §26 |
+| 4b | COMPLIANCE-P0-11 | Access certification of WonderID users' role assignments (certify / revoke), as audit evidence | Compliance | IAM-009; §35 |
+| 4b | EXPERIENCE-P0-21 | Administration navigation (Access Control: Users, Groups, Roles, Permissions; Authentication; Security; Audit) and persistent tenant context | Experience | IAM-010; §29, 46–47 |
+
+### Decisions taken while planning (recorded, not asked)
+
+1. **Permission IDs stay stable.** The existing 44 keys (e.g. `agent.read`,
+   `access.approve`) are the stable permission IDs. Both specifications
+   require stable IDs (§10), and the ownership map forbids renaming keys. The
+   spec's `<resource>.<action>` vocabulary is carried as catalog metadata:
+   resource, action, module and label. New keys are added only for
+   capabilities with no existing key (users.*, groups.*, roles.*,
+   permissions.view, access_reviews.*, tenant.security.manage and so on).
+   Nothing is renamed.
+2. **System role keys stay.** `TENANT_SUPER_ADMIN` is shown as "Tenant
+   Administrator" and `IAM_ADMIN` as "Identity Administrator". The spec's
+   missing system roles are added (Agent Administrator, Runtime Security
+   Administrator, Governance Administrator, Security Analyst). The other
+   existing system roles (IAM Architect, Certification Manager, the owner
+   roles, Requester) stay.
+3. **Tenant URL.** Each tenant is at `https://<slug>.<BASE_APP_HOST>`
+   (a new `BASE_APP_HOST` setting; the specs' "Base App URL" placeholder).
+   - The hostname narrows the tenant among the signed-in user's active
+     memberships. It never grants access (non-negotiable #2; spec §2).
+   - The bare host keeps today's membership and switcher behaviour.
+   - Production needs a wildcard domain on the Vercel project, a deployment
+     step for the user. Until then subdomains are exercised on
+     `*.localhost` in tests.
+4. **Environment scope** uses the environment already on applications
+   (ACCESS-P0-15) and agents. Resource scope uses the object's id. Further
+   scope types are added as rows, not schema changes (§19).
+5. **Open question for the user (recorded, not blocking).** Both new mockup
+   sets show a light sidebar, and §45 asks for a light theme. On
+   2026-09-26 the user explicitly chose the dark navy sidebar
+   (EXPERIENCE-P0-18). The navy sidebar stays until the user says
+   otherwise; content areas are already light.

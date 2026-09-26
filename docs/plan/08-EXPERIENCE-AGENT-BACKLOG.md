@@ -43,6 +43,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Done — 2026-09-26: WonderID brand (SVG mark, live wordmark, icons); dark navy sidebar with accordion, collapsed icon rail with section and third-level flyouts, remembered collapse, mobile drawer; only implemented routes listed |
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-21 | Administration navigation and persistent tenant context | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ---
 
@@ -655,3 +656,14 @@ The Home dashboard of the mockups over real data (identities, agents, applicatio
 ### EXPERIENCE-P0-20 — WonderID AI assistant
 
 The global assistant (explain, search, summarize, recommend, draft, simulate) under the existing AI provider configuration, permission- and tenant-scoped, executing nothing except governed low-risk actions and saying what it did and did not do.
+
+## Tenant & user permissioning — Phase 4b (2026-09-26)
+
+### EXPERIENCE-P0-21 — Administration navigation and persistent tenant context
+
+- The Administration section: Access Control (Users, Groups, Roles,
+  Permissions), Authentication, Security and Audit, each item appearing
+  only once its screen exists.
+- The tenant's name, environment and URL are always visible.
+- The user and role wizards follow the mockups (stepper, review step), in
+  both themes and at every width.

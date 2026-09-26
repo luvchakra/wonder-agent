@@ -48,9 +48,15 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
 | FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Done — 2026-09-25: migration `0061` applied live; `lib/security/agentApiKeys.ts` (hash-only storage, tenant+agent-bound verify, fail-closed), API routes, Agent 360 card; 16 unit + 9 live SQL checks + 4 E2E; see audit log |
 | FOUNDATION-P0-18 | New permission keys (master P0-42) | Done — 2026-09-25: 7 keys seeded by least privilege in `0061`, `requireAnyPermission()` added; live-verified; see audit log |
-| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles | Not Started — 2026-09-26, WonderID |
-| FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles — re-scoped 2026-09-26 (Phase 4b) as scoped assignments and the authorization engine | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-24 | Permission catalog with resource, action, module and administrative permissions (IAM-002) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-26 | Groups and group role assignments (IAM-004) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-27 | Tenant security profile, enforced (TENANT-004) | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ---
 
@@ -863,3 +869,106 @@ Extend `roles`/`permissions`/`user_roles` and `requirePermission()` (no second s
 ### FOUNDATION-P0-21 — Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery
 
 WebAuthn Level 3 passkeys and security keys on top of the existing Supabase Auth session (no parallel session stack): enrollment, sign-in, authenticator management, authentication policies, step-up for high-risk actions, and recovery that cannot silently bypass policy. Challenges are single-use and origin-bound; only public credential material is stored.
+
+## Tenant & user permissioning — Phase 4b (2026-09-26)
+
+Source: `docs/requirements/WonderID_Tenant_User_Permissioning_Model.md` and
+`docs/requirements/WonderID_User_Role_Permission_Management_Requirements.md`
+(with mockups); plan, gap analysis and decisions in
+`docs/plan/WONDERID-ROADMAP.md` § Phase 4b. Everything extends this module's
+existing tenants, memberships, roles, permissions, `requirePermission()` and
+audit; there is no second system. Permission keys and role keys are never
+renamed.
+
+### FOUNDATION-P0-22 — Tenant identity, tenant URL and domain registry
+
+- A slug policy: lowercase, URL-safe, 3–40 characters, reserved words
+  refused, immutable once set. Tenants gain a suspension reason and time.
+- `tenant_domains`: hostname, PLATFORM_SUBDOMAIN or CUSTOM_DOMAIN, status,
+  primary, verified_at. Every tenant gets `<slug>.<BASE_APP_HOST>`; custom
+  domains are modelled but not verified yet.
+- Hostname resolution: an unknown or unverified host is rejected; a
+  suspended tenant cannot sign in and says so. The resolved tenant must
+  match an active membership (the host narrows, never grants).
+- A tenant-branded sign-in page on the tenant URL, with no tenant picker.
+- The tenant name, environment and URL are always visible in the shell.
+
+### FOUNDATION-P0-23 — Users and membership lifecycle
+
+- Membership statuses INVITED, ACTIVE, SUSPENDED, DEACTIVATED, REMOVED.
+- Invite or create a user through a wizard: basic details (name, email,
+  job title, department, account type, authentication method), roles,
+  scope, review. Account type and department reach the user's identity.
+- Suspend (immediate: sessions revoked), reactivate, deactivate, remove,
+  each with a reason and audited.
+- Last-administrator protection. No self-escalation: nobody assigns
+  themselves a role or removes their own suspension.
+- A Users list with search and status, role and group filters, paged at
+  the database.
+- User detail: roles and groups, effective permissions, access history
+  and sessions.
+- New permissions: `users.view/create/update/suspend/remove/invite`.
+
+### FOUNDATION-P0-24 — Permission catalog
+
+- The existing stable keys gain resource, action, module (Discover,
+  Understand, Govern, Protect, Assure, Administration), a display label, a
+  resource type and a sensitivity.
+- Administrative permissions are added: `groups.*`, `roles.*`,
+  `permissions.view`, `access_reviews.*` and `tenant.security.manage`.
+- A read-only catalog screen, searchable and filterable by module and
+  action. Customers cannot invent permission IDs.
+
+### FOUNDATION-P0-25 — System and custom roles
+
+- The spec's system roles: Tenant Administrator (the existing
+  TENANT_SUPER_ADMIN), Security, Identity (IAM_ADMIN), Agent, Runtime
+  Security and Governance Administrators, Security Analyst, Auditor and
+  Read Only. Existing roles stay.
+- System role definitions are version-controlled and protected in the
+  database.
+- Custom roles are tenant-owned, with a lifecycle (active, inactive). A
+  wizard: basic details (or copy a role), permissions grouped by module
+  with search and select-all, scope and conditions, review.
+- Role details: overview, permission summary per module, users, groups.
+- Assigning a privileged role needs `roles.assign`; it is never
+  self-assigned.
+
+### FOUNDATION-P0-26 — Groups
+
+`groups`, `group_members` and `group_roles`, tenant-owned with RLS.
+Effective permissions combine direct and group roles, and a membership
+change takes effect on the next request. Screens: Groups list and detail
+(members, roles).
+
+### FOUNDATION-P0-19 (re-scoped) — Scoped assignments and the authorization engine
+
+- Role assignments (direct and group) carry:
+  - scope: tenant, environment, application, agent or resource;
+  - source: DIRECT, GROUP, POLICY or SYSTEM;
+  - start and expiry, and who assigned them.
+- Conditions: MFA satisfied, time window.
+- Explicit deny rules (`authorization_policies`).
+- `authorize({tenant, subject, resource, resourceId, action, context})`
+  returns ALLOW, DENY or REQUIRE_APPROVAL with reason codes, matched
+  roles, permissions, scopes and policies. `requirePermission()` becomes a
+  thin call to it, keeping its behaviour for every existing caller.
+
+### FOUNDATION-P0-20 (re-scoped) — Explanation, effective permissions, access audit
+
+- "Why can / why can't" answers, built from deterministic authorization
+  facts.
+- Effective permissions with provenance (every role, group and scope that
+  grants them).
+- Refusals of sensitive actions are audited (AUTHORIZATION_DENIED),
+  alongside the privileged changes the specification lists.
+
+### FOUNDATION-P0-27 — Tenant security profile
+
+- Per tenant: SSO required and password login allowed; MFA required
+  (enforced as AAL2 before tenant access); session and idle timeouts
+  (replacing the constants); access-certification interval; AI-agent
+  security defaults; audit retention.
+- Changing it needs `tenant.security.manage` and is audited.
+- It stays compatible with PLATFORM-P0-13's Configuration Studio, which
+  versions it.

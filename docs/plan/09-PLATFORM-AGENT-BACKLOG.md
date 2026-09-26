@@ -32,6 +32,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 | PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Partial — 2026-09-25: 13 master rollout flags seeded (`0065`, safe-rollout defaults); flags now enforced at the gateway (`runtime_observe`/`runtime_enforce`/`tool_filtering` — ENFORCE really enforces, per tenant) and at runtime ingestion, remediation, connector creation and certification launch; batched `getFeatureFlags()`. Remaining: `ai_assistant` (defaults OFF while AI summaries are live — needs a platform decision before enforcing) and the not-yet-built features' flags; see audit log |
 | PLATFORM-P0-13 | Configuration Studio | Not Started — 2026-09-26, WonderID |
+| PLATFORM-P0-14 | Tenant list with tenant URLs and the create-tenant wizard | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ---
 
@@ -582,3 +583,22 @@ These stories extend this module's own tables, services and routes.
 ### PLATFORM-P0-13 — Configuration Studio
 
 Tenant-level declarative configuration (identity types, attributes, correlation, onboarding templates, request/approval policies, certification and rogue-access rules, notification templates, terminology, navigation visibility, feature flags) versioned Draft → Validate → Simulate → Approve → Publish → Rollback. The vendor-only platform boundary is unchanged.
+
+## Tenant & user permissioning — Phase 4b (2026-09-26)
+
+### PLATFORM-P0-14 — Tenant list with tenant URLs and the create-tenant wizard
+
+Per `docs/requirements/wonderid-tenants-roles-mockups.png` (1–3):
+
+- The tenant list shows each tenant's URL, plan, users and status, with
+  totals.
+- A create-tenant wizard:
+  - organization details (name, slug with live availability, industry,
+    size, region);
+  - domain and URL;
+  - security and identity defaults (seeds FOUNDATION-P0-27's profile);
+  - subscription;
+  - review.
+- A success screen with the tenant URL and next steps.
+- Uses Foundation's published tenant and domain services, and stays
+  behind `requirePlatformAdmin()`.
