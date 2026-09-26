@@ -2,14 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   Activity,
+  AppWindow,
   ArrowRight,
-  Boxes,
   ClipboardCheck,
   Fingerprint,
+  Inbox,
   KeyRound,
   Mail,
   ShieldAlert,
   ShieldCheck,
+  UserCog,
+  Users,
 } from "lucide-react";
 import { BrowserFrame, FlowDiagram, LinkButton, WonderIDLogo, PhoneFrame } from "@/modules/ui";
 import agentsDesktopDark from "@/assets/product/agents-desktop-dark.png";
@@ -24,7 +27,7 @@ import riskDesktopLight from "@/assets/product/risk-desktop-light.png";
 export const metadata: Metadata = {
   title: { absolute: "WonderID · Secure every identity. Human and AI." },
   description:
-    "WonderID makes AI agents first-class enterprise identities: their owner, their approved purpose, the access they actually hold, and what they actually did — across the IAM platforms you already run.",
+    "WonderID is one identity governance and security platform for people, external users, machine identities and AI agents: who holds access, why they hold it, who approved it, and whether it is still appropriate — across the IAM platforms you already run.",
 };
 
 /**
@@ -44,34 +47,82 @@ export const metadata: Metadata = {
 
 const CAPABILITIES = [
   {
+    icon: Users,
+    title: "One directory of identities",
+    body: "Employees, contractors, external users, service accounts and AI agents in one place, fed by your authoritative sources, with joiner, mover and leaver work governed end to end.",
+  },
+  {
     icon: Fingerprint,
-    title: "Agent identity & lifecycle",
-    body: "Every agent gets an owner, a purpose and a lifecycle state — from discovered through retired — instead of living as an untracked service account.",
+    title: "AI agent identity & contracts",
+    body: "Every agent gets an accountable owner, an approved purpose and a lifecycle state — and shadow AI found in your systems lands in a discovery inbox instead of going unnoticed.",
+  },
+  {
+    icon: AppWindow,
+    title: "Applications & accounts",
+    body: "An application catalog with a guided onboarding path, and an account inventory that correlates every account to an identity and flags the orphaned and dormant ones.",
+  },
+  {
+    icon: Inbox,
+    title: "Access requests & packages",
+    body: "A self-service catalog, bundled access packages and staged approval chains with four-eyes enforced in the database — and separation-of-duties conflicts shown before anyone approves.",
   },
   {
     icon: KeyRound,
     title: "Effective Access (CAN)",
-    body: "Resolve what an agent can technically reach today by walking real entitlements, roles, groups, OAuth scopes and tool permissions from your IAM.",
+    body: "Resolve what an identity can technically reach today by walking real entitlements, roles, groups, OAuth scopes and tool permissions — with the path that grants each one.",
   },
   {
     icon: Activity,
     title: "Runtime assurance — Observed (DID)",
-    body: "Observe what the agent actually did — every tool call, resource and action — and compare it against what it was approved to do.",
+    body: "Observe every tool call, resource and action; decide in-line through the Runtime Gateway; and stop an agent instantly with audited emergency controls.",
   },
   {
     icon: ShieldAlert,
-    title: "Risk & rogue detection",
-    body: "Deterministic scoring across excessive access, unauthorized resources, sensitive-data violations and behavioural deviation. Never an LLM guess.",
+    title: "Risk, rogue detection & investigations",
+    body: "Deterministic scoring across excessive access, unauthorized actions, sensitive data and behavioural deviation — with investigations to work a case to its conclusion. Never an LLM guess.",
   },
   {
     icon: ClipboardCheck,
     title: "Certification & evidence",
-    body: "Run access certification campaigns over agents, with a reproducible evidence snapshot behind every decision a reviewer makes.",
+    body: "Access certification campaigns with a reproducible evidence snapshot behind every decision, audit trails and exportable reports ready for an auditor.",
   },
   {
-    icon: Boxes,
-    title: "Works with your IAM",
-    body: "Vendor-neutral by design. Saviynt, Okta, Entra, custom IAM and MCP runtimes map into one canonical model — your IAM stays the system of record.",
+    icon: UserCog,
+    title: "Precise administration",
+    body: "Users, groups, custom roles built from a published permission catalog, role assignments scoped by environment, application or agent, and explicit deny policies — nobody can grant themselves more.",
+  },
+] as const;
+
+const WHATS_NEW = [
+  {
+    tag: "Authorization",
+    title: "Scoped roles and explicit policies",
+    body: "Limit a role to production, to chosen applications or agents, to a date range or to MFA sessions. Add deny or require-approval policies that override any role, with a break-glass exception.",
+  },
+  {
+    tag: "Administration",
+    title: "Users, groups and custom roles",
+    body: "Invite and manage people through their whole membership lifecycle, give roles to groups, and design custom roles from the permission catalog — with self-escalation refused by design.",
+  },
+  {
+    tag: "Access governance",
+    title: "Requests, approvals and access packages",
+    body: "A request catalog with policies, a staged approval engine with escalation and expiry, and access packages that assign bundles of access in one request.",
+  },
+  {
+    tag: "Applications",
+    title: "Catalog, onboarding and account inventory",
+    body: "Onboard an application through configure, validate, simulate, approve and promote; discover the ones nobody registered; and find accounts that belong to nobody.",
+  },
+  {
+    tag: "Identities",
+    title: "Authoritative sources and lifecycle",
+    body: "Import people from HR and directory sources with precedence and review of uncertain matches, then run joiner, mover and leaver work as governed tasks.",
+  },
+  {
+    tag: "Your organization",
+    title: "Your own sign-in address and brand",
+    body: "Each organization signs in at its own address, sees its own name at the door, and keeps its data isolated in the database — never just in the application.",
   },
 ] as const;
 
@@ -79,22 +130,22 @@ const STEPS = [
   {
     n: "01",
     title: "Connect what you already run",
-    body: "Import agent identities and their access from your existing IAM, plus runtime events from your MCP or REST sources. Read-only until you say otherwise.",
+    body: "Bring in people from your HR and directory sources, accounts and entitlements from your IAM and applications, and runtime events from MCP or REST sources. Read-only until you say otherwise.",
   },
   {
     n: "02",
-    title: "Declare the agent's purpose",
-    body: "Name an owner, the approved applications, the approved data and the approved actions. That contract becomes Approved (SHOULD).",
+    title: "Give every identity an owner",
+    body: "Give each identity an owner and a lifecycle. For AI agents, declare the approved applications, data and actions — that contract becomes Approved (SHOULD).",
   },
   {
     n: "03",
-    title: "Watch the three diverge",
-    body: "WonderID continuously compares approved purpose, effective access and observed behaviour, and raises an evidence-backed finding the moment they stop agreeing.",
+    title: "Control how access is granted",
+    body: "People request access from a catalog; approvals run in stages with four-eyes and separation of duties; roles, groups, scopes and policies decide who may administer what.",
   },
   {
     n: "04",
-    title: "Remediate through your workflow",
-    body: "Every recommended revocation waits for a human to confirm it, is recorded against the finding as evidence, and is re-evaluated once the access changes.",
+    title: "Detect, certify, remediate",
+    body: "WonderID compares approved, effective and observed access, raises evidence-backed findings, runs certifications, and waits for a human to confirm every consequential change.",
   },
 ] as const;
 
@@ -404,11 +455,13 @@ export default function WelcomePage() {
           <div className="max-w-2xl">
             <SectionLabel>The platform</SectionLabel>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
-              Identity governance built for non-human identities.
+              One control plane for every identity — human, machine and AI.
             </h2>
             <p className="mt-4 text-base leading-relaxed text-muted-foreground">
-              Not a replacement IAM, IGA, PAM or SIEM. A governance and assurance layer that sits
-              over the ones you already run.
+              WonderID governs identities and access. It is not an identity provider, a PAM vault or
+              a SIEM: your IdP still signs people in, and your HR and directory systems stay the
+              system of record for what they own. Saviynt, Entra, Okta, custom IAM, REST sources
+              and MCP runtimes all map into one vendor-neutral model.
             </p>
           </div>
 
@@ -429,13 +482,38 @@ export default function WelcomePage() {
         </div>
       </section>
 
+      {/* ------------------------------------------------------ what's new */}
+      <section id="whats-new" className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="max-w-2xl">
+            <SectionLabel>What&rsquo;s new</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+              Recently shipped.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              WonderID started with AI agents. It now governs people, applications and access
+              requests too — with the same deterministic controls underneath.
+            </p>
+          </div>
+          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {WHATS_NEW.map((item) => (
+              <li key={item.title} className="rounded-xl border border-border bg-card p-5">
+                <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">{item.tag}</p>
+                <h3 className="mt-2 text-base font-semibold text-foreground">{item.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{item.body}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+
       {/* ----------------------------------------------------- how it works */}
       <section id="how-it-works" className="border-b border-border bg-card/40">
         <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="max-w-2xl">
             <SectionLabel>How it works</SectionLabel>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
-              From unknown agents to certified ones.
+              From unknown identities to certified access.
             </h2>
           </div>
 
@@ -459,10 +537,10 @@ export default function WelcomePage() {
         <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6 sm:py-24">
           <ShieldCheck className="mx-auto size-8 text-primary" aria-hidden="true" />
           <h2 className="mt-5 text-balance text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-4xl">
-            Know what every agent should do, can do, and did.
+            Know who and what has access, why — and whether it still should.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">
-            Create your organization and register your first agent in minutes.
+            Create your organization, invite your team and connect your first source in minutes.
           </p>
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <LinkButton href="/sign-up" size="lg" className="w-full rounded-full px-7 sm:w-auto">
@@ -486,7 +564,7 @@ export default function WelcomePage() {
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <WonderIDLogo size={26} />
           <p className="text-sm text-muted-foreground">
-            AI Identity Governance &amp; Runtime Assurance
+            Identity Governance &amp; Security · Govern every identity. Verify every access.
           </p>
           <div className="flex items-center gap-5 text-sm">
             <Link href="/help" className="text-muted-foreground hover:text-foreground">

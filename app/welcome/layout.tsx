@@ -8,9 +8,9 @@ import { LinkButton, ThemeToggle, WonderIDLogo } from "@/modules/ui";
  * getTenantContext() or anything that assumes a user.
  */
 const NAV = [
-  { href: "#problem", label: "The problem" },
   { href: "#model", label: "The solution" },
-  { href: "#product", label: "Product" },
+  { href: "#platform", label: "Platform" },
+  { href: "#whats-new", label: "What's new" },
   { href: "#how-it-works", label: "How it works" },
   { href: "/help", label: "Help" },
 ] as const;
@@ -36,7 +36,7 @@ export default function WelcomeLayout({ children }: { children: React.ReactNode 
               <a
                 key={item.href}
                 href={item.href}
-                className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className="whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground"
               >
                 {item.label}
               </a>

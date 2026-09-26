@@ -16,6 +16,8 @@ const SUGGESTIONS = [
   "How do I connect Saviynt?",
   "Why do I have no findings?",
   "What is the difference between Effective Access (CAN) and Observed (DID)?",
+  "How do I invite a user?",
+  "Can I limit a role to production?",
   "How do I reset my password?",
 ];
 

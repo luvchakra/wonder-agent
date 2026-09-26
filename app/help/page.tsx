@@ -18,6 +18,16 @@ export const metadata = {
  * Needs no permission of its own: it is product documentation, identical
  * for every tenant, and contains no customer data.
  */
+/** The latest additions, each pointing at the guide section that explains it. */
+const WHATS_NEW = [
+  { id: "authorization-policies", label: "Authorization policies", note: "Deny or require approval for any permission, with break-glass roles." },
+  { id: "scoped-assignments", label: "Scoped and time-limited roles", note: "Limit a role to an environment, application or agent, dates or MFA." },
+  { id: "groups", label: "Groups", note: "Give roles to a whole team at once." },
+  { id: "users", label: "Users and custom roles", note: "Invite, suspend and remove people; design roles from the permission catalog." },
+  { id: "access-requests", label: "Access requests and approvals", note: "A request catalog with staged, four-eyes approvals and SoD checks." },
+  { id: "applications", label: "Application onboarding and accounts", note: "Onboard apps step by step; find orphaned and dormant accounts." },
+] as const;
+
 export default function HelpPage() {
   const faq = sectionsByCategory("FAQ");
   const guideCategories = GUIDE_CATEGORIES.filter((c) => c !== "FAQ");
@@ -27,12 +37,28 @@ export default function HelpPage() {
       <header className="space-y-1">
         <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Get Help</h1>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          How WonderID works, how to set it up, and answers to the questions that come up most.
-          Ask the assistant below, or browse the guide.
+          How WonderID governs people, applications, access and AI agents, how to set it up, and
+          answers to the questions that come up most. Ask the assistant below, or browse the guide.
         </p>
       </header>
 
       <HelpAssistant />
+
+      <section aria-labelledby="whats-new" className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <h2 id="whats-new" className="text-sm font-semibold text-foreground">
+          What&rsquo;s new
+        </h2>
+        <ul className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {WHATS_NEW.map((item) => (
+            <li key={item.id} className="min-w-0">
+              <a href={`#${item.id}`} className="text-sm font-medium text-primary hover:underline">
+                {item.label}
+              </a>
+              <p className="mt-0.5 text-xs text-muted-foreground">{item.note}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
 
       <nav aria-label="Guide contents" className="rounded-xl border border-border bg-card p-4 sm:p-5">
         <h2 className="text-sm font-semibold text-foreground">Contents</h2>

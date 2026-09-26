@@ -2925,3 +2925,88 @@ and the decisions below are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
   including design-review's structure, theming and mobile tab-target
   checks.
 - Details are in the Foundation audit.
+
+## 2026-09-26 — Landing page and Get Help brought up to date (user request)
+
+**Why:** both pages still described the product as agent-only. The landing
+page also called WonderID "not a replacement IAM, IGA, PAM or SIEM", which
+contradicts the adopted WonderID scope (CLAUDE.md non-negotiable #7). The
+help guide pointed to menu paths that no longer exist, said "WonderID grew
+out of WonderID", and covered none of the features shipped since Phase 1.
+
+**Landing page (`/welcome`):**
+
+- The description and platform section now cover every identity type.
+  WonderID is described as not an IdP, PAM vault or SIEM; the IdP and
+  HR/directory systems remain the systems of record.
+- Nine capability cards:
+  - identities;
+  - AI agents;
+  - applications and accounts;
+  - access requests and packages;
+  - Effective Access (CAN);
+  - runtime (gateway and emergency controls);
+  - risk and investigations;
+  - certification;
+  - administration.
+- A new "What's new" section with six recent releases:
+  - scoped roles and authorization policies;
+  - users, groups and custom roles;
+  - access requests, approvals and packages;
+  - application onboarding and account inventory;
+  - identity sources and lifecycle;
+  - tenant sign-in addresses.
+- "How it works" now describes connect → govern → control access →
+  detect, certify, remediate. The closing call to action and the footer
+  tagline were updated.
+- Header nav trimmed to five items: The solution, Platform, What's new,
+  How it works, Help. At 1440px the seven-item version had wrapped.
+
+**Get Help (`/help`, `modules/ui/help/content.ts`):**
+
+- Rewritten around the current product: 41 sections in 14 categories.
+  New sections:
+  - finding your way around;
+  - the identity directory;
+  - joiners, movers and leavers;
+  - authoritative identity sources;
+  - agent API keys;
+  - applications and onboarding;
+  - accounts and data sources;
+  - requesting and approving access;
+  - access packages;
+  - the Runtime Gateway;
+  - emergency controls;
+  - investigations;
+  - users and membership;
+  - groups;
+  - scoped and time-limited role assignments;
+  - authorization policies;
+  - the organization's sign-in address;
+  - "Why can't I see a page or button?".
+- Existing sections were updated to current menu paths and behaviour.
+  Section ids and titles the assistant and tests rely on are unchanged.
+- Features still in progress are described as in progress:
+  - organization-wide MFA enforcement;
+  - certification of people's access;
+  - require-approval routing.
+- A "What's new" panel links to the new sections. The assistant's
+  suggested questions gain "How do I invite a user?" and "Can I limit a
+  role to production?".
+
+**Verified:**
+
+- tsc and eslint clean.
+- vitest `lib/ai`: 20/20. The deterministic retrieval tests are unchanged
+  and passing.
+- A spot check of 15 new questions landed each one on the right section.
+- Production build succeeds.
+- Playwright help, welcome, design-review and branding specs: 53/53. The
+  first run caught a duplicate "Govern every identity" heading; the step
+  was renamed "Give every identity an owner".
+- Screenshots: landing platform section (light, 1440); What's new (dark,
+  390); help (light, 1440); header at 1024 and 1440.
+
+**Left out:** the product screenshots on the landing page are the existing
+agent-centric captures. New captures of the identity and administration
+screens can follow when those screens are next restyled.
