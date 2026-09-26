@@ -1,12 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/rbac/requirePermission";
+import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { assignRole, removeRole } from "@/lib/rbac/roles";
 import { ApiError } from "@/lib/shared/types/foundation";
 
 export async function assignRoleAction(formData: FormData) {
-  const ctx = await requirePermission("role.manage");
+  const ctx = await requireAnyPermission(["roles.assign", "role.manage"]);
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "");
   if (!userId || !role) throw new Error("userId and role are required");
@@ -18,7 +18,7 @@ export async function assignRoleAction(formData: FormData) {
 // rather than throwing: a thrown server-action error reaches the browser
 // redacted in production, and the person needs to know why.
 export async function removeRoleAction(formData: FormData): Promise<{ ok: true } | { ok: false; error: string }> {
-  const ctx = await requirePermission("role.manage");
+  const ctx = await requireAnyPermission(["roles.assign", "role.manage"]);
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "");
   if (!userId || !role) return { ok: false, error: "userId and role are required" };

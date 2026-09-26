@@ -66,10 +66,10 @@ test.describe("branding — in the product", () => {
     await page.goto("/");
     await expect(page).toHaveTitle(`${TENANT_ONE.name} · WonderID`);
     const nav = page.locator("aside");
-    await logoRendered(page, 'aside a img[alt="WonderID"][src*="/brand/logo/wonderid-logo-dark"]');
+    await logoRendered(page, 'aside a img[alt="WonderID"][src$="/brand/logo/wonderid-logo.png"]');
     await page.getByRole("button", { name: "Collapse navigation" }).click();
     const expand = nav.getByRole("button", { name: "Expand navigation" });
-    await expect(expand.locator('img[src*="/brand/logo/wonderid-mark"]')).toBeVisible();
+    await expect(expand.locator('img[src*="/brand/logo/wonderid-mark"]:visible')).toHaveCount(1);
     await expand.click();
     await expect(page.getByRole("button", { name: "Collapse navigation" })).toBeVisible();
 

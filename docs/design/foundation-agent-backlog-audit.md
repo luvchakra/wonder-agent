@@ -1718,3 +1718,120 @@ see above):
   (sessions are per account). Revoking them signs the person out
   everywhere, as the specification's suspension requires. Recorded, not
   narrowed.
+
+## 2026-09-26 — Combined full suite (FOUNDATION-P0-22/23, EXPERIENCE-P0-22/23) and a test-data fix
+
+**Full Playwright run on the combined build:** 314 passed, 1 failed, 3 did
+not run (21.8 min).
+
+- The failure was data-sources.spec's first step, and it reproduced on
+  re-run.
+- **Cause:** 213 throwaway "E2E Acc App …" applications, which other specs
+  create on every run, had pushed the seeded "Snowflake" past the
+  application picker's 200-row list limit.
+- **Fix:** the seed's prune now removes throwaway "E2E …" applications
+  (their access requests first, the one foreign key that does not
+  cascade) and throwaway custom roles (`tests/e2e/support/seedTestData.ts`).
+- data-sources.spec then passed 11/11, including the 3 steps that had not
+  run.
+
+The product limit itself is unchanged: a picker of more than 200
+applications truncates. That belongs to the Access Agent's pickers and is
+recorded here for them.
+
+## 2026-09-26 — FOUNDATION-P0-24 and FOUNDATION-P0-25: the permission catalog, and system and custom roles
+
+IAM-002/003 and spec §13–17, 21–22, 28, 53.
+
+**FOUNDATION-P0-24, migration `0097_foundation_permission_catalog.sql` (applied):**
+
+- Every stable key gains resource and action (in the specification's
+  `<resource>.<action>` vocabulary), product module, label and
+  sensitivity. The columns are then **required**, with checks on module,
+  sensitivity and the resource/action shape, so no key can exist
+  uncatalogued.
+- The §28 administrative keys are added:
+  - `groups.*`, `roles.*`, `permissions.view`, `access_reviews.*`;
+  - `tenant.security.manage`, `authentication.manage`, `mfa.manage`.
+- The Tenant Administrator holds all of them. Identity, Security, Auditor
+  and Certification Manager roles get their share.
+- No key was renamed (Phase 4b decision 1).
+- `lib/rbac/catalog.ts` (pure) and `permissionCatalog.ts`.
+- `/settings/permissions`: grouped by module with counts, search, module
+  and sensitivity filters, each key's system roles. Read-only, gated by
+  `permissions.view`.
+
+**FOUNDATION-P0-25, migration `0098_foundation_custom_roles.sql` (applied):**
+
+- Roles gain display name, status, creator, copy source and updated time.
+  The actor and source are plain uuids, per the 0096 lesson.
+- The specification's system roles are added, with their permissions:
+  Agent, Runtime Security and Governance Administrators, and Security
+  Analyst. Every system role gets its display name; the keys are unchanged.
+- **System role definitions and their permissions are protected by
+  trigger**, even against the service role. A migration that changes them
+  sets `wonderid.system_roles_change = 'allow'` first.
+- Custom roles:
+  - never take a system role's name;
+  - are unique per tenant (case-insensitive);
+  - are never assigned outside their tenant (trigger on `user_roles`).
+- **An inactive role grants nothing:** `getTenantContext()` skips it.
+  Assigning an inactive role is refused (409 `ROLE_INACTIVE`).
+- **No escalation by design** (`lib/rbac/roleRules.ts`): a role gains only
+  permissions its designer holds. On edit it may keep what it had, and
+  removing is always allowed. Refusals are audited.
+- Service `lib/rbac/customRoles.ts`:
+  - list, detail (holders, per-module summary), create (from scratch or a
+    copy), update, activate/deactivate;
+  - delete only when nobody holds the role (409 `ROLE_IN_USE`);
+  - every change audited with the added and removed keys.
+- `lib/rbac/roles.ts` resolves a role by name among system roles and this
+  tenant's custom roles. `listAssignableRoles(tenantId)` includes the
+  tenant's active custom roles.
+- Assignment accepts `roles.assign` as well as the legacy `role.manage`.
+- Screens:
+  - `/settings/roles` is now **Roles**: custom and system roles, with
+    permission and holder counts. It replaces the old "Users & Roles"
+    member table; assignment is on each user's page;
+  - `/settings/roles/[id]`: per-module summary bars, permissions by
+    module, people, and activate/deactivate/delete for custom roles;
+  - `/settings/roles/new` (optionally `?copy=`) and `/[id]/edit`: the
+    wizard (basic details, permissions by module with search, select-all
+    and collapse, review). Permissions the designer lacks are disabled,
+    with the reason.
+- API:
+  - `GET`/`POST /api/v1/roles`;
+  - `GET`/`PATCH`/`DELETE /api/v1/roles/[id]`;
+  - `POST /api/v1/roles/[id]/status`.
+- Sidebar: "Users", "WonderID Roles", "Permission Catalog".
+
+**Verified:**
+
+- tsc and eslint clean.
+- vitest **721/721**, with the new `catalog.test.ts` and
+  `roleRules.test.ts`.
+- SQL checks, run live:
+  - `tests/foundation/permission-catalog-check.sql`: 10/10;
+  - `tests/foundation/custom-roles-isolation.sql`: 14/14, fixtures
+    removed.
+- E2E `permission-catalog.spec.ts` and `custom-roles.spec.ts`, with users,
+  branding, shell and navigation smoke: 71 passed.
+  - A requester given the custom role can read compliance controls (403 →
+    200).
+  - Deactivating the role takes that away and activating restores it; an
+    inactive role cannot be assigned.
+  - A role in use cannot be deleted.
+  - System role PATCH 403; a reserved name 400.
+  - Another organization gets 404 and cannot assign it; read-only is
+    redirected.
+  - Edit, then delete once unused.
+- Screenshots: Roles, role detail (light 1440; dark 390), and the create
+  wizard's permissions step.
+- The full suite is recorded in the next entry.
+
+**Left out / handed on:**
+
+- The scope and conditions step and scoped assignments: FOUNDATION-P0-19.
+- The groups tab: FOUNDATION-P0-26.
+- Custom roles cannot yet include permissions a tenant does not hold at
+  all, which is by design.

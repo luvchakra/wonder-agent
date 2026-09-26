@@ -25,8 +25,8 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `tenant_settings` | FA | Per-tenant configuration |
 | `users` | FA | Maps to Supabase Auth users |
 | `tenant_memberships` | FA | User ↔ tenant, source of tenant context. Lifecycle (FOUNDATION-P0-23, 0096): invited, active, suspended, deactivated, removed; who changed it, when and why; invitation, account type, sign-in method. No self status change; last Tenant Administrator guarded in the database |
-| `roles` | FA | Customer RBAC roles |
-| `permissions` | FA | Granular permission strings (e.g. `agent.read`) |
+| `roles` | FA | Customer RBAC roles. System roles (tenant_id null) are protected in the database and change only by migration; custom roles (FOUNDATION-P0-25, 0098) are tenant-owned, with display name, status (inactive grants nothing), creator and copy source; never assigned outside their tenant |
+| `permissions` | FA | Granular permission strings (e.g. `agent.read`), the stable ids. Catalogued (FOUNDATION-P0-24, 0097): resource, action, module, label and sensitivity are required; only migrations add keys |
 | `role_permissions` | FA | Role ↔ permission |
 | `user_roles` | FA | User ↔ role (scoped to tenant). `granted_by` (0096), never the user themselves; removing the last Tenant Administrator role is refused in the database |
 | `sso_connections` | FA | SAML/OIDC IdP configuration per tenant |

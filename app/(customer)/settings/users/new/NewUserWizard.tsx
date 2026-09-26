@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
  * once. Server-side errors bring the person back to the step that has them.
  */
 
-type RoleOption = { name: string; label: string };
+type RoleOption = { name: string; label: string; custom?: boolean };
 const STEPS = ["Basic details", "Roles", "Review"] as const;
 const initial: ActionState = { ok: false, message: null };
 
@@ -187,7 +187,7 @@ export function NewUserWizard({ roles, canInvite, canAdd, canAssignRoles }: { ro
                       <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent/50">
                         <input type="checkbox" checked={values.roles.includes(r.name)} onChange={() => toggleRole(r.name)} className="size-4 accent-[var(--primary)]" />
                         <span className="flex-1 font-medium text-foreground">{r.label}</span>
-                        <span className="text-xs text-muted-foreground">System</span>
+                        <span className="text-xs text-muted-foreground">{r.custom ? "Custom" : "System"}</span>
                       </label>
                     </li>
                   ))}

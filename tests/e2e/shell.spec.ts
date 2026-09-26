@@ -2,7 +2,8 @@ import { test, expect } from "@playwright/test";
 import { authFile } from "./support/testUsers";
 
 /**
- * EXPERIENCE-P0-18 — the WonderID shell (2026-09-26): a dark navy sidebar
+ * EXPERIENCE-P0-18 — the WonderID shell (2026-09-26): a sidebar (light since
+ * EXPERIENCE-P0-23)
  * from `lg` up, a bottom tab bar plus drawer below it, and one header
  * carrying search / notifications / help / account. The sidebar's sections
  * are an accordion (the current one opens by itself) with groups nested

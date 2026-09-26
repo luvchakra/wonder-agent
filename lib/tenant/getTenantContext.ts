@@ -22,7 +22,7 @@ type MembershipRow = {
 
 type RoleRow = {
   tenant_id: string;
-  roles: { name: string; role_permissions: { permissions: { key: string } }[] } | null;
+  roles: { name: string; status: string; role_permissions: { permissions: { key: string } }[] } | null;
 };
 
 /**
@@ -71,7 +71,7 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
   const supabase = await supabaseServer();
   const { data } = await supabase
     .from("user_roles")
-    .select("tenant_id, roles(name, role_permissions(permissions(key)))")
+    .select("tenant_id, roles(name, status, role_permissions(permissions(key)))")
     .eq("user_id", user.id)
     .returns<RoleRow[]>();
   return data ?? [];
@@ -124,7 +124,8 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
   const roles = new Set<string>();
   const permissions = new Set<string>();
   for (const row of roleRows) {
-    if (row.tenant_id !== tenantId || !row.roles) continue;
+    // An inactive (custom) role grants nothing (FOUNDATION-P0-25).
+    if (row.tenant_id !== tenantId || !row.roles || row.roles.status !== "active") continue;
     roles.add(row.roles.name);
     for (const rp of row.roles.role_permissions ?? []) {
       if (rp.permissions?.key) permissions.add(rp.permissions.key);

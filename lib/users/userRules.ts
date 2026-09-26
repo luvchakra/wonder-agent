@@ -173,15 +173,24 @@ export function databaseRefusal(error: { code?: string; message?: string } | nul
   return null;
 }
 
-/** How a system role is named on screen (Phase 4b decision 2); the key stays the stable id. */
+/**
+ * How a role is named on screen (Phase 4b decision 2). System roles keep
+ * their stable UPPER_SNAKE keys and show a name; a custom role's name is
+ * already what people typed, so it is shown as is.
+ */
 const ROLE_NAMES: Record<string, string> = {
   TENANT_SUPER_ADMIN: "Tenant Administrator",
   IAM_ADMIN: "Identity Administrator",
   SECURITY_ADMIN: "Security Administrator",
   IAM_ARCHITECT: "IAM Architect",
+  AGENT_ADMIN: "Agent Administrator",
+  RUNTIME_SECURITY_ADMIN: "Runtime Security Administrator",
+  GOVERNANCE_ADMIN: "Governance Administrator",
+  SECURITY_ANALYST: "Security Analyst",
 };
 
 export function roleLabel(role: string): string {
+  if (!/^[A-Z0-9_]+$/.test(role)) return role;
   return (
     ROLE_NAMES[role] ??
     role

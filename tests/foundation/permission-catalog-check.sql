@@ -8,6 +8,12 @@
 -- Administrator holds every permission; a signed-in member can read the
 -- catalog but can neither add nor change a permission, nor attach one to
 -- a role.
+--
+-- Run 2026-09-26 against the dev project, all 10 as expected: 0
+-- uncatalogued; the six modules; 16 §28 keys; the Tenant Administrator
+-- lacks none; an uncatalogued key 23502; an unknown module 23514; a member
+-- reads 66 permissions, cannot invent one (42501), downgrades 0, and
+-- cannot attach one to a role (42501).
 
 create temporary table check_results (check_name text, result text);
 insert into check_results select 'uncatalogued permissions (expect 0)', count(*)::text from permissions

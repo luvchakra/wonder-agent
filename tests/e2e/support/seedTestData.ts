@@ -151,6 +151,28 @@ export async function pruneThrowawayIntegrationsAndQuarantine(tenantIds: string[
     // ACCESS-P0-13: throwaway data sources (entitlements pointing at one fall back to null).
     const dataSources = await supabase.from("data_sources").delete().eq("tenant_id", tenantId).like("name", "E2E %");
     if (dataSources.error) throw new Error(`prune data sources(${tenantId}) failed: ${dataSources.error.message}`);
+    // Throwaway applications named "E2E …" (2026-09-26): specs create one per
+    // run, and at 200+ they pushed seeded ones like "Snowflake" past the
+    // 200-row list limit of the pickers that data-sources.spec uses. Their
+    // access requests go first (the only foreign key that doesn't cascade).
+    const { data: apps, error: appsError } = await supabase.from("applications").select("id").eq("tenant_id", tenantId).like("name", "E2E %");
+    if (appsError) throw new Error(`list throwaway applications(${tenantId}) failed: ${appsError.message}`);
+    const appIds = (apps ?? []).map((a) => a.id as string);
+    for (let i = 0; i < appIds.length; i += 100) {
+      const batch = appIds.slice(i, i + 100);
+      const requests = await supabase.from("access_requests").delete().eq("tenant_id", tenantId).in("application_id", batch);
+      if (requests.error) throw new Error(`prune throwaway access requests(${tenantId}) failed: ${requests.error.message}`);
+      const deleted = await supabase.from("applications").delete().eq("tenant_id", tenantId).in("id", batch);
+      if (deleted.error) throw new Error(`prune throwaway applications(${tenantId}) failed: ${deleted.error.message}`);
+    }
+    // Throwaway custom roles named "E2E …" (FOUNDATION-P0-25), with their assignments.
+    const { data: roles } = await supabase.from("roles").select("id").eq("tenant_id", tenantId).like("name", "E2E %");
+    const roleIds = (roles ?? []).map((r) => r.id as string);
+    if (roleIds.length) {
+      await supabase.from("user_roles").delete().eq("tenant_id", tenantId).in("role_id", roleIds);
+      const deletedRoles = await supabase.from("roles").delete().eq("tenant_id", tenantId).in("id", roleIds);
+      if (deletedRoles.error) throw new Error(`prune throwaway roles(${tenantId}) failed: ${deletedRoles.error.message}`);
+    }
     const quarantine = await supabase.from("runtime_event_quarantine").delete().eq("tenant_id", tenantId);
     if (quarantine.error) throw new Error(`prune quarantine(${tenantId}) failed: ${quarantine.error.message}`);
   }

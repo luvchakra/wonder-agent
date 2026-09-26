@@ -46,17 +46,35 @@ export async function listTenantMembersWithRoles(tenantId: string): Promise<Tena
   }));
 }
 
-/** The system role catalog available for assignment (P0: no per-tenant custom roles — see backlog P1). */
-export async function listAssignableRoles(): Promise<{ id: string; name: string }[]> {
+export type AssignableRole = { id: string; name: string; displayName: string; custom: boolean };
+
+/**
+ * The roles that can be assigned in a tenant: the system roles, and that
+ * tenant's active custom roles (FOUNDATION-P0-25). `tenantId` is the
+ * server-resolved tenant; RLS narrows the read the same way.
+ */
+export async function listAssignableRoles(tenantId: string): Promise<AssignableRole[]> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("roles")
-    .select("id, name")
-    .is("tenant_id", null)
-    .order("name")
-    .returns<{ id: string; name: string }[]>();
+    .select("id, name, display_name, tenant_id")
+    .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+    .eq("status", "active")
+    .order("display_name")
+    .returns<{ id: string; name: string; display_name: string; tenant_id: string | null }[]>();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  return data ?? [];
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name, displayName: r.display_name, custom: r.tenant_id !== null }));
+}
+
+// A role by name as this tenant knows it: a system role, or its own custom role.
+async function findRole(tenantId: string, roleName: string): Promise<{ id: string; status: string } | null> {
+  const { data } = await supabaseServiceRole()
+    .from("roles")
+    .select("id, status")
+    .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+    .eq("name", roleName)
+    .maybeSingle<{ id: string; status: string }>();
+  return data;
 }
 
 // FOUNDATION-P0-23: roles can be managed for any member still in the
@@ -106,13 +124,9 @@ export async function assignRole(
   await assertTenantMember(tenantId, targetUserId);
 
   const supabase = supabaseServiceRole();
-  const { data: role } = await supabase
-    .from("roles")
-    .select("id")
-    .is("tenant_id", null)
-    .eq("name", roleName)
-    .maybeSingle<{ id: string }>();
+  const role = await findRole(tenantId, roleName);
   if (!role) throw new ApiError(400, "UNKNOWN_ROLE", `Unknown role: ${roleName}`);
+  if (role.status !== "active") throw new ApiError(409, "ROLE_INACTIVE", "That role is inactive. Activate it before assigning it.");
 
   const { error } = await supabase
     .from("user_roles")
@@ -143,12 +157,7 @@ export async function removeRole(
   await assertTenantMember(tenantId, targetUserId);
 
   const supabase = supabaseServiceRole();
-  const { data: role } = await supabase
-    .from("roles")
-    .select("id")
-    .is("tenant_id", null)
-    .eq("name", roleName)
-    .maybeSingle<{ id: string }>();
+  const role = await findRole(tenantId, roleName);
   if (!role) throw new ApiError(400, "UNKNOWN_ROLE", `Unknown role: ${roleName}`);
 
   const { error } = await supabase

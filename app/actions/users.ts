@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/rbac/requirePermission";
+import { requireAnyPermission, requirePermission } from "@/lib/rbac/requirePermission";
 import { assignRole } from "@/lib/rbac/roles";
 import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantContext";
 import { getSessionUser } from "@/lib/tenant/session";
@@ -36,7 +36,7 @@ export async function inviteUserAction(_prev: ActionState, formData: FormData): 
   try {
     ctx = await requirePermission(invitePermission(method));
     // Granting roles on the way in is role management.
-    if (roles.length && !ctx.permissions.includes("role.manage")) {
+    if (roles.length && !ctx.permissions.some((p) => p === "roles.assign" || p === "role.manage")) {
       return { ok: false, message: "You can add people, but assigning roles needs role management. Leave the roles empty, or ask an administrator." };
     }
   } catch (err) {
@@ -141,7 +141,7 @@ export async function assignUserRoleAction(_prev: ActionState, formData: FormDat
   const role = String(formData.get("role") ?? "");
   if (!role) return { ok: false, message: "Choose a role." };
   try {
-    const ctx = await requirePermission("role.manage");
+    const ctx = await requireAnyPermission(["roles.assign", "role.manage"]);
     await assignRole(ctx.tenantId!, ctx.userId, userId, role);
     revalidatePath(`/settings/users/${userId}`);
     revalidatePath("/settings/users");

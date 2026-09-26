@@ -96,7 +96,7 @@ export default async function OnboardingPage() {
       )}
 
       <Card>
-        <CardHeader title="Create a new organization" description="Sets up a fresh, isolated organization you'll own as Tenant Super Admin." />
+        <CardHeader title="Create a new organization" description="Sets up a fresh, isolated organization you'll own as its Tenant Administrator." />
         <CardBody>
           <form action={createTenantAction} className="space-y-3">
             <TextField label="Organization name" name="name" required placeholder="Acme Corp" />

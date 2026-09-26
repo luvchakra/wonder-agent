@@ -34,7 +34,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const [{ items, total }, summary, roles] = await Promise.all([
     listUsers(ctx.tenantId!, { q, status: status || null, role: role || null, page, pageSize: PAGE_SIZE }),
     getUserSummary(ctx.tenantId!),
-    listAssignableRoles(),
+    listAssignableRoles(ctx.tenantId!),
   ]);
   const canAdd = ctx.permissions.includes("users.invite") || ctx.permissions.includes("users.create");
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -94,7 +94,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <option value="">All roles</option>
                 {roles.map((r) => (
                   <option key={r.id} value={r.name}>
-                    {roleLabel(r.name)}
+                    {r.displayName}
                   </option>
                 ))}
               </select>

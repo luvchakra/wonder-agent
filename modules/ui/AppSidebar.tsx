@@ -23,7 +23,8 @@ import {
 
 /**
  * The WonderID navigation (EXPERIENCE-P0-18, 2026-09-26; user decision to
- * adopt the WonderID mockups' dark navy sidebar).
+ * adopt the WonderID mockups' dark navy sidebar; 2026-09-26 later, the
+ * branding specification's light console — EXPERIENCE-P0-23).
  *
  * - **Expanded** (the default, `lg` and up): sections as an accordion.
  *   The current section opens by itself; any section opens on click. A
@@ -36,7 +37,7 @@ import {
  *   bar's "More" slot.
  *
  * One body renders all three, so they cannot drift. Colours come from the
- * `--sidebar*` tokens in app/globals.css (navy in both themes).
+ * `--sidebar*` tokens in app/globals.css (light rail; dark in dark mode).
  */
 
 
@@ -312,8 +313,8 @@ function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavIt
 // ---------------------------------------------------------------- body
 
 function Brand({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => void }) {
-  // BRAND-004: the lockup for dark surfaces (the rail is navy in both
-  // themes); collapsed, the W mark alone — which is then the expand control.
+  // BRAND-004: the lockup, following the theme (a light rail in light mode,
+  // a dark one in dark mode); collapsed, the W mark alone — which is then the expand control.
   if (collapsed && onToggle) {
     return (
       <div className="flex h-16 shrink-0 items-center justify-center border-b border-sidebar-border px-2">
@@ -324,7 +325,7 @@ function Brand({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => v
           title="Expand navigation"
           className={cn("flex size-11 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent", focusRing)}
         >
-          <WonderIDLogo variant="dark" showWordmark={false} size={26} alt="" />
+          <WonderIDLogo showWordmark={false} size={26} alt="" />
         </button>
       </div>
     );
@@ -332,7 +333,7 @@ function Brand({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => v
   return (
     <div className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
       <Link href="/" className={cn("flex min-w-0 flex-1 items-center rounded-md", focusRing)}>
-        <WonderIDLogo variant="dark" size={28} priority />
+        <WonderIDLogo size={28} priority />
       </Link>
       {onToggle ? (
         <button
@@ -424,7 +425,7 @@ export function AppSidebar({ initialCollapsed = false, ...props }: SidebarProps 
     <aside
       data-collapsed={collapsed || undefined}
       className={cn(
-        "sticky top-0 hidden h-screen shrink-0 flex-col bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
+        "sticky top-0 hidden h-screen shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground transition-[width] duration-200 lg:flex",
         collapsed ? "w-[76px]" : "w-64",
       )}
     >

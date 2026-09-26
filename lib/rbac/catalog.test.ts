@@ -12,7 +12,11 @@ const p = (key: string, module: CatalogPermission["module"], sensitivity: Catalo
   sensitivity,
   roles: [],
 });
-const items = [p("agent.read", "DISCOVER", "standard", "View AI agents"), p("runtime.emergency", "PROTECT", "privileged", "Use emergency controls"), p("users.view", "ADMINISTRATION", "standard", "View users")];
+const items = [
+  p("agent.read", "DISCOVER", "standard", "View AI agents"),
+  p("runtime.emergency", "PROTECT", "privileged", "Use emergency controls"),
+  p("users.view", "ADMINISTRATION", "standard", "View users"),
+];
 
 describe("filterCatalog", () => {
   it("filters by module, sensitivity and free text over key, label, resource and description", () => {

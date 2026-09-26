@@ -2882,3 +2882,36 @@ and the decisions below are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
   - official vector logo files are still needed;
   - the specification's light console versus the chosen navy sidebar:
     navy kept (Phase 4b decision 5).
+
+## 2026-09-26 — Branding follow-ups: the supplied artwork, the light console, verification
+
+1. **The user's own artwork** (user instruction: "just use the attached
+   images"). The logos, marks, icons and social image are cut from the
+   supplied brand sheet by `scripts/brand/extract-assets.py`; nothing is
+   redrawn. The redrawn first pass and its generator were removed before
+   release. See the entry above.
+2. **The light console** (user decision: "go ahead with branding document
+   suggestion"):
+   - The sidebar follows the branding specification instead of the navy
+     rail of EXPERIENCE-P0-18:
+     - white in light mode, with a hairline border;
+     - active items in Electric Blue on a soft blue tint (§26);
+     - the full-colour logo, theme-paired;
+     - a dark surface in dark mode.
+   - Only the `--sidebar*` tokens changed (both themes) and the rail's
+     logo variant; no component was forked.
+   - CLAUDE.md §13, the roadmap decisions (Phase 4b decision 5, Phase 4c
+     decision 4) and the design-review spec ("the sidebar follows the
+     theme") are updated.
+   - The account menu and onboarding now use the role display names
+     ("Tenant Administrator").
+
+**Verified:**
+
+- The branding spec, with the sign-in desktop and mobile screenshot
+  baselines, and the design-review spec: 34 passed on the light-console
+  build.
+- The earlier combined run (navy build) is recorded in the Foundation
+  audit.
+- Screenshots: Home in light and dark (1440).
+- The full suite on the final build is recorded in the next entry.

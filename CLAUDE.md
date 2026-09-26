@@ -33,7 +33,8 @@ WonderID P0 implementation specification (repository-grounded v3, stored at
 asked directly, chose to: adopt WonderID as the product contract (amending
 non-negotiable #7 and §10 below); rename the product to WonderID in the app now,
 keeping the repository, Vercel project, database and domain; and replace the light
-console navigation with the dark navy sidebar of the WonderID mockups. The
+console navigation with the dark navy sidebar of the WonderID mockups (later the same
+day the user adopted the branding specification's light console instead; see §13). The
 specification is additive to this repository: it forbids a parallel application,
 database, RBAC, policy engine or agent-governance stack, and where it conflicts with
 this file the repository's security controls, ownership and working implementation
@@ -550,12 +551,17 @@ consumer AI chatbot, or an AI-generated placeholder UI. This section is binding 
 every module that ships UI (primarily Experience Agent, but also any module's own bare functional pages before
 Experience composes them).
 
-**Navigation (2026-09-26, explicit user decision):** the WonderID shell uses a
-**dark navy left sidebar** (collapsible, hover flyouts to the third level, mobile
-drawer) with the light content area of the WonderID mockups
-(`docs/requirements/wonderid-*.png`). This supersedes the light-console rail of
-EXPERIENCE-P0-15. Content surfaces, tokens and both themes are unchanged, and a
-sidebar item appears only when its route and capability exist.
+**Navigation (2026-09-26, explicit user decisions):** the WonderID shell uses a
+collapsible left sidebar (hover flyouts to the third level, mobile drawer) beside
+the light content area of the WonderID mockups (`docs/requirements/wonderid-*.png`).
+The sidebar follows the branding specification's light enterprise console
+(`docs/requirements/WonderID_Branding_Application_Wide_Implementation_Requirements.md`,
+adopted by the user later the same day, superseding the dark navy rail): white in
+light mode, a dark surface in dark mode, active items in Electric Blue on a soft
+blue tint. Brand assets, colours and the logo come only from `modules/ui/brand.ts`
+and `public/brand/` (the user's brand sheet). Content surfaces, tokens and both
+themes are unchanged, and a sidebar item appears only when its route and
+capability exist.
 
 **The full, binding rule set is
 [`docs/design/UI-UX-DESIGN-RULES.md`](docs/design/UI-UX-DESIGN-RULES.md) — read it in

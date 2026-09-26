@@ -231,7 +231,7 @@ export async function inviteUser(
   actor: { userId: string; email: string | null },
   input: InviteInput,
 ): Promise<{ ok: true; value: InviteResult; invite: ValidInvite } | { ok: false; errors: Record<string, string> }> {
-  const assignable = (await listAssignableRoles()).map((r) => r.name);
+  const assignable = (await listAssignableRoles(tenant.tenantId)).map((r) => r.name);
   const parsed = validateInvite(input, assignable);
   if (!parsed.ok) return parsed;
   const v = parsed.value;

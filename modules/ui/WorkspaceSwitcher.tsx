@@ -11,7 +11,7 @@ import type { TenantOption } from "./AccountPanel";
  * Organization switcher, pinned above the account panel at the foot of the
  * navigation rail. It is the ONE tenant-switching surface: a header chip
  * that duplicated it was removed on 2026-09-18 by user decision. Because it
- * lives on the navy rail it colours itself from the --sidebar* tokens, not
+ * lives on the rail it colours itself from the --sidebar* tokens, not
  * --foreground/--accent (those invert with the theme; the rail does not).
  *
  * Ported structurally from WonderArk's BusinessSwitcher

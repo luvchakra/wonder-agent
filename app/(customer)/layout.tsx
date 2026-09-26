@@ -17,18 +17,8 @@ import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
 import { getActiveAnnouncements } from "@/modules/platform-admin/service";
 import { NAV_COOKIE, type ShellBadgeCounts } from "@/modules/ui/shell-nav";
 import { brandTitle, wonderIdBrand } from "@/modules/ui/brand";
+import { roleLabel } from "@/lib/users/userRules";
 import { WonderIDLogo } from "@/modules/ui/Logo";
-
-/** `TENANT_SUPER_ADMIN` → `Tenant Super Admin`, for the sidebar's user block. */
-function humanizeRole(role: string | undefined): string | null {
-  if (!role) return null;
-  return role
-    .toLowerCase()
-    .split(/[_\s]+/)
-    .filter(Boolean)
-    .map((w) => w[0].toUpperCase() + w.slice(1))
-    .join(" ");
-}
 
 // EXPERIENCE-P0-01.1. The one shared customer-facing shell every domain
 // module's pages mount into (app/(customer)/* — a Next.js route group, so
@@ -112,7 +102,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const sidebarUser = {
     email: user.email ?? "",
     displayName: profile?.displayName ?? null,
-    roleLabel: humanizeRole(ctx.roles[0]),
+    roleLabel: ctx.roles[0] ? roleLabel(ctx.roles[0]) : null,
     isPlatformAdmin: isAdmin,
   };
   const shellProps = {
@@ -170,10 +160,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
         {/* The bottom tab bar is fixed, so the page reserves room under its
             content (plus the home indicator) rather than letting the last
             row sit behind it. */}
-        <main
-          id="main-content"
-          className="flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:pb-10"
-        >
+        <main id="main-content" className="flex-1 px-4 py-6 pb-[calc(5rem+env(safe-area-inset-bottom))] sm:px-6 lg:px-8 lg:pb-10">
           <div className="mx-auto w-full max-w-[1560px]">{children}</div>
         </main>
       </div>

@@ -58,13 +58,15 @@ export default async function UserDetailPage({
     throw err;
   }
   const [{ userId }, sp] = await Promise.all([params, searchParams]);
+  // Assigning roles: roles.assign, or the legacy role.manage (FOUNDATION-P0-24/25).
+  const canAssign = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "roles") as TabKey;
   const [user, identity, history, sessions, assignable] = await Promise.all([
     getUserDetail(ctx.tenantId!, userId),
     getIdentityForUser(ctx.tenantId!, userId).catch(() => null),
     tab === "history" ? getAccessHistory(ctx.tenantId!, userId) : Promise.resolve(null),
     tab === "sessions" ? listUserSessions(ctx.tenantId!, userId).catch(() => null) : Promise.resolve(null),
-    ctx.permissions.includes("role.manage") ? listAssignableRoles() : Promise.resolve([]),
+    canAssign ? listAssignableRoles(ctx.tenantId!) : Promise.resolve([]),
   ]);
   if (!user) notFound();
 
@@ -176,7 +178,7 @@ export default async function UserDetailPage({
                         <Th>Type</Th>
                         <Th hideBelow="xl">Assigned</Th>
                         <Th hideBelow="lg">Assigned by</Th>
-                        {can("role.manage") && !self ? <Th className="text-right">Remove</Th> : null}
+                        {canAssign && !self ? <Th className="text-right">Remove</Th> : null}
                       </tr>
                     </Thead>
                     <tbody>
@@ -193,7 +195,7 @@ export default async function UserDetailPage({
                             {formatDate(r.grantedAt)}
                           </Td>
                           <Td hideBelow="lg">{r.grantedBy?.name ?? "—"}</Td>
-                          {can("role.manage") && !self ? (
+                          {canAssign && !self ? (
                             <Td className="text-right">
                               <RemoveRoleButton userId={user.userId} role={r.role} />
                             </Td>
@@ -203,8 +205,8 @@ export default async function UserDetailPage({
                     </tbody>
                   </TableContainer>
                 )}
-                {can("role.manage") && !self && !removed ? (
-                  <AssignRoleForm userId={user.userId} roles={unassigned.map((r) => ({ name: r.name, label: roleLabel(r.name) }))} />
+                {canAssign && !self && !removed ? (
+                  <AssignRoleForm userId={user.userId} roles={unassigned.map((r) => ({ name: r.name, label: r.displayName }))} />
                 ) : null}
                 <p className="text-xs text-muted-foreground">Groups arrive with group management; scoped assignments with the authorization engine.</p>
               </CardBody>

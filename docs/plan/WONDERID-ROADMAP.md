@@ -171,11 +171,11 @@ Users, Groups, Roles and Permissions screens.
 4. **Environment scope** uses the environment already on applications
    (ACCESS-P0-15) and agents. Resource scope uses the object's id. Further
    scope types are added as rows, not schema changes (§19).
-5. **Open question for the user (recorded, not blocking).** Both new mockup
-   sets show a light sidebar, and §45 asks for a light theme. On
-   2026-09-26 the user explicitly chose the dark navy sidebar
-   (EXPERIENCE-P0-18). The navy sidebar stays until the user says
-   otherwise; content areas are already light.
+5. **Sidebar: light (resolved 2026-09-26).** Both new mockup sets show a
+   light sidebar, and §45 asks for a light theme; the dark navy sidebar
+   (EXPERIENCE-P0-18) was the user's earlier choice. Asked, the user
+   adopted the branding specification's light console: the rail is white
+   in light mode and dark in dark mode (see Phase 4c, decision 4).
 
 ## Phase 4c — WonderID branding (added 2026-09-26)
 
@@ -220,10 +220,12 @@ branded.
    surfaces only. Status colours are unchanged, and `--violet` stays the
    text-safe AI tone: brand Violet #8B5CF6 is 4.2:1 on white, below AA
    for small text.
-4. **The navy sidebar stays.** The specification describes a light
-   console, and its sidebar sketch has no colour. The user's explicit
-   2026-09-26 decision for a dark navy sidebar stands, and content surfaces
-   are light (see Phase 4b, decision 5).
+4. **The light console (user decision, 2026-09-26: "go ahead with
+   branding document suggestion").** The sidebar becomes the
+   specification's light enterprise console, superseding the navy rail:
+   white with a hairline border, active items in Electric Blue on a soft
+   blue tint (§26), the full-colour logo, and a dark surface in dark
+   mode. CLAUDE.md §13 is updated to match.
 5. **The tagline.** "IDENTITIES • AGENTS • ACCESS • SECURITY" appears on
    the brand-introducing surfaces only (sign-in, onboarding, social
    image), never under the in-app logo (§5). The CLAUDE.md line "Govern
