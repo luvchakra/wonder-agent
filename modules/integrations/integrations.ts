@@ -1,5 +1,8 @@
 import "server-only";
 
+import { OutboundBlockedError, checkOutboundUrl, outboundPolicyFromEnv } from "./outboundPolicy";
+import { validateDeclaredCapabilities } from "./connectorWriteRules";
+
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -59,6 +62,20 @@ export async function createIntegration(
   const connectorFlag = CONNECTOR_FLAGS[input.integrationTypeId];
   if (connectorFlag) await requireFeature(tenantId, connectorFlag);
 
+  // INTEGRATION-P0-11: a customer-supplied address is checked when it is
+  // configured, so a disallowed one is refused here (400) rather than at
+  // the first sync. The guard checks it again on every request.
+  const baseUrl = (input.config as Record<string, unknown> | undefined)?.baseUrl;
+  if (baseUrl !== undefined) {
+    if (typeof baseUrl !== "string") throw new ApiError(400, "INVALID_INPUT", "config.baseUrl must be a URL");
+    try {
+      checkOutboundUrl(baseUrl, outboundPolicyFromEnv());
+    } catch (err) {
+      if (err instanceof OutboundBlockedError) throw new ApiError(400, "OUTBOUND_BLOCKED", `config.baseUrl: ${err.message}`);
+      throw err;
+    }
+  }
+
   const supabase = await supabaseServer();
   const { data: typeRow, error: typeError } = await supabase
     .from("integration_types")
@@ -68,6 +85,19 @@ export async function createIntegration(
   if (typeError) throw new ApiError(500, "QUERY_FAILED", typeError.message);
   if (!typeRow) throw new ApiError(400, "INVALID_INPUT", "Unknown integration type");
 
+  // INTEGRATION-P0-11: an integration may declare only what its connector
+  // can do; a write capability the connector lacks is refused (#12).
+  let declared = (typeRow.default_capabilities ?? {}) as ConnectorCapabilities;
+  if (input.capabilities !== undefined) {
+    let supported: ConnectorCapabilities = typeRow.default_capabilities ?? {};
+    try {
+      supported = { ...supported, ...createConnector(input.integrationTypeId).capabilities };
+    } catch {
+      // Push-only types (webhook) have no connector: their catalog defaults are all they support.
+    }
+    declared = validateDeclaredCapabilities(input.capabilities, supported);
+  }
+
   const { data, error } = await supabase
     .from("integrations")
     .insert({
@@ -75,7 +105,7 @@ export async function createIntegration(
       integration_type_id: input.integrationTypeId,
       name: input.name,
       config: input.config ?? {},
-      capabilities: input.capabilities ?? typeRow.default_capabilities ?? {},
+      capabilities: declared,
     })
     .select()
     .single();

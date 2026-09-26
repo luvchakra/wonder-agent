@@ -11,6 +11,7 @@ import type {
   NormalizedIdentity,
   NormalizedPolicy,
   NormalizedRuntimeEvent,
+  ConnectorWriteOperation,
 } from "@/lib/shared/types/integrations";
 
 /**
@@ -56,6 +57,14 @@ export interface ConnectorAdapter {
   importActivity?(): Promise<ImportedRecord<NormalizedRuntimeEvent>[]>;
 
   createAccessRequest?(request: AccessRequestInput): Promise<{ externalId: string }>;
+  /**
+   * INTEGRATION-P0-11: the single write entry point. Only called by
+   * connectorWrites.ts, after the operation's capability is declared and an
+   * idempotency record exists; the key is passed on so a target system that
+   * supports idempotency can use it too. No P0 connector implements it yet
+   * (all are read-only), so every write is reported as not implemented.
+   */
+  write?(operation: ConnectorWriteOperation, target: Record<string, string>, idempotencyKey: string): Promise<{ externalId?: string }>;
   removeAccess?(grantRef: string): Promise<void>;
   getObject?(externalRef: string): Promise<DiscoveredObject | null>;
 }

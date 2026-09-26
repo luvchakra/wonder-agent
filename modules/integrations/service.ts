@@ -43,3 +43,4 @@ export {
   type ReconciliationInput,
   type CorrelationDecision,
 } from "./identitySources";
+export { executeConnectorWrite } from "./connectorWrites";

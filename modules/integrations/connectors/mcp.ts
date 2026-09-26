@@ -1,5 +1,7 @@
 import "server-only";
 
+import { guardedFetch } from "../outboundFetch";
+
 import type { ConnectorAdapter, ConnectorConfig } from "../connector";
 import type { ConnectorCapabilities, DiscoveredObject } from "@/lib/shared/types/integrations";
 import { normalizeMcpDeclarations } from "../mcpNormalize";
@@ -33,7 +35,9 @@ export class McpConnector implements ConnectorAdapter {
   }
 
   private async rpc(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-    const res = await fetch(this.baseUrl, {
+    // INTEGRATION-P0-11: the MCP base URL goes through the SSRF guard
+    // (closes the MCP open item).
+    const res = await guardedFetch(this.baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

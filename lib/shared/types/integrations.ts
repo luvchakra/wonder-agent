@@ -34,6 +34,44 @@ export type ConnectorCapabilities = {
   importActivity?: boolean;
   provision?: boolean;
   deprovision?: boolean;
+  // INTEGRATION-P0-11: explicit write and ancillary capabilities. A write
+  // runs only when its capability is declared here AND the connector
+  // implements it (#12); every one defaults to off.
+  createAccount?: boolean;
+  updateAccount?: boolean;
+  disableAccount?: boolean;
+  deleteAccount?: boolean;
+  grantAccess?: boolean;
+  revokeAccess?: boolean;
+  readUsage?: boolean;
+  webhooks?: boolean;
+  bulk?: boolean;
+};
+
+/** INTEGRATION-P0-11: the write operations and the capability each needs. */
+export const CONNECTOR_WRITE_OPERATIONS = {
+  create_account: "createAccount",
+  update_account: "updateAccount",
+  disable_account: "disableAccount",
+  delete_account: "deleteAccount",
+  grant_access: "grantAccess",
+  revoke_access: "revokeAccess",
+} as const satisfies Record<string, keyof ConnectorCapabilities>;
+export type ConnectorWriteOperation = keyof typeof CONNECTOR_WRITE_OPERATIONS;
+export const WRITE_CAPABILITY_KEYS = Object.values(CONNECTOR_WRITE_OPERATIONS) as (keyof ConnectorCapabilities)[];
+
+export type ConnectorWriteStatus = "requested" | "succeeded" | "failed" | "blocked";
+
+export type ConnectorWriteResult = {
+  id: string;
+  integrationId: string;
+  idempotencyKey: string;
+  operation: ConnectorWriteOperation;
+  status: ConnectorWriteStatus;
+  /** True when this call returned an earlier result for the same key. */
+  replayed: boolean;
+  externalId: string | null;
+  error: string | null;
 };
 
 export type IntegrationStatus = "configured" | "connected" | "error" | "disabled";

@@ -2,6 +2,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { RestHttpClient } from "./restHttpClient";
 
+// INTEGRATION-P0-11: the client sends through the SSRF guard, so the guard
+// is what these tests replace (it has its own socket tests).
+const guarded = vi.hoisted(() => ({ fn: vi.fn() }));
+vi.mock("../outboundFetch", () => ({ guardedFetch: (...args: unknown[]) => guarded.fn(...args) }));
+
 function jsonResponse(body: unknown, ok = true): Response {
   return {
     ok,
@@ -17,7 +22,7 @@ describe("RestHttpClient", () => {
 
   it("sends the configured auth header for api_key", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "api_key", "secret-123", {}, "x-api-key", 1000);
     await client.get("/ping");
@@ -28,7 +33,7 @@ describe("RestHttpClient", () => {
 
   it("sends a Bearer Authorization header for bearer/oauth2", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}));
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "tok-abc", {}, "x-api-key", 1000);
     await client.get("/ping");
@@ -49,7 +54,7 @@ describe("RestHttpClient", () => {
       call += 1;
       return Promise.resolve(jsonResponse(page));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "t", {}, "x-api-key", 1000);
     const records = await client.fetchAllPages("/things", { style: "offset", pageSize: 2 });
@@ -70,7 +75,7 @@ describe("RestHttpClient", () => {
       call += 1;
       return Promise.resolve(jsonResponse(body));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "t", {}, "x-api-key", 1000);
     const records = await client.fetchAllPages("/things", {
@@ -85,7 +90,7 @@ describe("RestHttpClient", () => {
 
   it("extracts records from a nested dataPath for non-paginated responses", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({ data: { items: [{ id: "x" }] } }));
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "t", {}, "x-api-key", 1000);
     const records = await client.fetchAllPages("/things", { style: "none", dataPath: "data.items" });
@@ -95,7 +100,7 @@ describe("RestHttpClient", () => {
 
   it("throws when a page request fails", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse({}, false));
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "t", {}, "x-api-key", 1000);
     await expect(client.fetchAllPages("/things")).rejects.toThrow("HTTP 500");
@@ -114,7 +119,7 @@ describe("RestHttpClient", () => {
       call += 1;
       return Promise.resolve(jsonResponse(page));
     });
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "tok", {}, "x-api-key", 1000);
     const records = await client.postAllPages("/ECM/api/v5/getUser", {}, { pageSize: 2 });
@@ -129,7 +134,7 @@ describe("RestHttpClient", () => {
 
   it("postAllPages merges baseBody with pagination params on every page", async () => {
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse([]));
-    vi.stubGlobal("fetch", fetchMock);
+    guarded.fn = fetchMock;
 
     const client = new RestHttpClient("https://api.example.test", "bearer", "tok", {}, "x-api-key", 1000);
     await client.postAllPages("/ECM/api/v5/getAccounts", { advsearchcriteria: { status: "ACTIVE" } });

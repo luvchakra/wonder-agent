@@ -1,5 +1,7 @@
 import "server-only";
 
+import { guardedFetch } from "../outboundFetch";
+
 /**
  * Shared HTTP/pagination/throttling helper used by both the Generic REST and
  * Saviynt connectors (both are, mechanically, paginated REST APIs behind
@@ -61,13 +63,14 @@ export class RestHttpClient {
   async get(path: string): Promise<Response> {
     await this.throttle();
     const url = new URL(path, this.baseUrl);
-    return fetch(url, { headers: this.authHeaders() });
+    // INTEGRATION-P0-11: customer-supplied base URLs go through the SSRF guard.
+    return guardedFetch(url, { headers: this.authHeaders() });
   }
 
   async post(path: string, body: Record<string, unknown>): Promise<Response> {
     await this.throttle();
     const url = new URL(path, this.baseUrl);
-    return fetch(url, {
+    return guardedFetch(url, {
       method: "POST",
       headers: { ...this.authHeaders(), "Content-Type": "application/json" },
       body: JSON.stringify(body),

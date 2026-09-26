@@ -805,3 +805,103 @@ Pure rules live in `identitySourceRules.ts`.
 
 **Handed on:** governed joiner/mover/leaver workflows from these lifecycle
 signals are IDENTITY-P0-18.
+
+---
+
+## 2026-09-26 — INTEGRATION-P0-11 (Partial): outbound SSRF guard, capability model, idempotent write interface
+
+WonderID Phase 3 (spec S7 connector security, S8 SSRF). This closes the
+MCP `baseUrl` SSRF open item.
+
+### Outbound guard
+
+- **`outboundPolicy.ts`** (pure, 9 unit tests):
+  - https only;
+  - no credentials in URLs;
+  - no localhost, `.local`, `.internal` or `.home.arpa` names;
+  - no loopback, private, link-local, CGNAT, reserved, multicast or
+    documentation addresses, IPv4 and IPv6, including IPv4-mapped, NAT64,
+    decimal, hex and shorthand spellings (the WHATWG URL parser
+    normalizes those);
+  - cloud metadata endpoints (169.254.169.254, fd00:ec2::254,
+    metadata.google.internal, …) are refused even when private networks
+    are allowed.
+- **`outboundFetch.ts`** (`guardedFetch`, 6 socket tests):
+  - node http(s) with a `lookup` hook that checks every resolved address at
+    connect time, which covers DNS rebinding;
+  - at most 3 redirects, each re-checked; credentials are dropped when a
+    redirect leaves the origin;
+  - a 20 s timeout and a 10 MB response cap;
+  - errors name the host only.
+  - Built on Node's own http, with no new dependency.
+- **Wired in:**
+  - `RestHttpClient` (generic REST and Saviynt) and the MCP connector now
+    use `guardedFetch`; no bare `fetch` remains in connectors;
+  - `createIntegration` checks `config.baseUrl` when the integration is
+    configured (400 `OUTBOUND_BLOCKED`).
+- **Private networks** (loopback, http) are allowed only when the platform
+  sets `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true`:
+  - the test server (Playwright `webServer.env`) sets it for the MCP stub
+    specs;
+  - it is documented in `.env.local.example`;
+  - it is not set in Vercel.
+
+### Capability model and write interface
+
+- **`ConnectorCapabilities`** gains explicit createAccount, updateAccount,
+  disableAccount, deleteAccount, grantAccess, revokeAccess, readUsage,
+  webhooks and bulk. All default to off.
+- **`createIntegration`** now accepts only capabilities the connector
+  supports. A write the connector cannot perform is refused (#12).
+- **`executeConnectorWrite`** (`connectorWrites.ts`, published and not
+  routed; its governed caller will be INTEGRATION-P0-13):
+  - validates (no secret-named target fields);
+  - claims the idempotency key in `connector_write_operations` (0087)
+    **before** calling the connector. The unique key is the lock: a repeat
+    returns the first outcome (`replayed`), and a key reused for a
+    different request is 409;
+  - blocks undeclared writes and disabled integrations, recording that as
+    `blocked`;
+  - records `failed` truthfully when the connector has no `write` (none of
+    the P0 connectors do: they are read-only);
+  - audits `integration.write_<status>`.
+
+### Verified
+
+- `tsc` and `eslint` clean.
+- vitest **608/608**: outbound policy 9, guarded fetch 6 against real
+  sockets, write rules 6. `restHttpClient.test.ts`'s 8 tests now mock
+  `guardedFetch` rather than the global `fetch`, which the client no longer
+  calls.
+- Live SQL (`tests/integration/connector-write-operations-checks.sql`):
+  - the same key twice is 23505;
+  - a malformed key and an unknown operation are 23514;
+  - a member's direct write is 42501, and the member reads their own
+    record;
+  - nothing was left behind.
+  - The cross-tenant case was skipped because no other tenant had an
+    integration; the composite key pattern is proven elsewhere.
+- E2E `outbound-guard.spec.ts`:
+  - metadata (v4, name, mapped v6), `file://`, `gopher://` and
+    credentials-in-URL are 400 `OUTBOUND_BLOCKED` at configuration, even
+    with the test server's private-network switch on;
+  - a stub that 307-redirects to metadata makes "test connection" fail
+    naming metadata, without leaking the path.
+- The MCP inventory and bridge specs, and `integrations.spec`, pass
+  through the guard (18/18).
+- **Full Playwright suite (§17.8: connectors changed): 232/235.**
+  - The three failures were design-review width sweeps (1680, 1440 and
+    1280 px). They timed out while the server log showed Supabase
+    queries failing with `TypeError: fetch failed`, and in one the
+    session had fallen back to sign-in. That is a network problem, not
+    code: no guarded (outbound) request is made while rendering those
+    pages.
+  - Re-run alone on the same build, `design-review.spec` passed 21/21.
+
+### Why Partial
+
+`executeConnectorWrite` is covered by unit rules and the live SQL
+idempotency checks, but has no end-to-end caller until the provisioning
+pipeline (INTEGRATION-P0-13) exists; that story adds its E2E. The spec's
+per-connector rate limiting already exists (RestHttpClient); response
+validation and pagination limits for connectors are unchanged.
