@@ -8,11 +8,16 @@ import {
   listAttributeDefinitions,
   listIdentities,
   listIdentityRelationships,
+  listHumanLifecycleEvents,
+  listLifecycleTasks,
+  getOwnershipFootprint,
+  allowedTransitions,
+  HUMAN_TRANSITIONS,
 } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, EmptyState, LinkButton, TabPanel, Tabs } from "@/modules/ui";
-import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton } from "../IdentityForms";
-import { IDENTITY_TYPE_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE } from "../labels";
+import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm } from "../IdentityForms";
+import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
 
 // IDENTITY-P0-15/16/17 — one identity: its details, accountable people,
 // relationships and attributes. An AI agent's identity shows the agent's
@@ -36,7 +41,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-export default async function IdentityDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function IdentityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("identity.read");
@@ -44,19 +49,28 @@ export default async function IdentityDetailPage({ params }: { params: Promise<{
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
+  const [{ id }, { tab: requestedTab }] = await Promise.all([params, searchParams]);
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("identity.manage");
   const identity = await getIdentity(tenantId, id);
   if (!identity) notFound();
 
-  const [relationships, definitions, refs, people, candidates] = await Promise.all([
+  const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     canManage ? listIdentities(tenantId, { pageSize: 200 }).then((r) => r.rows.map((x) => ({ id: x.id, displayName: x.displayName, identityType: x.identityType }))) : Promise.resolve([]),
+    personIdentity ? listHumanLifecycleEvents(tenantId, id) : Promise.resolve([]),
+    personIdentity ? listLifecycleTasks(tenantId, { identityId: id }) : Promise.resolve([]),
   ]);
+  const openTasks = lifecycleTasks.filter((t) => t.status === "open");
+  const footprint = openTasks.some((t) => t.taskType === "transfer_ownership") ? await getOwnershipFootprint(tenantId, id) : null;
+  const transitionOptions = allowedTransitions(identity.lifecycleState).map((to) => {
+    const event = HUMAN_TRANSITIONS[identity.lifecycleState!][to]!;
+    return { toState: to, label: TRANSITION_LABEL[event] ?? to, needsReason: ["leaver", "disabled", "terminated", "hire_cancelled"].includes(event) };
+  });
 
   const ref = (refId: string | null) =>
     refId && refs.get(refId) ? (
@@ -79,6 +93,7 @@ export default async function IdentityDetailPage({ params }: { params: Promise<{
 
   const tabs = [
     { value: "overview", label: "Overview" },
+    ...(isPerson ? [{ value: "lifecycle", label: "Lifecycle", count: openTasks.length }] : []),
     { value: "relationships", label: "Relationships", count: current.length },
     { value: "attributes", label: "Attributes", count: storedKeys.length },
     ...(canManage ? [{ value: "edit", label: "Edit" }] : []),
@@ -120,7 +135,7 @@ export default async function IdentityDetailPage({ params }: { params: Promise<{
       ) : null}
 
       <Card className="p-4">
-        <Tabs tabs={tabs} ariaLabel="Identity sections">
+        <Tabs tabs={tabs} ariaLabel="Identity sections" defaultValue={tabs.some((t) => t.value === requestedTab) ? requestedTab : "overview"}>
           <TabPanel value="overview" className="pt-4">
             <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <Detail label="Email">{identity.email}</Detail>
@@ -152,6 +167,86 @@ export default async function IdentityDetailPage({ params }: { params: Promise<{
               .
             </p>
           </TabPanel>
+
+          {isPerson ? (
+            <TabPanel value="lifecycle" className="space-y-6 pt-4">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Lifecycle state</span>
+                <Badge tone="info">{identity.lifecycleState ? LIFECYCLE_STATE_LABEL[identity.lifecycleState] : "Not set"}</Badge>
+              </div>
+              {canManage && identity.lifecycleState ? <LifecycleTransitionForm identityId={identity.id} options={transitionOptions} /> : null}
+
+              <section aria-labelledby="open-work">
+                <h2 id="open-work" className="text-sm font-semibold text-foreground">
+                  Open work
+                </h2>
+                {openTasks.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground">Nothing open.</p>
+                ) : (
+                  <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+                    {openTasks.map((t) => (
+                      <li key={t.id} className="grid grid-cols-1 gap-3 px-3 py-3 lg:grid-cols-[1fr_22rem]">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-foreground">{LIFECYCLE_TASK_LABEL[t.taskType]?.title ?? t.taskType}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {LIFECYCLE_EVENT_LABEL[t.eventType] ?? t.eventType} · {LIFECYCLE_TASK_LABEL[t.taskType]?.help}
+                            {t.assigneeName ? ` · for ${t.assigneeName}` : ""}
+                          </p>
+                          {t.taskType === "transfer_ownership" && footprint ? (
+                            <p className="mt-1 text-xs text-foreground">
+                              {footprint.ownedIdentities + footprint.sponsoredIdentities + footprint.directReports + footprint.ownedAgents === 0
+                                ? "Owns, sponsors and manages nothing: close this as Done."
+                                : `Owns ${footprint.ownedIdentities} identities, sponsors ${footprint.sponsoredIdentities}, manages ${footprint.directReports}, owns ${footprint.ownedAgents} AI agents.`}
+                            </p>
+                          ) : null}
+                        </div>
+                        {canManage ? <LifecycleTaskActions taskId={t.id} taskType={t.taskType} people={people.filter((p) => p.id !== identity.id)} /> : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              <section aria-labelledby="history">
+                <h2 id="history" className="text-sm font-semibold text-foreground">
+                  History
+                </h2>
+                {lifecycleEvents.length === 0 ? (
+                  <p className="mt-1 text-sm text-muted-foreground">No lifecycle events yet.</p>
+                ) : (
+                  <ol className="mt-2 space-y-2">
+                    {lifecycleEvents.map((e) => (
+                      <li key={e.id} className="flex flex-wrap items-baseline gap-x-2 text-sm">
+                        <span className="font-medium text-foreground">{LIFECYCLE_EVENT_LABEL[e.eventType] ?? e.eventType}</span>
+                        {e.fromState || e.toState ? (
+                          <span className="text-muted-foreground">
+                            {e.fromState ? LIFECYCLE_STATE_LABEL[e.fromState] : "New"} → {e.toState ? LIFECYCLE_STATE_LABEL[e.toState] : "—"}
+                          </span>
+                        ) : null}
+                        {e.changedFields.filter((f) => f !== "lifecycleState").length ? (
+                          <span className="text-xs text-muted-foreground">({e.changedFields.filter((f) => f !== "lifecycleState").join(", ")})</span>
+                        ) : null}
+                        <span className="text-xs text-muted-foreground">
+                          · {e.origin === "source" ? "from an identity source" : "by a person"} ·{" "}
+                          {new Date(e.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+                        </span>
+                        {e.note ? <span className="w-full text-xs text-foreground">“{e.note}”</span> : null}
+                      </li>
+                    ))}
+                  </ol>
+                )}
+                {lifecycleTasks.some((t) => t.status !== "open") ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {lifecycleTasks.filter((t) => t.status !== "open").length} closed task(s); see the{" "}
+                    <Link href="/identities/lifecycle?status=all" className="text-primary hover:underline">
+                      lifecycle work
+                    </Link>{" "}
+                    list.
+                  </p>
+                ) : null}
+              </section>
+            </TabPanel>
+          ) : null}
 
           <TabPanel value="relationships" className="space-y-5 pt-4">
             {current.length === 0 ? (

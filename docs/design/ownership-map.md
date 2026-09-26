@@ -39,6 +39,8 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `identities` | IA | WonderID common identity reference, one row per identity of any type (IDENTITY-P0-15). AI_AGENT rows mirror `agents` 1:1 by trigger (`agents` stays canonical); HUMAN rows for members are created by trigger on `tenant_memberships` (FA's table, read only) |
 | `identity_attribute_definitions` | IA | Tenant-defined, typed identity attributes (IDENTITY-P0-16) |
 | `identity_relationships` | IA | Relationships between identities (manager_of, owns, sponsors, …) with validity windows (IDENTITY-P0-16) |
+| `identity_lifecycle_events` | IA | Human lifecycle events (joiner, mover, leaver, rehire, …), from sources or people (IDENTITY-P0-18) |
+| `identity_lifecycle_tasks` | IA | Governed work each lifecycle event opens; closed by people with a note (IDENTITY-P0-18) |
 | `identity_sources` | INT | Identity source configuration: template, authority, precedence, mappings, correlation rules, leaver strategy (INTEGRATION-P0-08) |
 | `identity_reconciliation_runs` | INT | Reconciliation runs with counts, errors, change log, guard and preview flags; written by the worker only (INTEGRATION-P0-09) |
 | `identity_source_links` | INT | Which source record is which identity; written by the worker only |
@@ -241,7 +243,7 @@ consume and persist into their own tables.
 |---|---|
 | `/api/v1/auth`, `/api/v1/users`, `/api/v1/roles`, `/api/v1/tenant`, `/api/v1/sso` | FA |
 | `/api/v1/agents`, `/api/v1/agents/:id` | IA |
-| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `relationships/:id`, `attributes`) | IA |
+| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `:id/lifecycle`, `relationships/:id`, `attributes`, `lifecycle-tasks`) | IA |
 | `/api/v1/integrations` (incl. `identity-sources`, `correlations`) | INT |
 | `/api/v1/access`, `/api/v1/policies` | AA |
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |

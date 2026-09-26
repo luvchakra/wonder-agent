@@ -58,3 +58,46 @@ export const DIRECTORY_VIEWS = {
   },
 } as const;
 export type DirectoryView = keyof typeof DIRECTORY_VIEWS;
+
+export const LIFECYCLE_STATE_LABEL: Record<string, string> = {
+  PRE_JOIN: "Joining",
+  ACTIVE: "Active",
+  LEAVE_PENDING: "Leaving",
+  DISABLED: "Disabled",
+  TERMINATED: "Terminated",
+  ARCHIVED: "Archived",
+};
+
+export const LIFECYCLE_EVENT_LABEL: Record<string, string> = {
+  joiner: "Joiner",
+  mover: "Mover",
+  leaver: "Leaver",
+  rehire: "Rehire",
+  conversion: "Conversion",
+  manager_change: "New manager",
+  leaver_cancelled: "Departure cancelled",
+  disabled: "Disabled",
+  terminated: "Terminated",
+  archived: "Archived",
+  hire_cancelled: "Hire cancelled",
+};
+
+export const LIFECYCLE_TASK_LABEL: Record<string, { title: string; help: string }> = {
+  request_baseline_access: { title: "Request baseline access", help: "Ask for the access this person's role needs to start work." },
+  review_access: { title: "Review access", help: "Remove access the new role or return no longer justifies." },
+  transfer_ownership: { title: "Transfer ownership", help: "Hand everything this person owns, sponsors or manages to someone else." },
+  revoke_access: { title: "Revoke access", help: "Remove this person's access in every connected system." },
+  disable_sign_in: { title: "Disable sign-in", help: "Suspend their WonderID membership under Administration → Organization." },
+};
+
+/** The step each transition takes, as a person would say it. */
+export const TRANSITION_LABEL: Record<string, string> = {
+  joiner: "Start work (joined)",
+  hire_cancelled: "Cancel the hire",
+  leaver: "Start leaving",
+  disabled: "Disable",
+  leaver_cancelled: "Cancel the departure",
+  terminated: "Terminate",
+  archived: "Archive",
+  rehire: "Rehire",
+};

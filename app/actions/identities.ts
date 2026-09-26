@@ -10,7 +10,11 @@ import {
   endIdentityRelationship,
   setAttributeDefinitionActive,
   updateIdentity,
+  transitionHumanLifecycle,
+  completeLifecycleTask,
+  transferOwnership,
 } from "@/modules/agent-identity/service";
+import { HUMAN_LIFECYCLE_STATES, type HumanLifecycleState } from "@/lib/shared/types/agent-identity";
 
 /**
  * IDENTITY-P0-15/16/17 — the identity directory's forms. Each returns the
@@ -147,4 +151,40 @@ export async function setAttributeActiveAction(definitionId: string, active: boo
   }
   revalidatePath("/identities/attributes");
   return { status: "saved", message: active ? "Restored." : "Retired." };
+}
+
+// ---------------------------------------------------------------- lifecycle (IDENTITY-P0-18)
+
+export async function transitionLifecycleAction(identityId: string, _prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
+  const ctx = await requirePermission("identity.manage");
+  try {
+    const toState = String(formData.get("toState") ?? "");
+    if (!(HUMAN_LIFECYCLE_STATES as readonly string[]).includes(toState)) return { status: "error", message: "Choose what happens next." };
+    await transitionHumanLifecycle(ctx.tenantId!, ctx.userId, identityId, toState as HumanLifecycleState, String(formData.get("note") ?? "") || null);
+  } catch (err) {
+    return formError(err);
+  }
+  revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/lifecycle");
+  return { status: "saved", message: "Done. Its work is listed below." };
+}
+
+export async function closeLifecycleTaskAction(taskId: string, _prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
+  const ctx = await requirePermission("identity.manage");
+  try {
+    const action = String(formData.get("action") ?? "");
+    if (action === "transfer") {
+      const r = await transferOwnership(ctx.tenantId!, ctx.userId, taskId, String(formData.get("toIdentityId") ?? ""));
+      revalidatePath("/identities", "layout");
+      return {
+        status: "saved",
+        message: `Transferred: ${r.ownedIdentities} owned, ${r.sponsoredIdentities} sponsored, ${r.directReports} reports, ${r.ownedAgents} AI agents.`,
+      };
+    }
+    await completeLifecycleTask(ctx.tenantId!, ctx.userId, taskId, { status: action, note: formData.get("note") });
+  } catch (err) {
+    return formError(err);
+  }
+  revalidatePath("/identities", "layout");
+  return { status: "saved", message: "Task closed." };
 }

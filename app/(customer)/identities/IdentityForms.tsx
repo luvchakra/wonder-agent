@@ -4,7 +4,9 @@ import { useActionState, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   addRelationshipAction,
+  closeLifecycleTaskAction,
   createAttributeDefinitionAction,
+  transitionLifecycleAction,
   createIdentityAction,
   endRelationshipAction,
   setAttributeActiveAction,
@@ -412,5 +414,77 @@ export function DirectorySearch({ defaultValue }: { defaultValue: string }) {
       </label>
       <input id="q" type="search" name="q" defaultValue={defaultValue} placeholder="Name, email or account" className={fieldInputClass} />
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- lifecycle (IDENTITY-P0-18)
+
+export type TransitionOption = { toState: string; label: string; needsReason: boolean };
+
+export function LifecycleTransitionForm({ identityId, options }: { identityId: string; options: TransitionOption[] }) {
+  const [state, action, pending] = useActionState(transitionLifecycleAction.bind(null, identityId), IDLE);
+  const [choice, setChoice] = useState(options[0]?.toState ?? "");
+  const needsReason = options.find((o) => o.toState === choice)?.needsReason ?? false;
+  if (!options.length) return <p className="text-sm text-muted-foreground">No further lifecycle step from here.</p>;
+  return (
+    <form action={action} className="grid grid-cols-1 gap-3 md:grid-cols-[14rem_1fr_auto] md:items-end">
+      <SelectField label="Next step" name="toState" value={choice} onChange={(e) => setChoice(e.target.value)}>
+        {options.map((o) => (
+          <option key={o.toState} value={o.toState}>
+            {o.label}
+          </option>
+        ))}
+      </SelectField>
+      <TextField label={needsReason ? "Reason" : "Note (optional)"} name="note" required={needsReason} maxLength={2000} placeholder={needsReason ? "Why, for the record" : ""} />
+      <Submit pending={pending} idle="Apply" busy="Applying…" />
+      <div className="md:col-span-3">
+        <Result state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function LifecycleTaskActions({ taskId, taskType, people }: { taskId: string; taskType: string; people: PersonOption[] }) {
+  const [state, action, pending] = useActionState(closeLifecycleTaskAction.bind(null, taskId), IDLE);
+  const [mode, setMode] = useState<"done" | "skipped" | "transfer">(taskType === "transfer_ownership" ? "transfer" : "done");
+  return (
+    <form action={action} className="space-y-2">
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground" role="radiogroup" aria-label="Close this task">
+        {taskType === "transfer_ownership" ? (
+          <label className="flex items-center gap-1.5">
+            <input type="radio" name="action" value="transfer" checked={mode === "transfer"} onChange={() => setMode("transfer")} className="accent-primary" />
+            Transfer
+          </label>
+        ) : null}
+        <label className="flex items-center gap-1.5">
+          <input type="radio" name="action" value="done" checked={mode === "done"} onChange={() => setMode("done")} className="accent-primary" />
+          Done
+        </label>
+        <label className="flex items-center gap-1.5">
+          <input type="radio" name="action" value="skipped" checked={mode === "skipped"} onChange={() => setMode("skipped")} className="accent-primary" />
+          Not needed
+        </label>
+      </div>
+      {mode === "transfer" ? (
+        <select name="toIdentityId" aria-label="New owner" required className={fieldInputClass} defaultValue="">
+          <option value="">Choose the new owner</option>
+          {people.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.displayName}
+              {p.email && p.email !== p.displayName ? ` (${p.email})` : ""}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input name="note" aria-label="Note" required={mode === "skipped"} maxLength={2000} placeholder={mode === "skipped" ? "Why it is not needed" : "What was done (optional)"} className={fieldInputClass} />
+      )}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" size="sm" variant="secondary" disabled={pending}>
+          {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+          {mode === "transfer" ? "Transfer ownership" : "Close task"}
+        </Button>
+        <Result state={state} />
+      </div>
+    </form>
   );
 }

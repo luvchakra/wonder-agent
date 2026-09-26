@@ -44,6 +44,7 @@ const ROUTES = [
   "/identities/external",
   "/identities/new",
   "/identities/attributes",
+  "/identities/lifecycle",
   // Identity sources (INTEGRATION-P0-08/09).
   "/integrations/sources",
   "/integrations/sources/new",

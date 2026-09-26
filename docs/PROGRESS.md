@@ -8,7 +8,7 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-09-25 from 11 module backlogs.
+Generated 2026-09-26 from 11 module backlogs.
 
 ---
 
@@ -23,9 +23,9 @@ Generated 2026-09-25 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 171 |
-| Partial | 23 |
+| Partial | 24 |
 | Deferred | 1 |
-| Not Started | 31 |
+| Not Started | 30 |
 | **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -39,7 +39,7 @@ and are deliberately excluded from the counts above.
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 1 | 0 | 2 | 20 | `███████████████░░░` 85% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 14 | 2 | 0 | 4 | 20 | `█████████████░░░░░` 70% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 15 | 0 | 0 | 11 | 26 | `██████████░░░░░░░░` 58% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
@@ -101,7 +101,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 17 done · 1 partial · 0 deferred · 2 not started (20 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 17 done · 2 partial · 0 deferred · 1 not started (20 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -123,7 +123,7 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Done — 2026-09-26, migrations 0077–0079 |
 | IDENTITY-P0-16 | Identity attributes and relationships | Done — 2026-09-26 |
 | IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
-| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Partial — 2026-09-26: events, governed tasks, transitions, ownership transfer done (0084/0085); automatic birthright grants and deprovisioning wait on ACCESS-P0-20 and INTEGRATION-P0-13 |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 
 ### 03 — Integration Agent

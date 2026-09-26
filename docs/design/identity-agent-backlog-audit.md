@@ -1343,3 +1343,150 @@ write path. The full pipeline is in the Integration audit (same date).
   `identity-sources.spec.ts`: an authoritative field is set; a
   lower-precedence source cannot overwrite it; managers resolve; leavers go
   to LEAVE_PENDING.
+
+---
+
+## 2026-09-26 — IDENTITY-P0-18 (Partial): human lifecycle, joiner to leaver, with governed work
+
+WonderID Phase 2. Lifecycle events are recorded and each opens governed
+tasks. They come from identity sources (INTEGRATION-P0-09) or from a
+person's transition. Following spec "Human lifecycle", nothing is granted
+or revoked by itself (#15).
+
+### Schema (migration 0084; applied live)
+
+- **`identity_lifecycle_events`**:
+  - event types: joiner, mover, leaver, rehire, conversion,
+    manager_change, leaver_cancelled, disabled, terminated, archived and
+    hire_cancelled;
+  - from/to state, changed fields;
+  - origin (source or manual), plus the source and run ids;
+  - actor and note.
+- **`identity_lifecycle_tasks`**:
+  - task types: request_baseline_access, review_access,
+    transfer_ownership, revoke_access and disable_sign_in;
+  - status open, done or skipped;
+  - an assignee (the person's manager for access work);
+  - a resolution note, required when skipped (a check constraint), and
+    completion by and at.
+- Same-tenant composite FKs throughout. RLS: members read, and insert and
+  update through the service. There is no delete policy: lifecycle history
+  is evidence.
+
+### Rules (`humanLifecycle.ts`, pure, 8 unit tests)
+
+- A first manager is an assignment, not a `manager_change`. A joiner's
+  manager is resolved in the run's second pass, so when a person gets
+  their first manager, their open, unassigned access tasks go to that
+  manager, who is then told. The E2E run found this.
+
+- **Transitions:**
+  - PRE_JOIN → ACTIVE (join) or ARCHIVED (hire cancelled);
+  - ACTIVE → LEAVE_PENDING (leaver) or DISABLED;
+  - LEAVE_PENDING → ACTIVE (departure cancelled) or DISABLED;
+  - DISABLED → TERMINATED or ACTIVE (rehire);
+  - TERMINATED → ARCHIVED or ACTIVE (rehire);
+  - ARCHIVED → ACTIVE (rehire).
+- **Status follows state.** LEAVE_PENDING keeps the current status:
+  someone serving notice still works.
+- **Detection from a sourced change:**
+  - new person → joiner;
+  - start date reached → joiner;
+  - department, title, business unit or location → mover;
+  - manager only → manager_change;
+  - employment type or subtype → conversion;
+  - gone → leaver;
+  - back → rehire.
+  - Someone who has gone does not "move".
+- **Tasks:**
+  - joiner → request baseline access;
+  - mover or conversion → review access;
+  - rehire → both;
+  - leaver → transfer ownership, revoke access, and disable sign-in (only
+    for people who can sign in).
+
+### Service (`humanLifecycleService.ts`)
+
+- **Sourced changes** are recorded by `applySourcedIdentities()` after the
+  identity change itself. A recording failure is reported on the result,
+  never hidden and never undoing the change.
+- **Manual transitions:**
+  - they need `identity.manage` and must be an allowed transition;
+  - leaver, disable, terminate and cancel-hire need a reason;
+  - optimistic concurrency: the change applies only if the state is still
+    what it was, else 409.
+- **Closing a task** needs a note to skip. "Done" on an ownership transfer
+  is refused while the person still owns anything.
+- **Ownership transfer** moves everything to an active person, then closes
+  the task:
+  - identities owned, sponsored and managed;
+  - current owns/sponsors/manager_of relationships (history kept);
+  - AI agents owned, through `assignOwner`/`removeOwner`, which requires a
+    receiving person who can sign in. Delegated ownership is left to
+    expire.
+- **The manager is told** through the new `lifecycle_task` notification
+  (Operations migration 0085).
+- **Audit:** `identity.lifecycle_event`, `identity.lifecycle_task_closed`
+  and `identity.ownership_transferred`.
+
+### API and UI
+
+- **API:**
+  - `/api/v1/identities/:id/lifecycle` (GET history and tasks; POST
+    transition);
+  - `/api/v1/identities/lifecycle-tasks` (GET, open by default);
+  - `/lifecycle-tasks/:id` (POST transfer, done or skipped).
+- **UI:**
+  - a **Lifecycle** tab on people (state, next step with a reason, open
+    work with transfer/done/not-needed, history), reachable as
+    `?tab=lifecycle`;
+  - **Identities → Lifecycle Work**, the organization's queue;
+  - the overview's "needs attention" counts open lifecycle work.
+
+### Deliberately left out (story stays Partial)
+
+- **No automatic birthright grants or deprovisioning.** Access packages
+  are ACCESS-P0-20 and the provisioning pipeline is INTEGRATION-P0-13.
+  Until then, "request baseline access" and "revoke access" are tracked
+  tasks a person closes.
+- **Disable sign-in** points to membership suspension (Foundation). It
+  does not suspend by itself.
+- Legal and retention holds: not implemented.
+
+### Verified
+
+- `tsc` and `eslint .` clean.
+- vitest **582/582**, including `humanLifecycle.test.ts` 8/8.
+- Live SQL (`tests/identity/human-lifecycle-isolation.sql`), 9/9:
+  - a tenant-A member sees 0 of B's events and tasks;
+  - their writes into B are denied (42501), and closing a B task affects
+    0 rows;
+  - cross-tenant events and tasks are 23503;
+  - a skip without a note, and a close without a completion time, are
+    23514.
+  - Fixtures were cleaned up.
+- E2E `human-lifecycle.spec.ts`, 13/13 (with setup):
+  - a source joiner, with the task assigned to the manager, who was
+    resolved in the same run;
+  - a source mover gets an access review;
+  - a source leaver gets ownership and access tasks, and no sign-in task
+    for someone who cannot sign in;
+  - the ownership transfer:
+    - "done" is refused while the person still owns things;
+    - the leaver cannot be the new owner;
+    - the service account moves;
+    - a second attempt is 409;
+  - skipping needs a note;
+  - manual transitions: an invalid step is 409, a missing reason is 400,
+    and disable → rehire opens tasks;
+  - a machine identity has no lifecycle;
+  - the Lifecycle tab closes a task, and the queue lists it;
+  - another organization gets 404 and sees nothing;
+  - read-only gets 403.
+- Screenshots checked (Lifecycle tab at desktop, and at 390 px dark; the
+  queue). Fixes that came from them:
+  - "lifecycleState" noise removed from the history;
+  - an empty-ownership message;
+  - the queue says when it shows only the latest 200.
+- Full Playwright suite (§17.8): **229/229 passed** (12.6 min, 0084/0085
+  live).

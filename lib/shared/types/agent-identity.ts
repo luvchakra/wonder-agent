@@ -436,3 +436,43 @@ export type SourceAuthority = {
   authoritativeFields: SourcedIdentityField[];
 };
 
+// ---------------------------------------------------------------------------
+// WonderID human lifecycle (IDENTITY-P0-18, 2026-09-26).
+// ---------------------------------------------------------------------------
+
+export const LIFECYCLE_EVENT_TYPES = ["joiner", "mover", "leaver", "rehire", "conversion", "manager_change", "leaver_cancelled", "disabled", "terminated", "archived", "hire_cancelled"] as const;
+export type LifecycleEventType = (typeof LIFECYCLE_EVENT_TYPES)[number];
+
+export const LIFECYCLE_TASK_TYPES = ["request_baseline_access", "review_access", "transfer_ownership", "revoke_access", "disable_sign_in"] as const;
+export type LifecycleTaskType = (typeof LIFECYCLE_TASK_TYPES)[number];
+
+export type LifecycleTaskStatus = "open" | "done" | "skipped";
+
+export type IdentityLifecycleEvent = {
+  id: string;
+  identityId: string;
+  eventType: LifecycleEventType;
+  fromState: HumanLifecycleState | null;
+  toState: HumanLifecycleState | null;
+  changedFields: string[];
+  origin: "manual" | "source";
+  sourceId: string | null;
+  runId: string | null;
+  actorId: string | null;
+  note: string | null;
+  createdAt: string;
+};
+
+export type IdentityLifecycleTask = {
+  id: string;
+  eventId: string;
+  identityId: string;
+  taskType: LifecycleTaskType;
+  status: LifecycleTaskStatus;
+  assigneeIdentityId: string | null;
+  detail: Record<string, unknown>;
+  resolutionNote: string | null;
+  completedBy: string | null;
+  completedAt: string | null;
+  createdAt: string;
+};

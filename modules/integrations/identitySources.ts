@@ -476,6 +476,11 @@ export async function executeReconciliation(
         if (errors.length < 200) errors.push({ ref: r.ref, message: r.error ?? "failed" });
       }
       if (r.action !== "unchanged" && changes.length < MAX_CHANGES_LOGGED) changes.push({ ref: r.ref, identityId: r.identityId, action: r.action, changed: r.changed });
+      // IDENTITY-P0-18: the change applied, but its lifecycle record did not.
+      if (r.lifecycleError) {
+        counts.errors++;
+        if (errors.length < 200) errors.push({ ref: r.ref, message: `lifecycle: ${r.lifecycleError}` });
+      }
     }
 
     // 8. Leavers: only after a full run with every record handled.
@@ -499,6 +504,7 @@ export async function executeReconciliation(
               if (errors.length < 200) errors.push({ ref: r.ref, message: r.error ?? "leaver failed" });
             }
             if (r.action !== "unchanged" && changes.length < MAX_CHANGES_LOGGED) changes.push({ ref: r.ref, identityId: r.identityId, action: r.action });
+            if (r.lifecycleError && errors.length < 200) errors.push({ ref: r.ref, message: `lifecycle: ${r.lifecycleError}` });
           }
         } else if (source.leaverStrategy === "flag") {
           counts.leavers = plan.leavers.length;

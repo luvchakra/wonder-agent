@@ -804,3 +804,14 @@ wording: its heading is "Approved (SHOULD) vs Effective Access (CAN) vs
 Observed (DID)", and each line leads with its label. It is a text change
 only. The pack's data and structure are unchanged, and the operations
 unit tests pass. Recorded in full in the Experience audit.
+
+---
+
+## 2026-09-26 — `lifecycle_task` notification type (for IDENTITY-P0-18)
+
+Migration 0085 widens both notification type checks with `lifecycle_task`,
+using the additive pattern of 0066. No value was removed. It is added to
+the `NotificationType` contract, and it is not mandatory (a preference).
+The Identity module sends it to a person's manager when a joiner, mover,
+leaver or rehire opens work for them (`humanLifecycleService.ts`). It was
+applied live. Nothing else in this module changed.

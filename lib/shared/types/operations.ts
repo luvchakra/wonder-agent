@@ -44,7 +44,10 @@ export type NotificationType =
   | "lifecycle_expiry"
   // OPERATIONS-P0-08 (master P0-41): raised from Runtime Gateway decisions.
   | "runtime_alert"
-  | "approval_required";
+  | "approval_required"
+  // IDENTITY-P0-18: governed work opened for a person's joiner, mover,
+  // leaver or rehire, sent to their manager. Not mandatory (a preference).
+  | "lifecycle_task";
 
 /**
  * Every P0 notification type is mandatory — never suppressible via

@@ -62,3 +62,14 @@ export {
   type SourcedOp,
   type SourcedResult,
 } from "./sourcedIdentities";
+export {
+  transitionHumanLifecycle,
+  listHumanLifecycleEvents,
+  listLifecycleTasks,
+  countOpenLifecycleTasks,
+  getOwnershipFootprint,
+  completeLifecycleTask,
+  transferOwnership,
+  type LifecycleTaskView,
+} from "./humanLifecycleService";
+export { allowedTransitions, HUMAN_TRANSITIONS } from "./humanLifecycle";

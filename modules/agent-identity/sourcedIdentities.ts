@@ -12,6 +12,9 @@ import {
   type SourcedIdentityField,
 } from "@/lib/shared/types/agent-identity";
 import { mergeSourcedFields } from "./sourcedMerge";
+import { detectLifecycleEvents, type DetectedEvent } from "./humanLifecycle";
+import { assignOpenTasksToManager, recordLifecycleEvents } from "./humanLifecycleService";
+import type { HumanLifecycleState } from "@/lib/shared/types/agent-identity";
 
 /**
  * INTEGRATION-P0-09 — the Identity module's published write path for
@@ -81,6 +84,9 @@ export type SourcedResult = {
   changed: SourcedIdentityField[];
   skipped: SourcedIdentityField[];
   error?: string;
+  /** Lifecycle events this change amounted to (people only), or why they could not be recorded. */
+  lifecycleEvents?: string[];
+  lifecycleError?: string;
 };
 
 const COLUMN: Record<SourcedIdentityField, string> = {
@@ -138,7 +144,7 @@ export async function applySourcedIdentities(
   for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await supabase
       .from("identities")
-      .select("id, identity_type, status, lifecycle_state, field_provenance, " + Object.values(COLUMN).join(", "))
+      .select("id, identity_type, status, lifecycle_state, user_id, field_provenance, " + Object.values(COLUMN).join(", "))
       .eq("tenant_id", tenantId)
       .in("id", ids.slice(i, i + 200));
     if (error) throw new Error(`applySourcedIdentities: ${error.message}`);
@@ -158,6 +164,19 @@ export async function applySourcedIdentities(
       // Field names only, never values (#10, §17.7).
       metadata: { sourceId: source.sourceId, sourceName: source.sourceName, runId: source.runId, ...metadata },
     });
+
+  // IDENTITY-P0-18: what each change to a person amounts to (joiner,
+  // mover, leaver, ...), recorded after the change itself. A recording
+  // failure is reported on the result, never hidden and never undoing it.
+  const lifecycle = async (result: SourcedResult, subject: { id: string; displayName: string; userId: string | null; managerIdentityId: string | null }, detected: DetectedEvent[]) => {
+    if (!detected.length) return;
+    try {
+      await recordLifecycleEvents(supabase, tenantId, subject, detected, { origin: "source", actorId: null, sourceId: source.sourceId, runId: source.runId });
+      result.lifecycleEvents = detected.map((d) => d.eventType);
+    } catch (err) {
+      result.lifecycleError = err instanceof Error ? err.message.slice(0, 300) : "lifecycle events not recorded";
+    }
+  };
 
   for (const op of ops) {
     try {
@@ -182,8 +201,17 @@ export async function applySourcedIdentities(
           .select("id")
           .single();
         if (error || !data) throw new Error(error?.message ?? "insert failed");
-        results.push({ ref: op.ref, identityId: data.id as string, action: "created", changed: Object.keys(op.fields) as SourcedIdentityField[], skipped: [] });
+        const created: SourcedResult = { ref: op.ref, identityId: data.id as string, action: "created", changed: Object.keys(op.fields) as SourcedIdentityField[], skipped: [] };
+        results.push(created);
         await audit("identity.created", data.id as string, { identityType: op.identityType, fields: Object.keys(op.fields) });
+        if (PERSON_TYPES.has(op.identityType)) {
+          const state = lifecycleFor(status, op.fields.startDate ?? null, today) as HumanLifecycleState;
+          await lifecycle(
+            created,
+            { id: data.id as string, displayName: op.fields.displayName, userId: null, managerIdentityId: op.fields.managerIdentityId ?? null },
+            detectLifecycleEvents(null, { ...op.fields, lifecycleState: state }),
+          );
+        }
         continue;
       }
 
@@ -202,8 +230,17 @@ export async function applySourcedIdentities(
           .eq("tenant_id", tenantId)
           .eq("id", op.identityId);
         if (error) throw new Error(error.message);
-        results.push({ ref: op.ref, identityId: op.identityId, action: "leaver", changed: ["status"], skipped: [] });
+        const left: SourcedResult = { ref: op.ref, identityId: op.identityId, action: "leaver", changed: ["status"], skipped: [] };
+        results.push(left);
         await audit("identity.leaver_detected", op.identityId, { from: row.status });
+        if (person) {
+          const before = { lifecycleState: (row.lifecycle_state as HumanLifecycleState | null) ?? null };
+          await lifecycle(
+            left,
+            { id: op.identityId, displayName: row.display_name as string, userId: (row.user_id as string | null) ?? null, managerIdentityId: (row.manager_identity_id as string | null) ?? null },
+            detectLifecycleEvents(before, { lifecycleState: "LEAVE_PENDING" }),
+          );
+        }
         continue;
       }
 
@@ -223,7 +260,34 @@ export async function applySourcedIdentities(
       }
       const { error } = await supabase.from("identities").update(update).eq("tenant_id", tenantId).eq("id", op.identityId);
       if (error) throw new Error(error.message);
-      results.push({ ref: op.ref, identityId: op.identityId, action: changed.length ? "updated" : "unchanged", changed, skipped: merge.skipped.map((s) => s.field) });
+      const updated: SourcedResult = { ref: op.ref, identityId: op.identityId, action: changed.length ? "updated" : "unchanged", changed, skipped: merge.skipped.map((s) => s.field) };
+      results.push(updated);
+      if (changed.length && PERSON_TYPES.has(row.identity_type as IdentityType)) {
+        const beforeState = (row.lifecycle_state as HumanLifecycleState | null) ?? null;
+        const afterState = ((update.lifecycle_state as HumanLifecycleState | undefined) ?? beforeState) as HumanLifecycleState | null;
+        await lifecycle(
+          updated,
+          {
+            id: op.identityId,
+            displayName: (merge.changes.displayName ?? row.display_name) as string,
+            userId: (row.user_id as string | null) ?? null,
+            managerIdentityId: (merge.changes.managerIdentityId ?? row.manager_identity_id ?? null) as string | null,
+          },
+          detectLifecycleEvents({ ...current, lifecycleState: beforeState }, { ...current, ...merge.changes, lifecycleState: afterState }),
+        );
+        if (merge.changes.managerIdentityId && !current.managerIdentityId) {
+          try {
+            await assignOpenTasksToManager(supabase, tenantId, {
+              id: op.identityId,
+              displayName: (merge.changes.displayName ?? row.display_name) as string,
+              userId: (row.user_id as string | null) ?? null,
+              managerIdentityId: merge.changes.managerIdentityId,
+            });
+          } catch (err) {
+            updated.lifecycleError = err instanceof Error ? err.message.slice(0, 300) : "lifecycle tasks not assigned";
+          }
+        }
+      }
       if (changed.length) {
         await audit(changed.includes("status") ? "identity.status_changed" : "identity.updated", op.identityId, {
           changed,

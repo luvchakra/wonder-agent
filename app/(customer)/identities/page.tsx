@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { countIdentitiesByType, getIdentityHealth } from "@/modules/agent-identity/service";
+import { countIdentitiesByType, countOpenLifecycleTasks, getIdentityHealth } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardBody, CardHeader, KpiCard, LinkButton } from "@/modules/ui";
 
@@ -17,12 +17,18 @@ export default async function IdentitiesOverviewPage() {
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const [counts, health] = await Promise.all([countIdentitiesByType(ctx.tenantId!), getIdentityHealth(ctx.tenantId!)]);
+  const [counts, health, openLifecycle] = await Promise.all([countIdentitiesByType(ctx.tenantId!), getIdentityHealth(ctx.tenantId!), countOpenLifecycleTasks(ctx.tenantId!)]);
   const machines = counts.SERVICE_ACCOUNT + counts.APPLICATION + counts.WORKLOAD + counts.API + counts.MACHINE;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const canManage = ctx.permissions.includes("identity.manage");
 
   const attention = [
+    {
+      label: "Open lifecycle work",
+      value: openLifecycle,
+      href: "/identities/lifecycle",
+      help: "Access requests, reviews and ownership transfers opened by joiners, movers and leavers.",
+    },
     {
       label: "Machine identities without an owner",
       value: health.machinesWithoutOwner,

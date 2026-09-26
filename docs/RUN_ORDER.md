@@ -131,13 +131,15 @@ isolation checks. Detail is in each module's audit log.
 | W0 | EXPERIENCE-P0-18: WonderID brand and dark navy navigation shell | Done | `26a5f1a` |
 | W1 | IDENTITY-P0-15/16: unified `identities` reference, attributes, relationships (0077–0079) | Done | `fe6c271` |
 | W1 | IDENTITY-P0-17: Identities directory and detail | Partial (Groups/Access/Risk/Activity views wait on later phases) | `fe6c271` |
-| W2 | INTEGRATION-P0-08/09: identity sources, reconciliation, pending matches, preview (0080–0083) | 09 Done, 08 Partial (schedules, native SCIM) | see Integration audit |
+| W2 | INTEGRATION-P0-08/09: identity sources, reconciliation, pending matches, preview (0080–0083) | 09 Done, 08 Partial (schedules, native SCIM) | `24ef508` |
+| W2 | IDENTITY-P0-18: human lifecycle events, governed tasks, ownership transfer (0084/0085) | Partial (auto birthright/deprovisioning wait on ACCESS-P0-20, INTEGRATION-P0-13) | see Identity audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
 phase, after QA-P0-20 locked the baseline. Phase 1 is done except IDENTITY-P0-17's
-later-phase views; Phase 2's sources and reconciliation are in. Next:
-IDENTITY-P0-18 (governed joiner/mover/leaver from the lifecycle signals).
+later-phase views; Phase 2's sources and reconciliation are in. IDENTITY-P0-18's
+lifecycle is in. Next: Phase 3 (ACCESS-P0-15 application catalog,
+INTEGRATION-P0-10/11, ACCESS-P0-16/17).
 
 **Still to do in this programme:**
 

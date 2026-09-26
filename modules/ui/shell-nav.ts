@@ -62,6 +62,7 @@ export const SHELL_NAV: ShellNavItem[] = [
       link("People", "/identities/humans"),
       link("External Identities", "/identities/external"),
       link("Machine Identities", "/identities/machines"),
+      link("Lifecycle Work", "/identities/lifecycle"),
       link("Non-human Identities", "/agents/identities"),
     ],
   },
