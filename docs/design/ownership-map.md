@@ -50,6 +50,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `application_onboardings` | AA | ACCESS-P0-16: one onboarding record per application — versioned, hashed configuration; validation, simulation, four-eyes approval and promotion each tied to the hash they ran against. Members read only; the service writes (service role, tenant-filtered) |
 | `accounts` | AA | Accounts an agent/identity holds on an application. Since ACCESS-P0-17 an account belongs to any identity (`identity_id`; `agent_id` only for an AI agent's), with correlation (matched / linked by hand / orphan / ambiguous), type, last use, last seen and missing-from-source |
 | `account_reconciliation_runs` | AA | ACCESS-P0-17: one record per reconciliation of an application's accounts against its connector, under the promoted onboarding configuration. Members read only; the service writes |
+| `application_discoveries` | INT | INTEGRATION-P0-10: applications found by connectors, OpenAPI documents, SCIM metadata or manual reports; matched to the catalog or UNRECOGNIZED until a person registers (through Access's `registerApplication`), links, excepts or ignores with a reason. Members read only; the service writes |
 | `entitlements` | AA | Roles/permissions/entitlements on an application |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |
 | `access_paths` | AA | Materialized/explainable path from agent → data |

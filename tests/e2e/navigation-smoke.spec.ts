@@ -25,6 +25,7 @@ const ROUTES = [
   { path: "/integrations", heading: "Integrations" },
   { path: "/integrations/new", heading: "Add an integration" },
   { path: "/integrations/jobs", heading: "Job Status" },
+  { path: "/integrations/discovery", heading: "Application discovery" },
   { path: "/audit", heading: "Audit Trail" },
   { path: "/reports", heading: "Reports" },
   { path: "/search", heading: "Search" },

@@ -51,6 +51,8 @@ export {
   getApplicationDetail,
   registerApplication,
   updateApplication,
+  listApplicationsForMatching,
+  type ApplicationOrigin,
   type CatalogFilter,
   type CatalogRow,
 } from "./catalog";

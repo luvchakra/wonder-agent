@@ -44,3 +44,17 @@ export {
   type CorrelationDecision,
 } from "./identitySources";
 export { executeConnectorWrite } from "./connectorWrites";
+export {
+  listDiscoveries,
+  getDiscoveryCounts,
+  getDiscovery,
+  discoverFromIntegration,
+  submitDiscovery,
+  decideDiscovery,
+  DISCOVERY_CAP,
+  type ApplicationDiscovery,
+  type DiscoveryFilter,
+  type DiscoveryDecision,
+  type DiscoveryRunResult,
+} from "./discovery";
+export { DISCOVERY_STATUSES, DISCOVERY_SOURCE_KINDS, allowedDecisions, type DiscoveryStatus, type DiscoverySourceKind } from "./discoveryRules";

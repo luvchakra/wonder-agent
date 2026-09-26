@@ -3,7 +3,7 @@ import "server-only";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import type { Application, ApplicationOnboardingStatus, ApplicationType, CatalogLevel } from "@/lib/shared/types/access-governance";
+import { DISCOVERY_SOURCES, type Application, type ApplicationOnboardingStatus, type ApplicationType, type CatalogLevel, type DiscoverySource } from "@/lib/shared/types/access-governance";
 import { getIdentity, getIdentityNames } from "@/modules/agent-identity/service";
 import { toApplication } from "./mappers";
 import { validateApplicationInput, type ApplicationInput } from "./applicationCatalogRules";
@@ -124,14 +124,30 @@ function writeError(error: { code?: string; message: string }): never {
   throw new ApiError(500, "WRITE_FAILED", error.message);
 }
 
-/** Registers an application by hand; it starts DISCOVERED (ACCESS-P0-16 onboards it). */
-export async function registerApplication(tenantId: string, actorId: string, input: ApplicationInput): Promise<Application> {
+/**
+ * Registers an application; it starts DISCOVERED (ACCESS-P0-16 onboards it).
+ *
+ * `origin` says where it came from. INTEGRATION-P0-10 passes it
+ * when a discovery is registered; the default is a manual registration.
+ * The integration, when given, must be this tenant's (the same-tenant key
+ * refuses another's with 23503).
+ */
+export type ApplicationOrigin = { discoverySource: DiscoverySource; sourceIntegrationId?: string | null };
+
+export async function registerApplication(tenantId: string, actorId: string, input: ApplicationInput, origin: ApplicationOrigin = { discoverySource: "manual" }): Promise<Application> {
   const row = validateApplicationInput(input, { partial: false });
+  if (!(DISCOVERY_SOURCES as readonly string[]).includes(origin.discoverySource)) throw new ApiError(400, "VALIDATION_FAILED", "discoverySource: unknown");
   await assertOwners(tenantId, row);
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("applications")
-    .insert({ tenant_id: tenantId, ...row, onboarding_status: "DISCOVERED", discovery_source: "manual" })
+    .insert({
+      tenant_id: tenantId,
+      ...row,
+      onboarding_status: "DISCOVERED",
+      discovery_source: origin.discoverySource,
+      ...(origin.sourceIntegrationId ? { source_integration_id: origin.sourceIntegrationId } : {}),
+    })
     .select()
     .single();
   if (error || !data) writeError(error ?? { message: "Failed to register the application" });
@@ -144,9 +160,23 @@ export async function registerApplication(tenantId: string, actorId: string, inp
     objectType: "application",
     objectId: app.id,
     outcome: "success",
-    metadata: { name: app.name, appType: app.appType, environment: app.environment, riskLevel: app.riskLevel },
+    metadata: { name: app.name, appType: app.appType, environment: app.environment, riskLevel: app.riskLevel, discoverySource: origin.discoverySource, sourceIntegrationId: origin.sourceIntegrationId ?? null },
   });
   return app;
+}
+
+/**
+ * The tenant's applications as matching keys (id, names, address) for a
+ * consumer that matches discovered applications to the catalog
+ * (INTEGRATION-P0-10). Capped; reads as the user under RLS with the tenant
+ * filtered explicitly.
+ */
+export const MATCHING_CAP = 5000;
+export async function listApplicationsForMatching(tenantId: string): Promise<{ id: string; name: string; displayName: string | null; url: string | null }[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("applications").select("id, name, display_name, url").eq("tenant_id", tenantId).limit(MATCHING_CAP);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name, displayName: r.display_name ?? null, url: r.url ?? null }));
 }
 
 export async function updateApplication(tenantId: string, actorId: string, applicationId: string, input: ApplicationInput): Promise<Application> {

@@ -50,8 +50,9 @@ const ROUTES = [
   "/integrations/sources",
   "/integrations/sources/new",
   "/integrations/correlations",
-  // Account inventory (ACCESS-P0-17).
+  // Account inventory (ACCESS-P0-17) and application discovery (INTEGRATION-P0-10).
   "/access/accounts",
+  "/integrations/discovery",
 ];
 
 /** The widths §32 names, plus the two the shell switches layout at. */

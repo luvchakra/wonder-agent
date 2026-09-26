@@ -70,7 +70,12 @@ export const SHELL_NAV: ShellNavItem[] = [
     label: "Applications",
     href: "/access",
     icon: "Box",
-    children: [link("Application Inventory", "/access"), link("Accounts", "/access/accounts"), link("Data Sources", "/access/data-sources")],
+    children: [
+      link("Application Inventory", "/access"),
+      link("Discovery", "/integrations/discovery"),
+      link("Accounts", "/access/accounts"),
+      link("Data Sources", "/access/data-sources"),
+    ],
   },
   {
     label: "Access Governance",

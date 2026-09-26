@@ -905,3 +905,155 @@ idempotency checks, but has no end-to-end caller until the provisioning
 pipeline (INTEGRATION-P0-13) exists; that story adds its E2E. The spec's
 per-connector rate limiting already exists (RestHttpClient); response
 validation and pagination limits for connectors are unchanged.
+
+## 2026-09-26 — INTEGRATION-P0-10: application discovery and unrecognized applications
+
+Applications are discovered from four sources:
+
+- a connector's imported applications;
+- an OpenAPI document;
+- SCIM ServiceProviderConfig metadata;
+- a manual report.
+
+Each is matched to the catalog, or held as UNRECOGNIZED until a person
+decides: register it, link it, record an exception, or ignore it with a
+reason. Ignored discoveries stay on record.
+
+### Schema (migration 0090; applied live)
+
+- **`application_discoveries`:**
+  - the source and a normalized `source_key`, unique per tenant and
+    source. Connector keys are prefixed with the integration, so two
+    connectors never collide;
+  - name, vendor, https-only address and description;
+  - `evidence`, a JSON object;
+  - status: UNRECOGNIZED, MATCHED, REGISTERED, EXCEPTION or IGNORED;
+  - `application_id` and `suggested_application_id`, same-tenant keys to
+    Access's `applications`;
+  - the decision note, who decided, when, and `exception_until`;
+  - sightings, first seen and last seen.
+- **Checks:** ignored and excepted discoveries must have a reason.
+- **RLS:** members can only read. The service writes with the service
+  role, filtered by tenant, so decisions are attributable and
+  tamper-resistant.
+
+### Rules (`discoveryRules.ts`, pure; 10 tests)
+
+- **Documents are data** (§17.2). They are parsed, never followed: no
+  address in them is fetched. Non-https addresses and addresses with
+  credentials are dropped, and control characters are stripped.
+- **OpenAPI 3 and Swagger 2**, JSON only: YAML is refused with a message
+  to convert it. The limit is 1 MB. The reader keeps the title,
+  contact/vendor, the first https server (or the Swagger host and base
+  path), the description, and evidence: spec and API version, number of
+  paths, and security schemes.
+- **SCIM:** a name and an https base address are required, and the
+  metadata must declare the ServiceProviderConfig schema. The reader
+  records support for PATCH, bulk, filter and password change, the
+  authentication schemes, and the documentation address.
+- **Connector objects:** the name comes from `displayName`, `name`,
+  `applicationName` or `appName`. An object without a name is skipped
+  and counted.
+- **`matchCatalog`** matches only on an authoritative identifier: the same
+  name or display name, or the same https host, as exactly one catalog
+  application. A contained-name resemblance (four characters or more on
+  both sides, exactly one candidate) is only a **suggestion**, never a
+  match (§17.6).
+- **`allowedDecisions`:**
+  - UNRECOGNIZED → register, link, exception or ignore;
+  - IGNORED or EXCEPTION → reopen;
+  - MATCHED or REGISTERED → none.
+
+### Service (`discovery.ts`)
+
+- **`discoverFromIntegration`** reads only the connector's stored
+  `application` objects, capped at 2,000.
+- **`submitDiscovery`** takes openapi, scim or manual input.
+- **`recordCandidates`** matches a new candidate or holds it
+  UNRECOGNIZED. A candidate seen before only gains a sighting and fresh
+  evidence, so the next discovery never undoes a person's decision.
+- **`decideDiscovery`:**
+  - register goes through Access's published `registerApplication`, with
+    its validation and owner checks. Its new optional `origin` records the
+    discovery source and, when "connect" is chosen, the connector;
+  - link checks the application through `getApplicationDetail`;
+  - an exception needs a reason and a future end date; ignore needs a
+    reason; reopen is allowed;
+  - each decision is a conditional update on the expected status (409 if
+    someone decided first), audited as `application_discovery.*`.
+- **Access contract, additive (#13, #14):**
+  - `registerApplication(…, origin?)`: the default stays manual;
+  - `listApplicationsForMatching` (capped at 5,000).
+  - Both are recorded in the Access audit.
+
+### API and UI
+
+- API:
+  - `GET` and `POST /api/v1/integrations/discoveries`: list with counts;
+    discover from a connector or record one document or report;
+  - `GET` and `POST /api/v1/integrations/discoveries/:id`: a decision.
+    Register and link also need `access.manage`.
+- `/integrations/discovery`:
+  - KPIs and status tabs (Unrecognized by default);
+  - search and a paged table;
+  - side cards to discover from a connector and to add a discovery
+    (OpenAPI, SCIM or manual).
+- `/integrations/discovery/:id`:
+  - what was found, with the evidence;
+  - the catalog match or suggestion, and the last decision;
+  - one decision form. Register takes a name, type, owners, risk and
+    classification, and "connect".
+- The sidebar gains "Discovery" under Applications.
+
+### Verified
+
+- `tsc` and `eslint` clean; the discovery rules pass 10/10.
+- **Live SQL** (`tests/integration/application-discovery-isolation.sql`).
+  Each expectation held:
+  - another tenant's integration or application is 23503;
+  - ignored without a reason is 23514;
+  - the same source key twice is 23505;
+  - a non-https address is 23514;
+  - a member sees their own (1) and none of another tenant's (0);
+  - a member's direct decision updated 0 rows, a direct insert was
+    42501, and a delete removed 0 rows;
+  - cleanup left 0 rows.
+- **E2E `application-discovery.spec.ts`: 13/13 with setup.** It covers:
+  - host match, a suggestion only for a similar name, and a nameless
+    object skipped;
+  - ignore without a reason is 400, and an unknown action is 400;
+  - a second ignore is 409;
+  - rediscovery adds a sighting and keeps IGNORED;
+  - reopen;
+  - an exception with a past date is 400; a future one is accepted;
+  - link to a bad id is 404; link to the suggestion works;
+  - register with owners, risk and connect: the catalog application
+    records `discoverySource: integration` and the connector;
+  - OpenAPI recorded once, then a sighting; YAML is 400;
+  - SCIM over http is 400; valid SCIM is recorded; a manual non-https
+    address is 400;
+  - the screens: a manual report, then ignore with a reason;
+  - another organization gets 404 on the discovery, the decision and the
+    connector discovery, and sees none of them;
+  - read-only reads, but gets 403 on changes.
+- **Screenshots:** the list (light, 1440), an OpenAPI discovery with the
+  register form (dark), and a matched discovery at 390 px.
+- **Vitest:** 640/640.
+- **Full Playwright suite:** **267/268.**
+  - The failure was `financebot-central-scenario`: 0 findings after
+    "Run risk evaluation now".
+  - It is a test race, not this story. The spec asserts the URL, which
+    already matches before the action runs, so it never waits for the
+    evaluation, and under load that took longer than the 10 s heading
+    wait.
+  - Re-run alone, it passed (8/8). The race and the button's missing
+    pending state (§15) are fixed in the next commit (Risk audit).
+
+**Left out:**
+
+- discovery from an IdP's app catalog (Entra or Okta enterprise apps);
+  that needs those connectors;
+- running discovery automatically after each sync;
+- YAML OpenAPI;
+- fetching a document from a URL. Pasting keeps it SSRF-free; a fetch
+  would go through `guardedFetch`.

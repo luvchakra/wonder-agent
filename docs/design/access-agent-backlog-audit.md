@@ -1468,3 +1468,18 @@ reconciliation run fills it from an onboarded application's connector.
 - a tenant-configured default dormant window (the query parameter covers
   P0);
 - account-level certification (the Compliance module's extension).
+
+## 2026-09-26 — Catalog contract additions for INTEGRATION-P0-10 (additive)
+
+- `registerApplication(tenantId, actorId, input, origin?)`:
+  - `origin` is `{ discoverySource, sourceIntegrationId? }`. It defaults
+    to manual, as before;
+  - an unknown source is 400, and another tenant's integration is 404
+    (from the same-tenant key's 23503);
+  - the audit metadata now carries both fields.
+- `listApplicationsForMatching(tenantId)`:
+  - returns id, name, display name and address for up to 5,000
+    applications;
+  - reads as the user, with the tenant filtered.
+- Existing callers are unchanged. Verified by `application-discovery.spec`
+  (registration through a discovery) and the catalog specs in the full run.
