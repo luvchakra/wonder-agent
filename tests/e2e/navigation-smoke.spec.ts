@@ -16,6 +16,7 @@ const ROUTES = [
   { path: "/agents/duplicates", heading: "Duplicate registration review" },
   { path: "/access", heading: "Applications" },
   { path: "/access/requests", heading: "Access Requests" },
+  { path: "/access/accounts", heading: "Accounts" },
   { path: "/policies", heading: "Policies" },
   { path: "/runtime", heading: "Runtime activity" },
   { path: "/risk", heading: "Risks & alerts" },

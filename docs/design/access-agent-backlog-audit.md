@@ -1322,3 +1322,149 @@ could weaken a blocking one.
   block; flag alone → advisory). 7/7 pass.
 - **E2E:** re-run with the leftover advisory policy still active, `sod`
   passed (409 as designed). The leftover E2E policy was then disabled.
+
+## 2026-09-26 — ACCESS-P0-17: account inventory (WonderID Phase 3)
+
+An account now belongs to any identity: a person, an external person, a
+machine identity or an AI agent, not only an agent. The inventory shows
+orphan, ambiguous, dormant, privileged and missing-from-source accounts. A
+reconciliation run fills it from an onboarded application's connector.
+
+### Schema (migration 0089; applied live)
+
+- **`accounts`, extended and backward compatible (#13):**
+  - `agent_id` is now nullable. Every existing reader filters by
+    `agent_id`, so a person's account never appears in an agent's CAN.
+  - New columns:
+    - `identity_id`, a same-tenant key to `identities`;
+    - `correlation` (correlated / manual / orphan / ambiguous);
+    - `account_name` and `account_type` (standard / privileged / service /
+      shared);
+    - `last_used_at`, `last_seen_at` and `missing_from_source_at`;
+    - `source` (manual / reconciliation), `source_integration_id` (a
+      same-tenant key) and `updated_at`.
+  - New key: `unique (tenant_id, application_id, external_account_ref)`.
+    There were no live duplicates.
+  - Backfill: all 18 live accounts were agent accounts. They took their
+    agent's mirrored identity and are "correlated".
+- **Trigger `accounts_identity_consistency`:**
+  - it fills `identity_id` for an agent account written without one (the
+    seed script, older callers);
+  - it keeps `correlation` consistent with `identity_id`, including when
+    the identity is deleted (the key sets it null, and the account becomes
+    an orphan).
+- **`account_reconciliation_runs`:** members can only read it; the service
+  writes it.
+
+### Rules and service
+
+- **`accountRules.ts`** (pure; 6 tests):
+  - dormant windows (30, 60, 90, 180 or 365 days; default 90). "Never
+    used" counts as dormant once the account is older than the window;
+  - case-insensitive correlation to exactly one identity. More than one
+    match is ambiguous, never a guess (§17.6);
+  - `planReconciliation`:
+    - a person's manual link and an agent's ownership are kept (only last
+      seen and last used move);
+    - everything else is correlated afresh;
+    - last use never moves backwards;
+    - disabled and privileged are read from the source;
+    - accounts it imported that the source dropped are listed, never
+      deleted (#7, #15).
+- **`accounts.ts`:**
+  - `listAccountInventory` has six views and is paged at the database.
+  - `getAccountSummary` runs its counts in parallel.
+  - `linkAccount` links or unlinks by hand, audited, with optimistic
+    concurrency. It never re-points an AI agent's account (that would
+    silently change CAN), and never links to an agent.
+  - `reconcileApplicationAccounts`:
+    - runs only under the configuration onboarding **promoted**
+      (ACCESS-P0-16), never a draft;
+    - reads the connector's imported accounts through Integration's
+      `getNormalizedObjects`, and identities through Identity's
+      `listIdentitiesForCorrelation`;
+    - upserts in batches and marks accounts missing from the source;
+    - records the run (a failure is recorded truthfully, §17.5) and
+      audits it;
+    - caps a run at 5,000 source accounts;
+    - runs synchronously: at that cap it is seconds. Moving it to a
+      background job belongs with scheduled reconciliation.
+- **Grants:** `createAccessGrant` refuses an account without an agent
+  (409 NOT_SUPPORTED) rather than skip separation of duties. Grants to
+  people's accounts come with human access governance (ACCESS-P0-20).
+
+### API and UI
+
+- API:
+  - `GET /api/v1/access/accounts` (`view`, `applicationId`, `q`,
+    `dormantDays`, `page`), which also returns the summary;
+  - `GET` and `PATCH /api/v1/access/accounts/:id` (`{ identityId }`, null
+    to unlink);
+  - `GET` and `POST /api/v1/access/applications/:id/reconciliations`.
+- `/access/accounts`:
+  - KPI cards and view tabs with counts;
+  - search and a dormant window;
+  - a table of who each account belongs to, with type and last use.
+  - Filtered to one application (`?app=`), it drops the application
+    column.
+- `/access/accounts/:id`:
+  - details and how the account was matched;
+  - an owner card with identity search and link / unlink. An agent's
+    account links to the agent instead.
+- The application page gains an Accounts card: counts, the last run, and
+  "Reconcile accounts" (disabled until onboarding is promoted).
+- The sidebar gains "Accounts" under Applications.
+
+### Verified
+
+- `tsc` and `eslint` clean; vitest **630/630**.
+- **Live SQL** (`tests/access/account-inventory-isolation.sql`). Each
+  expectation held:
+  - a person's account (no agent) is correlated;
+  - the trigger fills an agent account's identity;
+  - an orphan is the default;
+  - when the identity is deleted, the account is kept as an orphan;
+  - another tenant's identity or integration is 23503;
+  - a duplicate identifier is 23505;
+  - a member sees 3 own accounts, 0 of another tenant's accounts and runs,
+    and links 0 of another tenant's accounts;
+  - a member's direct run write is 42501;
+  - cleanup left 0 fixture rows, and 0 agent accounts without an identity.
+- **E2E `account-inventory.spec.ts`: 13/13 with setup.** It covers:
+  - a seeded connector with imported accounts (`seedIntegrationAccounts`,
+    the same Admin-API pattern as `seedFinanceBotAccess`);
+  - reconciliation is 409 before onboarding is promoted;
+  - the first simulation fails on an account without an identifier; the
+    source fixes it, and approval and promotion follow;
+  - the first run gives 4 new accounts: 1 matched, 2 orphan, 1 ambiguous,
+    1 privileged;
+  - the dormant view holds exactly the account last used in 2025;
+  - a manual link survives the next run;
+  - an account the source dropped is marked, not deleted;
+  - unlinking makes an orphan;
+  - a grant to a person's account is 409 NOT_SUPPORTED;
+  - linking to an AI agent is 400;
+  - the screens: the list, the orphan tab, and link by search;
+  - another organization gets 404 on the account, the link, and the
+    reconciliation, and sees no accounts or runs;
+  - read-only reads (200), but gets 403 on link and reconcile.
+- **Screenshots:** the inventory (light, 1440), account detail (dark), the
+  orphan view at 390 px, and the application's Accounts card.
+  - Fix from them: two KPI labels truncated at 390 px and were shortened.
+- The sweeps now include `/access/accounts` (`design-review` and
+  `navigation-smoke`).
+- **Full Playwright suite** (§17.8: migration and shell navigation
+  changed): **260/261.**
+  - The one failure was `risk.spec`'s agent registration. It did not
+    redirect within 10 s: the page showed no error, and the submit was
+    still pending.
+  - It touches no account path. Re-run alone, `risk.spec` passed 10/10.
+
+**Left out:**
+
+- scheduled or background reconciliation (with INTEGRATION-P0-10 and
+  -13's jobs);
+- last use from runtime (DID) for agent accounts;
+- a tenant-configured default dormant window (the query parameter covers
+  P0);
+- account-level certification (the Compliance module's extension).

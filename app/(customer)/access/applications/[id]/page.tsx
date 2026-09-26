@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getApplicationDetail, getOnboarding, listEntitlementsForApplication } from "@/modules/access-governance/service";
+import { getAccountSummary, getApplicationDetail, getOnboarding, listEntitlementsForApplication, listReconciliationRuns } from "@/modules/access-governance/service";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -9,10 +9,12 @@ import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton } fr
 import { ApplicationForm } from "../ApplicationForm";
 import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../labels";
 import { LifecycleForm } from "./onboarding/OnboardingForms";
+import { ReconcileAccountsForm } from "../../accounts/AccountForms";
 
 // ACCESS-P0-15 — one application: catalog details, owners, classification,
 // connector, and the access it holds. ACCESS-P0-16 adds its onboarding and
-// the suspend / resume / retire lifecycle.
+// the suspend / resume / retire lifecycle; ACCESS-P0-17 its accounts and
+// their reconciliation.
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -38,12 +40,15 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration, onboarding] = await Promise.all([
+  const [entitlements, people, integration, onboarding, accountSummary, runs] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
     getOnboarding(tenantId, id),
+    getAccountSummary(tenantId, { applicationId: id }),
+    listReconciliationRuns(tenantId, id, 1),
   ]);
+  const lastRun = runs[0] ?? null;
   const lifecycleActions = (
     app.onboardingStatus === "ACTIVE" ? ["suspend", "retire"] : app.onboardingStatus === "SUSPENDED" ? ["resume", "retire"] : app.onboardingStatus === "RETIRED" ? [] : ["retire"]
   ) as ("suspend" | "resume" | "retire")[];
@@ -148,7 +153,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
         <Card>
           <CardHeader
             title="Onboarding"
@@ -171,6 +176,44 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             ) : (
               <p className="text-sm text-muted-foreground">Not started.</p>
             )}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader
+            title="Accounts"
+            description={
+              lastRun
+                ? `Last reconciled ${new Date(lastRun.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${lastRun.status === "failed" ? ": failed" : ""}.`
+                : "Not reconciled yet."
+            }
+            actions={
+              <LinkButton href={`/access/accounts?app=${id}`} size="sm" variant="outline">
+                View accounts
+              </LinkButton>
+            }
+          />
+          <CardBody className="space-y-3">
+            <dl className="grid grid-cols-3 gap-3 text-sm">
+              <div>
+                <dt className="text-xs text-muted-foreground">Accounts</dt>
+                <dd className="tabular-nums text-foreground">{accountSummary.total}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Orphan</dt>
+                <dd className={accountSummary.orphan ? "tabular-nums text-destructive" : "tabular-nums text-foreground"}>{accountSummary.orphan}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">Dormant</dt>
+                <dd className={accountSummary.dormant ? "tabular-nums text-warning" : "tabular-nums text-foreground"}>{accountSummary.dormant}</dd>
+              </div>
+            </dl>
+            {lastRun?.status === "failed" && lastRun.error ? <p className="text-xs text-destructive">{lastRun.error}</p> : null}
+            {canManage ? (
+              <ReconcileAccountsForm
+                applicationId={id}
+                disabledReason={onboarding?.promotedAt ? null : "Promote an onboarding configuration first"}
+              />
+            ) : null}
           </CardBody>
         </Card>
         {canManage && lifecycleActions.length ? (

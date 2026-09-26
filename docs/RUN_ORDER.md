@@ -135,15 +135,18 @@ isolation checks. Detail is in each module's audit log.
 | W2 | IDENTITY-P0-18: human lifecycle events, governed tasks, ownership transfer (0084/0085) | Partial (auto birthright/deprovisioning wait on ACCESS-P0-20, INTEGRATION-P0-13) | `a2530cb` |
 | W3 | ACCESS-P0-15: application catalog and inventory (0086) | Done | `3793c5b` |
 | W3 | INTEGRATION-P0-11: outbound SSRF guard, capability model, idempotent write interface (0087) | Partial (write interface's E2E comes with INTEGRATION-P0-13) | `dadd08e` |
-| W3 | ACCESS-P0-16: application onboarding — configure, validate, simulate, four-eyes approve, promote (0088) | Done | see Access audit |
+| W3 | ACCESS-P0-16: application onboarding — configure, validate, simulate, four-eyes approve, promote (0088) | Done | `386bfb8` |
+| + | ACCESS-P0-14 fix: an advisory SoD policy could hide a blocking one | Done | `1a558dc` |
+| W3 | ACCESS-P0-17: account inventory — identity correlation, orphan, ambiguous, dormant, reconciliation (0089) | Done | see Access audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
 phase, after QA-P0-20 locked the baseline. Phase 1 is done except IDENTITY-P0-17's
 later-phase views; Phase 2's sources and reconciliation are in. IDENTITY-P0-18's
 lifecycle is in. Phase 3 has the catalog (ACCESS-P0-15), the outbound guard and
-write interface (INTEGRATION-P0-11) and onboarding (ACCESS-P0-16). Next:
-ACCESS-P0-17, INTEGRATION-P0-10.
+write interface (INTEGRATION-P0-11), onboarding (ACCESS-P0-16) and the account
+inventory (ACCESS-P0-17). Next: INTEGRATION-P0-10, then Phase 3's remaining
+stories in WONDERID-ROADMAP.md.
 
 **Still to do in this programme:**
 

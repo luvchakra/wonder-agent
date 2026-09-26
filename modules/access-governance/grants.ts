@@ -208,9 +208,13 @@ export async function createManualAccessGrant(
     .select("id, agent_id")
     .eq("id", accountId)
     .eq("tenant_id", tenantId)
-    .maybeSingle<{ id: string; agent_id: string }>();
+    .maybeSingle<{ id: string; agent_id: string | null }>();
   if (accountError) throw new ApiError(500, "QUERY_FAILED", accountError.message);
   if (!account) throw new ApiError(404, "ACCOUNT_NOT_FOUND");
+  // ACCESS-P0-17: accounts of people and other identities are inventoried,
+  // but granting to them waits for human access governance (ACCESS-P0-20),
+  // where separation of duties covers them. Refuse rather than skip SoD.
+  if (!account.agent_id) throw new ApiError(409, "NOT_SUPPORTED", "Grants to accounts that do not belong to an AI agent are not supported yet");
 
   const { data: entitlement, error: entitlementError } = await supabase
     .from("entitlements")

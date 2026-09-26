@@ -45,7 +45,8 @@ export function toAccount(row: any): Account {
   return {
     id: row.id,
     tenantId: row.tenant_id,
-    agentId: row.agent_id,
+    agentId: row.agent_id ?? null,
+    identityId: row.identity_id ?? null,
     applicationId: row.application_id,
     externalAccountRef: row.external_account_ref,
     status: row.status,

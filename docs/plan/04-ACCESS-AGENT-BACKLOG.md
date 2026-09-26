@@ -34,7 +34,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Done — 2026-09-25: `enforceSoD()` on request submission, request decision and manual grant; blocking → 409 SOD_CONFLICT (audited failure), flag → proceeds and audited; `checkSoD()` now service-role + matches the agent in object or metadata |
 | ACCESS-P0-15 | Application catalog model and inventory | Done — 2026-09-26, migration 0086 |
 | ACCESS-P0-16 | Application onboarding: state machine, checklist, validate, simulate, approve, promote | Done — 2026-09-26, migration 0088 |
-| ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Done — 2026-09-26, migration 0089 |
 | ACCESS-P0-18 | Self-service request catalog and request policies | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-20 | Access packages | Not Started — 2026-09-26, WonderID |

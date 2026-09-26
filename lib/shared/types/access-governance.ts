@@ -73,7 +73,9 @@ export type AccountStatus = "active" | "disabled";
 export type Account = {
   id: string;
   tenantId: string;
-  agentId: string;
+  /** Null for an account of a person or other non-agent identity (ACCESS-P0-17); see identityId. */
+  agentId: string | null;
+  identityId: string | null;
   applicationId: string;
   externalAccountRef: string;
   status: AccountStatus;
