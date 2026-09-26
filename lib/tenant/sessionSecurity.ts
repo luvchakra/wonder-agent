@@ -42,3 +42,17 @@ export function checkSessionExpiry(
   }
   return { expired: false };
 }
+
+/**
+ * Whether a failed `auth.getUser()` means the auth server could not be
+ * reached (a network failure or a server error) rather than that it
+ * rejected the session. Either way the request gets no access (fail
+ * closed); the difference is only what the user is told (CLAUDE.md §17.5):
+ * "the sign-in service is unavailable", not "your session expired".
+ */
+export function isAuthServiceUnavailable(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const e = error as { name?: unknown; status?: unknown };
+  if (e.name === "AuthRetryableFetchError") return true;
+  return typeof e.status === "number" && (e.status === 0 || e.status >= 500);
+}

@@ -1408,3 +1408,36 @@ Proposed fix (a proxy and authentication change, so a full-suite story):
 - Pages render a "sign-in service unavailable, try again" state instead
   of the expired message.
 - Still no access.
+
+## 2026-09-26 — Resolved: "sign-in service unavailable" is no longer reported as "session expired"
+
+Resolves the open item above. The behaviour is still fail-closed, now with a
+truthful message (§17.5):
+
+- **`isAuthServiceUnavailable(error)`** (`lib/tenant/sessionSecurity.ts`,
+  pure) is true for `AuthRetryableFetchError`, or a status of 0 or 5xx
+  from `getUser()`.
+- **`proxy.ts`:** when the session cookie is present but the auth server
+  cannot be reached, access is still refused, but truthfully:
+  - APIs return **503** `AUTH_UNAVAILABLE`, with `Retry-After: 30`;
+  - protected pages are rewritten to `/service-unavailable` with **503**.
+    The URL is kept, so "Try again" reloads the page that was asked for;
+  - public pages pass through as before.
+  - A **rejected** session behaves exactly as before: a redirect to
+    `/sign-in?reason=expired`, or 401.
+- **`/service-unavailable`** (AuthShell, public) says the session was not
+  ended, that nothing is shown until it can be confirmed, and that
+  nothing was changed.
+
+**Verified:**
+
+- unit: `sessionSecurity.test` 6/6 and a new `proxy.test.ts` 4/4, with a
+  mocked auth client for API 503, page rewrite 503, public page
+  pass-through, and an unchanged rejected-session redirect and 401;
+- vitest 659/659;
+- the page was checked in light (1280) and dark (390).
+- **Not simulated end to end:** that would mean breaking the sandbox's
+  egress proxy.
+- The full Playwright suite result is recorded in the next entry.
+- **Full Playwright suite** (§17.8: `proxy.ts` and authentication changed):
+  **273/273 passed** (16.1 min).

@@ -5,6 +5,7 @@ import {
   SESSION_LAST_SEEN_COOKIE,
   SESSION_STARTED_COOKIE,
   checkSessionExpiry,
+  isAuthServiceUnavailable,
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 
@@ -23,7 +24,7 @@ import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
  * data, so there is no reason to gate them behind a session — see
  * app/help/layout.tsx.
  */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help", "/service-unavailable"];
 /** Paths the idle/absolute session-expiry clock does not run on. */
 const UNENFORCED_PATHS = [
   "/sign-in",
@@ -106,6 +107,7 @@ export async function proxy(request: NextRequest) {
   // an expired token's cookies here, before the route runs.
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
   // Enforcement moved here from the customer layout so a session the auth
@@ -122,6 +124,18 @@ export async function proxy(request: NextRequest) {
       .some((c) => c.name.startsWith("sb-") && c.name.includes("-auth-token"));
     const isApi = pathname.startsWith("/api/");
     const isPublicPage = pathname === "/" || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+
+    // The auth server could not be reached: still no access (fail closed),
+    // but say so truthfully rather than "your session expired" (§17.5).
+    if (presentedSession && isAuthServiceUnavailable(authError) && !isPublicPage) {
+      if (isApi) {
+        return NextResponse.json(
+          { ok: false, error: { code: "AUTH_UNAVAILABLE", message: "The sign-in service is unavailable; try again shortly" } },
+          { status: 503, headers: { "Retry-After": "30" } },
+        );
+      }
+      return NextResponse.rewrite(new URL("/service-unavailable", request.url), { status: 503, headers: { "Retry-After": "30" } });
+    }
 
     if (isApi && presentedSession) {
       return NextResponse.json(

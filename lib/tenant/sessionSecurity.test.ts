@@ -29,3 +29,14 @@ describe("checkSessionExpiry — FOUNDATION-P0-09", () => {
     expect(checkSessionExpiry(startedAt, lastSeen, now)).toEqual({ expired: true, reason: "absolute" });
   });
 });
+
+describe("isAuthServiceUnavailable", () => {
+  it("is true for a network failure or a server error, false for a rejected session", async () => {
+    const { isAuthServiceUnavailable } = await import("./sessionSecurity");
+    expect(isAuthServiceUnavailable({ name: "AuthRetryableFetchError", status: 0 })).toBe(true);
+    expect(isAuthServiceUnavailable({ name: "AuthApiError", status: 503 })).toBe(true);
+    expect(isAuthServiceUnavailable({ name: "AuthApiError", status: 403 })).toBe(false);
+    expect(isAuthServiceUnavailable({ name: "AuthSessionMissingError", status: 400 })).toBe(false);
+    expect(isAuthServiceUnavailable(null)).toBe(false);
+  });
+});
