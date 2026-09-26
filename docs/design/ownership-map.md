@@ -24,11 +24,11 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `tenant_domains` | FA | Hostnames a tenant is reached at: PLATFORM_SUBDOMAIN (label under `BASE_APP_HOST`, created by trigger) or CUSTOM_DOMAIN (verification P1). Select-only RLS; `resolve_tenant_host()` is the one public lookup (FOUNDATION-P0-22, 0095) |
 | `tenant_settings` | FA | Per-tenant configuration |
 | `users` | FA | Maps to Supabase Auth users |
-| `tenant_memberships` | FA | User ↔ tenant, source of tenant context |
+| `tenant_memberships` | FA | User ↔ tenant, source of tenant context. Lifecycle (FOUNDATION-P0-23, 0096): invited, active, suspended, deactivated, removed; who changed it, when and why; invitation, account type, sign-in method. No self status change; last Tenant Administrator guarded in the database |
 | `roles` | FA | Customer RBAC roles |
 | `permissions` | FA | Granular permission strings (e.g. `agent.read`) |
 | `role_permissions` | FA | Role ↔ permission |
-| `user_roles` | FA | User ↔ role (scoped to tenant) |
+| `user_roles` | FA | User ↔ role (scoped to tenant). `granted_by` (0096), never the user themselves; removing the last Tenant Administrator role is refused in the database |
 | `sso_connections` | FA | SAML/OIDC IdP configuration per tenant |
 | `audit_logs` | FA (write primitive) / OA (read, presentation, search) | Foundation owns the schema and the `writeAudit()` utility every module calls; Operations owns audit views, evidence export and search over it. No module writes to this table by hand — always through the shared utility. |
 | `agents` | IA | Canonical AI agent identity |

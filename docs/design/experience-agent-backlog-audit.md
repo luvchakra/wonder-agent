@@ -2804,20 +2804,21 @@ and the decisions below are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
 - **Assets.** `public/brand/` holds the specification's set (§8):
   - `logo/`: the lockup for light and dark backgrounds, monochrome dark and
     light, the tagline lockups, and the mark with its variants;
-  - `favicon/`: SVG, 16, 32, 48 and Apple touch;
-  - `social/`: Open Graph and Twitter images.
+  - `favicon/`: 16, 32, 48 and Apple touch;
+  - `social/`: the Open Graph image.
 
-  `app/favicon.ico`, `icon.png` and `apple-icon.png` are rebuilt from the
-  mark.
-- **Interim artwork.** No vector files were supplied, so
-  `scripts/brand/build-assets.mjs` draws everything from one geometry:
-  - a W whose centre is a person, head above the central peak, in
-    Electric Blue, Sky Blue and Violet;
-  - the wordmark outlined from Geist Bold, the tagline from Geist Medium
-    (the app's typeface, SIL OFL), from `scripts/brand/wordmark-outlines.json`;
-  - no raster and no font dependency in any logo.
-
-  The official files replace them one for one under the same names.
+  `app/favicon.ico`, `icon.png` and `apple-icon.png` come from the same
+  source.
+- **The user's own artwork** (user instruction, 2026-09-26: "just use the
+  attached images"). `scripts/brand/extract-assets.py` cuts every asset
+  from the supplied `docs/requirements/wonderid-brand-sheet.png`. It
+  redraws nothing: it removes each panel's flat background (colour to
+  alpha against that panel's exact colour), blanks the tagline for the
+  plain lockups, and resamples the icon sizes. The results were checked
+  on white, the app's grey and navy with no halo. A first pass had
+  redrawn the mark and outlined the wordmark from Geist; it was removed
+  before release. The files are PNG at the sheet's resolution. Official
+  vector files, when supplied, replace them.
 - **Configuration.** `modules/ui/brand.ts` (`wonderIdBrand`, `brandTitle`)
   is the only brand configuration: name, tagline, statement, descriptor,
   palette, chart sequence, and asset paths with intrinsic sizes (from the

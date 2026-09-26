@@ -7,7 +7,7 @@ import { wonderIdBrand, type BrandAsset } from "./brand";
  * specification).
  *
  * `<WonderIDLogo />` renders only the brand's own assets from
- * public/brand/ (never a URL it is handed), sized from their intrinsic
+ * public/brand/ — the supplied brand sheet's artwork — never a URL it is handed, sized from their intrinsic
  * dimensions so nothing shifts on load. It is a Server Component: no
  * client JavaScript. On themed surfaces the `default` variant renders the
  * light- and dark-background artwork and CSS shows the one that matches
@@ -22,11 +22,10 @@ export type WonderIDLogoSize = keyof typeof SIZES | number;
 
 function pick(variant: Exclude<WonderIDLogoVariant, "default">, showWordmark: boolean, showTagline: boolean): BrandAsset {
   const a = wonderIdBrand.assets;
-  if (!showWordmark) {
-    return variant === "mono" ? a.markMonochrome : variant === "mono-light" ? a.markMonochromeLight : variant === "dark" ? a.markDark : a.markLight;
-  }
+  // The sheet has one mark for light and one for dark surfaces (no monochrome mark).
+  if (!showWordmark) return variant === "dark" || variant === "mono-light" ? a.markDark : a.mark;
   if (showTagline && (variant === "light" || variant === "dark")) return variant === "dark" ? a.logoTaglineDark : a.logoTagline;
-  return variant === "mono" ? a.monochrome : variant === "mono-light" ? a.monochromeLight : variant === "dark" ? a.logoDark : a.logoLight;
+  return variant === "mono" ? a.monochrome : variant === "mono-light" ? a.monochromeLight : variant === "dark" ? a.logoDark : a.logo;
 }
 
 function LogoImage({ asset, height, alt, priority, className }: { asset: BrandAsset; height: number; alt: string; priority?: boolean; className?: string }) {
@@ -37,7 +36,7 @@ function LogoImage({ asset, height, alt, priority, className }: { asset: BrandAs
       width={width}
       height={height}
       alt={alt}
-      // SVG from our own public/brand: served as-is, no optimizer.
+      // Our own small brand files: served as-is, so the path is stable.
       unoptimized
       priority={priority}
       draggable={false}

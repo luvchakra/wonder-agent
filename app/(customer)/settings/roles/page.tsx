@@ -17,10 +17,7 @@ export default async function RolesSettingsPage() {
     throw err;
   }
 
-  const [members, roles] = await Promise.all([
-    listTenantMembersWithRoles(ctx.tenantId!),
-    listAssignableRoles(),
-  ]);
+  const [members, roles] = await Promise.all([listTenantMembersWithRoles(ctx.tenantId!), listAssignableRoles()]);
 
   return (
     <div className="space-y-4">
@@ -59,19 +56,29 @@ export default async function RolesSettingsPage() {
                       </div>
                     </Td>
                     <Td>
-                      <form action={assignRoleAction} className="flex flex-wrap items-center gap-2">
-                        <input type="hidden" name="userId" value={m.userId} />
-                        <select name="role" required aria-label="Role to assign" className="max-w-[12rem] rounded border border-border bg-background px-2 py-1 text-sm text-foreground">
-                          {roles.map((r) => (
-                            <option key={r.id} value={r.name}>
-                              {r.name}
-                            </option>
-                          ))}
-                        </select>
-                        <button type="submit" className="text-primary hover:underline text-sm">
-                          Assign
-                        </button>
-                      </form>
+                      {m.userId === ctx.userId ? (
+                        // Nobody assigns themselves a role (FOUNDATION-P0-23, spec §30).
+                        <span className="text-xs text-muted-foreground">Another administrator assigns your roles</span>
+                      ) : (
+                        <form action={assignRoleAction} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="userId" value={m.userId} />
+                          <select
+                            name="role"
+                            required
+                            aria-label="Role to assign"
+                            className="max-w-[12rem] rounded border border-border bg-background px-2 py-1 text-sm text-foreground"
+                          >
+                            {roles.map((r) => (
+                              <option key={r.id} value={r.name}>
+                                {r.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button type="submit" className="text-primary hover:underline text-sm">
+                            Assign
+                          </button>
+                        </form>
+                      )}
                     </Td>
                   </Tr>
                 ))}

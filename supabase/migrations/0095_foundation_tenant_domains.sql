@@ -41,7 +41,7 @@ $$;
 alter table tenants add constraint tenants_slug_policy check (tenant_slug_is_valid(slug));
 
 create function tenants_guard_slug_and_suspension() returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
   if new.slug is distinct from old.slug then
     raise exception 'a tenant''s slug is its address and cannot change' using errcode = '23514';

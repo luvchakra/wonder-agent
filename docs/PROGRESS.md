@@ -14,18 +14,18 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**182 of 239 tracked stories complete — 76%**
+**183 of 239 tracked stories complete — 77%**
 
 ```
-██████████████████████████████░░░░░░░░░░  76%
+███████████████████████████████░░░░░░░░░  77%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 182 |
+| Done | 183 |
 | Partial | 26 |
 | Deferred | 1 |
-| Not Started | 30 |
+| Not Started | 29 |
 | **Total tracked** | **239** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 30 | 2 | 0 | 8 | 40 | `██████████████░░░░` 75% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 31 | 2 | 0 | 7 | 40 | `██████████████░░░░` 78% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 16 | 3 | 0 | 1 | 20 | `██████████████░░░░` 80% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 30 done · 2 partial · 0 deferred · 8 not started (40 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 31 done · 2 partial · 0 deferred · 7 not started (40 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -97,7 +97,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
 | FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Done — 2026-09-26 (custom-domain verification is P1; the shell shows name and URL, environment arrives with P0-27's profile) |
-| FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Done — 2026-09-26 (group filter and group tab wait on P0-26; scope step on P0-19; auth-method enforcement on P0-27) |
 | FOUNDATION-P0-24 | Permission catalog with resource, action, module and administrative permissions (IAM-002) | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-26 | Groups and group role assignments (IAM-004) | Not Started — 2026-09-26, WonderID Phase 4b |
@@ -302,7 +302,7 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-21 | Administration navigation and persistent tenant context | Not Started — 2026-09-26, WonderID Phase 4b |
-| EXPERIENCE-P0-22 | Brand foundation: assets, brand configuration, tokens, WonderIDLogo and TenantLogo (BRAND-001/002/003/006) | Done — 2026-09-26 (interim artwork from the brand sheet until official vector files are supplied) |
+| EXPERIENCE-P0-22 | Brand foundation: assets, brand configuration, tokens, WonderIDLogo and TenantLogo (BRAND-001/002/003/006) | Done — 2026-09-26 (artwork cut from the supplied brand sheet; official vector files to replace it when supplied) |
 | EXPERIENCE-P0-23 | Brand in the shell and authentication (BRAND-004/005) | Done — 2026-09-26 |
 | EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |

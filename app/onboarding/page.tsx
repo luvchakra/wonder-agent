@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { createTenantAction, selectTenantAction } from "@/app/actions/tenant";
+import { acceptInvitationAction } from "@/app/actions/users";
+import { listMyInvitations } from "@/lib/users/users";
 import { Card, CardHeader, CardBody, Button, WonderIDLogo, TextField } from "@/modules/ui";
 
 export default async function OnboardingPage() {
@@ -37,6 +39,9 @@ export default async function OnboardingPage() {
     .eq("status", "active")
     .returns<{ tenant_id: string; tenants: { name: string } | null }[]>();
 
+  // FOUNDATION-P0-23 — invitations waiting for this person (their own, by their user id).
+  const invitations = await listMyInvitations(user.id);
+
   if (ctx.tenantId && (!memberships || memberships.length === 0)) {
     // Tenant context resolved but the membership list didn't — treat as
     // transient/inconsistent rather than trusting a stale redirect.
@@ -50,6 +55,23 @@ export default async function OnboardingPage() {
         <WonderIDLogo size={52} showTagline priority />
         <p className="mt-3 text-sm text-muted-foreground">AI Identity Governance &amp; Runtime Assurance</p>
       </div>
+
+      {invitations.length > 0 && (
+        <Card>
+          <CardHeader title="Invitations" description="You have been invited to join these organizations." />
+          <CardBody className="space-y-2">
+            {invitations.map((i) => (
+              <form action={acceptInvitationAction} key={i.tenantId} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
+                <input type="hidden" name="tenantId" value={i.tenantId} />
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{i.tenantName}</span>
+                <Button type="submit" size="sm">
+                  Accept
+                </Button>
+              </form>
+            ))}
+          </CardBody>
+        </Card>
+      )}
 
       {memberships && memberships.length > 0 && (
         <Card>

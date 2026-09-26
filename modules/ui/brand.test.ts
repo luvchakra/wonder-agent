@@ -8,39 +8,29 @@ import manifest from "./brandAssets.generated.json";
 /**
  * BRAND-001/002/006 automated checks (branding specification §76): the
  * assets the brand configuration names exist and match their recorded
- * sizes, the favicon and site icons exist, the CSS palette is the
+ * sizes, the site icons exist, the CSS palette is the
  * configuration's palette, titles follow the convention, and no screen
  * hard-codes a brand colour.
  */
 const root = join(__dirname, "..", "..");
 
 describe("brand assets", () => {
-  it("every configured asset exists, is vector artwork, and matches its manifest size", () => {
+  it("every configured asset exists and is the PNG size the manifest records", () => {
     for (const [path, a] of Object.entries(manifest)) {
       const file = join(root, "public", "brand", path);
       expect(existsSync(file), path).toBe(true);
-      const svg = readFileSync(file, "utf8");
-      expect(svg, path).toContain(`viewBox="0 0 ${a.width} ${a.height}"`);
-      // Vector paths only: no embedded raster, no font dependency.
-      expect(svg, path).not.toMatch(/<image|<text|data:image/);
-      expect(svg, path).toContain("<title>WonderID</title>");
+      const png = readFileSync(file);
+      // PNG signature, then the IHDR chunk's width and height.
+      expect(png.subarray(1, 4).toString("ascii"), path).toBe("PNG");
+      expect([png.readUInt32BE(16), png.readUInt32BE(20)], path).toEqual([a.width, a.height]);
     }
   });
 
-  it("the favicons, site icons and social image exist", () => {
-    for (const p of [
-      "public/brand/favicon/favicon.svg",
-      "public/brand/favicon/favicon-16.png",
-      "public/brand/favicon/favicon-32.png",
-      "public/brand/favicon/apple-touch-icon.png",
-      "public/brand/social/wonderid-og.png",
-      "app/favicon.ico",
-      "app/icon.png",
-      "app/apple-icon.png",
-    ]) {
+  it("the site icons exist, and the artwork comes from the supplied brand sheet", () => {
+    for (const p of ["app/favicon.ico", "app/icon.png", "app/apple-icon.png", "docs/requirements/wonderid-brand-sheet.png", "scripts/brand/extract-assets.py"]) {
       expect(existsSync(join(root, p)), p).toBe(true);
     }
-    expect(existsSync(join(root, "public", wonderIdBrand.assets.social))).toBe(true);
+    for (const a of Object.values(wonderIdBrand.assets)) expect(a.src.startsWith("/brand/")).toBe(true);
   });
 });
 

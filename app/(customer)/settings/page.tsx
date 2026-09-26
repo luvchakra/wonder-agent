@@ -11,6 +11,9 @@ export default function SettingsPage() {
       <h1 className="text-xl font-semibold text-foreground">Administration</h1>
       <Card>
         <CardBody className="space-y-2">
+          <Link href="/settings/users" className="block text-primary hover:underline">
+            Users
+          </Link>
           <Link href="/settings/roles" className="block text-primary hover:underline">
             Users &amp; Roles
           </Link>

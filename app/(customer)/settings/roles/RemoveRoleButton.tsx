@@ -20,7 +20,8 @@ export function RemoveRoleButton({ userId, role }: { userId: string; role: strin
     formData.set("userId", userId);
     formData.set("role", role);
     try {
-      await removeRoleAction(formData);
+      const result = await removeRoleAction(formData);
+      if (!result.ok) return { kind: "single", success: false, error: result.error };
       return { kind: "single", success: true };
     } catch (err) {
       return { kind: "single", success: false, error: err instanceof Error ? err.message : "Request failed" };

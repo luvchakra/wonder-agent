@@ -59,7 +59,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const ctx = await getTenantContext();
   const name = ctx.tenantId ? (await getMyMemberships()).find((m) => m.tenantId === ctx.tenantId)?.name : null;
   if (!name) return {};
-  return { title: { default: brandTitle(null, name), template: `${name} · %s · ${wonderIdBrand.name}` } };
+  // `absolute`: the root layout's "WonderID · %s" template must not wrap it.
+  return { title: { absolute: brandTitle(null, name), template: `${name} · %s · ${wonderIdBrand.name}` } };
 }
 
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {

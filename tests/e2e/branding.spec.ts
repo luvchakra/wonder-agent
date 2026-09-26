@@ -23,17 +23,17 @@ async function logoRendered(page: Page, selector: string) {
 
 test.describe("branding — signed out", () => {
   test("brand assets are public and the sign-in page is branded", async ({ page, request }) => {
-    for (const p of ["/brand/logo/wonderid-logo.svg", "/brand/logo/wonderid-mark.svg", "/brand/favicon/favicon.svg"]) {
+    for (const p of ["/brand/logo/wonderid-logo.png", "/brand/logo/wonderid-mark.png", "/brand/favicon/favicon-32.png", "/icon.png"]) {
       const r = await request.get(p, { maxRedirects: 0 });
       expect(r.status(), p).toBe(200);
-      expect(r.headers()["content-type"], p).toContain("image/svg+xml");
+      expect(r.headers()["content-type"], p).toContain("image/png");
     }
     await page.goto("/sign-in");
     await expect(page).toHaveTitle("WonderID · Sign in");
     await expect(page.getByRole("heading", { name: "Sign in to WonderID" })).toBeVisible();
     await expect(page.getByText("Secure access for every identity.")).toBeVisible();
     await logoRendered(page, 'a[aria-label="WonderID"] img[src*="/brand/logo/wonderid-logo-tagline"]');
-    await expect(page.locator('link[rel="icon"][href*="/brand/favicon/favicon.svg"]')).toHaveCount(1);
+    await expect(page.locator('link[rel="icon"][href*="/icon.png"]')).toHaveCount(1);
   });
 
   test("an organization's address names it in the title and the page", async ({ page }) => {
@@ -73,10 +73,10 @@ test.describe("branding — in the product", () => {
     await expand.click();
     await expect(page.getByRole("button", { name: "Collapse navigation" })).toBeVisible();
 
-    // Electric Blue drives the primary colour (light theme).
-    await page.emulateMedia({ colorScheme: "light" });
-    const primary = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--primary").trim());
-    expect(primary).toBe("oklch(0.498 0.282 267.2)");
+    // The brand palette is on the page as tokens (the build normalizes the
+    // semantic --primary into another colour space, so read the constant).
+    const blue = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--brand-blue").trim().toLowerCase());
+    expect(blue).toBe("#2538ff");
   });
 
   test("below lg the header carries the W mark", async ({ page }) => {

@@ -14,13 +14,15 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 // BRAND-005/§16–§18: "WonderID · <page>" by default; the customer shell
 // switches to the organization-first form. Icons are app/icon.png,
-// app/apple-icon.png and app/favicon.ico (built by scripts/brand) plus the
-// scalable mark.
+// app/apple-icon.png and app/favicon.ico, cut from the brand sheet by
+// scripts/brand/extract-assets.py.
 export const metadata: Metadata = {
   title: { default: brandTitle(), template: `${wonderIdBrand.name} · %s` },
   description: "Identity governance and security for human, machine and AI-agent identities",
-  icons: { icon: [{ url: wonderIdBrand.assets.favicon.src, type: "image/svg+xml" }] },
-  openGraph: { siteName: wonderIdBrand.name, images: [{ url: wonderIdBrand.assets.social, width: 1200, height: 630, alt: wonderIdBrand.name }] },
+  openGraph: {
+    siteName: wonderIdBrand.name,
+    images: [{ url: wonderIdBrand.assets.social.src, width: wonderIdBrand.assets.social.width, height: wonderIdBrand.assets.social.height, alt: wonderIdBrand.name }],
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

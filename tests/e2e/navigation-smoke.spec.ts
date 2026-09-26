@@ -34,6 +34,7 @@ const ROUTES = [
   { path: "/search", heading: "Search" },
   { path: "/settings", heading: "Administration" },
   { path: "/settings/roles", heading: "Users & Roles" },
+  { path: "/settings/users", heading: "Users" },
   { path: "/settings/sso", heading: "Single Sign-On" },
   { path: "/settings/security", heading: null },
   { path: "/settings/notifications", heading: "Notification Preferences" },

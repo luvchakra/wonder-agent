@@ -1548,3 +1548,173 @@ scopes every read.
 - Pre-existing, not introduced here: two
   `invalid input syntax for type uuid: "null"` server log lines during the
   platform-admin auth setup. Noted for QA.
+
+## 2026-09-26 — FOUNDATION-P0-22 full suite, and a short production regression from 0096
+
+**Full Playwright run on the FOUNDATION-P0-22 build:** 300 passed, 3 failed,
+1 did not run (21.4 min). The 3 failures were not P0-22's:
+
+- During that run, migration 0096 (FOUNDATION-P0-23, below) was applied to
+  the shared database.
+- Its first form gave `tenant_memberships` two more foreign keys to `users`
+  (`status_changed_by`, `invited_by`), and `user_roles` one more
+  (`granted_by`).
+- PostgREST then found every existing `users(...)` embed from those tables
+  ambiguous (PGRST201). That broke:
+  - `GET /api/v1/users` (the multi-org spec);
+  - `/settings/roles` (navigation smoke);
+  - one onboarding-proposals step.
+
+**Production shares this database**, so the same two screens were broken in
+production for about 20 minutes.
+
+**Fixed without a deploy:** a follow-up step
+(`0096_foundation_user_lifecycle_actor_columns`) dropped the three foreign
+keys. The actor ids stay plain uuids, and the audit log also records the
+actor. The migration file was corrected to the equivalent end state. The 3
+specs were then re-run on the same build: 54/54 passed.
+
+**Lesson, for every module:** a second foreign key between two tables
+changes the meaning of every existing PostgREST embed between them. Use a
+plain uuid, or update every embed to name its foreign key
+(`users!tenant_memberships_user_id_fkey(...)`) in the same change.
+
+## 2026-09-26 — FOUNDATION-P0-23: users and the membership lifecycle (WonderID Phase 4b)
+
+Implements IAM-001 and the user-management requirements (§5–10, 23–25,
+30–34 of `docs/requirements/WonderID_User_Role_Permission_Management_Requirements.md`;
+mockups 1–3 and 9).
+
+**Migration `0096_foundation_user_lifecycle.sql`** (applied in four steps,
+see above):
+
+- Memberships:
+  - the statuses gain `deactivated`;
+  - each status change records when, by whom and why;
+  - invitations record who invited and when;
+  - account type (internal, external) and sign-in method are recorded.
+    Service accounts are machine identities, not members;
+  - an index on `(tenant_id, status)`.
+- **Self-protection in the database:**
+  - `user_roles.granted_by <> user_id` (check constraint);
+  - a trigger refuses a member changing their own status, except accepting
+    their own invitation.
+- **Last-administrator guard in the database:** a trigger on
+  membership status changes and deletes, and on role deletes.
+  - It refuses anything that would leave an organization with no active
+    Tenant Administrator.
+  - It is serialized on the tenant row, so two administrators cannot
+    remove each other at once.
+  - A cascade from a deleted organization or account is let through.
+- Permission keys `users.view/invite/create/update/suspend/remove`:
+  - Tenant Administrator: all;
+  - Identity Administrator: all but remove;
+  - Security Administrator: view and suspend;
+  - Auditor: view.
+- Service-role-only functions:
+  - `tenant_user_directory` (search escaped literally, status and role
+    filters, paged, with total);
+  - `tenant_user_summary`;
+  - `user_sessions` (browser and times, no IP);
+  - `revoke_user_sessions` (deletes the user's auth sessions; the proxy's
+    per-request check then refuses their next request).
+- An `audit_logs (tenant_id, object_id, created_at)` index for access
+  history.
+- Both new trigger functions (and 0095's) have a pinned search path; the
+  security advisor is otherwise unchanged.
+
+**Service** (`lib/users/`):
+
+- `userRules.ts` (pure): the lifecycle transitions and their permissions,
+  self-protection, invitation validation, effective permissions with
+  provenance, and database refusals mapped to answers.
+- `users.ts`:
+  - every query filters by the server-resolved tenant, and every change
+    re-reads the membership in this tenant first;
+  - conditional updates, with a 409 on a concurrent change;
+  - refusals are audited as failures;
+  - suspension, deactivation and removal end the person's sessions;
+  - removal also drops their roles here.
+- `lib/rbac/roles.ts`:
+  - assigning a role to yourself is refused (403 `SELF_ESCALATION`);
+  - `granted_by` is recorded;
+  - removing the last administrator's role answers 409
+    `LAST_TENANT_ADMIN`;
+  - roles can be managed for invited, suspended and deactivated members.
+
+**Invitations:**
+
+- The wizard (basic details, roles, review) invites or adds someone:
+  - it creates the account if the address has none;
+  - it grants the chosen roles as the administrator. Granting roles also
+    needs `role.manage`.
+- Job title, department and account type go to the person's identity
+  through the Identity Agent's published `updateIdentity`, only when the
+  administrator may edit identities. Otherwise the page says so.
+- The set-password link is e-mailed only to the invitee (Resend, when
+  configured) and never shown to the administrator, since it signs in as
+  that person. With no e-mail set up, the page says truthfully that
+  nothing was sent.
+- The invitee accepts:
+  - on `/onboarding` on the base address;
+  - on `/no-access` on the organization's own address.
+
+  Sign-in on an organization's address lets an invited member in far
+  enough to accept.
+
+**Screens:**
+
+- `/settings/users`: counts, search, status and role filters, paged at
+  the database.
+- `/settings/users/new`: the wizard.
+- `/settings/users/[id]`, with four tabs:
+  - roles, with who granted each and when;
+  - effective permissions, with the roles that grant each;
+  - access history, including refusals and reasons;
+  - sessions.
+
+  Its actions are suspend, reactivate, deactivate, remove (each with a
+  reason) and revoke sessions, plus edit name and assign or remove roles.
+  None is offered on your own page.
+- API:
+  - `GET /api/v1/users/[id]`;
+  - `POST .../status`;
+  - `POST`/`DELETE .../roles`;
+  - `GET`/`DELETE .../sessions`.
+- "Users" is in the sidebar and on `/settings`. The Users & Roles page no
+  longer offers you a role form on your own row, and shows removal
+  refusals.
+
+**Verified:**
+
+- tsc and eslint clean.
+- vitest **715/715**, with the new `userRules.test.ts` (10).
+- SQL check `tests/foundation/user-lifecycle-isolation.sql`, run live:
+  all 22 checks as expected (header); fixtures removed.
+- E2E `tests/e2e/users.spec.ts`:
+  - list search and filters;
+  - add now with Read Only: roles, effective permissions with
+    provenance, and the job title reaches the identity;
+  - suspension ends the person's session (their next API call refused)
+    and history shows the reason;
+  - reactivation restores access;
+  - an invitee accepts and lands in the organization;
+  - self-suspend 403 and self-grant 403;
+  - last-admin role removal 409, with the role kept;
+  - read-only 403, cross-tenant 404.
+
+  With the branding spec: **20/20**.
+- Screenshots: Users list (1440 light), Add user (1440 light), User
+  detail (1440 light; 390 dark).
+- The full suite on the combined build is recorded in the next entry.
+
+**Left out / handed on:**
+
+- The group filter and groups tab: FOUNDATION-P0-26.
+- The scope and conditions step: FOUNDATION-P0-19.
+- Enforcing the chosen sign-in method: FOUNDATION-P0-27's security profile.
+- Invitation expiry and resend: P1.
+- Session listing shows a person's sessions across all their organizations
+  (sessions are per account). Revoking them signs the person out
+  everywhere, as the specification's suspension requires. Recorded, not
+  narrowed.

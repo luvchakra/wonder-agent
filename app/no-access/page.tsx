@@ -3,6 +3,8 @@ import { getSessionUser } from "@/lib/tenant/session";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { signOutAction } from "@/app/actions/tenant";
+import { acceptInvitationAction } from "@/app/actions/users";
+import { listMyInvitations } from "@/lib/users/users";
 import { AuthShell, Button } from "@/modules/ui";
 
 // FOUNDATION-P0-22 — signed in, on an organization's own address, but with
@@ -19,6 +21,25 @@ export default async function NoAccessPage() {
   if (ctx.tenantId) redirect("/");
   const name = host.tenant?.name ?? "this organization";
   const suspended = host.tenant?.status === "suspended";
+  // FOUNDATION-P0-23 — invited here and not yet accepted: accepting is the way in.
+  const invitation = !suspended && host.tenant ? (await listMyInvitations(user.id)).find((i) => i.tenantId === host.tenant!.tenantId) : undefined;
+  if (invitation) {
+    return (
+      <AuthShell title={`Join ${name}`} subtitle={`You have been invited to ${name} on WonderID. Accept to start using it.`} footer={<>Signed in as {user.email ?? "your account"}.</>}>
+        <div className="flex flex-wrap gap-2">
+          <form action={acceptInvitationAction}>
+            <input type="hidden" name="tenantId" value={invitation.tenantId} />
+            <Button type="submit">Accept invitation</Button>
+          </form>
+          <form action={signOutAction}>
+            <Button type="submit" variant="outline">
+              Sign out
+            </Button>
+          </form>
+        </div>
+      </AuthShell>
+    );
+  }
   return (
     <AuthShell
       title={suspended ? `${name} is suspended` : `You don't have access to ${name}`}

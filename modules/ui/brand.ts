@@ -8,9 +8,10 @@ import assets from "./brandAssets.generated.json";
  * generated images, charts drawn in code).
  *
  * Source: docs/requirements/WonderID_Branding_Application_Wide_Implementation_Requirements.md.
- * The artwork under public/brand/ is interim, built by
- * scripts/brand/build-assets.mjs from the brand sheet until official
- * vector files are supplied (same file names, so they drop in).
+ * The artwork under public/brand/ is the user-supplied brand sheet
+ * (docs/requirements/wonderid-brand-sheet.png), cut into its pieces by
+ * scripts/brand/extract-assets.py — nothing redrawn. Official vector
+ * files, when supplied, replace them.
  */
 
 export type BrandAsset = { src: string; width: number; height: number };
@@ -37,21 +38,20 @@ export const wonderIdBrand = {
   chartSequence: ["#2538FF", "#06B6DA", "#8B5CF6", "#08122C", "#94A3B8"],
   assets: {
     /** Full colour, for light backgrounds. */
-    logo: asset("logo/wonderid-logo.svg"),
+    logo: asset("logo/wonderid-logo.png"),
     /** Full colour with a light wordmark, for dark backgrounds. */
-    logoDark: asset("logo/wonderid-logo-dark.svg"),
-    logoLight: asset("logo/wonderid-logo-light.svg"),
-    logoTagline: asset("logo/wonderid-logo-tagline.svg"),
-    logoTaglineDark: asset("logo/wonderid-logo-tagline-dark.svg"),
-    monochrome: asset("logo/wonderid-monochrome.svg"),
-    monochromeLight: asset("logo/wonderid-monochrome-light.svg"),
-    mark: asset("logo/wonderid-mark.svg"),
-    markDark: asset("logo/wonderid-mark-dark.svg"),
-    markLight: asset("logo/wonderid-mark-light.svg"),
-    markMonochrome: asset("logo/wonderid-mark-monochrome.svg"),
-    markMonochromeLight: asset("logo/wonderid-mark-monochrome-light.svg"),
-    favicon: asset("favicon/favicon.svg"),
-    social: "/brand/social/wonderid-og.png",
+    logoDark: asset("logo/wonderid-logo-dark.png"),
+    logoTagline: asset("logo/wonderid-logo-tagline.png"),
+    logoTaglineDark: asset("logo/wonderid-logo-tagline-dark.png"),
+    /** Black ink, for light backgrounds. */
+    monochrome: asset("logo/wonderid-monochrome.png"),
+    /** White ink, for dark backgrounds. */
+    monochromeLight: asset("logo/wonderid-monochrome-light.png"),
+    mark: asset("logo/wonderid-mark.png"),
+    markDark: asset("logo/wonderid-mark-dark.png"),
+    favicon: asset("favicon/favicon-32.png"),
+    appleTouchIcon: asset("favicon/apple-touch-icon.png"),
+    social: asset("social/wonderid-og.png"),
   },
 } as const;
 

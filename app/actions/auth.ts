@@ -1,7 +1,7 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { checkAndRecordAttempt, isDistinguishingClientIp, type RateLimitResult } from "@/lib/security/rateLimiter";
@@ -72,13 +72,17 @@ export async function signInAction(email: string, password: string): Promise<Aut
   if (error) return { ok: false, error: error.message };
 
   if (onTenantAddress && data.user) {
-    const { data: membership } = await supabase
+    // The person just authenticated, reading their own membership in the
+    // addressed organization. Service role: a membership that is not yet
+    // active (an invitation) is outside their RLS view.
+    const { data: membership } = await supabaseServiceRole()
       .from("tenant_memberships")
       .select("status")
       .eq("tenant_id", host.tenant!.tenantId)
       .eq("user_id", data.user.id)
       .maybeSingle();
-    if (membership?.status !== "active") {
+    // An invitation lets them in far enough to accept it (FOUNDATION-P0-23).
+    if (membership?.status !== "active" && membership?.status !== "invited") {
       // Only this new session ends; the account's other sessions are not touched.
       await supabase.auth.signOut({ scope: "local" });
       await writeAudit({

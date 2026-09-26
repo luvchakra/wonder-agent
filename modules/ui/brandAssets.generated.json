@@ -1,67 +1,67 @@
 {
-  "logo/wonderid-mark.svg": {
-    "src": "/brand/logo/wonderid-mark.svg",
-    "width": 120,
-    "height": 100
+  "logo/wonderid-logo-tagline.png": {
+    "src": "/brand/logo/wonderid-logo-tagline.png",
+    "width": 755,
+    "height": 164
   },
-  "logo/wonderid-mark-dark.svg": {
-    "src": "/brand/logo/wonderid-mark-dark.svg",
-    "width": 120,
-    "height": 100
+  "logo/wonderid-logo-tagline-dark.png": {
+    "src": "/brand/logo/wonderid-logo-tagline-dark.png",
+    "width": 471,
+    "height": 108
   },
-  "logo/wonderid-mark-light.svg": {
-    "src": "/brand/logo/wonderid-mark-light.svg",
-    "width": 120,
-    "height": 100
+  "logo/wonderid-logo.png": {
+    "src": "/brand/logo/wonderid-logo.png",
+    "width": 748,
+    "height": 156
   },
-  "logo/wonderid-mark-monochrome.svg": {
-    "src": "/brand/logo/wonderid-mark-monochrome.svg",
-    "width": 120,
-    "height": 100
+  "logo/wonderid-logo-dark.png": {
+    "src": "/brand/logo/wonderid-logo-dark.png",
+    "width": 466,
+    "height": 107
   },
-  "logo/wonderid-mark-monochrome-light.svg": {
-    "src": "/brand/logo/wonderid-mark-monochrome-light.svg",
-    "width": 120,
-    "height": 100
+  "logo/wonderid-mark.png": {
+    "src": "/brand/logo/wonderid-mark.png",
+    "width": 226,
+    "height": 156
   },
-  "logo/wonderid-logo.svg": {
-    "src": "/brand/logo/wonderid-logo.svg",
-    "width": 545,
-    "height": 100
+  "logo/wonderid-mark-dark.png": {
+    "src": "/brand/logo/wonderid-mark-dark.png",
+    "width": 141,
+    "height": 107
   },
-  "logo/wonderid-logo-light.svg": {
-    "src": "/brand/logo/wonderid-logo-light.svg",
-    "width": 545,
-    "height": 100
+  "logo/wonderid-monochrome.png": {
+    "src": "/brand/logo/wonderid-monochrome.png",
+    "width": 196,
+    "height": 48
   },
-  "logo/wonderid-logo-dark.svg": {
-    "src": "/brand/logo/wonderid-logo-dark.svg",
-    "width": 545,
-    "height": 100
+  "logo/wonderid-monochrome-light.png": {
+    "src": "/brand/logo/wonderid-monochrome-light.png",
+    "width": 197,
+    "height": 48
   },
-  "logo/wonderid-monochrome.svg": {
-    "src": "/brand/logo/wonderid-monochrome.svg",
-    "width": 545,
-    "height": 100
+  "favicon/favicon-16.png": {
+    "src": "/brand/favicon/favicon-16.png",
+    "width": 16,
+    "height": 16
   },
-  "logo/wonderid-monochrome-light.svg": {
-    "src": "/brand/logo/wonderid-monochrome-light.svg",
-    "width": 545,
-    "height": 100
+  "favicon/favicon-32.png": {
+    "src": "/brand/favicon/favicon-32.png",
+    "width": 32,
+    "height": 32
   },
-  "logo/wonderid-logo-tagline.svg": {
-    "src": "/brand/logo/wonderid-logo-tagline.svg",
-    "width": 547,
-    "height": 112
+  "favicon/favicon-48.png": {
+    "src": "/brand/favicon/favicon-48.png",
+    "width": 48,
+    "height": 48
   },
-  "logo/wonderid-logo-tagline-dark.svg": {
-    "src": "/brand/logo/wonderid-logo-tagline-dark.svg",
-    "width": 547,
-    "height": 112
+  "favicon/apple-touch-icon.png": {
+    "src": "/brand/favicon/apple-touch-icon.png",
+    "width": 180,
+    "height": 180
   },
-  "favicon/favicon.svg": {
-    "src": "/brand/favicon/favicon.svg",
-    "width": 120,
-    "height": 100
+  "social/wonderid-og.png": {
+    "src": "/brand/social/wonderid-og.png",
+    "width": 583,
+    "height": 290
   }
 }

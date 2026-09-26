@@ -44,7 +44,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-21 | Administration navigation and persistent tenant context | Not Started — 2026-09-26, WonderID Phase 4b |
-| EXPERIENCE-P0-22 | Brand foundation: assets, brand configuration, tokens, WonderIDLogo and TenantLogo (BRAND-001/002/003/006) | Done — 2026-09-26 (interim artwork from the brand sheet until official vector files are supplied) |
+| EXPERIENCE-P0-22 | Brand foundation: assets, brand configuration, tokens, WonderIDLogo and TenantLogo (BRAND-001/002/003/006) | Done — 2026-09-26 (artwork cut from the supplied brand sheet; official vector files to replace it when supplied) |
 | EXPERIENCE-P0-23 | Brand in the shell and authentication (BRAND-004/005) | Done — 2026-09-26 |
 | EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
@@ -682,8 +682,8 @@ decisions are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
 
 - `public/brand/` holds the specification's asset set (§8): the logo for
   light and dark backgrounds, monochrome dark and light, the mark and its
-  variants, favicons (SVG, 16, 32, 48, Apple touch) and social images.
-  All logos are vector paths with no raster and no font dependency.
+  variants, favicons (16, 32, 48, Apple touch) and a social image, all
+  cut from the supplied brand sheet (PNG) by `scripts/brand/extract-assets.py`.
 - One configuration, `modules/ui/brand.ts`: name, tagline, statement,
   palette, chart sequence, asset paths with intrinsic sizes, and the
   tab-title helper.

@@ -201,12 +201,16 @@ branded.
 
 ### Decisions taken while planning (recorded, not asked)
 
-1. **Interim artwork until official files arrive.** No vector logo files
-   came with the specification. `scripts/brand/build-assets.mjs` redraws
-   the sheet's mark (a W whose centre is a person, head above the central
-   peak) and outlines the wordmark from Geist, the app's own typeface
-   (SIL OFL). Every file has the specification's name (§8), so the
-   official SVGs replace them one for one.
+1. **The artwork is the user's own brand sheet** (user instruction,
+   2026-09-26: "just use the attached images"). `scripts/brand/extract-assets.py`
+   cuts each asset out of `docs/requirements/wonderid-brand-sheet.png`:
+   the lockups with and without the tagline, light and dark; the marks;
+   monochrome; the icons; the social image. It redraws nothing: it only
+   removes each panel's flat background, blanks the tagline where a plain
+   lockup is needed, and resamples the fixed icon sizes. The files are
+   PNG at the sheet's resolution (the full lockup is 748 px wide). The
+   specification prefers SVG (§9), so official vector files, when
+   supplied, replace them. A first pass that redrew the mark was dropped.
 2. **Colour values follow the specification's text.** The sheet image
    prints Deep Navy #081220 and Electric Blue #2563FF; the text (§19, §67)
    says #08122C and #2538FF. The text is used.

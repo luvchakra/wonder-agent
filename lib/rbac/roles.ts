@@ -59,16 +59,30 @@ export async function listAssignableRoles(): Promise<{ id: string; name: string 
   return data ?? [];
 }
 
+// FOUNDATION-P0-23: roles can be managed for any member still in the
+// organization (invited, suspended and deactivated included — only an
+// active membership makes them effective); never for a removed one. Read
+// with the service role, since members who are not active are outside the
+// caller's RLS view, and filtered by the verified tenant.
 async function assertTenantMember(tenantId: string, userId: string) {
-  const supabase = await supabaseServer();
-  const { data } = await supabase
+  const { data } = await supabaseServiceRole()
     .from("tenant_memberships")
     .select("user_id")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
-    .eq("status", "active")
+    .neq("status", "removed")
     .maybeSingle();
-  if (!data) throw new ApiError(404, "NOT_FOUND", "User is not an active member of this tenant");
+  if (!data) throw new ApiError(404, "NOT_FOUND", "User is not a member of this tenant");
+}
+
+// Migration 0096's guards (last administrator, self-grant), as answers.
+function refusalFrom(error: { message?: string } | null): ApiError | null {
+  const msg = error?.message ?? "";
+  if (msg.includes("LAST_TENANT_ADMIN")) {
+    return new ApiError(409, "LAST_TENANT_ADMIN", "This would leave the organization without a Tenant Administrator. Assign another administrator first.");
+  }
+  if (msg.includes("user_roles_no_self_grant")) return new ApiError(403, "SELF_ESCALATION", "You can't assign a role to yourself.");
+  return null;
 }
 
 /**
@@ -84,6 +98,11 @@ export async function assignRole(
   targetUserId: string,
   roleName: string,
 ): Promise<void> {
+  // Nobody grants themselves a role (spec §30); the database refuses it too.
+  if (actorId === targetUserId) {
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "role.assigned", objectType: "user_role", objectId: targetUserId, outcome: "failure", metadata: { role: roleName, refused: "SELF_ESCALATION" } });
+    throw new ApiError(403, "SELF_ESCALATION", "You can't assign a role to yourself. Another administrator must do it.");
+  }
   await assertTenantMember(tenantId, targetUserId);
 
   const supabase = supabaseServiceRole();
@@ -97,10 +116,10 @@ export async function assignRole(
 
   const { error } = await supabase
     .from("user_roles")
-    .insert({ tenant_id: tenantId, user_id: targetUserId, role_id: role.id });
+    .insert({ tenant_id: tenantId, user_id: targetUserId, role_id: role.id, granted_by: actorId });
   // unique(tenant_id, user_id, role_id) makes a duplicate assignment a
   // harmless no-op from the caller's point of view.
-  if (error && error.code !== "23505") throw new ApiError(500, "ASSIGN_FAILED", error.message);
+  if (error && error.code !== "23505") throw refusalFrom(error) ?? new ApiError(500, "ASSIGN_FAILED", error.message);
 
   await writeAudit({
     tenantId,
@@ -138,7 +157,14 @@ export async function removeRole(
     .eq("tenant_id", tenantId)
     .eq("user_id", targetUserId)
     .eq("role_id", role.id);
-  if (error) throw new ApiError(500, "REMOVE_FAILED", error.message);
+  if (error) {
+    const refusal = refusalFrom(error);
+    if (refusal) {
+      await writeAudit({ tenantId, actorId, actorType: "user", action: "role.removed", objectType: "user_role", objectId: targetUserId, outcome: "failure", metadata: { role: roleName, refused: refusal.code } });
+      throw refusal;
+    }
+    throw new ApiError(500, "REMOVE_FAILED", error.message);
+  }
 
   await writeAudit({
     tenantId,
