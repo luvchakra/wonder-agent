@@ -11,6 +11,8 @@ import { cn } from "@/lib/utils";
 import { RemoveRoleButton } from "../../roles/RemoveRoleButton";
 import { STATUS_TONE, formatDate, initials, relativeTime } from "../labels";
 import { AssignRoleForm, EditNameForm, RevokeSessionsForm, StatusActions } from "./UserActions";
+import { loadScopeOptions } from "../../roles/scopeOptions";
+import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
 
 // FOUNDATION-P0-23 — User detail (spec §23–25, 32–34; mockup 9): who they
 // are and their membership state; the roles they hold, who granted them
@@ -63,20 +65,24 @@ export default async function UserDetailPage({
   // Assigning roles: roles.assign, or the legacy role.manage (FOUNDATION-P0-24/25).
   const canAssign = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "roles") as TabKey;
-  const [user, identity, history, sessions, assignable] = await Promise.all([
+  const [user, identity, history, sessions, assignable, scope] = await Promise.all([
     getUserDetail(ctx.tenantId!, userId),
     getIdentityForUser(ctx.tenantId!, userId).catch(() => null),
     tab === "history" ? getAccessHistory(ctx.tenantId!, userId) : Promise.resolve(null),
     tab === "sessions" ? listUserSessions(ctx.tenantId!, userId).catch(() => null) : Promise.resolve(null),
     canAssign ? listAssignableRoles(ctx.tenantId!) : Promise.resolve([]),
+    loadScopeOptions(ctx.tenantId!),
   ]);
+  // Names for application and agent scopes (FOUNDATION-P0-19).
+  const scopeName = new Map([...scope.applications, ...scope.agents].map((o) => [o.id, o.label]));
+  const nameOf = (id: string) => scopeName.get(id) ?? "Not found";
+  const now = new Date();
   if (!user) notFound();
 
   const self = user.userId === ctx.userId;
   const name = user.displayName || user.email;
   const can = (p: string) => ctx.permissions.includes(p);
   const removed = user.status === "removed";
-  const unassigned = assignable.filter((r) => !user.roles.some((a) => a.role === r.name));
 
   return (
     <div className="space-y-5">
@@ -178,6 +184,7 @@ export default async function UserDetailPage({
                       <tr>
                         <Th>Role</Th>
                         <Th>Type</Th>
+                        <Th hideBelow="lg">Applies</Th>
                         <Th hideBelow="xl">Assigned</Th>
                         <Th hideBelow="lg">Assigned by</Th>
                         {canAssign && !self ? <Th className="text-right">Remove</Th> : null}
@@ -198,6 +205,14 @@ export default async function UserDetailPage({
                           <Td>
                             <Badge>{r.custom ? "Custom" : "System"}</Badge>
                           </Td>
+                          <Td hideBelow="lg" className="text-xs text-muted-foreground">
+                            {describeTerms(r.terms, nameOf)}
+                            {termsCurrent(r.terms, now) ? null : (
+                              <Badge tone="warning" className="ml-2">
+                                Not in effect
+                              </Badge>
+                            )}
+                          </Td>
                           <Td hideBelow="xl" className="whitespace-nowrap">
                             {formatDate(r.grantedAt)}
                           </Td>
@@ -213,7 +228,12 @@ export default async function UserDetailPage({
                   </TableContainer>
                 )}
                 {canAssign && !self && !removed ? (
-                  <AssignRoleForm userId={user.userId} roles={unassigned.map((r) => ({ name: r.name, label: r.displayName }))} />
+                  <AssignRoleForm
+                    userId={user.userId}
+                    roles={assignable.map((r) => ({ name: r.name, label: user.roles.some((a) => a.role === r.name) ? `${r.displayName} (change terms)` : r.displayName }))}
+                    applications={scope.applications}
+                    agents={scope.agents}
+                  />
                 ) : null}
               </CardBody>
             </Card>

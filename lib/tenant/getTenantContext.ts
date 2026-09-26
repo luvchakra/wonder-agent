@@ -6,6 +6,7 @@ import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getSessionUser } from "@/lib/tenant/session";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
 import type { TenantContext } from "@/lib/shared/types/foundation";
+import { grantActive, tenantWidePermissions, type AuthorizationPolicy, type Grant, type ScopeType } from "@/lib/rbac/authorizeCore";
 
 export const TENANT_COOKIE_NAME = "wa_tenant";
 
@@ -20,10 +21,15 @@ type MembershipRow = {
   tenants: { name: string; slug: string } | null;
 };
 
-type RoleRow = {
-  tenant_id: string;
-  roles: { name: string; status: string; role_permissions: { permissions: { key: string } }[] } | null;
-};
+type RoleOf = { id: string; name: string; display_name: string; status: string; role_permissions: { permissions: { key: string } | null }[] } | null;
+
+/** An assignment's terms (FOUNDATION-P0-19, migration 0100): scope, validity, condition. */
+type Terms = { scope_type: ScopeType; scope_values: string[]; starts_at: string | null; expires_at: string | null; requires_mfa: boolean };
+
+type RoleRow = Terms & { tenant_id: string; roles: RoleOf };
+
+const ROLE_SELECT = "roles(id, name, display_name, status, role_permissions(permissions(key)))";
+const TERMS_SELECT = "scope_type, scope_values, starts_at, expires_at, requires_mfa";
 
 /**
  * The current user's active tenant memberships, once per request. The
@@ -71,7 +77,7 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
   const supabase = await supabaseServer();
   const { data } = await supabase
     .from("user_roles")
-    .select("tenant_id, roles(name, status, role_permissions(permissions(key)))")
+    .select(`tenant_id, ${TERMS_SELECT}, ${ROLE_SELECT}`)
     .eq("user_id", user.id)
     .returns<RoleRow[]>();
   return data ?? [];
@@ -79,7 +85,7 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
 
 type GroupRoleRow = {
   tenant_id: string;
-  groups: { status: string; group_roles: { roles: RoleRow["roles"] }[] } | null;
+  groups: { name: string; status: string; group_roles: (Terms & { roles: RoleOf })[] } | null;
 };
 
 /**
@@ -95,11 +101,55 @@ const getMyGroupRoleRows = cache(async (): Promise<GroupRoleRow[]> => {
   const supabase = await supabaseServer();
   const { data } = await supabase
     .from("group_members")
-    .select("tenant_id, groups(status, group_roles(roles(name, status, role_permissions(permissions(key)))))")
+    .select(`tenant_id, groups(name, status, group_roles(${TERMS_SELECT}, ${ROLE_SELECT}))`)
     .eq("user_id", user.id)
     .returns<GroupRoleRow[]>();
   return data ?? [];
 });
+
+type PolicyRow = {
+  id: string;
+  tenant_id: string;
+  name: string;
+  effect: AuthorizationPolicy["effect"];
+  permissions: string[];
+  scope_type: ScopeType;
+  scope_values: string[];
+  exempt_role_ids: string[];
+};
+
+/**
+ * FOUNDATION-P0-19 — the active explicit authorization policies of the
+ * tenants the user belongs to (RLS), once per request. If they cannot be
+ * read, the context fails closed: see getTenantContext().
+ */
+const getMyPolicyRows = cache(async (): Promise<PolicyRow[] | null> => {
+  const user = await getSessionUser();
+  if (!user) return [];
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("authorization_policies")
+    .select("id, tenant_id, name, effect, permissions, scope_type, scope_values, exempt_role_ids")
+    .eq("status", "active")
+    .returns<PolicyRow[]>();
+  return error ? null : (data ?? []);
+});
+
+function grantOf(terms: Terms, role: NonNullable<RoleOf>, source: Grant["source"], via: string | null): Grant {
+  return {
+    roleId: role.id,
+    role: role.name,
+    roleDisplayName: role.display_name,
+    source,
+    via,
+    permissions: role.role_permissions.map((rp) => rp.permissions?.key).filter((k): k is string => !!k),
+    scopeType: terms.scope_type ?? "tenant",
+    scopeValues: terms.scope_values ?? [],
+    startsAt: terms.starts_at ?? null,
+    expiresAt: terms.expires_at ?? null,
+    requiresMfa: !!terms.requires_mfa,
+  };
+}
 
 /**
  * Resolves the current request's tenant context. Tenant context comes ONLY
@@ -125,18 +175,14 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
     return { userId: "", tenantId: null, tenantSlug: null, roles: [], permissions: [] };
   }
 
-  const [memberships, directRoleRows, groupRoleRows, cookieStore, host] = await Promise.all([
+  const [memberships, directRoleRows, groupRoleRows, policyRows, cookieStore, host] = await Promise.all([
     getMyMemberships(),
     getMyRoleRows(),
     getMyGroupRoleRows(),
+    getMyPolicyRows(),
     cookies(),
     getHostTenant(),
   ]);
-  // Direct roles, then the roles of the user's active groups.
-  const roleRows: RoleRow[] = [
-    ...directRoleRows,
-    ...groupRoleRows.flatMap((g) => (g.groups?.status === "active" ? g.groups.group_roles.map((gr) => ({ tenant_id: g.tenant_id, roles: gr.roles })) : [])),
-  ];
 
   // FOUNDATION-P0-22 — on a tenant's own address (`<slug>.<BASE_APP_HOST>`)
   // that tenant is the only candidate: the user must hold an active
@@ -156,22 +202,43 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
   }
 
   const tenantId = activeMembership.tenantId;
-  const roles = new Set<string>();
-  const permissions = new Set<string>();
-  for (const row of roleRows) {
-    // An inactive (custom) role grants nothing (FOUNDATION-P0-25).
-    if (row.tenant_id !== tenantId || !row.roles || row.roles.status !== "active") continue;
-    roles.add(row.roles.name);
-    for (const rp of row.roles.role_permissions ?? []) {
-      if (rp.permissions?.key) permissions.add(rp.permissions.key);
-    }
+  // FOUNDATION-P0-19 — the engine's facts for this tenant: every role
+  // assignment, direct and through active groups, with its terms. An
+  // inactive role grants nothing (FOUNDATION-P0-25).
+  const grants: Grant[] = [];
+  for (const row of directRoleRows) {
+    if (row.tenant_id === tenantId && row.roles && row.roles.status === "active") grants.push(grantOf(row, row.roles, "DIRECT", null));
   }
+  for (const g of groupRoleRows) {
+    if (g.tenant_id !== tenantId || g.groups?.status !== "active") continue;
+    for (const gr of g.groups.group_roles) if (gr.roles && gr.roles.status === "active") grants.push(grantOf(gr, gr.roles, "GROUP", g.groups.name));
+  }
+  // Policies that cannot be read are never permission (CLAUDE.md §17.4):
+  // the context then carries no permissions at all.
+  if (policyRows === null) {
+    return { userId: user.id, tenantId, tenantSlug: activeMembership.slug || null, roles: [], permissions: [], grants: [], policies: [], aal: user.aal };
+  }
+  const policies: AuthorizationPolicy[] = policyRows
+    .filter((p) => p.tenant_id === tenantId)
+    .map((p) => ({ id: p.id, name: p.name, effect: p.effect, permissions: p.permissions, scopeType: p.scope_type, scopeValues: p.scope_values, exemptRoleIds: p.exempt_role_ids }));
+  const now = new Date();
+  // Roles and permissions in effect across the whole tenant; scoped grants
+  // count only where a resource is named (lib/rbac/authorize.ts).
+  const permissions = tenantWidePermissions(grants, policies, now, user.aal);
+  const roles = [...new Set(grants.filter((g) => g.scopeType === "tenant" && isLive(g, now, user.aal)).map((g) => g.role))];
 
   return {
     userId: user.id,
     tenantId,
     tenantSlug: activeMembership.slug || null,
-    roles: [...roles],
-    permissions: [...permissions],
+    roles,
+    permissions,
+    grants,
+    policies,
+    aal: user.aal,
   };
 });
+
+function isLive(g: Grant, now: Date, aal: "aal1" | "aal2" | null): boolean {
+  return grantActive(g, now) === "ACTIVE" && (!g.requiresMfa || aal === "aal2");
+}

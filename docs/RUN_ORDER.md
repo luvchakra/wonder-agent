@@ -152,6 +152,7 @@ isolation checks. Detail is in each module's audit log.
 | 4c | EXPERIENCE-P0-23 (revised): the branding specification's light console sidebar, by user decision | Done | see Experience audit |
 | 4b | FOUNDATION-P0-23: users and membership lifecycle — Users list, Add user wizard, User detail (roles, effective permissions, access history, sessions), suspension with session revocation, invitations, self-protection and last-administrator guard (0096) | Done | see Foundation audit |
 | 4b | FOUNDATION-P0-26: groups — groups, members and group roles; effective permissions combine direct and group roles per request; no escalation through groups, in the service and the database; Groups screens, user and role pages, users-list filter (0099) | Done (group scopes wait on P0-19) | see Foundation audit |
+| 4b | FOUNDATION-P0-19: scoped assignments and the authorization engine — assignment scope, validity and MFA condition (direct and group), explicit deny/require-approval policies with exemptions, deterministic `authorize()` behind `requirePermission()`, resource-scoped agent routes, Authorization Policies screen (0100) | Done (generic resource scope and application routes with P0-20) | see Foundation audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by

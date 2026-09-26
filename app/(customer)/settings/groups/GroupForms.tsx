@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/groups";
 import { Button, PendingSubmitButton, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
+import { AssignmentTermsFields, type ScopeOption } from "../roles/AssignmentTermsFields";
 
 /**
  * FOUNDATION-P0-26 — the Groups screens' forms. Each waits for the server's
@@ -154,9 +155,9 @@ export function RemoveMemberButton({ groupId, userId, name }: { groupId: string;
   );
 }
 
-export function AddGroupRoleForm({ groupId, roles }: { groupId: string; roles: { name: string; label: string }[] }) {
+export function AddGroupRoleForm({ groupId, roles, applications, agents }: { groupId: string; roles: { name: string; label: string }[]; applications: ScopeOption[]; agents: ScopeOption[] }) {
   const [state, action] = useActionState(addGroupRoleAction, initial);
-  if (!roles.length) return <p className="text-xs text-muted-foreground">The group already has every role there is to give.</p>;
+  if (!roles.length) return <p className="text-xs text-muted-foreground">There are no roles to give.</p>;
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="groupId" value={groupId} />
@@ -180,6 +181,7 @@ export function AddGroupRoleForm({ groupId, roles }: { groupId: string; roles: {
           Assign role
         </PendingSubmitButton>
       </div>
+      <AssignmentTermsFields idPrefix="group-role" applications={applications} agents={agents} errors={state.errors} />
       <Result state={state} />
     </form>
   );

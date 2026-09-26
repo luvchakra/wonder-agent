@@ -2,7 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireAnyPermission, requirePermission } from "@/lib/rbac/requirePermission";
+import { requirePermission } from "@/lib/rbac/requirePermission";
+import { requireAnyPermissionFor } from "@/lib/rbac/authorize";
+import { agentResource } from "@/app/_shared/agentScope";
 import { engageEmergencyControl, ingestRuntimeEvent, liftEmergencyControl } from "@/modules/runtime-assurance/service";
 import { revokeAllAgentApiKeys } from "@/lib/security/agentApiKeys";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -56,7 +58,7 @@ export async function liftEmergencyControlAction(controlId: string, reason: stri
 
 export async function revokeAllAgentKeysAction(agentId: string, reason: string): Promise<ActionResult> {
   return asResult(async () => {
-    const ctx = await requireAnyPermission(["runtime.emergency", "agent.update"]);
+    const ctx = await requireAnyPermissionFor(["runtime.emergency", "agent.update"], agentResource(agentId));
     await revokeAllAgentApiKeys(ctx.tenantId!, ctx.userId, agentId, reason);
     revalidatePath(`/agents/${agentId}`);
   });

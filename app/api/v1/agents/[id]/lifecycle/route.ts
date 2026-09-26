@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listLifecycleEvents, transitionAgentLifecycle } from "@/modules/agent-identity/service";
 import { errorResponse } from "@/modules/agent-identity/http";
+import { requirePermissionFor } from "@/lib/rbac/authorize";
+import { agentResource } from "@/app/_shared/agentScope";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,8 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const ctx = await requirePermission("agent.update");
     const { id } = await params;
+    const ctx = await requirePermissionFor("agent.update", agentResource(id));
     const body = await request.json();
     const agent = await transitionAgentLifecycle(ctx.tenantId!, id, body.toState, body.reason, {
       actorType: "user",

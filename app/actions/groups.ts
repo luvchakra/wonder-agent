@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAnyPermission, requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError, type TenantContext } from "@/lib/shared/types/foundation";
+import { termsFromForm } from "@/lib/rbac/assignmentForm";
 import { addGroupMember, addGroupRole, createGroup, deleteGroup, getGroup, removeGroupMember, removeGroupRole, updateGroup } from "@/lib/users/groups";
 
 /**
@@ -115,9 +116,11 @@ export async function addGroupRoleAction(_prev: GroupActionState, formData: Form
   const groupId = String(formData.get("groupId") ?? "");
   const role = String(formData.get("role") ?? "");
   if (!role) return { ok: false, message: "Choose a role." };
+  const terms = termsFromForm(formData, role);
+  if (!terms.ok) return { ok: false, message: "Check the assignment's scope and dates.", errors: terms.errors };
   try {
     const ctx = await requireAnyPermission(ASSIGN);
-    await addGroupRole(ctx.tenantId!, ctx.userId, groupId, role);
+    await addGroupRole(ctx.tenantId!, ctx.userId, groupId, role, terms.terms);
   } catch (err) {
     return refused(err);
   }

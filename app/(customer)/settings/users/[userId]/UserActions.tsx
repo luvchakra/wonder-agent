@@ -5,6 +5,7 @@ import { assignUserRoleAction, changeUserStatusAction, revokeSessionsAction, upd
 import { Button, PendingSubmitButton, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import type { MembershipStatus, StatusAction } from "@/lib/users/userRules";
+import { AssignmentTermsFields, type ScopeOption } from "../../roles/AssignmentTermsFields";
 
 /**
  * FOUNDATION-P0-23 — the user detail page's actions. Every one waits for
@@ -153,7 +154,17 @@ export function EditNameForm({ userId, name }: { userId: string; name: string })
   );
 }
 
-export function AssignRoleForm({ userId, roles }: { userId: string; roles: { name: string; label: string }[] }) {
+export function AssignRoleForm({
+  userId,
+  roles,
+  applications = [],
+  agents = [],
+}: {
+  userId: string;
+  roles: { name: string; label: string }[];
+  applications?: ScopeOption[];
+  agents?: ScopeOption[];
+}) {
   const [state, formAction] = useActionState(assignUserRoleAction, initial);
   if (!roles.length) return <p className="text-xs text-muted-foreground">They hold every role there is to assign.</p>;
   return (
@@ -179,6 +190,7 @@ export function AssignRoleForm({ userId, roles }: { userId: string; roles: { nam
           Assign role
         </PendingSubmitButton>
       </div>
+      <AssignmentTermsFields idPrefix="assign" applications={applications} agents={agents} errors={state.errors} />
       <Result state={state} />
     </form>
   );

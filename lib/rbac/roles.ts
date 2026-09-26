@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { TENANT_WIDE, termsToRow, type AssignmentTerms } from "./assignmentRules";
 
 export type TenantMemberWithRoles = {
   userId: string;
@@ -100,6 +101,10 @@ function refusalFrom(error: { message?: string } | null): ApiError | null {
     return new ApiError(409, "LAST_TENANT_ADMIN", "This would leave the organization without a Tenant Administrator. Assign another administrator first.");
   }
   if (msg.includes("user_roles_no_self_grant")) return new ApiError(403, "SELF_ESCALATION", "You can't assign a role to yourself.");
+  if (msg.includes("SCOPE_NOT_IN_TENANT")) return new ApiError(400, "SCOPE_NOT_IN_TENANT", "The scope names an application or agent that isn't in this organization.");
+  if (msg.includes("ADMIN_ASSIGNMENT_UNCONDITIONAL")) {
+    return new ApiError(400, "ADMIN_ASSIGNMENT_UNCONDITIONAL", "The Tenant Administrator role is always organization-wide, permanent and unconditional.");
+  }
   return null;
 }
 
@@ -115,6 +120,7 @@ export async function assignRole(
   actorId: string,
   targetUserId: string,
   roleName: string,
+  terms: AssignmentTerms = TENANT_WIDE,
 ): Promise<void> {
   // Nobody grants themselves a role (spec §30); the database refuses it too.
   if (actorId === targetUserId) {
@@ -130,20 +136,32 @@ export async function assignRole(
 
   const { error } = await supabase
     .from("user_roles")
-    .insert({ tenant_id: tenantId, user_id: targetUserId, role_id: role.id, granted_by: actorId });
-  // unique(tenant_id, user_id, role_id) makes a duplicate assignment a
-  // harmless no-op from the caller's point of view.
-  if (error && error.code !== "23505") throw refusalFrom(error) ?? new ApiError(500, "ASSIGN_FAILED", error.message);
+    .insert({ tenant_id: tenantId, user_id: targetUserId, role_id: role.id, granted_by: actorId, ...termsToRow(terms) });
+  // unique(tenant_id, user_id, role_id): assigning a role someone already
+  // holds changes its terms (FOUNDATION-P0-19) — scope, validity, MFA.
+  let changed = false;
+  if (error?.code === "23505") {
+    const { error: updateError } = await supabase
+      .from("user_roles")
+      .update({ granted_by: actorId, ...termsToRow(terms) })
+      .eq("tenant_id", tenantId)
+      .eq("user_id", targetUserId)
+      .eq("role_id", role.id);
+    if (updateError) throw refusalFrom(updateError) ?? new ApiError(500, "ASSIGN_FAILED", updateError.message);
+    changed = true;
+  } else if (error) {
+    throw refusalFrom(error) ?? new ApiError(500, "ASSIGN_FAILED", error.message);
+  }
 
   await writeAudit({
     tenantId,
     actorId,
     actorType: "user",
-    action: "role.assigned",
+    action: changed ? "role.assignment_changed" : "role.assigned",
     objectType: "user_role",
     objectId: targetUserId,
     outcome: "success",
-    metadata: { role: roleName, targetUserId },
+    metadata: { role: roleName, targetUserId, ...termsToRow(terms) },
   });
 }
 

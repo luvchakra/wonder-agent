@@ -36,6 +36,8 @@ const ROUTES = [
   { path: "/settings/roles", heading: "Roles" },
   { path: "/settings/users", heading: "Users" },
   { path: "/settings/permissions", heading: "Permission catalog" },
+  { path: "/settings/authorization-policies", heading: "Authorization policies" },
+  { path: "/settings/groups", heading: "Groups" },
   { path: "/settings/sso", heading: "Single Sign-On" },
   { path: "/settings/security", heading: null },
   { path: "/settings/notifications", heading: "Notification Preferences" },

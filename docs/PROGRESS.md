@@ -14,7 +14,7 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**186 of 239 tracked stories complete — 78%**
+**187 of 239 tracked stories complete — 78%**
 
 ```
 ███████████████████████████████░░░░░░░░░  78%
@@ -22,10 +22,10 @@ Generated 2026-09-26 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 186 |
+| Done | 187 |
 | Partial | 26 |
 | Deferred | 1 |
-| Not Started | 26 |
+| Not Started | 25 |
 | **Total tracked** | **239** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 34 | 2 | 0 | 4 | 40 | `███████████████░░░` 85% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 35 | 2 | 0 | 3 | 40 | `████████████████░░` 88% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 16 | 3 | 0 | 1 | 20 | `██████████████░░░░` 80% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 34 done · 2 partial · 0 deferred · 4 not started (40 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 35 done · 2 partial · 0 deferred · 3 not started (40 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -93,7 +93,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
 | FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Done — 2026-09-25: migration `0061` applied live; `lib/security/agentApiKeys.ts` (hash-only storage, tenant+agent-bound verify, fail-closed), API routes, Agent 360 card; 16 unit + 9 live SQL checks + 4 E2E; see audit log |
 | FOUNDATION-P0-18 | New permission keys (master P0-42) | Done — 2026-09-25: 7 keys seeded by least privilege in `0061`, `requireAnyPermission()` added; live-verified; see audit log |
-| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles — re-scoped 2026-09-26 (Phase 4b) as scoped assignments and the authorization engine | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles — re-scoped 2026-09-26 (Phase 4b) as scoped assignments and the authorization engine | Done — 2026-09-26 (0100; scope types tenant, environment, application, agent — a generic 'resource' scope and application-route resource checks follow with FOUNDATION-P0-20; REQUIRE_APPROVAL refuses the direct action until an approval workflow is wired, P1) |
 | FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
 | FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Done — 2026-09-26 (custom-domain verification is P1; the shell shows name and URL, environment arrives with P0-27's profile) |

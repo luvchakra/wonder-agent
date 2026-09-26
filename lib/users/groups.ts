@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { TENANT_WIDE, termsToRow, type AssignmentTerms } from "@/lib/rbac/assignmentRules";
 
 /**
  * FOUNDATION-P0-26 — groups (spec §11–12): people grouped to manage
@@ -38,7 +39,19 @@ export type GroupRole = {
   displayName: string;
   custom: boolean;
   grantedAt: string;
+  /** Scope, validity and condition of the assignment (FOUNDATION-P0-19). */
+  terms: AssignmentTerms;
 };
+
+type TermsRow = { scope_type: AssignmentTerms["scopeType"]; scope_values: string[]; starts_at: string | null; expires_at: string | null; requires_mfa: boolean };
+const TERMS = "scope_type, scope_values, starts_at, expires_at, requires_mfa";
+const termsOf = (r: TermsRow): AssignmentTerms => ({
+  scopeType: r.scope_type ?? "tenant",
+  scopeValues: r.scope_values ?? [],
+  startsAt: r.starts_at,
+  expiresAt: r.expires_at,
+  requiresMfa: !!r.requires_mfa,
+});
 export type GroupDetail = GroupSummary & {
   members: GroupMember[];
   roleAssignments: GroupRole[];
@@ -56,7 +69,7 @@ type GroupRow = {
   created_at: string;
   updated_at: string;
   group_members: { user_id: string; created_at: string }[];
-  group_roles: {
+  group_roles: (TermsRow & {
     role_id: string;
     created_at: string;
     roles: {
@@ -64,11 +77,11 @@ type GroupRow = {
       display_name: string;
       tenant_id: string | null;
     } | null;
-  }[];
+  })[];
 };
 
 const GROUP_SELECT =
-  "id, name, description, status, created_at, updated_at, group_members(user_id, created_at), group_roles(role_id, created_at, roles(name, display_name, tenant_id))";
+  "id, name, description, status, created_at, updated_at, group_members(user_id, created_at), group_roles(role_id, created_at, " + TERMS + ", roles(name, display_name, tenant_id))";
 
 function summary(g: GroupRow): GroupSummary {
   return {
@@ -142,6 +155,7 @@ export async function getGroup(tenantId: string, groupId: string): Promise<Group
         displayName: r.roles!.display_name,
         custom: r.roles!.tenant_id !== null,
         grantedAt: r.created_at,
+        terms: termsOf(r),
       }))
       .sort((a, b) => a.displayName.localeCompare(b.displayName)),
   };
@@ -152,14 +166,14 @@ export type UserGroup = {
   id: string;
   name: string;
   status: string;
-  roles: { id: string; name: string; displayName: string; status: string }[];
+  roles: { id: string; name: string; displayName: string; status: string; terms: AssignmentTerms }[];
 };
 
 export async function groupsOfUser(tenantId: string, userId: string): Promise<UserGroup[]> {
   if (!UUID_RE.test(userId)) return [];
   const { data, error } = await supabaseServiceRole()
     .from("group_members")
-    .select("group_id, groups(id, name, status, group_roles(roles(id, name, display_name, status)))")
+    .select(`group_id, groups(id, name, status, group_roles(${TERMS}, roles(id, name, display_name, status)))`)
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
     .returns<
@@ -169,14 +183,14 @@ export async function groupsOfUser(tenantId: string, userId: string): Promise<Us
           id: string;
           name: string;
           status: string;
-          group_roles: {
+          group_roles: (TermsRow & {
             roles: {
               id: string;
               name: string;
               display_name: string;
               status: string;
             } | null;
-          }[];
+          })[];
         } | null;
       }[]
     >();
@@ -194,6 +208,7 @@ export async function groupsOfUser(tenantId: string, userId: string): Promise<Us
           name: gr.roles!.name,
           displayName: gr.roles!.display_name,
           status: gr.roles!.status,
+          terms: termsOf(gr),
         })),
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -356,7 +371,7 @@ export async function removeGroupMember(tenantId: string, actorId: string, group
   });
 }
 
-export async function addGroupRole(tenantId: string, actorId: string, groupId: string, roleName: string): Promise<void> {
+export async function addGroupRole(tenantId: string, actorId: string, groupId: string, roleName: string, terms: AssignmentTerms = TENANT_WIDE): Promise<void> {
   const g = await groupIn(tenantId, groupId);
   if (g.group_members.some((m) => m.user_id === actorId)) {
     await writeAudit({
@@ -384,22 +399,40 @@ export async function addGroupRole(tenantId: string, actorId: string, groupId: s
     tenant_id: tenantId,
     role_id: role.id,
     granted_by: actorId,
+    ...termsToRow(terms),
   });
-  if (error && error.code !== "23505") {
-    if ((error.message ?? "").includes("SELF_ESCALATION")) throw new ApiError(403, "SELF_ESCALATION", "Members of a group can't give it roles.");
-    throw new ApiError(500, "ASSIGN_FAILED", error.message);
+  // Giving a group a role it already carries changes the assignment's terms (FOUNDATION-P0-19).
+  let changed = false;
+  if (error?.code === "23505") {
+    const { error: updateError } = await supabaseServiceRole()
+      .from("group_roles")
+      .update({ granted_by: actorId, ...termsToRow(terms) })
+      .eq("tenant_id", tenantId)
+      .eq("group_id", g.id)
+      .eq("role_id", role.id);
+    if (updateError) throw assignRefusal(updateError);
+    changed = true;
+  } else if (error) {
+    throw assignRefusal(error);
   }
-  if (error) return;
   await writeAudit({
     tenantId,
     actorId,
     actorType: "user",
-    action: "group.role_assigned",
+    action: changed ? "group.role_assignment_changed" : "group.role_assigned",
     objectType: "group",
     objectId: g.id,
     outcome: "success",
-    metadata: { role: roleName, group: g.name },
+    metadata: { role: roleName, group: g.name, ...termsToRow(terms) },
   });
+}
+
+function assignRefusal(error: { message?: string }): ApiError {
+  const msg = error.message ?? "";
+  if (msg.includes("SELF_ESCALATION")) return new ApiError(403, "SELF_ESCALATION", "Members of a group can't give it roles.");
+  if (msg.includes("SCOPE_NOT_IN_TENANT")) return new ApiError(400, "SCOPE_NOT_IN_TENANT", "The scope names an application or agent that isn't in this organization.");
+  if (msg.includes("ADMIN_ASSIGNMENT_UNCONDITIONAL")) return new ApiError(400, "ADMIN_ASSIGNMENT_UNCONDITIONAL", "The Tenant Administrator role is always organization-wide, permanent and unconditional.");
+  return new ApiError(500, "ASSIGN_FAILED", msg);
 }
 
 export async function removeGroupRole(tenantId: string, actorId: string, groupId: string, roleId: string): Promise<void> {

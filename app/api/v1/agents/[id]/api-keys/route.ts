@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { createAgentApiKey, listAgentApiKeys } from "@/lib/security/agentApiKeys";
 import { errorResponse } from "@/lib/shared/apiError";
+import { requirePermissionFor } from "@/lib/rbac/authorize";
+import { agentResource } from "@/app/_shared/agentScope";
 
 // FOUNDATION-P0-17. Thin wrappers over Foundation's agent-API-key
 // primitive. The sub-route lives under the agent it belongs to; the
@@ -19,8 +21,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const ctx = await requirePermission("agent.update");
     const { id } = await params;
+    const ctx = await requirePermissionFor("agent.update", agentResource(id));
     const body = (await request.json().catch(() => ({}))) as { name?: unknown; expiresAt?: unknown };
     const { key, secret } = await createAgentApiKey(ctx.tenantId!, ctx.userId, id, {
       name: typeof body.name === "string" ? body.name : "",

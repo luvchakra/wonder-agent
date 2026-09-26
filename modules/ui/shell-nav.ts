@@ -152,7 +152,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     label: "Permissions (WonderID)",
     href: "/settings/roles",
     icon: "UserCog",
-    children: [link("Users", "/settings/users"), link("Groups", "/settings/groups"), link("WonderID Roles", "/settings/roles"), link("Permission Catalog", "/settings/permissions")],
+    children: [link("Users", "/settings/users"), link("Groups", "/settings/groups"), link("WonderID Roles", "/settings/roles"), link("Permission Catalog", "/settings/permissions"), link("Authorization Policies", "/settings/authorization-policies")],
   },
   {
     label: "Administration",

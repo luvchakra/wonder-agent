@@ -3,7 +3,12 @@ import "server-only";
 import { cache } from "react";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 
-export type SessionUser = { id: string; email: string | null };
+export type SessionUser = {
+  id: string;
+  email: string | null;
+  /** The session's authenticator assurance level (aal2 after MFA), from the verified token (FOUNDATION-P0-19). */
+  aal: "aal1" | "aal2" | null;
+};
 
 /**
  * The authenticated user for the current request, resolved once and shared
@@ -33,7 +38,8 @@ export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const { data, error } = await supabase.auth.getClaims();
   if (error || !data?.claims?.sub) return null;
   const email = typeof data.claims.email === "string" ? data.claims.email : null;
-  return { id: data.claims.sub, email };
+  const aal = data.claims.aal === "aal2" ? "aal2" : data.claims.aal === "aal1" ? "aal1" : null;
+  return { id: data.claims.sub, email, aal };
 });
 
 /**

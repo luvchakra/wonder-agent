@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireAnyPermission, requirePermission } from "@/lib/rbac/requirePermission";
+import { requireAnyPermissionFor, requirePermissionFor } from "@/lib/rbac/authorize";
+import { agentResource } from "@/app/_shared/agentScope";
 import { createAgentApiKey, revokeAgentApiKey } from "@/lib/security/agentApiKeys";
 import { ApiError } from "@/lib/shared/types/foundation";
 
@@ -20,7 +21,7 @@ export async function createAgentApiKeyAction(
   formData: FormData,
 ): Promise<CreateAgentKeyState> {
   try {
-    const ctx = await requirePermission("agent.update");
+    const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
     const expiry = String(formData.get("expiresOn") ?? "").trim();
     const { key, secret } = await createAgentApiKey(ctx.tenantId!, ctx.userId, agentId, {
       name: String(formData.get("name") ?? ""),
@@ -41,7 +42,7 @@ export async function revokeAgentApiKeyAction(
   reason: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const ctx = await requireAnyPermission(["agent.update", "runtime.emergency"]);
+    const ctx = await requireAnyPermissionFor(["agent.update", "runtime.emergency"], agentResource(agentId));
     await revokeAgentApiKey(ctx.tenantId!, ctx.userId, agentId, keyId, reason);
     revalidatePath(`/agents/${agentId}`);
     return { success: true };

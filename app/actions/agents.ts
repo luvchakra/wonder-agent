@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { requirePermissionFor } from "@/lib/rbac/authorize";
+import { agentResource } from "@/app/_shared/agentScope";
 import {
   addRelationship,
   assignOwner,
@@ -63,7 +65,7 @@ export async function confirmDistinctAction(formData: FormData) {
 }
 
 export async function assignOwnerAction(agentId: string, formData: FormData) {
-  const ctx = await requirePermission("agent.update");
+  const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   await assignOwner(
     ctx.tenantId!,
     agentId,
@@ -87,7 +89,7 @@ function dateField(formData: FormData, name: string, endOfDay = false): string |
 
 /** IDENTITY-P0-13 — the owner confirms the agent's ownership is still right. */
 export async function reviewOwnershipAction(agentId: string): Promise<{ ok: boolean; message: string }> {
-  const ctx = await requirePermission("agent.update");
+  const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   try {
     const r = await reviewOwnership(ctx.tenantId!, ctx.userId, agentId);
     revalidatePath(`/agents/${agentId}`);
@@ -99,7 +101,7 @@ export async function reviewOwnershipAction(agentId: string): Promise<{ ok: bool
 }
 
 export async function transitionLifecycleAction(agentId: string, formData: FormData) {
-  const ctx = await requirePermission("agent.update");
+  const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   await transitionAgentLifecycle(
     ctx.tenantId!,
     agentId,
@@ -111,7 +113,7 @@ export async function transitionLifecycleAction(agentId: string, formData: FormD
 }
 
 export async function createContractAction(agentId: string, formData: FormData) {
-  const ctx = await requirePermission("agent.update");
+  const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   const listField = (name: string) =>
     String(formData.get(name) ?? "")
       .split(",")
@@ -142,7 +144,7 @@ export async function createContractAction(agentId: string, formData: FormData) 
 }
 
 export async function addRelationshipAction(agentId: string, formData: FormData) {
-  const ctx = await requirePermission("agent.update");
+  const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   await addRelationship(
     ctx.tenantId!,
     agentId,
@@ -153,7 +155,7 @@ export async function addRelationshipAction(agentId: string, formData: FormData)
 }
 
 export async function linkIdentityAction(agentId: string, formData: FormData) {
-  const ctx = await requirePermission("agent.update");
+  const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   await linkAgentIdentity(
     ctx.tenantId!,
     agentId,

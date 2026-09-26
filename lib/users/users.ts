@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { listAssignableRoles } from "@/lib/rbac/roles";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { groupsOfUser, type UserGroup } from "./groups";
+import { describeTerms, isTenantWide, termsCurrent, type AssignmentTerms } from "@/lib/rbac/assignmentRules";
 import {
   TRANSITIONS,
   checkRoleGrant,
@@ -142,6 +143,8 @@ export type RoleAssignment = {
   active: boolean;
   grantedAt: string;
   grantedBy: { userId: string; name: string } | null;
+  /** Scope, validity and condition (FOUNDATION-P0-19). */
+  terms: AssignmentTerms;
 };
 
 export type UserDetail = {
@@ -170,8 +173,21 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 type RoleAssignmentRow = {
   created_at: string;
   granted_by: string | null;
+  scope_type: AssignmentTerms["scopeType"];
+  scope_values: string[];
+  starts_at: string | null;
+  expires_at: string | null;
+  requires_mfa: boolean;
   roles: { id: string; name: string; display_name: string; description: string | null; status: string; tenant_id: string | null } | null;
 };
+
+const termsOf = (r: RoleAssignmentRow): AssignmentTerms => ({
+  scopeType: r.scope_type ?? "tenant",
+  scopeValues: r.scope_values ?? [],
+  startsAt: r.starts_at,
+  expiresAt: r.expires_at,
+  requiresMfa: !!r.requires_mfa,
+});
 
 export async function getUserDetail(tenantId: string, userId: string): Promise<UserDetail | null> {
   if (!UUID_RE.test(userId)) return null;
@@ -183,7 +199,7 @@ export async function getUserDetail(tenantId: string, userId: string): Promise<U
     db.auth.admin.getUserById(userId),
     db
       .from("user_roles")
-      .select("created_at, granted_by, roles(id, name, display_name, description, status, tenant_id)")
+      .select("created_at, granted_by, scope_type, scope_values, starts_at, expires_at, requires_mfa, roles(id, name, display_name, description, status, tenant_id)")
       .eq("tenant_id", tenantId)
       .eq("user_id", userId)
       .returns<RoleAssignmentRow[]>(),
@@ -192,11 +208,22 @@ export async function getUserDetail(tenantId: string, userId: string): Promise<U
   if (rolesError) throw new ApiError(500, "QUERY_FAILED", rolesError.message);
   const roles = (roleRows ?? []).filter((r) => r.roles);
   // What grants what: active direct roles by name; active roles of active groups as "Role (via Group)".
+  // FOUNDATION-P0-19 — only assignments in effect now count, and a scoped or
+  // conditional one says where and when, e.g. "Agent Administrator (Environment: production · MFA)".
+  const now = new Date();
   const sources = new Map<string, string[]>();
-  for (const r of roles) if (r.roles!.status === "active") sources.set(r.roles!.id, [...(sources.get(r.roles!.id) ?? []), r.roles!.name]);
+  const add = (roleId: string, label: string) => sources.set(roleId, [...(sources.get(roleId) ?? []), label]);
+  for (const r of roles) {
+    const t = termsOf(r);
+    if (r.roles!.status !== "active" || !termsCurrent(t, now)) continue;
+    add(r.roles!.id, isTenantWide(t) ? r.roles!.name : `${r.roles!.display_name} (${describeTerms(t)})`);
+  }
   for (const g of groups) {
     if (g.status !== "active") continue;
-    for (const gr of g.roles) if (gr.status === "active") sources.set(gr.id, [...(sources.get(gr.id) ?? []), `${gr.displayName} (via ${g.name})`]);
+    for (const gr of g.roles) {
+      if (gr.status !== "active" || !termsCurrent(gr.terms, now)) continue;
+      add(gr.id, isTenantWide(gr.terms) ? `${gr.displayName} (via ${g.name})` : `${gr.displayName} (via ${g.name}; ${describeTerms(gr.terms)})`);
+    }
   }
   const roleIds = [...sources.keys()];
   const people = await namesOf([...roles.map((r) => r.granted_by), m.invited_by].filter((x): x is string => !!x));
@@ -226,6 +253,7 @@ export async function getUserDetail(tenantId: string, userId: string): Promise<U
         active: r.roles!.status === "active",
         grantedAt: r.created_at,
         grantedBy: r.granted_by ? { userId: r.granted_by, name: people.get(r.granted_by) ?? "A former member" } : null,
+        terms: termsOf(r),
       }))
       .sort((a, b) => a.role.localeCompare(b.role)),
     // A suspended, deactivated or invited member holds no effective access.

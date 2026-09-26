@@ -173,6 +173,10 @@ export async function pruneThrowawayIntegrationsAndQuarantine(tenantIds: string[
       const deletedRoles = await supabase.from("roles").delete().eq("tenant_id", tenantId).in("id", roleIds);
       if (deletedRoles.error) throw new Error(`prune throwaway roles(${tenantId}) failed: ${deletedRoles.error.message}`);
     }
+    // Throwaway authorization policies named "E2E …" (FOUNDATION-P0-19): a
+    // leftover policy would keep refusing actions in later runs.
+    const policies = await supabase.from("authorization_policies").delete().eq("tenant_id", tenantId).like("name", "E2E %");
+    if (policies.error) throw new Error(`prune throwaway policies(${tenantId}) failed: ${policies.error.message}`);
     // Throwaway groups named "E2E …" (FOUNDATION-P0-26); members and roles cascade.
     const groups = await supabase.from("groups").delete().eq("tenant_id", tenantId).like("name", "E2E %");
     if (groups.error) throw new Error(`prune throwaway groups(${tenantId}) failed: ${groups.error.message}`);

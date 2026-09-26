@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAnyPermission, requirePermission } from "@/lib/rbac/requirePermission";
 import { assignRole } from "@/lib/rbac/roles";
+import { termsFromForm } from "@/lib/rbac/assignmentForm";
 import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantContext";
 import { getSessionUser } from "@/lib/tenant/session";
 import { urlForTenant } from "@/lib/tenant/hostTenant";
@@ -140,9 +141,11 @@ export async function assignUserRoleAction(_prev: ActionState, formData: FormDat
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "");
   if (!role) return { ok: false, message: "Choose a role." };
+  const terms = termsFromForm(formData, role);
+  if (!terms.ok) return { ok: false, message: "Check the assignment's scope and dates.", errors: terms.errors };
   try {
     const ctx = await requireAnyPermission(["roles.assign", "role.manage"]);
-    await assignRole(ctx.tenantId!, ctx.userId, userId, role);
+    await assignRole(ctx.tenantId!, ctx.userId, userId, role, terms.terms);
     revalidatePath(`/settings/users/${userId}`);
     revalidatePath("/settings/users");
     return { ok: true, message: `${role} assigned.` };

@@ -7,8 +7,20 @@ export type TenantContext = {
   userId: string;
   tenantId: string | null;
   tenantSlug: string | null;
+  /** Roles in effect across the whole tenant (valid now, conditions met). */
   roles: string[];
+  /** Permissions usable without naming a resource (FOUNDATION-P0-19: tenant-wide grants, after policies). */
   permissions: string[];
+  /**
+   * FOUNDATION-P0-19 — the facts the authorization engine decides from:
+   * every role assignment in this tenant (direct and through groups, with
+   * scope, validity and conditions), the tenant's active policies, and the
+   * session's assurance level. Absent on contexts built outside
+   * getTenantContext() (tests), where `permissions` is the whole answer.
+   */
+  grants?: import("@/lib/rbac/authorizeCore").Grant[];
+  policies?: import("@/lib/rbac/authorizeCore").AuthorizationPolicy[];
+  aal?: "aal1" | "aal2" | null;
 };
 
 export type Role = {

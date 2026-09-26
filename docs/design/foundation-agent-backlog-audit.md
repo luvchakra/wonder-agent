@@ -1972,3 +1972,136 @@ this build. `741aabf` goes to main.
   progress, unmerged; migration 0100 is not applied.
 - Dynamic (rule-based) membership and nested groups: P1.
 - Group owners and access reviews of groups: COMPLIANCE-P0-11.
+
+## 2026-09-26 — FOUNDATION-P0-19: scoped assignments and the authorization engine (WonderID Phase 4b)
+
+**What was built** (spec §18–23, 33–34; re-scoped story):
+
+- **Migration 0100** (applied live, additive):
+  - Terms on every role assignment, direct (`user_roles`) and through a
+    group (`group_roles`):
+    - `scope_type`: `tenant` (the default, kept by every existing row),
+      `environment`, `application` or `agent`;
+    - `scope_values`;
+    - a validity window (`starts_at`, `expires_at`);
+    - a condition, `requires_mfa`.
+  - The source is DIRECT or GROUP by table. Who assigned it is
+    `granted_by`.
+  - The `role_assignment_scope_guard` trigger enforces two rules:
+    - a scope names only the tenant's own applications and agents;
+    - a Tenant Administrator assignment stays organization-wide, permanent
+      and unconditional (the last-administrator guard counts rows).
+  - `authorization_policies` (DENY or REQUIRE_APPROVAL):
+    - covers permission keys or `prefix.*`, in a scope, with exempt roles;
+    - RLS select for members; writes by the service;
+    - a check constraint means a policy never covers
+      `tenant.security.manage`, so a mistaken policy can always be undone;
+    - exempt roles and scopes must be the tenant's own.
+- **Engine** `lib/rbac/authorizeCore.ts`: pure and deterministic. It
+  evaluates in this order: grant validity → permission → scope → MFA
+  condition → explicit policies. It returns:
+  - ALLOW, DENY or REQUIRE_APPROVAL;
+  - reason codes;
+  - the grants that allowed it (role, source, group, scope);
+  - the grants that did not apply, and why;
+  - the policies that decided.
+  - Scope rule: a grant narrower than the tenant counts only when the
+    check names a resource inside it. A check with no resource counts
+    tenant-wide grants only, so a scoped grant never widens into
+    tenant-wide access through a route that does not say what it touches.
+- **Context:**
+  - `getTenantContext()` reads assignments with their terms, group
+    assignments and the tenant's active policies in the same parallel
+    batch. `permissions` is now "allowed without naming a resource" after
+    policies.
+  - Unreadable policies fail closed: no permissions.
+  - The session's assurance level (`aal`) comes from the verified token.
+- **Enforcement:**
+  - `requirePermission()` is now a thin call to the engine. A plain
+    missing permission is still 403 FORBIDDEN. Policy, MFA and approval
+    refusals get their own codes (POLICY_DENIED, MFA_REQUIRED,
+    APPROVAL_REQUIRED) and are audited as AUTHORIZATION_DENIED.
+  - `requirePermissionFor()` and `requireAnyPermissionFor()` check against
+    a named resource. Every per-agent route and action now uses them:
+    - owners, owner review, lifecycle, contracts, identities,
+      relationships;
+    - API keys (create and revoke), revoke-all;
+    - the agent page itself.
+  - So agent- and environment-scoped grants and policies apply there.
+- **Screens and API:**
+  - The user page's roles table shows each assignment's terms ("Not in
+    effect" when outside its window).
+  - "Assign a role" has collapsible scope, timing and conditions; posting
+    a held role changes its terms.
+  - The group page does the same.
+  - Effective-permission provenance counts only assignments in effect, and
+    names their scope.
+  - New Authorization Policies screen (list, create, edit, activate or
+    deactivate, delete). It needs `permissions.view` to see and
+    `tenant.security.manage` to change.
+  - `POST /api/v1/users/[id]/roles` and `POST /api/v1/groups/[id]/roles`
+    take the terms.
+  - `/api/v1/authorization-policies` (GET, POST), `[id]` (GET, PATCH,
+    DELETE) and `[id]/status`.
+
+**Verified:**
+
+- tsc and eslint clean; vitest **746/746**:
+  - new `authorizeCore.test.ts` (15);
+  - `assignmentRules.test.ts` (5);
+  - `policyRules.test.ts` (5).
+- Production build succeeds.
+- `tests/foundation/authorization-isolation.sql`, run live: **14/14** as
+  expected.
+  - Existing assignments are all organization-wide (0 otherwise).
+  - A scoped, expiring assignment is accepted.
+  - Refused with 23514:
+    - a scope pointing at another tenant's application;
+    - an unknown environment;
+    - a backwards validity window;
+    - an expiring Tenant Administrator;
+    - a policy over `tenant.security.manage`;
+    - a policy exempting another tenant's role, or scoped to another
+      tenant's application.
+  - A member reads their tenant's policies (1) and not the other's (0).
+  - They cannot write a policy (42501), nor deactivate a policy or widen
+    their own assignment directly (0 rows).
+  - Fixtures removed. Security advisors show nothing new.
+- `tests/e2e/authorization.spec.ts` (new, 7 tests). The requester gets a
+  throwaway custom role holding only `agent.update`; policies are scoped
+  to the spec's own agent, so parallel specs are unaffected.
+  - Environment scope: the production agent 201, the development agent
+    403, and a check naming no agent 403.
+  - Agent scope works the same way.
+  - A not-yet-started grant gets 403. An MFA-conditioned grant on an aal1
+    session gets 403 MFA_REQUIRED.
+  - A past expiry is refused (400), and so is an expiring Tenant
+    Administrator (400).
+  - Deny policy: 403 POLICY_DENIED for the requester and the admin alike,
+    while the other agent is unaffected. The refusal is in the audit trail.
+  - Exempting the role lets it through. Require-approval gets 403
+    APPROVAL_REQUIRED.
+  - Lockout policies are refused (400).
+  - Tenant Two gets 404 on the policy. It cannot see the policy, delete it
+    or scope an assignment to Tenant One's agent (400).
+  - A non-admin cannot create a policy (403).
+  - Screens: set an environment scope on the user page and see it shown;
+    create a policy through the form, see its scope, delete it.
+- Targeted run (authorization, users, groups, custom-roles,
+  navigation-smoke): **72/72**.
+- **Full suite** on the production build of this change (0100 applied,
+  nothing applied during the run): **340/340 passed** in 23.0 minutes.
+
+**Left out / handed on:**
+
+- A generic `resource` scope type, and resource-named checks on
+  application routes. Application scope is modelled and evaluated but no
+  application route names its resource yet; both follow with
+  FOUNDATION-P0-20.
+- REQUIRE_APPROVAL refuses the direct action and says approval is needed.
+  Routing such actions into the approval engine is P1.
+- Other resource checks still count tenant-wide grants, by design. That
+  covers emergency controls (tenant-wide kill switch), agent creation and
+  relationship removal by id.
+- "Why can / why can't" explanations: FOUNDATION-P0-20 (the engine
+  already returns the facts).

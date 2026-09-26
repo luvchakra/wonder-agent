@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { requirePermission } from "@/lib/rbac/requirePermission";
+import { authorizeContext, requirePermissionFor } from "@/lib/rbac/authorize";
+import { agentResource } from "@/app/_shared/agentScope";
 import {
   getAgent,
   getAgentContract,
@@ -168,10 +169,14 @@ const labelClass = "block text-sm font-medium text-muted-foreground";
  * AgentTabs — see EXPERIENCE-P0-03. */
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const ctx = await requirePermission("agent.read");
+  // Scoped grants count here: this page names the agent (FOUNDATION-P0-19).
+  const ctx = await requirePermissionFor("agent.read", agentResource(id));
 
   const agent = await getAgent(ctx.tenantId!, id);
   if (!agent) notFound();
+  // FOUNDATION-P0-19 — scoped grants apply to this agent (its id and environment).
+  const here = { type: "agent" as const, id: agent.id, environment: agent.environment };
+  const canUpdateHere = authorizeContext(ctx, "agent.update", here).decision === "ALLOW";
 
   const [
     owners,
@@ -858,8 +863,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       <AgentApiKeysPanel
         agentId={id}
         keys={apiKeys}
-        canCreate={ctx.permissions.includes("agent.update")}
-        canRevoke={ctx.permissions.includes("agent.update") || ctx.permissions.includes("runtime.emergency")}
+        canCreate={canUpdateHere}
+        canRevoke={canUpdateHere || authorizeContext(ctx, "runtime.emergency", here).decision === "ALLOW"}
       />
     </div>
   );

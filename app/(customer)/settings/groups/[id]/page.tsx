@@ -5,6 +5,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { getGroup } from "@/lib/users/groups";
 import { listUsers } from "@/lib/users/users";
 import { listAssignableRoles } from "@/lib/rbac/roles";
+import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
+import { loadScopeOptions } from "../../roles/scopeOptions";
 import { STATUS_LABEL, type MembershipStatus } from "@/lib/users/userRules";
 import { Badge, Card, CardBody, CardHeader, EmptyState } from "@/modules/ui";
 import { STATUS_TONE, formatDate } from "../../users/labels";
@@ -28,10 +30,11 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const can = (p: string) => ctx.permissions.includes(p);
   const canAssign = can("roles.assign") || can("role.manage");
-  const [group, people, assignable] = await Promise.all([
+  const [group, people, assignable, scope] = await Promise.all([
     getGroup(ctx.tenantId!, id),
     can("groups.manage_members") ? listUsers(ctx.tenantId!, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0 }),
     canAssign ? listAssignableRoles(ctx.tenantId!) : Promise.resolve([]),
+    loadScopeOptions(ctx.tenantId!),
   ]);
   if (!group) notFound();
   const inGroup = new Set(group.members.map((m) => m.userId));
@@ -41,7 +44,10 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
       userId: p.userId,
       label: p.displayName ? `${p.displayName} (${p.email})` : p.email,
     }));
-  const roleOptions = assignable.filter((r) => !group.roleAssignments.some((a) => a.roleId === r.id)).map((r) => ({ name: r.name, label: r.displayName }));
+  // A role the group already carries can be given again to change its terms (FOUNDATION-P0-19).
+  const roleOptions = assignable.map((r) => ({ name: r.name, label: group.roleAssignments.some((a) => a.roleId === r.id) ? `${r.displayName} (change terms)` : r.displayName }));
+  const scopeName = new Map([...scope.applications, ...scope.agents].map((o) => [o.id, o.label]));
+  const now = new Date();
 
   return (
     <div className="space-y-5">
@@ -80,13 +86,21 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
                         <span className="ml-2 text-xs text-muted-foreground">
                           {r.custom ? "Custom" : "System"} · since {formatDate(r.grantedAt)}
                         </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {describeTerms(r.terms, (v) => scopeName.get(v) ?? "Not found")}
+                          {termsCurrent(r.terms, now) ? null : (
+                            <Badge tone="warning" className="ml-2">
+                              Not in effect
+                            </Badge>
+                          )}
+                        </span>
                       </span>
                       {canAssign ? <RemoveGroupRoleButton groupId={group.id} roleId={r.roleId} /> : null}
                     </li>
                   ))}
                 </ul>
               )}
-              {canAssign ? <AddGroupRoleForm groupId={group.id} roles={roleOptions} /> : null}
+              {canAssign ? <AddGroupRoleForm groupId={group.id} roles={roleOptions} applications={scope.applications} agents={scope.agents} /> : null}
             </CardBody>
           </Card>
 
