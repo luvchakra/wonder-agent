@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { evaluateAgentRiskAction, assignFindingAction, resolveFindingAction, transitionFindingStatusAction } from "@/app/actions/risk";
 import { RemediateFindingButton } from "./RemediateFindingButton";
 import { FindingEvidenceTrigger, FindingEvidenceDrawer } from "./FindingEvidenceDrawer";
-import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState } from "@/modules/ui";
+import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, PendingSubmitButton } from "@/modules/ui";
 
 const inputClass =
   "block w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring";
@@ -54,9 +54,9 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
           description="Deterministic detection, never an LLM decision (non-negotiable #9)."
           actions={
             <form action={evaluateWithId}>
-              <Button type="submit" variant="secondary">
+              <PendingSubmitButton variant="secondary" pendingLabel="Evaluating…">
                 Run risk evaluation now
-              </Button>
+              </PendingSubmitButton>
             </form>
           }
         />

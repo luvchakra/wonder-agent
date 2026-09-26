@@ -79,11 +79,18 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     // 6. Risk evaluation generates the excessive-access finding with
     // evidence and a removal recommendation.
     await page.goto(`/risk/agents/${agentId}`);
-    await page.getByRole("button", { name: "Run risk evaluation now" }).click();
+    // Wait for the evaluation itself (the server action's response), as
+    // QA-P0-19 did for step 9: the URL is the same before and after, so the
+    // URL check proved nothing, and on 2026-09-26 under full-suite load the
+    // finding was looked for before the evaluation had run.
+    await Promise.all([
+      page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === `/risk/agents/${agentId}`),
+      page.getByRole("button", { name: "Run risk evaluation now" }).click(),
+    ]);
     await expect(page).toHaveURL(`/risk/agents/${agentId}`);
 
     const findingHeading = page.getByRole("heading", { level: 3, name: `${agentName} has effective access beyond its approved contract` });
-    await expect(findingHeading).toBeVisible();
+    await expect(findingHeading).toBeVisible({ timeout: 20_000 });
     const findingItem = page.locator("li", { has: findingHeading });
     await expect(findingItem.getByText(/Remove the following entitlement\(s\).*CustomerDB_READ/)).toBeVisible();
 

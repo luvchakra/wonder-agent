@@ -6,6 +6,7 @@
 export { Badge, SeverityBadge, StatusBadge, type BadgeTone } from "./Badge";
 export { Card, CardHeader, CardBody, StatCard } from "./Card";
 export { Button, LinkButton } from "./Button";
+export { PendingSubmitButton } from "./PendingSubmitButton";
 export { TableContainer, Thead, Th, Td, Tr, type HideBelow } from "./Table";
 export { EmptyState, ErrorState, NotYetAvailable, CardGridSkeleton, TableSkeleton, DetailSkeleton } from "./States";
 export { ThemeToggle, ThemeFlashGuard } from "./theme";

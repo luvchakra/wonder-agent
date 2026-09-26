@@ -936,3 +936,37 @@ published. This story is therefore `Partial` rather than `Done`.
 **Verified:** eslint clean, vitest **509/509**, Playwright **187/187**
 (8.6 min, a fresh build containing this story). Migration 0072 applied
 live.
+
+## 2026-09-26 — "Run risk evaluation now" shows it is working; the FinanceBot spec waits for it
+
+In the INTEGRATION-P0-10 full run, `financebot-central-scenario` failed at
+step 6 with "0 open findings". It passed alone.
+
+**Cause:**
+
+- The spec clicked "Run risk evaluation now", then asserted the URL. The
+  URL is the same before and after the server action, so nothing waited
+  for the evaluation.
+- Under two-worker load, the finding was looked for before the evaluation
+  had run.
+- QA-P0-19 had fixed the same race for step 9 but not step 6.
+- The button also gave no sign it was working, which §15 requires for
+  anything over about 300 ms.
+
+**Changes:**
+
+- A shared `PendingSubmitButton` (`modules/ui`, using `useFormStatus`)
+  for plain server-action forms. It shows a spinner and a pending label
+  and is disabled while the action runs, so a second click cannot start a
+  second run.
+- The risk evaluation button uses it ("Evaluating…").
+- The spec's step 6 now waits for the action's own POST response, with
+  the same exact-path matcher as step 9, before looking for the finding
+  (up to 20 s).
+
+**Verified:**
+
+- `financebot-central-scenario`, `risk.spec` and `onboarding-proposals`
+  together: 14 passed and 1 failed. The failure was a locator in the
+  then-new proposals spec, fixed and re-run 12/12.
+- The full suite runs again with INTEGRATION-P0-12.
