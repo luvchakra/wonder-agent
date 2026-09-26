@@ -103,20 +103,29 @@ const lead = admins[0]?.user_id ?? members[0].user_id;
 const second = members.find((m) => m.user_id !== lead)?.user_id ?? lead;
 
 // ---------------------------------------------------------------- applications
+// ACCESS-P0-15: demo applications are live systems, so they are ACTIVE in
+// the catalog, with a type, vendor and classification.
 const APPS = {
-  Snowflake: "data_warehouse",
-  SAP: "erp",
-  S3: "storage",
-  Zendesk: "support",
-  Workday: "hr",
-  Salesforce: "crm",
-  ServiceNow: "itsm",
-  GitHub: "devtools",
-  Slack: "collaboration",
-  Coupa: "procurement",
+  Snowflake: ["data_warehouse", "cloud_platform", "Snowflake", "high", "restricted"],
+  SAP: ["erp", "on_prem", "SAP", "critical", "confidential"],
+  S3: ["storage", "cloud_platform", "Amazon Web Services", "high", "confidential"],
+  Zendesk: ["support", "saas", "Zendesk", "medium", "confidential"],
+  Workday: ["hr", "saas", "Workday", "high", "restricted"],
+  Salesforce: ["crm", "saas", "Salesforce", "high", "confidential"],
+  ServiceNow: ["itsm", "saas", "ServiceNow", "medium", "internal"],
+  GitHub: ["devtools", "saas", "GitHub", "high", "confidential"],
+  Slack: ["collaboration", "saas", "Slack", "medium", "internal"],
+  Coupa: ["procurement", "saas", "Coupa", "medium", "confidential"],
 };
 const app = {};
-for (const [name, category] of Object.entries(APPS)) app[name] = await ensure("applications", { name }, { category }, "applications");
+for (const [name, [category, app_type, vendor, risk_level, data_classification]] of Object.entries(APPS)) {
+  app[name] = await ensure(
+    "applications",
+    { name },
+    { category, app_type, vendor, risk_level, data_classification, onboarding_status: "ACTIVE", environment: "production" },
+    "applications",
+  );
+}
 
 // ---------------------------------------------------------------- data sources
 const SOURCES = [

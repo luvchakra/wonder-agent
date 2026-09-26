@@ -26,7 +26,47 @@ export type Application = {
   /** ACCESS-P0-02.2 — an external-facing application (email/messaging/public API/etc.), the data source for Risk's "External communication capability" factor. */
   isExternal: boolean;
   createdAt: string;
+  // ACCESS-P0-15 (WonderID application catalog, 2026-09-26).
+  displayName: string | null;
+  description: string | null;
+  appType: ApplicationType;
+  vendor: string | null;
+  url: string | null;
+  businessOwnerIdentityId: string | null;
+  technicalOwnerIdentityId: string | null;
+  environment: ApplicationEnvironment;
+  riskLevel: CatalogLevel | null;
+  criticality: CatalogLevel | null;
+  dataClassification: DataClassificationLevel | null;
+  discoverySource: DiscoverySource;
+  onboardingStatus: ApplicationOnboardingStatus;
+  updatedAt: string;
 };
+
+export const APPLICATION_TYPES = ["saas", "on_prem", "custom", "cloud_platform", "database", "directory", "ai_service", "api", "other"] as const;
+export type ApplicationType = (typeof APPLICATION_TYPES)[number];
+export const APPLICATION_ENVIRONMENTS = ["production", "staging", "development", "test"] as const;
+export type ApplicationEnvironment = (typeof APPLICATION_ENVIRONMENTS)[number];
+export const CATALOG_LEVELS = ["low", "medium", "high", "critical"] as const;
+export type CatalogLevel = (typeof CATALOG_LEVELS)[number];
+export const DATA_CLASSIFICATION_LEVELS = ["public", "internal", "confidential", "restricted"] as const;
+export type DataClassificationLevel = (typeof DATA_CLASSIFICATION_LEVELS)[number];
+export const DISCOVERY_SOURCES = ["manual", "integration", "idp", "openapi", "scim"] as const;
+export type DiscoverySource = (typeof DISCOVERY_SOURCES)[number];
+/** Spec H3 onboarding object states; ACCESS-P0-16 drives the transitions. */
+export const APPLICATION_ONBOARDING_STATUSES = [
+  "DISCOVERED",
+  "CONFIGURING",
+  "CONNECTED",
+  "VALIDATING",
+  "SIMULATION_FAILED",
+  "READY_FOR_APPROVAL",
+  "APPROVED",
+  "ACTIVE",
+  "SUSPENDED",
+  "RETIRED",
+] as const;
+export type ApplicationOnboardingStatus = (typeof APPLICATION_ONBOARDING_STATUSES)[number];
 
 export type AccountStatus = "active" | "disabled";
 

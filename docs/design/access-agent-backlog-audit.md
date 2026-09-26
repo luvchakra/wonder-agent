@@ -1076,3 +1076,96 @@ agent/parent references `(col, tenant_id)` foreign keys under their
 existing names. For a member of two organizations, RLS alone admitted
 both. The full list, tests and live SQL verification are in the QA audit
 log's QA-P0-17 entry.
+
+---
+
+## 2026-09-26 — ACCESS-P0-15 (Done): application catalog model and inventory
+
+WonderID Phase 3 (`docs/plan/WONDERID-ROADMAP.md`; spec H3). The
+existing `applications` table stays the one application registry. The
+access graph, policies, risk and runtime already use it, so it is
+extended rather than duplicated.
+
+### Schema (migration 0086; applied live)
+
+- **New columns** on `applications`:
+  - display name, description, type (saas, on_prem, custom,
+    cloud_platform, database, directory, ai_service, api, other), vendor;
+  - https-only URL (a check constraint);
+  - business and technical owners, as same-tenant composite FKs to
+    WonderID `identities`, `on delete set null`;
+  - environment, risk level, criticality, data classification;
+  - discovery source;
+  - onboarding status with the spec's ten states (DISCOVERED …
+    ACTIVE/SUSPENDED/RETIRED);
+  - `updated_at`.
+- **`source_integration_id`** got the same-tenant FK it lacked (QA-P0-17's
+  note). It was checked first: no row pointed elsewhere.
+- **Covering indexes** for the three new FKs, plus (tenant, status, name).
+- **Backfill.** The 79 existing applications became ACTIVE: they are
+  already in use by grants, policies and runtime decisions. Their
+  discovery source is `integration` where linked (4), otherwise `manual`.
+  New registrations start DISCOVERED.
+
+### Rules, service, API, UI
+
+- **`applicationCatalogRules.ts`** (pure, 5 unit tests). It validates
+  every field and returns the columns to write. It never takes the tenant,
+  onboarding status, discovery source or integration link from input.
+  Status changes belong to ACCESS-P0-16's governed transitions.
+- **`catalog.ts`:**
+  - list with search, status, type, risk and missing-owner filters, paged
+    at the database, with account and entitlement counts embedded in the
+    same query (§15);
+  - head-count summary in parallel;
+  - detail;
+  - register and update. Owners must be active people of this
+    organization, read through Identity's published service (#6).
+  - Audit events: `application.registered` and `application.updated`
+    (changed field names).
+- **API:** `POST /api/v1/access/applications` registers into the catalog;
+  the integration-linked path is unchanged. There is a new
+  `/api/v1/access/applications/:id` (GET, PATCH).
+- **UI:**
+  - `/access` was rebuilt as the inventory: KPIs (total, active,
+    onboarding, missing an owner, high risk), URL-driven filters, database
+    paging, owners and status per row;
+  - `/access/applications/new` to register;
+  - `/access/applications/:id` with details, owners linked to their
+    identities, the connector, entitlements, and an edit form.
+  - The old in-page "Add an application" form and `ApplicationsTable` were
+    removed; the two `access.spec` tests now cover the new flow.
+- **Demo data:** `seed-demo-data.mjs` now gives demo applications a type,
+  vendor, risk and classification, and makes them ACTIVE. WonderArk's ten
+  were updated the same way in the database.
+
+### Verified
+
+- `tsc` and `eslint .` clean; vitest **587/587** (5 new catalog rules tests).
+- Live SQL (`tests/access/application-catalog-checks.sql`):
+  - a cross-tenant owner is 23503;
+  - a non-https URL is 23514;
+  - forged rows 0.
+  - The integration case was skipped because the second tenant had none;
+    the same key pattern is proven in the identity-sources check.
+- E2E `application-catalog.spec.ts`:
+  - validation (http URL, unknown type);
+  - registration as DISCOVERED even when `onboardingStatus: ACTIVE` is
+    sent;
+  - a duplicate name is 409;
+  - an owner must be an active person (a service account is 400);
+  - update;
+  - inventory filters (the high filter shows the application, low shows
+    none);
+  - the detail page edit;
+  - another organization gets 404 on read, patch and the page, and cannot
+    borrow a Tenant One person as owner (404);
+  - read-only reads (200) but gets 403 on register and patch.
+- `access.spec` 10/10 and navigation-smoke pass.
+- Screenshots: inventory (light), detail (dark), inventory at 390 px. One
+  fix came from them: the KPI label is now "High risk".
+
+- Full Playwright suite (§17.8: migration and shell changed): **233/233 passed** (13.2 min).
+
+**Left to ACCESS-P0-16:** onboarding transitions, checklist, validate,
+simulate, approve and promote.

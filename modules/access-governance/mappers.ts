@@ -24,6 +24,20 @@ export function toApplication(row: any): Application {
     sourceIntegrationId: row.source_integration_id,
     isExternal: row.is_external,
     createdAt: row.created_at,
+    displayName: row.display_name ?? null,
+    description: row.description ?? null,
+    appType: row.app_type ?? "other",
+    vendor: row.vendor ?? null,
+    url: row.url ?? null,
+    businessOwnerIdentityId: row.business_owner_identity_id ?? null,
+    technicalOwnerIdentityId: row.technical_owner_identity_id ?? null,
+    environment: row.environment ?? "production",
+    riskLevel: row.risk_level ?? null,
+    criticality: row.criticality ?? null,
+    dataClassification: row.data_classification ?? null,
+    discoverySource: row.discovery_source ?? "manual",
+    onboardingStatus: row.onboarding_status ?? "ACTIVE",
+    updatedAt: row.updated_at ?? row.created_at,
   };
 }
 

@@ -7,7 +7,6 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import {
   addPolicyException,
   addPolicyRule,
-  createApplication,
   createDataSource,
   createEntitlement,
   createManualAccessGrant,
@@ -27,18 +26,6 @@ import type {
   PolicyCategory,
   PolicyRuleType,
 } from "@/lib/shared/types/access-governance";
-
-export async function createApplicationAction(formData: FormData) {
-  const ctx = await requirePermission("access.manage");
-  await createApplication(
-    ctx.tenantId!,
-    String(formData.get("name") ?? ""),
-    String(formData.get("category") ?? "") || undefined,
-    undefined,
-    formData.get("isExternal") === "on",
-  );
-  redirect("/access");
-}
 
 export async function createEntitlementAction(applicationId: string, formData: FormData) {
   const ctx = await requirePermission("access.manage");

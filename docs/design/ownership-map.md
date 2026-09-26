@@ -45,7 +45,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `identity_reconciliation_runs` | INT | Reconciliation runs with counts, errors, change log, guard and preview flags; written by the worker only (INTEGRATION-P0-09) |
 | `identity_source_links` | INT | Which source record is which identity; written by the worker only |
 | `pending_identity_correlations` | INT | Ambiguous matches waiting for a person; decided through INT's service, which calls IA's `applySourcedIdentities()` |
-| `applications` | AA | Canonical application registry (governed access-graph entity) |
+| `applications` | AA | Canonical application registry (governed access-graph entity); since ACCESS-P0-15 also the WonderID application catalog (type, owners as identities, classification, onboarding status) |
 | `accounts` | AA | Accounts an agent/identity holds on an application |
 | `entitlements` | AA | Roles/permissions/entitlements on an application |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |

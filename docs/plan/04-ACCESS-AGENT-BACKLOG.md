@@ -32,7 +32,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-12 | Policy targets and publish (master P0-23) | Done — 2026-09-25: targets (TOOL, MCP_SERVER, MCP_TOOL, DATA_SOURCE, DATA_RESOURCE, ACTION) in `scope.targets` decide which runtime policies apply; priority orders evaluation; drafts + `publishPolicy()` (new version, audited) behind `policy.publish`; `createPolicy` now audited |
 | ACCESS-P0-13 | Data sources inventory (master P0-11) | Done — 2026-09-25: `data_sources` (migration 0070, RLS, same-tenant composite FKs, no delete), entitlement link, CAN carries data source + classification fallback, audited service/API, `/access/data-sources` |
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Done — 2026-09-25: `enforceSoD()` on request submission, request decision and manual grant; blocking → 409 SOD_CONFLICT (audited failure), flag → proceeds and audited; `checkSoD()` now service-role + matches the agent in object or metadata |
-| ACCESS-P0-15 | Application catalog model and inventory | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-15 | Application catalog model and inventory | Done — 2026-09-26, migration 0086 |
 | ACCESS-P0-16 | Application onboarding: state machine, checklist, validate, simulate, approve, promote | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-18 | Self-service request catalog and request policies | Not Started — 2026-09-26, WonderID |

@@ -45,3 +45,12 @@ export { classifyAction, classifyActionsForAgent } from "./actionGovernance";
 // ACCESS-P0-11 — the deterministic runtime decision, for the Runtime Gateway.
 export { decideRuntimeRequest, isMutatingAction, filterToolsForAgent, type ToolVisibility } from "./runtimeDecision";
 export { evaluateRuntimeRequest, evaluateToolVisibility, type RuntimePrincipal, type RuntimeEmergencyState } from "./runtimeDecisionLoader";
+export {
+  listApplicationCatalog,
+  getCatalogSummary,
+  getApplicationDetail,
+  registerApplication,
+  updateApplication,
+  type CatalogFilter,
+  type CatalogRow,
+} from "./catalog";
