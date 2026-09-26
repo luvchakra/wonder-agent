@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Logo } from "./Logo";
+import { WonderIDLogo } from "./Logo";
 
 /**
  * Shared chrome for the two public auth screens, so /sign-in and /sign-up
@@ -37,7 +37,7 @@ export function AuthShell({
       <main className="relative flex flex-1 items-center justify-center px-4 py-12 sm:py-16">
         <div className="w-full max-w-sm">
           <Link href="/" aria-label="WonderID" className="mx-auto flex w-fit items-center">
-            <Logo variant="full" height={56} priority />
+            <WonderIDLogo size={52} showTagline alt="" priority />
           </Link>
 
           <div className="mt-8 rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-md)] sm:p-7">

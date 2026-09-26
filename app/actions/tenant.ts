@@ -3,17 +3,25 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/db/supabaseServer";
+import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 import { getSessionUser } from "@/lib/tenant/session";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
 
+/**
+ * The first part of a new tenant's slug. FOUNDATION-P0-22's slug policy
+ * (migration 0095: lowercase, URL-safe, 3–40 characters) leaves room for
+ * the "-xxxxxx" suffix added below, so this part is at most 33 characters.
+ */
 function slugify(name: string): string {
   return (
     name
       .toLowerCase()
       .trim()
       .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") || "tenant"
+      .replace(/(^-|-$)/g, "")
+      .slice(0, 33)
+      .replace(/-+$/, "") || "tenant"
   );
 }
 
@@ -28,6 +36,12 @@ export async function createTenantAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) {
     throw new Error("Organization name is required");
+  }
+
+  // FOUNDATION-P0-22 — organizations are created from the WonderID address, never from inside another organization's.
+  const host = await getHostTenant();
+  if (host.target.kind !== "none" && host.target.kind !== "base") {
+    throw new Error("Organizations are created from the main WonderID address, not from an organization's own address");
   }
 
   const supabase = await supabaseServer();
@@ -78,6 +92,16 @@ export async function selectTenantAction(formData: FormData) {
 
   if (!membership) {
     throw new Error("Not a member of the requested tenant");
+  }
+
+  // FOUNDATION-P0-22 — on an organization's own address the address decides
+  // the organization, so switching means going to the other one's address
+  // (where the user signs in; sessions are per address).
+  const host = await getHostTenant();
+  if (host.target.kind === "subdomain" || host.target.kind === "invalid") {
+    const { data: target } = await supabase.from("tenants").select("slug").eq("id", tenantId).maybeSingle();
+    const url = target?.slug ? await urlForTenant(target.slug as string) : null;
+    if (url) redirect(url);
   }
 
   const cookieStore = await cookies();

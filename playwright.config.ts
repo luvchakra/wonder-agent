@@ -67,7 +67,7 @@ export default defineConfig({
         // INTEGRATION-P0-11: the MCP specs run stub servers on 127.0.0.1,
         // which the outbound SSRF guard refuses unless the platform allows
         // private networks. Tests only; production never sets it.
-        env: { OUTBOUND_ALLOW_PRIVATE_NETWORKS: "true" },
+        env: { OUTBOUND_ALLOW_PRIVATE_NETWORKS: "true", BASE_APP_HOST: "localhost" },
         url: BASE_URL,
         reuseExistingServer: !process.env.CI,
         timeout: 180_000,

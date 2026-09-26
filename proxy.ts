@@ -8,6 +8,7 @@ import {
   isAuthServiceUnavailable,
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
+import { baseAppHost, parseTenantHost } from "@/lib/tenant/host";
 
 /**
  * Reachable without a session. Everything else under the matcher needs one.
@@ -24,7 +25,7 @@ import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
  * data, so there is no reason to gate them behind a session — see
  * app/help/layout.tsx.
  */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help", "/service-unavailable"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help", "/service-unavailable", "/tenant-not-found"];
 /** Paths the idle/absolute session-expiry clock does not run on. */
 const UNENFORCED_PATHS = [
   "/sign-in",
@@ -44,6 +45,24 @@ const UNENFORCED_PATHS = [
  * additional), and enforces idle/absolute session expiry
  * (FOUNDATION-P0-09) on top of Supabase Auth's own JWT expiry/refresh.
  */
+// FOUNDATION-P0-22 — which tenant addresses exist, per host label, for a
+// short time. Bounded (oldest entries dropped) and keyed by the address
+// alone: it holds only "is there a tenant here", never tenant data.
+const HOST_CACHE_TTL_MS = 30_000;
+const HOST_CACHE_MAX = 500;
+const hostCache = new Map<string, { found: boolean; at: number }>();
+
+async function lookUpTenantHost(supabase: ReturnType<typeof createServerClient>, label: string): Promise<"found" | "missing" | "error"> {
+  const hit = hostCache.get(label);
+  if (hit && Date.now() - hit.at < HOST_CACHE_TTL_MS) return hit.found ? "found" : "missing";
+  const { data, error } = await supabase.rpc("resolve_tenant_host", { p_subdomain: label, p_hostname: null });
+  if (error) return "error";
+  const found = Array.isArray(data) ? data.length > 0 : Boolean(data);
+  if (hostCache.size >= HOST_CACHE_MAX) hostCache.delete(hostCache.keys().next().value as string);
+  hostCache.set(label, { found, at: Date.now() });
+  return found ? "found" : "missing";
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -105,10 +124,35 @@ export async function proxy(request: NextRequest) {
   // token still has a valid signature until it expires; only the auth
   // server knows it was revoked. getUser() also lets @supabase/ssr rotate
   // an expired token's cookies here, before the route runs.
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser();
+  //
+  // FOUNDATION-P0-22 — on a tenant address (`<slug>.<BASE_APP_HOST>`), the
+  // tenant it names is looked up alongside the session check (in parallel,
+  // cached briefly per host). An address that names no tenant is a 404 on
+  // every path; a failed lookup fails closed as "unavailable". The address
+  // never authorizes anything: that is still the membership check.
+  const hostTarget = parseTenantHost(request.headers.get("host"), baseAppHost());
+  const [
+    {
+      data: { user },
+      error: authError,
+    },
+    hostLookup,
+  ] = await Promise.all([supabase.auth.getUser(), hostTarget.kind === "subdomain" ? lookUpTenantHost(supabase, hostTarget.label) : Promise.resolve(null)]);
+
+  if (hostTarget.kind === "invalid" || (hostTarget.kind === "subdomain" && hostLookup !== "found")) {
+    const unavailable = hostLookup === "error";
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json(
+        unavailable
+          ? { ok: false, error: { code: "TENANT_LOOKUP_UNAVAILABLE", message: "The organization could not be looked up; try again shortly" } }
+          : { ok: false, error: { code: "TENANT_NOT_FOUND", message: "No organization is at this address" } },
+        { status: unavailable ? 503 : 404 },
+      );
+    }
+    if (!pathname.startsWith("/tenant-not-found") && !pathname.startsWith("/service-unavailable")) {
+      return NextResponse.rewrite(new URL(unavailable ? "/service-unavailable" : "/tenant-not-found", request.url), { status: unavailable ? 503 : 404 });
+    }
+  }
 
   // Enforcement moved here from the customer layout so a session the auth
   // server has rejected never reaches a route whose local check would
@@ -155,6 +199,12 @@ export async function proxy(request: NextRequest) {
   // the URL at "/" while rendering the marketing tree, which lets the
   // landing page and the authenticated Overview share the root path without
   // two route groups both declaring a `page.tsx` for it.
+  // FOUNDATION-P0-22 — an organization's own address opens its sign-in
+  // page, never the marketing page (spec §28: no picker, no detour).
+  const onTenantAddress = hostTarget.kind === "subdomain";
+  if (!user && onTenantAddress && (pathname === "/" || pathname.startsWith("/welcome") || pathname.startsWith("/sign-up"))) {
+    return NextResponse.redirect(new URL("/sign-in", request.url));
+  }
   if (!user && pathname === "/") {
     return NextResponse.rewrite(new URL("/welcome", request.url), { request });
   }
@@ -210,6 +260,9 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
+// Public static files skip the proxy: the build's assets, the site icons
+// and the brand artwork (public/brand/), which the sign-in page shows
+// before anyone has a session. None of it is tenant data.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|brand/).*)"],
 };

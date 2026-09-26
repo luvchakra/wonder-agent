@@ -73,7 +73,7 @@ export function WorkspaceSwitcher({
           <span className={cn("min-w-0 flex-1", compact && "sr-only")}>
             <span className="block truncate text-sm font-medium">{current?.name ?? "Select organization"}</span>
             <span className="block truncate text-xs text-sidebar-muted-foreground">
-              {current?.slug ? `wonderagent.app/${current.slug}` : "No organization selected"}
+              {current?.url ? current.url.replace(/^https?:\/\//, "") : current?.slug ? `Organization: ${current.slug}` : "No organization selected"}
             </span>
           </span>
           {compact ? null : <ChevronDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LinkButton, ThemeToggle, Logo } from "@/modules/ui";
+import { LinkButton, ThemeToggle, WonderIDLogo } from "@/modules/ui";
 import { getSessionUser } from "@/lib/tenant/session";
 
 /**
@@ -34,7 +34,7 @@ export default async function HelpLayout({ children }: { children: React.ReactNo
       <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-4 sm:px-6">
           <Link href="/" aria-label="WonderID" className="flex items-center">
-            <Logo variant="lockup" height={30} priority />
+            <WonderIDLogo size={30} alt="" priority />
           </Link>
 
           <div className="ml-auto flex min-w-0 items-center gap-2">

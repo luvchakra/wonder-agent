@@ -1,0 +1,67 @@
+{
+  "logo/wonderid-mark.svg": {
+    "src": "/brand/logo/wonderid-mark.svg",
+    "width": 120,
+    "height": 100
+  },
+  "logo/wonderid-mark-dark.svg": {
+    "src": "/brand/logo/wonderid-mark-dark.svg",
+    "width": 120,
+    "height": 100
+  },
+  "logo/wonderid-mark-light.svg": {
+    "src": "/brand/logo/wonderid-mark-light.svg",
+    "width": 120,
+    "height": 100
+  },
+  "logo/wonderid-mark-monochrome.svg": {
+    "src": "/brand/logo/wonderid-mark-monochrome.svg",
+    "width": 120,
+    "height": 100
+  },
+  "logo/wonderid-mark-monochrome-light.svg": {
+    "src": "/brand/logo/wonderid-mark-monochrome-light.svg",
+    "width": 120,
+    "height": 100
+  },
+  "logo/wonderid-logo.svg": {
+    "src": "/brand/logo/wonderid-logo.svg",
+    "width": 545,
+    "height": 100
+  },
+  "logo/wonderid-logo-light.svg": {
+    "src": "/brand/logo/wonderid-logo-light.svg",
+    "width": 545,
+    "height": 100
+  },
+  "logo/wonderid-logo-dark.svg": {
+    "src": "/brand/logo/wonderid-logo-dark.svg",
+    "width": 545,
+    "height": 100
+  },
+  "logo/wonderid-monochrome.svg": {
+    "src": "/brand/logo/wonderid-monochrome.svg",
+    "width": 545,
+    "height": 100
+  },
+  "logo/wonderid-monochrome-light.svg": {
+    "src": "/brand/logo/wonderid-monochrome-light.svg",
+    "width": 545,
+    "height": 100
+  },
+  "logo/wonderid-logo-tagline.svg": {
+    "src": "/brand/logo/wonderid-logo-tagline.svg",
+    "width": 547,
+    "height": 112
+  },
+  "logo/wonderid-logo-tagline-dark.svg": {
+    "src": "/brand/logo/wonderid-logo-tagline-dark.svg",
+    "width": 547,
+    "height": 112
+  },
+  "favicon/favicon.svg": {
+    "src": "/brand/favicon/favicon.svg",
+    "width": 120,
+    "height": 100
+  }
+}

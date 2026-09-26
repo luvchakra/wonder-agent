@@ -4,7 +4,7 @@ import { GUIDE_CATEGORIES, GUIDE_SECTIONS, sectionsByCategory } from "@/modules/
 import { HelpAssistant } from "@/modules/ui/help/HelpAssistant";
 
 export const metadata = {
-  title: "Get Help — WonderID",
+  title: "Help",
   description: "User guide, FAQ and help assistant for WonderID.",
 };
 

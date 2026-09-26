@@ -5,7 +5,7 @@ import { AuthShell } from "@/modules/ui";
 // truth about why (CLAUDE.md §17.5) instead of claiming the session
 // expired. The proxy rewrites to it with status 503, keeping the URL, so
 // "Try again" reloads the page that was asked for.
-export const metadata = { title: "Service unavailable · WonderID" };
+export const metadata = { title: "Service unavailable" };
 
 export default function ServiceUnavailablePage() {
   return (

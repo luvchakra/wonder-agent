@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, ChevronRight, ChevronsLeft, ChevronsRight, Menu, Sparkles, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronsLeft, Menu, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
-import { Logo } from "./Logo";
+import { WonderIDLogo } from "./Logo";
 import type { TenantOption } from "./AccountPanel";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import {
@@ -312,26 +312,40 @@ function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavIt
 // ---------------------------------------------------------------- body
 
 function Brand({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => void }) {
+  // BRAND-004: the lockup for dark surfaces (the rail is navy in both
+  // themes); collapsed, the W mark alone — which is then the expand control.
+  if (collapsed && onToggle) {
+    return (
+      <div className="flex h-16 shrink-0 items-center justify-center border-b border-sidebar-border px-2">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label="Expand navigation"
+          title="Expand navigation"
+          className={cn("flex size-11 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent", focusRing)}
+        >
+          <WonderIDLogo variant="dark" showWordmark={false} size={26} alt="" />
+        </button>
+      </div>
+    );
+  }
   return (
-    <div className={cn("flex h-16 shrink-0 items-center border-b border-sidebar-border", collapsed ? "justify-center px-2" : "gap-2 px-4")}>
-      {collapsed ? null : (
-        <Link href="/" className={cn("flex min-w-0 flex-1 items-center gap-2.5 rounded-md", focusRing)}>
-          <Logo variant="mark" height={28} className="shrink-0" />
-          <span className="truncate text-[18px] font-semibold tracking-[-0.015em] text-sidebar-foreground">WonderID</span>
-        </Link>
-      )}
+    <div className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
+      <Link href="/" className={cn("flex min-w-0 flex-1 items-center rounded-md", focusRing)}>
+        <WonderIDLogo variant="dark" size={28} priority />
+      </Link>
       {onToggle ? (
         <button
           type="button"
           onClick={onToggle}
-          aria-label={collapsed ? "Expand navigation" : "Collapse navigation"}
-          title={collapsed ? "Expand navigation" : "Collapse navigation"}
+          aria-label="Collapse navigation"
+          title="Collapse navigation"
           className={cn(
             "flex size-8 shrink-0 items-center justify-center rounded-md border border-sidebar-border text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
             focusRing,
           )}
         >
-          {collapsed ? <ChevronsRight className="size-4" aria-hidden="true" /> : <ChevronsLeft className="size-4" aria-hidden="true" />}
+          <ChevronsLeft className="size-4" aria-hidden="true" />
         </button>
       ) : null}
     </div>

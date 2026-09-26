@@ -144,7 +144,8 @@ isolation checks. Detail is in each module's audit log.
 | + | Proxy: an unreachable sign-in service answers 503 / "service unavailable", not "session expired" | Done | `e6c9f59` |
 | W4 | ACCESS-P0-18: request catalog and request policies; requests for identities (0092) | Done | with P0-19 |
 | W4 | ACCESS-P0-19: approval engine — staged chains, approver scope, four-eyes in the database, fingerprint invalidation, escalation/expiry (0093) | Done (named groups deferred) | `a177663` |
-| W4 | ACCESS-P0-20: access packages — contents, eligibility-controlled discovery, requests through the approval engine, assignments with work items, expiry and revocation work (0094) | Done | see Access audit |
+| W4 | ACCESS-P0-20: access packages — contents, eligibility-controlled discovery, requests through the approval engine, assignments with work items, expiry and revocation work (0094) | Done | `8332995` |
+| 4b | FOUNDATION-P0-22: tenant URL and domain registry — slug policy, `tenant_domains`, `<slug>.<BASE_APP_HOST>` routing, tenant-branded sign-in, suspension (0095) | Done (custom-domain verification P1) | see Foundation audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
@@ -162,7 +163,10 @@ permissioning runs next**, ahead of Phase 4's remaining stories. It covers
 FOUNDATION-P0-22 through -27, the re-scoped FOUNDATION-P0-19 and -20,
 PLATFORM-P0-14, COMPLIANCE-P0-11 and EXPERIENCE-P0-21. The plan, gap
 analysis and recorded decisions are in `docs/plan/WONDERID-ROADMAP.md`
-§ Phase 4b.
+§ Phase 4b. FOUNDATION-P0-22 (tenant addresses) is done. **Production
+needs `BASE_APP_HOST` set in Vercel and a wildcard domain
+`*.<BASE_APP_HOST>` on the project**; until then tenant addresses are
+simply off and the app behaves as before.
 
 **Still to do in this programme:**
 

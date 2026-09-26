@@ -44,6 +44,10 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-21 | Administration navigation and persistent tenant context | Not Started — 2026-09-26, WonderID Phase 4b |
+| EXPERIENCE-P0-22 | Brand foundation: assets, brand configuration, tokens, WonderIDLogo and TenantLogo (BRAND-001/002/003/006) | Done — 2026-09-26 (interim artwork from the brand sheet until official vector files are supplied) |
+| EXPERIENCE-P0-23 | Brand in the shell and authentication (BRAND-004/005) | Done — 2026-09-26 |
+| EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
+| EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
 
 ---
 
@@ -667,3 +671,49 @@ The global assistant (explain, search, summarize, recommend, draft, simulate) un
 - The tenant's name, environment and URL are always visible.
 - The user and role wizards follow the mockups (stepper, review step), in
   both themes and at every width.
+
+## WonderID branding — Phase 4c (2026-09-26)
+
+Source: `docs/requirements/WonderID_Branding_Application_Wide_Implementation_Requirements.md`
+and `docs/requirements/wonderid-brand-sheet.png`. The plan and recorded
+decisions are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
+
+### EXPERIENCE-P0-22 — Brand foundation
+
+- `public/brand/` holds the specification's asset set (§8): the logo for
+  light and dark backgrounds, monochrome dark and light, the mark and its
+  variants, favicons (SVG, 16, 32, 48, Apple touch) and social images.
+  All logos are vector paths with no raster and no font dependency.
+- One configuration, `modules/ui/brand.ts`: name, tagline, statement,
+  palette, chart sequence, asset paths with intrinsic sizes, and the
+  tab-title helper.
+- Tokens: `--brand-*` constants and `brand-*` utilities; `--primary` is
+  Electric Blue and the sidebar Deep Navy; status colours unchanged.
+- `<WonderIDLogo variant size showWordmark showTagline alt />`: a Server
+  Component, own assets only, sized to prevent layout shift, theme-paired
+  on themed surfaces. `<TenantLogo />` is separate.
+
+### EXPERIENCE-P0-23 — Brand in the shell and authentication
+
+- Sidebar: the dark-surface lockup; collapsed, the W mark (which expands
+  it). Below `lg` the header carries the W mark.
+- Sign-in: the tagline lockup and "Secure access for every identity."; on
+  an organization's address, "Sign in to your organization" with the
+  organization's `TenantLogo` and "Secure access powered by WonderID".
+- Titles: "WonderID · <page>"; in the product and on an organization's
+  address, "<Organization> · <page> · WonderID".
+
+### EXPERIENCE-P0-24 — Brand across components, modules and administration
+
+- The chart palette from `wonderIdBrand.chartSequence` for categorical
+  series; semantic colours for states (§47–48).
+- Per-page tab titles across the five pillars and administration.
+- W-mark empty, loading, error and 404 states (§37–40); permission chips
+  and security warnings (§63–65).
+
+### EXPERIENCE-P0-25 — Visual regression
+
+- Screenshot baselines (light; desktop and mobile) for sign-in, dashboard,
+  sidebar expanded and collapsed, Agent 360, runtime, risk, Users, Roles,
+  the permission catalog, tenant settings and mobile navigation (§75).
+

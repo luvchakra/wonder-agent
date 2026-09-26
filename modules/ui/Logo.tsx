@@ -1,76 +1,108 @@
+import Image from "next/image";
+import { wonderIdBrand, type BrandAsset } from "./brand";
+
 /**
- * The WonderID logo (EXPERIENCE-P0-18, 2026-09-26), in the three forms the
- * product needs.
+ * BRAND-003 (EXPERIENCE-P0-22, 2026-09-26) — the WonderID logo and, kept
+ * deliberately separate, a tenant's logo (§68–§70 of the branding
+ * specification).
  *
- * - `mark`   — the W alone, for square and small placements (the sidebar,
- *   anywhere under ~28px).
- * - `lockup` — W + "WonderID", the default for headers.
- * - `full`   — lockup + the tagline, for the places that introduce the
- *   product (auth screens, onboarding).
- *
- * The mark is inline SVG drawn with solid brand colours: two strokes and
- * the lighter overlap where they cross, as in the WonderID mockups. No
- * gradient `<defs>`: an id-referenced gradient breaks when its first
- * instance sits in a hidden subtree, and the mark renders several times
- * per page. The wordmark is live text in the theme's foreground colour,
- * so it reads on light and dark surfaces without paired raster assets.
- * (The WonderAgent raster logo files remain in assets/brand/ for the
- * record; nothing renders them.)
+ * `<WonderIDLogo />` renders only the brand's own assets from
+ * public/brand/ (never a URL it is handed), sized from their intrinsic
+ * dimensions so nothing shifts on load. It is a Server Component: no
+ * client JavaScript. On themed surfaces the `default` variant renders the
+ * light- and dark-background artwork and CSS shows the one that matches
+ * (`.theme-light-only` / `.theme-dark-only`, app/globals.css), so the
+ * right logo is there on first paint; surfaces that are dark in both
+ * themes (the navy sidebar) ask for `dark`.
  */
-export type LogoVariant = "mark" | "lockup" | "full";
 
-export const WONDERID_TAGLINE = "Govern every identity. Verify every access.";
+export type WonderIDLogoVariant = "default" | "light" | "dark" | "mono" | "mono-light";
+const SIZES = { xs: 20, sm: 24, md: 32, lg: 44, xl: 56 } as const;
+export type WonderIDLogoSize = keyof typeof SIZES | number;
 
-/** The W. Aspect 4:3; sized by height. */
-export function WonderIdMark({ height = 28, className }: { height?: number; className?: string }) {
+function pick(variant: Exclude<WonderIDLogoVariant, "default">, showWordmark: boolean, showTagline: boolean): BrandAsset {
+  const a = wonderIdBrand.assets;
+  if (!showWordmark) {
+    return variant === "mono" ? a.markMonochrome : variant === "mono-light" ? a.markMonochromeLight : variant === "dark" ? a.markDark : a.markLight;
+  }
+  if (showTagline && (variant === "light" || variant === "dark")) return variant === "dark" ? a.logoTaglineDark : a.logoTagline;
+  return variant === "mono" ? a.monochrome : variant === "mono-light" ? a.monochromeLight : variant === "dark" ? a.logoDark : a.logoLight;
+}
+
+function LogoImage({ asset, height, alt, priority, className }: { asset: BrandAsset; height: number; alt: string; priority?: boolean; className?: string }) {
+  const width = Math.round((asset.width / asset.height) * height);
   return (
-    <svg viewBox="0 0 64 48" height={height} width={Math.round((height * 64) / 48)} className={className} aria-hidden="true" focusable="false">
-      <g fill="none" strokeLinecap="round" strokeLinejoin="round" strokeWidth="9">
-        <path d="M7 8 L20.5 40 L32 17" stroke="#5B5BF0" />
-        <path d="M32 17 L43.5 40 L57 8" stroke="#A04DF2" />
-        <path d="M24.5 30.5 L32 17 L39.5 30.5" stroke="#8B7CF6" />
-      </g>
-    </svg>
+    <Image
+      src={asset.src}
+      width={width}
+      height={height}
+      alt={alt}
+      // SVG from our own public/brand: served as-is, no optimizer.
+      unoptimized
+      priority={priority}
+      draggable={false}
+      className={className}
+      style={{ height, width: "auto", maxWidth: "100%" }}
+    />
   );
 }
 
-export function Logo({
-  variant = "lockup",
-  height = 28,
-  /** Accessible name. Omit when an ancestor (a link, say) is already labelled. */
-  alt,
+export function WonderIDLogo({
+  variant = "default",
+  size = "md",
+  showWordmark = true,
+  showTagline = false,
+  alt = wonderIdBrand.name,
+  priority,
   className,
 }: {
-  variant?: LogoVariant;
-  height?: number;
+  variant?: WonderIDLogoVariant;
+  /** Rendered height: a named size or pixels. The full lockup reads from ~24px; below that use the mark. */
+  size?: WonderIDLogoSize;
+  showWordmark?: boolean;
+  /** The tagline lockup — for brand-introducing surfaces only (sign-in, landing), never the app shell (§5). */
+  showTagline?: boolean;
+  /** Accessible name; pass "" when an ancestor (a labelled link) already names it. */
   alt?: string;
-  className?: string;
-  /** Kept for call-site compatibility with the raster logo; inline SVG needs no preload. */
   priority?: boolean;
+  className?: string;
 }) {
-  const label = alt ? { role: "img" as const, "aria-label": alt } : { "aria-hidden": true };
-
-  if (variant === "mark") {
-    return (
-      <span {...label} className={className}>
-        <WonderIdMark height={height} />
-      </span>
-    );
+  const height = typeof size === "number" ? size : SIZES[size];
+  if (variant !== "default") {
+    return <LogoImage asset={pick(variant, showWordmark, showTagline)} height={height} alt={alt} priority={priority} className={className} />;
   }
-
-  // The lockup's text is sized from the requested height so call sites
-  // keep the proportions they had with the raster wordmark.
-  const markHeight = variant === "full" ? Math.round(height * 0.62) : height;
-  const fontSize = variant === "full" ? Math.round(height * 0.5) : Math.round(height * 0.72);
+  const light = pick("light", showWordmark, showTagline);
+  const dark = pick("dark", showWordmark, showTagline);
+  if (light.src === dark.src) return <LogoImage asset={light} height={height} alt={alt} priority={priority} className={className} />;
   return (
-    <span {...label} className={`inline-flex max-w-full flex-col items-center ${className ?? ""}`}>
-      <span className="inline-flex max-w-full items-center gap-[0.35em]" style={{ fontSize }}>
-        <WonderIdMark height={markHeight} className="shrink-0" />
-        <span className="truncate font-semibold leading-none tracking-[-0.02em] text-foreground">WonderID</span>
-      </span>
-      {variant === "full" ? (
-        <span className="mt-1.5 text-center text-[0.8125rem] font-medium tracking-[0.01em] text-muted-foreground">{WONDERID_TAGLINE}</span>
-      ) : null}
+    <>
+      <LogoImage asset={light} height={height} alt={alt} priority={priority} className={`theme-light-only ${className ?? ""}`} />
+      <LogoImage asset={dark} height={height} alt={alt} priority={priority} className={`theme-dark-only ${className ?? ""}`} />
+    </>
+  );
+}
+
+/**
+ * A customer organization's mark (§70). Never the WonderID logo, and
+ * never mixed with it. Organizations have no uploaded logo yet (that
+ * arrives with tenant branding settings), so this is the organization's
+ * initials on a neutral tile — identity, not decoration.
+ */
+export function TenantLogo({ name, size = 32, className }: { name: string; size?: number; className?: string }) {
+  const initials =
+    name
+      .split(/[\s\-_.]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]!.toUpperCase())
+      .join("") || "?";
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-flex shrink-0 items-center justify-center rounded-md border border-border bg-secondary font-semibold text-secondary-foreground ${className ?? ""}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
+    >
+      {initials}
     </span>
   );
 }

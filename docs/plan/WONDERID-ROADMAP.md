@@ -176,3 +176,58 @@ Users, Groups, Roles and Permissions screens.
    2026-09-26 the user explicitly chose the dark navy sidebar
    (EXPERIENCE-P0-18). The navy sidebar stays until the user says
    otherwise; content areas are already light.
+
+## Phase 4c — WonderID branding (added 2026-09-26)
+
+**Source:** a further user-supplied specification, stored with its brand sheet:
+
+- `docs/requirements/WonderID_Branding_Application_Wide_Implementation_Requirements.md`
+  (stories BRAND-001…012, §78; implementation order §79);
+- `docs/requirements/wonderid-brand-sheet.png` (mark, lockups, colour
+  variations, app icon, favicon, clear space, minimum size, palette, login).
+
+It runs alongside Phase 4b. The foundation (assets, configuration, tokens,
+logo components, shell and sign-in) changes the shared shell, so it lands
+before the Phase 4b administration screens, which are then built already
+branded.
+
+| Phase | Story | Title | Module | Spec |
+|---|---|---|---|---|
+| 4c | EXPERIENCE-P0-22 | Brand foundation: `public/brand/` artwork (mark, lockups, monochrome, favicons, app icons, social image), one brand configuration (`modules/ui/brand.ts`), brand tokens mapped onto the semantic tokens, `<WonderIDLogo />` and a separate `<TenantLogo />` | Experience | BRAND-001/002/003/006 |
+| 4c | EXPERIENCE-P0-23 | Brand in the shell and authentication: sidebar lockup, collapsed W mark, mobile header mark, sign-in (tagline lockup, organization identity), tab-title convention, favicon | Experience | BRAND-004/005 |
+| 4c | EXPERIENCE-P0-24 | Brand across core components, product modules and administration: chart palette, per-page tab titles, W-mark empty, loading, error and 404 states, permission chips and security warnings | Experience | BRAND-007/008/009 |
+| 4c | EXPERIENCE-P0-25 | Visual regression baselines for the key screens (sign-in first; dashboard, Agent 360, runtime, administration and mobile navigation once P0-24 lands) | Experience (with QA) | BRAND-012 |
+| 4c | Operations P1 | Branded system e-mail with tenant-aware links; branded reports and evidence packages (logo, tenant, metadata, page numbers, footer) | Operations | BRAND-010/011 (P1) |
+
+### Decisions taken while planning (recorded, not asked)
+
+1. **Interim artwork until official files arrive.** No vector logo files
+   came with the specification. `scripts/brand/build-assets.mjs` redraws
+   the sheet's mark (a W whose centre is a person, head above the central
+   peak) and outlines the wordmark from Geist, the app's own typeface
+   (SIL OFL). Every file has the specification's name (§8), so the
+   official SVGs replace them one for one.
+2. **Colour values follow the specification's text.** The sheet image
+   prints Deep Navy #081220 and Electric Blue #2563FF; the text (§19, §67)
+   says #08122C and #2538FF. The text is used.
+3. **Semantic tokens stay the interface.** `--primary` becomes Electric
+   Blue (6.8:1 on white) and the sidebar Deep Navy; components keep using
+   `primary`, `sidebar` and so on. `--brand-*` constants exist for brand
+   surfaces only. Status colours are unchanged, and `--violet` stays the
+   text-safe AI tone: brand Violet #8B5CF6 is 4.2:1 on white, below AA
+   for small text.
+4. **The navy sidebar stays.** The specification describes a light
+   console, and its sidebar sketch has no colour. The user's explicit
+   2026-09-26 decision for a dark navy sidebar stands, and content surfaces
+   are light (see Phase 4b, decision 5).
+5. **The tagline.** "IDENTITIES • AGENTS • ACCESS • SECURITY" appears on
+   the brand-introducing surfaces only (sign-in, onboarding, social
+   image), never under the in-app logo (§5). The CLAUDE.md line "Govern
+   every identity. Verify every access." remains the contract's summary.
+   The landing page's tab title now uses the specification's secondary message.
+6. **One brand configuration.** The platform console's "Product name"
+   setting (`/platform-admin/branding`, Platform-owned) predates this. It
+   overlaps §71 ("no second brand configuration"). It is handed to
+   PLATFORM-P0-14 to fold into, or retire in favour of, `wonderIdBrand`,
+   not changed here.
+

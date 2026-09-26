@@ -2791,3 +2791,93 @@ closes the flyout.
 
 **Verified:** `shell.spec` **41/41** over `--repeat-each=5`; tsc and eslint
 clean.
+
+## 2026-09-26 — EXPERIENCE-P0-22/23: WonderID brand foundation, shell and sign-in (Phase 4c)
+
+Source: the user-supplied
+`docs/requirements/WonderID_Branding_Application_Wide_Implementation_Requirements.md`
+and its brand sheet, `docs/requirements/wonderid-brand-sheet.png`. The plan
+and the decisions below are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
+
+**EXPERIENCE-P0-22: brand foundation (BRAND-001/002/003/006).**
+
+- **Assets.** `public/brand/` holds the specification's set (§8):
+  - `logo/`: the lockup for light and dark backgrounds, monochrome dark and
+    light, the tagline lockups, and the mark with its variants;
+  - `favicon/`: SVG, 16, 32, 48 and Apple touch;
+  - `social/`: Open Graph and Twitter images.
+
+  `app/favicon.ico`, `icon.png` and `apple-icon.png` are rebuilt from the
+  mark.
+- **Interim artwork.** No vector files were supplied, so
+  `scripts/brand/build-assets.mjs` draws everything from one geometry:
+  - a W whose centre is a person, head above the central peak, in
+    Electric Blue, Sky Blue and Violet;
+  - the wordmark outlined from Geist Bold, the tagline from Geist Medium
+    (the app's typeface, SIL OFL), from `scripts/brand/wordmark-outlines.json`;
+  - no raster and no font dependency in any logo.
+
+  The official files replace them one for one under the same names.
+- **Configuration.** `modules/ui/brand.ts` (`wonderIdBrand`, `brandTitle`)
+  is the only brand configuration: name, tagline, statement, descriptor,
+  palette, chart sequence, and asset paths with intrinsic sizes (from the
+  generated `brandAssets.generated.json`).
+- **Tokens.**
+  - `--brand-navy/blue/sky/violet/slate/mist` and `brand-*` utilities;
+  - `--primary`, `--ring` and `--accent-foreground` are now Electric Blue
+    (6.8:1 against white text), with a lifted tint in dark mode;
+  - the sidebar is Deep Navy with an Electric Blue active pill;
+  - status colours are unchanged, and `--violet` stays the text-safe AI
+    tone: brand Violet is 4.2:1 on white.
+  - Deliberately not token-mapped: the whole page background. The current
+    gray-blue already matches Mist's role, and the specification forbids a
+    wholesale colour replacement (§72).
+- **Components** (`modules/ui/Logo.tsx`):
+  - `<WonderIDLogo variant size showWordmark showTagline alt priority />`
+    is a Server Component. It renders only the brand's own assets, sets
+    width and height from the manifest (no layout shift), and pairs light
+    and dark artwork on themed surfaces through `.theme-light-only` /
+    `.theme-dark-only`.
+  - `<TenantLogo name />`, kept separate: the organization's initials,
+    since tenants have no uploaded logo yet.
+  - The old inline-SVG `Logo` and `WONDERID_TAGLINE` are gone; all six call
+    sites were moved over.
+
+**EXPERIENCE-P0-23: shell and authentication (BRAND-004/005).**
+
+- Sidebar: the dark-surface lockup. Collapsed, it shows the W mark, and
+  the mark is the "Expand navigation" control. Before, the collapsed rail
+  showed no brand at all.
+- Below `lg` the header carries the W mark (link "WonderID home").
+- Sign-in and sign-up: the tagline lockup and "Secure access for every
+  identity." On an organization's address the page reads "Sign in to your
+  organization", with the organization's `TenantLogo` and "Secure access
+  powered by WonderID". Onboarding uses the tagline lockup.
+- Titles (§16–18):
+  - root: `WonderID · %s`, defaulting to "WonderID · AI Identity Security";
+  - the customer layout: `<Organization> · %s · WonderID` (request-cached,
+    no extra query);
+  - sign-in: "<Organization> · Sign in · WonderID" on a tenant address;
+  - the public pages' titles were shortened to fit the template.
+- The favicon link is the SVG mark; the Open Graph image is set.
+- `proxy.ts`'s matcher skips `/brand/`, `/icon.png` and `/apple-icon.png`.
+  Before this, a signed-out visitor's request for a logo would have been
+  redirected to sign-in.
+
+**Verified:** see the next entry.
+
+**Left out / handed on:**
+
+- EXPERIENCE-P0-24: the chart palette, per-page titles, W-mark empty,
+  loading, error and 404 states, permission chips.
+- The rest of EXPERIENCE-P0-25's baselines.
+- Operations P1: BRAND-010 e-mail and BRAND-011 reports and evidence.
+- PLATFORM-P0-14: the platform console's "Product name" setting, which
+  overlaps the single brand configuration (§71); and the platform console,
+  still unstyled scaffolding.
+- **For the user:**
+  - the sheet image prints #081220 and #2563FF where the text says #08122C
+    and #2538FF; the text was used;
+  - official vector logo files are still needed;
+  - the specification's light console versus the chosen navy sidebar:
+    navy kept (Phase 4b decision 5).

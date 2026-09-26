@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { ThemeFlashGuard } from "@/modules/ui";
+import { ThemeFlashGuard, brandTitle, wonderIdBrand } from "@/modules/ui";
 
 /**
  * globals.css has always mapped --font-sans/--font-mono onto
@@ -12,9 +12,15 @@ import { ThemeFlashGuard } from "@/modules/ui";
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"], display: "swap" });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
 
+// BRAND-005/§16–§18: "WonderID · <page>" by default; the customer shell
+// switches to the organization-first form. Icons are app/icon.png,
+// app/apple-icon.png and app/favicon.ico (built by scripts/brand) plus the
+// scalable mark.
 export const metadata: Metadata = {
-  title: "WonderID",
+  title: { default: brandTitle(), template: `${wonderIdBrand.name} · %s` },
   description: "Identity governance and security for human, machine and AI-agent identities",
+  icons: { icon: [{ url: wonderIdBrand.assets.favicon.src, type: "image/svg+xml" }] },
+  openGraph: { siteName: wonderIdBrand.name, images: [{ url: wonderIdBrand.assets.social, width: 1200, height: 630, alt: wonderIdBrand.name }] },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

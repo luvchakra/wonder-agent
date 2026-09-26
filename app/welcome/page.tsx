@@ -11,7 +11,7 @@ import {
   ShieldAlert,
   ShieldCheck,
 } from "lucide-react";
-import { BrowserFrame, FlowDiagram, LinkButton, Logo, PhoneFrame } from "@/modules/ui";
+import { BrowserFrame, FlowDiagram, LinkButton, WonderIDLogo, PhoneFrame } from "@/modules/ui";
 import agentsDesktopDark from "@/assets/product/agents-desktop-dark.png";
 import agentsDesktopLight from "@/assets/product/agents-desktop-light.png";
 import overviewDesktopDark from "@/assets/product/overview-desktop-dark.png";
@@ -22,7 +22,7 @@ import riskDesktopDark from "@/assets/product/risk-desktop-dark.png";
 import riskDesktopLight from "@/assets/product/risk-desktop-light.png";
 
 export const metadata: Metadata = {
-  title: "WonderID — Govern every identity. Verify every access.",
+  title: { absolute: "WonderID · Secure every identity. Human and AI." },
   description:
     "WonderID makes AI agents first-class enterprise identities: their owner, their approved purpose, the access they actually hold, and what they actually did — across the IAM platforms you already run.",
 };
@@ -484,7 +484,7 @@ export default function WelcomePage() {
       {/* ---------------------------------------------------------- footer */}
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <Logo variant="lockup" height={26} alt="WonderID" className="flex items-center" />
+          <WonderIDLogo size={26} />
           <p className="text-sm text-muted-foreground">
             AI Identity Governance &amp; Runtime Assurance
           </p>

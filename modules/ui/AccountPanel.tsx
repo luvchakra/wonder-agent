@@ -7,7 +7,8 @@ import { ChevronDown, LifeBuoy, LogOut, Shield, SunMoon, User } from "lucide-rea
 import { ThemeToggle } from "./theme";
 import { Avatar } from "./Avatar";
 
-export type TenantOption = { id: string; name: string; slug: string; current: boolean };
+/** `url`: the organization's own WonderID address, when tenant addresses are configured (FOUNDATION-P0-22). */
+export type TenantOption = { id: string; name: string; slug: string; current: boolean; url?: string | null };
 
 /**
  * Account menu in the page header, top right (moved from the foot of the

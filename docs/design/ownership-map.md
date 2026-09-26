@@ -20,7 +20,8 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 
 | Table | Owner | Notes |
 |---|---|---|
-| `tenants` | FA | Core tenant record |
+| `tenants` | FA | Core tenant record. Slug is the tenant's address: policy-checked, immutable; `suspended_at`/`suspension_reason` (FOUNDATION-P0-22, 0095) |
+| `tenant_domains` | FA | Hostnames a tenant is reached at: PLATFORM_SUBDOMAIN (label under `BASE_APP_HOST`, created by trigger) or CUSTOM_DOMAIN (verification P1). Select-only RLS; `resolve_tenant_host()` is the one public lookup (FOUNDATION-P0-22, 0095) |
 | `tenant_settings` | FA | Per-tenant configuration |
 | `users` | FA | Maps to Supabase Auth users |
 | `tenant_memberships` | FA | User ↔ tenant, source of tenant context |

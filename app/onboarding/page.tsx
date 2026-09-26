@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { Check } from "lucide-react";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
+import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { createTenantAction, selectTenantAction } from "@/app/actions/tenant";
-import { Card, CardHeader, CardBody, Button, Logo, TextField } from "@/modules/ui";
+import { Card, CardHeader, CardBody, Button, WonderIDLogo, TextField } from "@/modules/ui";
 
 export default async function OnboardingPage() {
   const supabase = await supabaseServer();
@@ -22,6 +23,9 @@ export default async function OnboardingPage() {
   // create an *additional* tenant, so this must not bounce them straight
   // back to "/" before they can reach the create-organization form below.
   const ctx = await getTenantContext();
+  // FOUNDATION-P0-22 — an organization's own address is for that organization only.
+  const host = await getHostTenant();
+  if (host.target.kind === "subdomain" || host.target.kind === "invalid") redirect(ctx.tenantId ? "/" : "/no-access");
 
   // Filtered by user_id for the same reason as getTenantContext(): the
   // tenant_memberships RLS policy is tenant-scoped, so relying on it alone
@@ -43,7 +47,7 @@ export default async function OnboardingPage() {
     <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center space-y-6 px-4 py-12">
       <div className="flex flex-col items-center text-center">
         <h1 className="sr-only">WonderID</h1>
-        <Logo variant="full" height={56} priority />
+        <WonderIDLogo size={52} showTagline priority />
         <p className="mt-3 text-sm text-muted-foreground">AI Identity Governance &amp; Runtime Assurance</p>
       </div>
 

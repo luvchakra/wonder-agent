@@ -2,6 +2,8 @@
 
 import { cookies, headers } from "next/headers";
 import { supabaseServer } from "@/lib/db/supabaseServer";
+import { writeAudit } from "@/lib/audit/writeAudit";
+import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { checkAndRecordAttempt, isDistinguishingClientIp, type RateLimitResult } from "@/lib/security/rateLimiter";
 import { SESSION_STARTED_COOKIE, SESSION_LAST_SEEN_COOKIE } from "@/lib/tenant/sessionSecurity";
 
@@ -56,9 +58,42 @@ export async function signInAction(email: string, password: string): Promise<Aut
     return { ok: false, error: "Too many sign-in attempts. Please try again in a few minutes." };
   }
 
+  // FOUNDATION-P0-22 — on an organization's own address: an address that
+  // names no organization, or a suspended one, cannot be signed in to at
+  // all; and an account that is not an active member there is signed
+  // straight back out (the address never grants access).
+  const host = await getHostTenant();
+  const onTenantAddress = host.target.kind === "subdomain" || host.target.kind === "invalid";
+  if (onTenantAddress && !host.tenant) return { ok: false, error: "No organization is at this address." };
+  if (onTenantAddress && host.tenant!.status !== "active") return { ok: false, error: `${host.tenant!.name} is suspended. Sign-in is paused; contact your administrator.` };
+
   const supabase = await supabaseServer();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { ok: false, error: error.message };
+
+  if (onTenantAddress && data.user) {
+    const { data: membership } = await supabase
+      .from("tenant_memberships")
+      .select("status")
+      .eq("tenant_id", host.tenant!.tenantId)
+      .eq("user_id", data.user.id)
+      .maybeSingle();
+    if (membership?.status !== "active") {
+      // Only this new session ends; the account's other sessions are not touched.
+      await supabase.auth.signOut({ scope: "local" });
+      await writeAudit({
+        tenantId: host.tenant!.tenantId,
+        actorId: data.user.id,
+        actorType: "user",
+        action: "auth.sign_in_refused",
+        objectType: "tenant",
+        objectId: host.tenant!.tenantId,
+        outcome: "failure",
+        metadata: { reason: membership ? `membership ${membership.status}` : "not a member" },
+      });
+      return { ok: false, error: `This account is not an active member of ${host.tenant!.name}.` };
+    }
+  }
   await stampSessionCookies();
   return { ok: true };
 }

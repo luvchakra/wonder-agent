@@ -4,6 +4,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getSessionUser } from "@/lib/tenant/session";
+import { getHostTenant } from "@/lib/tenant/hostTenant";
 import type { TenantContext } from "@/lib/shared/types/foundation";
 
 export const TENANT_COOKIE_NAME = "wa_tenant";
@@ -85,7 +86,8 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
  *
  * The `wa_tenant` cookie only *chooses among* memberships the database
  * says the user holds; a cookie naming a tenant they are not a member of
- * is ignored.
+ * is ignored. On a tenant's own address the hostname fixes the candidate
+ * instead (FOUNDATION-P0-22) — still only among the user's memberships.
  *
  * Resolved once per request (`cache()`): the layout, the page, and the
  * service calls under them all share it. The two lookups it needs run in
@@ -99,10 +101,20 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
     return { userId: "", tenantId: null, tenantSlug: null, roles: [], permissions: [] };
   }
 
-  const [memberships, roleRows, cookieStore] = await Promise.all([getMyMemberships(), getMyRoleRows(), cookies()]);
+  const [memberships, roleRows, cookieStore, host] = await Promise.all([getMyMemberships(), getMyRoleRows(), cookies(), getHostTenant()]);
 
-  const requestedTenantId = cookieStore.get(TENANT_COOKIE_NAME)?.value ?? null;
-  const activeMembership = memberships.find((m) => m.tenantId === requestedTenantId) ?? memberships[0] ?? null;
+  // FOUNDATION-P0-22 — on a tenant's own address (`<slug>.<BASE_APP_HOST>`)
+  // that tenant is the only candidate: the user must hold an active
+  // membership in it, or there is no tenant context at all (never a
+  // fallback to another of their organizations). Elsewhere the cookie
+  // chooses among the user's memberships, as before.
+  let activeMembership: Membership | null;
+  if (host.target.kind === "subdomain" || host.target.kind === "invalid") {
+    activeMembership = host.tenant ? (memberships.find((m) => m.tenantId === host.tenant!.tenantId) ?? null) : null;
+  } else {
+    const requestedTenantId = cookieStore.get(TENANT_COOKIE_NAME)?.value ?? null;
+    activeMembership = memberships.find((m) => m.tenantId === requestedTenantId) ?? memberships[0] ?? null;
+  }
 
   if (!activeMembership) {
     return { userId: user.id, tenantId: null, tenantSlug: null, roles: [], permissions: [] };

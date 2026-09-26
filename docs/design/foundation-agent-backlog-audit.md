@@ -1441,3 +1441,110 @@ truthful message (§17.5):
 - The full Playwright suite result is recorded in the next entry.
 - **Full Playwright suite** (§17.8: `proxy.ts` and authentication changed):
   **273/273 passed** (16.1 min).
+
+## 2026-09-26 — FOUNDATION-P0-22: tenant identity, tenant URL and domain registry (WonderID Phase 4b)
+
+Implements TENANT-001/002/003 of
+`docs/requirements/WonderID_Tenant_User_Permissioning_Model.md`. The
+address narrows which tenant a request is for; it never grants access
+(non-negotiable #2). Access still needs an active membership, and RLS still
+scopes every read.
+
+**Migration `0095_foundation_tenant_domains.sql` (applied to the dev project):**
+
+- `tenants.slug` is the tenant's address:
+  - `tenant_slug_is_valid()` (immutable, pinned `search_path`): lowercase,
+    URL-safe, 3–40 characters, no `--`, reserved words refused
+    (`www`, `api`, `admin`, `platform`, `auth`, `sso`, …);
+  - enforced by the `tenants_slug_policy` check;
+  - a trigger refuses any slug change.
+- `tenants.suspended_at` / `suspension_reason`: stamped on suspension,
+  cleared on reactivation (same trigger).
+- `tenant_domains`:
+  - PLATFORM_SUBDOMAIN stores only the label, so one database serves every
+    environment's `<slug>.<BASE_APP_HOST>`;
+  - CUSTOM_DOMAIN stores the full hostname; verification is P1, so these
+    stay `pending` and never resolve;
+  - one primary per tenant; `verified` ⇔ `verified_at`;
+  - select-only RLS for members; writes come from the platform (service
+    role) and the trigger.
+- Every new tenant gets its verified primary subdomain from a trigger;
+  existing tenants were backfilled. Trigger functions have execute revoked
+  from public, anon and authenticated.
+- `resolve_tenant_host(p_subdomain, p_hostname)`:
+  - the one public lookup (anon and authenticated);
+  - verified domains only;
+  - returns only id, name, slug and status.
+
+**App:**
+
+- `lib/tenant/host.ts` (pure):
+  - `BASE_APP_HOST` normalization;
+  - `parseTenantHost` → none / base / subdomain / invalid. Nested labels,
+    reserved or malformed labels and lookalike hosts are not subdomains;
+  - `slugProblem`; `tenantUrl`.
+- `lib/tenant/hostTenant.ts`:
+  - `getHostTenant()` resolves once per request (`cache`); a failed lookup
+    resolves nothing;
+  - `urlForTenant()` keeps the request's scheme and port.
+- `getTenantContext()`: on a tenant address the only candidate membership
+  is the addressed tenant's. The active-tenant cookie cannot pull in
+  another tenant there. Elsewhere it behaves as before.
+- `proxy.ts`:
+  - the host lookup runs in parallel with the session check, with a 30 s
+    bounded cache;
+  - an unknown, unverified or invalid address answers 404
+    (`TENANT_NOT_FOUND` for APIs, `/tenant-not-found` for pages) without
+    naming any tenant;
+  - a failed lookup answers 503 (fail closed);
+  - a signed-out visitor on a tenant address is sent to `/sign-in`, not
+    the marketing page.
+- Sign-in on a tenant address (`app/sign-in/page.tsx` server component +
+  `SignInForm.tsx`):
+  - shows the organization's name; no organization picker, sign-up or
+    Google;
+  - a suspended organization says so and the form is disabled;
+  - `signInAction` refuses an unknown or suspended address. A successful
+    password check without an active membership there ends that new
+    session (local sign-out), writes `auth.sign_in_refused`, and says
+    "This account is not an active member of X."
+- `/no-access` (suspended or not a member, with sign out): the customer
+  layout sends a tenant address there instead of `/onboarding`.
+  Onboarding and creating an organization are refused on a tenant address.
+- The workspace switcher shows each organization's address. Switching on a
+  tenant address navigates to the target tenant's own URL, because sessions
+  are per host.
+- `BASE_APP_HOST` is documented in `.env.local.example`; unset, tenant
+  addresses are off and nothing changes. The Playwright server runs with
+  `BASE_APP_HOST=localhost` (Chromium resolves `*.localhost`).
+
+**Verified:**
+
+- tsc clean; eslint clean on every changed file.
+- vitest **700/700**, including the new `host.test.ts` (6) and
+  `proxy.test.ts` now at 10: unknown-address 404 for APIs and pages, 503
+  on lookup failure, signed-out redirect to `/sign-in`, and pass-through
+  for a known address.
+- SQL check `tests/foundation/tenant-domains-isolation.sql`, run live:
+  every check held (results in the file header); fixtures removed.
+- E2E `tests/e2e/tenant-address.spec.ts` **12/12**:
+  - the tenant sign-in page;
+  - unknown and reserved addresses are 404 for pages and the API;
+  - a member lands in the addressed tenant;
+  - a non-member is refused and the new session ends;
+  - a two-organization member gets the addressed one each time;
+  - a suspended organization refuses and says so.
+- Screenshots: tenant sign-in (light, 1280), suspended (dark, 390),
+  "No organization at this address" (light, 1280).
+
+**Left out / handed on:**
+
+- Custom-domain verification (DNS TXT) and management UI: P1, with
+  PLATFORM-P0-14's tenant pages.
+- The shell's environment label arrives with FOUNDATION-P0-27's security
+  profile.
+- **Production needs `BASE_APP_HOST` in Vercel and a wildcard domain
+  `*.<BASE_APP_HOST>`.** Not configured by this change.
+- Pre-existing, not introduced here: two
+  `invalid input syntax for type uuid: "null"` server log lines during the
+  platform-admin auth setup. Noted for QA.

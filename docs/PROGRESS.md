@@ -14,7 +14,7 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**179 of 235 tracked stories complete — 76%**
+**182 of 239 tracked stories complete — 76%**
 
 ```
 ██████████████████████████████░░░░░░░░░░  76%
@@ -22,11 +22,11 @@ Generated 2026-09-26 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 179 |
-| Partial | 25 |
+| Done | 182 |
+| Partial | 26 |
 | Deferred | 1 |
 | Not Started | 30 |
-| **Total tracked** | **235** |
+| **Total tracked** | **239** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -38,14 +38,14 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 9 | 40 | `█████████████░░░░░` 73% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 30 | 2 | 0 | 8 | 40 | `██████████████░░░░` 75% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 16 | 3 | 0 | 1 | 20 | `██████████████░░░░` 80% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 21 | 2 | 0 | 4 | 27 | `██████████████░░░░` 78% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 23 | 3 | 0 | 5 | 31 | `█████████████░░░░░` 74% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 2 | 16 | `██████████████░░░░` 75% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 3 | 28 | `████████░░░░░░░░░░` 46% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 29 done · 2 partial · 0 deferred · 9 not started (40 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 30 done · 2 partial · 0 deferred · 8 not started (40 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -96,7 +96,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles — re-scoped 2026-09-26 (Phase 4b) as scoped assignments and the authorization engine | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
-| FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Done — 2026-09-26 (custom-domain verification is P1; the shell shows name and URL, environment arrives with P0-27's profile) |
 | FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-24 | Permission catalog with resource, action, module and administrative permissions (IAM-002) | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Not Started — 2026-09-26, WonderID Phase 4b |
@@ -271,7 +271,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 21 done · 2 partial · 0 deferred · 4 not started (27 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 23 done · 3 partial · 0 deferred · 5 not started (31 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -302,6 +302,10 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-21 | Administration navigation and persistent tenant context | Not Started — 2026-09-26, WonderID Phase 4b |
+| EXPERIENCE-P0-22 | Brand foundation: assets, brand configuration, tokens, WonderIDLogo and TenantLogo (BRAND-001/002/003/006) | Done — 2026-09-26 (interim artwork from the brand sheet until official vector files are supplied) |
+| EXPERIENCE-P0-23 | Brand in the shell and authentication (BRAND-004/005) | Done — 2026-09-26 |
+| EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
+| EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
 
 ### 09 — Platform Agent
 

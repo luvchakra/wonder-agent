@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -6,6 +7,7 @@ import { getProfile, getSessionUser } from "@/lib/tenant/session";
 import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContext";
 import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
+import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
 import { getFindings } from "@/modules/risk/service";
 import { AppSidebar, MobileNavDrawer, MobileNavTrigger } from "@/modules/ui/AppSidebar";
 import { MobileTabBar } from "@/modules/ui/MobileTabBar";
@@ -14,6 +16,8 @@ import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchA
 import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
 import { getActiveAnnouncements } from "@/modules/platform-admin/service";
 import { NAV_COOKIE, type ShellBadgeCounts } from "@/modules/ui/shell-nav";
+import { brandTitle, wonderIdBrand } from "@/modules/ui/brand";
+import { WonderIDLogo } from "@/modules/ui/Logo";
 
 /** `TENANT_SUPER_ADMIN` → `Tenant Super Admin`, for the sidebar's user block. */
 function humanizeRole(role: string | undefined): string | null {
@@ -48,12 +52,27 @@ function humanizeRole(role: string | undefined): string | null {
 // context, membership list and platform-admin check are all request-cached,
 // so the page rendering beside this layout reuses them instead of
 // repeating them. Everything below is one parallel wave of queries.
+// BRAND-005/§18 — organization-first tab titles inside the product:
+// "ACME · Agents · WonderID". Reuses the request-cached tenant context and
+// membership list, so it costs no extra query.
+export async function generateMetadata(): Promise<Metadata> {
+  const ctx = await getTenantContext();
+  const name = ctx.tenantId ? (await getMyMemberships()).find((m) => m.tenantId === ctx.tenantId)?.name : null;
+  if (!name) return {};
+  return { title: { default: brandTitle(null, name), template: `${name} · %s · ${wonderIdBrand.name}` } };
+}
+
 export default async function CustomerLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
   if (!user) redirect("/sign-in");
 
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) redirect("/onboarding");
+  if (!ctx.tenantId) {
+    // FOUNDATION-P0-22 — on an organization's own address there is nothing
+    // to create or pick: the user either belongs there or has no access.
+    const host = await getHostTenant();
+    redirect(host.target.kind === "subdomain" || host.target.kind === "invalid" ? "/no-access" : "/onboarding");
+  }
 
   const [profile, memberships, isAdmin, announcements, openFindings, cookieStore] = await Promise.all([
     getProfile(),
@@ -78,11 +97,14 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     cookies(),
   ]);
 
-  const tenantOptions = memberships.map((m) => ({
+  // FOUNDATION-P0-22 — each organization's own address, so the rail always shows where you are.
+  const tenantUrls = await Promise.all(memberships.map((m) => (m.slug ? urlForTenant(m.slug) : Promise.resolve(null))));
+  const tenantOptions = memberships.map((m, i) => ({
     id: m.tenantId,
     name: m.name,
     slug: m.slug,
     current: m.tenantId === ctx.tenantId,
+    url: tenantUrls[i],
   }));
 
   const badges: ShellBadgeCounts = { risk: openFindings.length };
@@ -115,6 +137,10 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-card/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:gap-3 lg:px-6">
           <MobileNavTrigger />
+          {/* BRAND-004/§54 — below lg the rail is hidden, so the header carries the W mark. */}
+          <Link href="/" aria-label="WonderID home" className="flex shrink-0 items-center rounded-md lg:hidden">
+            <WonderIDLogo showWordmark={false} size={26} alt="" />
+          </Link>
           <div className="min-w-0 max-w-xl flex-1">
             <ShellGlobalSearch />
           </div>

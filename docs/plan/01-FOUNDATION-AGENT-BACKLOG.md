@@ -51,7 +51,7 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles — re-scoped 2026-09-26 (Phase 4b) as scoped assignments and the authorization engine | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
-| FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Done — 2026-09-26 (custom-domain verification is P1; the shell shows name and URL, environment arrives with P0-27's profile) |
 | FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-24 | Permission catalog with resource, action, module and administrative permissions (IAM-002) | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Not Started — 2026-09-26, WonderID Phase 4b |
