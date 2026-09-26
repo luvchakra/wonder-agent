@@ -1835,3 +1835,32 @@ IAM-002/003 and spec §13–17, 21–22, 28, 53.
 - The groups tab: FOUNDATION-P0-26.
 - Custom roles cannot yet include permissions a tenant does not hold at
   all, which is by design.
+
+## 2026-09-26 — Full suite on FOUNDATION-P0-24/25 and the light console (741aabf)
+
+**What ran:** the full Playwright suite (326 tests) against a production
+build of `741aabf` — FOUNDATION-P0-22..25, EXPERIENCE-P0-22/23 and the
+light-console sidebar. Migrations 0095–0098 were applied; no migration was
+applied during the run.
+
+**Result:** 310 passed, 8 failed and 8 did not run (dependants of the
+failures in serial blocks).
+
+- All 16 sat in one ten-minute window (tests 134–155, about 10:30–10:40
+  UTC).
+- The server log shows `TypeError: fetch failed` from the Supabase client
+  in that window. The session check in `proxy.ts` failed, so signed-in
+  users were treated as signed out:
+  - the signed-in help test landed on the landing page;
+  - `/agents/new` never rendered its form;
+  - the platform tenants API returned no data;
+  - design-review page loads aborted.
+- The sandbox proxy recorded relay failures over the same minutes.
+- This was network egress, not this change.
+
+**Rerun:** the five affected specs (design-review, emergency-controls,
+financebot-central-scenario, gateway-enforcement, help) against the same
+build: **54/54 passed**.
+
+With the 310 passed in the full run, every test in the suite has passed on
+this build. `741aabf` goes to main.

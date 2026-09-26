@@ -2915,3 +2915,13 @@ and the decisions below are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
   audit.
 - Screenshots: Home in light and dark (1440).
 - The full suite on the final build is recorded in the next entry.
+
+## 2026-09-26 — Full suite on the light console build (741aabf)
+
+- 310 passed. 16 failed or did not run, all in one ten-minute window when
+  the server could not reach Supabase (`fetch failed`), so sessions read
+  as signed out.
+- Re-running the five affected specs against the same build: 54/54 passed,
+  including design-review's structure, theming and mobile tab-target
+  checks.
+- Details are in the Foundation audit.
