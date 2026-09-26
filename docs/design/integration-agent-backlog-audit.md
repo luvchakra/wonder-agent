@@ -652,3 +652,156 @@ agent/parent references `(col, tenant_id)` foreign keys under their
 existing names. For a member of two organizations, RLS alone admitted
 both. The full list, tests and live SQL verification are in the QA audit
 log's QA-P0-17 entry.
+
+---
+
+## 2026-09-26 — INTEGRATION-P0-09 (Done), INTEGRATION-P0-08 (Partial): identity sources and reconciliation
+
+WonderID Phase 2 (`docs/plan/WONDERID-ROADMAP.md`; spec H2). It adds an
+identity-source role on top of this module, and a
+reconciliation pipeline that never writes `identities` itself. The
+Identity module's published `applySourcedIdentities()` decides what may
+change and writes it (#5, #6; see the Identity audit, same date).
+
+### Schema (migrations 0081, 0082, 0083; applied live)
+
+- **`identity_sources`** (members write, permission-checked):
+  - template: csv, scim, rest, hr_api, or an existing integration via a
+    same-tenant composite FK;
+  - identity type it provides;
+  - authoritative flag and authoritative fields;
+  - precedence (1 is highest);
+  - attribute mappings (column or dotted path → identity field, the
+    source's own id, or the manager's source id);
+  - ordered correlation rules (email, username, composite);
+  - leaver strategy (disable, flag, none) and leaver safety limit %;
+  - schedule and status.
+- **Written only by the service-role worker**, with explicit tenant
+  filters, the `integration_sync_jobs` pattern. There are no client write
+  policies on these three tables:
+  - **`identity_reconciliation_runs`**: counts, errors, a capped change
+    log, the guard flag and `dry_run` (0083).
+  - **`identity_source_links`**: which external record is which identity,
+    and whether it was present in the latest full run.
+  - **`pending_identity_correlations`**: one open row per record.
+- **0082** added the two tenant_id indexes that a catalog check found
+  missing after 0081.
+
+### Pipeline (`modules/integrations/identitySources.ts`)
+
+Pure rules live in `identitySourceRules.ts`.
+
+- **Fetch:**
+  - a CSV file (RFC 4180 parser, ≤ 10,000 records), posted to the runs
+    API by the page (server actions cap bodies at 1 MB);
+  - or the identity objects the linked integration already imported, as
+    raw fields plus `normalized.*` and `externalId`.
+- **Validate and normalize.** Every row needs an external id and a display
+  name. Emails, dates and status words ("A", "Terminated", "LOA", …) are
+  normalized, and a repeated external id is refused. Invalid rows are
+  counted and listed; none is applied halfway.
+- **Correlate.** The source's own link wins; then each rule in order:
+  - exactly one candidate is a match;
+  - several go to **pending matches** for a person (§17.6), never to the
+    closest guess;
+  - none means a new identity.
+  - An identity already linked to another record of the same source is
+    never a candidate.
+- **Compare and apply** go through Identity's `applySourcedIdentities()`,
+  which enforces per-field precedence and records provenance.
+- **Managers** are resolved after every record in the run has an
+  identity.
+- **Leavers:**
+  - they are decided only after every record is handled;
+  - they apply only on a full run with no apply errors.
+  - **Guard:** when more than the limit (and at least 5) of linked
+    identities are missing, no one is treated as a leaver and the run asks
+    for review. A truncated file or a failed page disables nobody.
+  - A failed run applies no leavers at all.
+- **Preview** (the "stage" step, 0083) plans everything a real run would do
+  (creates, compares, pending, leavers, the guard) and changes nothing but
+  the run record.
+- **Runs** are queued and then executed with `after()`. The page polls
+  while a run is queued or running (§15), and states are truthful:
+  queued, running, succeeded, needs review, failed (§17.5).
+- **Pending-match decisions** (link to one of the candidates, create, or
+  dismiss) need `identity.manage`. The row is claimed atomically first, so
+  two reviewers cannot both act, and the claim is released if the identity
+  change fails.
+- **Audit events:** `identity_source.created`, `.updated`, `.run_started`,
+  `.run_completed` (with counts) and `.correlation_resolved`. Each
+  identity change is audited by the Identity module, with the run id as
+  correlation.
+
+### API and UI
+
+- **API:**
+  - `/api/v1/integrations/identity-sources` (GET, POST) and `/:id` (GET,
+    PATCH);
+  - `/:id/runs` (GET, POST → 202);
+  - `/identity-sources/runs/:runId`;
+  - `/api/v1/integrations/correlations` (GET) and `/:id` (POST decision).
+  - Permissions: `integration.read`, `.create`, `.update` and `.execute`,
+    plus `identity.manage` for decisions.
+- **UI:**
+  - Integrations → Identity Sources: the list, a new-source form with
+    template mapping presets, a mapping editor and correlation choices;
+  - the source page: import (CSV or from the integration, full or partial,
+    preview), runs, and configuration;
+  - the run page: counts, problems, and the change log linked to
+    identities;
+  - Integrations → Pending Matches.
+
+### Verified
+
+- `tsc` and `eslint` clean.
+- vitest **574/574**, including `identitySourceRules.test.ts` 18/18:
+  config validation, CSV edge cases, normalization, correlation, the
+  leaver guard and precedence.
+- Live SQL (`tests/integration/identity-sources-isolation.sql`), 13/13:
+  - a tenant-A member sees 0 of B's sources, runs, links and pending
+    matches;
+  - their writes into B are denied (42501), and their updates and
+    dismissals of B rows affect 0 rows;
+  - client writes to runs and pending matches are denied even in their own
+    tenant;
+  - cross-tenant integration, source and identity references are 23503,
+    even from the service role;
+  - a second open match for one record is 23505;
+  - non-object provenance is 23514.
+  - Fixtures were cleaned up.
+- E2E `identity-sources.spec.ts`, 16/16:
+  - configuration validation;
+  - a full import with match, create, invalid row, ambiguous hold and
+    manager;
+  - precedence;
+  - a decision made once (400 for a non-candidate, 409 the second time);
+  - a preview that plans leavers but changes nothing;
+  - partial vs. full leavers;
+  - the guard;
+  - the UI upload following the run;
+  - another organization gets 404 on the source, run, patch and decision
+    and does not see them;
+  - read-only gets 403.
+- Screenshots checked (new source; run; source in dark mode; pending
+  matches at 390 px). Two fixes came from them: shorter KPI labels, and
+  readable field names in the change log.
+- Security advisor: nothing new.
+- **Full Playwright suite (§17.8): 221/222.** The one failure was
+  `shell.spec`'s collapsed-sidebar flyout: the menu did not stay open. It
+  was a real race in the shell (see the Experience audit, same date), not
+  in this story. After the fix, `shell.spec` passed **41/41** over five
+  repeats. The identity specs were re-run on the same build.
+
+### INTEGRATION-P0-08 stays Partial
+
+- **Schedule** is stored but not executed; nothing runs sources on a timer
+  yet. That needs a scheduler decision (Vercel Cron or similar).
+- **SCIM, REST and HR-API templates** are mapping presets for those record
+  shapes. Their records arrive as an export file or through a linked
+  integration (e.g. the generic REST connector). There is no native SCIM
+  pull.
+- **Incremental** means a partial run.
+
+**Handed on:** governed joiner/mover/leaver workflows from these lifecycle
+signals are IDENTITY-P0-18.

@@ -129,14 +129,15 @@ isolation checks. Detail is in each module's audit log.
 | + | Demo data: `npm run seed:demo` seeded WonderArk across every module (real gateway decisions); Agent 360 decision labels fixed | Done | `84e3dda` |
 | W0 | QA-P0-20: WonderID adopted, contract amended, baseline locked, roadmap written | Done | `0a52efa` |
 | W0 | EXPERIENCE-P0-18: WonderID brand and dark navy navigation shell | Done | `26a5f1a` |
-| W1 | IDENTITY-P0-15/16: unified `identities` reference, attributes, relationships (0077–0079) | Done | see Identity audit |
-| W1 | IDENTITY-P0-17: Identities directory and detail | Partial (Groups/Access/Risk/Activity views wait on later phases) | see Identity audit |
+| W1 | IDENTITY-P0-15/16: unified `identities` reference, attributes, relationships (0077–0079) | Done | `fe6c271` |
+| W1 | IDENTITY-P0-17: Identities directory and detail | Partial (Groups/Access/Risk/Activity views wait on later phases) | `fe6c271` |
+| W2 | INTEGRATION-P0-08/09: identity sources, reconciliation, pending matches, preview (0080–0083) | 09 Done, 08 Partial (schedules, native SCIM) | see Integration audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
 phase, after QA-P0-20 locked the baseline. Phase 1 is done except IDENTITY-P0-17's
-later-phase views. Next: Phase 2 (INTEGRATION-P0-08/09, identity sources and
-authoritative feeds), then IDENTITY-P0-18.
+later-phase views; Phase 2's sources and reconciliation are in. Next:
+IDENTITY-P0-18 (governed joiner/mover/leaver from the lifecycle signals).
 
 **Still to do in this programme:**
 

@@ -244,7 +244,21 @@ function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavIt
   return (
     <li className="flex justify-center" onPointerEnter={(e) => e.pointerType === "mouse" && hoverOpen()} onPointerLeave={(e) => e.pointerType === "mouse" && hoverClose()}>
       <DropdownMenu.Root open={open} onOpenChange={setOpen} modal={false}>
-        <DropdownMenu.Trigger aria-label={`${item.label}${count ? `, ${count} needing attention` : ""}`} data-active={active || undefined} className={iconClass}>
+        <DropdownMenu.Trigger
+          aria-label={`${item.label}${count ? `, ${count} needing attention` : ""}`}
+          data-active={active || undefined}
+          className={iconClass}
+          // Hovering has already opened the flyout by the time a mouse
+          // press lands, and Radix's own press handler would toggle it shut
+          // again. A mouse press therefore always opens; the keyboard keeps
+          // Radix's toggle.
+          onPointerDown={(e) => {
+            if (e.pointerType === "mouse" && e.button === 0) {
+              e.preventDefault();
+              hoverOpen();
+            }
+          }}
+        >
           <NavIcon name={item.icon} className="size-5" />
           {dot}
         </DropdownMenu.Trigger>

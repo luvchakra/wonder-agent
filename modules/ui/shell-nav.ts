@@ -134,7 +134,13 @@ export const SHELL_NAV: ShellNavItem[] = [
     label: "Integrations",
     href: "/integrations",
     icon: "Link2",
-    children: [link("Connectors", "/integrations"), link("MCP Servers", "/integrations/mcp"), link("Sync Jobs", "/integrations/jobs")],
+    children: [
+      link("Connectors", "/integrations"),
+      link("Identity Sources", "/integrations/sources"),
+      link("Pending Matches", "/integrations/correlations"),
+      link("MCP Servers", "/integrations/mcp"),
+      link("Sync Jobs", "/integrations/jobs"),
+    ],
   },
   {
     label: "Permissions (WonderID)",

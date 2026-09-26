@@ -1305,3 +1305,41 @@ roadmap decision 1: a reference model, not a second source of truth.
   (light), new-external and all-identities at 390 px. One fix came from
   them: the search box got a visible label so it lines up with the status
   filter.
+
+---
+
+## 2026-09-26 — Sourced identity writes and field provenance (for INTEGRATION-P0-09)
+
+Identity sources (Integration module) need to change identities. This
+module keeps sole ownership of those writes (#5, #6) and publishes the
+write path. The full pipeline is in the Integration audit (same date).
+
+- **Migration 0080:** `identities.field_provenance` jsonb. It records which
+  source set each field, at what precedence and when. It is checked to be
+  an object and applied live.
+- **`sourcedMerge.ts` (pure):**
+  - a source's authoritative field is written unless a higher-precedence
+    source set it last;
+  - other fields only fill blanks;
+  - ties go to the incoming source, so it can correct its own value.
+  - A manual edit leaves provenance alone, so the owning source's next
+    import restores its value (#7: the source stays the system of record).
+- **`sourcedIdentities.ts`** (published through `service.ts`):
+  - `listIdentitiesForCorrelation()`;
+  - `applySourcedIdentities(tenantId, authority, ops)` with `create`,
+    `update` and `leaver` ops. It uses the service role (runs execute after
+    the request); every statement is tenant-filtered, and every target row
+    is re-read inside the tenant first.
+  - Each op succeeds or fails on its own and reports why.
+  - Person lifecycle follows the sourced status: pending or future start →
+    PRE_JOIN; inactive → DISABLED; terminated → TERMINATED. A leaver
+    becomes inactive with LEAVE_PENDING.
+  - AI agents are never created by a source.
+  - Audit: `identity.created`, `identity.updated`,
+    `identity.status_changed` and `identity.leaver_detected`, with actor
+    type `integration` and the run id as correlation. Field names only.
+- **Tests:** precedence unit tests are in
+  `modules/integrations/identitySourceRules.test.ts`. E2E coverage is in
+  `identity-sources.spec.ts`: an authoritative field is set; a
+  lower-precedence source cannot overwrite it; managers resolve; leavers go
+  to LEAVE_PENDING.

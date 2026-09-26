@@ -29,3 +29,17 @@ export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";
 export { receiveWebhook, type WebhookResult } from "./webhooks";
 export { ingestMcpRuntimeEvent, parseMcpEvent, type McpEventResult, type McpRuntimeOutcome } from "./mcpEvents";
+export {
+  listIdentitySources,
+  getIdentitySource,
+  createIdentitySource,
+  updateIdentitySource,
+  listReconciliationRuns,
+  getReconciliationRun,
+  startReconciliation,
+  listPendingCorrelations,
+  countPendingCorrelations,
+  resolvePendingCorrelation,
+  type ReconciliationInput,
+  type CorrelationDecision,
+} from "./identitySources";

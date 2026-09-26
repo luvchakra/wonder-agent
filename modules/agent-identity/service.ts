@@ -55,3 +55,10 @@ export {
   type IdentityListRow,
   type RelationshipView,
 } from "./directory";
+export {
+  listIdentitiesForCorrelation,
+  applySourcedIdentities,
+  type CorrelationCandidate,
+  type SourcedOp,
+  type SourcedResult,
+} from "./sourcedIdentities";

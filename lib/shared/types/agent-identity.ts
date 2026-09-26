@@ -400,3 +400,39 @@ export type IdentityAttributeDefinition = {
   active: boolean;
   createdAt: string;
 };
+
+/**
+ * Identity fields an identity source may supply (INTEGRATION-P0-09 via
+ * the Identity module's applySourcedIdentities). `managerIdentityId` is
+ * resolved by the caller from the source's own manager reference.
+ */
+export const SOURCED_IDENTITY_FIELDS = [
+  "displayName",
+  "email",
+  "username",
+  "subtype",
+  "department",
+  "title",
+  "businessUnit",
+  "location",
+  "employmentType",
+  "organization",
+  "startDate",
+  "endDate",
+  "status",
+  "managerIdentityId",
+] as const;
+export type SourcedIdentityField = (typeof SOURCED_IDENTITY_FIELDS)[number];
+export type SourcedFields = Partial<Record<SourcedIdentityField, string | null>>;
+
+/** Which source set a field, at what precedence (lower number wins). */
+export type FieldProvenance = Record<string, { sourceId: string; priority: number; at: string }>;
+
+/** One source's say in a merge. */
+export type SourceAuthority = {
+  sourceId: string;
+  priority: number;
+  /** Fields this source is the system of record for; others only fill blanks. */
+  authoritativeFields: SourcedIdentityField[];
+};
+

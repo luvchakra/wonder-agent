@@ -32,8 +32,8 @@ for every non-"Done" row is in
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 | INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
-| INTEGRATION-P0-08 | Authoritative identity sources | Not Started — 2026-09-26, WonderID |
-| INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-08 | Authoritative identity sources | Partial — 2026-09-26: sources, authority, precedence, mappings, correlation rules, leaver strategy and guard done (0081); schedules are stored but not executed, and SCIM/REST/HR-API are mapping presets (files or a linked integration), not native pulls |
+| INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Done — 2026-09-26, 0081–0083 (preview = stage) |
 | INTEGRATION-P0-10 | Application discovery and unrecognized applications | Not Started — 2026-09-26, WonderID |
 | INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Not Started — 2026-09-26, WonderID |
 | INTEGRATION-P0-12 | AI-assisted onboarding proposals | Not Started — 2026-09-26, WonderID |

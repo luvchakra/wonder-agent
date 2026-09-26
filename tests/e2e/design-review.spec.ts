@@ -44,6 +44,10 @@ const ROUTES = [
   "/identities/external",
   "/identities/new",
   "/identities/attributes",
+  // Identity sources (INTEGRATION-P0-08/09).
+  "/integrations/sources",
+  "/integrations/sources/new",
+  "/integrations/correlations",
 ];
 
 /** The widths §32 names, plus the two the shell switches layout at. */

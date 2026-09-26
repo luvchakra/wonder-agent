@@ -14,18 +14,18 @@ Generated 2026-09-25 from 11 module backlogs.
 
 ## Overall
 
-**170 of 226 tracked stories complete — 75%**
+**171 of 226 tracked stories complete — 76%**
 
 ```
-██████████████████████████████░░░░░░░░░░  75%
+██████████████████████████████░░░░░░░░░░  76%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 170 |
-| Partial | 22 |
+| Done | 171 |
+| Partial | 23 |
 | Deferred | 1 |
-| Not Started | 33 |
+| Not Started | 31 |
 | **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 1 | 0 | 2 | 20 | `███████████████░░░` 85% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 13 | 1 | 0 | 6 | 20 | `████████████░░░░░░` 65% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 14 | 2 | 0 | 4 | 20 | `█████████████░░░░░` 70% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 15 | 0 | 0 | 11 | 26 | `██████████░░░░░░░░` 58% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
@@ -130,7 +130,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 13 done · 1 partial · 0 deferred · 6 not started (20 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 14 done · 2 partial · 0 deferred · 4 not started (20 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -148,8 +148,8 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 | INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
-| INTEGRATION-P0-08 | Authoritative identity sources | Not Started — 2026-09-26, WonderID |
-| INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-08 | Authoritative identity sources | Partial — 2026-09-26: sources, authority, precedence, mappings, correlation rules, leaver strategy and guard done (0081); schedules are stored but not executed, and SCIM/REST/HR-API are mapping presets (files or a linked integration), not native pulls |
+| INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Done — 2026-09-26, 0081–0083 (preview = stage) |
 | INTEGRATION-P0-10 | Application discovery and unrecognized applications | Not Started — 2026-09-26, WonderID |
 | INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Not Started — 2026-09-26, WonderID |
 | INTEGRATION-P0-12 | AI-assisted onboarding proposals | Not Started — 2026-09-26, WonderID |

@@ -2771,3 +2771,23 @@ with the dark navy sidebar of the WonderID mockups
   dark) and 390 px (drawer).
 - Full Playwright suite (§17.8, the shell changed): **202/202 passed**
   (9.5 min).
+
+---
+
+## 2026-09-26 — Collapsed sidebar: a click no longer shuts a flyout that hover opened
+
+Found by the full suite for INTEGRATION-P0-08/09.
+`shell.spec`'s "collapsed … third-level flyout" test failed once in 222.
+
+**Cause:** a race between two handlers. Moving the mouse onto a section's
+icon opens its flyout (hover). The press that follows then reached
+Radix's trigger, which toggles, so the flyout closed again. Whether a
+user saw it open depended on timing.
+
+**Fix:** in `AppSidebar.tsx`'s `CollapsedSection`, a primary mouse press on
+the trigger now always opens (`preventDefault` on Radix's toggle). The
+keyboard keeps Radix's Enter/Space toggle, and leaving the section still
+closes the flyout.
+
+**Verified:** `shell.spec` **41/41** over `--repeat-each=5`; tsc and eslint
+clean.

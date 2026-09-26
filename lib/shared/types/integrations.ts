@@ -1,3 +1,5 @@
+import type { SourcedIdentityField as _SourcedIdentityField } from "./agent-identity";
+
 /**
  * Shared contracts owned by the Integration Agent (docs/plan/03-INTEGRATION-AGENT-BACKLOG.md).
  * Other modules import these instead of redefining connector/import shapes,
@@ -215,4 +217,100 @@ export type McpServerInventory = {
   lastDiscoveredAt: string | null;
   tools: McpTool[];
   resources: McpResource[];
+};
+
+// ---------------------------------------------------------------------------
+// WonderID identity sources (INTEGRATION-P0-08/09, 2026-09-26).
+// ---------------------------------------------------------------------------
+
+export const IDENTITY_SOURCE_TEMPLATES = ["csv", "scim", "rest", "hr_api", "integration"] as const;
+export type IdentitySourceTemplate = (typeof IDENTITY_SOURCE_TEMPLATES)[number];
+
+/** Identity types a source may create (never AI agents: they are registered). */
+export const SOURCE_IDENTITY_TYPES = ["HUMAN", "EXTERNAL", "MACHINE", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API"] as const;
+
+export const LEAVER_STRATEGIES = ["disable", "flag", "none"] as const;
+export type LeaverStrategy = (typeof LEAVER_STRATEGIES)[number];
+
+/** Where a source column can go: an identity field, its own id, or its manager's id. */
+export const IDENTITY_SOURCE_TARGETS = [
+  "externalId",
+  "managerExternalId",
+  "displayName",
+  "email",
+  "username",
+  "subtype",
+  "department",
+  "title",
+  "businessUnit",
+  "location",
+  "employmentType",
+  "organization",
+  "startDate",
+  "endDate",
+  "status",
+] as const;
+export type IdentitySourceTarget = (typeof IDENTITY_SOURCE_TARGETS)[number];
+export type AttributeMapping = { source: string; target: IdentitySourceTarget };
+
+export const CORRELATION_KINDS = ["email", "username", "composite"] as const;
+export type CorrelationRule = { kind: (typeof CORRELATION_KINDS)[number]; fields?: _SourcedIdentityField[] };
+
+export type IdentitySource = {
+  id: string;
+  tenantId: string;
+  name: string;
+  template: IdentitySourceTemplate;
+  integrationId: string | null;
+  identityType: (typeof SOURCE_IDENTITY_TYPES)[number];
+  authoritative: boolean;
+  priority: number;
+  authoritativeFields: _SourcedIdentityField[];
+  attributeMappings: AttributeMapping[];
+  correlationRules: CorrelationRule[];
+  leaverStrategy: LeaverStrategy;
+  leaverThresholdPercent: number;
+  schedule: "manual" | "daily" | "hourly";
+  status: "active" | "paused";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReconciliationRunStatus = "queued" | "running" | "succeeded" | "partial" | "failed";
+
+export type ReconciliationRun = {
+  id: string;
+  sourceId: string;
+  trigger: "upload" | "integration" | "manual";
+  mode: "full" | "partial";
+  status: ReconciliationRunStatus;
+  recordsSeen: number;
+  recordsInvalid: number;
+  createdCount: number;
+  updatedCount: number;
+  unchangedCount: number;
+  pendingCount: number;
+  leaverCount: number;
+  errorCount: number;
+  guardTripped: boolean;
+  /** A preview ("stage") run: planned, nothing changed. */
+  dryRun: boolean;
+  errors: { ref?: string; message: string }[];
+  changes: { ref: string; identityId: string | null; action: string; changed?: string[] }[];
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+};
+
+export type PendingCorrelation = {
+  id: string;
+  sourceId: string;
+  runId: string | null;
+  externalId: string;
+  normalized: Record<string, unknown>;
+  candidateIdentityIds: string[];
+  reason: string;
+  status: "pending" | "linked" | "created" | "dismissed";
+  resolvedIdentityId: string | null;
+  createdAt: string;
 };
