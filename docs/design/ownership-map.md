@@ -52,13 +52,16 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `account_reconciliation_runs` | AA | ACCESS-P0-17: one record per reconciliation of an application's accounts against its connector, under the promoted onboarding configuration. Members read only; the service writes |
 | `application_discoveries` | INT | INTEGRATION-P0-10: applications found by connectors, OpenAPI documents, SCIM metadata or manual reports; matched to the catalog or UNRECOGNIZED until a person registers (through Access's `registerApplication`), links, excepts or ignores with a reason. Members read only; the service writes |
 | `onboarding_proposals` | INT | INTEGRATION-P0-12: proposals from an OpenAPI document or sample account (schema, identifier, correlation, entitlements, operations with evidence, risk, policies, assumptions, questions, destructive actions, tests) with AI provenance; the input is not stored (hash and size only). Applying writes only an onboarding draft. Members read only; the service writes |
-| `entitlements` | AA | Roles/permissions/entitlements on an application |
+| `entitlements` | AA | Roles/permissions/entitlements on an application; since ACCESS-P0-19 an optional owner (an identity) who approves requests for it |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |
 | `access_paths` | AA | Materialized/explainable path from agent → data |
 | `policies` | AA | Identity/Access/Runtime/Agent/Lifecycle policy definitions |
 | `policy_rules` | AA | Individual rule conditions within a policy |
 | `policy_exceptions` | AA | Approved exceptions to a policy |
 | `policy_evaluations` | AA | Evaluation results/audit trail of policy checks |
+| `access_requests` | AA | Access requests (ACCESS-P0-06). Since ACCESS-P0-18 also requests for identities: subject and requester identity, the request policy applied and its result, assessed risk, duration and expiry, cancelled/expired states; one pending request per person and item. Identity requests are written by the service (policy evaluation decides the initial status) |
+| `access_request_policies` | AA | ACCESS-P0-18: what may be requested and on what terms, per tenant default, application or entitlement (most specific wins): requestable, self/others scope, durations, justification, risk threshold, auto-approval, approval route. Members read only; the service writes |
+| `access_request_approvals` | AA | ACCESS-P0-19: the approval steps of a catalog request — stage, who is asked (manager, entitlement owner, application owner, or access managers) and why, the action fingerprint the step is valid for, due time and escalation, and the decision (who, when, roles, comment). Members read only; the service writes; a trigger refuses a decision by the requester or subject |
 | `runtime_events` | RA | Normalized runtime event stream |
 | `runtime_tools` | RA | Tool inventory observed/declared at runtime |
 | `runtime_resources` | RA | Resource inventory observed at runtime |

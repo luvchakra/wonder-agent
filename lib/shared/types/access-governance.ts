@@ -94,6 +94,8 @@ export type Entitlement = {
   createdAt: string;
   /** ACCESS-P0-13: the data source this entitlement grants access to, if known. */
   dataSourceId?: string | null;
+  /** ACCESS-P0-19: the identity who approves requests for this entitlement. */
+  ownerIdentityId?: string | null;
 };
 
 /**
@@ -171,7 +173,7 @@ export type AccessPath = {
   path: AccessPathStep[];
 };
 
-export type AccessRequestStatus = "pending" | "approved" | "rejected" | "fulfilled";
+export type AccessRequestStatus = "pending" | "approved" | "rejected" | "fulfilled" | "cancelled" | "expired";
 
 /** COMPLIANCE-P0-01.3 — 'grant' is a request for new access; 'modify' is a reviewer-initiated request to change an entitlement already covered by an existing access_grant. */
 export type AccessRequestType = "grant" | "modify";
@@ -179,7 +181,19 @@ export type AccessRequestType = "grant" | "modify";
 export type AccessRequest = {
   id: string;
   tenantId: string;
-  agentId: string;
+  /** Null for a request for a person or other identity (ACCESS-P0-18); see subjectIdentityId. */
+  agentId: string | null;
+  subjectIdentityId: string | null;
+  requesterIdentityId: string | null;
+  requestPolicyId: string | null;
+  policyResult: { checks: { check: string; result: string }[] } | null;
+  riskLevel: "low" | "medium" | "high" | "critical" | null;
+  durationDays: number | null;
+  requestedExpiry: string | null;
+  cancelledAt: string | null;
+  /** ACCESS-P0-19: the approval stage the request is at, and what the approvals are valid for. */
+  approvalStage: number | null;
+  actionFingerprint: string | null;
   requestedBy: string;
   applicationId: string;
   entitlementId: string | null;

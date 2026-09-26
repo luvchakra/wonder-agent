@@ -41,6 +41,7 @@ export {
   countIdentitiesByType,
   getIdentityHealth,
   getIdentity,
+  getIdentityForUser,
   getIdentityNames,
   listAccountableHumans,
   createIdentity,

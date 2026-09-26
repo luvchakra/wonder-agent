@@ -53,6 +53,9 @@ const ROUTES = [
   // Account inventory (ACCESS-P0-17) and application discovery (INTEGRATION-P0-10).
   "/access/accounts",
   "/integrations/discovery",
+  // Request catalog and request policies (ACCESS-P0-18).
+  "/access/catalog",
+  "/access/request-policies",
 ];
 
 /** The widths §32 names, plus the two the shell switches layout at. */

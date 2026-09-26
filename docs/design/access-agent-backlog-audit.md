@@ -1483,3 +1483,333 @@ reconciliation run fills it from an onboarded application's connector.
   - reads as the user, with the tenant filtered.
 - Existing callers are unchanged. Verified by `application-discovery.spec`
   (registration through a discovery) and the catalog specs in the full run.
+
+## 2026-09-26 — ACCESS-P0-18 (Done): self-service request catalog and request policies
+
+**Built (WonderID Phase 4, spec §11).**
+
+- **Migration 0092** (applied to the dev project):
+  - `access_request_policies`: one policy per scope — the tenant default
+    (no application), an application, or one of its entitlements (unique
+    by scope). Each says:
+    - whether the item is requestable;
+    - whether people may request for themselves, and who may request for
+      others (nobody / the subject's manager or an access manager / access
+      managers only);
+    - the longest and default duration;
+    - whether a justification is required;
+    - the risk threshold at or above which approval is always needed;
+    - whether a request below it may be approved automatically;
+    - the approval route (manager / owner / manager then owner), which
+      ACCESS-P0-19 consumes.
+    Same-tenant keys to applications and entitlements. Members read only;
+    the service writes after `access.manage`.
+  - `access_requests` grows to requests for identities (additive, #13):
+    - `agent_id` is nullable; the new columns are subject identity,
+      requester identity, policy and its result, risk level, duration,
+      requested expiry and `cancelled_at`;
+    - the status set adds `cancelled` and `expired`;
+    - a check requires an agent or a subject;
+    - a partial unique index allows one pending request per person and
+      item.
+    Every existing row is an agent request and keeps its meaning.
+- **`requestRules.ts`** (pure):
+  - the most specific active policy wins (entitlement > application >
+    tenant default); no policy means nothing is requestable;
+  - risk comes from the entitlement's privilege and classification and
+    the application's risk;
+  - `evaluateRequest` refuses with a reason in this order: the application
+    is not live; not requestable; the subject is an AI agent (agents keep
+    the ACCESS-P0-06 path); the subject is inactive; outside the
+    self/others scope (`REQUEST_SCOPE`); duration over the maximum;
+    justification missing or under 10 characters;
+  - otherwise it returns the initial status: approved only when the
+    policy auto-approves and the risk is below the threshold, else
+    pending.
+- **`requestCatalog.ts`:**
+  - the paged catalog of live applications, with each entitlement's
+    risk, whether it is requestable and who approves. `requestableOnly`
+    narrows in the query to applications an active policy makes
+    requestable (unless a requestable tenant default covers everything),
+    so paging holds; the screen uses it by default;
+  - policy save is an upsert per scope, audited;
+  - submit applies the rules. An identical open request is returned, not
+    duplicated (a race is caught by the unique index and resolved to the
+    existing row). Submissions are audited as `access.request_submitted`
+    or `access.request_auto_approved`, refusals as
+    `access.request_refused`;
+  - cancel is for the requester only, while pending;
+  - lists: mine, waiting, all.
+- **`requests.ts` decisions:**
+  - for an identity request the requester can never approve or reject
+    their own (409 `SELF_APPROVAL`);
+  - the decision is conditional on the status it read (409 on a race);
+  - SoD still applies to agent requests.
+- **API:** `GET /api/v1/access/catalog` (`?q`, `?page`, `?requestable=1`);
+  `GET|POST /api/v1/access/request-policies`;
+  `POST /api/v1/access/requests` (no `agentId` means an identity request);
+  `POST /api/v1/access/requests/[id]/cancel`;
+  `GET /api/v1/access/requests?mine=1|view=all`.
+- **Screens:**
+  - `/access/catalog` (Request Access): cards per application with the
+    risk and approval of each entitlement, and a "show every live
+    application" toggle;
+  - `/access/catalog/[applicationId]`: the request form, for yourself or
+    a person found by search, with duration, justification and a live
+    preview of risk and approval;
+  - `/access/requests`: rebuilt with waiting, mine and all tabs;
+    cancel, decide and mark fulfilled;
+  - `/access/request-policies`: the policy table and scope form.
+  - The sidebar's Access Governance group: Request Access, Access
+    Requests, Request Policies.
+- **Consumed:** Identity's new `getIdentityForUser` (recorded in the
+  Identity audit).
+
+**Verified.**
+
+- `tsc`, `eslint`: clean. Vitest: 669/669 (88 files), including
+  `requestRules.test.ts` 10/10.
+- **SQL `tests/access/request-catalog-isolation.sql`** against the dev
+  project:
+  - a policy on another tenant's application is 23503;
+  - a second policy for a scope is 23505;
+  - a request for another tenant's identity is 23503;
+  - a request for nobody is 23514;
+  - a second identical pending request is 23505;
+  - a member sees own policies 1 and another tenant's 0;
+  - a member's direct policy update changes 0 rows, and a direct insert
+    is 42501;
+  - no request is left without an agent or subject;
+  - the fixtures were deleted afterwards.
+- **E2E `request-catalog.spec.ts`: 14/14 with setup.** It covers:
+  - a request before the application is live is 409; live with no
+    policy is 403; a bad threshold is 400; saving a scope again updates
+    it;
+  - the catalog shows low risk as automatic and admin as critical with
+    manager-then-owner approval; an application never promoted is
+    absent; requestable-only lists this application and only
+    requestable ones;
+  - for yourself: a short justification or too long a duration is 400;
+    low risk is approved at once with a 30-day expiry; an identical
+    request returns the open one (`meta.duplicate`);
+  - critical waits: the requester's own approval is 409 `SELF_APPROVAL`;
+    the IAM admin approves; a second decision is 409;
+  - for others: an access manager may; a requester who is not the
+    person's manager gets 403 `REQUEST_SCOPE`; only the requester can
+    cancel (others 403), once (then 409);
+  - the screens: catalog, form, duplicate message, my requests, policies;
+  - another organization gets 404 on submit and policy save and sees no
+    catalog items, policies or requests; read-only gets 403 on request
+    and policy save.
+- **Screenshots:** the catalog (light, 1440, and dark, 390), the form
+  (light and dark 390), requests (light, dark, 390) and policies (light,
+  dark 390). Fixes from them:
+  - the catalog listed every live application, most "Not requestable";
+    it now shows the requestable ones by default;
+  - risk and status badges wrapped mid-word ("critic/al");
+  - a cancelled request still showed its expiry.
+- The sweeps now include `/access/catalog` and `/access/request-policies`
+  (`design-review`, `navigation-smoke`).
+- **Full Playwright suite** on this story's build (§17.8: migration and
+  navigation changed): **282/282** in 17.3 minutes.
+- It ships in the same commit as ACCESS-P0-19 (next entry), because the
+  engine replaces this story's single-decision path for catalog requests.
+
+**Left out:**
+
+- multi-stage approval, approver scope and escalation — ACCESS-P0-19;
+  the route is recorded on every request for it to consume;
+- access packages in the catalog — ACCESS-P0-20;
+- fulfilment into the target application (INTEGRATION-P0-13's write
+  interface) and automatic expiry (a scheduled job);
+- "their manager" is the subject identity's `manager_identity_id`
+  (the directory field sources maintain), compared with the requester's
+  identity; a signed-in user with no linked identity is never a manager,
+  so only `access.manage` lets them request for others.
+
+## 2026-09-26 — ACCESS-P0-19 (Done): the approval engine
+
+**Built (WonderID Phase 4; spec §11.1 "see approval chain", §19.6, §37A.27
+and invariant S4).** Committed together with ACCESS-P0-18.
+
+- **Migration 0093** (applied to the dev project in four steps — the table,
+  the open-step key, the revoke, the decided-check fix — all folded into
+  the one file):
+  - `access_request_approvals`: one row per step. Each step records:
+    - the stage, and who it asks (`manager`, `entitlement_owner`,
+      `application_owner` or `access_managers`) with the reason;
+    - the approver identity and user;
+    - the status (waiting, pending, approved, rejected, skipped, expired,
+      invalidated);
+    - the action fingerprint it is valid for, and the policy version;
+    - the due time and escalation;
+    - the decision: who, when, their roles, and a comment.
+
+    Same-tenant keys to the request and identity. A partial unique key
+    means the same open step cannot be inserted twice. Members read only;
+    the service writes. Checks:
+    - an access-manager step names nobody, and a named step names a
+      person;
+    - an approved or rejected step has a decision time;
+    - an open step has no decision.
+
+    Trigger `access_request_approvals_four_eyes` refuses a decision by the
+    request's requester or by the subject's user, whatever path writes it,
+    including the service role. Execution is revoked from public, anon
+    and authenticated.
+  - `access_request_policies` gains `approval_mode` (sequential or
+    parallel), `approval_timeout_days` (1–60, default 5) and `on_timeout`
+    (escalate or expire).
+  - `entitlements` gains `owner_identity_id` (same tenant).
+  - `access_requests` gains `action_fingerprint` and `approval_stage`,
+    plus a `(id, tenant_id)` key for the steps' same-tenant reference.
+- **`approvalRules.ts`** (pure; 9 new unit tests):
+  - `planApprovalChain`:
+    - routes: manager; owner (the entitlement owner, else the application
+      owner); or both, in order or at once;
+    - critical risk appends an access-manager review;
+    - a step goes to access managers, with the reason, when nobody is
+      recorded, the person is inactive or cannot sign in, or the person
+      is the requester or the subject;
+    - each approver is asked once (a later step resolving to someone an
+      earlier stage already asks is dropped).
+  - `actionFingerprint`: sha256 over tenant, request, subject,
+    application, entitlement, privilege, duration, type and policy.
+  - `chainOutcome`, `actionableStep`, `timeoutAction` (escalate a named
+    step once, then expire).
+- **`approvals.ts`:**
+  - the chain starts when a catalog request is stored as waiting;
+  - `decideApprovalStep`:
+    - the requester and the subject are refused (`SELF_APPROVAL`), in code
+      and again in the database;
+    - the fingerprint is recomputed from what the request is now. A
+      change (for example, the entitlement's privilege raised)
+      invalidates every step, rebuilds the chain with the re-assessed
+      risk, and answers 409 `APPROVAL_INVALIDATED`;
+    - only the approver a pending step of the current stage names, or an
+      access manager for a step open to access managers, may decide
+      (`NOT_AN_APPROVER`). An access-manager review cannot be taken by
+      someone who already decided an earlier stage (`ALREADY_DECIDED`);
+    - the step update is conditional on it still being pending (409 on a
+      race);
+    - a rejection closes the request and skips the rest; the last
+      approval approves it; otherwise the next stage opens with its due
+      time;
+    - every step and outcome is audited with the §37A.27 approval record:
+      fingerprint, resource ids, stage, approver kind and roles, policy
+      and version, comment.
+  - `sweepApprovalTimeouts`: for one tenant (signed-in approval views) or
+    all tenants (`/api/cron/access-request-approvals`, daily at 05:00 UTC
+    in `vercel.json`, the existing `CRON_SECRET` bearer). A named step
+    escalates once to access managers, per policy; otherwise the request
+    expires. System actor, audited.
+  - `repairApprovalChains`: waiting catalog requests without a chain
+    (ACCESS-P0-18's, or a failed start) get one on the next waiting view.
+  - `getRequestWithApprovals`, `listRequestIdsAwaiting`.
+- **Decision path:**
+  - `POST /api/v1/access/requests/[id]/decision` takes
+    `{ decision, comment? }`. For a catalog request it goes to the engine
+    and needs only `access.read`: the engine's approver scope is the real
+    check, so a named owner or manager with a read-only role can decide
+    their own step. An agent request, and marking any request fulfilled,
+    still need `access.approve`.
+  - `decideAccessRequest` now refuses approve or reject on a catalog
+    request (`USE_APPROVAL_CHAIN`).
+- **Other APIs:**
+  - `GET /api/v1/access/requests/[id]`: the request with its chain;
+  - `GET /api/v1/access/requests?view=waiting`: what the caller may
+    decide now;
+  - `PUT /api/v1/access/entitlements/[id]/owner`: `access.manage`; the
+    owner must be an active person of the organization.
+- **Screens:**
+  - `/access/requests`: "Waiting for you" is the default when anything
+    waits for the caller (always for approvers). Each row links to its
+    detail and shows its stage.
+  - New `/access/requests/[id]`: stages, each step with who and why, its
+    due time, escalation, decision, comment and fingerprint prefix. Steps
+    invalidated by a change are kept under a disclosure. Decide with a
+    comment; the outcome stays on screen after the refresh.
+  - The policy form gains the approval mode, the days each approver has,
+    and what happens on timeout; the policy table shows them.
+  - The catalog preview now reads "your manager and the owner", plus ",
+    then an access manager" for critical risk.
+
+**Verified.**
+
+- `tsc`, `eslint`: clean. Vitest: 678/678 (89 files), including
+  `approvalRules.test.ts` 9/9.
+- **SQL `tests/access/approval-engine-isolation.sql`** against the dev
+  project. Every expectation held (details and the one fixture correction
+  are in the file):
+  - a step on another tenant's request, or naming another tenant's
+    identity, is 23503;
+  - the requester deciding their own request, even as the service role,
+    is 23514;
+  - malformed steps are 23514; a duplicate open step is 23505;
+  - an entitlement owner from another tenant is 23503;
+  - a member sees 1 own and 0 of another tenant's steps; a direct
+    reopen, insert or delete by a member is 0 rows or 42501.
+- **Supabase advisors:**
+  - security: the new trigger function was flagged as executable by
+    anon and authenticated; execution was revoked, as 0089 does. Nothing
+    else new.
+  - performance: every new foreign key is indexed. The new indexes show
+    as "unused" only because they are minutes old.
+- **E2E `approval-engine.spec.ts`: 15/15 with setup.** It covers:
+  - in order: the owner's turn has not come (`NOT_AN_APPROVER`); an
+    access manager who is not named cannot decide; the requester is
+    `SELF_APPROVAL`. The manager approves (stage 2), then the read-only
+    owner approves from their waiting list (approved), and the comment
+    is stored;
+  - in parallel with critical risk: owner and manager at stage 1; the
+    access-manager review refuses the manager (`ALREADY_DECIDED`); a
+    rejection closes the request;
+  - the entitlement owner comes ahead of the application owner; the
+    manager's own request routes to access managers with the reason; the
+    subject is `SELF_APPROVAL`;
+  - raising the entitlement's privilege after an approval gives
+    `APPROVAL_INVALIDATED`: two steps invalidated, a new chain, risk now
+    high;
+  - a due time in the past escalates once, then expires the request (the
+    remaining step is skipped);
+  - the approver's screen: the waiting tab, the chain, approving with a
+    comment;
+  - another organization gets 404 on the detail, the decision and the
+    owner change, and sees none of it waiting.
+- `request-catalog.spec.ts` still passes 14/14 on the engine: a critical
+  self-request resolves to one access-manager step.
+- **Fixes found on the way:**
+  - steps opened together share a timestamp, so their order is now fixed
+    (stage, then kind);
+  - invalidating an approved step broke the first "approved ⇔ decided"
+    check (0093d replaced it);
+  - the decision message vanished when the refreshed page dropped the
+    buttons (the actions stay mounted);
+  - the read-only owner landed on "My requests" while a step waited for
+    them;
+  - the policy Status badge wrapped;
+  - the request's policy checks are now labelled "when submitted" (risk
+    can change after invalidation).
+- **Screenshots:** the chain (light 1440; dark 390), the named owner's
+  view with the comment box, waiting (read-only, 390), and the policy
+  form (dark).
+- **Full Playwright suite** on the final build (§17.8: migrations, RBAC path of the decision route, navigation): **290/290** in 18.8 minutes.
+- **Observed, not introduced here:** two server-side `QUERY_FAILED`
+  errors (`invalid input syntax for type uuid: "null"`, or empty) are
+  logged during the Playwright auth setup, at the platform-admin
+  sign-in, before any spec runs. The setup passes. Left to the Foundation
+  or Platform owner to trace.
+
+**Left out:**
+
+- named approver groups (the spec's "named group" approver) — no group
+  object exists yet; it arrives with ACCESS-P0-21 roles or a groups
+  story;
+- delegation of approvals (ACCESS-P0-23);
+- reminders or notifications to approvers (Operations' notification
+  channel);
+- an authentication-strength field on the approval record: the session
+  does not expose it yet;
+- escalation to the approver's manager (it goes to access managers);
+- a live chain preview on the request form (the preview is textual; the
+  exact chain is on the request once submitted).

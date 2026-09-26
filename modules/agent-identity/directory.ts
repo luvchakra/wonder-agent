@@ -259,6 +259,19 @@ export async function getIdentity(tenantId: string, identityId: string): Promise
   return data ? toIdentity(data) : null;
 }
 
+/**
+ * The person identity of a signed-in member (ACCESS-P0-18: who is asking,
+ * and whose manager they are). Every active member has one, mirrored from
+ * their membership (IDENTITY-P0-15). Null if none.
+ */
+export async function getIdentityForUser(tenantId: string, userId: string): Promise<Identity | null> {
+  if (!UUID_RE.test(userId)) return null;
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("identities").select().eq("tenant_id", tenantId).eq("user_id", userId).eq("identity_type", "HUMAN").maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return data ? toIdentity(data) : null;
+}
+
 /** Names of the given identities in this tenant (for showing references). */
 export async function getIdentityNames(tenantId: string, ids: string[]): Promise<Map<string, { displayName: string; identityType: IdentityType }>> {
   const unique = [...new Set(ids.filter((id) => UUID_RE.test(id)))];

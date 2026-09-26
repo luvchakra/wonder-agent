@@ -13,6 +13,7 @@ export {
   listEntitlementsForApplication,
   listEntitlementsForTenant,
   getEntitlement,
+  setEntitlementOwner,
   type EntitlementWithContext,
 } from "./entitlements";
 export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createManualAccessGrant, revokeAccessGrant, getAccessGrant } from "./grants";
@@ -83,3 +84,29 @@ export {
   type ReconciliationRun,
 } from "./accounts";
 export { DORMANT_WINDOWS, DEFAULT_DORMANT_DAYS, parseDormantDays } from "./accountRules";
+export {
+  listRequestPolicies,
+  saveRequestPolicy,
+  listRequestCatalog,
+  getRequestCatalogItem,
+  submitAccessRequest,
+  cancelAccessRequest,
+  listRequests,
+  type CatalogItem,
+  type CatalogEntitlement,
+  type PolicyRow,
+  type RequestRow,
+  type RequestInput,
+} from "./requestCatalog";
+export { RISK_LEVELS, ALLOW_FOR_OTHERS, APPROVAL_ROUTES, APPROVAL_MODES, ON_TIMEOUT, type RequestPolicy, type RiskLevel } from "./requestRules";
+export {
+  decideApprovalStep,
+  sweepApprovalTimeouts,
+  repairApprovalChains,
+  getRequestWithApprovals,
+  listRequestIdsAwaiting,
+  type ApprovalStep,
+  type ApprovalView,
+  type ApproverActor,
+} from "./approvals";
+export type { ApproverKind, StepStatus } from "./approvalRules";

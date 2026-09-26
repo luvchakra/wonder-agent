@@ -64,6 +64,7 @@ export function toEntitlement(row: any): Entitlement {
     privilegeLevel: row.privilege_level,
     createdAt: row.created_at,
     dataSourceId: row.data_source_id ?? null,
+    ownerIdentityId: row.owner_identity_id ?? null,
   };
 }
 
@@ -84,7 +85,17 @@ export function toAccessRequest(row: any): AccessRequest {
   return {
     id: row.id,
     tenantId: row.tenant_id,
-    agentId: row.agent_id,
+    agentId: row.agent_id ?? null,
+    subjectIdentityId: row.subject_identity_id ?? null,
+    requesterIdentityId: row.requester_identity_id ?? null,
+    requestPolicyId: row.request_policy_id ?? null,
+    policyResult: row.policy_result ?? null,
+    riskLevel: row.risk_level ?? null,
+    durationDays: row.duration_days ?? null,
+    requestedExpiry: row.requested_expiry ?? null,
+    cancelledAt: row.cancelled_at ?? null,
+    approvalStage: row.approval_stage ?? null,
+    actionFingerprint: row.action_fingerprint ?? null,
     requestedBy: row.requested_by,
     applicationId: row.application_id,
     entitlementId: row.entitlement_id,

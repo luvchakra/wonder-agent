@@ -73,6 +73,8 @@ const ALLOWED_DECISIONS: Record<AccessRequestStatus, AccessRequestStatus[]> = {
   approved: ["fulfilled"],
   rejected: [],
   fulfilled: [],
+  cancelled: [],
+  expired: [],
 };
 
 /**
@@ -106,16 +108,26 @@ export async function decideAccessRequest(
   if (!allowed.includes(decision)) {
     throw new ApiError(409, "INVALID_TRANSITION", `Cannot move from ${existing.status} to ${decision}`);
   }
-  // ACCESS-P0-14: e.g. the person who requested access may not also approve it.
-  await enforceSoD(tenantId, actorId, `access.request_${decision}`, existing.agent_id);
+  if (existing.agent_id) {
+    // ACCESS-P0-14: e.g. the person who requested access may not also approve it.
+    await enforceSoD(tenantId, actorId, `access.request_${decision}`, existing.agent_id);
+  } else if (decision !== "fulfilled") {
+    // ACCESS-P0-19: a catalog request is approved or rejected only through
+    // its approval chain (approvals.ts), step by step, never directly here.
+    throw new ApiError(409, "USE_APPROVAL_CHAIN", "This request is decided by its approvers, step by step");
+  }
 
+  // Conditional on the status read above, so two deciders cannot both win.
   const { data, error } = await supabase
     .from("access_requests")
     .update({ status: decision, decided_by: actorId, decided_at: new Date().toISOString() })
     .eq("id", requestId)
+    .eq("tenant_id", tenantId)
+    .eq("status", existing.status)
     .select()
-    .single();
-  if (error || !data) throw new ApiError(500, "UPDATE_FAILED", error?.message ?? "Failed to update request");
+    .maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data) throw new ApiError(409, "CONFLICT", "The request changed meanwhile; reload");
 
   await writeAudit({
     tenantId,
@@ -126,7 +138,7 @@ export async function decideAccessRequest(
     objectId: requestId,
     outcome: "success",
     // agentId lets a later separation-of-duties check see this decision.
-    metadata: { previousStatus: existing.status, agentId: existing.agent_id },
+    metadata: { previousStatus: existing.status, agentId: existing.agent_id, subjectIdentityId: existing.subject_identity_id ?? null },
   });
 
   return toAccessRequest(data);

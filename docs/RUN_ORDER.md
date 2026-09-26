@@ -140,7 +140,10 @@ isolation checks. Detail is in each module's audit log.
 | W3 | ACCESS-P0-17: account inventory — identity correlation, orphan, ambiguous, dormant, reconciliation (0089) | Done | `f7d7b24` |
 | W3 | INTEGRATION-P0-10: application discovery — connectors, OpenAPI, SCIM, manual; unrecognized applications and decisions (0090) | Done | `d2c1a0a` |
 | + | Risk evaluation pending state; FinanceBot spec waits for the evaluation | Done | `9336cf4` |
-| W3 | INTEGRATION-P0-12: AI-assisted onboarding proposals, proposal only (0091) | Done | see Integration audit |
+| W3 | INTEGRATION-P0-12: AI-assisted onboarding proposals, proposal only (0091) | Done | `c4d0e06` |
+| + | Proxy: an unreachable sign-in service answers 503 / "service unavailable", not "session expired" | Done | `e6c9f59` |
+| W4 | ACCESS-P0-18: request catalog and request policies; requests for identities (0092) | Done | with P0-19 |
+| W4 | ACCESS-P0-19: approval engine — staged chains, approver scope, four-eyes in the database, fingerprint invalidation, escalation/expiry (0093) | Done (named groups deferred) | see Access audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
@@ -149,8 +152,9 @@ later-phase views; Phase 2's sources and reconciliation are in. IDENTITY-P0-18's
 lifecycle is in. Phase 3 has the catalog (ACCESS-P0-15), the outbound guard and
 write interface (INTEGRATION-P0-11), onboarding (ACCESS-P0-16) and the account
 inventory (ACCESS-P0-17), application discovery (INTEGRATION-P0-10) and
-onboarding proposals (INTEGRATION-P0-12): Phase 3 is complete. Next: Phase 4
-(ACCESS-P0-18 onwards).
+onboarding proposals (INTEGRATION-P0-12): Phase 3 is complete. Phase 4 has
+the request catalog and policies (ACCESS-P0-18) and the approval engine
+(ACCESS-P0-19). Next: access packages (ACCESS-P0-20) onwards.
 
 **Still to do in this programme:**
 

@@ -1,6 +1,8 @@
 import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
+import { writeAudit } from "@/lib/audit/writeAudit";
+import { getIdentity } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { Entitlement, PrivilegeLevel } from "@/lib/shared/types/access-governance";
 import { toEntitlement } from "./mappers";
@@ -73,4 +75,29 @@ export async function listEntitlementsForTenant(tenantId: string): Promise<Entit
     ...toEntitlement(row),
     applicationName: row.applications?.name ?? "",
   }));
+}
+
+/**
+ * ACCESS-P0-19 — names the person who approves requests for this
+ * entitlement (ahead of the application's business owner), or clears it
+ * with null. The owner must be an active person of this organization.
+ */
+export async function setEntitlementOwner(tenantId: string, actorId: string, entitlementId: string, ownerIdentityId: string | null): Promise<Entitlement> {
+  if (ownerIdentityId) {
+    const owner = await getIdentity(tenantId, ownerIdentityId);
+    if (!owner) throw new ApiError(404, "NOT_FOUND", "ownerIdentityId: that identity is not in this organization");
+    if (owner.identityType !== "HUMAN" || owner.status !== "active") throw new ApiError(400, "VALIDATION_FAILED", "ownerIdentityId: an active person");
+  }
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("entitlements")
+    .update({ owner_identity_id: ownerIdentityId })
+    .eq("id", entitlementId)
+    .eq("tenant_id", tenantId)
+    .select()
+    .maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.entitlement_owner_set", objectType: "entitlement", objectId: entitlementId, outcome: "success", metadata: { ownerIdentityId } });
+  return toEntitlement(data);
 }

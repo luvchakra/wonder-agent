@@ -1490,3 +1490,13 @@ or revoked by itself (#15).
   - the queue says when it shows only the latest 200.
 - Full Playwright suite (§17.8): **229/229 passed** (12.6 min, 0084/0085
   live).
+
+## 2026-09-26 — `getIdentityForUser` (published for ACCESS-P0-18, additive)
+
+- `getIdentityForUser(tenantId, userId)` returns the tenant's HUMAN identity
+  linked to that signed-in user, or null. It reads as the user, with the
+  tenant filtered. It is exported from `modules/agent-identity/service.ts`.
+- Access uses it to know who "me" is when a person requests access for
+  themselves.
+- No existing caller changed. Verified by `request-catalog.spec` (requests
+  for yourself resolve the requester's identity).
