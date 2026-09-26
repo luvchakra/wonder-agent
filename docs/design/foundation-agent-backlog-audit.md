@@ -1388,3 +1388,23 @@ is in the tenant, revokes every active key in one tenant-filtered update,
 and writes one audit event, `agent_api_key.revoked_all`, with the count
 and key ids. It is covered by the emergency E2E spec: the next gateway
 call gets 401.
+
+## 2026-09-26 — Open item: a network failure to Supabase Auth reads as "session expired"
+
+Found while verifying INTEGRATION-P0-12:
+
+- During a roughly 4-minute egress outage, no request reached Supabase:
+  the edge logs are empty from 04:06 to 04:09.
+- `proxy.ts` ignores the error from `supabase.auth.getUser()`. A network
+  failure (`AuthRetryableFetchError`) therefore looks the same as a
+  revoked session: pages redirect to `/sign-in?reason=expired`, and APIs
+  return 401 UNAUTHENTICATED.
+- Failing closed is correct, but the state is untruthful (§17.5), and a
+  user is told their session expired when it did not.
+
+Proposed fix (a proxy and authentication change, so a full-suite story):
+
+- On a retryable network error, APIs return 503 `AUTH_UNAVAILABLE`.
+- Pages render a "sign-in service unavailable, try again" state instead
+  of the expired message.
+- Still no access.

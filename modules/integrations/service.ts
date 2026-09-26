@@ -58,3 +58,10 @@ export {
   type DiscoveryRunResult,
 } from "./discovery";
 export { DISCOVERY_STATUSES, DISCOVERY_SOURCE_KINDS, allowedDecisions, type DiscoveryStatus, type DiscoverySourceKind } from "./discoveryRules";
+export {
+  createOnboardingProposal,
+  listOnboardingProposals,
+  applyOnboardingProposal,
+  dismissOnboardingProposal,
+  type StoredProposal,
+} from "./onboardingProposals";

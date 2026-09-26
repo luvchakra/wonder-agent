@@ -4,12 +4,14 @@ import { Check, CircleAlert, CircleMinus, CircleX } from "lucide-react";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { getApplicationDetail, getOnboarding, type ApplicationOnboarding } from "@/modules/access-governance/service";
-import { listIntegrations } from "@/modules/integrations/service";
+import { listIntegrations, listOnboardingProposals } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../../labels";
 import { ConfigureOnboardingForm, DecisionForm, StartOnboardingForm, StepForm } from "./OnboardingForms";
+import { ProposalCard } from "./ProposalCard";
+import { ProposalRequestForm } from "./ProposalForms";
 
 // ACCESS-P0-16 — onboarding an application (spec §8): configure, validate
 // against the §8.5 checklist, simulate against the imported accounts
@@ -63,12 +65,15 @@ export default async function ApplicationOnboardingPage({ params }: { params: Pr
   const { id } = await params;
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
-  const [app, o, members, integrations] = await Promise.all([
+  const canPropose = ctx.permissions.includes("integration.update");
+  const [app, o, members, integrations, proposals] = await Promise.all([
     getApplicationDetail(tenantId, id),
     getOnboarding(tenantId, id),
     listTenantMembersWithRoles(tenantId),
     canManage && ctx.permissions.includes("integration.read") ? listIntegrations(tenantId) : Promise.resolve([]),
+    ctx.permissions.includes("integration.read") ? listOnboardingProposals(tenantId, id, 3) : Promise.resolve([]),
   ]);
+  const latestProposal = proposals[0] ?? null;
   if (!app) notFound();
   const name = (userId: string | null) => {
     if (!userId) return null;
@@ -103,6 +108,23 @@ export default async function ApplicationOnboardingPage({ params }: { params: Pr
           {o ? <Badge tone="neutral">Configuration v{o.configVersion}</Badge> : null}
         </div>
       </div>
+
+      {canPropose || latestProposal ? (
+        <Card>
+          <CardHeader
+            title="Proposed configuration"
+            description="From an OpenAPI document or a sample account: a proposal to review, never a change. Applying it only fills the draft below."
+          />
+          <CardBody className="space-y-6">
+            {latestProposal ? <ProposalCard stored={latestProposal} canDecide={canPropose} canApply={canPropose && canManage} /> : null}
+            {canPropose && o?.status !== "PROMOTED" ? (
+              <div className={latestProposal ? "border-t border-border pt-4" : undefined}>
+                <ProposalRequestForm applicationId={id} />
+              </div>
+            ) : null}
+          </CardBody>
+        </Card>
+      ) : null}
 
       {!o ? (
         <Card>

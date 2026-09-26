@@ -51,6 +51,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `accounts` | AA | Accounts an agent/identity holds on an application. Since ACCESS-P0-17 an account belongs to any identity (`identity_id`; `agent_id` only for an AI agent's), with correlation (matched / linked by hand / orphan / ambiguous), type, last use, last seen and missing-from-source |
 | `account_reconciliation_runs` | AA | ACCESS-P0-17: one record per reconciliation of an application's accounts against its connector, under the promoted onboarding configuration. Members read only; the service writes |
 | `application_discoveries` | INT | INTEGRATION-P0-10: applications found by connectors, OpenAPI documents, SCIM metadata or manual reports; matched to the catalog or UNRECOGNIZED until a person registers (through Access's `registerApplication`), links, excepts or ignores with a reason. Members read only; the service writes |
+| `onboarding_proposals` | INT | INTEGRATION-P0-12: proposals from an OpenAPI document or sample account (schema, identifier, correlation, entitlements, operations with evidence, risk, policies, assumptions, questions, destructive actions, tests) with AI provenance; the input is not stored (hash and size only). Applying writes only an onboarding draft. Members read only; the service writes |
 | `entitlements` | AA | Roles/permissions/entitlements on an application |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |
 | `access_paths` | AA | Materialized/explainable path from agent → data |

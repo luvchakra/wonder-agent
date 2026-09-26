@@ -1057,3 +1057,144 @@ reason. Ignored discoveries stay on record.
 - YAML OpenAPI;
 - fetching a document from a URL. Pasting keeps it SSRF-free; a fetch
   would go through `guardedFetch`.
+
+## 2026-09-26 — INTEGRATION-P0-12: AI-assisted onboarding proposals (proposal only)
+
+From an OpenAPI document or a sample account payload, WonderID proposes an
+onboarding configuration. The output follows spec §8.2: the proposal,
+assumptions, per-section confidence, evidence, unresolved questions,
+destructive actions and suggested tests. It never activates anything.
+
+### How it is safe (#9, #19, §17)
+
+- **The proposal is computed deterministically** (`onboardingProposalRules.ts`,
+  10 tests):
+  - Field paths come from the account schema (OpenAPI `components.schemas`
+    or `definitions`) or from the sample (a SCIM `Resources` list is
+    read too).
+  - The identifier, correlation and entitlement field are ranked by name,
+    with confidence.
+  - Also found: last-use, status and privileged fields.
+  - Operations are matched from paths and methods, each with its evidence
+    (for example `POST /users` or `DELETE /groups/{g}/members/{u}`). A
+    sample payload proposes no operations.
+  - A data classification comes from sensitive-looking fields (salary,
+    ssn…). Request and certification policies tighten with it.
+  - Missing things become questions, never guesses.
+- **The AI is optional and bounded:**
+  - When the tenant has a provider (PLATFORM-P0-05.2), the model receives
+    only field names and the deterministic candidate lists. It never sees
+    the pasted document or any value.
+  - It may pick among the candidates and add up to 3 assumptions and 3
+    questions, labelled "AI:".
+  - `refineWithAi` rejects any field not in the input, and records it (a
+    hallucination guard). It cannot add operations or touch policies or
+    risk.
+  - A failed or non-JSON reply leaves the deterministic proposal, and the
+    reason is recorded (§17.5).
+- **External content is data** (§17.2). Text in the input that reads like
+  instructions ("ignore previous instructions…", "approve…") becomes a
+  warning, lowers confidence to low, and changes nothing else.
+- **The input is not stored.** Only its SHA-256 and size are kept, so a
+  sample's personal data does not persist.
+- **Provenance** (§17.7) is kept on the row and in the audit
+  (`onboarding_proposal.created`): input kind and hash, AI used, provider,
+  accepted and rejected choices, any error, confidence and warnings.
+- **Applying never activates anything:**
+  - It writes the identifier, correlation, entitlement source and policies
+    into the onboarding draft through Access's published
+    `configureOnboarding`, and starts onboarding if needed.
+  - It never switches on operations.
+  - The draft still needs validation, simulation, approval by someone else
+    (four-eyes) and promotion (ACCESS-P0-16).
+
+### Schema (migration 0091; applied live)
+
+`onboarding_proposals` holds:
+
+- the input kind, SHA-256 and size;
+- `proposal` (jsonb) and the overall confidence;
+- the AI fields;
+- status: PROPOSED, APPLIED or DISMISSED;
+- who created and who decided it.
+
+It has a same-tenant key to `applications`. Members can only read it; the
+service writes it, conditional on PROPOSED (409 otherwise).
+
+### API and UI
+
+- API:
+  - `GET` and `POST /api/v1/integrations/onboarding-proposals`;
+  - `POST /api/v1/integrations/onboarding-proposals/:id`
+    (`{ action: apply | dismiss }`). Apply also needs `access.manage`.
+- The onboarding page gains a "Proposed configuration" card:
+  - chips for confidence, source and AI status;
+  - the field choices with confidence and alternatives;
+  - risk and policies;
+  - the operations found, each with its evidence and the note "not
+    applied";
+  - destructive actions, questions, assumptions, tests, evidence and set-
+    aside AI suggestions;
+  - Apply and Dismiss, and the request form.
+
+### Verified
+
+- `tsc` and `eslint` clean.
+- Unit tests:
+  - rules 10/10;
+  - service 4/4 with a mocked provider:
+    - the model's prompt contains no value from the input and none of the
+      injected text;
+    - an invented field is rejected;
+    - timeout and prose replies leave the deterministic proposal;
+    - no provider means no call.
+- **Live SQL** (`tests/integration/onboarding-proposals-isolation.sql`):
+  - another tenant's application is 23503; a malformed hash is 23514;
+  - a member sees 1 own proposal and 0 of another tenant's;
+  - a member's direct apply updates 0 rows, and a direct insert is 42501.
+- **E2E `onboarding-proposals.spec.ts`: 12/12 with setup.** The E2E
+  tenants have no AI provider, so this is the deterministic path; the AI
+  path is covered by the unit tests. It covers:
+  - a bad kind or bad JSON is 400;
+  - an OpenAPI proposal returns fields, operations with evidence,
+    restricted risk, destructive actions and tests, and no stored input;
+  - no onboarding exists afterwards, and the application stays
+    DISCOVERED;
+  - injected instructions are flagged, confidence is low, and no email
+    from the sample is stored;
+  - dismiss;
+  - apply fills the draft: identifier, correlation, policies and manual
+    entitlements, with every operation off, no validation and no
+    approval;
+  - a second apply is 409;
+  - the screen requests a sample proposal;
+  - another organization sees none of them and gets 404 on create and
+    dismiss;
+  - read-only reads, but gets 403 on create and apply.
+- **Screenshots:** the onboarding page with an OpenAPI proposal (light,
+  1440) and at 390 px (dark).
+- **Checks:** `tsc` and `eslint` clean; vitest **654/654**.
+- **Full Playwright suite: 257 passed, 8 failed, 8 did not run.** The
+  failures were not this story's code.
+  - The failures were design-review, help, gateway-enforcement, the
+    emergency-controls setup, and FinanceBot; the ones that did not run
+    were their serial followers.
+  - They were sign-in redirects ("Your session expired") and timeouts.
+  - Supabase's auth and edge logs show about 1,200 `/user` calls a minute
+    from this server until 04:05, then **none at all** until 04:10: no
+    logout and no revocation for the user. Requests stopped leaving the
+    sandbox.
+  - A first re-run of those five specs hit the same outage window.
+  - A second re-run passed **54/54**.
+- **Finding for Foundation.** When `getUser()` fails on the network,
+  `proxy.ts` treats it as a rejected session and shows "Your session
+  expired". Failing closed is right, but the message is untruthful
+  (§17.5): it should say the sign-in service is unavailable. This is
+  recorded in the Foundation audit, not changed here.
+
+**Left out:**
+
+- fetching the document from a URL (pasting keeps it SSRF-free);
+- YAML;
+- role-hierarchy inference;
+- generated provisioning mappings (INTEGRATION-P0-13).

@@ -14,18 +14,18 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**175 of 226 tracked stories complete — 77%**
+**176 of 226 tracked stories complete — 78%**
 
 ```
-███████████████████████████████░░░░░░░░░  77%
+███████████████████████████████░░░░░░░░░  78%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 175 |
+| Done | 176 |
 | Partial | 25 |
 | Deferred | 1 |
-| Not Started | 25 |
+| Not Started | 24 |
 | **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 15 | 3 | 0 | 2 | 20 | `██████████████░░░░` 75% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 16 | 3 | 0 | 1 | 20 | `██████████████░░░░` 80% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 18 | 0 | 0 | 8 | 26 | `████████████░░░░░░` 69% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
@@ -130,7 +130,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 15 done · 3 partial · 0 deferred · 2 not started (20 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 16 done · 3 partial · 0 deferred · 1 not started (20 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -152,7 +152,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Done — 2026-09-26, 0081–0083 (preview = stage) |
 | INTEGRATION-P0-10 | Application discovery and unrecognized applications | Done — 2026-09-26, migration 0090 |
 | INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Partial — 2026-09-26: SSRF guard on every connector request and at configuration, capability model, idempotent write interface (0087) done; the write interface gets its end-to-end caller with INTEGRATION-P0-13 |
-| INTEGRATION-P0-12 | AI-assisted onboarding proposals | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-12 | AI-assisted onboarding proposals | Done — 2026-09-26, migration 0091 |
 | INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Not Started — 2026-09-26, WonderID |
 
 ### 04 — Access Agent
