@@ -14,18 +14,18 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**172 of 226 tracked stories complete — 76%**
+**173 of 226 tracked stories complete — 77%**
 
 ```
-██████████████████████████████░░░░░░░░░░  76%
+███████████████████████████████░░░░░░░░░  77%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 172 |
+| Done | 173 |
 | Partial | 25 |
 | Deferred | 1 |
-| Not Started | 28 |
+| Not Started | 27 |
 | **Total tracked** | **226** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -41,7 +41,7 @@ and are deliberately excluded from the counts above.
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 14 | 3 | 0 | 3 | 20 | `█████████████░░░░░` 70% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 16 | 0 | 0 | 10 | 26 | `███████████░░░░░░░` 62% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 17 | 0 | 0 | 9 | 26 | `████████████░░░░░░` 65% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 1 | 14 | `█████████████████░` 93% |
@@ -159,7 +159,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 16 done · 0 partial · 0 deferred · 10 not started (26 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 17 done · 0 partial · 0 deferred · 9 not started (26 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -179,7 +179,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-13 | Data sources inventory (master P0-11) | Done — 2026-09-25: `data_sources` (migration 0070, RLS, same-tenant composite FKs, no delete), entitlement link, CAN carries data source + classification fallback, audited service/API, `/access/data-sources` |
 | ACCESS-P0-14 | Wire SoD checks (codebase-map D5, master P0-25) | Done — 2026-09-25: `enforceSoD()` on request submission, request decision and manual grant; blocking → 409 SOD_CONFLICT (audited failure), flag → proceeds and audited; `checkSoD()` now service-role + matches the agent in object or metadata |
 | ACCESS-P0-15 | Application catalog model and inventory | Done — 2026-09-26, migration 0086 |
-| ACCESS-P0-16 | Application onboarding: state machine, checklist, validate, simulate, approve, promote | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-16 | Application onboarding: state machine, checklist, validate, simulate, approve, promote | Done — 2026-09-26, migration 0088 |
 | ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-18 | Self-service request catalog and request policies | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Not Started — 2026-09-26, WonderID |

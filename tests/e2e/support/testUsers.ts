@@ -12,7 +12,7 @@ export const E2E_PASSWORD = "E2E-Test-Passw0rd!1";
 export const TENANT_ONE = { name: "E2E Tenant One", slug: "e2e-tenant-one" };
 export const TENANT_TWO = { name: "E2E Tenant Two", slug: "e2e-tenant-two" };
 
-export type TestUserKey = "adminOne" | "readOnly" | "requester" | "adminTwo" | "platformAdmin" | "signOutOnly" | "passwordResetOnly" | "multiOrg";
+export type TestUserKey = "adminOne" | "readOnly" | "requester" | "adminTwo" | "platformAdmin" | "signOutOnly" | "passwordResetOnly" | "multiOrg" | "iamAdminOne";
 
 export type TestUserSpec = {
   email: string;
@@ -61,6 +61,9 @@ export const TEST_USERS: Record<TestUserKey, TestUserSpec> = {
     isPlatformAdmin: false,
     alsoIn: { tenant: TENANT_TWO, role: "TENANT_SUPER_ADMIN" },
   },
+  // ACCESS-P0-16 — a second person who can manage access in Tenant One, so
+  // four-eyes approval (the submitter never approves) can be exercised.
+  iamAdminOne: { email: "e2e-iam-admin-1@e2e.wonderagent.test", password: E2E_PASSWORD, role: "IAM_ADMIN", tenant: TENANT_ONE, isPlatformAdmin: false },
 };
 
 export function authFile(key: TestUserKey): string {

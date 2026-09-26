@@ -126,38 +126,48 @@ async function clippedElements(page: Page): Promise<string[]> {
 test.describe("design review — layout holds at every width", () => {
   test.use({ storageState: authFile("adminOne") });
 
+  // The route list outgrew one test's budget at the wide widths once the
+  // WonderID screens joined it (two full-suite runs on 2026-09-26 timed
+  // out on the last routes, while the spec alone passed), so each width
+  // sweeps it in two halves.
+  const mid = Math.ceil(ROUTES.length / 2);
+  const PARTS = [ROUTES.slice(0, mid), ROUTES.slice(mid)];
   for (const { name, width, height } of WIDTHS) {
-    test(`no horizontal overflow at ${name} (${width}px)`, async ({ page }) => {
-      // Seventeen routes plus an agent's detail page in one test — this is
-      // a sweep, not a unit check.
-      test.setTimeout(300_000);
-      await page.setViewportSize({ width, height });
-      const problems: string[] = [];
+    for (const [part, partRoutes] of PARTS.entries()) {
+      test(`no horizontal overflow at ${name} (${width}px), part ${part + 1}`, async ({ page }) => {
+        // A sweep of many routes in one test, not a unit check.
+        test.setTimeout(300_000);
+        await page.setViewportSize({ width, height });
+        const problems: string[] = [];
 
-      // Agent 360 has a dynamic URL, so resolve it from the list first.
-      await settle(page, "/agents");
-      const agentHref = await page.locator('a[href^="/agents/"][href*="-"]').first().getAttribute("href");
-      const routes = agentHref ? [...ROUTES, agentHref] : ROUTES;
-
-      for (const route of routes) {
-        await settle(page, route);
-
-        const overflow = await horizontalOverflow(page);
-        if (overflow > 1) problems.push(`${route}: page scrolls ${overflow}px horizontally`);
-
-        for (const clipped of await clippedElements(page)) {
-          problems.push(`${route}: ${clipped}`);
+        // Agent 360 has a dynamic URL, so part 1 resolves it from the list.
+        let routes = partRoutes;
+        if (part === 0) {
+          await settle(page, "/agents");
+          const agentHref = await page.locator('a[href^="/agents/"][href*="-"]').first().getAttribute("href");
+          if (agentHref) routes = [...partRoutes, agentHref];
         }
 
-        // Screens rebuilt with column priorities must fit their tables to
-        // the card at tablet-and-up widths rather than scroll sideways.
-        if (width >= 768 && FIT_TABLES.includes(route)) {
-          for (const region of await scrollingTables(page)) problems.push(`${route}: table scrolls sideways (${region})`);
-        }
-      }
+        for (const route of routes) {
+          await settle(page, route);
 
-      expect(problems, `layout breaks at ${width}px:\n${problems.join("\n")}`).toEqual([]);
-    });
+          const overflow = await horizontalOverflow(page);
+          if (overflow > 1) problems.push(`${route}: page scrolls ${overflow}px horizontally`);
+
+          for (const clipped of await clippedElements(page)) {
+            problems.push(`${route}: ${clipped}`);
+          }
+
+          // Screens rebuilt with column priorities must fit their tables to
+          // the card at tablet-and-up widths rather than scroll sideways.
+          if (width >= 768 && FIT_TABLES.includes(route)) {
+            for (const region of await scrollingTables(page)) problems.push(`${route}: table scrolls sideways (${region})`);
+          }
+        }
+
+        expect(problems, `layout breaks at ${width}px:\n${problems.join("\n")}`).toEqual([]);
+      });
+    }
   }
 });
 

@@ -54,3 +54,14 @@ export {
   type CatalogFilter,
   type CatalogRow,
 } from "./catalog";
+export {
+  getOnboarding,
+  startOnboarding,
+  configureOnboarding,
+  validateOnboarding,
+  simulateOnboarding,
+  decideOnboarding,
+  promoteOnboarding,
+  setApplicationLifecycle,
+  type ApplicationOnboarding,
+} from "./onboarding";

@@ -912,3 +912,14 @@ agent governance.
 - `next build` passes;
 - 76 migrations (latest 0076);
 - 28 E2E spec files, last full run 201/201.
+
+## 2026-09-26 — design-review width sweep split in two (suite health)
+
+The layout sweep in `design-review.spec.ts` loads every listed route in one
+test per width, with a 300 s budget. The WonderID routes have taken the list
+past 30 routes. Two full runs on 2026-09-26 timed out on the last routes at
+1680 and 1440 px, yet the spec passed alone.
+
+Each width now sweeps the list in two halves, in two tests. No route or
+check was removed. Agent 360 is still resolved from the list, in part 1.
+The split spec passed alone, 29/29, in 5.6 min.

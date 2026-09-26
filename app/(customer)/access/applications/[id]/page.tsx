@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getApplicationDetail, listEntitlementsForApplication } from "@/modules/access-governance/service";
+import { getApplicationDetail, getOnboarding, listEntitlementsForApplication } from "@/modules/access-governance/service";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton } from "@/modules/ui";
 import { ApplicationForm } from "../ApplicationForm";
-import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL } from "../labels";
+import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../labels";
+import { LifecycleForm } from "./onboarding/OnboardingForms";
 
 // ACCESS-P0-15 — one application: catalog details, owners, classification,
-// connector, and the access it holds.
+// connector, and the access it holds. ACCESS-P0-16 adds its onboarding and
+// the suspend / resume / retire lifecycle.
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -36,11 +38,15 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration] = await Promise.all([
+  const [entitlements, people, integration, onboarding] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
+    getOnboarding(tenantId, id),
   ]);
+  const lifecycleActions = (
+    app.onboardingStatus === "ACTIVE" ? ["suspend", "retire"] : app.onboardingStatus === "SUSPENDED" ? ["resume", "retire"] : app.onboardingStatus === "RETIRED" ? [] : ["retire"]
+  ) as ("suspend" | "resume" | "retire")[];
   const status = ONBOARDING_LABEL[app.onboardingStatus];
 
   return (
@@ -140,6 +146,41 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             )}
           </CardBody>
         </Card>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader
+            title="Onboarding"
+            description={
+              onboarding
+                ? `Configuration v${onboarding.configVersion}. ${ONBOARDING_STAGE_LABEL[onboarding.status].label}.`
+                : "Configure, validate, simulate and approve how this application is governed."
+            }
+            actions={
+              app.onboardingStatus !== "RETIRED" || onboarding ? (
+                <LinkButton href={`/access/applications/${id}/onboarding`} size="sm" variant={onboarding ? "outline" : "default"}>
+                  {onboarding ? "Open onboarding" : canManage ? "Start onboarding" : "View onboarding"}
+                </LinkButton>
+              ) : null
+            }
+          />
+          <CardBody>
+            {onboarding ? (
+              <Badge tone={ONBOARDING_STAGE_LABEL[onboarding.status].tone}>{ONBOARDING_STAGE_LABEL[onboarding.status].label}</Badge>
+            ) : (
+              <p className="text-sm text-muted-foreground">Not started.</p>
+            )}
+          </CardBody>
+        </Card>
+        {canManage && lifecycleActions.length ? (
+          <Card>
+            <CardHeader title="Lifecycle" description="Suspending or retiring an application needs a reason and is audited." />
+            <CardBody>
+              <LifecycleForm applicationId={id} actions={lifecycleActions} />
+            </CardBody>
+          </Card>
+        ) : null}
       </div>
 
       {canManage ? (

@@ -47,6 +47,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `connector_write_operations` | INT | Idempotency record of every connector write (the key is the lock); written by the write interface only (INTEGRATION-P0-11) |
 | `pending_identity_correlations` | INT | Ambiguous matches waiting for a person; decided through INT's service, which calls IA's `applySourcedIdentities()` |
 | `applications` | AA | Canonical application registry (governed access-graph entity); since ACCESS-P0-15 also the WonderID application catalog (type, owners as identities, classification, onboarding status) |
+| `application_onboardings` | AA | ACCESS-P0-16: one onboarding record per application — versioned, hashed configuration; validation, simulation, four-eyes approval and promotion each tied to the hash they ran against. Members read only; the service writes (service role, tenant-filtered) |
 | `accounts` | AA | Accounts an agent/identity holds on an application |
 | `entitlements` | AA | Roles/permissions/entitlements on an application |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |

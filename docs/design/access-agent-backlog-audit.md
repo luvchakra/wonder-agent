@@ -1169,3 +1169,156 @@ extended rather than duplicated.
 
 **Left to ACCESS-P0-16:** onboarding transitions, checklist, validate,
 simulate, approve and promote.
+
+## 2026-09-26 — ACCESS-P0-16: application onboarding (WonderID Phase 3)
+
+Spec §8: every application is onboarded through Configure → Validate →
+Simulate → Approve → Promote. One record per application holds a
+versioned, hashed configuration. Validation, simulation and approval each
+record the hash they ran against, so any change invalidates them (§8.6).
+
+### Schema (migration 0088; applied live)
+
+- `application_onboardings`:
+  - one row per application (`unique(application_id)`); same-tenant
+    composite key to `applications`;
+  - `mode` (quick_start / assisted / advanced) and `status` (the spec's ten
+    states);
+  - `config`, `config_version`, `config_hash` (canonical sha256, key order
+    never matters);
+  - validation and simulation results with the hash they ran against;
+  - `submitted_by` (who ran the passing simulation);
+  - `approved_hash`, `approved_config`, `approved_by`, `decision_note`;
+  - `promoted_config`, `promoted_hash`, `promoted_at`.
+- Four-eyes is also a table check: `approved_by <> submitted_by` (23514,
+  even for the service role).
+- **RLS: members can only read.** There is no insert, update or delete
+  policy: approval records must be tamper-resistant (§17.4). The service
+  writes with the service role, after checking `access.manage`, the stage
+  and four-eyes, and every write is filtered by the tenant resolved from
+  the session.
+
+### Rules (`onboardingRules.ts`, pure; 15 tests)
+
+- `validateOnboardingConfig`: validates and merges a partial configuration.
+- `configHash`: the canonical hash.
+- `evaluateChecklist`: the §8.5 checklist, 15 items (disable and delete are
+  one item, as in the spec).
+  - Blocking items stop promotion: schema, correlation, entitlement model,
+    reconciliation (when connected), owners, risk, access model, request
+    and certification policy, provenance.
+  - The operations decide only "automation ready". An operation the
+    connector does not declare is fulfilled by hand, so it warns but does
+    not block (§8.6: a failed deprovision is not automation ready).
+- `simulateOnboarding`: plays the configuration against the accounts the
+  connector imported:
+  - correlated, orphan and ambiguous counts;
+  - an account without the identifier fails the simulation.
+- `blockReason`: which step may follow which, and four-eyes.
+
+### Service (`onboarding.ts`)
+
+- The steps: start, configure, validate, simulate, decide (approve or
+  reject; a rejection needs a note), promote.
+- `setApplicationLifecycle`: suspend, resume and retire a live application.
+  Taking one out needs a reason.
+- Every step is a conditional update on the state and hash it expects, so
+  concurrent steps get a 409; each is audited
+  (`application.onboarding_*`).
+- **Simulation only reads.** It reads the integration's objects through
+  Integration's published `getNormalizedObjects`, and identities through
+  Identity's `listIdentitiesForCorrelation`.
+- **Promotion** copies exactly `approved_config`, only while the record
+  still holds the approved hash. It then makes the application ACTIVE and
+  links the approved integration.
+- The catalog status follows the onboarding stage (CONFIGURING / CONNECTED
+  → VALIDATING → READY_FOR_APPROVAL → APPROVED). It never demotes a live
+  application.
+
+### API and UI
+
+- `GET` and `POST /api/v1/access/applications/:id/onboarding`
+  (`{ action: start | configure | validate | simulate | approve | reject |
+  promote }`).
+- `POST /api/v1/access/applications/:id/lifecycle`.
+- The server actions in `app/actions/applications.ts` return the real
+  outcome (§17.5).
+- `/access/applications/:id/onboarding`:
+  - a five-step progress bar (done, next and failed are announced to
+    screen readers);
+  - the configuration form (read-only without `access.manage`);
+  - a record card: version and hash, submitter, decision, what is live;
+  - the checklist with pass, fail, warning and not-applicable icons;
+  - simulation counts;
+  - approval, disabled with the reason for the submitter;
+  - promote, disabled until the configuration is approved and unchanged.
+- The application detail page gains an Onboarding card and a Lifecycle
+  card (suspend, resume, retire).
+
+### Test support
+
+- A new E2E identity, `iamAdminOne` (IAM_ADMIN in Tenant One). It is the
+  second person who can manage access, which four-eyes needs.
+
+### Verified
+
+- **Checks:** `tsc` and `eslint .` are clean. Vitest **623/623** passes,
+  including 15 onboarding rules tests.
+- **Live SQL** (`tests/access/application-onboarding-isolation.sql`):
+  - A member sees their own onboarding (1) and none of another tenant's
+    (0).
+  - A member's direct self-approval and promotion each updated 0 rows.
+  - A member's direct insert was refused (42501); their delete removed 0
+    rows.
+  - Onboarding another tenant's application was refused (23503).
+  - The submitter approving, even with the service role, was refused
+    (23514).
+  - The fixtures were cleaned up.
+- **E2E `application-onboarding.spec.ts`** (17 passed with setup). It covers:
+  - start;
+  - a missing identifier fails validation, and simulation and promotion
+    are 409;
+  - undeclared operations are not automation ready but do not block;
+  - simulation changes no entitlements and submits for approval;
+  - the submitter's own approval is 409, and a rejection without a note is
+    400;
+  - a second person (IAM admin) approves;
+  - a change after approval drops the approval and blocks promotion;
+  - a second round, then promotion of exactly the approved hash, which
+    makes the application ACTIVE;
+  - suspend and resume, with a reason;
+  - the screens, from start to a failed validation, then a save that
+    invalidates the check;
+  - another organization gets 404 on every step and on lifecycle;
+  - read-only reads, but gets 403 on changes.
+- **Screenshots:** the promoted onboarding (light, 1440), a failed
+  validation (dark), and 390 px. One fix came from them: "1 entitlement(s)"
+  pluralisation.
+- **Full Playwright suite** (§17.8: a migration and a test identity
+  changed):
+  - **First run: 240/244.**
+    - Two design-review width sweeps timed out on their last routes. They
+      pass alone; the sweep had outgrown one test's 300 s budget. It now
+      runs in two halves per width (QA note in the QA audit).
+    - `shadow-ai` passed on its own re-run.
+    - `sod` failed on a real bug, recorded below.
+  - **Second run, with the split sweep and the fix below: 254/254 passed**
+    (14.0 min).
+
+## 2026-09-26 — ACCESS-P0-14 fix: an advisory SoD policy could hide a blocking one
+
+`checkSoD` returned the first matching policy. In the first ACCESS-P0-16
+full run, the `sod` spec timed out in its `finally` and left its flag-only
+policy active in E2E Tenant Two. On every later run, that advisory policy
+matched first, so the blocking policy never refused the requester's own
+approval (200 instead of 409).
+
+That is a real hole, not only test pollution: any advisory SoD policy
+could weaken a blocking one.
+
+- **Fix:** every matching policy is checked. The first blocking conflict
+  wins; an advisory one is reported only when nothing blocks.
+- **Unit test:** a new `sod.test.ts` case (flag and block both match →
+  block; flag alone → advisory). 7/7 pass.
+- **E2E:** re-run with the leftover advisory policy still active, `sod`
+  passed (409 as designed). The leftover E2E policy was then disabled.
