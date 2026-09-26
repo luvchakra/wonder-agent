@@ -29,6 +29,9 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `permissions` | FA | Granular permission strings (e.g. `agent.read`), the stable ids. Catalogued (FOUNDATION-P0-24, 0097): resource, action, module, label and sensitivity are required; only migrations add keys |
 | `role_permissions` | FA | Role ↔ permission |
 | `user_roles` | FA | User ↔ role (scoped to tenant). `granted_by` (0096), never the user themselves; removing the last Tenant Administrator role is refused in the database |
+| `groups` | FA | Tenant-owned groups of people (FOUNDATION-P0-26, 0099): name unique per tenant (case-insensitive), description, status. RLS select for the tenant's members; writes by the service only |
+| `group_members` | FA | Group ↔ member (0099). Composite foreign keys keep the group and the member in the same tenant; nobody is recorded as adding themselves |
+| `group_roles` | FA | Group ↔ role (0099): a system role or the tenant's own custom role (trigger); never granted by a member of the group (trigger, 42501). `getTenantContext()` combines these with direct roles on every request |
 | `sso_connections` | FA | SAML/OIDC IdP configuration per tenant |
 | `audit_logs` | FA (write primitive) / OA (read, presentation, search) | Foundation owns the schema and the `writeAudit()` utility every module calls; Operations owns audit views, evidence export and search over it. No module writes to this table by hand — always through the shared utility. |
 | `agents` | IA | Canonical AI agent identity |

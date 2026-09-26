@@ -40,6 +40,8 @@ const HISTORY_LABEL: Record<string, string> = {
   "user.sessions_revoked": "Sessions revoked",
   "role.assigned": "Role assigned",
   "role.removed": "Role removed",
+  "group.member_added": "Added to a group",
+  "group.member_removed": "Removed from a group",
 };
 
 export default async function UserDetailPage({
@@ -185,11 +187,16 @@ export default async function UserDetailPage({
                       {user.roles.map((r) => (
                         <Tr key={r.role}>
                           <Td>
-                            <span className="font-medium text-foreground">{roleLabel(r.role)}</span>
+                            <span className="font-medium text-foreground">{r.displayName || roleLabel(r.role)}</span>
+                            {r.active ? null : (
+                              <Badge tone="warning" className="ml-2">
+                                Inactive
+                              </Badge>
+                            )}
                             {r.description ? <span className="block text-xs text-muted-foreground">{r.description}</span> : null}
                           </Td>
                           <Td>
-                            <Badge>System</Badge>
+                            <Badge>{r.custom ? "Custom" : "System"}</Badge>
                           </Td>
                           <Td hideBelow="xl" className="whitespace-nowrap">
                             {formatDate(r.grantedAt)}
@@ -208,7 +215,59 @@ export default async function UserDetailPage({
                 {canAssign && !self && !removed ? (
                   <AssignRoleForm userId={user.userId} roles={unassigned.map((r) => ({ name: r.name, label: r.displayName }))} />
                 ) : null}
-                <p className="text-xs text-muted-foreground">Groups arrive with group management; scoped assignments with the authorization engine.</p>
+              </CardBody>
+            </Card>
+          ) : null}
+
+          {tab === "roles" ? (
+            <Card>
+              <CardHeader title={`Groups (${user.groups.length})`} description="Roles a group carries apply to every member of the group." />
+              <CardBody>
+                {user.groups.length === 0 ? (
+                  <EmptyState title="Not in any group" description="Add people to groups on the Groups page to give them roles together." />
+                ) : (
+                  <TableContainer>
+                    <Thead>
+                      <tr>
+                        <Th>Group</Th>
+                        <Th>Roles it gives</Th>
+                      </tr>
+                    </Thead>
+                    <tbody>
+                      {user.groups.map((g) => (
+                        <Tr key={g.id}>
+                          <Td>
+                            {can("groups.view") ? (
+                              <Link href={`/settings/groups/${g.id}`} className="font-medium text-foreground hover:text-primary">
+                                {g.name}
+                              </Link>
+                            ) : (
+                              <span className="font-medium text-foreground">{g.name}</span>
+                            )}
+                            {g.status === "active" ? null : (
+                              <Badge tone="warning" className="ml-2">
+                                Inactive
+                              </Badge>
+                            )}
+                          </Td>
+                          <Td>
+                            {g.roles.length ? (
+                              <span className="flex flex-wrap gap-1">
+                                {g.roles.map((r) => (
+                                  <Badge key={r.id} tone={r.status === "active" ? "neutral" : "warning"}>
+                                    {r.displayName}
+                                  </Badge>
+                                ))}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">No roles</span>
+                            )}
+                          </Td>
+                        </Tr>
+                      ))}
+                    </tbody>
+                  </TableContainer>
+                )}
               </CardBody>
             </Card>
           ) : null}
@@ -271,6 +330,7 @@ export default async function UserDetailPage({
                           <p className="text-foreground">
                             <span className="font-medium">{HISTORY_LABEL[e.action] ?? e.action}</span>
                             {typeof e.detail.role === "string" ? ` — ${roleLabel(e.detail.role)}` : ""}
+                            {typeof e.detail.group === "string" ? ` — ${e.detail.group}` : ""}
                             {e.outcome === "failure" ? (
                               <span className="text-destructive"> (refused{typeof e.detail.refused === "string" ? `: ${e.detail.refused}` : ""})</span>
                             ) : null}

@@ -5,6 +5,7 @@ import { getResendApiKey, getResendFromEmail } from "@/lib/db/env";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { listAssignableRoles } from "@/lib/rbac/roles";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { groupsOfUser, type UserGroup } from "./groups";
 import {
   TRANSITIONS,
   checkRoleGrant,
@@ -48,7 +49,9 @@ export type DirectoryUser = {
   joinedAt: string;
 };
 
-export type DirectoryFilter = { q?: string; status?: string | null; role?: string | null; page?: number; pageSize?: number };
+export type DirectoryFilter = { q?: string; status?: string | null; role?: string | null; group?: string | null; page?: number; pageSize?: number };
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const STATUS_SET = new Set(["invited", "active", "suspended", "deactivated", "removed"]);
 
@@ -60,6 +63,7 @@ export async function listUsers(tenantId: string, filter: DirectoryFilter): Prom
     p_search: filter.q?.slice(0, 100) || null,
     p_status: filter.status && STATUS_SET.has(filter.status) ? filter.status : null,
     p_role: filter.role || null,
+    p_group: filter.group && UUID.test(filter.group) ? filter.group : null,
     p_limit: pageSize,
     p_offset: (page - 1) * pageSize,
   });
@@ -128,7 +132,17 @@ async function membershipIn(tenantId: string, userId: string): Promise<Membershi
   return data;
 }
 
-export type RoleAssignment = { role: string; description: string | null; grantedAt: string; grantedBy: { userId: string; name: string } | null };
+export type RoleAssignment = {
+  role: string;
+  displayName: string;
+  description: string | null;
+  /** A tenant's own role rather than a system role (FOUNDATION-P0-25). */
+  custom: boolean;
+  /** An inactive role is held but grants nothing. */
+  active: boolean;
+  grantedAt: string;
+  grantedBy: { userId: string; name: string } | null;
+};
 
 export type UserDetail = {
   userId: string;
@@ -144,37 +158,50 @@ export type UserDetail = {
   joinedAt: string;
   lastSignInAt: string | null;
   roles: RoleAssignment[];
+  /** Groups the user is in, and the roles each gives them (FOUNDATION-P0-26). */
+  groups: UserGroup[];
+  /** Each effective permission and what grants it: a role, or "Role (via Group)". */
   permissions: { permission: string; roles: string[] }[];
 };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** One user of this organization; null when they are not (or no longer) in it, removed included. */
+type RoleAssignmentRow = {
+  created_at: string;
+  granted_by: string | null;
+  roles: { id: string; name: string; display_name: string; description: string | null; status: string; tenant_id: string | null } | null;
+};
+
 export async function getUserDetail(tenantId: string, userId: string): Promise<UserDetail | null> {
   if (!UUID_RE.test(userId)) return null;
   const m = await membershipIn(tenantId, userId);
   if (!m) return null;
   const db = supabaseServiceRole();
-  const [{ data: user }, { data: authUser }, { data: roleRows, error: rolesError }] = await Promise.all([
+  const [{ data: user }, { data: authUser }, { data: roleRows, error: rolesError }, groups] = await Promise.all([
     db.from("users").select("email, display_name").eq("id", userId).maybeSingle<{ email: string; display_name: string | null }>(),
     db.auth.admin.getUserById(userId),
     db
       .from("user_roles")
-      .select("created_at, granted_by, roles(id, name, description)")
+      .select("created_at, granted_by, roles(id, name, display_name, description, status, tenant_id)")
       .eq("tenant_id", tenantId)
       .eq("user_id", userId)
-      .returns<{ created_at: string; granted_by: string | null; roles: { id: string; name: string; description: string | null } | null }[]>(),
+      .returns<RoleAssignmentRow[]>(),
+    groupsOfUser(tenantId, userId),
   ]);
   if (rolesError) throw new ApiError(500, "QUERY_FAILED", rolesError.message);
   const roles = (roleRows ?? []).filter((r) => r.roles);
-  const roleIds = roles.map((r) => r.roles!.id);
+  // What grants what: active direct roles by name; active roles of active groups as "Role (via Group)".
+  const sources = new Map<string, string[]>();
+  for (const r of roles) if (r.roles!.status === "active") sources.set(r.roles!.id, [...(sources.get(r.roles!.id) ?? []), r.roles!.name]);
+  for (const g of groups) {
+    if (g.status !== "active") continue;
+    for (const gr of g.roles) if (gr.status === "active") sources.set(gr.id, [...(sources.get(gr.id) ?? []), `${gr.displayName} (via ${g.name})`]);
+  }
+  const roleIds = [...sources.keys()];
   const people = await namesOf([...roles.map((r) => r.granted_by), m.invited_by].filter((x): x is string => !!x));
   const { data: grants, error: grantsError } = roleIds.length
-    ? await db
-        .from("role_permissions")
-        .select("roles(name), permissions(key)")
-        .in("role_id", roleIds)
-        .returns<{ roles: { name: string } | null; permissions: { key: string } | null }[]>()
+    ? await db.from("role_permissions").select("role_id, permissions(key)").in("role_id", roleIds).returns<{ role_id: string; permissions: { key: string } | null }[]>()
     : { data: [], error: null };
   if (grantsError) throw new ApiError(500, "QUERY_FAILED", grantsError.message);
   return {
@@ -193,7 +220,10 @@ export async function getUserDetail(tenantId: string, userId: string): Promise<U
     roles: roles
       .map((r) => ({
         role: r.roles!.name,
+        displayName: r.roles!.display_name,
         description: r.roles!.description,
+        custom: r.roles!.tenant_id !== null,
+        active: r.roles!.status === "active",
         grantedAt: r.created_at,
         grantedBy: r.granted_by ? { userId: r.granted_by, name: people.get(r.granted_by) ?? "A former member" } : null,
       }))
@@ -201,8 +231,11 @@ export async function getUserDetail(tenantId: string, userId: string): Promise<U
     // A suspended, deactivated or invited member holds no effective access.
     permissions:
       m.status === "active"
-        ? effectivePermissions((grants ?? []).filter((g) => g.roles && g.permissions).map((g) => ({ role: g.roles!.name, permission: g.permissions!.key })))
+        ? effectivePermissions(
+            (grants ?? []).filter((g) => g.permissions).flatMap((g) => (sources.get(g.role_id) ?? []).map((source) => ({ role: source, permission: g.permissions!.key }))),
+          )
         : [],
+    groups,
   };
 }
 
@@ -401,7 +434,10 @@ export async function changeUserStatus(tenantId: string, actorId: string, userId
   if (action === "remove") {
     // A removed member keeps no roles (the history stays in the audit log).
     const { error: rolesError } = await db.from("user_roles").delete().eq("tenant_id", tenantId).eq("user_id", userId);
-    if (rolesError) throw new ApiError(500, "REMOVE_FAILED", "The member was removed but their roles were not. Remove them on the Users & Roles page.");
+    if (rolesError) throw new ApiError(500, "REMOVE_FAILED", "The member was removed but their roles were not. Remove them on their user page.");
+    // …nor any group (FOUNDATION-P0-26).
+    const { error: groupsError } = await db.from("group_members").delete().eq("tenant_id", tenantId).eq("user_id", userId);
+    if (groupsError) throw new ApiError(500, "REMOVE_FAILED", "The member was removed but is still in groups. Remove them from their groups.");
   }
 
   // Tenant access already ended with the status (only `active` reaches

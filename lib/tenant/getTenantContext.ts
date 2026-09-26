@@ -77,6 +77,30 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
   return data ?? [];
 });
 
+type GroupRoleRow = {
+  tenant_id: string;
+  groups: { status: string; group_roles: { roles: RoleRow["roles"] }[] } | null;
+};
+
+/**
+ * FOUNDATION-P0-26 — the roles the user holds through groups, resolved per
+ * request like direct roles, so joining or leaving a group applies on the
+ * next request. Filtered by user_id for the same reason as above (the
+ * group_members RLS policy is tenant-scoped); RLS limits the rows to
+ * tenants where the user is an active member.
+ */
+const getMyGroupRoleRows = cache(async (): Promise<GroupRoleRow[]> => {
+  const user = await getSessionUser();
+  if (!user) return [];
+  const supabase = await supabaseServer();
+  const { data } = await supabase
+    .from("group_members")
+    .select("tenant_id, groups(status, group_roles(roles(name, status, role_permissions(permissions(key)))))")
+    .eq("user_id", user.id)
+    .returns<GroupRoleRow[]>();
+  return data ?? [];
+});
+
 /**
  * Resolves the current request's tenant context. Tenant context comes ONLY
  * from the authenticated user's active tenant_memberships rows (via RLS) —
@@ -101,7 +125,18 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
     return { userId: "", tenantId: null, tenantSlug: null, roles: [], permissions: [] };
   }
 
-  const [memberships, roleRows, cookieStore, host] = await Promise.all([getMyMemberships(), getMyRoleRows(), cookies(), getHostTenant()]);
+  const [memberships, directRoleRows, groupRoleRows, cookieStore, host] = await Promise.all([
+    getMyMemberships(),
+    getMyRoleRows(),
+    getMyGroupRoleRows(),
+    cookies(),
+    getHostTenant(),
+  ]);
+  // Direct roles, then the roles of the user's active groups.
+  const roleRows: RoleRow[] = [
+    ...directRoleRows,
+    ...groupRoleRows.flatMap((g) => (g.groups?.status === "active" ? g.groups.group_roles.map((gr) => ({ tenant_id: g.tenant_id, roles: gr.roles })) : [])),
+  ];
 
   // FOUNDATION-P0-22 — on a tenant's own address (`<slug>.<BASE_APP_HOST>`)
   // that tenant is the only candidate: the user must hold an active

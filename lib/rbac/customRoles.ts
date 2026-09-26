@@ -35,6 +35,8 @@ export type RoleHolder = { userId: string; name: string; email: string; status: 
 export type RoleDetail = RoleSummary & {
   permissions: string[];
   holders: RoleHolder[];
+  /** Groups that carry the role; their members hold it too (FOUNDATION-P0-26). */
+  groups: { id: string; name: string; status: string; memberCount: number }[];
   createdBy: string | null;
   copiedFrom: { id: string; displayName: string } | null;
   updatedAt: string;
@@ -110,11 +112,18 @@ export async function getRoleDetail(tenantId: string, roleId: string): Promise<R
   const ids = [...new Set((assigned ?? []).map((a) => a.user_id))];
   // Names and statuses of people holding it in *this* tenant (ids came from this tenant's assignments).
   const db = supabaseServiceRole();
-  const [{ data: people }, { data: memberships }, copied] = await Promise.all([
+  const [{ data: people }, { data: memberships }, copied, { data: groupRows, error: groupsError }] = await Promise.all([
     ids.length ? db.from("users").select("id, email, display_name").in("id", ids) : Promise.resolve({ data: [] }),
     ids.length ? db.from("tenant_memberships").select("user_id, status").eq("tenant_id", tenantId).in("user_id", ids) : Promise.resolve({ data: [] }),
     r.copied_from ? readRole(tenantId, r.copied_from) : Promise.resolve(null),
+    supabase
+      .from("group_roles")
+      .select("groups(id, name, status, group_members(count))")
+      .eq("tenant_id", tenantId)
+      .eq("role_id", r.id)
+      .returns<{ groups: { id: string; name: string; status: string; group_members: { count: number }[] } | null }[]>(),
   ]);
+  if (groupsError) throw new ApiError(500, "QUERY_FAILED", groupsError.message);
   const statusOf = new Map(((memberships ?? []) as { user_id: string; status: string }[]).map((m) => [m.user_id, m.status]));
   const holders = ((people ?? []) as { id: string; email: string; display_name: string | null }[])
     .map((p) => ({ userId: p.id, name: p.display_name || p.email, email: p.email, status: statusOf.get(p.id) ?? "removed" }))
@@ -126,6 +135,10 @@ export async function getRoleDetail(tenantId: string, roleId: string): Promise<R
       .filter((k): k is string => !!k)
       .sort(),
     holders,
+    groups: (groupRows ?? [])
+      .filter((g) => g.groups)
+      .map((g) => ({ id: g.groups!.id, name: g.groups!.name, status: g.groups!.status, memberCount: g.groups!.group_members[0]?.count ?? 0 }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     createdBy: r.created_by,
     copiedFrom: copied ? { id: copied.id, displayName: copied.display_name } : null,
     updatedAt: r.updated_at,
@@ -293,6 +306,9 @@ export async function deleteRole(tenantId: string, actorId: string, roleId: stri
   const r = await customRoleIn(tenantId, roleId);
   const { count } = await supabaseServiceRole().from("user_roles").select("user_id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("role_id", r.id);
   if (count) throw new ApiError(409, "ROLE_IN_USE", `${count} ${count === 1 ? "person holds" : "people hold"} this role. Remove it from them, or deactivate the role instead.`);
+  // Nor while a group carries it (FOUNDATION-P0-26): deleting would silently take it from the group's members.
+  const { count: groups } = await supabaseServiceRole().from("group_roles").select("group_id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("role_id", r.id);
+  if (groups) throw new ApiError(409, "ROLE_IN_USE", `${groups} ${groups === 1 ? "group carries" : "groups carry"} this role. Remove it from them, or deactivate the role instead.`);
   const { error } = await supabaseServiceRole().from("roles").delete().eq("id", r.id).eq("tenant_id", tenantId);
   if (error) throw refusal(error) ?? new ApiError(500, "DELETE_FAILED", error.message);
   await writeAudit({ tenantId, actorId, actorType: "user", action: "role.deleted", objectType: "role", objectId: r.id, outcome: "success", metadata: { name: r.name } });

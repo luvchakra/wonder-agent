@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listAssignableRoles } from "@/lib/rbac/roles";
 import { getUserSummary, listUsers } from "@/lib/users/users";
+import { listGroups } from "@/lib/users/groups";
 import { MEMBERSHIP_STATUSES, STATUS_LABEL, roleLabel } from "@/lib/users/userRules";
 import { Badge, Card, CardBody, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { STATUS_TONE, initials, relativeTime } from "./labels";
@@ -11,13 +12,13 @@ import { STATUS_TONE, initials, relativeTime } from "./labels";
 // FOUNDATION-P0-23 — the organization's users (spec §6, mockup 1): who is
 // in it, in what state, with which roles, and when they were last active.
 // Search and status/role filters run in the database, a page at a time.
-// Groups arrive with FOUNDATION-P0-26.
+// FOUNDATION-P0-26 adds the group filter.
 
 export const metadata = { title: "Users" };
 
 const PAGE_SIZE = 25;
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; role?: string; page?: string }> }) {
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; role?: string; group?: string; page?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("users.view");
@@ -30,17 +31,20 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const q = (sp.q ?? "").slice(0, 100);
   const status = (MEMBERSHIP_STATUSES as readonly string[]).includes(sp.status ?? "") ? sp.status! : "";
   const role = (sp.role ?? "").slice(0, 60);
+  const canSeeGroups = ctx.permissions.includes("groups.view");
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
-  const [{ items, total }, summary, roles] = await Promise.all([
-    listUsers(ctx.tenantId!, { q, status: status || null, role: role || null, page, pageSize: PAGE_SIZE }),
+  const [{ items, total }, summary, roles, groups] = await Promise.all([
+    listUsers(ctx.tenantId!, { q, status: status || null, role: role || null, group: canSeeGroups ? sp.group || null : null, page, pageSize: PAGE_SIZE }),
     getUserSummary(ctx.tenantId!),
     listAssignableRoles(ctx.tenantId!),
+    canSeeGroups ? listGroups(ctx.tenantId!) : Promise.resolve([]),
   ]);
+  const group = groups.some((g) => g.id === sp.group) ? sp.group! : "";
   const canAdd = ctx.permissions.includes("users.invite") || ctx.permissions.includes("users.create");
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const href = (p: number) =>
-    `/settings/users?${new URLSearchParams({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(role ? { role } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`;
-  const filtered = !!(q || status || role);
+    `/settings/users?${new URLSearchParams({ ...(q ? { q } : {}), ...(status ? { status } : {}), ...(role ? { role } : {}), ...(group ? { group } : {}), ...(p > 1 ? { page: String(p) } : {}) }).toString()}`;
+  const filtered = !!(q || status || role || group);
 
   return (
     <div className="space-y-5">
@@ -99,6 +103,21 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 ))}
               </select>
             </div>
+            {groups.length ? (
+              <div>
+                <label htmlFor="group" className={fieldLabelClass}>
+                  Group
+                </label>
+                <select id="group" name="group" defaultValue={group} className={fieldInputClass}>
+                  <option value="">All groups</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <button type="submit" className="h-9 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground hover:bg-accent">
               Filter
             </button>

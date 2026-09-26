@@ -1864,3 +1864,111 @@ build: **54/54 passed**.
 
 With the 310 passed in the full run, every test in the suite has passed on
 this build. `741aabf` goes to main.
+
+## 2026-09-26 — FOUNDATION-P0-26: groups (WonderID Phase 4b)
+
+**What was built** (IAM-004; spec §11–12, §16–17):
+
+- **Migration 0099** (applied live):
+  - `groups`: tenant-owned; name unique per tenant ignoring case; status
+    active or inactive.
+  - `group_members`: composite foreign keys to `groups(id, tenant_id)`
+    and to `tenant_memberships(tenant_id, user_id)`, so a member is always
+    in the group's own tenant. `added_by <> user_id`: nobody is recorded
+    as adding themselves.
+  - `group_roles`: a guard trigger allows only a system role or the
+    tenant's own custom role, and refuses a grant by anyone who is in the
+    group (SELF_ESCALATION, 42501).
+  - RLS: select only, for the tenant's members. Writes go through the
+    service.
+  - `tenant_user_directory` gains `p_group` (default null, so deployed
+    callers are unaffected).
+  - Actor columns are plain uuids (the 0096 lesson about PostgREST
+    embeds).
+- **Effective permissions** come from direct roles plus the roles of the
+  user's active groups. `getTenantContext()` reads them in the same
+  parallel batch, per request, so joining or leaving a group applies on
+  the next request with no cache. Inactive roles and inactive groups grant
+  nothing.
+- **Service** `lib/users/groups.ts`:
+  - list, detail, `groupsOfUser`, create, update, delete;
+  - add and remove members;
+  - give and take roles.
+  - Every write is audited, and refusals are audited as failures.
+- **No escalation through groups:**
+  - nobody adds themselves;
+  - a member cannot give their own group roles;
+  - giving a group a role needs `roles.assign` (or `role.manage`);
+  - adding people to a group that carries roles needs role assignment
+    too, not just `groups.manage_members`.
+  - Each rule is checked in the service and again in the database.
+- **Removing a member** from the organization also removes them from
+  every group.
+- **Screens:**
+  - `/settings/groups`: list and create.
+  - `/settings/groups/[id]`: roles, members, details, delete.
+  - User detail:
+    - a Groups card;
+    - custom and system role badges;
+    - inactive roles marked;
+    - permissions attributed as "Role (via Group)";
+    - group events in the access history.
+  - Users list: a group filter.
+  - Role detail: a Groups tab.
+  - Sidebar: "Groups".
+- **A role a group carries cannot be deleted** (409 `ROLE_IN_USE`).
+  Deleting it would silently take it from the group's members.
+- **API:**
+  - `GET`/`POST /api/v1/groups`;
+  - `GET`/`PATCH`/`DELETE /api/v1/groups/[id]`;
+  - `POST /api/v1/groups/[id]/members`;
+  - `DELETE /api/v1/groups/[id]/members/[userId]`;
+  - `POST /api/v1/groups/[id]/roles`;
+  - `DELETE /api/v1/groups/[id]/roles/[roleId]`.
+
+**Verified:**
+
+- tsc and eslint clean; vitest **721/721**; production build succeeds.
+- `tests/foundation/groups-isolation.sql`, run live: **16/16** as
+  expected.
+  - Another tenant's member or group is refused (23503).
+  - Self-add is refused (23514); another tenant's custom role is refused
+    (23514).
+  - A member granting their own group a role is refused (42501).
+  - The directory filters by group (1 of 2).
+  - A tenant-A member sees A's groups, members and roles, and none of
+    B's.
+  - They cannot create a group, add a member or give a role directly
+    (42501), cannot delete members (0 rows), and cannot call the
+    directory function (42501).
+  - Fixtures removed (0 left). Security advisors show nothing new.
+- `tests/e2e/groups.spec.ts` (new): created through the screens.
+  - The group's role grants real access: `/api/v1/reports` goes 403 →
+    200.
+  - Removing the member revokes it and re-adding restores it; an inactive
+    role grants nothing through a group.
+  - Provenance shows on the user page, the users list filters by group,
+    and the role page lists the group.
+  - Deleting the role is refused while the group carries it.
+  - Self-add is 403 SELF_ESCALATION. The Identity Administrator cannot
+    add people to a group that carries roles, nor give roles.
+  - A member giving their own group a role is 403 SELF_ESCALATION.
+  - Other tenants get 404; read-only users are redirected; deleting the
+    group revokes the access.
+- Targeted run: groups, users, custom-roles, navigation-smoke and shell
+  specs. 67 passed and 1 failed. The failure was interference between
+  specs:
+  - custom-roles and groups ran in parallel, and both toggled
+    `compliance.read` for the same requester;
+  - the groups spec now probes `report.read`, which no other spec
+    toggles;
+  - re-run: 17/17.
+- **Full suite** on the production build of this change (0099 applied,
+  nothing applied during the run): **331/331 passed** in 22.9 minutes.
+
+**Left out / handed on:**
+
+- Group scopes and conditions: FOUNDATION-P0-19. That work is in
+  progress, unmerged; migration 0100 is not applied.
+- Dynamic (rule-based) membership and nested groups: P1.
+- Group owners and access reviews of groups: COMPLIANCE-P0-11.

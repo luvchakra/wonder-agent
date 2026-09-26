@@ -21,6 +21,7 @@ export const metadata = { title: "Role" };
 const TABS = [
   { key: "permissions", label: "Permissions" },
   { key: "people", label: "People" },
+  { key: "groups", label: "Groups" },
 ] as const;
 
 export default async function RoleDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; saved?: string }> }) {
@@ -35,7 +36,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const [role, catalog] = await Promise.all([getRoleDetail(ctx.tenantId!, id), listPermissionCatalog()]);
   if (!role) notFound();
-  const tab = sp.tab === "people" ? "people" : "permissions";
+  const tab = TABS.find((t) => t.key === sp.tab)?.key ?? "permissions";
   const summary = moduleSummary(role.permissions, catalog);
   const held = new Set(role.permissions);
   const can = (p: string) => ctx.permissions.includes(p);
@@ -125,7 +126,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
             {TABS.map((t) => (
               <Link
                 key={t.key}
-                href={`/settings/roles/${role.id}${t.key === "permissions" ? "" : "?tab=people"}`}
+                href={`/settings/roles/${role.id}${t.key === "permissions" ? "" : `?tab=${t.key}`}`}
                 aria-current={t.key === tab ? "page" : undefined}
                 className={cn(
                   "-mb-px border-b-2 px-3 py-2 text-sm",
@@ -133,7 +134,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
                 )}
               >
                 {t.label}
-                {t.key === "people" ? ` (${role.holderCount})` : ` (${role.permissions.length})`}
+                {` (${t.key === "people" ? role.holderCount : t.key === "groups" ? role.groups.length : role.permissions.length})`}
               </Link>
             ))}
           </nav>
@@ -162,6 +163,32 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
                   </section>
                 ))}
                 {role.permissions.length === 0 ? <EmptyState title="No permissions" /> : null}
+              </CardBody>
+            </Card>
+          ) : tab === "groups" ? (
+            <Card>
+              <CardBody>
+                {role.groups.length === 0 ? (
+                  <EmptyState title="No group carries this role" description="Give it to a group on the Groups page; every member then holds it." />
+                ) : (
+                  <ul className="divide-y divide-border rounded-lg border border-border">
+                    {role.groups.map((g) => (
+                      <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
+                        {can("groups.view") ? (
+                          <Link href={`/settings/groups/${g.id}`} className="min-w-0 font-medium text-foreground hover:text-primary">
+                            {g.name}
+                          </Link>
+                        ) : (
+                          <span className="min-w-0 font-medium text-foreground">{g.name}</span>
+                        )}
+                        <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {g.memberCount} {g.memberCount === 1 ? "member" : "members"}
+                          {g.status === "active" ? null : <Badge tone="warning">Inactive</Badge>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </CardBody>
             </Card>
           ) : (

@@ -14,18 +14,18 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**185 of 239 tracked stories complete — 77%**
+**186 of 239 tracked stories complete — 78%**
 
 ```
-███████████████████████████████░░░░░░░░░  77%
+███████████████████████████████░░░░░░░░░  78%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 185 |
+| Done | 186 |
 | Partial | 26 |
 | Deferred | 1 |
-| Not Started | 27 |
+| Not Started | 26 |
 | **Total tracked** | **239** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 33 | 2 | 0 | 5 | 40 | `███████████████░░░` 83% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 34 | 2 | 0 | 4 | 40 | `███████████████░░░` 85% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 16 | 3 | 0 | 1 | 20 | `██████████████░░░░` 80% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 33 done · 2 partial · 0 deferred · 5 not started (40 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 34 done · 2 partial · 0 deferred · 4 not started (40 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -97,10 +97,10 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
 | FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Done — 2026-09-26 (custom-domain verification is P1; the shell shows name and URL, environment arrives with P0-27's profile) |
-| FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Done — 2026-09-26 (group filter and group tab wait on P0-26; scope step on P0-19; auth-method enforcement on P0-27) |
+| FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Done — 2026-09-26 (group filter and Groups card added with P0-26; scope step on P0-19; auth-method enforcement on P0-27) |
 | FOUNDATION-P0-24 | Permission catalog with resource, action, module and administrative permissions (IAM-002) | Done — 2026-09-26 |
-| FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Done — 2026-09-26 (scope and conditions step and groups tab wait on P0-19 and P0-26) |
-| FOUNDATION-P0-26 | Groups and group role assignments (IAM-004) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Done — 2026-09-26 (groups tab added with P0-26; scope and conditions step waits on P0-19) |
+| FOUNDATION-P0-26 | Groups and group role assignments (IAM-004) | Done — 2026-09-26 (group scopes and dynamic membership wait on P0-19) |
 | FOUNDATION-P0-27 | Tenant security profile, enforced (TENANT-004) | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ### 02 — Identity Agent

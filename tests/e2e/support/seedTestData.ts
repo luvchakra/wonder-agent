@@ -173,6 +173,9 @@ export async function pruneThrowawayIntegrationsAndQuarantine(tenantIds: string[
       const deletedRoles = await supabase.from("roles").delete().eq("tenant_id", tenantId).in("id", roleIds);
       if (deletedRoles.error) throw new Error(`prune throwaway roles(${tenantId}) failed: ${deletedRoles.error.message}`);
     }
+    // Throwaway groups named "E2E …" (FOUNDATION-P0-26); members and roles cascade.
+    const groups = await supabase.from("groups").delete().eq("tenant_id", tenantId).like("name", "E2E %");
+    if (groups.error) throw new Error(`prune throwaway groups(${tenantId}) failed: ${groups.error.message}`);
     const quarantine = await supabase.from("runtime_event_quarantine").delete().eq("tenant_id", tenantId);
     if (quarantine.error) throw new Error(`prune quarantine(${tenantId}) failed: ${quarantine.error.message}`);
   }
