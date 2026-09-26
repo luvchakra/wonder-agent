@@ -19,7 +19,7 @@ import type { RequestPolicy, RiskLevel } from "./requestRules";
  *   privilege, duration, type and policy.
  */
 
-export type ApproverKind = "manager" | "entitlement_owner" | "application_owner" | "access_managers";
+export type ApproverKind = "manager" | "entitlement_owner" | "application_owner" | "package_owner" | "access_managers";
 export type StepStatus = "waiting" | "pending" | "approved" | "rejected" | "skipped" | "expired" | "invalidated";
 
 export type Person = { identityId: string; userId: string | null; active: boolean } | null;
@@ -39,6 +39,9 @@ export type ChainInput = {
   manager: Person;
   entitlementOwner: Person;
   applicationOwner: Person;
+  /** ACCESS-P0-20: for a package request, its owner is "the owner". */
+  packageOwner?: Person;
+  isPackage?: boolean;
   requesterUserId: string;
   subjectUserId: string | null;
 };
@@ -47,6 +50,7 @@ const LABEL: Record<Exclude<ApproverKind, "access_managers">, string> = {
   manager: "manager",
   entitlement_owner: "entitlement owner",
   application_owner: "application owner",
+  package_owner: "package owner",
 };
 
 /** One named approver, or access managers with the reason why. */
@@ -63,7 +67,12 @@ function resolve(kind: Exclude<ApproverKind, "access_managers">, person: Person,
 
 export function planApprovalChain(c: ChainInput): PlannedStep[] {
   const manager = () => resolve("manager", c.manager, c);
-  const owner = () => (c.entitlementOwner ? resolve("entitlement_owner", c.entitlementOwner, c) : resolve("application_owner", c.applicationOwner, c));
+  const owner = () =>
+    c.isPackage
+      ? resolve("package_owner", c.packageOwner ?? null, c)
+      : c.entitlementOwner
+        ? resolve("entitlement_owner", c.entitlementOwner, c)
+        : resolve("application_owner", c.applicationOwner, c);
   const stages: Omit<PlannedStep, "stage">[][] =
     c.route === "manager_approval" ? [[manager()]] : c.route === "owner_approval" ? [[owner()]] : c.mode === "parallel" ? [[manager(), owner()]] : [[manager()], [owner()]];
   if (c.risk === "critical") stages.push([{ approverKind: "access_managers", approverIdentityId: null, approverUserId: null, reason: "Critical risk: an access manager reviews as well" }]);
@@ -87,17 +96,22 @@ export type FingerprintInput = {
   tenantId: string;
   requestId: string;
   subjectIdentityId: string;
-  applicationId: string;
+  applicationId: string | null;
   entitlementId: string | null;
   privilegeLevel: string | null;
   durationDays: number | null;
   requestType: string;
   policyId: string | null;
+  /** ACCESS-P0-20: a package request is an approval of the package as it is now. */
+  packageId?: string | null;
+  packageContents?: string | null;
 };
 
 /** What an approval is an approval of. Any change means it must be approved again. */
 export function actionFingerprint(f: FingerprintInput): string {
-  const canonical = JSON.stringify([f.tenantId, f.requestId, f.subjectIdentityId, f.applicationId, f.entitlementId, f.privilegeLevel, f.durationDays, f.requestType, f.policyId]);
+  const base = [f.tenantId, f.requestId, f.subjectIdentityId, f.applicationId, f.entitlementId, f.privilegeLevel, f.durationDays, f.requestType, f.policyId];
+  // Appended only for a package, so every earlier fingerprint stays as it was.
+  const canonical = JSON.stringify(f.packageId ? [...base, f.packageId, f.packageContents ?? ""] : base);
   return createHash("sha256").update(canonical).digest("hex");
 }
 

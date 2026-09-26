@@ -67,6 +67,8 @@ const submit = (ctx: APIRequestContext, data: Record<string, unknown>) => ctx.po
 const live = (d: Detail) => d.steps.filter((s) => s.status !== "invalidated");
 
 test.describe.serial("approval engine", () => {
+  // Each step makes many sequential calls against the live database.
+  test.describe.configure({ timeout: 90_000 });
   test.use({ storageState: authFile("adminOne") });
   let requester: APIRequestContext;
   let iam: APIRequestContext;

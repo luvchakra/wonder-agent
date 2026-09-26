@@ -60,12 +60,27 @@ describe("planApprovalChain", () => {
   });
 });
 
+describe("package requests (ACCESS-P0-20)", () => {
+  it("ask the package owner, never the application or entitlement owner", () => {
+    const steps = planApprovalChain(input({ isPackage: true, packageOwner: person("pkg"), entitlementOwner: person("ent") }));
+    expect(steps.map((s) => [s.stage, s.approverKind, s.approverUserId])).toEqual([
+      [1, "manager", "u-mgr"],
+      [2, "package_owner", "u-pkg"],
+    ]);
+    expect(planApprovalChain(input({ route: "owner_approval", isPackage: true, packageOwner: null }))[0].reason).toMatch(/No package owner/);
+  });
+});
+
 describe("actionFingerprint", () => {
   const base = { tenantId: "t", requestId: "r", subjectIdentityId: "s", applicationId: "a", entitlementId: "e", privilegeLevel: "standard", durationDays: 30, requestType: "grant", policyId: "p" };
   it("is stable, and changes with the resource, privilege, duration or policy", () => {
     const f = actionFingerprint(base);
     expect(f).toMatch(/^[0-9a-f]{64}$/);
     expect(actionFingerprint({ ...base })).toBe(f);
+    // A package's contents are part of what is approved; without a package the fingerprint is unchanged.
+    expect(actionFingerprint({ ...base, packageId: null })).toBe(f);
+    const pkg = actionFingerprint({ ...base, packageId: "k", packageContents: "a:*:-" });
+    expect(actionFingerprint({ ...base, packageId: "k", packageContents: "a:*:-|b:*:-" })).not.toBe(pkg);
     for (const change of [{ entitlementId: "e2" }, { privilegeLevel: "admin" }, { durationDays: 90 }, { policyId: "p2" }, { tenantId: "t2" }, { requestType: "modify" }]) {
       expect(actionFingerprint({ ...base, ...change })).not.toBe(f);
     }

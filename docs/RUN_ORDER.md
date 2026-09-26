@@ -143,7 +143,8 @@ isolation checks. Detail is in each module's audit log.
 | W3 | INTEGRATION-P0-12: AI-assisted onboarding proposals, proposal only (0091) | Done | `c4d0e06` |
 | + | Proxy: an unreachable sign-in service answers 503 / "service unavailable", not "session expired" | Done | `e6c9f59` |
 | W4 | ACCESS-P0-18: request catalog and request policies; requests for identities (0092) | Done | with P0-19 |
-| W4 | ACCESS-P0-19: approval engine — staged chains, approver scope, four-eyes in the database, fingerprint invalidation, escalation/expiry (0093) | Done (named groups deferred) | see Access audit |
+| W4 | ACCESS-P0-19: approval engine — staged chains, approver scope, four-eyes in the database, fingerprint invalidation, escalation/expiry (0093) | Done (named groups deferred) | `a177663` |
+| W4 | ACCESS-P0-20: access packages — contents, eligibility-controlled discovery, requests through the approval engine, assignments with work items, expiry and revocation work (0094) | Done | see Access audit |
 
 **WonderID (adopted 2026-09-26, explicit user decision).** The product is now
 WonderID; the programme continues in `docs/plan/WONDERID-ROADMAP.md`, phase by
@@ -154,7 +155,14 @@ write interface (INTEGRATION-P0-11), onboarding (ACCESS-P0-16) and the account
 inventory (ACCESS-P0-17), application discovery (INTEGRATION-P0-10) and
 onboarding proposals (INTEGRATION-P0-12): Phase 3 is complete. Phase 4 has
 the request catalog and policies (ACCESS-P0-18) and the approval engine
-(ACCESS-P0-19). Next: access packages (ACCESS-P0-20) onwards.
+(ACCESS-P0-19) and access packages (ACCESS-P0-20).
+
+**Phase 4b (added 2026-09-26, user-supplied specifications): tenant & user
+permissioning runs next**, ahead of Phase 4's remaining stories. It covers
+FOUNDATION-P0-22 through -27, the re-scoped FOUNDATION-P0-19 and -20,
+PLATFORM-P0-14, COMPLIANCE-P0-11 and EXPERIENCE-P0-21. The plan, gap
+analysis and recorded decisions are in `docs/plan/WONDERID-ROADMAP.md`
+§ Phase 4b.
 
 **Still to do in this programme:**
 

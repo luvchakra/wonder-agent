@@ -128,9 +128,9 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
                     <Tr key={r.id}>
                       <Td>
                         <Link href={`/access/requests/${r.id}`} className="font-medium text-foreground hover:underline">
-                          {r.applicationName ?? "Application"}
+                          {r.packageName ?? r.applicationName ?? "Application"}
                         </Link>
-                        <span className="block text-xs text-muted-foreground">{r.entitlementName ?? "Application access"}</span>
+                        <span className="block text-xs text-muted-foreground">{r.accessPackageId ? "Access package" : (r.entitlementName ?? "Application access")}</span>
                       </Td>
                       <Td>
                         {r.subjectIdentityId ? (

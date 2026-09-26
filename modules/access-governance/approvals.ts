@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessRequest } from "@/lib/shared/types/access-governance";
 import { getIdentity, getIdentityForUser, getIdentityNames } from "@/modules/agent-identity/service";
 import { toAccessRequest } from "./mappers";
+import { assignApprovedPackageRequest, loadPackageForApproval } from "./packages";
 import { assessRisk, type RequestPolicy } from "./requestRules";
 import {
   actionFingerprint,
@@ -33,7 +34,7 @@ import {
  */
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const KIND_ORDER: ApproverKind[] = ["manager", "entitlement_owner", "application_owner", "access_managers"];
+const KIND_ORDER: ApproverKind[] = ["manager", "entitlement_owner", "application_owner", "package_owner", "access_managers"];
 const LIVE: StepStatus[] = ["waiting", "pending", "approved", "rejected", "skipped", "expired"];
 /** With the policy gone, the strictest route applies: fail safe, never looser. */
 const FALLBACK_POLICY = { id: null, approval: "manager_and_owner", approvalMode: "sequential", approvalTimeoutDays: 5, onTimeout: "escalate", updatedAt: null } as const;
@@ -81,7 +82,12 @@ function toStep(r: Record<string, unknown>): ApprovalStep {
 type RequestRow = Record<string, unknown> & { id: string; tenant_id: string; status: string; requested_by: string; subject_identity_id: string | null };
 type PolicyTerms = { id: string | null; approval: RequestPolicy["approval"]; approvalMode: RequestPolicy["approvalMode"]; approvalTimeoutDays: number; onTimeout: RequestPolicy["onTimeout"]; updatedAt: string | null };
 
-async function loadPolicyTerms(tenantId: string, policyId: string | null): Promise<PolicyTerms> {
+async function loadPolicyTerms(tenantId: string, policyId: string | null, packageId?: string | null): Promise<PolicyTerms> {
+  // ACCESS-P0-20: a package request follows the package's own policy.
+  if (packageId) {
+    const { terms } = await loadPackageForApproval(tenantId, packageId);
+    return { id: null, ...terms };
+  }
   if (!policyId) return FALLBACK_POLICY;
   const { data, error } = await supabaseServiceRole()
     .from("access_request_policies")
@@ -103,6 +109,10 @@ async function loadPolicyTerms(tenantId: string, policyId: string | null): Promi
 
 /** What the request is now: resource, privilege and risk, read fresh. */
 async function loadSubjectMatter(tenantId: string, req: RequestRow) {
+  if (req.access_package_id) {
+    const pkg = await loadPackageForApproval(tenantId, req.access_package_id as string);
+    return { risk: pkg.risk, privilegeLevel: null, entitlementOwnerId: null, applicationOwnerId: null, packageOwnerId: pkg.ownerIdentityId, packageDigest: pkg.digest };
+  }
   const admin = supabaseServiceRole();
   const [app, ent] = await Promise.all([
     admin.from("applications").select("id, risk_level, data_classification, business_owner_identity_id").eq("tenant_id", tenantId).eq("id", req.application_id as string).maybeSingle(),
@@ -124,20 +134,24 @@ async function loadSubjectMatter(tenantId: string, req: RequestRow) {
     privilegeLevel: (ent.data?.privilege_level as string | null) ?? null,
     entitlementOwnerId: (ent.data?.owner_identity_id as string | null) ?? null,
     applicationOwnerId: (app.data.business_owner_identity_id as string | null) ?? null,
+    packageOwnerId: null as string | null,
+    packageDigest: null as string | null,
   };
 }
 
-function fingerprintOf(tenantId: string, req: RequestRow, privilegeLevel: string | null, policyId: string | null): string {
+function fingerprintOf(tenantId: string, req: RequestRow, matter: { privilegeLevel: string | null; packageDigest: string | null }, policyId: string | null): string {
   return actionFingerprint({
     tenantId,
     requestId: req.id,
     subjectIdentityId: req.subject_identity_id as string,
-    applicationId: req.application_id as string,
+    applicationId: (req.application_id as string | null) ?? null,
     entitlementId: (req.entitlement_id as string | null) ?? null,
-    privilegeLevel,
+    privilegeLevel: matter.privilegeLevel,
     durationDays: (req.duration_days as number | null) ?? null,
     requestType: req.request_type as string,
     policyId,
+    packageId: (req.access_package_id as string | null) ?? null,
+    packageContents: matter.packageDigest,
   });
 }
 
@@ -166,15 +180,18 @@ async function readSteps(tenantId: string, requestId: string): Promise<ApprovalS
  */
 async function buildChain(tenantId: string, req: RequestRow, now: Date): Promise<{ steps: ApprovalStep[]; fingerprint: string; risk: string }> {
   const [terms, matter, subject] = await Promise.all([
-    loadPolicyTerms(tenantId, (req.request_policy_id as string | null) ?? null),
+    loadPolicyTerms(tenantId, (req.request_policy_id as string | null) ?? null, (req.access_package_id as string | null) ?? null),
     loadSubjectMatter(tenantId, req),
     getIdentity(tenantId, req.subject_identity_id as string),
   ]);
   if (!subject) throw new ApiError(409, "SUBJECT_GONE", "The person this request is for no longer exists");
-  const [manager, entitlementOwner, applicationOwner] = await Promise.all([
-    person(tenantId, subject.managerIdentityId),
+  // A non-human identity has no manager; its accountable owner stands in.
+  const managerId = subject.managerIdentityId ?? (subject.identityType !== "HUMAN" ? subject.ownerIdentityId : null);
+  const [manager, entitlementOwner, applicationOwner, packageOwner] = await Promise.all([
+    person(tenantId, managerId),
     person(tenantId, matter.entitlementOwnerId),
     person(tenantId, matter.applicationOwnerId),
+    person(tenantId, matter.packageOwnerId),
   ]);
   const plan = planApprovalChain({
     route: terms.approval,
@@ -183,10 +200,12 @@ async function buildChain(tenantId: string, req: RequestRow, now: Date): Promise
     manager,
     entitlementOwner,
     applicationOwner,
+    packageOwner,
+    isPackage: Boolean(req.access_package_id),
     requesterUserId: req.requested_by,
     subjectUserId: subject.userId,
   });
-  const fingerprint = fingerprintOf(tenantId, req, matter.privilegeLevel, terms.id);
+  const fingerprint = fingerprintOf(tenantId, req, matter, terms.id);
   const due = dueAt(now, terms.approvalTimeoutDays);
   const admin = supabaseServiceRole();
   const { error } = await admin.from("access_request_approvals").insert(
@@ -246,8 +265,11 @@ async function currentChain(tenantId: string, actorId: string, req: RequestRow):
   const live = (await readSteps(tenantId, req.id)).filter((s) => LIVE.includes(s.status));
   if (!live.length) return (await buildChain(tenantId, req, new Date())).steps;
 
-  const [terms, matter] = await Promise.all([loadPolicyTerms(tenantId, (req.request_policy_id as string | null) ?? null), loadSubjectMatter(tenantId, req)]);
-  const now = fingerprintOf(tenantId, req, matter.privilegeLevel, terms.id);
+  const [terms, matter] = await Promise.all([
+    loadPolicyTerms(tenantId, (req.request_policy_id as string | null) ?? null, (req.access_package_id as string | null) ?? null),
+    loadSubjectMatter(tenantId, req),
+  ]);
+  const now = fingerprintOf(tenantId, req, matter, terms.id);
   if (live.every((s) => s.actionFingerprint === now)) return live;
 
   const { data: invalidated, error } = await supabaseServiceRole()
@@ -373,8 +395,9 @@ export async function decideApprovalStep(
       approverKind: step.approverKind,
       actionFingerprint: decidedStep.actionFingerprint,
       subjectIdentityId: row.subject_identity_id,
-      applicationId: row.application_id,
+      applicationId: row.application_id ?? null,
       entitlementId: row.entitlement_id ?? null,
+      packageId: row.access_package_id ?? null,
       durationDays: row.duration_days ?? null,
       policyId: row.request_policy_id ?? null,
       policyVersion: decided.policy_version ?? null,
@@ -398,11 +421,20 @@ export async function decideApprovalStep(
         objectType: "access_request",
         objectId: requestId,
         outcome: "success",
-        metadata: { subjectIdentityId: row.subject_identity_id, actionFingerprint: decidedStep.actionFingerprint, stages: Math.max(...after.map((s) => s.stage)) },
+        metadata: { subjectIdentityId: row.subject_identity_id, packageId: row.access_package_id ?? null, actionFingerprint: decidedStep.actionFingerprint, stages: Math.max(...after.map((s) => s.stage)) },
       });
+      // ACCESS-P0-20: an approved package request becomes its assignment.
+      // If that fails, the request stays approved and the failure is audited.
+      if (next.state === "approved" && row.access_package_id) {
+        try {
+          await assignApprovedPackageRequest(tenantId, actor.userId, requestId);
+        } catch (err) {
+          await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: "access.package_assigned", objectType: "access_package", objectId: row.access_package_id as string, outcome: "failure", metadata: { requestId, error: err instanceof ApiError ? err.code : "UNEXPECTED" } });
+        }
+      }
     }
   } else if (next.state === "open" && next.stage > outcome.stage) {
-    const terms = await loadPolicyTerms(tenantId, (row.request_policy_id as string | null) ?? null);
+    const terms = await loadPolicyTerms(tenantId, (row.request_policy_id as string | null) ?? null, (row.access_package_id as string | null) ?? null);
     await openStage(tenantId, requestId, next.stage, terms.approvalTimeoutDays, now);
   }
   const { data: fresh } = await admin.from("access_requests").select().eq("tenant_id", tenantId).eq("id", requestId).single();
@@ -419,7 +451,7 @@ export async function sweepApprovalTimeouts(tenantId: string | null, now = new D
   const admin = supabaseServiceRole();
   let query = admin
     .from("access_request_approvals")
-    .select("id, tenant_id, request_id, stage, approver_kind, escalated_at, access_requests(request_policy_id, status, subject_identity_id)")
+    .select("id, tenant_id, request_id, stage, approver_kind, escalated_at, access_requests(request_policy_id, access_package_id, status, subject_identity_id)")
     .eq("status", "pending")
     .lt("due_at", now.toISOString())
     .order("due_at")
@@ -431,9 +463,9 @@ export async function sweepApprovalTimeouts(tenantId: string | null, now = new D
   let expired = 0;
   for (const s of data ?? []) {
     const stepTenant = s.tenant_id as string;
-    const req = s.access_requests as unknown as { request_policy_id: string | null; status: string; subject_identity_id: string | null } | null;
+    const req = s.access_requests as unknown as { request_policy_id: string | null; access_package_id: string | null; status: string; subject_identity_id: string | null } | null;
     if (!req || req.status !== "pending") continue;
-    const terms = await loadPolicyTerms(stepTenant, req.request_policy_id);
+    const terms = await loadPolicyTerms(stepTenant, req.request_policy_id, req.access_package_id);
     const action = timeoutAction({ approverKind: s.approver_kind as ApproverKind, escalatedAt: (s.escalated_at as string | null) ?? null }, terms.onTimeout);
     if (action === "escalate") {
       const { data: done } = await admin
@@ -468,11 +500,11 @@ export async function sweepApprovalTimeouts(tenantId: string | null, now = new D
 export type ApprovalView = ApprovalStep & { approverName: string | null; decidedByName: string | null };
 
 /** A request with its approval chain (all steps, including invalidated ones, for the record). */
-export async function getRequestWithApprovals(tenantId: string, requestId: string): Promise<{ request: AccessRequest; steps: ApprovalView[]; subjectName: string | null; applicationName: string | null; entitlementName: string | null } | null> {
+export async function getRequestWithApprovals(tenantId: string, requestId: string): Promise<{ request: AccessRequest; steps: ApprovalView[]; subjectName: string | null; applicationName: string | null; entitlementName: string | null; packageName: string | null } | null> {
   if (!UUID_RE.test(requestId)) return null;
   const supabase = await supabaseServer();
   const [{ data: req, error }, { data: rows, error: stepError }] = await Promise.all([
-    supabase.from("access_requests").select("*, applications(name, display_name), entitlements(name)").eq("tenant_id", tenantId).eq("id", requestId).maybeSingle(),
+    supabase.from("access_requests").select("*, applications(name, display_name), entitlements(name), access_packages(name)").eq("tenant_id", tenantId).eq("id", requestId).maybeSingle(),
     supabase.from("access_request_approvals").select().eq("tenant_id", tenantId).eq("request_id", requestId).order("created_at").order("stage"),
   ]);
   if (error || stepError) throw new ApiError(500, "QUERY_FAILED", (error ?? stepError)!.message);
@@ -492,6 +524,7 @@ export async function getRequestWithApprovals(tenantId: string, requestId: strin
     subjectName: req.subject_identity_id ? (names.get(req.subject_identity_id)?.displayName ?? null) : null,
     applicationName: app ? (app.display_name ?? app.name) : null,
     entitlementName: (req.entitlements as { name: string } | null)?.name ?? null,
+    packageName: (req.access_packages as { name: string } | null)?.name ?? null,
   };
 }
 

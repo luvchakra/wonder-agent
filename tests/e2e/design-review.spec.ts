@@ -56,6 +56,9 @@ const ROUTES = [
   // Request catalog and request policies (ACCESS-P0-18).
   "/access/catalog",
   "/access/request-policies",
+  // Access packages (ACCESS-P0-20).
+  "/access/packages",
+  "/access/packages/new",
 ];
 
 /** The widths §32 names, plus the two the shell switches layout at. */

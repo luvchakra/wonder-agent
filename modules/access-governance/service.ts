@@ -110,3 +110,26 @@ export {
   type ApproverActor,
 } from "./approvals";
 export type { ApproverKind, StepStatus } from "./approvalRules";
+export {
+  listPackages,
+  getPackage,
+  createPackage,
+  updatePackage,
+  addPackageResource,
+  removePackageResource,
+  requestPackage,
+  assignPackageDirect,
+  listAssignments,
+  getAssignment,
+  setAssignmentItemStatus,
+  revokeAssignment,
+  sweepPackageExpiry,
+  listLiveApplications,
+  type AccessPackage,
+  type PackageDetail,
+  type PackageListItem,
+  type PackageResource,
+  type PackageAssignment,
+  type AssignmentItem,
+} from "./packages";
+export { checkEligibility as checkPackageEligibility, PACKAGE_IDENTITY_TYPES, CERTIFICATION_FREQUENCIES } from "./packageRules";

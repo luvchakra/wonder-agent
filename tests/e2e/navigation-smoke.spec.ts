@@ -19,6 +19,7 @@ const ROUTES = [
   { path: "/access/accounts", heading: "Accounts" },
   { path: "/access/catalog", heading: "Request access" },
   { path: "/access/request-policies", heading: "Request policies" },
+  { path: "/access/packages", heading: "Access packages" },
   { path: "/policies", heading: "Policies" },
   { path: "/runtime", heading: "Runtime activity" },
   { path: "/risk", heading: "Risks & alerts" },

@@ -10,7 +10,7 @@
       "schedule": "0 7 * * *"
     },
     {
-      "path": "/api/cron/access-request-approvals",
+      "path": "/api/cron/access-governance",
       "schedule": "0 5 * * *"
     }
   ]

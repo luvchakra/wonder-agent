@@ -32,6 +32,7 @@ const KIND: Record<string, string> = {
   manager: "Manager",
   entitlement_owner: "Entitlement owner",
   application_owner: "Application owner",
+  package_owner: "Package owner",
   access_managers: "Any access manager",
 };
 const RISK_TONE: Record<string, BadgeTone> = { low: "neutral", medium: "info", high: "warning", critical: "danger" };
@@ -123,8 +124,8 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">
-            {found.applicationName ?? "Application"}
-            <span className="text-muted-foreground"> · {found.entitlementName ?? "Application access"}</span>
+            {found.packageName ?? found.applicationName ?? "Application"}
+            <span className="text-muted-foreground"> · {r.accessPackageId ? "access package" : (found.entitlementName ?? "Application access")}</span>
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             For{" "}

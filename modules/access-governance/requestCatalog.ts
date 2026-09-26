@@ -344,7 +344,7 @@ export async function cancelAccessRequest(tenantId: string, actorUserId: string,
   return toAccessRequest(data);
 }
 
-export type RequestRow = AccessRequest & { subjectName: string | null; applicationName: string | null; entitlementName: string | null };
+export type RequestRow = AccessRequest & { subjectName: string | null; applicationName: string | null; entitlementName: string | null; packageName: string | null };
 
 /** Requests, newest first, paged at the database: everyone's, or the actor's own. */
 export async function listRequests(
@@ -361,7 +361,7 @@ export async function listRequests(
   const pageSize = Math.min(Math.max(filter.pageSize ?? 50, 1), 200);
   const page = Math.max(filter.page ?? 1, 1);
   const supabase = await supabaseServer();
-  let query = supabase.from("access_requests").select("*, applications(name, display_name), entitlements(name)", { count: "exact" }).eq("tenant_id", tenantId);
+  let query = supabase.from("access_requests").select("*, applications(name, display_name), entitlements(name), access_packages(name)", { count: "exact" }).eq("tenant_id", tenantId);
   if (filter.mineUserId) query = query.eq("requested_by", filter.mineUserId);
   if (filter.status) query = query.eq("status", filter.status);
   if (filter.awaiting) {
@@ -381,6 +381,7 @@ export async function listRequests(
       subjectName: r.subject_identity_id ? (names.get(r.subject_identity_id)?.displayName ?? null) : null,
       applicationName: (r.applications as { name: string; display_name: string | null } | null)?.display_name ?? (r.applications as { name: string } | null)?.name ?? null,
       entitlementName: (r.entitlements as { name: string } | null)?.name ?? null,
+      packageName: (r.access_packages as { name: string } | null)?.name ?? null,
     })),
     total: count ?? 0,
   };

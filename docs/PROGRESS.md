@@ -14,19 +14,19 @@ Generated 2026-09-26 from 11 module backlogs.
 
 ## Overall
 
-**178 of 226 tracked stories complete — 79%**
+**179 of 235 tracked stories complete — 76%**
 
 ```
-████████████████████████████████░░░░░░░░  79%
+██████████████████████████████░░░░░░░░░░  76%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 178 |
+| Done | 179 |
 | Partial | 25 |
 | Deferred | 1 |
-| Not Started | 22 |
-| **Total tracked** | **226** |
+| Not Started | 30 |
+| **Total tracked** | **235** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -38,15 +38,15 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 3 | 34 | `███████████████░░░` 85% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 29 | 2 | 0 | 9 | 40 | `█████████████░░░░░` 73% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 16 | 3 | 0 | 1 | 20 | `██████████████░░░░` 80% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 20 | 0 | 0 | 6 | 26 | `██████████████░░░░` 77% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
-| 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 1 | 14 | `█████████████████░` 93% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 21 | 2 | 0 | 3 | 26 | `███████████████░░░` 81% |
-| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 1 | 15 | `██████████████░░░░` 80% |
+| 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 13 | 0 | 0 | 2 | 15 | `████████████████░░` 87% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 21 | 2 | 0 | 4 | 27 | `██████████████░░░░` 78% |
+| 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 12 | 1 | 1 | 2 | 16 | `██████████████░░░░` 75% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 3 | 28 | `████████░░░░░░░░░░` 46% |
 
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 29 done · 2 partial · 0 deferred · 3 not started (34 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 29 done · 2 partial · 0 deferred · 9 not started (40 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -93,9 +93,15 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-16 | `lib/ai/` — shared, read-only, advisory-only LLM summarization primitive | Done — 2026-09-16: the provider/credential decision this row was waiting on resolved via `PLATFORM-P0-05.2` (OpenAI, platform-wide + per-tenant BYOK). `summarize(tenantId, request)` now calls Platform's published `resolveAiProviderKey()` and makes a real OpenAI chat-completions call via `fetch()`; still throws `AiNotConfiguredError` when no key resolves, never a fake/empty summary. No DB client import in this file itself (boundary still enforced by the file's own shape) — see Platform Agent's audit log for the full implementation detail (this file's change is a small, expected consequence of that story, not new Foundation-owned scope) |
 | FOUNDATION-P0-17 | Agent API keys — machine credential for the Runtime Gateway (master P0-27) | Done — 2026-09-25: migration `0061` applied live; `lib/security/agentApiKeys.ts` (hash-only storage, tenant+agent-bound verify, fail-closed), API routes, Agent 360 card; 16 unit + 9 live SQL checks + 4 E2E; see audit log |
 | FOUNDATION-P0-18 | New permission keys (master P0-42) | Done — 2026-09-25: 7 keys seeded by least privilege in `0061`, `requireAnyPermission()` added; live-verified; see audit log |
-| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles | Not Started — 2026-09-26, WonderID |
-| FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-19 | WonderID permissioning: object, request, approval and admin scope; default roles — re-scoped 2026-09-26 (Phase 4b) as scoped assignments and the authorization engine | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-20 | Permission simulation and the Permissions (WonderID) screens — re-scoped 2026-09-26 (Phase 4b) as authorization explanation, effective permissions with provenance and access audit | Not Started — 2026-09-26, WonderID Phase 4b |
 | FOUNDATION-P0-21 | Passwordless: passkeys/WebAuthn enrollment, sign-in, policy, step-up, recovery | Not Started — 2026-09-26, WonderID |
+| FOUNDATION-P0-22 | Tenant identity, tenant URL and domain registry (TENANT-001/002/003) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-23 | Users and membership lifecycle; Users list and User detail (IAM-001) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-24 | Permission catalog with resource, action, module and administrative permissions (IAM-002) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-25 | System and custom roles; role designer and role details (IAM-003) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-26 | Groups and group role assignments (IAM-004) | Not Started — 2026-09-26, WonderID Phase 4b |
+| FOUNDATION-P0-27 | Tenant security profile, enforced (TENANT-004) | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ### 02 — Identity Agent
 
@@ -159,7 +165,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 20 done · 0 partial · 0 deferred · 6 not started (26 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 21 done · 0 partial · 0 deferred · 5 not started (26 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -183,7 +189,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Done — 2026-09-26, migration 0089 |
 | ACCESS-P0-18 | Self-service request catalog and request policies | Done — 2026-09-26, migration 0092 (packages with ACCESS-P0-20) |
 | ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Done — 2026-09-26, migration 0093 (named groups deferred) |
-| ACCESS-P0-20 | Access packages | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later) |
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
@@ -241,7 +247,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Certification, Controls & Compliance  
 **Backlog status:** DORMANT — do not start until the user says "Run Compliance Agent"  
-**Stories:** 13 done · 0 partial · 0 deferred · 1 not started (14 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 13 done · 0 partial · 0 deferred · 2 not started (15 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -259,12 +265,13 @@ and are deliberately excluded from the counts above.
 | COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
 | COMPLIANCE-P0-10 | Certification campaigns for every identity type | Not Started — 2026-09-26, WonderID |
+| COMPLIANCE-P0-11 | Access certification of WonderID users' role assignments | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ### 08 — Experience Agent
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 21 done · 2 partial · 0 deferred · 3 not started (26 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 21 done · 2 partial · 0 deferred · 4 not started (27 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -294,12 +301,13 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-18 | WonderID brand and dark navy navigation shell | Done — 2026-09-26: WonderID brand (SVG mark, live wordmark, icons); dark navy sidebar with accordion, collapsed icon rail with section and third-level flyouts, remembered collapse, mobile drawer; only implemented routes listed |
 | EXPERIENCE-P0-19 | WonderID Home and My Access self-service portal | Not Started — 2026-09-26, WonderID |
 | EXPERIENCE-P0-20 | WonderID AI assistant | Not Started — 2026-09-26, WonderID |
+| EXPERIENCE-P0-21 | Administration navigation and persistent tenant context | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ### 09 — Platform Agent
 
 **Module:** Vendor Platform Administration  
 **Backlog status:** DORMANT — do not start until the user says "Run Platform Agent"  
-**Stories:** 12 done · 1 partial · 1 deferred · 1 not started (15 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 12 done · 1 partial · 1 deferred · 2 not started (16 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -318,6 +326,7 @@ and are deliberately excluded from the counts above.
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 | PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Partial — 2026-09-25: 13 master rollout flags seeded (`0065`, safe-rollout defaults); flags now enforced at the gateway (`runtime_observe`/`runtime_enforce`/`tool_filtering` — ENFORCE really enforces, per tenant) and at runtime ingestion, remediation, connector creation and certification launch; batched `getFeatureFlags()`. Remaining: `ai_assistant` (defaults OFF while AI summaries are live — needs a platform decision before enforcing) and the not-yet-built features' flags; see audit log |
 | PLATFORM-P0-13 | Configuration Studio | Not Started — 2026-09-26, WonderID |
+| PLATFORM-P0-14 | Tenant list with tenant URLs and the create-tenant wizard | Not Started — 2026-09-26, WonderID Phase 4b |
 
 ### 10 — Operations Agent
 

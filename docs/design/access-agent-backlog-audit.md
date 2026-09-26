@@ -1813,3 +1813,173 @@ and invariant S4).** Committed together with ACCESS-P0-18.
 - escalation to the approver's manager (it goes to access managers);
 - a live chain preview on the request form (the preview is textual; the
   exact chain is on the request once submitted).
+
+## 2026-09-26 — ACCESS-P0-20 (Done): access packages
+
+**Built (WonderID Phase 4, spec §12).**
+
+- **Migration 0094** (applied to the dev project):
+  - `access_packages`:
+    - name and description, an owner (an identity), and status (draft,
+      active or retired);
+    - discoverability: `requestable`, eligible identity types (people,
+      external, machine, AI agents), and eligible departments (empty
+      means all);
+    - the approval route, mode, timeout and on-timeout action, the same
+      terms as request policies;
+    - the longest and default duration, extension allowed, and
+      certification frequency.
+  - `access_package_resources`: a live application's access, or one of
+    its entitlements (unique per package).
+  - `access_requests`:
+    - `application_id` is nullable; the new `access_package_id` column
+      holds a package instead;
+    - a check requires exactly one of the two;
+    - a partial unique index allows one waiting request per identity and
+      package.
+  - `access_package_assignments`:
+    - who holds a package, where from (a request or a direct assignment),
+      until when, and its state;
+    - one live assignment per identity and package, and one assignment
+      per request;
+    - an ended assignment records when, by whom and why.
+  - `access_package_assignment_items`: one work item per included
+    resource.
+  - `access_request_approvals` can ask the `package_owner`.
+  - Every new table has same-tenant keys and RLS read-only for members;
+    the service writes.
+- **`packageRules.ts`** (pure; 9 unit tests):
+  - eligibility, with every reason it fails (exact department match, the
+    same comparison the catalog query makes, so paging and the
+    explanation agree);
+  - package risk (the worst included);
+  - assignment state from its items: a failure shows as partially failed;
+    all fulfilled is active; an end state is kept;
+  - what ending does to each item: fulfilled becomes revoke-pending, the
+    rest revoked;
+  - the expiry (never past the maximum);
+  - input validation;
+  - the contents digest.
+- **`packages.ts`:**
+  - list: browse what the caller may discover, filtered in the query, or
+    manage all;
+  - detail, create, update, add and remove content, activate and retire.
+    A package goes live only with contents on live applications and an
+    owner;
+  - request (for oneself; for others by their manager, a non-human's
+    owner, or an access manager): an identical waiting request is
+    returned; a package already held is refused (`ALREADY_ASSIGNED`); the
+    approval chain follows;
+  - `assignApprovedPackageRequest` is called by the approval engine on
+    the final approval;
+  - direct assignment by an access manager, to AI agents too, with a
+    justification and eligibility enforced;
+  - item outcomes (pending → fulfilled/failed, failed → fulfilled/pending,
+    revoke-pending → revoked; a failure needs a detail), with the
+    assignment state recomputed;
+  - revocation (fulfilled items become revocation work);
+  - expiry sweep;
+  - all writes are service role, tenant-filtered, conditional and
+    audited.
+- **Approval engine (ACCESS-P0-19) extended:**
+  - a package request follows the package's own terms, and "the owner" is
+    the package owner;
+  - the package id and contents digest are appended to the action
+    fingerprint, only for package requests, so every earlier fingerprint
+    is unchanged. Changing what a package includes invalidates waiting
+    approvals;
+  - a non-human's accountable owner stands in for a manager;
+  - the final approval creates the assignment. If that fails, the failure
+    is audited and the request stays approved.
+- **APIs:**
+  - `/api/v1/access/packages`: GET browse or `?view=manage`; POST create.
+  - `/packages/[id]`: GET, PATCH. Outside access managers, only an
+    active, requestable package the caller is eligible for is visible;
+    otherwise 404.
+  - `/packages/[id]/resources[/rid]`: add, remove.
+  - `/packages/[id]/requests`: request.
+  - `/packages/[id]/assignments`: list, direct assign.
+  - `/package-assignments/[id]`: GET; `/revoke`.
+  - `/package-assignment-items/[id]`: `access.approve`.
+  - Holders are visible to access managers, fulfillers and the package
+    owner; anyone else sees only their own.
+- **Cron:** the approvals cron route, not yet used by any deploy, was
+  renamed to `/api/cron/access-governance`. It sweeps approval timeouts
+  and package expiry daily (`vercel.json`).
+- **Screens:**
+  - `/access/packages`: available to you, or manage (with status filter),
+    as cards with contents, risk, approval and duration;
+  - `/access/packages/new`;
+  - `/access/packages/[id]`:
+    - what it includes, with risk;
+    - request panel: your eligibility and why, the approval preview, the
+      expiry preview, the form, and "you hold this package";
+    - manage: policy form, status, add content, assign directly;
+    - assignments, with item outcomes and revoke.
+  - Request lists and details show the package name.
+  - Sidebar: Access Governance → Access Packages. Both new screens are
+    in the design-review and navigation sweeps.
+
+**Verified.**
+
+- `tsc`, `eslint`: clean. Vitest: 688/688 (90 files); `packageRules` 9
+  and `approvalRules` 10.
+- **SQL `tests/access/access-packages-isolation.sql`** against the dev
+  project. Every expectation held, and the fixtures were deleted
+  afterwards:
+  - cross-tenant application, package, owner, request, assignment or item
+    references are 23503;
+  - a request naming both or neither is 23514;
+  - a duplicate waiting request or live assignment is 23505;
+  - a direct assignment carrying a request, or ending without a time, is
+    23514;
+  - a member sees own rows 1/1/1/1 and 0 of another tenant's; direct
+    writes are 0 rows or 42501.
+- **E2E `access-packages.spec.ts`: 15/15 with setup.** It covers:
+  - activation refused while empty (`PACKAGE_EMPTY`), with a non-live
+    application (`APPLICATION_NOT_LIVE`) and without an owner;
+  - policy-controlled discovery: of three packages the requester sees
+    one; the Finance-only and agent-only ones are 404 and 403;
+  - a request: a short justification and too long a duration are 400;
+    risk high, 30 days; a duplicate is returned;
+  - the chain: manager, then package owner (read-only role); the
+    assignment then has two pending items; the package cannot be
+    requested again;
+  - holder visibility: own, and the owner sees them; not others';
+  - a failed item makes the assignment partially failed; fixing it makes
+    it active; read-only cannot record outcomes;
+  - removing content invalidates a waiting approval;
+  - direct assignment to an AI agent (read-only 403, an ineligible
+    person `NOT_ELIGIBLE`);
+  - an end date in the past means expired, with revocation work, then
+    removed;
+  - revoking the requester's assignment turns both items into removal
+    work;
+  - the screens;
+  - another organization gets 404 or an empty list everywhere.
+- `approval-engine`, `request-catalog` and `navigation-smoke` re-run:
+  58/58.
+- **Full Playwright suite** (§17.8: migration, the approval engine,
+  navigation): **292 passed, 1 failed, 6 did not run** (20.3 minutes).
+  - The failure was the approval-engine spec's first serial step, which
+    timed out at the default 30 s during a slow run. The remaining steps
+    of that serial group were skipped as a consequence.
+  - That spec, like `access-packages.spec`, now allows 90 s per step. The
+    step makes many sequential live calls; nothing in the product
+    changed.
+  - Re-run alone on the same build: **15/15**. Every spec in the suite
+    therefore passed on this build.
+- **Screenshots:** browse (light), manage (dark), detail (light 1440 and
+  dark 390), new package.
+  - Fix from them: every member could see every holder of a package.
+    Holders are now limited as above.
+
+**Left out:**
+
+- provisioning into target systems: INTEGRATION-P0-13 takes over the work
+  items;
+- extension requests;
+- package certification campaigns (the Compliance module);
+- recommended packages, and packages containing roles (ACCESS-P0-21
+  roles);
+- birthright auto-assignment (with IDENTITY-P0-18's lifecycle).

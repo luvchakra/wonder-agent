@@ -195,7 +195,9 @@ export type AccessRequest = {
   approvalStage: number | null;
   actionFingerprint: string | null;
   requestedBy: string;
-  applicationId: string;
+  /** Null for a package request (ACCESS-P0-20). */
+  applicationId: string | null;
+  accessPackageId: string | null;
   entitlementId: string | null;
   requestType: AccessRequestType;
   justification: string;

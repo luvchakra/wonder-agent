@@ -82,7 +82,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     href: "/access/requests",
     icon: "KeyRound",
     match: ["/access/agents"],
-    children: [link("Request Access", "/access/catalog"), link("Access Requests", "/access/requests"), link("Request Policies", "/access/request-policies")],
+    children: [link("Request Access", "/access/catalog"), link("Access Packages", "/access/packages"), link("Access Requests", "/access/requests"), link("Request Policies", "/access/request-policies")],
   },
   {
     label: "Certifications",
