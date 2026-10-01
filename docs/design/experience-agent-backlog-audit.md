@@ -3040,3 +3040,65 @@ and IT security on the landing page.
 - The new app screens (billing, privacy, my-privacy, audit integrity) reuse
   `modules/ui` primitives. They were not screenshotted with a signed-in session
   in this sandbox; the §32 review at seven widths is open for those screens.
+
+---
+
+## 2026-10-01 — Landing page repositioned as IGA for human and non-human identities
+
+User request: say the product is IGA for human and non-human identities,
+describe all its main features, and highlight the security, privacy and
+compliance built into the product.
+
+- **Hero.** The label now reads "Identity Governance & Administration". The
+  lede says WonderID is IGA for human and non-human identities. Two chip rows
+  were added: the four identity types (workforce and external are human;
+  machine and AI agents are non-human) and the compliance frameworks.
+- **New `#identities` section.** Four identity-type cards (workforce, external,
+  machine, AI agents), each saying what WonderID governs for that type, plus a
+  strip showing one lifecycle for every type (discover through offboard).
+- **Problem section.** Broadened from agents only to every identity type: an
+  unowned service account, a leaver contractor whose accounts stayed open, and
+  an agent at night.
+- **SHOULD/CAN/DID section.** Now labelled "Beyond classic IGA", framed as what
+  non-human identities need on top of classic IGA. The heading the E2E suite
+  asserts is unchanged.
+- **`#platform` section.** Replaced by nine feature groups, each with concrete
+  points: identity lifecycle, applications & accounts, access requests,
+  effective access, certification, policy & administration, risk & detection,
+  runtime assurance, insights & operations.
+- **New `#security` section, "Security is the architecture".** Nine controls:
+  RLS tenant isolation, rules not AI, human approval with database-enforced
+  four-eyes, the hash-chained audit trail, SSO/MFA/sessions, AES-256-GCM
+  secrets, read-only connectors, runtime containment, and a hardened
+  web/supply chain.
+- **`#trust` section, now "Privacy & compliance".**
+  - The cards are privacy (GDPR/DPDP), financial compliance (SOX), security &
+    AI governance (ISO 27001, SOC 2, ISO 42001, NIST AI RMF, NIST CSF) and
+    payments.
+  - A list of the 16 included control libraries was added.
+  - An explicit disclaimer says mappings are evidence, not certification
+    (CLAUDE.md §10 item 10).
+- **Other copy.**
+  - The header nav is now Identities · Platform · Security · Compliance · How
+    it works · Help. "Log in" no longer wraps.
+  - "What's new" is trimmed to six items.
+  - The metadata and footer tagline were updated.
+- **Accuracy.** Every claim was checked against shipped code, the sidebar
+  routes, the Get Help content and the seeded `control_frameworks` (0105 and
+  earlier). No feature that does not exist is advertised.
+
+**Verification.**
+- `tsc --noEmit` reports 0 errors, eslint is clean, and `next build` passes.
+- The built server was driven in Chromium at 1440, 1280, 1024, 768, 390 and
+  320 px, light and dark: horizontal overflow was 0 at every width.
+- The first pass overflowed by 19 px at 1024 px (the header nav). It was fixed
+  by shortening "Privacy & compliance" to "Compliance" in the nav and adding
+  `whitespace-nowrap` to "Log in", then re-checked.
+- Screenshots of the hero, identities, platform, security and trust sections
+  were reviewed in both themes.
+- A scripted check covered what `welcome.spec.ts` asserts: the h1 "Govern every
+  identity", the "Close the gap…" heading, and "Get started" → /sign-up and
+  "Sign in" → /sign-in. It also found no duplicate ids and no empty headings,
+  and the server log had no errors.
+- The full Playwright suite was not re-run: the change is copy and layout on
+  the public page only, with no shared infrastructure touched (§17.8 list).
