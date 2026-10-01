@@ -782,3 +782,71 @@ and guarded on the old title. It was **not** written to
 `platform_audit_logs`: that table requires a human `actor_id`, and attributing
 the change to the administrator would record an action they did not take.
 This entry is its record.
+
+---
+
+## 2026-10-01 — PLATFORM-P1-04 Billing: Stripe and Razorpay (brought forward by explicit user request)
+
+**Finding.** No billing existed. `subscriptions` was assigned by hand in the
+console, with no payment, invoice or provider link.
+
+**Built.**
+- `0102_platform_billing.sql`:
+  - `subscriptions` gains the provider link and adds statuses
+    trialing/incomplete/paused.
+  - New tables: `billing_prices` (12 seeded list prices for pro/max ×
+    month/year × USD/EUR/INR; INR includes GST), `billing_profiles`,
+    `billing_checkouts`, `billing_invoices` (immutability trigger),
+    `billing_invoice_sequences` + `next_invoice_number()` (gapless
+    `WID/2026-27/000001`), `billing_webhook_events` and
+    `billing_adjustments` (four-eyes check constraint).
+  - New notification types `billing_alert` and `privacy_deadline`.
+- `modules/billing/`:
+  - `rules.ts`: provider routing (INR→Razorpay, else Stripe), status mapping,
+    GST CGST/SGST/IGST/export, GSTIN check character, EU/UK VAT format,
+    profile validation, Indian FY.
+  - `signatures.ts`: Stripe v1 with 5-minute tolerance; Razorpay webhook and
+    checkout signatures.
+  - `stripeClient.ts` and `razorpayClient.ts`: fetch, no SDK. The Stripe API
+    version is pinned to 2024-06-20, with idempotency keys.
+  - `http.ts`: timeout, one retry on idempotent calls only, redacted errors.
+  - `service.ts`: overview, profile, checkout, portal, cancel at period end,
+    resume (Stripe).
+  - `webhooks.ts`: intake persisted before processing, the tenant resolved only
+    from WonderID's own records, stale-event guard, invoice ledger, refunds,
+    billing alerts to `billing.manage` holders.
+  - `adjustments.ts`: maker-checker refunds, plan overrides and immediate
+    cancellation; price management.
+- Routes:
+  - `/api/v1/billing/*`, with webhooks at `/api/v1/billing/webhooks/{stripe,razorpay}`.
+  - `/api/platform/v1/billing/{adjustments,prices,events}`.
+- Screens:
+  - `/settings/billing`: plan, usage, plan picker, billing details, invoices.
+    It shows the truthful "payment submitted, the plan changes when the
+    provider confirms" state.
+  - `/platform-admin/billing`: adjustment queue, price catalogue, webhook log.
+    It is in the platform nav.
+
+**Decisions recorded.**
+- List prices are a business default, editable in the console.
+- An ended subscription drops to Free limits. Nothing is deleted.
+- Customer cancellation is always at period end. Immediate cancellation is a
+  four-eyes platform adjustment.
+- INR prices are tax-inclusive.
+
+**Verification.**
+- `rules.test.ts` and `signatures.test.ts`, 30+ cases: GST arithmetic sums
+  exactly, known-valid GSTINs (27AAPFU0939F1ZV, 29AAGCB7383J1Z4), tampered /
+  replayed / mis-signed webhooks rejected, form encoding.
+- Rolled-back live isolation test: invoices and profiles are invisible without
+  `billing.view` and invisible cross-tenant; client inserts and
+  `next_invoice_number()` are refused; an invoice amount change or delete is
+  refused; self-approval is refused.
+- On the built server, the unconfigured Stripe webhook answers 503.
+- typecheck, eslint, vitest 797/797, `next build` all pass.
+
+**Not done.** No real Stripe or Razorpay account or key is available here, so
+checkout, portal and webhooks were not exercised end to end against the
+providers. Setup steps are in `docs/security/SECURITY-CONTROLS.md` §1. A Stripe
+test-mode run plus a Razorpay test-mode subscription is the next verification
+step once keys are set.

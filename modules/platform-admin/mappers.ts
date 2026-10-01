@@ -29,6 +29,12 @@ export function toSubscription(row: any): Subscription {
     status: row.status,
     startedAt: row.started_at,
     renewedAt: row.renewed_at,
+    provider: row.provider ?? "manual",
+    priceId: row.price_id ?? null,
+    billingInterval: row.billing_interval ?? null,
+    currency: row.currency ?? null,
+    currentPeriodEnd: row.current_period_end ?? null,
+    cancelAtPeriodEnd: !!row.cancel_at_period_end,
   };
 }
 

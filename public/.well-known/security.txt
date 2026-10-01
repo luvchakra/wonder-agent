@@ -1,0 +1,8 @@
+# WonderID vulnerability disclosure (RFC 9116).
+# Please report suspected vulnerabilities privately; do not test against
+# other customers' data or degrade the service.
+Contact: mailto:security@wonderid.example
+Expires: 2027-10-01T00:00:00.000Z
+Preferred-Languages: en
+Policy: https://wonderid.example/help
+Canonical: https://wonderid.example/.well-known/security.txt

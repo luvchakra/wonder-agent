@@ -47,7 +47,13 @@ export type NotificationType =
   | "approval_required"
   // IDENTITY-P0-18: governed work opened for a person's joiner, mover,
   // leaver or rehire, sent to their manager. Not mandatory (a preference).
-  | "lifecycle_task";
+  | "lifecycle_task"
+  // PLATFORM-P1-04 (0102): payment failed, subscription past due/cancelled;
+  // sent to the tenant's billing administrators.
+  | "billing_alert"
+  // COMPLIANCE-P0-12 (0102): a privacy request or breach notification
+  // deadline is near or passed; sent to the tenant's privacy staff.
+  | "privacy_deadline";
 
 /**
  * Every P0 notification type is mandatory — never suppressible via
@@ -64,6 +70,8 @@ export const MANDATORY_NOTIFICATION_TYPES: NotificationType[] = [
   "lifecycle_expiry",
   "runtime_alert",
   "approval_required",
+  "billing_alert",
+  "privacy_deadline",
 ];
 
 export type Notification = {

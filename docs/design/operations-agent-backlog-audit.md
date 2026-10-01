@@ -815,3 +815,17 @@ the `NotificationType` contract, and it is not mandatory (a preference).
 The Identity module sends it to a person's manager when a joiner, mover,
 leaver or rehire opens work for them (`humanLifecycleService.ts`). It was
 applied live. Nothing else in this module changed.
+
+---
+
+## 2026-10-01 — Cross-module note: two notification types added (billing, privacy)
+
+Platform's migration `0102` widened `notifications_type_check` and
+`notification_preferences_type_check` additively with `billing_alert` and
+`privacy_deadline`. `NotificationType` and `MANDATORY_NOTIFICATION_TYPES` in
+`lib/shared/types/operations.ts` gained both; regulatory deadlines are not
+suppressible. They are produced by `modules/billing/webhooks.ts` and
+`modules/privacy/service.ts` through the existing `notify()` /
+`wasRecentlyNotified()`, addressed to permission holders, not broadcast.
+Nothing in Operations' own code changed. This was done under the user's
+explicit request. Recorded here per non-negotiable #14.

@@ -1030,3 +1030,72 @@ agent/parent references `(col, tenant_id)` foreign keys under their
 existing names. For a member of two organizations, RLS alone admitted
 both. The full list, tests and live SQL verification are in the QA audit
 log's QA-P0-17 entry.
+
+---
+
+## 2026-10-01 — COMPLIANCE-P0-12 Privacy programme (GDPR / UK GDPR / DPDP / CCPA) and COMPLIANCE-P0-13 financial and privacy frameworks
+
+Explicit user request. **Finding:** no rights-request, consent, retention or
+breach tooling existed, and the frameworks had no financial or privacy
+coverage.
+
+**Built.**
+- `0103_compliance_privacy.sql` creates eight tables, all tenant-scoped with
+  RLS. Staff reads need `privacy.view` via `has_tenant_permission()`; a member
+  sees their own consents and requests. There are no client writes.
+  - `privacy_settings`, `privacy_processing_activities`,
+    `privacy_consent_purposes`, `privacy_retention_policies`,
+    `privacy_legal_holds` and `privacy_breach_incidents`.
+  - `privacy_consent_records`: terms are immutable (trigger) and there is one
+    active grant per subject and purpose.
+  - `privacy_requests`: four-eyes check; extension and closed-state shape
+    checks.
+- `modules/privacy/rules.ts` (pure):
+  - Deadlines: GDPR one calendar month with clamping (max three); DPDP 90
+    days, no extension; CCPA 45+45.
+  - The request state machine.
+  - Breach obligations: GDPR authority within 72h unless the risk is unlikely,
+    individuals when high risk; DPDP Board without delay plus a report in 72h,
+    and every affected principal.
+  - A close refusal while notices are outstanding.
+  - Retention floors.
+- `modules/privacy/service.ts`:
+  - Settings, RoPA, consent purposes and ledger, self-service consent.
+  - Requests: self-service with the session as verification, staff-logged with
+    the clock running from receipt, and a guarded workflow.
+  - Exports, retention runner, legal holds, breach register.
+  - Deadline sweep, and `runPrivacyJobs()` for `/api/cron/privacy` (daily
+    04:30 UTC in vercel.json).
+- `modules/privacy/subjectData.ts`:
+  - `buildSubjectExport()`.
+  - `eraseSubject()`: membership removed through Foundation's
+    `changeUserStatus`; identities, consents and earlier requests
+    pseudonymised; notifications deleted; the global account pseudonymised and
+    banned only if no other tenant holds the person; the audit trail untouched,
+    and no personal data in the erasure audit event.
+  - Subject matching never uses a string-built `or()` filter and LIKE-escapes
+    emails.
+- Screens: `/settings/privacy` (six sections), request and breach detail
+  pages, `/my-privacy` (also in the account menu), and nav entries under
+  Governance & Policies.
+- `0105`: 10 frameworks and 55 controls, listed on `/audit/integrity`.
+
+**Verification.**
+- `rules.test.ts` 12/12.
+- Live rolled-back isolation proof `tests/compliance/billing-privacy-tenant-isolation.sql`
+  28/28:
+  - Without a role: own request only (1 of 2), own consent only, no breaches.
+  - With Auditor: all of them.
+  - Tenant B5's Auditor sees zero of Tenant A5's rows, and
+    `has_tenant_permission` returns false.
+  - Consent term change, erasure self-approval and a 90-day audit retention
+    are all rejected.
+- Full vitest 797/797, typecheck, eslint and `next build` all pass.
+
+**Not done.**
+- Erasure and export were not run end to end against a live member, because
+  no throwaway member exists in this sandbox. The guarded paths are unit- and
+  RLS-tested, but the service functions are not; an E2E spec is the follow-up
+  for the QA Agent.
+- Privacy notifications reuse Operations' `notify()` with the new
+  `privacy_deadline` type, recorded in the Operations log.

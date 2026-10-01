@@ -4,7 +4,11 @@ import {
   Activity,
   AppWindow,
   ArrowRight,
+  CreditCard,
   ClipboardCheck,
+  FileLock2,
+  Landmark,
+  LockKeyhole,
   Fingerprint,
   Inbox,
   KeyRound,
@@ -95,6 +99,21 @@ const CAPABILITIES = [
 
 const WHATS_NEW = [
   {
+    tag: "Billing",
+    title: "Pay with Stripe or Razorpay",
+    body: "Choose a plan, pay on the provider's secure page, and download GST-ready invoices. Cancel any time, effective at the end of the paid period.",
+  },
+  {
+    tag: "Privacy",
+    title: "GDPR and DPDP privacy centre",
+    body: "Rights requests on statutory deadlines, records of processing, consent, retention, legal holds and a breach register — plus My privacy for every member.",
+  },
+  {
+    tag: "Assurance",
+    title: "Tamper-evident audit trail",
+    body: "Audit entries are append-only and hash-chained; Audit Integrity proves nothing was altered, with financial control libraries for SOX, PCI DSS and more.",
+  },
+  {
     tag: "Authorization",
     title: "Scoped roles and explicit policies",
     body: "Limit a role to production, to chosen applications or agents, to a date range or to MFA sessions. Add deny or require-approval policies that override any role, with a break-glass exception.",
@@ -123,6 +142,57 @@ const WHATS_NEW = [
     tag: "Your organization",
     title: "Your own sign-in address and brand",
     body: "Each organization signs in at its own address, sees its own name at the door, and keeps its data isolated in the database — never just in the application.",
+  },
+] as const;
+
+const TRUST = [
+  {
+    icon: CreditCard,
+    tag: "Payments",
+    title: "Stripe and Razorpay billing",
+    body: "Upgrade, renew and cancel in-product. Cards, UPI and net banking are entered only on Stripe's or Razorpay's hosted pages, so WonderID never touches payment data (PCI DSS SAQ-A).",
+    points: [
+      "INR through Razorpay with RBI e-mandates; USD and EUR through Stripe",
+      "Signed, replay-protected and idempotent webhooks",
+      "GST-ready invoices: GSTIN validation, CGST/SGST or IGST, consecutive numbering",
+      "Refunds and plan overrides need a second approver",
+    ],
+  },
+  {
+    icon: FileLock2,
+    tag: "Privacy",
+    title: "GDPR and India DPDP built in",
+    body: "Run data-subject and data-principal rights on their statutory clocks, keep records of processing, and prove consent — for every person whose identity data you govern.",
+    points: [
+      "Access, correction, erasure, grievance and nomination requests with legal deadlines",
+      "One-click data export and consent withdrawal for every member",
+      "Breach register with the 72-hour GDPR and DPDP Board clocks",
+      "Retention schedules, legal holds and four-eyes erasure",
+    ],
+  },
+  {
+    icon: Landmark,
+    tag: "Financial compliance",
+    title: "SOX-ready evidence",
+    body: "Access reviews, separation of duties and approvals become evidence your auditors can rely on — kept in an audit trail nobody can quietly edit.",
+    points: [
+      "Tamper-evident audit trail: append-only and SHA-256 hash-chained",
+      "Control libraries for SOX ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF and CERT-In",
+      "Maker-checker on access and on financial adjustments",
+      "Seven-year audit retention on Enterprise",
+    ],
+  },
+  {
+    icon: LockKeyhole,
+    tag: "Security",
+    title: "Security by default",
+    body: "Every organization's data is isolated in the database itself, and every deterministic decision stays out of an AI model's hands.",
+    points: [
+      "Row-level tenant isolation, MFA, SSO and session expiry",
+      "HSTS, strict content security policy and cross-site request blocking",
+      "AES-256-GCM secrets with key rotation; secrets redacted from logs",
+      "Automated dependency and secret scanning on every change",
+    ],
   },
 ] as const;
 
@@ -206,6 +276,14 @@ export default function WelcomePage() {
           <p className="mt-6 text-sm text-muted-foreground">
             Read-only to start. Your IAM stays the system of record.
           </p>
+
+          <ul aria-label="Compliance highlights" className="mx-auto mt-6 flex max-w-3xl flex-wrap justify-center gap-2">
+            {["Stripe & Razorpay", "GDPR", "India DPDP", "SOX ITGC", "PCI DSS SAQ-A", "Tamper-evident audit"].map((label) => (
+              <li key={label} className="rounded-full border border-border bg-card px-3 py-1 font-mono text-[11px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                {label}
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -476,6 +554,46 @@ export default function WelcomePage() {
                 </span>
                 <h3 className="mt-4 text-base font-semibold text-foreground">{title}</h3>
                 <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ------------------------------------------------- trust & compliance */}
+      <section id="trust" className="border-b border-border bg-card/40">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="max-w-2xl">
+            <SectionLabel>Trust &amp; compliance</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+              Built for regulated enterprises.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Payments, privacy law, financial controls and security engineering are part of the
+              product, not an add-on. WonderID gives you the controls and the evidence; your
+              auditors and regulators decide compliance.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-4 md:grid-cols-2">
+            {TRUST.map(({ icon: Icon, tag, title, body, points }) => (
+              <div key={title} className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-[var(--shadow-sm)]">
+                <div className="flex items-center gap-3">
+                  <span className="inline-flex size-9 items-center justify-center rounded-lg bg-accent text-accent-foreground">
+                    <Icon className="size-[18px]" aria-hidden="true" />
+                  </span>
+                  <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">{tag}</p>
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-foreground">{title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{body}</p>
+                <ul className="mt-4 space-y-2">
+                  {points.map((point) => (
+                    <li key={point} className="flex gap-2 text-sm text-foreground">
+                      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
+                      <span>{point}</span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             ))}
           </div>

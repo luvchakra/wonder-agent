@@ -3010,3 +3010,33 @@ out of WonderID", and covered none of the features shipped since Phase 1.
 **Left out:** the product screenshots on the landing page are the existing
 agent-centric captures. New captures of the identity and administration
 screens can follow when those screens are next restyled.
+
+---
+
+## 2026-10-01 — Landing page, Get Help and navigation for billing, privacy, audit integrity and security
+
+User request: highlight Razorpay/Stripe, GDPR/DPDP, SOX/financial compliance
+and IT security on the landing page.
+
+- `/welcome` has a new "Trust & compliance" section (`#trust`, linked from the
+  header nav). It has four cards, each with concrete, true-to-code points:
+  payments, privacy, financial compliance and security.
+- There is a compliance chip row in the hero, and three new "What's new"
+  items. The copy says WonderID provides controls and evidence, never
+  "compliant" (CLAUDE.md §10 item 10).
+- Get Help (`modules/ui/help/content.ts`) has four new sections: billing,
+  privacy, my-privacy and audit-integrity.
+- Sidebar:
+  - Administration gains Billing.
+  - Governance & Policies gains Privacy & Data Protection and Audit Integrity.
+  - The account menu gains My privacy.
+  - The Administration index links all four.
+
+**Verification.**
+- A built server was screenshotted in Chromium at 1440 px light and dark, and
+  at 390 px light. There is no horizontal overflow, the cards stack on mobile,
+  and the tokens render in both themes.
+- eslint is clean and `next build` passes.
+- The new app screens (billing, privacy, my-privacy, audit integrity) reuse
+  `modules/ui` primitives. They were not screenshotted with a signed-in session
+  in this sandbox; the §32 review at seven widths is open for those screens.

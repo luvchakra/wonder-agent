@@ -29,6 +29,18 @@ export default function SettingsPage() {
           <Link href="/settings/ai" className="block text-primary hover:underline">
             AI Provider
           </Link>
+          <Link href="/settings/billing" className="block text-primary hover:underline">
+            Billing (plan, payments and invoices)
+          </Link>
+          <Link href="/settings/privacy" className="block text-primary hover:underline">
+            Privacy &amp; Data Protection (GDPR / DPDP)
+          </Link>
+          <Link href="/audit/integrity" className="block text-primary hover:underline">
+            Audit Integrity (tamper evidence)
+          </Link>
+          <Link href="/my-privacy" className="block text-primary hover:underline">
+            My privacy
+          </Link>
           <p className="text-sm text-muted-foreground">Tenant Settings administration screens are not yet available.</p>
         </CardBody>
       </Card>

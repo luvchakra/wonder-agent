@@ -21,7 +21,7 @@ export type PlatformTenant = {
 };
 
 export type SubscriptionPlan = "free" | "pro" | "max" | "enterprise";
-export type SubscriptionStatus = "active" | "past_due" | "cancelled";
+export type SubscriptionStatus = "active" | "past_due" | "cancelled" | "trialing" | "incomplete" | "paused";
 
 export type Subscription = {
   id: string;
@@ -35,6 +35,113 @@ export type Subscription = {
   status: SubscriptionStatus;
   startedAt: string;
   renewedAt: string | null;
+  // PLATFORM-P1-04 (0102) — billing provider link. "manual" is the
+  // platform-assigned path that predates billing.
+  provider?: BillingProviderOrManual;
+  priceId?: string | null;
+  billingInterval?: BillingInterval | null;
+  currency?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelAtPeriodEnd?: boolean;
+};
+
+// ---------------------------------------------------------------------------
+// PLATFORM-P1-04 — Billing (Stripe + Razorpay), migration 0102.
+// ---------------------------------------------------------------------------
+
+export type BillingProvider = "stripe" | "razorpay";
+export type BillingProviderOrManual = BillingProvider | "manual";
+export type BillingInterval = "month" | "year";
+export type PaidPlan = "pro" | "max";
+
+export type BillingPrice = {
+  id: string;
+  plan: PaidPlan;
+  interval: BillingInterval;
+  currency: string;
+  unitAmount: number;
+  taxBehavior: "inclusive" | "exclusive";
+  active: boolean;
+};
+
+export type TaxIdType = "in_gst" | "eu_vat" | "gb_vat" | "au_abn" | "us_ein" | "other";
+
+export type BillingProfile = {
+  tenantId: string;
+  legalName: string;
+  billingEmail: string;
+  country: string;
+  region: string | null;
+  city: string | null;
+  postalCode: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  taxIdType: TaxIdType | null;
+  taxId: string | null;
+  updatedAt: string;
+};
+
+export type InvoiceStatus = "open" | "paid" | "void" | "uncollectible" | "refunded" | "partially_refunded";
+
+export type TaxLine = { name: string; rate: number; amount: number };
+
+export type BillingInvoice = {
+  id: string;
+  tenantId: string;
+  provider: BillingProvider;
+  invoiceNumber: string | null;
+  providerNumber: string | null;
+  status: InvoiceStatus;
+  currency: string;
+  subtotal: number;
+  taxAmount: number;
+  total: number;
+  amountPaid: number;
+  amountRefunded: number;
+  taxBreakdown: TaxLine[];
+  periodStart: string | null;
+  periodEnd: string | null;
+  hostedInvoiceUrl: string | null;
+  invoicePdfUrl: string | null;
+  issuedAt: string;
+  paidAt: string | null;
+};
+
+export type BillingAdjustmentKind = "refund" | "plan_override" | "cancel_immediately";
+export type BillingAdjustmentStatus = "pending" | "approved" | "rejected" | "executed" | "failed";
+
+export type BillingAdjustment = {
+  id: string;
+  tenantId: string;
+  invoiceId: string | null;
+  kind: BillingAdjustmentKind;
+  amount: number | null;
+  currency: string | null;
+  targetPlan: SubscriptionPlan | null;
+  reason: string;
+  status: BillingAdjustmentStatus;
+  requestedBy: string;
+  requestedAt: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  executedAt: string | null;
+  providerReference: string | null;
+  error: string | null;
+};
+
+export type BillingWebhookEvent = {
+  id: string;
+  provider: BillingProvider;
+  eventId: string;
+  eventType: string;
+  tenantId: string | null;
+  signatureVerified: boolean;
+  status: "received" | "processed" | "ignored" | "failed";
+  attempts: number;
+  error: string | null;
+  receivedAt: string;
+  processedAt: string | null;
 };
 
 export type FeatureFlag = {

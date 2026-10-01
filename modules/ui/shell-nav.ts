@@ -95,7 +95,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     label: "Governance & Policies",
     href: "/policies",
     icon: "FileText",
-    children: [link("Policies", "/policies")],
+    children: [link("Policies", "/policies"), link("Privacy & Data Protection", "/settings/privacy"), link("Audit Integrity", "/audit/integrity")],
   },
   {
     label: "Risk & Security",
@@ -163,6 +163,7 @@ export const SHELL_NAV: ShellNavItem[] = [
       link("Identity Attributes", "/identities/attributes"),
       link("Notifications", "/settings/notifications"),
       link("AI Assistance", "/settings/ai"),
+      link("Billing", "/settings/billing"),
     ],
   },
 ];

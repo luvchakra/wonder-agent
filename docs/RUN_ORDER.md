@@ -243,3 +243,25 @@ What is still genuinely blocked, and should not be re-attempted blindly:
 
 A session picking up a story that was deferred "because of egress" should
 re-test the specific operation rather than trusting the old note.
+
+## 2026-10-01 — Payments, privacy, financial compliance and IT security
+
+On the user's explicit request (outside the auto-chain order), four
+capabilities were implemented across three modules, with migrations `0101`–`0105`
+applied to the live project:
+
+- **Platform:** `PLATFORM-P1-04` Stripe + Razorpay billing (brought forward from P1).
+- **Compliance:** `COMPLIANCE-P0-12` GDPR/DPDP privacy programme;
+  `COMPLIANCE-P0-13` SOX, PCI DSS and other financial/privacy control frameworks.
+- **Foundation:** `FOUNDATION-P0-28` permission-gated RLS, `P0-29`
+  tamper-evident audit trail, `P0-30` IT security hardening.
+
+The binding rules are in `CLAUDE.md` §18. The operator reference is
+`docs/security/SECURITY-CONTROLS.md`.
+
+Open items:
+- Run the full Playwright suite (the proxy, headers and RLS changed; §17.8).
+- Run Stripe and Razorpay in test mode once keys are configured.
+- The owner enables Supabase leaked-password protection and sets the real
+  `security.txt` contact.
+- Do the §32 design review of the new signed-in screens.

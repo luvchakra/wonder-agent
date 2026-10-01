@@ -45,3 +45,25 @@ describe("encryptSecret / decryptSecret", () => {
     );
   });
 });
+
+describe("key rotation — FOUNDATION-P0-30", () => {
+  it("decrypts values written under a retired key and re-encrypts them under the current one", async () => {
+    const { encryptSecret: enc, decryptSecret: dec, reencryptSecret } = await import("./encryptSecret");
+    process.env.SECRET_ENCRYPTION_KEY = "old-key-for-rotation-test";
+    const legacy = await enc("rotate-me");
+
+    process.env.SECRET_ENCRYPTION_KEY = "new-key-for-rotation-test";
+    process.env.SECRET_ENCRYPTION_KEY_PREVIOUS = "old-key-for-rotation-test";
+    expect(await dec(legacy)).toBe("rotate-me");
+    const { payload, rotated } = await reencryptSecret(legacy);
+    expect(rotated).toBe(true);
+
+    // Once the retired key is dropped, only the re-encrypted value still opens.
+    delete process.env.SECRET_ENCRYPTION_KEY_PREVIOUS;
+    expect(await dec(payload)).toBe("rotate-me");
+    await expect(dec(legacy)).rejects.toThrow();
+    expect((await reencryptSecret(payload)).rotated).toBe(false);
+
+    process.env.SECRET_ENCRYPTION_KEY = "test-only-key-not-for-production-use";
+  });
+});
