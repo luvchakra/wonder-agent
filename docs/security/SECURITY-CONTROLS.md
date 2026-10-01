@@ -10,11 +10,12 @@ how to configure and verify it.
 |---|---|
 | Hosted payment pages only (PCI DSS SAQ-A) | `modules/billing/service.ts` `startCheckout()` / `openBillingPortal()` |
 | Webhook signature verification (HMAC-SHA256, constant time, Stripe 5-min tolerance) | `modules/billing/signatures.ts`, `app/api/v1/billing/webhooks/*` |
-| Idempotent intake persisted before processing, redacted payloads | `billing_webhook_events`, `modules/billing/webhooks.ts` |
+| Idempotent intake persisted before processing, redacted payloads; one processor per event (`claimed_at`) | `billing_webhook_events`, `modules/billing/webhooks.ts` |
+| No second checkout within 10 minutes of an open one | `startCheckout()` |
 | Tenant resolved only from WonderID's own records | `billing_checkouts`, `subscriptions.provider_subscription_id`, `billing_profiles` |
 | Stale events never overwrite newer state | `subscriptions.provider_state_at` |
 | Immutable issued invoices, accumulate-only refunds | `billing_invoices_guard` trigger |
-| Gapless invoice numbers per Indian FY (`WID/2026-27/000001`) | `next_invoice_number()` |
+| Gapless invoice numbers per Indian FY (`WID/2026-27/000001`), drawn only when stored | `next_invoice_number()` via `assign_invoice_number()` (0106) |
 | GST (CGST+SGST / IGST / zero-rated export), GSTIN check character | `modules/billing/rules.ts` |
 | Maker-checker refunds, plan overrides, immediate cancellation | `billing_adjustments` (+ `four_eyes` check), `/platform-admin/billing` |
 | RLS: invoices/profiles readable only with `billing.view` | `has_tenant_permission()` (0101) |

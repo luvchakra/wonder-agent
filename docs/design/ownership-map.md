@@ -109,9 +109,9 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `billing_prices` | PA | Global price catalogue (plan × interval × currency, minor units, tax behaviour, lazily-created Stripe price / Razorpay plan ids). Select for authenticated; changed only through `/platform-admin/billing` (0102) |
 | `billing_profiles` | PA | Tenant's invoiced legal entity, address, tax id (GSTIN/VAT), provider customer ids. RLS select needs `billing.view` (0102) |
 | `billing_checkouts` | PA | Every checkout WonderID starts; the only way a webhook is matched to a tenant. RLS `billing.view` (0102) |
-| `billing_invoices` | PA | Invoice ledger with gapless `WID/<FY>/<n>` numbers (`next_invoice_number()`), tax breakdown and customer snapshot; amounts immutable once issued (trigger). RLS `billing.view` (0102) |
+| `billing_invoices` | PA | Invoice ledger with gapless `WID/<FY>/<n>` numbers (`assign_invoice_number()` → `next_invoice_number()`, 0102/0106), tax breakdown and customer snapshot; amounts immutable once issued (trigger). RLS `billing.view` (0102) |
 | `billing_invoice_sequences` | PA | Per-financial-year invoice counter; no policies (0102) |
-| `billing_webhook_events` | PA | Signed webhook intake, idempotent on (provider, event_id), redacted payload; vendor-only, no policies (0102) |
+| `billing_webhook_events` | PA | Signed webhook intake, idempotent on (provider, event_id), redacted payload, `claimed_at` single-processor claim (0106); vendor-only, no policies (0102) |
 | `billing_adjustments` | PA | Maker-checker refunds / plan overrides / immediate cancellations; approver ≠ requester (check constraint); vendor-only (0102) |
 | `platform_audit_logs` | PA | Platform-admin action audit (separate from tenant `audit_logs`) |
 | `platform_config_versions` | PA | PLATFORM-P0-05.3 — version history for branding/feature-flag-default config changes, with rollback |

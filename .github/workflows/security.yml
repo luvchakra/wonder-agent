@@ -24,6 +24,10 @@ jobs:
           cache: "npm"
       - name: Install dependencies (lockfile only, no install scripts from new packages)
         run: npm ci
+      # next-env.d.ts (image and route types) is gitignored; generate it so a
+      # fresh checkout typechecks the same as a built tree.
+      - name: Generate Next.js types
+        run: npx next typegen
       - name: Typecheck
         run: npm run typecheck
       - name: Lint

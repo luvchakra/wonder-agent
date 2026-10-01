@@ -1099,3 +1099,13 @@ coverage.
   for the QA Agent.
 - Privacy notifications reuse Operations' `notify()` with the new
   `privacy_deadline` type, recorded in the Operations log.
+
+### 2026-10-01 (later) — self-review fix: the subject cannot approve their own erasure
+
+Four-eyes only stopped the processor from approving. A privacy administrator
+who is the subject of an erasure request could approve it, and the erasure
+then failed on Foundation's self-removal guard instead of being refused up
+front. `advanceRequest("approve")` now refuses with 403 `FOUR_EYES_REQUIRED`
+when the approver is the subject, and audits the refusal.
+`tests/e2e/trust-compliance.spec.ts` covers the processor case (see the QA
+entry).

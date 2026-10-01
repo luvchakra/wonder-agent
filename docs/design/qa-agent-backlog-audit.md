@@ -935,3 +935,32 @@ list). The full Playwright suite was **not** run in this session. Because
 `proxy.ts`, security headers and RLS changed, §17.8 requires it before the
 next release. The existing `csrf.spec.ts` should still pass: it uses a GET,
 which the new cross-site write guard does not touch.
+
+### 2026-10-01 (later) — E2E spec for payments, privacy, audit integrity and security
+
+New file: `tests/e2e/trust-compliance.spec.ts`, 7 serial tests.
+- Security: headers, `security.txt`, and the cross-site write guard returning
+  403 `CROSS_SITE_REQUEST`.
+- Billing:
+  - The screen renders.
+  - A bad GSTIN is refused and a good one is accepted.
+  - A body `tenant_id` is ignored.
+  - Checkout is refused truthfully when no provider is configured.
+  - Unsigned webhooks are refused.
+- Privacy:
+  - A GDPR request's deadline is one month, and completion is refused until
+    the identity is verified.
+  - The export works, and a closed request never reopens.
+  - A DPDP erasure gets 90 days, an extension is refused, and self-approval is
+    refused.
+  - A DPDP breach lists the Board obligations, and closing is refused while
+    they are outstanding.
+- Self-service export works, and the audit chain verifies intact.
+- A read-only member gets 403 on billing and privacy administration but still
+  reaches `/privacy/me`. Tenant Two gets 404 on everything of Tenant One's.
+
+The spec typechecks, lints and is discovered by `playwright test --list`. It
+was **not run**: this sandbox has no `SUPABASE_SERVICE_ROLE_KEY`, which
+`auth.setup.ts` needs. The `e2e.yml` workflow has it as a repository secret and
+runs it on the next push to `main` or the next PR, together with the full suite
+§17.8 requires.

@@ -33,7 +33,10 @@ type Intake = { provider: BillingProvider; eventId: string; eventType: string; c
 
 const db = () => supabaseServiceRole();
 
-async function recordIntake(intake: Intake): Promise<{ id: string; duplicate: boolean }> {
+/** How long a claim on an event lasts before a redelivery may take it over (a crashed run). */
+const CLAIM_STALE_MS = 2 * 60 * 1000;
+
+async function recordIntake(intake: Intake): Promise<{ id: string; duplicate: boolean; inFlight: boolean }> {
   const supabase = db();
   const { data, error } = await supabase
     .from("billing_webhook_events")
@@ -47,13 +50,24 @@ async function recordIntake(intake: Intake): Promise<{ id: string; duplicate: bo
     })
     .select("id")
     .single();
-  if (!error && data) return { id: data.id, duplicate: false };
+  if (!error && data) return { id: data.id, duplicate: false, inFlight: false };
   if (error?.code !== "23505") throw new Error(`webhook intake failed: ${error?.message}`);
-  const { data: existing } = await supabase.from("billing_webhook_events").select("id, status, attempts").eq("provider", intake.provider).eq("event_id", intake.eventId).single();
+  const { data: existing } = await supabase.from("billing_webhook_events").select("id, status, attempts, claimed_at").eq("provider", intake.provider).eq("event_id", intake.eventId).single();
   if (!existing) throw new Error("webhook intake conflict without a row");
-  if (existing.status === "processed" || existing.status === "ignored") return { id: existing.id, duplicate: true };
-  await supabase.from("billing_webhook_events").update({ attempts: (existing.attempts ?? 1) + 1, status: "received", error: null }).eq("id", existing.id);
-  return { id: existing.id, duplicate: false };
+  if (existing.status === "processed" || existing.status === "ignored") return { id: existing.id, duplicate: true, inFlight: false };
+  // Reclaim only a failed event or a stale claim, and only if nobody else
+  // reclaimed it first (conditional on the claim time just read), so two
+  // deliveries never process the same event at once.
+  const stale = new Date(Date.now() - CLAIM_STALE_MS).toISOString();
+  if (existing.status === "received" && existing.claimed_at > stale) return { id: existing.id, duplicate: false, inFlight: true };
+  const { data: claimed } = await supabase
+    .from("billing_webhook_events")
+    .update({ attempts: (existing.attempts ?? 1) + 1, status: "received", error: null, claimed_at: new Date().toISOString() })
+    .eq("id", existing.id)
+    .eq("claimed_at", existing.claimed_at)
+    .select("id");
+  if (!claimed?.length) return { id: existing.id, duplicate: false, inFlight: true };
+  return { id: existing.id, duplicate: false, inFlight: false };
 }
 
 async function finish(id: string, outcome: WebhookOutcome, tenantId: string | null): Promise<WebhookOutcome> {
@@ -190,13 +204,6 @@ async function upsertInvoice(inv: InvoiceUpsert): Promise<void> {
   const { data: existing } = await supabase.from("billing_invoices").select().eq("provider", inv.provider).eq("provider_invoice_id", inv.providerInvoiceId).maybeSingle();
   if (existing && existing.tenant_id !== inv.tenantId) throw new Error("invoice belongs to a different tenant");
 
-  let invoiceNumber: string | null = existing?.invoice_number ?? null;
-  if (!invoiceNumber && inv.status === "paid") {
-    const { data: n, error } = await supabase.rpc("next_invoice_number", { p_at: (inv.paidAt ?? new Date()).toISOString() });
-    if (error) throw new Error(`invoice numbering failed: ${error.message}`);
-    invoiceNumber = n as string;
-  }
-
   if (!existing) {
     const { error } = await supabase.from("billing_invoices").insert({
       tenant_id: inv.tenantId,
@@ -205,7 +212,6 @@ async function upsertInvoice(inv: InvoiceUpsert): Promise<void> {
       provider_invoice_id: inv.providerInvoiceId,
       provider_payment_id: inv.providerPaymentId,
       provider_number: inv.providerNumber,
-      invoice_number: invoiceNumber,
       status: inv.status,
       currency: inv.currency,
       subtotal: inv.subtotal,
@@ -220,6 +226,7 @@ async function upsertInvoice(inv: InvoiceUpsert): Promise<void> {
       invoice_pdf_url: inv.invoicePdfUrl,
       paid_at: inv.paidAt?.toISOString() ?? null,
     });
+    // A concurrent delivery inserted it first: fall through to the number step.
     if (error && error.code !== "23505") throw new Error(`invoice insert failed: ${error.message}`);
   } else {
     // A refunded invoice keeps its refund status; payment state only moves forward.
@@ -231,7 +238,6 @@ async function upsertInvoice(inv: InvoiceUpsert): Promise<void> {
         amount_paid: Math.max(Number(existing.amount_paid), inv.amountPaid),
         provider_payment_id: existing.provider_payment_id ?? inv.providerPaymentId,
         provider_number: existing.provider_number ?? inv.providerNumber,
-        invoice_number: invoiceNumber,
         hosted_invoice_url: inv.hostedInvoiceUrl ?? existing.hosted_invoice_url,
         invoice_pdf_url: inv.invoicePdfUrl ?? existing.invoice_pdf_url,
         paid_at: existing.paid_at ?? inv.paidAt?.toISOString() ?? null,
@@ -239,6 +245,17 @@ async function upsertInvoice(inv: InvoiceUpsert): Promise<void> {
       .eq("id", existing.id)
       .eq("tenant_id", inv.tenantId);
     if (error) throw new Error(`invoice update failed: ${error.message}`);
+  }
+
+  // The number is drawn in the same transaction that locks the invoice
+  // (assign_invoice_number, 0106), so the GST series never has a gap.
+  let invoiceNumber: string | null = existing?.invoice_number ?? null;
+  if (inv.status === "paid" && !invoiceNumber) {
+    const { data: row } = await supabase.from("billing_invoices").select("id").eq("provider", inv.provider).eq("provider_invoice_id", inv.providerInvoiceId).eq("tenant_id", inv.tenantId).maybeSingle();
+    if (!row) throw new Error("invoice not found after write");
+    const { data: n, error } = await supabase.rpc("assign_invoice_number", { p_invoice: row.id });
+    if (error) throw new Error(`invoice numbering failed: ${error.message}`);
+    invoiceNumber = (n as string | null) ?? null;
   }
 
   if (inv.status === "paid" && existing?.status !== "paid") {
@@ -354,6 +371,8 @@ function stripeInvoiceSubscription(inv: any): string | null {
 export async function processStripeEvent(event: any): Promise<WebhookOutcome> {
   const intake = await recordIntake({ provider: "stripe", eventId: String(event.id), eventType: String(event.type), createdAt: fromUnix(event.created), payload: event });
   if (intake.duplicate) return { status: "duplicate", retry: false };
+  // Another delivery is processing it right now: ask the provider to retry later.
+  if (intake.inFlight) return { status: "duplicate", retry: true, detail: "already being processed" };
   const stateAt = fromUnix(event.created) ?? new Date();
   const obj = event.data?.object ?? {};
   let tenantId: string | null = null;
@@ -457,6 +476,8 @@ export async function processStripeEvent(event: any): Promise<WebhookOutcome> {
 export async function processRazorpayEvent(eventId: string, event: any): Promise<WebhookOutcome> {
   const intake = await recordIntake({ provider: "razorpay", eventId, eventType: String(event.event ?? "unknown"), createdAt: fromUnix(event.created_at), payload: event });
   if (intake.duplicate) return { status: "duplicate", retry: false };
+  // Another delivery is processing it right now: ask the provider to retry later.
+  if (intake.inFlight) return { status: "duplicate", retry: true, detail: "already being processed" };
   const stateAt = fromUnix(event.created_at) ?? new Date();
   const sub = event.payload?.subscription?.entity;
   const payment = event.payload?.payment?.entity;

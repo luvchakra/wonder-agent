@@ -157,6 +157,9 @@ export async function saveBillingProfile(
   return { ok: true, profile: toProfile(data) };
 }
 
+/** How long an open checkout blocks another one for the same organization. */
+const RECENT_CHECKOUT_MS = 10 * 60 * 1000;
+
 /** A paid subscription the provider still manages blocks a second checkout. */
 function hasLiveProviderSubscription(sub: Subscription | null): boolean {
   return !!sub && sub.provider !== undefined && sub.provider !== "manual" && sub.status !== "cancelled";
@@ -174,6 +177,18 @@ export async function startCheckout(tenantId: string, actorId: string, priceId: 
   if (!profileRow) throw new ApiError(409, "BILLING_PROFILE_REQUIRED", "Add the billing details to invoice before choosing a plan");
   if (hasLiveProviderSubscription(subscription)) {
     throw new ApiError(409, "SUBSCRIPTION_EXISTS", "This organization already has a paid subscription. Change or cancel it first.");
+  }
+  // A checkout started moments ago may still be completing: a second one
+  // could open a second paid subscription (most likely a double click).
+  const { data: recentOpen } = await supabase
+    .from("billing_checkouts")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "open")
+    .gte("created_at", new Date(Date.now() - RECENT_CHECKOUT_MS).toISOString())
+    .limit(1);
+  if (recentOpen?.length) {
+    throw new ApiError(409, "CHECKOUT_IN_PROGRESS", "A checkout was started a few minutes ago. Finish it in the payment window, or try again in 10 minutes.");
   }
 
   const price = toPrice(priceRow);
