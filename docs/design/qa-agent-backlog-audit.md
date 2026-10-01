@@ -923,3 +923,37 @@ past 30 routes. Two full runs on 2026-09-26 timed out on the last routes at
 Each width now sweeps the list in two halves, in two tests. No route or
 check was removed. Agent 360 is still resolved from the list, in part 1.
 The split spec passed alone, 29/29, in 5.6 min.
+
+---
+
+## 2026-10-01 — Comprehensive E2E / security QA run (commit `acbdc0f`)
+
+Full write-up: `docs/testing/WONDERID_E2E_TEST_REPORT.md`, live log and
+coverage matrix `docs/testing/E2E_TEST_EXECUTION.md`, defects
+`docs/testing/E2E_DEFECTS.json` (14: CRITICAL 1, HIGH 3, MEDIUM 5, LOW 5).
+
+**Ran:** `npm test` 746/746; lint clean; build clean; typecheck clean only
+after `next typegen` (fresh clone fails, E2E-011);
+`tests/live-client-tenant-isolation.mjs` 150 pass / 1 fixture fail (E2E-012);
+new `tests/e2e/api-unauthenticated.spec.ts` 237/237; anonymous sweep of 96
+pages (87 protected all redirect). Live catalog inspection of RLS, grants,
+SECURITY DEFINER functions and triggers through the Supabase MCP (read-only).
+
+**Not run:** the existing 340-test Playwright suite, and a live
+direct-PostgREST write probe. The session's permission classifier refused
+both, because the only database is production (E2E-013), and the suite's
+server needs `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true`.
+
+**Headline findings (handed to Foundation Agent; every module owns its policies):**
+- E2E-001 CRITICAL: 47 RLS write policies on 25 tables check membership
+  only, so any member, including READ_ONLY, can write agents, policies,
+  integrations (`config.baseUrl` → credential exfiltration), risk weights,
+  policy exceptions and access requests directly through PostgREST,
+  unaudited.
+- E2E-002 HIGH: `tenant_id` is client-updatable; a two-org member can move
+  rows between orgs.
+- E2E-003 HIGH: no privilege ceiling on role assignment or group
+  membership (`lib/rbac/roles.ts`, `lib/users/groups.ts`).
+- E2E-004 MEDIUM: open redirect in `/auth/callback` via `/\host`.
+
+No application code was changed.
