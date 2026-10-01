@@ -1,0 +1,38 @@
+name: Checks and security
+
+# FOUNDATION-P0-30 — the fast checks every change must pass (CLAUDE.md §4
+# step 3) plus supply-chain and secret hygiene, on every push and PR.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+      - name: Install dependencies (lockfile only, no install scripts from new packages)
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
+      - name: Unit tests
+        run: npm test
+      - name: Dependency audit (fail on high or critical, production dependencies)
+        run: npm audit --omit=dev --audit-level=high
+      - name: No secrets or private keys committed
+        run: |
+          if git ls-files | grep -E '(^|/)\.env(\.local)?$'; then echo "An .env file is tracked"; exit 1; fi
+          if git grep -nE -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|sk_live_[A-Za-z0-9]{10,}|rzp_live_[A-Za-z0-9]{10,}|whsec_[A-Za-z0-9]{20,}' -- ':!*.test.ts' ':!docs/**'; then echo "A secret-looking value is committed"; exit 1; fi

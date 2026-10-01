@@ -32,6 +32,8 @@ for every row is in `docs/design/compliance-agent-backlog-audit.md`.
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
 | COMPLIANCE-P0-10 | Certification campaigns for every identity type | Not Started — 2026-09-26, WonderID |
 | COMPLIANCE-P0-11 | Access certification of WonderID users' role assignments | Not Started — 2026-09-26, WonderID Phase 4b |
+| COMPLIANCE-P0-12 | Privacy programme: GDPR / UK GDPR / DPDP / CCPA rights requests, consent, RoPA, retention, legal holds, breach register (2026-10-01 user request) | Done — 2026-10-01 (`0103`, `modules/privacy`, `/settings/privacy`, `/my-privacy`, `/api/v1/privacy/*`, daily `/api/cron/privacy`; 12 rule tests; live isolation proof 28/28) |
+| COMPLIANCE-P0-13 | Financial and privacy control frameworks (SOX ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF, CERT-In, GDPR, DPDP) | Done — 2026-10-01 (`0105`, 10 frameworks / 55 controls; shown on `/audit/integrity`) |
 
 ---
 

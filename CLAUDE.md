@@ -41,6 +41,14 @@ this file the repository's security controls, ownership and working implementati
 win (spec, "Final Claude Code operating instruction"). Phase plan and story IDs:
 `docs/plan/WONDERID-ROADMAP.md`.
 
+**2026-10-01 — payments, privacy, financial compliance and IT security (explicit
+user request).** Stripe and Razorpay billing, GDPR / DPDP privacy tooling, SOX and
+financial control evidence (a tamper-evident audit trail) and an IT security
+hardening pass were implemented across Foundation, Platform and Compliance
+(migrations `0101`–`0105`). The analysis findings and the binding practices that
+came out of it are §18; module detail is in each module's audit log and in
+`docs/security/SECURITY-CONTROLS.md`.
+
 **2026-09-14 requirements refresh:** the user supplied an updated 11-module master
 requirements package (plus an execution guide) expanding P0/P1/P2 scope per module.
 Every `docs/plan/NN-*-BACKLOG.md` file has a dated "Requirements Refresh" section
@@ -365,6 +373,8 @@ modules/
   certification-compliance/         # Compliance Agent
   ui/                              # Experience Agent: composition components, shell
   platform-admin/                  # Platform Agent: platform-only services
+  billing/                         # Platform Agent: Stripe/Razorpay billing (customer + vendor side)
+  privacy/                         # Compliance Agent: GDPR/DPDP privacy programme
   operations/                      # Operations Agent: audit/reports/notifications/search
 
 supabase/
@@ -875,3 +885,146 @@ document new environment variables in `.env.local.example`, explain new migratio
 document new APIs, integrations, permissions and scopes, and describe important
 operational behaviour — and keep that documentation aligned with what is actually
 implemented.
+
+---
+
+## 18. Payments, Privacy, Financial Compliance & IT Security
+
+Adopted 2026-10-01 on the user's explicit request to implement Razorpay and Stripe
+billing, GDPR and DPDP compliance, SOX and other financial compliance, and IT
+security best practice. It adds to §1, §14, §16 and §17 and never loosens them.
+
+### 18.1 Key findings of the 2026-10-01 analysis
+
+What the full code review found before the work, and what now holds:
+
+- **Billing did not exist.** `subscriptions` was assigned by hand in the platform
+  console. Now Platform's `modules/billing` takes payment through Stripe (USD/EUR)
+  and Razorpay (INR), keeps an invoice ledger, and syncs plan limits from signed
+  webhooks (`0102`).
+- **No data-subject tooling.** Nothing handled access, erasure, consent, retention or
+  breach notification. Now Compliance's `modules/privacy` does (`0103`), with a
+  member self-service page (`/my-privacy`) and an admin centre (`/settings/privacy`).
+- **The audit trail could be silently edited.** `audit_logs` had no client write
+  policy, but any service-role caller could UPDATE or DELETE a row unseen. Now both
+  audit tables are append-only for every role, and `audit_logs` is SHA-256
+  hash-chained per tenant with `verify_audit_chain()` and `/audit/integrity`
+  (`0104`).
+- **Control frameworks had no financial or privacy coverage.** Now there are SOX
+  ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF, CERT-In, GDPR and DPDP control
+  sets (`0105`).
+- **Sensitive tenant tables were readable by every member through PostgREST.** The
+  existing RLS pattern (`tenant_id in current_tenant_ids()`) does not distinguish
+  roles. Invoices, privacy requests and breach records now use
+  `has_tenant_permission(tenant, key)` (`0101`), a narrower database-side check
+  under the application's authorization engine.
+- **Security headers and pipeline had gaps.** There was no HSTS, COOP/CORP, CSP
+  `object-src`/`frame-src`, `poweredByHeader: false`, or cross-site write check on
+  the JSON API. There was no CI for typecheck/lint/unit tests/dependency audit, and
+  no `security.txt`. All are added. The encryption key could not be rotated; now
+  `SECRET_ENCRYPTION_KEY_PREVIOUS` allows that.
+- **Still open, needs the owner.** Supabase Auth's leaked-password protection is off.
+  It is a project dashboard setting this sandbox cannot change. The CSP still allows
+  `'unsafe-inline'` scripts for Next's bootstrap; moving to per-request nonces is a
+  recorded follow-up.
+
+### 18.2 Payments (Stripe, Razorpay)
+
+1. **Never touch card or bank data.** Collect payment only on the provider's hosted
+   page (Stripe Checkout / Billing Portal, Razorpay subscription link). Never embed
+   card fields, and never store PAN, CVV, UPI VPA or bank details (PCI DSS SAQ-A).
+2. **Verify every webhook before parsing it.** Use HMAC over the raw body, constant-time
+   comparison, and Stripe's 5-minute timestamp tolerance. Persist the event,
+   idempotent on the provider's event id, *before* processing. Store the payload
+   only through `redact()`.
+3. **Resolve the tenant only from records WonderID created.** Use `billing_checkouts`,
+   `subscriptions.provider_subscription_id` and `billing_profiles.*_customer_id`.
+   Never use provider metadata alone (§14). An unmatched event is retried, not
+   guessed.
+4. **The provider is the system of record for a payment; WonderID is for its prices.**
+   Apply state only from confirmed provider events, ignore events older than the
+   applied state, and read authoritative state back from the API where it matters.
+   Never show a plan as changed before the provider confirms it (§17.5).
+5. **Financial records are append-only.** An issued invoice's amounts, currency,
+   number and customer snapshot never change (database trigger). Payments and refunds
+   only accumulate. Invoice numbers are gapless per Indian financial year
+   (`next_invoice_number()`, GST rule 46).
+6. **Money-moving staff actions are maker-checker.** Refunds, plan overrides and
+   immediate cancellations need a second platform administrator. This is enforced in
+   the service and by a check constraint. Use idempotency keys on every provider write.
+7. **Tax is deterministic code.** GST is CGST+SGST within the state, IGST across states,
+   and zero-rated exports. GSTINs are validated with the GSTN check character. Prices
+   say whether they include tax.
+8. Provider keys are server-only environment variables (`STRIPE_*`, `RAZORPAY_*`,
+   `BILLING_SUPPLIER_*`, `APP_BASE_URL`). Return URLs come from `APP_BASE_URL`, never
+   from a client-supplied Host.
+
+### 18.3 Privacy (GDPR, UK GDPR, DPDP, CCPA)
+
+1. **Statutory deadlines are code, from receipt.** Use `responseDueAt()`: GDPR one month
+   (one extension, three months total, told within the first month); DPDP 90 days, no
+   extension; CCPA 45+45. Remind before expiry, and never let a request reopen once
+   closed.
+2. **Verify identity before releasing or deleting anything.** A signed-in member's own
+   session is verification for self-service; staff record the method otherwise.
+3. **Erasure is four-eyes and runs before it is reported.** Remove the membership through
+   Foundation's lifecycle path, then pseudonymise identity, consent and request records.
+   Pseudonymise the global account only if no other organization holds the person.
+   Never alter the audit trail; that is the legal-obligation exemption, GDPR Art.
+   17(3)(b) and the DPDP s.8(7) proviso. Never write the erased personal data into an
+   audit event.
+4. **Consent is provable and as easy to withdraw as to give.** Record one row per grant
+   with its notice version and language. Changed purpose wording needs a new notice
+   version. Withdrawal is one click.
+5. **Breaches run on their clocks.** GDPR: notify the authority within 72 hours unless a
+   risk is unlikely, and individuals when the risk is high. DPDP: tell the Board and
+   every affected person without delay, and file the detailed report within 72 hours.
+   A recorded notification time is evidence: it can be set but not rewritten. A breach
+   cannot close with notices outstanding unless a delay reason is recorded.
+6. **Storage limitation is enforced daily** (`/api/cron/privacy`). Legal holds always
+   win. Audit logs are kept at least 365 days (DPDP Rule 8(3)) and leave only through
+   `purge_audit_logs()`.
+7. **One tenant is one controller.** An export or erasure never reads or touches the same
+   person's data in another tenant (non-negotiables #4 and #16).
+8. **Match people with authoritative ids, never string-built filters.** Use user id
+   first, then a LIKE-escaped email. Never interpolate user-supplied text into a
+   PostgREST `or()` filter.
+
+### 18.4 SOX and financial compliance
+
+1. **Audit evidence is tamper-evident.** No migration may add an UPDATE or DELETE path to
+   `audit_logs` or `platform_audit_logs`, or bypass `audit_logs_chain()`. Anything new
+   that must remove audit rows goes through `purge_audit_logs()`. Changing this needs
+   explicit user approval.
+2. **Segregation of duties is enforced in the database, not only the UI.** Keep the
+   existing four-eyes constraints, including approvals, onboarding, billing adjustments
+   and privacy erasure, whenever new consequential workflows are added.
+3. **Configuration and policy changes are versioned and audited** (SOX ITGC PC-01).
+   Access reviews and certifications keep their evidence snapshots.
+4. **Never claim certification.** Control mappings are evidence for the customer's
+   auditors, never "SOX compliant" or "PCI compliant" (§10 item 10).
+5. **Retention.** Enterprise keeps audit evidence seven years (`PLAN_DEFAULTS`).
+   CERT-In expects ICT logs for 180 days; PCI DSS expects 12 months.
+
+### 18.5 IT security baseline
+
+1. Security headers live in `next.config.ts`: HSTS with preload, COOP/CORP, a strict
+   CSP (`frame-ancestors`, `object-src`, `frame-src 'none'`, an explicit
+   `form-action` allow-list), Permissions-Policy, and no `X-Powered-By`. Widen the CSP
+   only for a named, hosted provider page, and say why in a comment.
+2. The proxy refuses cross-site browser writes to `/api/*` (`isCrossSiteApiWrite()`).
+   Third-party callbacks must be listed as exempt *and* authenticate themselves:
+   signature, bearer secret or API key.
+3. Secrets use AES-256-GCM (`encryptSecret`). Rotate with
+   `SECRET_ENCRYPTION_KEY_PREVIOUS` and `reencryptSecret()`. Never log a secret: route
+   external payloads and error text through `redact()` / `safeErrorMessage()`.
+4. Every outbound provider call has a fixed host, a timeout and bounded retries, and
+   retries only idempotent requests.
+5. CI (`.github/workflows/security.yml`) runs typecheck, lint, unit tests,
+   `npm audit --omit=dev --audit-level=high` and a committed-secret scan on every
+   change. Do not merge a red run.
+6. Report vulnerabilities through `/.well-known/security.txt` (RFC 9116). Keep its
+   contact and expiry current.
+7. Run Supabase advisors after every migration. A new `SECURITY DEFINER` function
+   revokes `execute` from `public`/`anon` and grants only what it needs.
+

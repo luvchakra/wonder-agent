@@ -10,6 +10,7 @@ import { LinkButton, ThemeToggle, WonderIDLogo } from "@/modules/ui";
 const NAV = [
   { href: "#model", label: "The solution" },
   { href: "#platform", label: "Platform" },
+  { href: "#trust", label: "Trust & compliance" },
   { href: "#whats-new", label: "What's new" },
   { href: "#how-it-works", label: "How it works" },
   { href: "/help", label: "Help" },

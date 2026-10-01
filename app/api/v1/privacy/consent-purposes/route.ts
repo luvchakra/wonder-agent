@@ -1,0 +1,26 @@
+import { NextResponse } from "next/server";
+import { requirePermission } from "@/lib/rbac/requirePermission";
+import { errorResponse } from "@/lib/shared/apiError";
+import { assertPlainObject } from "@/lib/security/validate";
+import { listConsentPurposes, saveConsentPurpose } from "@/modules/privacy/service";
+
+export async function GET() {
+  try {
+    const ctx = await requirePermission("privacy.view");
+    return NextResponse.json({ ok: true, data: await listConsentPurposes(ctx.tenantId!) });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
+/** Create, or update with `id` (a changed wording needs a new noticeVersion). */
+export async function POST(request: Request) {
+  try {
+    const ctx = await requirePermission("privacy.manage");
+    const result = await saveConsentPurpose(ctx.tenantId!, ctx.userId, assertPlainObject(await request.json().catch(() => null), "body"));
+    if (!result.ok) return NextResponse.json({ ok: false, error: { code: "VALIDATION_FAILED", message: "Check the highlighted fields", fields: result.errors } }, { status: 400 });
+    return NextResponse.json({ ok: true, data: await listConsentPurposes(ctx.tenantId!) });
+  } catch (err) {
+    return errorResponse(err);
+  }
+}

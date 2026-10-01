@@ -8,7 +8,18 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+  // FOUNDATION-P0-30 — IT security hardening (2026-10-01): HTTPS only for
+  // two years including tenant subdomains (preload-eligible); the window
+  // is isolated from cross-origin openers; this app's responses are not
+  // embeddable by other sites; no DNS prefetch leakage; and powerful
+  // browser features are off. Payment needs no Payment Request API since
+  // checkout is on the provider's hosted page.
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
+  { key: "X-DNS-Prefetch-Control", value: "off" },
+  { key: "X-Permitted-Cross-Domain-Policies", value: "none" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), usb=(), serial=(), hid=(), bluetooth=(), interest-cohort=(), browsing-topics=()" },
   {
     key: "Content-Security-Policy",
     value: [
@@ -19,13 +30,19 @@ const securityHeaders = [
       "font-src 'self' data:",
       "connect-src 'self' https://*.supabase.co",
       "frame-ancestors 'none'",
+      "frame-src 'none'",
+      "object-src 'none'",
       "base-uri 'self'",
-      "form-action 'self'",
+      // PLATFORM-P1-04: a checkout form's redirect lands on the provider's
+      // hosted page (Stripe Checkout / Billing Portal, Razorpay's link).
+      "form-action 'self' https://checkout.stripe.com https://billing.stripe.com https://rzp.io https://api.razorpay.com",
     ].join("; "),
   },
 ];
 
 const nextConfig: NextConfig = {
+  // Do not advertise the framework in every response.
+  poweredByHeader: false,
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },

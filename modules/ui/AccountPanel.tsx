@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, LifeBuoy, LogOut, Shield, SunMoon, User } from "lucide-react";
+import { ChevronDown, LifeBuoy, LogOut, Shield, SunMoon, User, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "./theme";
 import { Avatar } from "./Avatar";
 
@@ -82,6 +82,13 @@ export function AccountPanel({
               <Link href="/settings" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
                 <User className="size-4 text-muted-foreground" aria-hidden="true" />
                 Settings
+              </Link>
+            </DropdownMenu.Item>
+
+            <DropdownMenu.Item asChild>
+              <Link href="/my-privacy" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+                <ShieldCheck className="size-4 text-muted-foreground" aria-hidden="true" />
+                My privacy
               </Link>
             </DropdownMenu.Item>
 

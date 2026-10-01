@@ -34,7 +34,8 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `group_roles` | FA | Group ↔ role (0099): a system role or the tenant's own custom role (trigger); never granted by a member of the group (trigger, 42501). `getTenantContext()` combines these with direct roles on every request |
 | `authorization_policies` | FA | Explicit tenant authorization policies (FOUNDATION-P0-19, 0100): DENY or REQUIRE_APPROVAL for permission keys or `prefix.*`, scoped to the tenant, environments, applications or agents, with exempt roles. Never covers `tenant.security.manage` (check constraint). RLS select for members; writes by the service with `tenant.security.manage`. Read on every request by `getTenantContext()` |
 | `sso_connections` | FA | SAML/OIDC IdP configuration per tenant |
-| `audit_logs` | FA (write primitive) / OA (read, presentation, search) | Foundation owns the schema and the `writeAudit()` utility every module calls; Operations owns audit views, evidence export and search over it. No module writes to this table by hand — always through the shared utility. |
+| `audit_logs` | FA (write primitive) / OA (read, presentation, search) | Foundation owns the schema and the `writeAudit()` utility every module calls; Operations owns audit views, evidence export and search over it. No module writes to this table by hand — always through the shared utility. Since 0104 (FOUNDATION-P0-29) append-only for every role and hash-chained per tenant (`chain_seq`, `prev_hash`, `row_hash`; `verify_audit_chain()`); rows leave only via `purge_audit_logs()` |
+| `audit_log_purges` | FA | Checkpoints where a tenant's audit chain resumes after a retention purge (0104) |
 | `agents` | IA | Canonical AI agent identity |
 | `agent_identities` | IA | Correlation to IAM/service-account/workload identities |
 | `agent_owners` | IA | Business/technical/IAM/application/data/escalation/delegated owner assignments, with delegation expiry and ownership-review stamps (IDENTITY-P0-13) |
@@ -80,7 +81,15 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `certification_campaigns` | CA | Certification campaign definitions |
 | `certification_items` | CA | Individual access items under review in a campaign |
 | `certification_decisions` | CA | Reviewer decisions (approve/revoke/modify/delegate/request info) |
-| `control_frameworks` | CA | ISO 27001/42001, NIST AI RMF/CSF, SOC 2, CIS, etc. |
+| `control_frameworks` | CA | ISO 27001/42001, NIST AI RMF/CSF, SOC 2, CIS; since 0105 (COMPLIANCE-P0-13) SOX ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI ITGRC, SEBI CSCRF, CERT-In, GDPR, DPDP |
+| `privacy_settings` | CA | DPO / grievance officer / EU representative contacts, applicable regimes, notice, SDF flag (COMPLIANCE-P0-12, 0103). RLS `privacy.view` |
+| `privacy_processing_activities` | CA | Records of processing (GDPR Art. 30), lawful basis, transfers + safeguard, retention, DPIA (0103). RLS `privacy.view` |
+| `privacy_consent_purposes` | CA | Tenant consent purposes with notice versions; readable to members (0103) |
+| `privacy_consent_records` | CA | One row per consent grant; terms immutable (trigger); subject sees own, staff need `privacy.view` (0103) |
+| `privacy_requests` | CA | Data-subject / data-principal requests with statutory `due_at`, one extension, verification, four-eyes erasure (check constraint); subject sees own, staff `privacy.view` (0103) |
+| `privacy_retention_policies` | CA | Per-category retention (audit logs ≥ 365 days by constraint), applied by `/api/cron/privacy` (0103) |
+| `privacy_legal_holds` | CA | Holds that stop retention for the categories they cover (0103) |
+| `privacy_breach_incidents` | CA | Breach register with GDPR / DPDP notification timestamps (0103). RLS `privacy.view` |
 | `controls` | CA | Individual controls within a framework |
 | `control_mappings` | CA | Control ↔ WonderAgent policy mapping |
 | `control_evidence` | CA | Evidence attached to a control |
@@ -96,7 +105,14 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
 | `platform_feature_flags` | PA | Global feature flag catalog |
 | `feature_flags` | PA | Per-tenant feature flag state |
-| `subscriptions` | PA | Per-tenant plan/subscription record |
+| `subscriptions` | PA | Per-tenant plan/subscription record. Since 0102 (PLATFORM-P1-04) also the billing provider link: provider, provider customer/subscription ids, price, interval, currency, period, cancel-at-period-end, `provider_state_at` (stale-event guard); status adds trialing/incomplete/paused |
+| `billing_prices` | PA | Global price catalogue (plan × interval × currency, minor units, tax behaviour, lazily-created Stripe price / Razorpay plan ids). Select for authenticated; changed only through `/platform-admin/billing` (0102) |
+| `billing_profiles` | PA | Tenant's invoiced legal entity, address, tax id (GSTIN/VAT), provider customer ids. RLS select needs `billing.view` (0102) |
+| `billing_checkouts` | PA | Every checkout WonderID starts; the only way a webhook is matched to a tenant. RLS `billing.view` (0102) |
+| `billing_invoices` | PA | Invoice ledger with gapless `WID/<FY>/<n>` numbers (`next_invoice_number()`), tax breakdown and customer snapshot; amounts immutable once issued (trigger). RLS `billing.view` (0102) |
+| `billing_invoice_sequences` | PA | Per-financial-year invoice counter; no policies (0102) |
+| `billing_webhook_events` | PA | Signed webhook intake, idempotent on (provider, event_id), redacted payload; vendor-only, no policies (0102) |
+| `billing_adjustments` | PA | Maker-checker refunds / plan overrides / immediate cancellations; approver ≠ requester (check constraint); vendor-only (0102) |
 | `platform_audit_logs` | PA | Platform-admin action audit (separate from tenant `audit_logs`) |
 | `platform_config_versions` | PA | PLATFORM-P0-05.3 — version history for branding/feature-flag-default config changes, with rollback |
 | `platform_ai_provider_configs` | PA | PLATFORM-P0-05.2 — per-tenant BYOK key override for OpenAI or Gemini (RLS enabled, zero client policies, mirrors `integration_credentials`); the platform-wide default keys are the `PLATFORM_OPENAI_API_KEY`/`PLATFORM_GEMINI_API_KEY` env vars, not rows in this table — migrations `0057`/`0058`, built 2026-09-16 |
@@ -266,6 +282,9 @@ consume and persist into their own tables.
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |
 | `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
+| `/api/v1/privacy` (settings, processing-activities, consent-purposes, consents, requests, retention, legal-holds, breaches, `me/*` self-service) and `/api/cron/privacy` | CA |
+| `/api/v1/billing` (overview, profile, checkout, portal, subscription, invoices, `webhooks/stripe`, `webhooks/razorpay`) | PA (customer-facing billing; Platform owns billing end to end) |
+| `/api/v1/audit/integrity` | FA (verification primitive `lib/audit/integrity.ts`; Operations keeps the audit views) |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
 | `/api/gateway/v1/*` (`/authorize` live since RUNTIME-P0-15) | RA — the endpoint, which authenticates agents with API keys (FA) and calls AA's `evaluateRuntimeRequest()` for the decision |
 | `/api/v1/ai/summarize` | FA — pure passthrough wrapper over `lib/ai/summarize.ts` (FOUNDATION-P0-16); added by Experience Agent to unblock `EXPERIENCE-P0-14`, since no domain module owns this cross-cutting primitive |
@@ -283,6 +302,13 @@ composes — EA does not invent domain logic, and domain modules do not own page
 layout. Platform Agent (PA) owns `app/platform-admin/*` end-to-end (both composition
 and logic), since it is a separate authorization boundary that must not depend on the
 customer-facing shell.
+
+2026-10-01 additions: `/settings/billing` composes PA's `modules/billing`;
+`/settings/privacy` and `/my-privacy` compose CA's `modules/privacy` (whose
+contract types live in `modules/privacy/types.ts` and `rules.ts`, published
+through `modules/privacy/service.ts`, since no other module consumes them yet);
+`/audit/integrity` composes FA's `lib/audit/integrity.ts`; `/platform-admin/billing`
+is PA's.
 
 ## 4. Shared TypeScript contracts
 

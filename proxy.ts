@@ -9,6 +9,7 @@ import {
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 import { baseAppHost, parseTenantHost } from "@/lib/tenant/host";
+import { isCrossSiteApiWrite } from "@/lib/security/origin";
 
 /**
  * Reachable without a session. Everything else under the matcher needs one.
@@ -73,6 +74,12 @@ export async function proxy(request: NextRequest) {
   // trip entirely; no cookie is read or written for it.
   if (pathname.startsWith("/api/gateway/")) {
     return NextResponse.next();
+  }
+
+  // FOUNDATION-P0-30 — a browser write to the JSON API from another origin
+  // is refused before any session work (defence in depth on SameSite=Lax).
+  if (isCrossSiteApiWrite({ method: request.method, pathname, origin: request.headers.get("origin"), host: request.headers.get("x-forwarded-host") ?? request.headers.get("host") })) {
+    return NextResponse.json({ ok: false, error: { code: "CROSS_SITE_REQUEST", message: "Cross-site requests are not allowed" } }, { status: 403 });
   }
 
   const response = NextResponse.next({ request });
@@ -260,9 +267,10 @@ export async function proxy(request: NextRequest) {
   return response;
 }
 
-// Public static files skip the proxy: the build's assets, the site icons
-// and the brand artwork (public/brand/), which the sign-in page shows
-// before anyone has a session. None of it is tenant data.
+// Public static files skip the proxy: the build's assets, the site icons,
+// the brand artwork (public/brand/), which the sign-in page shows before
+// anyone has a session, and the RFC 9116 security.txt
+// (public/.well-known/), which must be public. None of it is tenant data.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|brand/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|brand/|\.well-known/).*)"],
 };

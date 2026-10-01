@@ -547,6 +547,63 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     href: "/settings/ai",
   },
   {
+    id: "billing",
+    title: "Billing: plans, payment and invoices",
+    category: "Settings",
+    summary:
+      "Choose or change your plan in Administration → Billing; you pay on Stripe's or Razorpay's secure page and WonderID never sees card or bank details.",
+    body: [
+      "Billing shows your plan, its status, your usage against the plan's limits, and your invoices. Viewing needs the View billing permission; choosing a plan, paying, cancelling or changing billing details needs Manage billing.",
+      "Add your billing details first: the legal entity to invoice, its country and, for tax, a GSTIN (India) or VAT number (EU/UK). Indian prices include 18% GST; invoices show CGST and SGST for a supply within the supplier's state, or IGST otherwise, and carry a consecutive invoice number.",
+      "Payments in Indian rupees go through Razorpay (cards, UPI, net banking and RBI e-mandates); US dollars and euros go through Stripe. After paying, your plan changes as soon as the provider confirms the payment, usually within a minute.",
+      "Cancelling takes effect at the end of the period you have paid for; nothing is deleted and the organization then moves to the Free plan's limits. Refunds and other adjustments are made by WonderID staff and need two people to approve.",
+    ],
+    keywords: ["billing", "payment", "pay", "stripe", "razorpay", "invoice", "gst", "gstin", "vat", "plan", "upgrade", "subscription", "cancel", "refund", "upi", "card"],
+    href: "/settings/billing",
+  },
+  {
+    id: "privacy",
+    title: "Privacy: GDPR and DPDP",
+    category: "Compliance",
+    summary:
+      "Privacy & Data Protection runs your GDPR and DPDP obligations: rights requests on statutory deadlines, records of processing, consent, retention, legal holds and breach notification.",
+    body: [
+      "Rights requests: members raise them on My privacy, or privacy staff log ones received by email or post. Each gets its legal deadline from receipt — one month under GDPR (extendable once by up to two more), 90 days under DPDP, 45 under CCPA — and reminders as it nears. Identity is verified before anything is released or deleted.",
+      "Erasure is prepared by one person and approved by another; approving removes the person from the organization and pseudonymises their identity records, consents and earlier requests. The audit trail is kept unchanged, as the law allows for records kept under a legal obligation.",
+      "Records of processing (GDPR Art. 30), consent purposes with notice versions, retention periods for each kind of data, and legal holds that stop retention deleting anything they cover are all on the same screen.",
+      "The breach register starts the statutory clocks at detection: notify the supervisory authority within 72 hours under GDPR unless a risk is unlikely, and under DPDP intimate the Data Protection Board and every affected person without delay, with a detailed report within 72 hours.",
+    ],
+    keywords: ["gdpr", "dpdp", "privacy", "data subject", "data principal", "dsar", "erasure", "right to be forgotten", "consent", "breach", "retention", "dpo", "grievance", "ropa", "legal hold"],
+    href: "/settings/privacy",
+  },
+  {
+    id: "my-privacy",
+    title: "My privacy: your own data",
+    category: "Settings",
+    summary:
+      "Every member can download their data, give or withdraw consent, and raise a privacy request from My privacy in the account menu.",
+    body: [
+      "Download my data gives you a machine-readable copy of what your organization holds about you in WonderID.",
+      "Consents can be withdrawn with one click, as easily as they were given. Requests show the date by which your organization must answer.",
+    ],
+    keywords: ["my data", "download", "export", "consent", "withdraw", "personal data", "privacy request"],
+    href: "/my-privacy",
+  },
+  {
+    id: "audit-integrity",
+    title: "Audit integrity and financial compliance",
+    category: "Compliance",
+    summary:
+      "The audit trail is append-only and hash-chained; Audit Integrity verifies that no entry was changed, removed or reordered, for SOX, PCI DSS and similar audits.",
+    body: [
+      "No one, including WonderID's own service, can edit an audit entry; the database refuses it. Entries leave only through the retention purge, which never touches the last year or anything under a legal hold.",
+      "Each entry carries a SHA-256 hash of its content linked to the entry before it, so any tampering breaks the chain at a specific entry. Audit Integrity checks the whole chain when you open it and records that check.",
+      "Control libraries for SOX IT general controls, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF and CERT-In sit alongside ISO 27001, SOC 2 and the AI frameworks. Mapping controls and attaching evidence supports your auditors; it does not by itself make an organization compliant.",
+    ],
+    keywords: ["sox", "sarbanes", "audit", "tamper", "hash chain", "integrity", "pci", "itgc", "soc 1", "financial", "rbi", "sebi", "dora", "evidence"],
+    href: "/audit/integrity",
+  },
+  {
     id: "tenancy",
     title: "Organizations and data isolation",
     category: "Settings",

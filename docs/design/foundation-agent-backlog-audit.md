@@ -2105,3 +2105,103 @@ this build. `741aabf` goes to main.
   relationship removal by id.
 - "Why can / why can't" explanations: FOUNDATION-P0-20 (the engine
   already returns the facts).
+
+---
+
+## 2026-10-01 — FOUNDATION-P0-28 / P0-29 / P0-30: compliance permissions, tamper-evident audit trail, IT security hardening
+
+Explicit user request: implement Razorpay and Stripe, GDPR and DPDP, SOX and
+other financial compliance, and IT security best practice. These are the
+Foundation-owned parts. Platform (billing) and Compliance (privacy,
+frameworks) have their own entries.
+
+**Findings that drove the work.**
+- `audit_logs` had no client write policy, but any service-role caller could
+  UPDATE or DELETE rows, and nothing would show it.
+- Sensitive new tables needed role-aware RLS. The existing member-wide pattern
+  would let any member read invoices or breach records through PostgREST.
+- There was no HSTS/COOP/CORP header, no cross-site check on the JSON API, no
+  CI for typecheck/lint/unit tests/dependency audit, no `security.txt`, and no
+  way to rotate the encryption key.
+
+**What was built.**
+- `0101_foundation_compliance_permissions.sql` adds 6 catalogued keys
+  (`billing.view`, `billing.manage`, `privacy.view`, `privacy.manage`,
+  `privacy.requests.process`, `privacy.incidents.manage`), granted to Tenant
+  Administrator, Governance Admin, Security Admin and Auditor. It uses `set local
+  wonderid.system_roles_change` because 0098's guard rejected the first apply.
+  It also adds `has_tenant_permission(tenant, key)`: tenant-wide, currently
+  valid, active-role grants only, MFA-conditioned grants only on aal2, and
+  narrower than `getTenantContext()` by design.
+- `0104_foundation_audit_integrity.sql`:
+  - `audit_logs.chain_seq/prev_hash/row_hash`, backfilled for all 8,940
+    existing rows.
+  - The `audit_logs_chain` BEFORE INSERT trigger: a per-tenant advisory lock,
+    then SHA-256 over the previous hash and the row's fields.
+  - `audit_logs_append_only`: UPDATE is always refused; DELETE is refused
+    except through the retention purge or a tenant's own hard-delete cascade.
+  - `purge_audit_logs()`: oldest prefix only, never under 365 days, legal holds
+    honoured, checkpoint in `audit_log_purges`.
+  - `verify_audit_chain()`.
+  - `platform_audit_logs` is append-only too; only the FK's set-null on a
+    tenant hard delete may touch it.
+- `lib/audit/integrity.ts` + `GET /api/v1/audit/integrity` + `/audit/integrity`
+  (audit.read). The verification itself is audited.
+- `lib/rbac/permissionHolders.ts`: notification recipients for one tenant.
+  It never decides authorization.
+- `lib/security/redact.ts`: key deny-list, secret shapes, Luhn card numbers,
+  bounded depth and size.
+- `lib/security/encryptSecret.ts` key rotation via
+  `SECRET_ENCRYPTION_KEY_PREVIOUS` and `reencryptSecret()`. The existing format
+  is unchanged.
+- `lib/security/origin.ts` `isCrossSiteApiWrite()`, wired into `proxy.ts`
+  before any session work.
+- `next.config.ts`:
+  - New headers: HSTS 2y with preload, COOP/CORP same-origin,
+    `X-DNS-Prefetch-Control: off`, `X-Permitted-Cross-Domain-Policies: none`,
+    and a wider Permissions-Policy.
+  - CSP gains `frame-src 'none'`, `object-src 'none'` and a `form-action`
+    allow-list for the payment providers' hosted pages.
+  - `poweredByHeader: false`.
+  - `upgrade-insecure-requests` was tried and dropped: it risks breaking the
+    http://localhost E2E server, and HSTS covers production.
+- `public/.well-known/security.txt`, excluded from the proxy matcher so it is
+  public. `.github/workflows/security.yml` runs typecheck, lint, unit tests,
+  `npm audit --omit=dev --audit-level=high`, and a committed-secret grep.
+
+**Verification.**
+- `verify_audit_chain()` on the three live tenants with audit rows: intact
+  (8,287 / 609 / 44 rows).
+- Rolled-back tamper test on the live project:
+  - A new row chained to seq 45 with a matching prev hash.
+  - UPDATE, DELETE, a purge inside 365 days, and a `platform_audit_logs`
+    update were all rejected.
+  - With the trigger disabled, an altered row was found at its exact
+    sequence ("row content does not match its hash").
+- `tests/compliance/billing-privacy-tenant-isolation.sql`: 28/28 checks as
+  expected (rolled back, verified clean).
+- Unit tests: `redact` 5, `origin` 4, `encryptSecret` rotation 1, full suite
+  797/797.
+- `next build` succeeded. Header and route behaviour was checked against a
+  built server: `curl -I` shows HSTS/COOP/CORP/CSP and no `X-Powered-By`; a
+  cross-origin POST to `/api/v1/billing/checkout` returns 403; security.txt is
+  served signed-out.
+- eslint is clean on the whole repo.
+- Security advisors after the migrations raise nothing new beyond the expected
+  ones:
+  - INFO "RLS enabled, no policy" on the vendor-only billing tables, the same
+    pattern as `platform_*`.
+  - WARN `has_tenant_permission` executable by authenticated. This is
+    intended: RLS calls it, and it only answers about the caller themself.
+
+**Not done / handed on.**
+- Supabase Auth leaked-password protection is still OFF (advisor WARN). It is a
+  dashboard setting this session cannot change; the project owner must enable
+  it.
+- CSP `'unsafe-inline'` scripts remain, for Next's bootstrap. Per-request
+  nonces in `proxy.ts` are the follow-up.
+- The full Playwright suite was not run in this session. The proxy, headers
+  and RLS changed, so CLAUDE.md §17.8 requires the full suite before release.
+  It is the first thing for the next session or CI.
+- `security.txt` has a placeholder contact (`security@wonderid.example`). The
+  owner must set the real one.

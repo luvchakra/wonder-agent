@@ -923,3 +923,15 @@ past 30 routes. Two full runs on 2026-09-26 timed out on the last routes at
 Each width now sweeps the list in two halves, in two tests. No route or
 check was removed. Agent 360 is still resolved from the list, in part 1.
 The split spec passed alone, 29/29, in 5.6 min.
+
+---
+
+## 2026-10-01 — New isolation proof for billing, privacy and the audit trail
+
+`tests/compliance/billing-privacy-tenant-isolation.sql` covers migrations
+0101–0104. It runs in one transaction and rolls back. It was run live and all
+28 checks matched (see the Foundation, Platform and Compliance entries for the
+list). The full Playwright suite was **not** run in this session. Because
+`proxy.ts`, security headers and RLS changed, §17.8 requires it before the
+next release. The existing `csrf.spec.ts` should still pass: it uses a GET,
+which the new cross-site write guard does not touch.
