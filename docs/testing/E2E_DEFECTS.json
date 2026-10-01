@@ -33,7 +33,10 @@
       "test": "has_column_privilege('authenticated', <table>, 'tenant_id', 'UPDATE') = true for agents, policies, integrations, identities, access_requests, policy_exceptions, risk_severity_weights, agent_relationships; UPDATE WITH CHECK only requires the new tenant_id to be one of the caller's tenants.",
       "evidence": "Same policy set as E2E-001. Composite same-tenant foreign keys (migration 0076) block moving a row that has cross-referenced children, but leaf rows are not protected.",
       "impact": "Cross-tenant data movement (exfiltration from org A into org B where the user is an admin) by a user who holds only READ_ONLY in org A. Rated HIGH, not CRITICAL, because it requires membership in both organizations; upgrade to CRITICAL if confirmed live.",
-      "sourceFiles": ["supabase/migrations (UPDATE policies)", "tests/qa/same-tenant-references.sql"],
+      "sourceFiles": [
+        "supabase/migrations (UPDATE policies)",
+        "tests/qa/same-tenant-references.sql"
+      ],
       "suggestedFix": "Revoke UPDATE on tenant_id from authenticated on every tenant table (or add a BEFORE UPDATE trigger raising when NEW.tenant_id <> OLD.tenant_id). Confirm with a rolled-back SQL fixture using a two-membership user."
     },
     {
@@ -46,7 +49,13 @@
       "test": "Code review of assignRole() and addGroupMember().",
       "evidence": "lib/rbac/roles.ts:118 assignRole() checks only actorId !== targetUserId, role exists and is active. lib/users/groups.ts:318 addGroupMember() needs only groups.manage_members and checks only actorId !== userId. Custom-role design (lib/rbac/customRoles.ts escalationIn) does enforce a ceiling, so the gap is specific to assignment.",
       "impact": "A delegated administrator holding a custom role with roles.assign can grant TENANT_SUPER_ADMIN to a colleague or to a second account they invited (users.invite). A holder of groups.manage_members, without roles.assign, can add anyone to a group that carries TENANT_SUPER_ADMIN.",
-      "sourceFiles": ["lib/rbac/roles.ts", "lib/users/groups.ts", "app/actions/roles.ts", "app/actions/groups.ts", "app/actions/users.ts"],
+      "sourceFiles": [
+        "lib/rbac/roles.ts",
+        "lib/users/groups.ts",
+        "app/actions/roles.ts",
+        "app/actions/groups.ts",
+        "app/actions/users.ts"
+      ],
       "suggestedFix": "Before assigning a role (directly, through invite, or by adding a member to a group with roles), require that the actor holds every permission of each role being conferred (reuse escalationIn from lib/rbac/roleRules.ts). Treat adding a member to a group with roles as role assignment (require roles.assign)."
     },
     {
@@ -59,7 +68,9 @@
       "test": "node: isSafeRelativeNextPath('/\\\\evil.example') === true; new URL('/\\\\evil.example', 'https://agent.wonderapps.biz/auth/callback').href === 'https://evil.example/'. The same holds for '/\\t/evil.example'.",
       "evidence": "app/auth/callback/route.ts:15-17 accepts any value starting with '/' and not '//'.",
       "impact": "After a successful code exchange the user is redirected off-site (phishing after a genuine sign-in or password reset).",
-      "sourceFiles": ["app/auth/callback/route.ts"],
+      "sourceFiles": [
+        "app/auth/callback/route.ts"
+      ],
       "suggestedFix": "Resolve with new URL(next, request.url) and require result.origin === new URL(request.url).origin; also reject backslashes and control characters."
     },
     {
@@ -72,7 +83,10 @@
       "test": "proxy.ts: when wa_session_started_at is absent it is backfilled to now; checkSessionExpiry(null, null) is never expired.",
       "evidence": "lib/tenant/sessionSecurity.ts:32-44; proxy.ts session-expiry block.",
       "impact": "A client (or a stolen-token replay through curl) that omits the two cookies is never idle- or absolute-expired by the app. Supabase JWT and refresh-token lifetimes still apply.",
-      "sourceFiles": ["proxy.ts", "lib/tenant/sessionSecurity.ts"],
+      "sourceFiles": [
+        "proxy.ts",
+        "lib/tenant/sessionSecurity.ts"
+      ],
       "suggestedFix": "Anchor the absolute timeout to the session's server-side creation time (JWT iat / auth.sessions.created_at) and the idle timeout to a server-side last-seen record, not to client cookies."
     },
     {
@@ -85,7 +99,11 @@
       "test": "Policy users_update_self: USING/WITH CHECK id = auth.uid(), no column restriction; UPDATE granted to authenticated.",
       "evidence": "public.users has columns id, email, display_name, created_at. Admin screens, group/role holder lists and email notifications (modules/operations/email.ts:97) read these columns.",
       "impact": "A user can impersonate another person's name or email in approval queues, holder lists and audit displays, and silently redirect their own notifications.",
-      "sourceFiles": ["supabase/migrations (users_update_self)", "lib/users/users.ts", "modules/operations/email.ts"],
+      "sourceFiles": [
+        "supabase/migrations (users_update_self)",
+        "lib/users/users.ts",
+        "modules/operations/email.ts"
+      ],
       "suggestedFix": "Restrict the self-update policy to display_name via column grants (REVOKE UPDATE(email)), and keep email synced only from auth.users."
     },
     {
@@ -98,7 +116,10 @@
       "test": "app/auth/callback/route.ts merges claims as { ...identityData, ...user.user_metadata }; resolveJitRole reads the configured role claim from the merged object.",
       "evidence": "user_metadata is writable by the user via supabase.auth.updateUser({ data }).",
       "impact": "If an account's user_metadata carries the configured role claim before JIT provisioning, the self-asserted value outranks the IdP's. Exploitability depends on GoTrue's SSO sign-in behaviour; needs a test IdP to confirm.",
-      "sourceFiles": ["app/auth/callback/route.ts", "lib/auth/sso.ts:203"],
+      "sourceFiles": [
+        "app/auth/callback/route.ts",
+        "lib/auth/sso.ts:203"
+      ],
       "suggestedFix": "Read role/group claims only from the IdP-asserted identity_data (or app_metadata), never from user_metadata."
     },
     {
@@ -111,7 +132,9 @@
       "test": "Code review of recordDecision delegate branch.",
       "evidence": "modules/certification-compliance/decisions.ts:39-40 only checks presence; :187 writes reviewer_id = delegateToUserId with the service role. There is no check that the delegate is an active member of the tenant or not an owner of the reviewed agent.",
       "impact": "A reviewer can hand an item to a non-member (the item becomes unreviewable) or to the agent's own owner, steering it toward self-certification (the owner still meets the SoD prompt at decision time).",
-      "sourceFiles": ["modules/certification-compliance/decisions.ts"],
+      "sourceFiles": [
+        "modules/certification-compliance/decisions.ts"
+      ],
       "suggestedFix": "Validate that delegateToUserId is an active member of the tenant with compliance.decide and is not an owner of the item's agent."
     },
     {
@@ -124,7 +147,9 @@
       "test": "Code review of receiveWebhook().",
       "evidence": "modules/integrations/webhooks.ts: the HMAC covers the body only (no timestamp). Bodies without id/eventId get randomUUID(), so a replayed signed body creates a new row each time. An upsert error returns insertError.message to the caller.",
       "impact": "Replay of captured signed bodies creates duplicate activity rows; internal error text is visible to the caller.",
-      "sourceFiles": ["modules/integrations/webhooks.ts"],
+      "sourceFiles": [
+        "modules/integrations/webhooks.ts"
+      ],
       "suggestedFix": "Sign a timestamp header with the body and reject outside a replay window (reuse isWithinReplayWindow); derive a deterministic id from the body hash; return a generic error."
     },
     {
@@ -137,7 +162,12 @@
       "test": "Anonymous POST with an empty body: /api/v1/authorization-policies/[id]/status, /api/v1/roles/[id]/status, /api/v1/users/[id]/roles (POST and DELETE), /api/v1/users/[id]/status return 400 with schema hints; with a valid body they return 401.",
       "evidence": "curl output recorded in E2E_TEST_EXECUTION.md phase 5.",
       "impact": "Minor: an anonymous caller learns the expected input shape.",
-      "sourceFiles": ["app/api/v1/roles/[id]/status/route.ts", "app/api/v1/users/[userId]/roles/route.ts", "app/api/v1/users/[userId]/status/route.ts", "app/api/v1/authorization-policies/[id]/status/route.ts"],
+      "sourceFiles": [
+        "app/api/v1/roles/[id]/status/route.ts",
+        "app/api/v1/users/[userId]/roles/route.ts",
+        "app/api/v1/users/[userId]/status/route.ts",
+        "app/api/v1/authorization-policies/[id]/status/route.ts"
+      ],
       "suggestedFix": "Resolve tenant context and permission before parsing the body."
     },
     {
@@ -150,7 +180,10 @@
       "test": "Fresh clone + npm ci + npm run typecheck → 8 × TS2307 for the PNG imports in app/welcome/page.tsx; passes after npx next typegen.",
       "evidence": "next-env.d.ts is gitignored and generated only by next dev/build/typegen.",
       "impact": "Typecheck as the first verification step in a new session or CI job without a build fails spuriously.",
-      "sourceFiles": ["package.json", "app/welcome/page.tsx"],
+      "sourceFiles": [
+        "package.json",
+        "app/welcome/page.tsx"
+      ],
       "suggestedFix": "\"typecheck\": \"next typegen && tsc --noEmit\"."
     },
     {
@@ -163,7 +196,10 @@
       "test": "node tests/live-client-tenant-isolation.mjs → 150 PASS, 1 FAIL ('applications visible to B — 0 rows').",
       "evidence": "e2e-tenant-two has 0 applications, so the reality check cannot prove isolation for that table. Tenants fixture-tenant-a5-test/b5-test remain in the shared database from an earlier SQL fixture run.",
       "impact": "One table's isolation is unproven in that direction; stale fixture rows accumulate in a database that also serves production.",
-      "sourceFiles": ["tests/live-client-tenant-isolation.mjs", "tests/e2e/support/seedTestData.ts"],
+      "sourceFiles": [
+        "tests/live-client-tenant-isolation.mjs",
+        "tests/e2e/support/seedTestData.ts"
+      ],
       "suggestedFix": "Seed one application in Tenant Two in seedTestData(); clean up the a5/b5 fixtures."
     },
     {
@@ -176,7 +212,10 @@
       "test": "Vercel production env NEXT_PUBLIC_SUPABASE_URL = project ekgyjwoenteadaaqakmd, the project the CI workflow and playwright.config.ts target; real tenants (e.g. Northwind Financial) live beside e2e-* tenants.",
       "evidence": ".github/workflows/e2e.yml, playwright.config.ts, Vercel project env listing.",
       "impact": "Every CI run writes test data into production. A test defect, a fixture cleanup bug or a mis-scoped query can touch customer tenants. Destructive and exploit-style security tests cannot be run safely, which is why E2E-001/002 could not be confirmed live.",
-      "sourceFiles": [".github/workflows/e2e.yml", "playwright.config.ts"],
+      "sourceFiles": [
+        ".github/workflows/e2e.yml",
+        "playwright.config.ts"
+      ],
       "suggestedFix": "Point CI and E2E at a separate Supabase project or a Supabase branch, and keep production secrets out of CI."
     },
     {
@@ -189,8 +228,72 @@
       "test": "resolve_tenant_host(p_subdomain, p_hostname) is SECURITY DEFINER and executable by anon; returns id, name, slug, status.",
       "evidence": "Function source in the live database.",
       "impact": "Anyone can confirm an organization's existence and learn its UUID, display name and status from a guessed slug.",
-      "sourceFiles": ["proxy.ts (lookUpTenantHost)", "supabase/migrations (resolve_tenant_host)"],
+      "sourceFiles": [
+        "proxy.ts (lookUpTenantHost)",
+        "supabase/migrations (resolve_tenant_host)"
+      ],
       "suggestedFix": "Return only a boolean (the proxy uses only existence), or call it with the service role from the proxy."
+    },
+    {
+      "id": "E2E-015",
+      "severity": "LOW",
+      "area": "API / tenancy UX",
+      "title": "Sub-resource routes answer 200/empty for another tenant's id instead of 404",
+      "status": "OPEN",
+      "verification": "REPRODUCED",
+      "test": "Round-2 cross-tenant GET sweep; tests/e2e/cross-tenant-pages.spec.ts 'every detail page answers with not-found or a redirect to its list' (expected failure)",
+      "evidence": "26 of the 56 id-taking GET routes return 200 {data:[]} for a Tenant Two id when called by Tenant One (e.g. /api/v1/agents/[id]/owners, /policies/[id]/rules, /compliance/campaigns/[id]/items); /compliance/campaigns/[id] renders an empty campaign. No foreign data returned in any case.",
+      "sourceFiles": [
+        "app/api/v1/agents/[id]/*",
+        "app/api/v1/policies/[id]/*",
+        "app/(customer)/compliance/campaigns/[id]/page.tsx"
+      ],
+      "suggestedFix": "Resolve the parent record in the caller's tenant first and return 404 / notFound() when absent."
+    },
+    {
+      "id": "E2E-016",
+      "severity": "LOW",
+      "area": "UI",
+      "title": "Not-found detail pages return HTTP 200 and show the unstyled framework 404",
+      "status": "OPEN",
+      "verification": "REPRODUCED",
+      "test": "tests/e2e/cross-tenant-pages.spec.ts 'not-found detail pages carry HTTP 404' (expected failure)",
+      "evidence": "/agents/<unknown> and /policies/<unknown> render '404 This page could not be found.' with status 200; notFound() fires after app/(customer)/loading.tsx starts streaming. No app/(customer)/not-found.tsx exists.",
+      "sourceFiles": [
+        "app/(customer)/agents/[id]/page.tsx:176",
+        "app/(customer)/loading.tsx"
+      ],
+      "suggestedFix": "Check existence before the streamed boundary and add a designed not-found.tsx in app/(customer)."
+    },
+    {
+      "id": "E2E-017",
+      "severity": "LOW",
+      "area": "Responsive UI",
+      "title": "Horizontal scroll on /settings/authorization-policies at 375 px",
+      "status": "OPEN",
+      "verification": "REPRODUCED",
+      "test": "Round-2 responsive sweep (52 pages × 3 viewports)",
+      "evidence": "documentElement.scrollWidth exceeds viewport by 125 px; the 'Permissions it applies to' fieldset is 500 px wide (fieldset default min-width: min-content).",
+      "sourceFiles": [
+        "app/(customer)/settings/authorization-policies/PolicyForm.tsx:105"
+      ],
+      "suggestedFix": "Add min-w-0 to the fieldset."
+    },
+    {
+      "id": "E2E-018",
+      "severity": "LOW",
+      "area": "RBAC UX",
+      "title": "Create/launch forms shown to roles that cannot use them",
+      "status": "OPEN",
+      "verification": "REPRODUCED",
+      "test": "Round-2 READ_ONLY/REQUESTER page sweep plus POST with empty body",
+      "evidence": "READ_ONLY sees Register (/agents/new), Create (/policies), Launch (/compliance/campaigns); REQUESTER sees Register. Server refuses each: 403 Missing permission agent.create / policy.create / compliance.manage.",
+      "sourceFiles": [
+        "app/(customer)/agents/new/page.tsx",
+        "app/(customer)/policies/page.tsx",
+        "app/(customer)/compliance/campaigns/page.tsx"
+      ],
+      "suggestedFix": "Render these forms only when the context holds the permission the action requires."
     }
   ]
 }

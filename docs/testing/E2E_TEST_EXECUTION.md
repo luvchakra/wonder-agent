@@ -93,3 +93,21 @@ in the repository; "New" means added in this run.
 | Platform admin | vendor console | tenant user opens `/platform-admin` | refused | `platform-admin.spec.ts` | No | P0 | BLOCKED (anonymous → sign-in PASS) |
 | Accessibility | names, labels, keyboard, dialogs | axe / keyboard pass | no criticals | `design-review.spec.ts` (partial) | Yes (axe not installed) | P1 | NOT_TESTABLE this run |
 | Responsive | desktop/tablet/mobile | each viewport | no overflow | `design-review.spec.ts`, `shell.spec.ts` | No | P1 | BLOCKED |
+
+## Round 2 — signed-in, read-only (same day)
+
+The local production build was served by `next start` without the SSRF-guard flag. Sessions came from the repo's own `auth.setup.ts` run with `E2E_SKIP_SEED=1`, which signs in but does not seed. Only GETs, page loads and empty-body POSTs that must be refused were sent.
+
+| # | Phase | Scenario | Result | Defect | Severity | Evidence | Notes |
+|---|---|---|---|---|---|---|---|
+| R2-1 | Tenancy | 97 GET API routes as Tenant One admin, with Tenant Two's real ids (discovered from Tenant Two's own session) in every `[id]` and `tenant_id`/`tenantId` injected in the query | PASS (0 leaks) | E2E-015 | LOW | 66×200, 28×404, 3×400; the one id hit was a refused sign-in audit row (an outsider's attempt, audited in the target tenant by design) | 26 sub-resource routes answer 200/empty instead of 404 |
+| R2-2 | Tenancy | Same sweep reversed (Tenant Two admin → Tenant One) | PASS (0 leaks) | — | — | identical status profile | |
+| R2-3 | RBAC | Same sweep as READ_ONLY | PASS | — | — | 60×200, 12×403, 22×404, 3×400; every 200 inside `*.read` permissions | |
+| R2-4 | RBAC | Same sweep as REQUESTER (`access.read`, `access.request`, `agent.read`, `integration.read`, `notification.manage`) | PASS | — | — | 37×200, 44×403; every 200 is an agents/access/integrations/self route | |
+| R2-5 | RBAC | POST `/api/v1/agents`, `/policies`, `/compliance/campaigns` with `{}` as READ_ONLY and REQUESTER | PASS | — | — | 6 × 403 `Missing permission: …` | Empty body, so nothing could be written even if permitted |
+| R2-6 | RBAC UX | READ_ONLY/REQUESTER on 52 pages: visible create/launch forms | FAIL | E2E-018 | LOW | READ_ONLY: Register, Create policy, Launch campaign; REQUESTER: Register | Server refuses (R2-5) |
+| R2-7 | Tenancy UI | 8 detail URLs with Tenant Two ids as Tenant One (`cross-tenant-pages.spec.ts`) | PASS (no foreign data) | E2E-015, E2E-016 | LOW | agent tab routes redirect to `/agents` or `/risk/rogue`; agent/policy/identity show not-found with HTTP 200; the campaign shows an empty shell | |
+| R2-8 | Agent 360 | Overview / Access (CAN) / Runtime (DID) / Risk on the tenant's own agent | PASS | — | — | 200, tab bar with 4 links, 1 `aria-current`, no page error | Identity/Policies/Governance/Evidence/Timeline tabs NOT_IMPLEMENTED |
+| R2-9 | UX / a11y | 52 pages × 1440/768/375: page errors, console errors, 5xx, overflow, unnamed controls, unlabeled inputs, `img` without alt, `h1` count | PASS 152 / FAIL 1 / NOT_TESTABLE 3 | E2E-017 | LOW | `/settings/authorization-policies` +125 px at 375 | `/settings/security` console error is the browser's direct call to Supabase `/auth/v1/user` failing TLS through the sandbox proxy (environment) |
+
+New spec: `tests/e2e/cross-tenant-pages.spec.ts`. 12/12 with setup: 5 tests, of which 2 are recorded expected failures tied to E2E-015 and E2E-016.

@@ -957,3 +957,16 @@ server needs `OUTBOUND_ALLOW_PRIVATE_NETWORKS=true`.
 - E2E-004 MEDIUM: open redirect in `/auth/callback` via `/\host`.
 
 No application code was changed.
+
+**Round 2, same day (signed-in, read-only).** Cross-tenant GET sweep of 97
+routes × 4 sessions (both directions, READ_ONLY, REQUESTER): 0 leaks, and
+API RBAC is consistent with each role. Cross-tenant browser URLs: no foreign
+data rendered. 52 pages × 3 viewports: one overflow. New spec
+`tests/e2e/cross-tenant-pages.spec.ts` (12/12 with setup, 2 tests are
+expected failures pinned to defects). New LOW defects:
+- E2E-015: sub-resource routes return 200/empty for a foreign id.
+- E2E-016: not-found pages are served with HTTP 200.
+- E2E-017: 375 px overflow on `/settings/authorization-policies`.
+- E2E-018: create/launch forms are shown to roles the server refuses.
+
+Total defects: 18.
