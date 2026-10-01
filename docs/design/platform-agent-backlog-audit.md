@@ -850,3 +850,33 @@ checkout, portal and webhooks were not exercised end to end against the
 providers. Setup steps are in `docs/security/SECURITY-CONTROLS.md` §1. A Stripe
 test-mode run plus a Razorpay test-mode subscription is the next verification
 step once keys are set.
+
+### 2026-10-01 (later) — self-review fixes: gapless numbering under concurrency, in-flight webhooks, double checkout
+
+A by-hand review of the billing code found three defects. All are fixed.
+
+1. **Invoice numbers could have a gap.** `upsertInvoice()` drew
+   `next_invoice_number()` before writing, so the losing write in a race
+   discarded its number, and GST rule 46 needs a consecutive series. Migration
+   `0106_platform_billing_concurrency.sql` adds `assign_invoice_number(invoice)`,
+   which locks the invoice row and draws a number only when it will be stored.
+   The application now inserts or updates first, then calls it.
+2. **Concurrent deliveries could both process one event.** An event whose
+   status was `received` was re-processed by any redelivery.
+   `billing_webhook_events.claimed_at` (0106) is now checked: a fresh claim
+   answers "retry later" (HTTP 500 so the provider retries), and only a failed
+   event or a claim older than 2 minutes is reclaimed, conditionally on the
+   claim time just read.
+3. **Double checkout.** A second checkout was allowed while the first was
+   still open, which could open two paid subscriptions. `startCheckout()` now
+   refuses with 409 `CHECKOUT_IN_PROGRESS` when the organization opened a
+   checkout in the last 10 minutes.
+
+**Verification.**
+- `assign_invoice_number` was tested live in a rolled-back transaction:
+  - A repeat call on the same invoice returns the same number
+    (`WID/2026-27/000001`).
+  - The next invoice gets `…000002`, and the counter is 2: no number wasted.
+  - An open invoice gets none, and a missing id is refused.
+  - Verified clean afterwards.
+- typecheck, eslint and vitest 797/797 pass.

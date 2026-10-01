@@ -923,6 +923,13 @@ What the full code review found before the work, and what now holds:
   the JSON API. There was no CI for typecheck/lint/unit tests/dependency audit, and
   no `security.txt`. All are added. The encryption key could not be rotated; now
   `SECRET_ENCRYPTION_KEY_PREVIOUS` allows that.
+- **The framework had a critical advisory.** `next@16.3.5` was inside the range of
+  GHSA-vcvr-r3jv-pc5j (RCE in `next/og`). It was patched to 16.3.8. Keep
+  `npm audit --omit=dev --audit-level=high` green; a red audit is a release blocker.
+- **Concurrency is part of correctness for money.** Draw invoice numbers in the same
+  transaction that stores them (`assign_invoice_number()`), let only one processor
+  claim a webhook event (`claimed_at`), and refuse a second checkout while one is
+  open.
 - **Still open, needs the owner.** Supabase Auth's leaked-password protection is off.
   It is a project dashboard setting this sandbox cannot change. The CSP still allows
   `'unsafe-inline'` scripts for Next's bootstrap; moving to per-request nonces is a

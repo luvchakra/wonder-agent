@@ -2205,3 +2205,30 @@ frameworks) have their own entries.
   It is the first thing for the next session or CI.
 - `security.txt` has a placeholder contact (`security@wonderid.example`). The
   owner must set the real one.
+
+### 2026-10-01 (later) — critical Next.js advisory patched; new CI workflow verified locally
+
+Running the new security workflow's checks locally found one failure.
+`npm audit --omit=dev --audit-level=high` reported a **critical** advisory,
+GHSA-vcvr-r3jv-pc5j (remote code execution in `next/og` `ImageResponse`,
+`>=16.2.0 <16.3.6`), against the pinned `next@16.3.5`. The app does not import
+`next/og`, so it was not directly exposed. `next` and `eslint-config-next`
+were bumped to the non-breaking patch release **16.3.8**; the lockfile changed
+50 lines.
+
+After the bump, every check in `.github/workflows/security.yml` was run
+locally:
+- `npm audit` exits 0 and the secret scan finds nothing.
+- typecheck is clean except the 8 existing `app/welcome` image-module errors,
+  which a fresh clone without a build always shows; `next build` generates the
+  types.
+- eslint is clean and vitest is 797/797.
+- `next build` passes on Next.js 16.3.8.
+- A built-server smoke test passed: `/welcome` 200 with HSTS/COOP/CSP and no
+  `X-Powered-By`, a cross-site POST to `/api/v1/privacy/requests` is 403, and
+  the trust section renders.
+
+The typecheck step needed a fix. `next-env.d.ts` is gitignored, so on a fresh
+checkout typecheck reported 8 errors (verified: with the file removed, 8; after
+`npx next typegen`, 0). The workflow now runs `npx next typegen` before
+`npm run typecheck`.

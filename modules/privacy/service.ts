@@ -539,6 +539,11 @@ export async function advanceRequest(tenantId: string, actorId: string, requestI
         await audit(tenantId, actorId, "privacy.request_self_approval_refused", "privacy_request", requestId, {}, "failure");
         throw new ApiError(403, "FOUR_EYES_REQUIRED", "A different person must approve what you prepared");
       }
+      // Nor can the person whose data it is approve its erasure (a conflict of interest, and Foundation's lifecycle refuses a self-removal).
+      if (req.subjectUserId && req.subjectUserId === actorId) {
+        await audit(tenantId, actorId, "privacy.request_self_approval_refused", "privacy_request", requestId, { reason: "subject" }, "failure");
+        throw new ApiError(403, "FOUR_EYES_REQUIRED", "Someone other than the requester must approve the erasure of their own data");
+      }
       // Execute first; only a completed erasure is recorded as completed (§17.5).
       const result = await eraseSubject(tenantId, actorId, { userId: req.subjectUserId, email: req.subjectEmail }, requestId);
       to = "completed";
