@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/db/env";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { Button } from "./Button";
 
@@ -17,11 +18,47 @@ import { Button } from "./Button";
  * PKCE code verifier into a cookie the server callback can read, which is
  * what lets `exchangeCodeForSession()` complete server-side.
  *
+ * Before redirecting, the button asks Supabase Auth's public settings
+ * endpoint whether the Google provider is enabled. `signInWithOAuth` does
+ * not report "provider is not enabled" itself: it simply navigates the
+ * browser to `/auth/v1/authorize`, and a disabled provider there returns a
+ * raw JSON 400 page. So the check is the only way to tell the user the
+ * truth on this screen (CLAUDE.md §17.5). It is a UX guard only, never an
+ * authorization decision: if the settings call itself fails, the redirect
+ * proceeds and Supabase Auth remains the authority.
+ *
  * Deliberately NOT rate-limited through `app/actions/auth.ts` like the
  * password paths are: no credential is presented here for us to throttle —
  * Google performs the authentication, and Supabase Auth applies its own
  * limits to the callback.
  */
+export const GOOGLE_NOT_ENABLED_MESSAGE =
+  "Google sign-in is not enabled for WonderID yet. Use your email and password, or ask your administrator.";
+
+/**
+ * Reads `external.google` from Supabase Auth's public settings. Returns
+ * `null` when the answer is unknown (network failure, timeout, unexpected
+ * shape), so the caller falls through to Supabase rather than blocking on a
+ * guess.
+ */
+const SETTINGS_TIMEOUT_MS = 3_000;
+
+export async function isGoogleProviderEnabled(fetchImpl: typeof fetch = fetch): Promise<boolean | null> {
+  try {
+    const res = await fetchImpl(`${getSupabaseUrl()}/auth/v1/settings`, {
+      headers: { apikey: getSupabasePublishableKey() },
+      cache: "no-store",
+      // A slow answer must never leave the button stuck on "Redirecting…".
+      signal: AbortSignal.timeout(SETTINGS_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { external?: { google?: unknown } };
+    return typeof body.external?.google === "boolean" ? body.external.google : null;
+  } catch {
+    return null;
+  }
+}
+
 export function GoogleAuthButton({ label = "Continue with Google" }: { label?: string }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,15 +66,20 @@ export function GoogleAuthButton({ label = "Continue with Google" }: { label?: s
   async function handleClick() {
     setPending(true);
     setError(null);
+    if ((await isGoogleProviderEnabled()) === false) {
+      setError(GOOGLE_NOT_ENABLED_MESSAGE);
+      setPending(false);
+      return;
+    }
     const supabase = supabaseBrowser();
     const { error: oauthError } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/auth/callback` },
     });
-    // On success the browser navigates to Google and nothing below runs.
-    // A failure here is almost always "provider is not enabled" on the
-    // Supabase project — surfaced rather than swallowed, so a
-    // misconfigured deployment is legible instead of a dead button.
+    // On success the browser navigates to Supabase Auth, then Google, and
+    // nothing below runs. A failure here (e.g. the client cannot build the
+    // PKCE request) is surfaced rather than swallowed, so a misconfigured
+    // deployment is legible instead of a dead button.
     if (oauthError) {
       setError(oauthError.message);
       setPending(false);

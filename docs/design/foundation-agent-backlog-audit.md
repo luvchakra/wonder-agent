@@ -2232,3 +2232,82 @@ The typecheck step needed a fix. `next-env.d.ts` is gitignored, so on a fresh
 checkout typecheck reported 8 errors (verified: with the file removed, 8; after
 `npx next typegen`, 0). The workflow now runs `npx next typegen` before
 `npm run typecheck`.
+
+---
+
+## 2026-10-02 — Google sign-up / sign-in: readiness check and two safe-failure fixes
+
+User request: make sure Google sign-up and sign-in work, and list what the
+owner must do.
+
+**Finding.** The code path is correct: `GoogleAuthButton` calls
+`signInWithOAuth({ provider: "google" })` with PKCE, back to `/auth/callback`,
+which exchanges the code. A user who already belongs to an organization lands
+on `/`; a new user lands on `/onboarding`. It cannot work yet only because
+Google is **disabled on the Supabase project**:
+- `GET /auth/v1/settings` returns `external.google: false`.
+- `/auth/v1/authorize?provider=google` returns 400 "Unsupported provider:
+  provider is not enabled".
+- Because `signInWithOAuth` just navigates to that URL, users saw a raw JSON
+  error page.
+
+**Fixes (code).**
+- `modules/ui/GoogleAuthButton.tsx` (Experience-owned UI primitive):
+  - Before redirecting, the button reads Supabase Auth's public settings
+    (publishable key, 3 s timeout).
+  - If Google is disabled, it shows "Google sign-in is not enabled for
+    WonderID yet…" and stays on the page.
+  - If the check cannot be made, the redirect proceeds and Supabase stays the
+    authority. This is a UX guard only, never an authorization decision.
+- `app/auth/callback/route.ts`:
+  - A round trip that returns without a session is no longer a silent bounce.
+    The causes are `?error=…` from Google/Supabase or a failed code exchange.
+  - `/sign-in` now gets a fixed `reason` code: `oauth_cancelled` for
+    `access_denied`, otherwise `oauth_failed`. `SignInForm` shows a matching
+    notice.
+  - The provider's `error_description` is never reflected (§17.2).
+  - Behaviour with a valid session, `?next=`, SSO JIT provisioning and the
+    recovery flow is unchanged.
+
+**Verification.**
+- `tsc --noEmit`: 0 errors. eslint: clean. Vitest: 806/806 (104 files),
+  including 5 new `GoogleAuthButton` tests and 4 new `signInFailureReason`
+  tests.
+- `tests/e2e/auth.spec.ts`:
+  - The existing Google test now stubs the settings answer. It also fulfills
+    (rather than aborts) the authorize request; an abort raced the next
+    `page.goto` (3/6 failures before the change, 0 after).
+  - Two new tests: the disabled-provider message, and the callback error path,
+    covering cancelled, failed, provider text not reflected, and a bad code.
+  - The three Google tests ran 5× against a local production build: 15/15.
+- Against the real dev project's settings payload (`google: false`), in
+  Chromium light and dark, on /sign-in and /sign-up: the message appears in
+  under 110 ms, the URL is unchanged and the button stays enabled.
+- In this sandbox Chromium cannot complete the cross-origin settings GET
+  through the TLS-intercepting proxy, although the preflight succeeds. curl
+  confirms Supabase returns the right CORS headers for `agent.wonderapps.biz`.
+  The 3 s timeout fallback was observed working there.
+- **Not run:** the full Playwright suite (§17.8 lists auth changes). The
+  repository has no `SUPABASE_SERVICE_ROLE_KEY` here, so auth setup cannot run.
+  The diff is confined to the no-session branch of the callback and the
+  Google button.
+- **Not verified:** a real Google login. It needs the provider enabled.
+
+**Owner steps to enable Google** (dashboard settings, not code):
+1. Google Cloud Console → APIs & Services:
+   - OAuth consent screen (External; app name WonderID; support email;
+     authorized domain `wonderapps.biz`; scopes `openid`, `email`,
+     `profile`).
+   - Then Credentials → Create OAuth client ID → Web application.
+   - Authorized JavaScript origins: `https://agent.wonderapps.biz`.
+   - Authorized redirect URI:
+     `https://ekgyjwoenteadaaqakmd.supabase.co/auth/v1/callback`.
+2. Supabase → Authentication → Sign In / Providers → Google: enable it and
+   paste the Client ID and Client Secret.
+3. Supabase → Authentication → URL Configuration:
+   - Site URL `https://agent.wonderapps.biz`.
+   - Redirect URLs `https://agent.wonderapps.biz/auth/callback`,
+     `https://wonder-agent-tau.vercel.app/auth/callback`,
+     `https://*-luvchakras-projects.vercel.app/auth/callback` (previews) and
+     `http://localhost:3000/auth/callback`.
+4. Publish the consent screen; in "Testing" only listed test users can sign in.

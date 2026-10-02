@@ -21,7 +21,16 @@ export function SignInFormBoundary({ tenant }: { tenant: SignInTenant }) {
 function SignInForm({ tenant }: { tenant: SignInTenant }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const sessionExpired = searchParams.get("reason") === "expired";
+  const reason = searchParams.get("reason");
+  const sessionExpired = reason === "expired";
+  // Set by /auth/callback when a Google or SSO round trip came back
+  // without a session. Only these fixed codes are recognised.
+  const oauthNotice =
+    reason === "oauth_cancelled"
+      ? "Google sign-in was cancelled. Try again, or use your email and password."
+      : reason === "oauth_failed"
+        ? "Sign-in with Google or SSO did not complete. Try again, or use your email and password."
+        : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +138,11 @@ function SignInForm({ tenant }: { tenant: SignInTenant }) {
             </Link>
           </div>
 
+          {oauthNotice && !error ? (
+            <p role="status" className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
+              {oauthNotice}
+            </p>
+          ) : null}
           {sessionExpired && !error ? (
             <p role="status" className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-foreground">
               Your session expired. Please sign in again.

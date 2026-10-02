@@ -17,6 +17,21 @@ export function isSafeRelativeNextPath(next: string | null): next is string {
 }
 
 /**
+ * Why a sign-in that reached this callback without producing a session
+ * failed, as a fixed code for /sign-in's `reason` parameter. The provider's
+ * own `error_description` is deliberately never forwarded: it is external
+ * text, and reflecting it onto the sign-in page would let anyone craft a
+ * link that displays arbitrary wording there (CLAUDE.md §17.2).
+ * `access_denied` is what Google (and the OAuth spec) return when the user
+ * cancels on the consent screen.
+ */
+export function signInFailureReason(providerError: string | null, exchangeFailed: boolean): string | null {
+  if (providerError === "access_denied") return "oauth_cancelled";
+  if (providerError || exchangeFailed) return "oauth_failed";
+  return null;
+}
+
+/**
  * FOUNDATION-P0-03.3 — completes an SSO (or any Supabase Auth PKCE) redirect
  * and performs SSO just-in-time tenant provisioning.
  *
@@ -31,10 +46,13 @@ export function isSafeRelativeNextPath(next: string | null): next is string {
  */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
+  const providerError = request.nextUrl.searchParams.get("error");
   const supabase = await supabaseServer();
 
+  let exchangeFailed = false;
   if (code) {
-    await supabase.auth.exchangeCodeForSession(code);
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    exchangeFailed = !!error;
   }
 
   const {
@@ -42,7 +60,12 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user?.email) {
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+    // A failed or cancelled Google/SSO round trip lands here with no
+    // session; say so on /sign-in rather than silently showing the form.
+    const signIn = new URL("/sign-in", request.url);
+    const reason = signInFailureReason(providerError, exchangeFailed);
+    if (reason) signIn.searchParams.set("reason", reason);
+    return NextResponse.redirect(signIn);
   }
 
   const domain = user.email.split("@")[1]?.toLowerCase();
