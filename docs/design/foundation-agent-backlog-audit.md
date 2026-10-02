@@ -2398,3 +2398,46 @@ list what the owner must do.
 
 The Supabase URL Configuration (Site URL and redirect URLs) is the same as in
 the Google entry above.
+
+---
+
+## 2026-10-02 — Social sign-in readiness re-check via the Supabase MCP connection
+
+User request: re-check Google/Microsoft/LinkedIn now that Supabase is
+connected over MCP. No code changed. The MCP server exposes no Auth-config
+tool, so it can **read** state (project, logs, advisors) but cannot enable
+providers or edit URL settings. The OAuth client IDs and secrets have to come
+from Google Cloud, Microsoft Entra and LinkedIn in any case.
+
+**Findings (project `ekgyjwoenteadaaqakmd`, ACTIVE_HEALTHY).**
+- **All three providers are still disabled.** `/auth/v1/settings` reports
+  `google`, `azure` and `linkedin_oidc` all `false`. `auth_logs` shows every
+  `/authorize` attempt today returning 400 "provider is not enabled".
+- **The Site URL and redirect allow-list cover only
+  `wonder-agent-tau.vercel.app`.**
+  - Method: `/authorize` was probed with chosen `redirect_to` values, and the
+    `referer` GoTrue logged for each (the address it would actually return
+    to) was read back.
+  - Allowed: `https://wonder-agent-tau.vercel.app/auth/callback`, including
+    with a query string, so the entry is a wildcard.
+  - Replaced by the Site URL `https://wonder-agent-tau.vercel.app/`:
+    `https://agent.wonderapps.biz/auth/callback` (with or without `?next=`),
+    the Vercel preview URL and `http://localhost:3000/auth/callback`.
+  - Consequences on the production domain `agent.wonderapps.biz`:
+    - **Password reset is broken today.** `requestPasswordResetAction` builds
+      `redirectTo` from the request host, so its emailed link returns to the
+      `tau` root without reaching `/auth/callback`.
+    - Social sign-in would fail the same way once enabled: the PKCE verifier
+      cookie lives on the other domain.
+  - No code change can fix this. The owner must set the Site URL to
+    `https://agent.wonderapps.biz` and add `https://agent.wonderapps.biz/**`
+    (plus the tau, preview and localhost entries) to Redirect URLs.
+- **Security advisor:** no new issues.
+  - `auth_leaked_password_protection` is still off; the owner turns it on in
+    the dashboard.
+  - The remaining lints are long-standing and intentional:
+    - service-role-only tables (RLS enabled with no client policies);
+    - `current_tenant_ids`, `has_tenant_permission` and
+      `create_tenant_with_owner`, executable by signed-in users by design;
+    - `resolve_tenant_host`, executable by `anon` for host-based tenant
+      resolution before sign-in.
