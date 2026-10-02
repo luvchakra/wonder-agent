@@ -25,7 +25,7 @@ export { AnnouncementsBanner } from "./AnnouncementsBanner";
 export { AuthShell } from "./AuthShell";
 export { WonderIDLogo, TenantLogo, type WonderIDLogoVariant, type WonderIDLogoSize } from "./Logo";
 export { wonderIdBrand, brandTitle, type BrandAsset } from "./brand";
-export { GoogleAuthButton } from "./GoogleAuthButton";
+export { OAuthProviderButton, SocialAuthButtons } from "./SocialAuthButtons";
 export { BrowserFrame, PhoneFrame } from "./ProductShot";
 export { FlowDiagram } from "./FlowDiagram";
 export { AppSidebar, MobileNavDrawer, MobileNavTrigger, openMobileNav, type SidebarUser } from "./AppSidebar";

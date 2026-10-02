@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signUpAction } from "@/app/actions/auth";
-import { AuthShell, Button, GoogleAuthButton, TextField } from "@/modules/ui";
+import { AuthShell, Button, SocialAuthButtons, TextField } from "@/modules/ui";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -82,7 +82,7 @@ export default function SignUpPage() {
         <span className="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
 
-      <GoogleAuthButton label="Sign up with Google" />
+      <SocialAuthButtons verb="Sign up" />
     </AuthShell>
   );
 }

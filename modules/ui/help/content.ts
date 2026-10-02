@@ -510,14 +510,14 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     title: "Sign-in, SSO and security settings",
     category: "Settings",
     summary:
-      "Sign in with a password, Google or SSO; add an authenticator app for MFA; sessions expire, and signing out ends your sessions everywhere.",
+      "Sign in with a password, Google, Microsoft, LinkedIn or SSO; add an authenticator app for MFA; sessions expire, and signing out ends your sessions everywhere.",
     body: [
-      "Password sign-in, Google sign-in and domain-based SSO are available from the sign-in screen. SSO routes users whose email domain has an active connection to their identity provider.",
+      "Password sign-in, Google, Microsoft and LinkedIn sign-in, and domain-based SSO are available from the sign-in screen. SSO routes users whose email domain has an active connection to their identity provider. Only an SSO sign-in joins you to your organization automatically; Google, Microsoft and LinkedIn sign in your own account, and an administrator invites you to an organization.",
       "Forgot your password? Use “Forgot password?” on the sign-in screen; the emailed link lets you set a new one. Repeated reset requests are rate-limited.",
       "Authentication → Sign-in Security lets you enroll an authenticator app for multi-factor authentication. Organization-wide MFA requirements are being added.",
       "Sessions end after inactivity and after an absolute lifetime. Signing out is global by design — it ends your other sessions too. Authentication → Single Sign-On configures SAML/OIDC connections.",
     ],
-    keywords: ["sso", "saml", "oidc", "google", "sign in", "login", "password", "forgot", "reset", "session", "timeout", "logout", "mfa", "authenticator", "totp"],
+    keywords: ["sso", "saml", "oidc", "google", "microsoft", "azure", "linkedin", "sign in", "login", "password", "forgot", "reset", "session", "timeout", "logout", "mfa", "authenticator", "totp"],
     href: "/settings/sso",
   },
   {

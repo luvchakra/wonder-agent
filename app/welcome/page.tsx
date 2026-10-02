@@ -216,7 +216,7 @@ const SECURITY = [
   {
     icon: Fingerprint,
     title: "Strong authentication",
-    body: "SAML and OIDC single sign-on, Google sign-in, authenticator-app MFA and idle and absolute session limits. Signing out ends every session.",
+    body: "SAML and OIDC single sign-on, Google, Microsoft and LinkedIn sign-in, authenticator-app MFA and idle and absolute session limits. Signing out ends every session.",
   },
   {
     icon: KeyRound,
