@@ -91,11 +91,20 @@ test.describe("unauthenticated", () => {
     // and its URL is checked. Deliberately not asserting a real trip to
     // accounts.google.com — that needs Google enabled on the project AND
     // egress this sandbox's TLS-intercepting proxy doesn't allow.
+    // The button first asks Supabase Auth whether Google is enabled (it is
+    // not on the dev project), so that answer is stubbed to "enabled" here;
+    // the disabled path has its own test below.
+    await page.route("**/auth/v1/settings**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ external: { google: true, email: true } }) }),
+    );
     for (const path of ["/sign-in", "/sign-up"]) {
       let authorizeUrl: string | null = null;
       await page.route("**/auth/v1/authorize**", async (route) => {
         authorizeUrl = route.request().url();
-        await route.abort();
+        // Fulfilled with a stub page rather than aborted: an abort makes
+        // Chromium commit its own error page asynchronously, which can
+        // interrupt the next iteration's page.goto.
+        await route.fulfill({ status: 200, contentType: "text/html", body: "<p>authorize stub</p>" });
       });
 
       await page.goto(path);
@@ -103,14 +112,47 @@ test.describe("unauthenticated", () => {
       await expect(google).toBeVisible();
       await google.click();
 
-      await expect
-        .poll(() => authorizeUrl, { timeout: 10_000 })
-        .toMatch(/\/auth\/v1\/authorize\?.*provider=google/);
+      await page.waitForURL(/\/auth\/v1\/authorize\?.*provider=google/, { timeout: 10_000 });
+      expect(authorizeUrl).toMatch(/\/auth\/v1\/authorize\?.*provider=google/);
       // The return leg must come back to this app's own callback, which is
       // where the PKCE code is exchanged.
       expect(decodeURIComponent(authorizeUrl!)).toContain("/auth/callback");
       await page.unroute("**/auth/v1/authorize**");
     }
+  });
+
+  test("a cancelled or failed Google round trip comes back to sign-in with a fixed, truthful notice", async ({ page }) => {
+    await page.goto("/auth/callback?error=access_denied&error_description=User+denied");
+    await expect(page).toHaveURL(/\/sign-in\?reason=oauth_cancelled$/);
+    await expect(page.getByText("Google sign-in was cancelled.", { exact: false })).toBeVisible();
+
+    // The provider's own text is never reflected onto the page.
+    await page.goto("/auth/callback?error=server_error&error_description=Injected+wording+here");
+    await expect(page).toHaveURL(/\/sign-in\?reason=oauth_failed$/);
+    await expect(page.getByText("did not complete", { exact: false })).toBeVisible();
+    await expect(page.getByText("Injected wording here")).toHaveCount(0);
+
+    // A code that cannot be exchanged is a failure too, not a silent bounce.
+    await page.goto("/auth/callback?code=not-a-real-code");
+    await expect(page).toHaveURL(/\/sign-in\?reason=oauth_failed$/);
+  });
+
+  test("when Google is not enabled, the button says so instead of leaving the app", async ({ page }) => {
+    await page.route("**/auth/v1/settings**", (route) =>
+      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ external: { google: false, email: true } }) }),
+    );
+    let authorizeCalled = false;
+    await page.route("**/auth/v1/authorize**", async (route) => {
+      authorizeCalled = true;
+      await route.abort();
+    });
+    for (const path of ["/sign-in", "/sign-up"]) {
+      await page.goto(path);
+      await page.getByRole("button", { name: /with Google/i }).click();
+      await expect(page.getByText("Google sign-in is not enabled", { exact: false })).toBeVisible();
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+    }
+    expect(authorizeCalled).toBe(false);
   });
 
   test("sign-in has a Forgot password? link to /forgot-password", async ({ page }) => {
