@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getFullActiveSsoConnectionByDomain, provisionSsoMembership } from "@/lib/auth/sso";
@@ -22,13 +23,32 @@ export function isSafeRelativeNextPath(next: string | null): next is string {
  * own `error_description` is deliberately never forwarded: it is external
  * text, and reflecting it onto the sign-in page would let anyone craft a
  * link that displays arbitrary wording there (CLAUDE.md §17.2).
- * `access_denied` is what Google (and the OAuth spec) return when the user
- * cancels on the consent screen.
+ * `access_denied` is what Google, Microsoft and LinkedIn (and the OAuth
+ * spec) return when the user cancels on the consent screen.
  */
 export function signInFailureReason(providerError: string | null, exchangeFailed: boolean): string | null {
   if (providerError === "access_denied") return "oauth_cancelled";
   if (providerError || exchangeFailed) return "oauth_failed";
   return null;
+}
+
+/**
+ * True only when this account signed in through Supabase SSO (SAML/OIDC
+ * enterprise SSO), whose identities carry a provider of `sso:<id>`.
+ *
+ * SSO just-in-time provisioning grants membership of the organization that
+ * owns the email domain, so it must only ever follow an SSO sign-in. A
+ * Google, Microsoft or LinkedIn account can carry an address on any domain
+ * (a Microsoft work account's email claim is not even verified — the
+ * "nOAuth" class of attack), so treating a social sign-in as proof of
+ * membership would let anyone join an organization by naming its domain
+ * (non-negotiables #2 and #4). Supabase never links SSO identities to other
+ * accounts, so an `sso:` identity on the user means SSO authenticated it.
+ */
+export function isSsoAuthenticated(user: Pick<User, "app_metadata" | "identities">): boolean {
+  const provider = user.app_metadata?.provider;
+  if (typeof provider === "string" && provider.startsWith("sso:")) return true;
+  return (user.identities ?? []).some((identity) => identity.provider.startsWith("sso:"));
 }
 
 /**
@@ -60,7 +80,7 @@ export async function GET(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user?.email) {
-    // A failed or cancelled Google/SSO round trip lands here with no
+    // A failed or cancelled social/SSO round trip lands here with no
     // session; say so on /sign-in rather than silently showing the form.
     const signIn = new URL("/sign-in", request.url);
     const reason = signInFailureReason(providerError, exchangeFailed);
@@ -93,7 +113,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(next, request.url));
   }
 
-  if (domain) {
+  // Only an SSO sign-in can join the organization that owns the domain;
+  // a social sign-in falls through to the ordinary paths below.
+  if (domain && isSsoAuthenticated(user)) {
     const connection = await getFullActiveSsoConnectionByDomain(domain);
     if (connection) {
       // IdP-asserted attributes land in user_metadata for OIDC and in the

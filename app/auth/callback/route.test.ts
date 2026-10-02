@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { isSafeRelativeNextPath, signInFailureReason } from "./route";
+import { isSafeRelativeNextPath, isSsoAuthenticated, signInFailureReason } from "./route";
 
 describe("isSafeRelativeNextPath — open-redirect guard for ?next=", () => {
   it("accepts a bare relative path", () => {
@@ -50,5 +50,24 @@ describe("signInFailureReason — what /sign-in is told after a failed OAuth/SSO
 
   it("only ever returns fixed codes, never the provider's text", () => {
     expect(signInFailureReason("<script>alert(1)</script>", false)).toBe("oauth_failed");
+  });
+});
+
+describe("isSsoAuthenticated — SSO JIT provisioning only follows an SSO sign-in", () => {
+  const identity = (provider: string) => ({ provider }) as unknown as NonNullable<Parameters<typeof isSsoAuthenticated>[0]["identities"]>[number];
+
+  it("accepts a user whose provider is an SSO connection", () => {
+    expect(isSsoAuthenticated({ app_metadata: { provider: "sso:9f1c" }, identities: [identity("sso:9f1c")] })).toBe(true);
+    expect(isSsoAuthenticated({ app_metadata: {}, identities: [identity("sso:9f1c")] })).toBe(true);
+  });
+
+  it("refuses Google, Microsoft, LinkedIn and email accounts, whatever their email domain", () => {
+    for (const provider of ["google", "azure", "linkedin_oidc", "email"]) {
+      expect(isSsoAuthenticated({ app_metadata: { provider }, identities: [identity(provider)] })).toBe(false);
+    }
+  });
+
+  it("refuses a user with no identities", () => {
+    expect(isSsoAuthenticated({ app_metadata: {}, identities: undefined })).toBe(false);
   });
 });

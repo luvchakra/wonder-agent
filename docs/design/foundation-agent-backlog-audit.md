@@ -2311,3 +2311,90 @@ Google is **disabled on the Supabase project**:
      `https://*-luvchakras-projects.vercel.app/auth/callback` (previews) and
      `http://localhost:3000/auth/callback`.
 4. Publish the consent screen; in "Testing" only listed test users can sign in.
+
+---
+
+## 2026-10-02 — Microsoft and LinkedIn sign-up / sign-in; SSO JIT restricted to SSO sign-ins
+
+User request: make sure Microsoft and LinkedIn sign-up and sign-in work, and
+list what the owner must do.
+
+**Finding.**
+- Neither provider existed in the code: only Google had a button.
+- Both are disabled on the Supabase project (`azure: false`,
+  `linkedin_oidc: false`; `/auth/v1/authorize` returns 400 "provider is not
+  enabled").
+- **Security issue found while reviewing the callback:** `/auth/callback`
+  just-in-time provisioned membership of whichever organization had an
+  active SSO connection for the user's email domain, *however the user
+  signed in*. With social sign-in that is a cross-tenant path
+  (non-negotiables #2, #4). A Microsoft work account's `email` claim is not
+  verified (the "nOAuth" attack), and even a verified Google/LinkedIn
+  address bypasses the organization's IdP controls. The issue predated this
+  change (Google); adding Microsoft made it exploitable in practice.
+
+**Changes.**
+- `modules/ui/SocialAuthButtons.tsx` replaces `GoogleAuthButton.tsx`:
+  - The same provider-enabled guard and timeout for Google, Microsoft
+    (Supabase provider `azure`, with the `email` scope Microsoft needs) and
+    LinkedIn (`linkedin_oidc`).
+  - Brand marks per each provider's guidance.
+  - Used on /sign-in (still hidden on tenant addresses) and /sign-up.
+- `app/auth/callback/route.ts`:
+  - New `isSsoAuthenticated(user)`: true only for an `sso:` identity.
+    Supabase never links SSO identities to other accounts.
+  - SSO JIT provisioning now runs only when it holds. A social sign-in on an
+    SSO domain falls through to the normal path: existing memberships go to
+    `/`, otherwise `/onboarding`.
+  - The failure notices are now provider-neutral.
+- Copy updated: the Get Help sign-in article (also states that only SSO
+  auto-joins an organization) and the landing page security card.
+
+**Verification.**
+- `tsc --noEmit`: 0 errors. eslint: clean. Vitest: 812/812, including 8
+  `SocialAuthButtons` tests and 3 `isSsoAuthenticated` tests.
+- E2E (`auth.spec.ts`), 3 social tests run 4× against a local production
+  build: 12/12. They check:
+  - every button on both screens reaches `/auth/v1/authorize` with the right
+    `provider`, the `/auth/callback` return and Microsoft's `email` scope;
+  - the disabled messages;
+  - the callback error paths.
+- Against the real dev settings payload, at 1280 and 390 px, light and dark:
+  all three buttons render, the Microsoft/LinkedIn messages appear, the URL
+  is unchanged and there is no overflow.
+- **Not run:** the full Playwright suite (no service-role key here) and any
+  real provider login (the providers are disabled). SSO JIT has no E2E
+  coverage because SAML is not enabled on the project.
+
+**Owner steps — Microsoft** (Supabase provider "Azure"):
+1. Azure portal → Microsoft Entra ID → App registrations → New registration.
+   - Name: WonderID.
+   - Supported accounts: "Any organizational directory and personal
+     Microsoft accounts".
+   - Redirect URI (Web):
+     `https://ekgyjwoenteadaaqakmd.supabase.co/auth/v1/callback`.
+2. Copy the Application (client) ID.
+3. Certificates & secrets → New client secret. Copy its **Value** and diary
+   its expiry (24 months maximum).
+4. Token configuration → Add optional claim → ID token: `email` and
+   `xms_edov`. Supabase uses the latter to trust the email.
+5. Optionally complete publisher verification, so users don't see
+   "unverified".
+6. Supabase → Authentication → Providers → Azure: enable it and paste the ID
+   and secret. Leave Tenant URL empty (common), or set
+   `https://login.microsoftonline.com/<tenant-id>` to restrict sign-in to one
+   directory.
+
+**Owner steps — LinkedIn:**
+1. linkedin.com/developers → Create app. This needs a WonderID LinkedIn
+   Company Page, a logo and a privacy-policy URL. The page admin verifies the
+   app.
+2. Products → add "Sign In with LinkedIn using OpenID Connect".
+3. Auth → Authorized redirect URLs:
+   `https://ekgyjwoenteadaaqakmd.supabase.co/auth/v1/callback`. Copy the
+   Client ID and Primary Client Secret.
+4. Supabase → Providers → **LinkedIn (OIDC)**, not the deprecated
+   "LinkedIn": enable it and paste the ID and secret.
+
+The Supabase URL Configuration (Site URL and redirect URLs) is the same as in
+the Google entry above.

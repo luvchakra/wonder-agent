@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { signInAction } from "@/app/actions/auth";
-import { AuthShell, Button, GoogleAuthButton, TenantLogo, TextField } from "@/modules/ui";
+import { AuthShell, Button, SocialAuthButtons, TenantLogo, TextField } from "@/modules/ui";
 
 /** The organization an address names, as the sign-in page may show it (FOUNDATION-P0-22). */
 export type SignInTenant = { name: string; suspended: boolean } | null;
@@ -23,13 +23,13 @@ function SignInForm({ tenant }: { tenant: SignInTenant }) {
   const searchParams = useSearchParams();
   const reason = searchParams.get("reason");
   const sessionExpired = reason === "expired";
-  // Set by /auth/callback when a Google or SSO round trip came back
+  // Set by /auth/callback when a social or SSO round trip came back
   // without a session. Only these fixed codes are recognised.
   const oauthNotice =
     reason === "oauth_cancelled"
-      ? "Google sign-in was cancelled. Try again, or use your email and password."
+      ? "Sign-in was cancelled. Try again, or use your email and password."
       : reason === "oauth_failed"
-        ? "Sign-in with Google or SSO did not complete. Try again, or use your email and password."
+        ? "Sign-in did not complete. Try again, or use your email and password."
         : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -167,8 +167,8 @@ function SignInForm({ tenant }: { tenant: SignInTenant }) {
       </div>
 
       <div className="space-y-2">
-        {/* On an organization's address, only its own sign-in methods: Google's redirect allowlist does not include tenant addresses yet. */}
-        {tenant ? null : <GoogleAuthButton label="Sign in with Google" />}
+        {/* On an organization's address, only its own sign-in methods: the social providers' redirect allowlists do not include tenant addresses. */}
+        {tenant ? null : <SocialAuthButtons verb="Sign in" />}
         <Button type="button" variant="outline" onClick={handleSsoSignIn} disabled={ssoChecking || Boolean(tenant?.suspended)} className="w-full">
           {ssoChecking ? "Checking…" : "Sign in with SSO"}
         </Button>

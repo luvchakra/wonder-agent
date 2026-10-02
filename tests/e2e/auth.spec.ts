@@ -83,53 +83,71 @@ test.describe("unauthenticated", () => {
     expect(emailValid).toBe(false);
   });
 
-  test("both auth screens offer Google, and the button really starts the OAuth flow", async ({ page }) => {
-    // Asserts the button is wired, not merely present, without depending on
+  // Google, Microsoft (Supabase's `azure` provider) and LinkedIn
+  // (`linkedin_oidc`): the button name and the provider parameter each
+  // one must send to Supabase Auth.
+  const SOCIAL = [
+    { name: "Google", provider: "google" },
+    { name: "Microsoft", provider: "azure" },
+    { name: "LinkedIn", provider: "linkedin_oidc" },
+  ] as const;
+
+  test("both auth screens offer Google, Microsoft and LinkedIn, and each button really starts its OAuth flow", async ({ page }) => {
+    // Asserts each button is wired, not merely present, without depending on
     // anything outside this app: the click is expected to navigate to
     // Supabase Auth's own /auth/v1/authorize endpoint (which is what then
-    // forwards to Google), so the request is intercepted and aborted there
-    // and its URL is checked. Deliberately not asserting a real trip to
-    // accounts.google.com — that needs Google enabled on the project AND
-    // egress this sandbox's TLS-intercepting proxy doesn't allow.
-    // The button first asks Supabase Auth whether Google is enabled (it is
-    // not on the dev project), so that answer is stubbed to "enabled" here;
-    // the disabled path has its own test below.
+    // forwards to the provider), so the request is intercepted there and its
+    // URL is checked. Deliberately not asserting a real trip to the provider
+    // — that needs it enabled on the project AND egress this sandbox's
+    // TLS-intercepting proxy doesn't allow.
+    // Each button first asks Supabase Auth whether its provider is enabled
+    // (none is on the dev project), so that answer is stubbed to "enabled"
+    // here; the disabled path has its own test below.
     await page.route("**/auth/v1/settings**", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ external: { google: true, email: true } }) }),
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ external: { google: true, azure: true, linkedin_oidc: true, email: true } }),
+      }),
     );
     for (const path of ["/sign-in", "/sign-up"]) {
-      let authorizeUrl: string | null = null;
-      await page.route("**/auth/v1/authorize**", async (route) => {
-        authorizeUrl = route.request().url();
-        // Fulfilled with a stub page rather than aborted: an abort makes
-        // Chromium commit its own error page asynchronously, which can
-        // interrupt the next iteration's page.goto.
-        await route.fulfill({ status: 200, contentType: "text/html", body: "<p>authorize stub</p>" });
-      });
+      for (const { name, provider } of SOCIAL) {
+        let authorizeUrl: string | null = null;
+        await page.route("**/auth/v1/authorize**", async (route) => {
+          authorizeUrl = route.request().url();
+          // Fulfilled with a stub page rather than aborted: an abort makes
+          // Chromium commit its own error page asynchronously, which can
+          // interrupt the next iteration's page.goto.
+          await route.fulfill({ status: 200, contentType: "text/html", body: "<p>authorize stub</p>" });
+        });
 
-      await page.goto(path);
-      const google = page.getByRole("button", { name: /with Google/i });
-      await expect(google).toBeVisible();
-      await google.click();
+        await page.goto(path);
+        const button = page.getByRole("button", { name: new RegExp(`with ${name}$`) });
+        await expect(button).toBeVisible();
+        await button.click();
 
-      await page.waitForURL(/\/auth\/v1\/authorize\?.*provider=google/, { timeout: 10_000 });
-      expect(authorizeUrl).toMatch(/\/auth\/v1\/authorize\?.*provider=google/);
-      // The return leg must come back to this app's own callback, which is
-      // where the PKCE code is exchanged.
-      expect(decodeURIComponent(authorizeUrl!)).toContain("/auth/callback");
-      await page.unroute("**/auth/v1/authorize**");
+        await page.waitForURL(new RegExp(`/auth/v1/authorize\\?.*provider=${provider}(&|$)`), { timeout: 10_000 });
+        const url = new URL(authorizeUrl!);
+        expect(url.searchParams.get("provider")).toBe(provider);
+        // The return leg must come back to this app's own callback, which is
+        // where the PKCE code is exchanged.
+        expect(url.searchParams.get("redirect_to")).toMatch(/\/auth\/callback$/);
+        // Microsoft only returns an email address when it is asked for one.
+        if (provider === "azure") expect(url.searchParams.get("scopes") ?? "").toContain("email");
+        await page.unroute("**/auth/v1/authorize**");
+      }
     }
   });
 
-  test("a cancelled or failed Google round trip comes back to sign-in with a fixed, truthful notice", async ({ page }) => {
+  test("a cancelled or failed social sign-in comes back to sign-in with a fixed, truthful notice", async ({ page }) => {
     await page.goto("/auth/callback?error=access_denied&error_description=User+denied");
     await expect(page).toHaveURL(/\/sign-in\?reason=oauth_cancelled$/);
-    await expect(page.getByText("Google sign-in was cancelled.", { exact: false })).toBeVisible();
+    await expect(page.getByText("Sign-in was cancelled.", { exact: false })).toBeVisible();
 
     // The provider's own text is never reflected onto the page.
     await page.goto("/auth/callback?error=server_error&error_description=Injected+wording+here");
     await expect(page).toHaveURL(/\/sign-in\?reason=oauth_failed$/);
-    await expect(page.getByText("did not complete", { exact: false })).toBeVisible();
+    await expect(page.getByText("Sign-in did not complete", { exact: false })).toBeVisible();
     await expect(page.getByText("Injected wording here")).toHaveCount(0);
 
     // A code that cannot be exchanged is a failure too, not a silent bounce.
@@ -137,9 +155,13 @@ test.describe("unauthenticated", () => {
     await expect(page).toHaveURL(/\/sign-in\?reason=oauth_failed$/);
   });
 
-  test("when Google is not enabled, the button says so instead of leaving the app", async ({ page }) => {
+  test("when a social provider is not enabled, its button says so instead of leaving the app", async ({ page }) => {
     await page.route("**/auth/v1/settings**", (route) =>
-      route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ external: { google: false, email: true } }) }),
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ external: { google: false, azure: false, linkedin_oidc: false, email: true } }),
+      }),
     );
     let authorizeCalled = false;
     await page.route("**/auth/v1/authorize**", async (route) => {
@@ -148,9 +170,11 @@ test.describe("unauthenticated", () => {
     });
     for (const path of ["/sign-in", "/sign-up"]) {
       await page.goto(path);
-      await page.getByRole("button", { name: /with Google/i }).click();
-      await expect(page.getByText("Google sign-in is not enabled", { exact: false })).toBeVisible();
-      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      for (const { name } of SOCIAL) {
+        await page.getByRole("button", { name: new RegExp(`with ${name}$`) }).click();
+        await expect(page.getByText(`${name} sign-in is not enabled`, { exact: false })).toBeVisible();
+        await expect(page).toHaveURL(new RegExp(`${path}$`));
+      }
     }
     expect(authorizeCalled).toBe(false);
   });
