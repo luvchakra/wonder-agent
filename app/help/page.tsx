@@ -20,12 +20,12 @@ export const metadata = {
  */
 /** The latest additions, each pointing at the guide section that explains it. */
 const WHATS_NEW = [
-  { id: "authorization-policies", label: "Authorization policies", note: "Deny or require approval for any permission, with break-glass roles." },
-  { id: "scoped-assignments", label: "Scoped and time-limited roles", note: "Limit a role to an environment, application or agent, dates or MFA." },
-  { id: "groups", label: "Groups", note: "Give roles to a whole team at once." },
-  { id: "users", label: "Users and custom roles", note: "Invite, suspend and remove people; design roles from the permission catalog." },
-  { id: "access-requests", label: "Access requests and approvals", note: "A request catalog with staged, four-eyes approvals and SoD checks." },
+  { id: "billing", label: "Billing and invoices", note: "Choose a plan and pay with Stripe or Razorpay; invoices carry GST or VAT details." },
+  { id: "privacy", label: "Privacy: GDPR and DPDP", note: "Rights requests on statutory deadlines, consent, retention and breach clocks." },
+  { id: "audit-integrity", label: "Tamper-evident audit trail", note: "Verify the audit chain; control libraries for SOX, PCI DSS and more." },
+  { id: "access-requests", label: "Access requests, approvals and packages", note: "Request policies, staged approvals, no self-approval, and bundles of access." },
   { id: "applications", label: "Application onboarding and accounts", note: "Onboard apps step by step; find orphaned and dormant accounts." },
+  { id: "scoped-assignments", label: "Scoped roles and authorization policies", note: "Limit a role to an environment, application or agent, dates or MFA; deny or hold actions." },
 ] as const;
 
 export default function HelpPage() {
@@ -144,6 +144,22 @@ export default function HelpPage() {
             </article>
           ))}
         </div>
+      </section>
+
+      {/* The one contact route the product already has: the landing page's
+          "Email us" link. As there, the address is only in the mailto: href,
+          never printed, so it can't be read straight off the page text. */}
+      <section aria-labelledby="still-need-help" className="rounded-xl border border-border bg-card p-4 sm:p-5">
+        <h2 id="still-need-help" className="text-sm font-semibold text-foreground">
+          Still need help?
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          For access, roles and sign-in questions, start with your organization&rsquo;s administrator. To reach the WonderID team,{" "}
+          <a href="mailto:connect@wonderapps.biz" className="font-medium text-primary hover:underline">
+            email the WonderID team
+          </a>
+          .
+        </p>
       </section>
     </div>
   );
