@@ -19,6 +19,8 @@ const SUGGESTIONS = [
   "How do I invite a user?",
   "Can I limit a role to production?",
   "How do I reset my password?",
+  "How do I request access?",
+  "How does an agent get approved?",
 ];
 
 /**

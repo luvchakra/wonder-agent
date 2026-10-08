@@ -47,6 +47,36 @@ test.describe("help centre (signed out)", () => {
     await expect(page.getByRole("heading", { name: "Why do I have no findings?" })).toBeVisible();
   });
 
+  test("covers the newer areas: the Home overview, the agent lifecycle and troubleshooting", async ({ page }) => {
+    await page.goto("/help");
+    await expect(page.getByRole("heading", { name: "The Home overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Agent lifecycle and approval" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Something isn't working — what should I do?" })).toBeVisible();
+  });
+
+  test("does not promise social sign-in is switched on", async ({ page }) => {
+    await page.goto("/help");
+    const section = page.locator("#sso-security");
+    await expect(section).toContainText(/only once that provider has been enabled/i);
+  });
+
+  test("offers the WonderID team's email link without printing the address", async ({ page }) => {
+    await page.goto("/help");
+    const link = page.getByRole("link", { name: "email the WonderID team" });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", /^mailto:/);
+    await expect(page.locator("main")).not.toContainText("@");
+  });
+
+  test("a suggested question about access requests lands on that section", async ({ page }) => {
+    await page.goto("/help");
+    await page.getByRole("button", { name: "How do I request access?" }).click();
+    const answers = page.getByRole("list", { name: "Assistant answers" });
+    const link = answers.getByRole("link", { name: "Requesting and approving access" });
+    await expect(link).toBeVisible({ timeout: 15_000 });
+    await expect(link).toHaveAttribute("href", "/help#access-requests");
+  });
+
   test("the assistant answers a question anonymously, retrieval-only", async ({ page }) => {
     await page.goto("/help");
     await page.getByLabel("Ask a question about WonderID").fill("how do I connect Saviynt?");

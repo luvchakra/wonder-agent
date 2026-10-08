@@ -32,6 +32,25 @@ describe("retrieveSections — deterministic guide retrieval", () => {
     expect(hits.map((s) => s.id)).toContain("faq-no-findings");
   });
 
+  it("routes questions about the newer areas to their sections", () => {
+    expect(retrieveSections("how do I request access?")[0]?.id).toBe("access-requests");
+    expect(retrieveSections("what do the agent lifecycle states mean?")[0]?.id).toBe("agent-lifecycle");
+    expect(retrieveSections("how does an agent get approved?")[0]?.id).toBe("agent-lifecycle");
+    expect(retrieveSections("what is the home dashboard?")[0]?.id).toBe("home-overview");
+    expect(retrieveSections("how do I import people from a csv?")[0]?.id).toBe("identity-sources");
+    expect(retrieveSections("what happens when someone leaves?")[0]?.id).toBe("identity-lifecycle");
+    expect(retrieveSections("where is the kill switch?")[0]?.id).toBe("emergency-controls");
+  });
+
+  it("sends a sign-in problem with a social provider to the sign-in section", () => {
+    expect(retrieveSections("why can't Google sign in work?")[0]?.id).toBe("sso-security");
+  });
+
+  it("offers the troubleshooting entry for a general 'it is not working' or contact question", () => {
+    expect(retrieveSections("something is not working").map((s) => s.id)).toContain("faq-something-wrong");
+    expect(retrieveSections("how do I contact support?")[0]?.id).toBe("faq-something-wrong");
+  });
+
   it("returns nothing for a question the guide does not cover", () => {
     expect(retrieveSections("kubernetes helm chart rollout strategy")).toEqual([]);
   });

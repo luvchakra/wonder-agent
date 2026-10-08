@@ -3102,3 +3102,101 @@ compliance built into the product.
   and the server log had no errors.
 - The full Playwright suite was not re-run: the change is copy and layout on
   the public page only, with no shared infrastructure touched (§17.8 list).
+
+---
+
+## 2026-10-08 — Get Help checked against the code and brought up to date (founder request)
+
+User request: update the Get Help page to match the latest features. No
+backlog story: like the 2026-09-26 and 2026-10-01 refreshes, this is a copy
+and documentation change, so no Progress Tracker row moves.
+
+**Method.** Every statement in `modules/ui/help/content.ts` was read against
+the screen or service it describes (the sidebar in `shell-nav.ts`, each
+route's page, and the rule modules behind them). Statements the code did not
+support were corrected or removed; capabilities with no help were added.
+
+**Statements that were no longer true, now corrected.**
+- Agent lifecycle named a "proposed" state. The states are Discovered,
+  Registered, Assessed, Approved, Provisioned, Active, Certification due,
+  Restricted, Suspended and Retired, with role and contract preconditions.
+- Identity page "shows the access it holds". It shows details, relationships,
+  attributes and (for people) the lifecycle; access is on the agent's Access tab.
+- Non-human Identities "lists service accounts and keys with owner and expiry".
+  It is the connector-reported inventory with Linked, Not linked, Likely AI
+  agents, Orphaned and Ignored views and no expiry column.
+- Certification decisions were "certify, flag or revoke" with a campaign
+  "evidence pack". They are Approve, Revoke, Modify, Delegate and Request
+  information. The campaign evidence export and the per-agent PDF evidence pack
+  exist only as API routes, with no button, so Reports now lists the eight
+  reports that do have CSV export and the pack is no longer promised.
+- Request policies "decide who approves (manager, entitlement owner,
+  application owner, access managers)", and a separation-of-duties conflict
+  "is shown before anyone approves". Routes are manager, owner, or manager and
+  owner; a critical-risk request adds an access-manager review. Separation of
+  duties is an identity-category policy that applies to agent access requests
+  and grants and refuses at the time of the action; it is now described there.
+- Contracts had a "completeness score". The agent page has a governance posture
+  score (twelve dimensions); the contract is versioned and can expire.
+- "Revoke all keys" was placed in the runtime emergency controls. It is on the
+  agent's API keys panel; the Runtime card has the kill switch, tool and MCP
+  server suspension and session termination.
+- Notifications "controls which events reach you". All eleven types are
+  mandatory; the page shows them locked on.
+- Data sources "link to applications". They link to entitlements.
+- Pending Matches "confirm or reject" uncertain matches. The page is for source
+  records that match more than one identity: link, create new or dismiss.
+- Rogue detection listed "unapproved access"; access-scope findings are
+  excluded from it.
+- Search covered "agents, identities, findings and policies"; it covers eleven
+  object kinds filtered by permission, and not the people in the directory.
+- Sign-in said Google, Microsoft and LinkedIn "are available". The 2026-10-02
+  Foundation audit entry found all three providers disabled in the production
+  project, and the buttons say so when clicked. Help now says each works only
+  once that provider is enabled, and that organization addresses offer password
+  and SSO only (as `SignInForm` does).
+- The words "database" and "row-level security" are gone from user-facing text.
+- "Formerly WonderAgent" now appears once (What WonderID is); the guide had no
+  other stale product name.
+
+**Added.** The Home overview; agent lifecycle and approval; the Current Request
+(NOW) view; manual agent registration, duplicate handling and the agent page's
+tabs; owner types and ownership gaps; new identity and the Overview's attention
+list; person lifecycle steps and the tasks each event opens; identity-source
+setup, full/partial/preview imports and runs; application onboarding step by
+step with proposals; application discovery; account views; effective access on
+the Access tab; request policy terms, statuses and the three request views;
+access package management and direct assignment; policy categories, actions,
+draft/publish and exceptions; gateway decisions and observe-only; finding
+workflow and resolution types; investigations; certification scopes and
+decisions; connector pages; reports and audit filters; the user wizard
+(invite or add now); two FAQ entries (troubleshooting, how the assistant
+works); and a "Still need help?" block on `/help` with the landing page's
+existing `mailto:` link (address not printed, as there). "What's new" now leads
+with billing, privacy and audit integrity. The `birthright` retrieval keyword
+was dropped (no such concept in the product).
+
+**Tests.** New `modules/ui/help/content.test.ts` (unique ids, no empty
+sections, current lifecycle states, no internal technology names, one
+historical use of the old name, no invented contact address or promise).
+`lib/ai/helpAnswer.test.ts` gains retrieval cases for the new sections.
+`tests/e2e/help.spec.ts` gains checks for the new sections, the contact link,
+the social sign-in wording and a suggested question.
+
+**Verification.** `npx next typegen` then `npm run typecheck` (0 errors),
+`npm run lint` (clean), `npm test` (105 files, 825 tests passed). `/help` was
+rendered by a local `next dev` with placeholder environment variables and no
+network to any service: the new sections, "What's new" items and the mailto
+link are present and no `@` appears in the page text. The Playwright help spec
+was not run: its global setup seeds tenants through the service-role key, which
+this sandbox does not have (and must not use).
+
+**Left for the owner (not changed here).**
+- Social sign-in is still off and, per the 2026-10-02 audit, the redirect
+  allow-list does not include `agent.wonderapps.biz`, which also affects the
+  emailed password-reset link. Help describes the screens truthfully either
+  way; it does not fix either.
+- SSO's end-to-end handshake is still unverified (FOUNDATION-P0-03.3 Partial).
+- `public/.well-known/security.txt` still carries the placeholder
+  `security@wonderid.example`.
+- The campaign evidence package and the governance evidence pack have no UI.
