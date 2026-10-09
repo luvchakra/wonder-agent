@@ -895,3 +895,27 @@ A by-hand review of the billing code found three defects. All are fixed.
 - The landing page caches the result for an hour (ISR). A price changed
   in the console reaches the page within the hour.
 - Covered by the welcome spec's pricing test.
+
+---
+
+## 2026-10-09 — "Welcome to WonderID" announcement ended
+
+User request: remove the banner "Welcome to WonderID — Thanks for trying
+WonderID — your governance data is seeded and ready to explore."
+
+- **What it was.** A global `platform_announcements` row of type `notice`
+  (`d6469d00-…`), seeded on 2026-09-15 with no end date, so it showed to
+  every organization. Since sign-up now creates an empty organization
+  automatically, its "your governance data is seeded" was also untrue for
+  new customers (CLAUDE.md §19.2).
+- **What changed.** The row's `ends_at` was set to now (20:09 UTC), and a
+  `platform.announcement_ended` event was written to `platform_audit_logs`
+  with the old and new values.
+  - The row is kept rather than deleted: it is announcement history, and it
+    can be restored by clearing `ends_at`.
+  - The platform console can create announcements but has no "end" action
+    yet, so this was done in SQL under the platform administrator account.
+    Adding that action is a candidate follow-up.
+- **Verified.** No announcements are active for any organization.
+- **Code.** None changed. `AnnouncementsBanner` renders nothing when there is
+  no active announcement.
