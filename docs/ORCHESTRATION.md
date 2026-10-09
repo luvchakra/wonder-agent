@@ -40,8 +40,8 @@ actually on disk, verify which copy of a shared package is actually being resolv
 through a pull request.**
 - One branch per task, created from the latest `main`.
 - Commit, push the branch, open a pull request, and share its Vercel preview URL.
-- Squash-merge as soon as CI (`security.yml`, `e2e.yml`) is green. No need to ask
-  first.
+- Squash-merge as soon as CI (`security.yml`) is green. No need to ask first.
+  The full Playwright suite (`e2e.yml`) runs nightly, not per change.
 - Then confirm the production deploy is ready, and move to the next story.
 - **Never push directly to `main`.** This replaces the earlier auto-merge and
   "also fast-forward `main` after every push" instructions.
@@ -69,9 +69,16 @@ Before every push, run the fast, relevant checks (`CLAUDE.md` §19.6):
   reference project, never production), then re-check its security and
   performance advisories
 
-CI runs the full suite on the pull request, including the whole Playwright suite.
-Do not merge until CI is green. Run end-to-end tests locally only when asked or
-when the change is genuinely risky.
+CI then runs, in parallel:
+- the full typecheck;
+- lint on the changed files;
+- the unit tests related to the change;
+- the dependency audit and secret scan.
+
+Do not merge until it is green. The full Playwright suite runs nightly
+(`e2e.yml`), and a red nightly run is fixed before anything else merges. For a
+genuinely risky change, run the affected specs first, locally or through a
+hand-started `e2e.yml` run.
 
 ## 4. Shared database changes require ownership discipline
 

@@ -1,14 +1,26 @@
 name: E2E (Playwright)
 
+# Nightly, not per change (user decision 2026-10-09, CLAUDE.md §19.6): the full
+# suite runs every night against main; a run can also be started by hand,
+# optionally for chosen spec files only (e.g. "tests/e2e/groups.spec.ts").
 on:
-  push:
-    branches: [main]
-  pull_request:
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST
+  workflow_dispatch:
+    inputs:
+      specs:
+        description: "Spec files to run (space-separated); empty runs the full suite"
+        required: false
+        default: ""
+
+concurrency:
+  group: e2e
+  cancel-in-progress: false
 
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
@@ -18,13 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
-        run: npm ci
+      - uses: ./.github/actions/setup
 
       - name: Install Playwright's Chromium
         run: npx playwright install --with-deps chromium
@@ -36,8 +42,12 @@ jobs:
       # production bundle itself (playwright.config.ts's webServer),
       # exactly matching what `npm run build && npm run start` produces
       # locally, so a passing run here is a genuine pre-deploy signal.
+      # The input goes through an environment variable, never straight into
+      # the script, so it cannot inject shell commands.
       - name: Run Playwright E2E suite
-        run: npm run test:e2e
+        env:
+          SPECS: ${{ inputs.specs }}
+        run: npx playwright test $SPECS
 
       - name: Upload Playwright report
         if: always()

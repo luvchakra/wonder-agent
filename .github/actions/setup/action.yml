@@ -1,0 +1,18 @@
+name: Set up Node and dependencies
+description: Node 22 with node_modules restored from cache; npm ci only when the lockfile changed.
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: "22"
+    # node_modules itself is cached (keyed on the lockfile), so an unchanged
+    # lockfile skips npm ci entirely instead of re-extracting the npm cache.
+    - id: modules
+      uses: actions/cache@v4
+      with:
+        path: node_modules
+        key: node-modules-${{ runner.os }}-node22-${{ hashFiles('package-lock.json') }}
+    - if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --no-audit --no-fund
