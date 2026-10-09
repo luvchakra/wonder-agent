@@ -2494,3 +2494,15 @@ used only the publishable key, and printed no secret.
   sign in. Publish it for general use.
 - Vercel has no `APP_BASE_URL`. Billing return URLs need it
   (`https://id.wonderapps.biz`). This does not affect sign-in.
+
+**Follow-up the same day: the first real sign-in failed at the code exchange.**
+- The owner's first real attempts (19:20:51 and 19:21:03 UTC) returned to
+  `/sign-in?reason=oauth_failed`.
+- `auth_logs` shows `/callback` failing with
+  `oauth2: "invalid_client" "The provided client secret is invalid."`.
+- The client ID and redirect URI are accepted, so the Client Secret saved in
+  Supabase's Google provider does not match the client. The app's handling is
+  correct: no session is created and the reason is shown.
+- Fix (owner, in the dashboards): generate a new client secret on that Google
+  OAuth client and paste it into Supabase → Authentication → Providers →
+  Google.
