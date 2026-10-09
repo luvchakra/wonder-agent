@@ -36,33 +36,18 @@ actually on disk, verify which copy of a shared package is actually being resolv
 
 ## 2. Merge mechanics
 
-**Auto-merge after every single story — no need to ask first.** Commit, push the
-feature branch, merge into the integration branch, continue to the next story
-immediately.
+**Since 2026-10-09 (explicit user decision, `CLAUDE.md` §19): every change ships
+through a pull request.**
+- One branch per task, created from the latest `main`.
+- Commit, push the branch, open a pull request, and share its Vercel preview URL.
+- Squash-merge as soon as CI (`security.yml`, `e2e.yml`) is green. No need to ask
+  first.
+- Then confirm the production deploy is ready, and move to the next story.
+- **Never push directly to `main`.** This replaces the earlier auto-merge and
+  "also fast-forward `main` after every push" instructions.
 
-If checking out the integration branch fails because another concurrent agent has it
-locked in its own worktree, don't get stuck:
-
-1. Fetch the integration branch fresh.
-2. Create/reset a throwaway scratch branch tracking it.
-3. Merge your feature branch into that scratch branch.
-4. Push the scratch branch directly to the integration branch.
-5. Delete the scratch branch.
-6. Continue.
-
-If that push is ever rejected as non-fast-forward, re-fetch and redo the whole
-sequence.
-
-**Never force-push. Never rewrite history on the integration branch or any feature
-branch.**
-
-**Standing instruction: also fast-forward `main` after every push.** Once the
-feature/integration branch push above succeeds, push the same commit(s) to `main`
-as well (`git push origin <branch>:main`) — no need to ask first, per the user's
-standing instruction. Only do this when it is a clean fast-forward (verify with
-`git rev-list --left-right --count origin/main...<branch>` showing 0 commits `main`
-has that the branch doesn't); if `main` has diverged with commits not on the
-branch, stop and report rather than force-pushing or merging unreviewed.
+**Never force-push. Never rewrite history on `main` or on someone else's branch.**
+On a branch only you push to, follow the merge-or-rebase rule of `CLAUDE.md` §4.
 
 **Auto-chaining across modules is now the standing policy (see `CLAUDE.md` §7):**
 once an agent finishes every story in its own backlog, it starts the next dormant
@@ -73,22 +58,20 @@ starts the next agent only after the current one has fully finished, verified, a
 reported — never concurrently), and an agent never invokes another module's agent
 mid-story to help with its own work.
 
-## 3. Full verification before every commit and merge
+## 3. Verification before every push and merge
 
-Before every commit and merge, run:
+Before every push, run the fast, relevant checks (`CLAUDE.md` §19.6):
 
-- Typecheck
-- Lint
-- Any import-boundary/architecture lint script
-- Any migration-lint script
-- The module's own test suite
-- If a real dev database is available: apply migrations live to a **dev** Supabase
-  project only (never a read-only reference project, never production), then
-  re-check its security/performance advisories
-- Build the app if UI/routes changed
+- `npm run typecheck`
+- eslint on the files you changed
+- the unit tests for the areas you touched (`npx vitest run <paths>`)
+- for a migration: apply it to a **dev** Supabase project only (never a read-only
+  reference project, never production), then re-check its security and
+  performance advisories
 
-A push that turns the pipeline red costs every other module's agent trust in the
-integration branch. Do not merge until everything above is clean.
+CI runs the full suite on the pull request, including the whole Playwright suite.
+Do not merge until CI is green. Run end-to-end tests locally only when asked or
+when the change is genuinely risky.
 
 ## 4. Shared database changes require ownership discipline
 
