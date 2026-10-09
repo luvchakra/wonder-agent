@@ -7,23 +7,12 @@ import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 import { getSessionUser } from "@/lib/tenant/session";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
-
-/**
- * The first part of a new tenant's slug. FOUNDATION-P0-22's slug policy
- * (migration 0095: lowercase, URL-safe, 3–40 characters) leaves room for
- * the "-xxxxxx" suffix added below, so this part is at most 33 characters.
- */
-function slugify(name: string): string {
-  return (
-    name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "")
-      .slice(0, 33)
-      .replace(/-+$/, "") || "tenant"
-  );
-}
+import { ORGANIZATION_NAME_MAX, newTenantSlug } from "@/lib/tenant/organizationName";
+import { writeAudit } from "@/lib/audit/writeAudit";
+import { renameOrganization } from "@/lib/tenant/organization";
+import { requirePermission } from "@/lib/rbac/requirePermission";
+import { ApiError } from "@/lib/shared/types/foundation";
+import { revalidatePath } from "next/cache";
 
 /**
  * FOUNDATION-P0-03.2 — self-service tenant creation. Delegates the actual
@@ -37,6 +26,9 @@ export async function createTenantAction(formData: FormData) {
   if (!name) {
     throw new Error("Organization name is required");
   }
+  if (name.length > ORGANIZATION_NAME_MAX) {
+    throw new Error(`Organization name must be at most ${ORGANIZATION_NAME_MAX} characters`);
+  }
 
   // FOUNDATION-P0-22 — organizations are created from the WonderID address, never from inside another organization's.
   const host = await getHostTenant();
@@ -45,7 +37,7 @@ export async function createTenantAction(formData: FormData) {
   }
 
   const supabase = await supabaseServer();
-  const slug = `${slugify(name)}-${Math.random().toString(36).slice(2, 8)}`;
+  const slug = newTenantSlug(name);
 
   const { data: tenantId, error } = await supabase.rpc("create_tenant_with_owner", {
     tenant_name: name,
@@ -55,6 +47,9 @@ export async function createTenantAction(formData: FormData) {
   if (error || !tenantId) {
     throw new Error(error?.message ?? "Failed to create tenant");
   }
+
+  const user = await getSessionUser();
+  await writeAudit({ tenantId, actorId: user?.id ?? null, actorType: "user", action: "tenant.created", objectType: "tenant", objectId: tenantId, outcome: "success", metadata: { automatic: false } });
 
   const cookieStore = await cookies();
   cookieStore.set(TENANT_COOKIE_NAME, tenantId, {
@@ -134,4 +129,25 @@ export async function signOutAction() {
   cookieStore.delete(SESSION_STARTED_COOKIE);
   cookieStore.delete(SESSION_LAST_SEEN_COOKIE);
   redirect("/sign-in");
+}
+
+export type RenameOrganizationState = { ok: boolean; message: string | null };
+
+/**
+ * Administration → Organization: rename the active organization. Needs
+ * "Manage organization settings" (tenant.settings); the tenant comes from
+ * the session, never the form.
+ */
+export async function renameOrganizationAction(_prev: RenameOrganizationState, formData: FormData): Promise<RenameOrganizationState> {
+  let ctx;
+  try {
+    ctx = await requirePermission("tenant.settings");
+  } catch (err) {
+    if (err instanceof ApiError) return { ok: false, message: err.status === 403 ? "You don't have permission to rename this organization." : err.message };
+    throw err;
+  }
+  const result = await renameOrganization(ctx.tenantId!, ctx.userId, formData.get("name"));
+  if (!result.ok) return { ok: false, message: result.error };
+  revalidatePath("/", "layout");
+  return { ok: true, message: "Saved." };
 }

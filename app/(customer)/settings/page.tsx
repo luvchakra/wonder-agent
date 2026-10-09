@@ -1,14 +1,30 @@
 import Link from "next/link";
-import { Card, CardBody } from "@/modules/ui";
+import { Card, CardBody, CardHeader } from "@/modules/ui";
+import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContext";
+import { OrganizationNameForm } from "./OrganizationNameForm";
 
 // Owned by Foundation Agent. Roles/Tenant Settings/Audit Logs UI remain
 // deferred (see docs/design/foundation-agent-backlog-audit.md); SSO is
 // live at /settings/sso (FOUNDATION-P0-03.3) and AI Provider configuration
 // (Platform-owned, PLATFORM-P0-05.2) is live at /settings/ai.
-export default function SettingsPage() {
+export default async function SettingsPage() {
+  // The layout has already resolved both (request-cached), so this costs nothing.
+  const [ctx, memberships] = await Promise.all([getTenantContext(), getMyMemberships()]);
+  const organizationName = memberships.find((m) => m.tenantId === ctx.tenantId)?.name ?? null;
+  const canRename = ctx.permissions.includes("tenant.settings");
+
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold text-foreground">Administration</h1>
+      {organizationName ? (
+        <Card>
+          <CardHeader
+            title="Organization"
+            description={canRename ? "The name everyone in your organization sees. New organizations are named from the account that created them; change it here." : "The name everyone in your organization sees."}
+          />
+          <CardBody>{canRename ? <OrganizationNameForm name={organizationName} /> : <p className="text-sm font-medium text-foreground">{organizationName}</p>}</CardBody>
+        </Card>
+      ) : null}
       <Card>
         <CardBody className="space-y-2">
           <Link href="/settings/users" className="block text-primary hover:underline">
@@ -41,7 +57,6 @@ export default function SettingsPage() {
           <Link href="/my-privacy" className="block text-primary hover:underline">
             My privacy
           </Link>
-          <p className="text-sm text-muted-foreground">Tenant Settings administration screens are not yet available.</p>
         </CardBody>
       </Card>
     </div>
