@@ -2506,3 +2506,19 @@ used only the publishable key, and printed no secret.
 - Fix (owner, in the dashboards): generate a new client secret on that Google
   OAuth client and paste it into Supabase → Authentication → Providers →
   Google.
+
+**Resolved the same day: Google sign-in works end to end on production.**
+- After the owner replaced the client secret, `auth_logs` at 19:24:27 UTC
+  shows `/callback` 302 with `user_signedup` (provider `google`), then
+  `/token` 200 with `grant_type: pkce` and `login`. The PKCE exchange in
+  `/auth/callback` completed and a session was issued.
+- `https://id.wonderapps.biz/sign-in` renders "Sign in with Google" (and
+  Microsoft, LinkedIn and SSO). `/sign-up` shows the same buttons.
+- By design, the social buttons are hidden on an organization's own
+  address (`<slug>.<BASE_APP_HOST>`, FOUNDATION-P0-22), because Supabase's
+  redirect allow-list holds only `https://id.wonderapps.biz`. Showing them
+  there would need `https://*.id.wonderapps.biz/**` in Supabase Redirect
+  URLs and a code change in `app/sign-in/SignInForm.tsx`. Not done; waiting
+  for the owner to decide.
+- No code changed. Read-only checks: production page fetch, Supabase
+  `auth_logs` query.
