@@ -2441,3 +2441,56 @@ from Google Cloud, Microsoft Entra and LinkedIn in any case.
       `create_tenant_with_owner`, executable by signed-in users by design;
     - `resolve_tenant_host`, executable by `anon` for host-based tenant
       resolution before sign-in.
+
+---
+
+## 2026-10-09 — Google sign-in verified on production (`id.wonderapps.biz`)
+
+User request: check Google sign-in now that the Google OAuth client and the
+Supabase provider are configured. No code changed. All checks were read-only,
+used only the publishable key, and printed no secret.
+
+**What was checked and found.**
+- **Provider enabled.** `/auth/v1/settings` reports `external.google = true`
+  (with `email`). Microsoft (`azure`) and LinkedIn are still off; their
+  buttons show the "not enabled yet" message (SocialAuthButtons' settings check).
+- **Supabase → Google.** `/auth/v1/authorize?provider=google` returns 302 to
+  `accounts.google.com` with the configured web client, `redirect_uri`
+  `https://ekgyjwoenteadaaqakmd.supabase.co/auth/v1/callback`, and scope
+  `email profile`. Following it reaches Google's account chooser with no
+  `redirect_uri_mismatch`, `invalid_client` or "Access blocked" error, so the
+  Google Console redirect URI and client credentials match.
+- **Return address allow-list** (method as on 2026-10-02: probe `redirect_to`
+  and read GoTrue's logged `referer` in `auth_logs`):
+  - Site URL is now `https://id.wonderapps.biz`.
+  - Accepted: `https://id.wonderapps.biz/auth/callback`, including
+    `?next=/update-password`. Password reset links and social sign-in return
+    correctly on production.
+  - Replaced by the Site URL: `wonder-agent-tau.vercel.app`, Vercel preview
+    URLs, `localhost:3000`, `agent.wonderapps.biz` (now 404, no longer the
+    production domain) and an arbitrary external host.
+- **Production domain.** The Vercel project `wonder-id` serves
+  `id.wonderapps.biz` (verified) and `wonder-agent-tau.vercel.app`. No
+  application code references the old `agent.wonderapps.biz`.
+- **End to end in a browser.** Headless Chromium on
+  `https://id.wonderapps.biz/sign-in` → "Sign in with Google" lands on Google's
+  sign-in page with `redirect_to=https://id.wonderapps.biz/auth/callback`, and
+  the PKCE code-verifier cookie is set on `id.wonderapps.biz`, which is what
+  `/auth/callback`'s `exchangeCodeForSession()` needs. The final step (a real
+  Google account consenting) needs a human and was not performed.
+- **CSP.** Not affected: OAuth is a top-level navigation, not a form post or
+  fetch to Google; `connect-src` already allows `https://*.supabase.co`.
+
+**Optional owner settings (not blockers).**
+- Google's consent screen names the app `ekgyjwoenteadaaqakmd.supabase.co`.
+  Showing "WonderID" needs a Supabase custom auth domain (e.g.
+  `auth.wonderapps.biz`) plus that domain's callback in the Google client's
+  redirect URIs.
+- To use Google sign-in on the tau URL, previews or localhost, add
+  `https://wonder-agent-tau.vercel.app/**`,
+  `https://*-luvchakras-projects.vercel.app/**` and `http://localhost:3000/**`
+  to Supabase Redirect URLs. Without them those hosts return to production.
+- While the Google consent screen is in "Testing", only listed test users can
+  sign in. Publish it for general use.
+- Vercel has no `APP_BASE_URL`. Billing return URLs need it
+  (`https://id.wonderapps.biz`). This does not affect sign-in.
