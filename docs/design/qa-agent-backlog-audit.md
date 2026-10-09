@@ -1054,3 +1054,24 @@ tests run nightly; per-change CI runs feature-specific tests only.
 - Add the five Actions secrets so the nightly suite can run.
 - Optionally, a larger Vercel build machine. Compile time scales with cores:
   the current machine has 2 cores and 8 GB.
+
+**Measured after merging (#8, `3a969ad`).**
+- **Pull request CI:** 52s wall clock on its own PR, down from about 83s.
+  That was the slowest case:
+  - an empty `node_modules` cache, so `npm ci` ran;
+  - full lint and tests, because `.github/` changed.
+
+  Each job took 7–50s, all running in parallel.
+- **Production deploy:** 38s from build start to ready, down from 92s.
+  - "Skipping validation of types": the 34s TypeScript pass is gone.
+  - Compiled in 5.2s from the restored build cache.
+  - `vercel-ignore-build.sh` logged "App code changed since 2e81268;
+    building".
+- **Local full Playwright run** of the earlier sign-up change (before #8):
+  350 passed, 3 failed, 4 did not run.
+  - The 3 failures were `mcp-bridge`, `mcp-inventory` and one
+    `request-catalog` test that lost its connection ("socket hang up").
+  - All three specs passed on rerun (21/21).
+  - The likely cause: `npm audit fix` replaced `node_modules` under the
+    running server mid-run. This is not proven. None of the three touch
+    the sign-up change.
