@@ -62,7 +62,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // FOUNDATION-P0-22 — on an organization's own address there is nothing
     // to create or pick: the user either belongs there or has no access.
     const host = await getHostTenant();
-    redirect(host.target.kind === "subdomain" || host.target.kind === "invalid" ? "/no-access" : "/onboarding");
+    redirect(host.target.kind === "subdomain" || host.target.kind === "invalid" ? "/no-access" : "/onboarding/start");
   }
 
   const [profile, memberships, isAdmin, announcements, openFindings, cookieStore] = await Promise.all([

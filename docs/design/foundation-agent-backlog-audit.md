@@ -2522,3 +2522,85 @@ used only the publishable key, and printed no secret.
   for the owner to decide.
 - No code changed. Read-only checks: production page fetch, Supabase
   `auth_logs` query.
+
+---
+
+## 2026-10-09 — Sign-up lands in the product: automatic first organization, and renaming it
+
+User request (after confirming Google sign-in works): remove the "Create a
+new organization" screen that followed sign-up.
+
+**What changed.**
+- **Migration `0107_foundation_first_organization.sql`** (applied to the dev
+  project) adds `create_first_tenant_for_current_user(name, slug)`. It wraps
+  `create_tenant_with_owner()` (0008) with two checks, made in the database:
+  - A per-user `pg_advisory_xact_lock` makes the check-and-create atomic, so
+    a double redirect or two tabs still produce exactly one organization.
+  - It returns null, creating nothing, when the account has any membership
+    row (active, invited, suspended or removed) or is a platform
+    administrator. Invited people still choose on `/onboarding`. Removed
+    people are not silently given a new organization. Platform
+    administrators hold no tenant by design (non-negotiable #3).
+  - It runs as the caller (`auth.uid()`), never a service role. Execute is
+    revoked from `public` and `anon`.
+- **`/onboarding/start`** (new page) is where the customer layout and
+  `/auth/callback` now send a signed-in person with no organization.
+  - It calls `ensureFirstOrganization()` (`lib/tenant/firstOrganization.ts`,
+    session client, audit `tenant.created` with `automatic: true`), then
+    hands over with a full page load (`EnterOrganization`, a "Setting up …"
+    status).
+  - Anything else goes to `/onboarding`, which keeps invitations and the
+    manual form; the workspace switcher's "Create new organization" link
+    still points there.
+  - Two bugs found and fixed while building it:
+    - A route handler did not work: the layout's redirect happens during
+      client navigation, which does not follow a route handler's redirect.
+    - A plain `redirect("/")` after creating looped `/ ⇄ /onboarding/start`
+      inside the client router cache, which still held the
+      pre-organization redirect.
+- **Naming** (`lib/tenant/organizationName.ts`, pure, unit-tested):
+  - A company address names the company: `ava@acme-corp.co.uk` → "Acme Corp".
+  - A personal address (Gmail, Outlook, iCloud, …) names the person:
+    "Ava's organization", from the provider's full name, else the address.
+  - `slugify` moved here from `app/actions/tenant.ts`; the manual create
+    action reuses it, caps the name at 80 characters, and now also writes a
+    `tenant.created` audit event.
+- **Rename**: a new Organization card on Administration (`/settings`).
+  - People with `tenant.settings` (Tenant Administrator) see a name form:
+    `renameOrganizationAction` → `renameOrganization()` in
+    `lib/tenant/organization.ts`.
+    - It uses the service role (`tenants` has no client UPDATE policy).
+    - The write is pinned to the session's tenant and to `status = 'active'`.
+    - The name is trimmed to 2–80 characters.
+    - It writes a `tenant.renamed` audit event with the old and new names.
+    - The slug (the organization's address) never changes.
+  - Everyone else sees the name read-only.
+  - The "Tenant Settings administration screens are not yet available" line
+    was removed.
+
+**Verified.**
+- `tsc`, eslint on the changed files, and `npm run build`: clean.
+- Vitest: 106 files, 829 tests passed, including the 4 new naming tests.
+- `tests/foundation/first-organization.sql`, run live: 9/9 as expected.
+  - A new account gets 1 organization, and a second call creates none.
+  - It is Tenant Administrator of it.
+  - The invited, suspended and platform-admin accounts get none.
+  - `anon` is refused with 42501.
+- The two cleanup calls for that test were cancelled, so its fixture rows
+  remain: tenants with slugs `fixture-a107` and `fixture-new-107-aaaaaa`, and
+  the four `fixture-*107@example.test` accounts. The cleanup statements are at
+  the end of the SQL file.
+- Playwright `first-organization.spec.ts` (new) together with
+  `users.spec.ts`, `auth.spec.ts` and `welcome.spec.ts`: 53/53. The new spec
+  covers:
+  - a password sign-in by a brand-new account lands on Overview in "Wonderagent";
+  - a repeat visit to `/onboarding/start` creates nothing;
+  - rename, with both audit events;
+  - a too-short name refused by the server;
+  - a read-only member sees no rename form.
+  
+  The invited-person (`users.spec`) and platform-admin (`auth.setup`) paths
+  still reach `/onboarding`.
+- Security advisor: one new expected WARN, that signed-in users can execute
+  `create_first_tenant_for_current_user`. It is intended, like
+  `create_tenant_with_owner`. No other change.

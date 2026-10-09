@@ -144,7 +144,9 @@ export async function GET(request: NextRequest) {
   // sign-in. That is the same friction FOUNDATION already removed from the
   // password path ("sign-in lands on the app, not the organization
   // picker"); this brings the OAuth/callback path in line with it. Only a
-  // genuinely new user with no membership yet still needs /onboarding.
+  // genuinely new user with no membership yet goes through
+  // /onboarding/start, which gives a brand-new account its first
+  // organization (or falls back to /onboarding for invitations).
   const ctx = await getTenantContext();
-  return NextResponse.redirect(new URL(ctx.tenantId ? "/" : "/onboarding", request.url));
+  return NextResponse.redirect(new URL(ctx.tenantId ? "/" : "/onboarding/start", request.url));
 }

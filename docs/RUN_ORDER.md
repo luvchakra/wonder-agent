@@ -15,6 +15,15 @@ concurrently. The only reasons to stop instead of auto-chaining: a genuine block
 or a key architecture/security decision the backlog doesn't specify (the
 stop-and-report rule always wins).
 
+**2026-10-09 — how work ships (explicit user decision, `CLAUDE.md` §19).**
+- Every change goes through its own branch and a pull request.
+- It is squash-merged as soon as CI (`security.yml`, `e2e.yml`) is green.
+- It is never pushed directly to `main`.
+- Local checks before a push are the fast ones: typecheck, lint on the changed
+  files, and the unit tests for the touched areas. CI runs the full suite.
+- §19 also adds the real-data, AI-governance and minimal-UI rules.
+- Autopilot chaining above is unchanged.
+
 ## Run order
 
 | Wave | Agent | Why this position | Status |
