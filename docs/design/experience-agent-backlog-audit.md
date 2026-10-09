@@ -3200,3 +3200,94 @@ this sandbox does not have (and must not use).
 - `public/.well-known/security.txt` still carries the placeholder
   `security@wonderid.example`.
 - The campaign evidence package and the governance evidence pack have no UI.
+
+## 2026-10-09 — Landing page: pricing, non-human identities, identity and administration screenshots (user requests)
+
+**What changed** (`app/welcome/*`):
+
+- **Pricing** (`#pricing`, new `app/welcome/Pricing.tsx`, header link
+  "Pricing"):
+  - Free, Pro, Max and Enterprise, with a monthly/yearly switch and USD,
+    EUR or INR.
+  - Prices are the billing catalogue's own rows, the same ones checkout
+    charges, read by Platform's new `listPublicPrices()`. Limits come
+    from `PLAN_DEFAULTS`, the same values billing enforces.
+  - Yearly prices show "About X a month, billed yearly" and the computed
+    saving. USD and EUR say "plus applicable tax"; INR says "incl. GST".
+  - The page is static and re-read hourly (`revalidate = 3600`), so a
+    price changed in the console appears within the hour.
+  - If the catalogue can't be read, no price is shown ("Contact us for
+    pricing") and the error is logged.
+  - The section states, truthfully, that every plan includes the whole
+    product and plans differ only in scale and audit retention. No
+    feature is plan-gated in the code.
+  - Enterprise is "Custom" with a mailto (the footer's pattern; the
+    address is never printed).
+- **Non-human identities (NHI):** a dedicated panel (`#nhi`) inside the
+  identities section, with its own screenshot of the NHI inventory and six
+  shipped capabilities:
+  - one inventory of service accounts, workloads, OAuth clients, API keys
+    and MCP server identities;
+  - links to the agent or account each runs as, with agent likelihood;
+  - an owner on each, with orphaned and privileged ones flagged;
+  - governed rotation and expiry, with no secrets stored;
+  - Shadow AI;
+  - the same certifications, risk scoring and audit trail as people.
+- **Screenshots replaced:** the agent-centric overview, risk and agent
+  shots are gone. The hero is now the Identities overview, desktop and
+  phone. "Inside the product" is a 2×2 grid, each shot with new copy:
+  - the All identities directory;
+  - Users;
+  - Roles;
+  - Authorization policies.
+- **Header:** "Compliance" and "How it works" show from xl up only, so the
+  header fits at 1024px. At 1024 the seven-item nav cut off "Get started".
+
+**Demo data** (Northwind Financial, kept for screenshots by the user's
+2026-09-17 decision):
+
+- New `scripts/seed-showcase-identity.mjs`. It is idempotent, scoped to
+  one tenant, and fills only empty values. It added:
+  - job titles for the four members;
+  - seven more people, one of them leaving;
+  - two external identities with a sponsor and end date;
+  - three service accounts with an owner, two of them privileged;
+  - the groups Finance Operations and Security Engineering;
+  - the custom role Finance Reviewer;
+  - Priya Nair's Agent Administrator role, scoped to production with a
+    90-day expiry and MFA;
+  - the policy "Production agents are never deleted".
+- A second run added nothing.
+- Capture: `ava.chen@northwind.example`'s password was reset through the
+  service-role admin API, as on 2026-09-17. The new random password was
+  passed only through the environment of the capture run, never printed,
+  stored or committed.
+- `scripts/capture-landing-shots.mjs` now:
+  - captures the new screens;
+  - fills the password by `#password`, because the "Show password" button
+    shares the label;
+  - hides the global announcement banner with a style injected into the
+    capture browser only. The live announcement is never changed. The
+    banner root gained `data-slot="announcements"` for this.
+
+**Also fixed:** the sign-in visual baseline (desktop and mobile) was
+regenerated. `da1b565` on main added Microsoft and LinkedIn buttons
+without updating it, so the branding spec failed: the page is 872px tall
+against the 800px baseline. The new rendering was reviewed; the only
+difference is the two buttons.
+
+**Verified:**
+
+- tsc and eslint clean; vitest 825/825.
+- Production build: `/welcome` is static, with a 1-hour revalidate.
+- Playwright welcome, help, design-review, branding and shell specs:
+  66 run, 65 passed. The one failure was the stale sign-in baseline; after
+  regenerating it, branding passes 12/12.
+- Two new welcome tests:
+  - pricing renders catalogue prices for monthly, yearly and INR with
+    GST, limits from the plan definitions, and the CTA targets;
+  - the NHI panel and all four product-shot headings render.
+- Screenshots reviewed: pricing (light monthly USD; dark yearly USD;
+  yearly INR), the NHI panel, the product grid (dark), and the header at
+  1024 and 1440.
+- No horizontal overflow at 390 or 1440.

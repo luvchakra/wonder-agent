@@ -43,6 +43,25 @@ export async function listPrices(): Promise<BillingPrice[]> {
   return (data ?? []).map(toPrice);
 }
 
+/**
+ * The public price list, for the signed-out landing page. billing_prices is
+ * WonderID's own global catalogue — no customer data — but its RLS policy
+ * admits signed-in users only, so this reads it with the service role and
+ * returns only the public columns of active prices: never the payment
+ * providers' price or plan ids. Read-only, no tenant involved.
+ */
+export async function listPublicPrices(): Promise<BillingPrice[]> {
+  const { data, error } = await supabaseServiceRole()
+    .from("billing_prices")
+    .select("id, plan, billing_interval, currency, unit_amount, tax_behavior, active")
+    .eq("active", true)
+    .order("plan")
+    .order("billing_interval")
+    .order("currency");
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map(toPrice);
+}
+
 export async function getBillingProfile(tenantId: string): Promise<BillingProfile | null> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase.from("billing_profiles").select().eq("tenant_id", tenantId).maybeSingle();

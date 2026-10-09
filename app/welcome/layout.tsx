@@ -7,12 +7,14 @@ import { LinkButton, ThemeToggle, WonderIDLogo } from "@/modules/ui";
  * layout renders for signed-out visitors, so it must never call
  * getTenantContext() or anything that assumes a user.
  */
+/** `wide`: shown only from xl up, so the header never overflows at 1024px. */
 const NAV = [
   { href: "#identities", label: "Identities" },
   { href: "#platform", label: "Platform" },
   { href: "#security", label: "Security" },
-  { href: "#trust", label: "Compliance" },
-  { href: "#how-it-works", label: "How it works" },
+  { href: "#trust", label: "Compliance", wide: true },
+  { href: "#how-it-works", label: "How it works", wide: true },
+  { href: "#pricing", label: "Pricing" },
   { href: "/help", label: "Help" },
 ] as const;
 
@@ -37,7 +39,7 @@ export default function WelcomeLayout({ children }: { children: React.ReactNode 
               <a
                 key={item.href}
                 href={item.href}
-                className="whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground"
+                className={`whitespace-nowrap text-sm text-muted-foreground transition-colors hover:text-foreground ${"wide" in item && item.wide ? "hidden xl:inline" : ""}`}
               >
                 {item.label}
               </a>

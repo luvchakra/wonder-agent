@@ -32,20 +32,36 @@ import {
   Users,
 } from "lucide-react";
 import { BrowserFrame, FlowDiagram, LinkButton, WonderIDLogo, PhoneFrame } from "@/modules/ui";
-import agentsDesktopDark from "@/assets/product/agents-desktop-dark.png";
-import agentsDesktopLight from "@/assets/product/agents-desktop-light.png";
-import overviewDesktopDark from "@/assets/product/overview-desktop-dark.png";
-import overviewDesktopLight from "@/assets/product/overview-desktop-light.png";
-import overviewMobileDark from "@/assets/product/overview-mobile-dark.png";
-import overviewMobileLight from "@/assets/product/overview-mobile-light.png";
-import riskDesktopDark from "@/assets/product/risk-desktop-dark.png";
-import riskDesktopLight from "@/assets/product/risk-desktop-light.png";
+import directoryDesktopDark from "@/assets/product/directory-desktop-dark.png";
+import directoryDesktopLight from "@/assets/product/directory-desktop-light.png";
+import identitiesDesktopDark from "@/assets/product/identities-desktop-dark.png";
+import identitiesDesktopLight from "@/assets/product/identities-desktop-light.png";
+import identitiesMobileDark from "@/assets/product/identities-mobile-dark.png";
+import identitiesMobileLight from "@/assets/product/identities-mobile-light.png";
+import nhiDesktopDark from "@/assets/product/nhi-desktop-dark.png";
+import nhiDesktopLight from "@/assets/product/nhi-desktop-light.png";
+import policiesDesktopDark from "@/assets/product/policies-desktop-dark.png";
+import policiesDesktopLight from "@/assets/product/policies-desktop-light.png";
+import rolesDesktopDark from "@/assets/product/roles-desktop-dark.png";
+import rolesDesktopLight from "@/assets/product/roles-desktop-light.png";
+import usersDesktopDark from "@/assets/product/users-desktop-dark.png";
+import usersDesktopLight from "@/assets/product/users-desktop-light.png";
+import { PLAN_DEFAULTS } from "@/modules/platform-admin/service";
+import { listPublicPrices } from "@/modules/billing/service";
+import { Pricing, type PublicPrice } from "./Pricing";
 
 export const metadata: Metadata = {
   title: { absolute: "WonderID · Identity governance for human and non-human identities" },
   description:
     "WonderID is identity governance and administration (IGA) for human and non-human identities: employees, contractors, partners, service accounts, workloads, API keys and AI agents. One control plane for lifecycle, access requests, certification, risk and runtime assurance, with security, privacy (GDPR, DPDP) and financial compliance (SOX) built in.",
 };
+
+/**
+ * Prices come from the billing catalogue (listPublicPrices) and are re-read
+ * at most hourly, so a price a platform administrator changes reaches this
+ * page within the hour without a deploy.
+ */
+export const revalidate = 3600;
 
 /**
  * EXPERIENCE-P0-14 — the public landing page. Served at `/` for signed-out
@@ -100,6 +116,16 @@ const IDENTITY_TYPES = [
 ] as const;
 
 const LIFECYCLE = ["Discover", "Onboard", "Request", "Approve", "Certify", "Detect", "Remediate", "Offboard"] as const;
+
+/** Non-human identities (NHI): what WonderID does with them, each point a shipped screen or control. */
+const NHI_POINTS = [
+  "One inventory of service accounts, workload identities, OAuth clients, API keys and MCP server identities, from every connected source",
+  "Each one linked to the application, account or AI agent it runs as, with how likely an unlinked one is to be an agent",
+  "An accountable owner on every machine identity, and orphaned or privileged ones flagged",
+  "Ownership, rotation evidence and expiry governed; secrets never stored or shown",
+  "Shadow AI: activity from agents nobody registered, surfaced in a discovery inbox",
+  "The same certifications, risk scoring and audit trail as people",
+] as const;
 
 const FEATURE_GROUPS = [
   {
@@ -366,6 +392,41 @@ const STEPS = [
   },
 ] as const;
 
+const PRODUCT_SHOTS = [
+  {
+    light: directoryDesktopLight,
+    dark: directoryDesktopDark,
+    label: "app.wonderid/identities/all",
+    alt: "All identities in one table: people, external partners, AI agents and a privileged service account, each with its type, status, owner and department.",
+    title: "Every identity, one directory",
+    body: "People, external partners, service accounts and AI agents side by side, each with a status, an owner and where it came from — a privileged service account is as visible as an employee.",
+  },
+  {
+    light: usersDesktopLight,
+    dark: usersDesktopDark,
+    label: "app.wonderid/settings/users",
+    alt: "The Users screen: four people with their job titles, roles, status and last activity, filterable by status, role and group.",
+    title: "People and their roles",
+    body: "Invite, suspend and remove people with a recorded reason. Every user's page shows each permission they hold and exactly which role or group gives it to them.",
+  },
+  {
+    light: rolesDesktopLight,
+    dark: rolesDesktopDark,
+    label: "app.wonderid/settings/roles",
+    alt: "The Roles screen: a custom Finance Reviewer role above fifteen system roles, each with its permission and holder counts.",
+    title: "Roles you can reason about",
+    body: "System roles for common jobs and custom roles built from a published permission catalog. Nobody can design a role more powerful than they are, and assignments can be scoped and time-limited.",
+  },
+  {
+    light: policiesDesktopLight,
+    dark: policiesDesktopDark,
+    label: "app.wonderid/settings/authorization-policies",
+    alt: "The Authorization policies screen with a policy denying agent deletion in production.",
+    title: "Policies that override any role",
+    body: "Deny an action, or hold it for approval, across the organization or in one environment — with a break-glass exception. Every refusal lands in the audit trail.",
+  },
+] as const;
+
 function GridBackdrop() {
   return (
     <div
@@ -386,7 +447,18 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function WelcomePage() {
+async function loadPrices(): Promise<PublicPrice[] | null> {
+  try {
+    return (await listPublicPrices()).map(({ plan, interval, currency, unitAmount, taxBehavior }) => ({ plan, interval, currency, unitAmount, taxBehavior }));
+  } catch (err) {
+    // No catalogue, no numbers: the section then says "contact us" rather than guessing.
+    console.error("landing: price catalogue unavailable:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+export default async function WelcomePage() {
+  const prices = await loadPrices();
   return (
     <>
       {/* ---------------------------------------------------------- hero */}
@@ -452,9 +524,9 @@ export default function WelcomePage() {
         <div className="mx-auto max-w-6xl px-4 sm:px-6">
           <div className="relative -mt-10 pb-16 sm:-mt-14 sm:pb-20">
             <BrowserFrame
-              light={overviewDesktopLight}
-              dark={overviewDesktopDark}
-              alt="The WonderID overview dashboard: agent counts, risk by severity, an action queue and recent findings for a tenant called Northwind Financial."
+              light={identitiesDesktopLight}
+              dark={identitiesDesktopDark}
+              alt="The WonderID Identities overview for Northwind Financial: 21 identities — 11 people, 2 external, 3 machine identities and 5 AI agents — with accountability gaps and machine identities by kind."
               priority
               sizes="(min-width: 1280px) 1100px, 100vw"
             />
@@ -462,9 +534,9 @@ export default function WelcomePage() {
                 beneath the browser on small ones, so neither is ever cropped. */}
             <div className="mt-6 flex justify-center lg:mt-0 lg:absolute lg:-bottom-4 lg:-right-6 lg:block">
               <PhoneFrame
-                light={overviewMobileLight}
-                dark={overviewMobileDark}
-                alt="The same overview on a phone, with the metric cards stacked two across."
+                light={identitiesMobileLight}
+                dark={identitiesMobileDark}
+                alt="The same Identities overview on a phone, with the identity counts stacked two across."
                 className="w-40 sm:w-48 lg:w-[220px]"
               />
             </div>
@@ -522,6 +594,37 @@ export default function WelcomePage() {
                 </li>
               ))}
             </ol>
+          </div>
+
+          {/* ------------------------------------- non-human identities (NHI) */}
+          <div id="nhi" className="mt-16 grid scroll-mt-20 items-center gap-10 lg:grid-cols-[1fr_1.15fr]">
+            <div>
+              <SectionLabel>Non-human identities (NHI)</SectionLabel>
+              <h3 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-foreground sm:text-2xl">
+                Most identities in your estate aren&rsquo;t people. Govern them like they are.
+              </h3>
+              <p className="mt-3 text-base leading-relaxed text-muted-foreground">
+                Service accounts, workloads, API keys and OAuth clients outnumber employees and
+                rarely have an owner. WonderID brings every non-human identity your connected
+                systems know about into one inventory and holds each to the same standard as a
+                person: an owner, a reason for its access and a record of what it did.
+              </p>
+              <ul className="mt-5 space-y-2.5">
+                {NHI_POINTS.map((point) => (
+                  <li key={point} className="flex gap-2 text-sm leading-relaxed text-foreground">
+                    <ServerCog className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span>{point}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <BrowserFrame
+              light={nhiDesktopLight}
+              dark={nhiDesktopDark}
+              alt="The Non-human identities inventory: service accounts and an OAuth client imported from Saviynt and a custom IAM, each linked to the AI agent it runs as."
+              label="app.wonderid/agents/identities"
+              sizes="(min-width: 1024px) 55vw, 100vw"
+            />
           </div>
         </div>
       </section>
@@ -701,42 +804,20 @@ export default function WelcomePage() {
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
               Built for the person who has to answer for it.
             </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Every identity in one directory, and administration precise enough that nobody holds
+              more than their job needs — including the administrators.
+            </p>
           </div>
 
-          <div className="mt-10 grid gap-8 lg:grid-cols-2">
-            <div>
-              <BrowserFrame
-                light={riskDesktopLight}
-                dark={riskDesktopDark}
-                alt="The Risk screen listing every agent with open findings, worst severity first — FinanceBot critical, ProcurementCopilot high, SupportTriageBot medium."
-                label="agent.WonderApps.biz/risk"
-                sizes="(min-width: 1024px) 50vw, 100vw"
-              />
-              <h3 className="mt-5 text-base font-semibold text-foreground">
-                Risk, ordered by what to do first
-              </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                Every agent with an open finding, worst severity first, each one tracing back to the
-                entitlement and the runtime event that produced it.
-              </p>
-            </div>
-
-            <div>
-              <BrowserFrame
-                light={agentsDesktopLight}
-                dark={agentsDesktopDark}
-                alt="The AI Agents inventory listing FinanceBot, SupportTriageBot, InvoiceReconciler, ProcurementCopilot and DataQualityAgent with lifecycle state, criticality and owner."
-                label="agent.WonderApps.biz/agents"
-                sizes="(min-width: 1024px) 50vw, 100vw"
-              />
-              <h3 className="mt-5 text-base font-semibold text-foreground">
-                An inventory that is actually governed
-              </h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                Lifecycle state, criticality and accountable owner on every agent — so an unowned
-                agent in production is a visible exception, not a silent one.
-              </p>
-            </div>
+          <div className="mt-10 grid gap-x-8 gap-y-12 lg:grid-cols-2">
+            {PRODUCT_SHOTS.map((shot) => (
+              <div key={shot.title}>
+                <BrowserFrame light={shot.light} dark={shot.dark} alt={shot.alt} label={shot.label} sizes="(min-width: 1024px) 50vw, 100vw" />
+                <h3 className="mt-5 text-base font-semibold text-foreground">{shot.title}</h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{shot.body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -916,6 +997,23 @@ export default function WelcomePage() {
               </li>
             ))}
           </ol>
+        </div>
+      </section>
+
+      {/* --------------------------------------------------------- pricing */}
+      <section id="pricing" className="border-b border-border">
+        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+          <div className="max-w-2xl">
+            <SectionLabel>Pricing</SectionLabel>
+            <h2 className="mt-3 text-2xl font-semibold tracking-[-0.02em] text-foreground sm:text-3xl">
+              Start free. Pay as you grow.
+            </h2>
+            <p className="mt-4 text-base leading-relaxed text-muted-foreground">
+              Every plan has the whole product. Choose by how many people, agents and integrations
+              you govern, and how long you need to keep audit history.
+            </p>
+          </div>
+          <Pricing prices={prices} limits={PLAN_DEFAULTS} />
         </div>
       </section>
 

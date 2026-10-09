@@ -28,6 +28,37 @@ test.describe("landing page (signed out)", () => {
     await expect(page.getByRole("heading", { name: "Sign in to WonderID" })).toBeVisible();
   });
 
+  test("pricing shows the billing catalogue's plans, by period and currency", async ({ page }) => {
+    await page.goto("/#pricing");
+    const pricing = page.locator("#pricing");
+    await expect(pricing.getByRole("heading", { name: "Start free. Pay as you grow." })).toBeVisible();
+    for (const plan of ["Free", "Pro", "Max", "Enterprise"]) await expect(pricing.getByRole("heading", { name: plan, exact: true })).toBeVisible();
+    // Paid prices come from billing_prices, never a hard-coded figure: a monthly price in USD…
+    const pro = pricing.getByRole("listitem").filter({ has: page.getByRole("heading", { name: "Pro", exact: true }) });
+    await expect(pro.getByText(/^\$[\d,]+$/)).toBeVisible();
+    await expect(pro.getByText("/ month")).toBeVisible();
+    // …a yearly one with its monthly equivalent, and the same plan in rupees with GST included.
+    await pricing.getByRole("button", { name: "Yearly" }).click();
+    await expect(pro.getByText("/ year")).toBeVisible();
+    await expect(pro.getByText(/billed yearly/)).toBeVisible();
+    await pricing.getByLabel("Currency").selectOption("INR");
+    await expect(pro.getByText(/^₹[\d,]+$/)).toBeVisible();
+    await expect(pro.getByText(/incl\. GST/)).toBeVisible();
+    // Limits match the plan definitions, and the CTAs go where they say.
+    await expect(pricing.getByText("3 users")).toBeVisible();
+    await expect(pricing.getByRole("link", { name: "Talk to us" })).toHaveAttribute("href", /^mailto:/);
+    await expect(pricing.getByRole("link", { name: "Start with Pro" })).toHaveAttribute("href", "/sign-up");
+  });
+
+  test("non-human identities and the identity and administration screens are shown", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: /Most identities in your estate aren.t people/ })).toBeVisible();
+    for (const name of ["Every identity, one directory", "People and their roles", "Roles you can reason about", "Policies that override any role"]) {
+      await expect(page.getByRole("heading", { name })).toBeVisible();
+    }
+    await expect(page.getByRole("img", { name: /Identities overview for Northwind Financial/ }).first()).toBeAttached();
+  });
+
   test("renders without horizontal overflow at mobile width", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto("/");

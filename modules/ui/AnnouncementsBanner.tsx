@@ -12,7 +12,7 @@ export function AnnouncementsBanner({ announcements }: { announcements: Platform
   if (announcements.length === 0) return null;
 
   return (
-    <div className="flex flex-col gap-px border-b border-border">
+    <div data-slot="announcements" className="flex flex-col gap-px border-b border-border">
       {announcements.map((a) => (
         <div
           key={a.id}

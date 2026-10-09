@@ -880,3 +880,18 @@ A by-hand review of the billing code found three defects. All are fixed.
   - An open invoice gets none, and a missing id is refused.
   - Verified clean afterwards.
 - typecheck, eslint and vitest 797/797 pass.
+
+## 2026-10-09 — `listPublicPrices()` for the public landing page
+
+- Added `listPublicPrices()` to `modules/billing/service.ts`, so the
+  signed-out landing page can show the real price list.
+- `billing_prices` is WonderID's own global catalogue and holds no
+  customer data, but its RLS policy admits `authenticated` only.
+- The function reads with the service role and returns only the public
+  columns (plan, interval, currency, amount, tax behaviour) of **active**
+  prices. It never returns the Stripe or Razorpay price and plan ids.
+- No RLS or schema change. The anon role still cannot read the table
+  through PostgREST.
+- The landing page caches the result for an hour (ISR). A price changed
+  in the console reaches the page within the hour.
+- Covered by the welcome spec's pricing test.
