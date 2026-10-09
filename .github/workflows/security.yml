@@ -1,39 +1,115 @@
 name: Checks and security
 
-# FOUNDATION-P0-30 — the fast checks every change must pass (CLAUDE.md §4
-# step 3) plus supply-chain and secret hygiene, on every push and PR.
+# FOUNDATION-P0-30 — the fast checks every change must pass, plus supply-chain
+# and secret hygiene. Optimized 2026-10-09 (user request, CLAUDE.md §19.6):
+# - typecheck, lint, unit tests and security run as parallel jobs;
+# - node_modules and the TypeScript/ESLint caches are restored, not rebuilt;
+# - on a pull request, lint and unit tests cover only the files it changes
+#   (and the tests that import them); push to main and the nightly run cover
+#   everything;
+# - docs-only changes skip CI, and a newer push cancels the older run.
+# The Playwright suite runs nightly in e2e.yml, not here.
 on:
   push:
     branches: [main]
+    paths-ignore: ["docs/**", "**/*.md"]
   pull_request:
+    paths-ignore: ["docs/**", "**/*.md"]
   schedule:
-    - cron: "17 3 * * 1"
+    - cron: "17 3 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Files whose change can affect any test or lint result: run everything.
+  RUN_ALL_PATTERN: '^(package(-lock)?\.json|tsconfig\.json|vitest\.(config|setup)\.ts|eslint\.config\.mjs|next\.config\.ts|\.github/)'
+
 jobs:
-  checks:
+  typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+      # Incremental build info from the last run on main: tsc re-checks only
+      # what changed. Always validated by tsc itself, so a stale cache is safe.
+      - uses: actions/cache@v4
+        with:
+          path: tsconfig.tsbuildinfo
+          key: tsbuildinfo-${{ hashFiles('package-lock.json', 'tsconfig.json') }}-${{ github.sha }}
+          restore-keys: tsbuildinfo-${{ hashFiles('package-lock.json', 'tsconfig.json') }}-
+      # next-env.d.ts (image and route types) is gitignored; generate it so a
+      # fresh checkout typechecks the same as a built tree.
+      - run: npx next typegen
+      - run: npm run typecheck
+
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/setup
+      - uses: actions/cache@v4
+        with:
+          path: .eslintcache
+          key: eslintcache-${{ hashFiles('package-lock.json', 'eslint.config.mjs') }}-${{ github.sha }}
+          restore-keys: eslintcache-${{ hashFiles('package-lock.json', 'eslint.config.mjs') }}-
+      - name: Lint (changed files on a pull request, everything otherwise)
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            changed=$(git diff --name-only --diff-filter=ACMR HEAD^1 HEAD)
+            if ! grep -Eq "$RUN_ALL_PATTERN" <<<"$changed"; then
+              files=$(grep -E '\.(ts|tsx|js|jsx|mjs)$' <<<"$changed" || true)
+              if [ -z "$files" ]; then echo "No lintable files changed."; exit 0; fi
+              echo "Linting $(wc -l <<<"$files") changed file(s)."
+              xargs npx eslint --cache --cache-location .eslintcache --no-warn-ignored <<<"$files"
+              exit 0
+            fi
+          fi
+          npx eslint --cache --cache-location .eslintcache .
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/setup
+      - name: Unit tests (related to the change on a pull request, all otherwise)
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # The pull_request checkout is the merge commit: HEAD^1 is the base.
+            changed=$(git diff --name-only --diff-filter=ACMR HEAD^1 HEAD)
+            if ! grep -Eq "$RUN_ALL_PATTERN" <<<"$changed"; then
+              files=$(grep -E '\.(ts|tsx|js|jsx|mjs)$' <<<"$changed" || true)
+              if [ -z "$files" ]; then echo "No source files changed."; exit 0; fi
+              # Runs the tests that import any changed file, directly or not.
+              xargs npx vitest related --run --passWithNoTests <<<"$files"
+              exit 0
+            fi
+          fi
+          npm test
+
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
-      - name: Install dependencies (lockfile only, no install scripts from new packages)
-        run: npm ci
-      # next-env.d.ts (image and route types) is gitignored; generate it so a
-      # fresh checkout typechecks the same as a built tree.
-      - name: Generate Next.js types
-        run: npx next typegen
-      - name: Typecheck
-        run: npm run typecheck
-      - name: Lint
-        run: npm run lint
-      - name: Unit tests
-        run: npm test
+      # Reads package-lock.json only; no install needed.
       - name: Dependency audit (fail on high or critical, production dependencies)
         run: npm audit --omit=dev --audit-level=high
       - name: No secrets or private keys committed

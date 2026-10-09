@@ -45,7 +45,8 @@ win (spec, "Final Claude Code operating instruction"). Phase plan and story IDs:
 general "working rules for Claude" template and chose to adopt it, including its
 workflow. Work now ships through a branch, a pull request and a squash merge once
 CI is green, never as a direct push to `main`. Local checks before a push are the
-fast ones; CI runs the full suite. The template also adds the real-data,
+fast ones; CI runs the feature-specific checks, and the full Playwright suite
+runs nightly. The template also adds the real-data,
 AI-governance and minimal-UI rules. They are §19, adapted to this repository. The
 security non-negotiables, including #1 and #2 (tenant from membership, RLS
 required), are unchanged. §4, §12, §17.8 and `docs/ORCHESTRATION.md` §2–§3 were
@@ -302,7 +303,8 @@ Each agent works one story at a time from its own backlog doc:
    - `npx vitest run <paths>` for the areas you touched;
    - for a migration, apply it to the dev Supabase project and re-check advisories.
 
-   CI runs the full suite on the pull request.
+   CI runs the typecheck, the tests related to the change and changed-file lint
+   on the pull request; the full Playwright suite runs nightly.
 4. **Update the module's own audit log** with a dated entry: what was built, how it
    was verified, what was deliberately left out or deferred.
 5. **Update the Progress Tracker table** at the very top of the module's own backlog
@@ -563,8 +565,9 @@ A feature is complete only when:
   fetch waterfalls.
 - TypeScript/lint/build checks pass where applicable.
 - The module's own audit log is updated.
-- CI is green on the pull request. CI's `e2e` workflow is the full Playwright suite,
-  so shared-infrastructure changes (the list in §17.8) are covered there.
+- CI is green on the pull request. For shared-infrastructure changes (the list
+  in §17.8), the nightly full Playwright run after the merge is green too, or a
+  hand-started run of the affected specs passed before the merge.
 - The change is committed with a focused message on its own branch and
   squash-merged through a pull request once CI is green (§19.6).
 
@@ -887,9 +890,12 @@ core flows, and no P0 failure ships without a documented, approved exception.
 tenant resolution, RBAC, RLS or migrations, AI orchestration or context retrieval,
 tool governance or autonomy, executors and connectors, webhooks, file processing,
 or notifications, the **full** Playwright suite must pass, not just the module's
-specs. Since 2026-10-09 that is CI's `e2e` workflow on the pull request. Never merge
-while it is red. Run it locally only when asked, or when the change is genuinely
-risky (§19.6).
+specs. Since 2026-10-09 (user decision) the full suite runs nightly in CI
+(`e2e.yml`), not on every pull request.
+- For such a change, run the affected spec files before merging: locally, or
+  with a hand-started `e2e.yml` run given those specs.
+- Check the next nightly run.
+- A red nightly run is fixed before anything else merges.
 An apparently isolated change can alter security behaviour: on 2026-09-18 a
 one-line switch to local JWT verification passed every targeted test and was
 caught only by an unrelated spec asserting that global sign-out is immediate.
@@ -1182,9 +1188,17 @@ beats exhaustive pre-push verification.
   - `npx eslint <changed files>`;
   - `npx vitest run <paths you touched>`.
 
-  CI runs the full suite on every pull request: `security.yml` (typecheck, lint,
-  unit tests, `npm audit`, secret scan) and `e2e.yml` (the full Playwright
-  suite). Let it.
+  Pull request CI (`security.yml`) runs in parallel jobs:
+  - the full typecheck;
+  - lint on the changed files;
+  - the unit tests related to the changed files;
+  - `npm audit` and the secret scan.
+
+  A change to `package.json`, the lockfile, `tsconfig.json`, the Vitest, ESLint
+  or Next config, or `.github/` runs every test and the whole lint. Push to
+  `main` and the nightly run also cover everything. The full Playwright suite
+  runs nightly (`e2e.yml`, 03:00 IST), not per change. It can be started by hand
+  from the Actions tab, optionally for chosen spec files.
 - **Don't run** end-to-end, accessibility or full-app walkthroughs unless asked or
   the change is genuinely risky. A quick look at the one screen you changed is
   enough.
@@ -1227,8 +1241,16 @@ beats exhaustive pre-push verification.
 - Database schema: `supabase/migrations/` (§5 numbering), owned per
   `docs/design/ownership-map.md`. The permission catalogue (migration 0097 and
   later) and `lib/shared/types` must match it.
-- Full check: CI, `.github/workflows/security.yml` and `.github/workflows/e2e.yml`,
-  on every pull request.
+- Full check:
+  - `.github/workflows/security.yml`, feature-specific on pull requests and
+    complete on `main` and nightly;
+  - `.github/workflows/e2e.yml`, the full Playwright suite, nightly and on
+    demand.
+- Deploy: Vercel builds production only.
+  - It skips a deploy whose changes are all docs, tests, CI, migrations or
+    scripts (`scripts/vercel-ignore-build.sh`).
+  - It skips `next build`'s TypeScript pass, which CI's typecheck job already
+    covers (`next.config.ts`).
 - Before changing navigation or information architecture, read:
   - `docs/design/UI-UX-DESIGN-RULES.md`;
   - `modules/ui/shell-nav.ts`;

@@ -964,3 +964,93 @@ was **not run**: this sandbox has no `SUPABASE_SERVICE_ROLE_KEY`, which
 `auth.setup.ts` needs. The `e2e.yml` workflow has it as a repository secret and
 runs it on the next push to `main` or the next PR, together with the full suite
 §17.8 requires.
+
+---
+
+## 2026-10-09 — CI and deploy optimized; Playwright moved to nightly
+
+User request: optimize CI and CD and minimize build and deploy time. End-to-end
+tests run nightly; per-change CI runs feature-specific tests only.
+
+**Before** (measured from the last runs):
+- **CI `checks`:** about 80s, one serial job:
+  - `npm ci` 15s;
+  - typecheck 19s;
+  - lint 25s;
+  - all unit tests 17s.
+- **CI `e2e`:** the full Playwright suite on every pull request and push. It
+  has been red on every commit because the repository has no Actions secrets.
+- **Vercel production deploy:** about 92s from start to ready (2-core build
+  machine):
+  - install 3s;
+  - compile 27s;
+  - `next build`'s TypeScript pass 34s;
+  - page data and static pages 7s;
+  - deploy 11s.
+  
+  Every merge deployed, including docs-only ones.
+
+**What changed.**
+- **`security.yml`** is now four parallel jobs: typecheck, lint, test and
+  security.
+  - `node_modules` is cached on the lockfile hash, so `npm ci` runs only when
+    the lockfile changes (new `.github/actions/setup`).
+  - `tsconfig.tsbuildinfo` and `.eslintcache` are cached, so tsc and eslint
+    re-check only what changed.
+  - On a pull request, lint covers the changed files and the unit tests are
+    `vitest related` on the changed files (the tests that import them). This
+    uses the merge commit's first parent, so a depth-2 checkout is enough.
+  - A change to `package.json`, the lockfile, `tsconfig.json`, the
+    Vitest/ESLint/Next config or `.github/` runs everything, and so do push
+    to `main` and the nightly schedule (03:17 UTC daily, previously weekly).
+  - Docs-only changes skip CI, and a newer push cancels the older run.
+  - `npm audit` reads the lockfile without installing.
+- **`e2e.yml`** no longer runs on pull requests or pushes. It runs nightly at
+  21:30 UTC (03:00 IST) and by hand (`workflow_dispatch`).
+  - A hand-started run takes an optional list of spec files. The list is
+    passed through an environment variable, never interpolated into the
+    script.
+  - The timeout is raised to 60 minutes for the full suite.
+  - It still needs the repository's Actions secrets
+    (`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+    `SUPABASE_SERVICE_ROLE_KEY`, `SECRET_ENCRYPTION_KEY`, `CRON_SECRET`). Until
+    the owner adds them, the nightly run fails at setup.
+- **Vercel.**
+  - `next.config.ts` sets `typescript.ignoreBuildErrors` only when
+    `VERCEL=1`, which removes the 34s duplicate of CI's typecheck from every
+    deploy. Local and E2E builds still type-check.
+  - `vercel.json` gains `ignoreCommand: bash scripts/vercel-ignore-build.sh`.
+    It keeps the project's existing behaviour (production only, no preview
+    builds). It skips a production deploy when everything changed since
+    `VERCEL_GIT_PREVIOUS_SHA` is docs, tests, CI, Supabase migrations,
+    scripts or test config, and builds whenever it is unsure.
+- CLAUDE.md §4, §12, §17.8, §19.6 and §19.8, ORCHESTRATION §2–3 and
+  RUN_ORDER now describe the new policy:
+  - pull requests merge on green `security.yml`;
+  - shared-infrastructure changes run their affected specs first, locally
+    or by a hand-started `e2e.yml`;
+  - a red nightly run is fixed before anything else merges.
+
+**Verified.**
+- All three YAML files parse.
+- `vercel-ignore-build.sh`, dry-run against real commits:
+  - docs-only #7 → skip (exit 0);
+  - a range including #6's app code → build (exit 1);
+  - a preview → skip;
+  - an unknown previous SHA → build.
+- The changed-file commands run locally:
+  - `vitest related` on `lib/tenant/organizationName.ts` ran its 4 tests in
+    3.4s;
+  - changed-file eslint finished in 1.8s.
+- Typecheck is clean.
+- Expected afterwards:
+  - pull request CI about 30–40s wall clock, down from about 80s;
+  - production deploys about 55–60s, down from about 92s;
+  - docs-only merges no longer deploy.
+
+  The numbers will be confirmed on this PR and the next deploy.
+
+**Left to the owner.**
+- Add the five Actions secrets so the nightly suite can run.
+- Optionally, a larger Vercel build machine. Compile time scales with cores:
+  the current machine has 2 cores and 8 GB.

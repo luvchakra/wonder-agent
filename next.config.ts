@@ -43,6 +43,11 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   // Do not advertise the framework in every response.
   poweredByHeader: false,
+  // Vercel builds skip `next build`'s own TypeScript pass (34s of a ~90s
+  // deploy, 2026-10-09). The same `tsc --noEmit` is CI's "typecheck" job,
+  // which must be green before a pull request merges (CLAUDE.md §19.6).
+  // Local and E2E builds still type-check.
+  typescript: { ignoreBuildErrors: process.env.VERCEL === "1" },
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
