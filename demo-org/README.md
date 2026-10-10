@@ -63,8 +63,12 @@ The script creates:
 - firewall rules (80/443, plus 636 and 5432 for LDAPS and PostgreSQL);
 - a schedule that runs the VM from 08:00 to 20:00 IST.
 
-Running 12 hours a day costs about USD 60 a month, so new-account credits
-last several months. To run it around the clock, set `STOP_AT=never`.
+Running 12 hours a day costs about USD 60 a month. Sign up for Google
+Cloud's Free Trial (the Always Free tier's `e2-micro` is far too small for
+this machine): its USD 300 credit expires after 90 days, so it covers the
+whole trial with room to spare (about USD 180 used). After that, upgrade to
+a paid account to keep the VM; set a budget alert first. To run it around
+the clock, set `STOP_AT=never` (about USD 120 a month).
 
 When it finishes:
 
