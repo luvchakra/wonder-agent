@@ -1373,3 +1373,17 @@ tolerance.
   deleted, never committed.
 - Workflow marker commit and message parsing, checked against a throwaway
   remote.
+
+### 2026-10-10 — Vercel builder baselines recorded
+
+- Two recording runs on Vercel for `branding.spec.ts`. In both, everything
+  else in the spec passed: 11 of 12, the twelfth being the expected
+  write-the-baseline failure.
+  - Both runs produced byte-identical images: desktop 1280×872, 49,960
+    bytes; mobile 390×844, 42,161 bytes. Rendering on the builder is
+    stable.
+  - The images were downloaded from the recording deployment through a
+    Vercel share link.
+- **Review:** compared by eye with the Ubuntu baselines. Same layout and
+  elements; only the text rasterization differs. They are committed as
+  `tests/e2e/branding.spec.ts-snapshots/sign-in-{desktop,mobile}-chromium-linux-vercel.png`.
