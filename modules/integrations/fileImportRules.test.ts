@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { FileImportInvalidError, IMPORT_KINDS, INLINE_SYNC_MAX_ROWS, MAX_IMPORT_BYTES, checkImportForm, isImportKind, tooLargeForImport } from "./fileImportRules";
+import { FileImportInvalidError, IMPORT_KINDS, PAGE_IMPORT_MAX_ROWS, MAX_IMPORT_BYTES, checkImportForm, isImportKind, tooLargeForImport } from "./fileImportRules";
 
 const file = (name: string, size: number) => ({ name, size, type: "text/csv", text: async () => "" });
 
@@ -42,7 +42,7 @@ describe("importing a CSV from an object page", () => {
   });
 
   it("syncs small files before answering and large ones in the background", () => {
-    expect(INLINE_SYNC_MAX_ROWS).toBe(5_000);
+    expect(PAGE_IMPORT_MAX_ROWS).toBe(5_000);
   });
 
   it("carries each problem's row and column", () => {

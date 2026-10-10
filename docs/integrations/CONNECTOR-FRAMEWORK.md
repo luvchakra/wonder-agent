@@ -27,7 +27,10 @@ allowlists needs the user's approval.
 ## The Connector Gateway
 
 User requirement (2026-10-10): "all such connections should pass through one
-gateway which sits between WonderID and external world". Code:
+gateway which sits between WonderID and external world". The user also
+explicitly approved adding the gateway to the outbound allowlist of
+`tests/architecture/connector-boundary.test.ts` (2026-10-10, as non-negotiable
+#20 requires for any widening). Code:
 `modules/integrations/gateway` (`gateway.ts`, with its pure rules in
 `gatewayRules.ts`).
 
@@ -286,31 +289,75 @@ deletes older files a sync has read. An unread file is never deleted.
 
 ### Importing from an object page
 
-`POST /api/v1/imports` (session, `integration.execute`, the permission that
-runs a sync), `multipart/form-data`:
+User decision (2026-10-10): an import from an object page is **previewed
+first** and **additive**. The rows go straight into that page's list: new
+records are added and existing ones updated. A record missing from the file
+is never removed, revoked or deactivated (there are no leavers here).
+
+Two calls, both `multipart/form-data` with the same fields, both needing a
+session with `integration.execute` (the permission that runs a sync) **and**
+the page's manage permission (`identity.manage` for identities,
+`access.manage` for the rest):
 
 | Field | Value |
 |---|---|
 | `kind` | `identity`, `account`, `entitlement`, `access_grant` or `application` |
-| `file` | the CSV, at most 10 MB |
+| `file` | the CSV, at most 10 MB and 5,000 rows |
+| `scope` | the page (`people`, `external-identities`, `machine-identities`, `identities`): the type new identities get when the file has no `identityType` column |
 
-The file becomes an upload of the organization's single **File imports**
-connection (`csv-file`, created on first use, `config.purpose =
-"file_imports"`), and that connection's sync reads it: before the response
-for up to 5,000 rows, in the background above that.
+1. **`POST /api/v1/imports/preview`** reads and maps the file with the File
+   imports connection's definition and settings (exactly as its sync will)
+   and matches each record against the page's records. Nothing is stored or
+   changed. `200 { data: { kind, rows, counts: { new, update, unchanged,
+   invalid, review }, columns, shown: [{ row, externalId, decision, values,
+   changes: [{ field, from, to }], note }] } }`. At most 500 rows are sent
+   (rows that will not be imported first); the counts cover the whole file.
+2. **`POST /api/v1/imports`** (after the person clicks **Confirm import**).
+   The file becomes an upload of the organization's single **File imports**
+   connection (`csv-file`, created on first use, `config.purpose =
+   "file_imports"`), whose sync reads, maps and stores it in
+   `integration_objects`. What that sync stored (its `sync_job_id`) is then
+   handed to the module that owns the records, which re-plans it against
+   the current data and writes it. `200 { data: { jobId, integrationId,
+   rows, counts: { created, updated, unchanged, skipped, failed }, problems:
+   [{ row, externalId, message }] } }`.
 
-- `202 { ok, data: { jobId, integrationId, rows, sync } }`: `sync` is
-  `completed` (the job holds the outcome) or `running`.
-- `400 { ok: false, error: { code: "INVALID_FILE", message, details: [{ row,
-  column?, message }] } }`: the file was refused and nothing was stored.
-  Row 1 is the header.
-- `409`: the File imports connection is disabled, or reads that kind from
-  an address.
+Errors: `400 INVALID_FILE` with `details: [{ row, column?, message }]` (row 1
+is the header; nothing was stored); `409` when the File imports connection
+is disabled or reads that kind from an address; `502 SYNC_FAILED` when the
+connection could not read the file (nothing was added).
 
-The service function is `importFileForObject(ctx, kind, filename, csvText)`
-in `modules/integrations/service.ts`. Every import is audited
-(`integration.file_imported`) with the kind, row count, size and SHA-256,
-never the rows.
+The whole file is refused when a record appears twice (the sync would keep
+only the last), when an account or entitlement file has no `application`
+column (and the connection names no application), or above 5,000 rows.
+
+**How each record is matched and written:**
+
+| Kind | Matched by | Written by | Notes |
+|---|---|---|---|
+| identity | WonderID id, then source reference (`source_native_id`), then email, then username; several matches → **needs review** | Integration plans; Identity's `applySourcedIdentities` writes (precedence 1000, the lowest: a source of record such as HR keeps the fields it owns) | An empty cell changes nothing. New identities keep the external id as their source reference. Managers are set after every record has an identity. |
+| application | WonderID id, then name | Access's `registerApplication` / `updateApplication` | A rename only when the row names the application by its id. |
+| entitlement | WonderID id, then application + name | Access (`fileImport.ts`), batched | The application must already exist. |
+| account | WonderID id, then application + external id | Access (`fileImport.ts`), batched | `owner` links an unlinked account to an identity; an account already linked keeps its owner. |
+| access_grant | account + entitlement | Access's `createManualAccessGrant` | The same rules as access granted by hand (an AI agent's account, separation of duties). Existing access is left as it is. |
+
+The service functions are `previewFileForObject(ctx, kind, scope, csvText)`
+and `importFileForObject(ctx, kind, scope, filename, csvText)` in
+`modules/integrations/service.ts`; the pure rules are
+`modules/integrations/fileImportPlan.ts` and
+`modules/access-governance/fileImportRules.ts`. Audit: every import
+(`integration.file_imported`, with kind, row count, size and SHA-256) and
+its outcome (`integration.file_applied`, with the counts), plus the owning
+module's own events (`identity.created`/`identity.updated`,
+`application.registered`/`application.updated`, `entitlement.imported`,
+`account.imported`, `access.grant_created`). Never the rows' values.
+
+In the app, the object page's **Actions → Import CSV…** dialog shows the
+preview as a table in the page's own columns, with each row's result
+(**New**, **Update** with old → new values, **No change**, **Needs review**,
+**Not imported** with the reason), and **Confirm import** or **Cancel
+import**. After the import it says what was added and updated, lists rows
+not imported, and refreshes the page's list.
 
 **Platform limit.** Vercel accepts request bodies up to 4.5 MB, so a file
 sent or imported through the hosted app is limited to that; a file fetched

@@ -1500,3 +1500,24 @@ or revoked by itself (#15).
   themselves.
 - No existing caller changed. Verified by `request-catalog.spec` (requests
   for yourself resolve the requester's identity).
+
+### 2026-10-10 — Sourced identities: native ids and a preview of a merge
+
+For the object-page CSV import (preview, then additive import; user
+decision, 2026-10-10). All changes are additive; no existing caller changed.
+
+- `listIdentitiesForCorrelation()` also returns `sourceNativeId`, so a later
+  import of the same record finds the identity it created.
+- A `create` op may carry `nativeId`. It is stored as `source_native_id`
+  under `source_system = "File imports"`, guarded by the existing unique
+  index `(tenant, source_system, source_native_id)`.
+- `previewSourcedIdentities(tenantId, authority, ops)` is new and reads only.
+  - It applies `mergeSourcedFields` to the same rows that
+    `applySourcedIdentities` would update, and returns each op's changes
+    (field, from, to) and the fields kept by precedence.
+  - It writes nothing.
+- File imports write with precedence 1000, the lowest, so an authoritative
+  source such as HR keeps the fields it owns. The preview shows those as
+  "kept by a source of record".
+- Verified: the agent-identity suite is green within the 617-test run
+  recorded in the Integration log; typecheck clean.

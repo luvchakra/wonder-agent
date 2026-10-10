@@ -41,7 +41,8 @@ const source = [...files(join(ROOT, "app")), ...files(join(ROOT, "modules")), ..
 const OUTBOUND_ALLOWED: Record<string, string> = {
   "modules/integrations/outboundFetch.ts": "the SSRF-guarded fetch the framework uses",
   "modules/integrations/framework/": "the connector framework itself",
-  "modules/integrations/gateway/": "the Connector Gateway every connection's traffic passes (user requirement, 2026-10-10)",
+  // Added with the gateway; the user confirmed this widening explicitly on 2026-10-10 (non-negotiable #20).
+  "modules/integrations/gateway/": "the Connector Gateway every connection's traffic passes (user requirement and approval, 2026-10-10)",
   "lib/ai/provider.ts": "WonderID's AI model provider (§19.3), not organization data",
   "modules/operations/email.ts": "WonderID's own email provider",
   "lib/users/users.ts": "WonderID's own email provider (invitations)",

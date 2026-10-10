@@ -1983,3 +1983,50 @@ and invariant S4).** Committed together with ACCESS-P0-18.
 - recommended packages, and packages containing roles (ACCESS-P0-21
   roles);
 - birthright auto-assignment (with IDENTITY-P0-18's lifecycle).
+
+### 2026-10-10 — CSV import into the Access pages (preview, then add and update)
+
+**Why.** User decision (2026-10-10): importing a CSV on an object page adds
+new records and updates existing ones, after a preview. Additive only:
+nothing absent from the file is removed, revoked or deactivated.
+
+**What changed.**
+- Pure rules, `fileImportRules.ts` (#9): which existing record each row is,
+  and what would change.
+
+  | Kind | Matched by | Refused (invalid) when |
+  |---|---|---|
+  | application | WonderID id, then name | it would take another application's name |
+  | entitlement | WonderID id, then application + name | the application does not exist; the privilege is unknown |
+  | account | WonderID id, then application + external id | status, type or date is invalid |
+  | access | account + entitlement | the account is not an AI agent's |
+
+  - A second row for the same record goes to review.
+  - An application is renamed only when the row names it by its id.
+  - An account's `owner` links an unlinked account (`correlation:
+    manual`); an account already linked keeps its owner.
+  - Access is added only to an AI agent's account, the same rule as a grant
+    made by hand; existing access is left as it is.
+- Service, `fileImport.ts`: `previewAccessImport()` and
+  `applyAccessImport()`, exported from `service.ts`.
+  - It reads lookups a page at a time (PostgREST's 1,000-row cap) as the
+    user under RLS, filtered on the tenant.
+  - It re-plans at apply time, so a stale preview cannot write the wrong
+    record.
+  - Applications go through `registerApplication` / `updateApplication`
+    (validated, audited per record).
+  - Entitlements and accounts are inserted in batches of 500, falling back
+    to one row at a time so each failure is reported against its row.
+    Updates go row by row. Each import writes one audit event
+    (`entitlement.imported`, `account.imported`) with the ids it touched.
+  - Access goes through `createManualAccessGrant` (separation of duties and
+    audit, as by hand).
+
+**Verified.**
+- `fileImportRules.test.ts`: 7 tests, passed.
+- The Access suite is green within the 617-test run recorded in the
+  Integration log.
+- No migration: every column used exists (checked against the dev database).
+
+**Left out.** Revoking access, deactivating accounts, or deleting anything
+missing from a file. That is deliberately not part of an import.

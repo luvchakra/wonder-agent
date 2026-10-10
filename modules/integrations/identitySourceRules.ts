@@ -237,7 +237,11 @@ function read(raw: Record<string, unknown>, path: string): unknown {
  * invalid instead of a record when it cannot be used: it is then counted
  * and reported, never applied half-way.
  */
-export function normalizeRecord(raw: Record<string, unknown>, mappings: AttributeMapping[]): NormalizedSourceRecord | { invalid: string } {
+export function normalizeRecord(
+  raw: Record<string, unknown>,
+  mappings: AttributeMapping[],
+  opts: { requireDisplayName?: boolean } = {},
+): NormalizedSourceRecord | { invalid: string } {
   const fields: SourcedFields = {};
   let externalId = "";
   let managerExternalId: string | null = null;
@@ -272,7 +276,7 @@ export function normalizeRecord(raw: Record<string, unknown>, mappings: Attribut
   }
   if (!externalId) return { invalid: "no external id" };
   if (externalId.length > 300) return { invalid: "external id longer than 300 characters" };
-  if (!fields.displayName) return { invalid: "no display name" };
+  if (!fields.displayName && opts.requireDisplayName !== false) return { invalid: "no display name" };
   if (fields.startDate && fields.endDate && fields.endDate < fields.startDate) return { invalid: "endDate is before startDate" };
   return { externalId, fields, managerExternalId };
 }

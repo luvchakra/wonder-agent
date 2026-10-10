@@ -1387,3 +1387,20 @@ tolerance.
 - **Review:** compared by eye with the Ubuntu baselines. Same layout and
   elements; only the text rasterization differs. They are committed as
   `tests/e2e/branding.spec.ts-snapshots/sign-in-{desktop,mobile}-chromium-linux-vercel.png`.
+
+### 2026-10-10 — Owner decisions recorded: gateway allowlist, screenshot difference
+
+- **Gateway allowlist: approved.** The owner explicitly confirmed adding the
+  Connector Gateway (`modules/integrations/gateway/`) to the outbound
+  allowlist of `tests/architecture/connector-boundary.test.ts`.
+  - Non-negotiable #20 requires approval for any widening.
+  - The allowlist entry and `docs/integrations/CONNECTOR-FRAMEWORK.md` now
+    say so.
+- **Screenshot difference: accepted as a pass.** The owner accepted the
+  remaining rendering difference between the Ubuntu and Vercel builder
+  screenshots, and asked that no more time go into it.
+  - The sign-in baselines stay per environment, as recorded above.
+  - No further work is planned.
+- **Object-page CSV import.** `tests/e2e/file-import.spec.ts` was rewritten
+  for the preview-then-import flow. The spec run on Vercel is recorded in
+  the next entry.

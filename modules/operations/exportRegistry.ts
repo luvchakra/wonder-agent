@@ -27,6 +27,14 @@ import { CANONICAL_FIELDS, type ResourceKind } from "@/modules/integrations/fram
 export const EXPORT_PERMISSION = "report.export";
 /** Starting a CSV import runs a connector job. */
 export const IMPORT_PERMISSION = "integration.execute";
+/** Importing also adds and updates the page's records, so it needs the permission that manages them. */
+export const IMPORT_MANAGE_PERMISSIONS: Record<ImportKind, string> = {
+  identity: "identity.manage",
+  application: "access.manage",
+  entitlement: "access.manage",
+  account: "access.manage",
+  access_grant: "access.manage",
+};
 export const EXPORT_CHUNK_SIZE = 1000;
 export const EXPORT_ROW_CAP = 50_000;
 export const IMPORT_MAX_BYTES = 10 * 1024 * 1024;
@@ -568,7 +576,8 @@ export function importColumns(kind: ImportKind): { required: string[]; optional:
 // ---------------------------------------------------------------------------
 
 export type ExportMenuItem = { label: string; href: string };
-export type ImportMenuItem = { kind: ImportKind; label: string; title: string; required: string[]; optional: string[]; templateHref: string };
+/** `scope`: the page the import starts from (an identity page's type is the default for new identities). */
+export type ImportMenuItem = { kind: ImportKind; scope: string; label: string; title: string; required: string[]; optional: string[]; templateHref: string };
 export type ObjectActions = { exports: ExportMenuItem[]; imports: ImportMenuItem[] };
 
 /**
@@ -598,10 +607,11 @@ export function objectActionsFor(permissions: readonly string[], keys: readonly 
   if (permissions.includes(IMPORT_PERMISSION)) {
     const seen = new Set<ImportKind>();
     for (const e of entries) {
-      if (!e.importKind || seen.has(e.importKind)) continue;
+      if (!e.importKind || seen.has(e.importKind) || !permissions.includes(IMPORT_MANAGE_PERMISSIONS[e.importKind])) continue;
       seen.add(e.importKind);
       imports.push({
         kind: e.importKind,
+        scope: e.key,
         label: several ? `Import ${e.label}…` : "Import CSV…",
         title: `Import ${e.label}`,
         ...importColumns(e.importKind),

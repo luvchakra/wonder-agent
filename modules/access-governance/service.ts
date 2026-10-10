@@ -133,3 +133,6 @@ export {
   type AssignmentItem,
 } from "./packages";
 export { checkEligibility as checkPackageEligibility, PACKAGE_IDENTITY_TYPES, CERTIFICATION_FREQUENCIES } from "./packageRules";
+// 2026-10-10 — CSV imports from the object pages (preview, then additive apply).
+export { previewAccessImport, applyAccessImport } from "./fileImport";
+export { ACCESS_IMPORT_KINDS, type AccessImportKind } from "./fileImportRules";
