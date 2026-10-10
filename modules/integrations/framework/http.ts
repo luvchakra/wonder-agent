@@ -4,8 +4,9 @@ import { fillTemplate, readPath, type TemplateScope } from "./mapping";
 /**
  * The http driver: requests, authentication and paging for a definition.
  * Pure of any WonderID dependency: the caller passes the fetch to use, so
- * production goes through guardedFetch (SSRF guard, timeouts, size caps)
- * and the unit tests use a fake.
+ * production goes through the Connector Gateway (modules/integrations/gateway:
+ * rate limit, request budget, SSRF guard, timeouts, size caps, traffic
+ * accounting) and the unit tests use a fake.
  */
 
 export type FetchLike = (url: string, init: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<Response>;
@@ -59,11 +60,9 @@ export function parseLinkNext(header: string | null): string | null {
 
 export class HttpSession {
   private token: { value: string; expiresAt: number } | null = null;
-  private lastRequestAt = 0;
   requestCount = 0;
   private readonly base: string;
   private readonly origins: Set<string>;
-  private readonly minIntervalMs: number;
 
   constructor(
     private readonly def: ConnectorDefinition,
@@ -73,7 +72,6 @@ export class HttpSession {
   ) {
     this.base = baseUrlOf(def, settings);
     this.origins = allowedOrigins(def, settings);
-    this.minIntervalMs = Math.ceil(1000 / (def.rateLimitPerSecond ?? 10));
   }
 
   private authScope(): TemplateScope {
@@ -85,12 +83,6 @@ export class HttpSession {
     const url = /^https?:\/\//i.test(pathOrUrl) ? new URL(pathOrUrl) : new URL(this.base + pathOrUrl);
     if (!this.origins.has(url.origin)) throw new ConnectorRequestError(`Refused a request to ${url.origin}: not this connection's address`);
     return url;
-  }
-
-  private async throttle() {
-    const wait = this.lastRequestAt + this.minIntervalMs - Date.now();
-    if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    this.lastRequestAt = Date.now();
   }
 
   private async oauthToken(force = false): Promise<string> {
@@ -108,7 +100,6 @@ export class HttpSession {
       form.set("client_id", clientId);
       form.set("client_secret", clientSecret);
     }
-    await this.throttle();
     this.requestCount++;
     const res = await this.fetchImpl(tokenUrl.toString(), { method: "POST", headers, body: form.toString() });
     if (!res.ok) throw new ConnectorRequestError(`Getting an access token failed: HTTP ${res.status}`, res.status);
@@ -181,7 +172,7 @@ export class HttpSession {
         const base = spec.body && typeof spec.body === "object" && !Array.isArray(spec.body) ? spec.body : spec.body === undefined ? {} : spec.body;
         body = JSON.stringify(extraBody && typeof base === "object" && !Array.isArray(base) ? { ...base, ...extraBody } : base);
       }
-      await this.throttle();
+      // The definition's rateLimitPerSecond is enforced by the gateway, around fetchImpl.
       const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body });
       if (res.status === 401 && attempt === 0 && this.def.auth.type === "oauth2_client_credentials") continue;
       if (!res.ok) throw new ConnectorRequestError(`${label} failed: HTTP ${res.status}`, res.status);

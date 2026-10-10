@@ -9,6 +9,7 @@ import type { IntegrationSyncJob, SyncJobTrigger } from "@/lib/shared/types/inte
 import { toSyncJob } from "./mappers";
 import { createConnector } from "./registry";
 import { getDecryptedCredential } from "./credentials";
+import { openGateway, type GatewaySession } from "./gateway/gateway";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -123,6 +124,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
   const errors: { objectType?: string; message: string }[] = [];
   let recordsProcessed = 0;
   let recordsFailed = 0;
+  // The run's Connector Gateway session: every request of this sync passes it; flushed at the end.
+  let gateway: GatewaySession | null = null;
 
   try {
     const { data: integration, error: integrationError } = await supabase
@@ -136,7 +139,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     }
 
     const secret = await getDecryptedCredential(tenantId, integration.id);
-    const connector = createConnector(integration.integration_type_id);
+    gateway = openGateway({ tenantId, integrationId: integration.id, status: integration.status });
+    const connector = createConnector(integration.integration_type_id, gateway);
     await connector.authenticate(integration.config ?? {}, secret);
 
     // Every kind the connection's definition reads, in import order (an MCP
@@ -258,5 +262,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       referenceType: "integration_sync_job",
       referenceId: jobId,
     });
+  } finally {
+    await gateway?.flush();
   }
 }

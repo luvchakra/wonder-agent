@@ -11,6 +11,7 @@ import type { ConnectorCapabilities, Integration, IntegrationType } from "@/lib/
 import { toIntegration, toIntegrationType } from "./mappers";
 import { createConnector } from "./registry";
 import { capabilitiesOf, parseConnectorConfig } from "./framework/engine";
+import { openGateway } from "./gateway/gateway";
 import { getDecryptedCredential } from "./credentials";
 import { requireFeature } from "@/modules/platform-admin/service";
 
@@ -90,17 +91,15 @@ export async function createIntegration(
   // can do; a write capability the connector lacks is refused (#12).
   let declared = (typeRow.default_capabilities ?? {}) as ConnectorCapabilities;
   if (input.capabilities !== undefined) {
+    // The catalog defaults, except that a connector connection supports
+    // exactly what its definition reads and receives.
     let supported: ConnectorCapabilities = typeRow.default_capabilities ?? {};
     if (input.integrationTypeId === "connector") {
-      // A connector connection supports exactly what its definition reads
-      // and receives, not the generic type's catalog defaults.
       try {
         supported = capabilitiesOf(parseConnectorConfig(input.config ?? {}).def);
       } catch (err) {
         throw new ApiError(400, "INVALID_INPUT", err instanceof Error ? err.message : "Invalid connector definition");
       }
-    } else {
-      supported = { ...supported, ...createConnector(input.integrationTypeId).capabilities };
     }
     declared = validateDeclaredCapabilities(input.capabilities, supported);
   }
@@ -180,9 +179,19 @@ export async function testIntegrationConnection(
   if (!integration) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
 
   const secret = await getDecryptedCredential(tenantId, integrationId);
-  const connector = createConnector(integration.integrationTypeId);
-  await connector.authenticate(integration.config, secret);
-  const result = await connector.testConnection();
+  // The test's requests pass the connection's Connector Gateway session (a disabled connection is refused there).
+  const gateway = openGateway({ tenantId, integrationId, status: integration.status });
+  let result: { ok: boolean; message?: string };
+  try {
+    const connector = createConnector(integration.integrationTypeId, gateway);
+    await connector.authenticate(integration.config, secret);
+    result = await connector.testConnection();
+    await connector.close();
+  } finally {
+    await gateway.flush();
+  }
+  // A disabled connection stays disabled: its refused test does not mark it as failing.
+  if (integration.status === "disabled") return result;
 
   const supabase = await supabaseServer();
   await supabase

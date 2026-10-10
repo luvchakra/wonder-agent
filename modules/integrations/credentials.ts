@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AuthType } from "@/lib/shared/types/integrations";
 import { createConnector } from "./registry";
+import { openGateway } from "./gateway/gateway";
 
 /**
  * INTEGRATION-P0-01.2 (higher bar) / INTEGRATION-P0-05.1 (verified
@@ -37,22 +38,30 @@ export async function setCredential(
 
   const { data: integration, error: integrationError } = await supabase
     .from("integrations")
-    .select("id, integration_type_id, config")
+    .select("id, integration_type_id, config, status")
     .eq("id", integrationId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (integrationError) throw new ApiError(500, "QUERY_FAILED", integrationError.message);
   if (!integration) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
 
+  // The verification's requests pass the connection's Connector Gateway session.
+  const gateway = openGateway({ tenantId, integrationId, status: integration.status });
   let connector;
   try {
-    connector = createConnector(integration.integration_type_id);
+    connector = createConnector(integration.integration_type_id, gateway);
   } catch {
     connector = null;
   }
   if (connector) {
-    await connector.authenticate((integration.config ?? {}) as Record<string, unknown>, plaintextSecret);
-    const result = await connector.testConnection();
+    let result: { ok: boolean; message?: string };
+    try {
+      await connector.authenticate((integration.config ?? {}) as Record<string, unknown>, plaintextSecret);
+      result = await connector.testConnection();
+      await connector.close();
+    } finally {
+      await gateway.flush();
+    }
     if (!result.ok) {
       throw new ApiError(
         400,

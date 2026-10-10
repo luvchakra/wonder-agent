@@ -27,6 +27,7 @@ export { getNormalizedObjects, getNormalizedObjectsForTenant } from "./objects";
 export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";
 export { rotateReceiverSecret, getReceiverStatus } from "./framework/receive";
+export { listConnectorTraffic, purgeConnectorTraffic, TRAFFIC_PAGE_SIZE, type ConnectionTraffic } from "./gateway/traffic";
 export {
   listIdentitySources,
   getIdentitySource,

@@ -22,6 +22,69 @@ Product modules read only what the framework stored.
 when any other module calls out or opens a machine route. Widening its
 allowlists needs the user's approval.
 
+## The Connector Gateway
+
+User requirement (2026-10-10): "all such connections should pass through one
+gateway which sits between WonderID and external world". Code:
+`modules/integrations/gateway` (`gateway.ts`, with its pure rules in
+`gatewayRules.ts`).
+
+```text
+WonderID ── sync, test, MCP discovery, preview ──▶ ┌─────────────────────┐ ──▶ organization's systems
+                                                   │  Connector Gateway  │
+WonderID ◀── /api/connect receivers ────────────── │  policies + ledger  │ ◀── organization's systems
+                                                   └─────────────────────┘
+```
+
+- **One place.** The http, mcp, ldap and sql drivers are built only inside
+  the gateway. A connector gets its drivers from a gateway session
+  (`createDefinitionConnector(gateway)`), and every receiver request passes a
+  session too (`receive.ts`). `connector-boundary.test.ts` fails if a driver
+  is built anywhere else, or if a receiver stops going through it.
+- **A session is one run**: a sync, a connection test, a credential check,
+  an MCP discovery, a preview, or one received request. The caller opens it
+  with the connection row (`openGateway({ tenantId, integrationId, status })`)
+  and calls `flush()` in a `finally`.
+- **Policies, in this order, for every outbound request:**
+  1. the connection is not disabled (a disabled connection also receives
+     nothing);
+  2. the run's request budget is not spent (10,000 requests across every
+     driver);
+  3. the definition's `rateLimitPerSecond` (default 10) is honoured, as a
+     token bucket. This used to live in the http driver alone; it now
+     covers MCP, LDAP and SQL too.
+  4. HTTP and MCP then go through `guardedFetch` (SSRF guard, redirects,
+     20 s timeout, 10 MB response cap). LDAP and PostgreSQL connect only
+     to an address `resolveSafeHost` vetted, with their own timeouts and
+     row limits.
+- **Traffic ledger** (`connector_traffic`, migration 0110). Each request is
+  counted in memory per session: direction, operation (`http GET`,
+  `mcp tools/list`, `ldap search`, `sql query`, `receive events`), host,
+  outcome (`ok`, `error`, `blocked`), error category, bytes in and out, and
+  duration. `flush()` writes once per session through
+  `record_connector_traffic()`, which adds to the minute's row, so a busy
+  connection produces at most one row per minute per kind of traffic.
+  - Only the host name is recorded: never a path, query string, header,
+    body, error message or credential. For inbound traffic the sender's
+    address is not recorded at all.
+  - Receivers record an authentication failure as `blocked`
+    (`unauthenticated`), and a disabled connection as `blocked`
+    (`disabled`). A request for a connection that does not exist is not
+    recorded: there is no organization to account it to.
+  - A preview of an unsaved definition is recorded under the organization
+    with no connection ("Connector previews").
+  - A failure to record is logged and never fails the run: the traffic
+    already happened.
+  - Members of the organization read it; only the service role writes it.
+    Rows older than 30 days are purged by the daily retention cron
+    (`/api/cron/privacy` calls `purge_connector_traffic()`).
+- **Where to see it:** **Integrations → Gateway** (`/integrations/gateway`)
+  shows the last 24 hours per connection, and each integration's page has a
+  "Traffic (24h)" card.
+- **Adding a driver** (for example a file driver): build it inside
+  `gateway.ts` with `meteredDriver("<kind>", factory)` and add it to the
+  session's `drivers`. Nothing else may construct it.
+
 ## The idea
 
 A connector is a **definition**: JSON that describes one product's API. It
@@ -45,7 +108,7 @@ product takes a definition, not new code.
 definition (JSON) ──validate──▶ catalog ──connect──▶ integration (type "connector")
                                                         │  settings + encrypted secret
                                                         ▼
-                                 sync job ─▶ engine ─▶ driver (http | ldap | sql | mcp)
+                                 sync job ─▶ engine ─▶ gateway ─▶ driver (http | ldap | sql | mcp)
                                                         ▼
                                  integration_objects (identity, account, entitlement, access_grant, application, policy, mcp_*)
                                                         ▼

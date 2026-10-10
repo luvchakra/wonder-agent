@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { ConnectorCapabilities, ConnectorWriteResult } from "@/lib/shared/types/integrations";
 import { createConnector } from "./registry";
+import { openGateway } from "./gateway/gateway";
 import { getDecryptedCredential } from "./credentials";
 import { decideWrite, requestFingerprint, validateWriteRequest, type WriteRequestInput } from "./connectorWriteRules";
 
@@ -110,9 +111,11 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
   const decision = decideWrite(request.operation, (integration.capabilities ?? {}) as ConnectorCapabilities, integration.status as string);
   if (!decision.run) return finish("blocked", null, decision.reason);
 
+  // Any request a write makes passes the connection's Connector Gateway session.
+  const gateway = openGateway({ tenantId, integrationId, status: integration.status as string });
   let connector: ConnectorAdapter;
   try {
-    connector = createConnector(integration.integration_type_id as string);
+    connector = createConnector(integration.integration_type_id as string, gateway);
   } catch {
     return finish("failed", null, "This integration type has no connector");
   }
@@ -124,5 +127,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
     return finish("succeeded", out.externalId ?? null, null);
   } catch (err) {
     return finish("failed", null, err instanceof Error ? err.message.slice(0, 1000) : "The write failed");
+  } finally {
+    await gateway.flush();
   }
 }

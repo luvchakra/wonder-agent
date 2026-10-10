@@ -41,6 +41,7 @@ const source = [...files(join(ROOT, "app")), ...files(join(ROOT, "modules")), ..
 const OUTBOUND_ALLOWED: Record<string, string> = {
   "modules/integrations/outboundFetch.ts": "the SSRF-guarded fetch the framework uses",
   "modules/integrations/framework/": "the connector framework itself",
+  "modules/integrations/gateway/": "the Connector Gateway every connection's traffic passes (user requirement, 2026-10-10)",
   "lib/ai/provider.ts": "WonderID's AI model provider (§19.3), not organization data",
   "modules/operations/email.ts": "WonderID's own email provider",
   "lib/users/users.ts": "WonderID's own email provider (invitations)",
@@ -53,6 +54,22 @@ const MACHINE_ROUTES_ALLOWED: Record<string, string> = {
   "app/api/v1/billing/webhooks/": "WonderID's payment providers (signed webhooks), not organization data",
   "app/api/v1/sso/domain-lookup/": "sign-in routing by email domain, before a session exists",
 };
+
+/**
+ * The Connector Gateway (user requirement, 2026-10-10: "all such connections
+ * should pass through one gateway which sits between WonderID and external
+ * world"). The drivers that reach an organization's systems are built only
+ * inside it, so nothing can call out around its policies and accounting.
+ * Besides the gateway, only the files that define a driver mention one.
+ */
+const DRIVER_CONSTRUCTION_ALLOWED: Record<string, string> = {
+  "modules/integrations/gateway/": "the Connector Gateway: the only place drivers are built",
+  "modules/integrations/framework/engine.ts": "defines httpDriver",
+  "modules/integrations/framework/drivers/": "define the ldap, sql and mcp drivers and their address guard",
+  "modules/integrations/outboundFetch.ts": "defines guardedFetch",
+};
+
+const withoutComments = (text: string) => text.replace(/\/\/.*$|\/\*[\s\S]*?\*\//gm, "");
 
 const allowed = (path: string, list: Record<string, string>) => Object.keys(list).some((p) => path === p || (p.endsWith("/") && path.startsWith(p)));
 
@@ -82,6 +99,33 @@ describe("connector boundary (non-negotiable #20)", () => {
       .map((f) => f.path)
       .filter((p) => !allowed(p, MACHINE_ROUTES_ALLOWED));
     expect(sessionless).toEqual([]);
+  });
+
+  it("the connector drivers are built only in the Connector Gateway", () => {
+    const offenders = source
+      .filter((f) => /\b(httpDriver|mcpDriver|guardedFetch|guardedLookup|resolveSafeHost)\s*\(|\b(ldapDriver|sqlDriver|guardedFetch)\b/.test(withoutComments(f.text)))
+      .filter((f) => !allowed(f.path, DRIVER_CONSTRUCTION_ALLOWED))
+      .map((f) => f.path);
+    expect(offenders).toEqual([]);
+  });
+
+  it("a connector runs only on a gateway session's drivers", () => {
+    const constructs = source.filter((f) => /new DefinitionConnector\s*\(/.test(withoutComments(f.text))).map((f) => f.path);
+    expect(constructs).toEqual(["modules/integrations/framework/connector.ts"]);
+    const factory = source.find((f) => f.path === "modules/integrations/framework/connector.ts")!.text;
+    expect(factory).toMatch(/createDefinitionConnector\(gateway: GatewaySession\)/);
+    expect(withoutComments(factory)).toMatch(/new DefinitionConnector\(gateway\.drivers\)/);
+  });
+
+  it("the receivers route every request through the Connector Gateway", () => {
+    const receivers = source.filter((f) => f.path.startsWith("app/api/connect/") && f.path.endsWith("/route.ts"));
+    expect(receivers.length).toBeGreaterThan(0);
+    for (const r of receivers) expect(r.text).toMatch(/from "@\/modules\/integrations\/framework\/receive"/);
+    const receive = withoutComments(source.find((f) => f.path === "modules/integrations/framework/receive.ts")!.text);
+    expect(receive).toMatch(/openGateway\(/);
+    expect(receive).toMatch(/\.admits\(\)/);
+    expect(receive).toMatch(/\.recordInbound\(/);
+    expect(receive).toMatch(/\.flush\(\)/);
   });
 
   it("the retired direct routes are gone", () => {

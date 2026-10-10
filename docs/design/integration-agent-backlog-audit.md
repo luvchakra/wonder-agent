@@ -1525,3 +1525,88 @@ and `none` drivers, every connection of type `connector`).
 **Left out:** no schema change. The API paths under
 `/api/v1/integrations/connectors` keep their names. The screens are recorded
 in the Experience Agent's audit log, same date.
+## 2026-10-10 — The Connector Gateway: one gateway for every connection's traffic
+
+User requirement: "all such connections should pass through one gateway
+which sits between WonderID and external world".
+
+**Built:**
+
+- **`modules/integrations/gateway/`** (`gateway.ts`, pure rules in
+  `gatewayRules.ts`, reads in `traffic.ts`). `openGateway({ tenantId,
+  integrationId, status })` opens a session for one run. Its `drivers`
+  (http, mcp, ldap, sql) are the only driver instances in the product.
+  Every outbound request passes, in order:
+  - the connection is not disabled;
+  - the run's request budget (10,000 across every driver);
+  - the definition's `rateLimitPerSecond` as a token bucket (moved out of
+    `HttpSession`, so it no longer double-limits and now also covers MCP,
+    LDAP and SQL);
+  - `guardedFetch` with explicit timeout and size caps (HTTP, MCP), or the
+    driver's `resolveSafeHost` (LDAP, SQL).
+- **Every caller** opens a session and flushes it in a `finally`:
+  `syncJobs`, `mcpTools`, `testIntegrationConnection`, `setCredential`
+  (verification), `connectorWrites`, the catalog preview, and the live test
+  (never flushed). `createDefinitionConnector(gateway)` and
+  `createConnector(type, gateway)` now require a session.
+- **Inbound:** `receive()` opens a session per request on the connection
+  row. The gateway refuses a disabled connection (recorded as `blocked`,
+  `disabled`); every answered request is recorded by channel and status (an
+  authentication failure is `blocked`, `unauthenticated`), with no body,
+  sender address or secret.
+- **Ledger, migration 0110** (`connector_traffic`): aggregated in memory per
+  session and written once on flush through `record_connector_traffic()`,
+  which adds to the minute's row (one row per minute per direction,
+  operation, host, outcome and error category, never one per request).
+  - Host name only.
+  - Same-tenant foreign key to `integrations`; `integration_id` is null only
+    for previews of unsaved definitions (decision: record them, under the
+    organization, as "Connector previews").
+  - RLS with a member SELECT policy (as `integration_sync_jobs`), no client
+    write policy. The record and purge functions are executable by the
+    service role only. `connector_traffic_summary()` (SECURITY INVOKER)
+    totals and pages per connection in the database.
+  - 30-day retention: `purge_connector_traffic()`, called by the daily
+    `/api/cron/privacy` run (no new cron entry; a failed purge reports null
+    and never fails the privacy job). That route is Compliance's; the
+    one-line addition is recorded in its audit log too.
+- **UI:** `/integrations/gateway` lists the last 24 hours per connection
+  (requests, errors, blocked, data in and out, average duration), paged in
+  the database, with an empty state. The integration page gets a "Traffic
+  (24h)" card in its own Suspense boundary. The nav entry is left to the
+  lead (`shell-nav.ts` untouched).
+- **Small fixes on the way:** a refused test of a disabled connection no
+  longer marks it `error`; connection tests and credential checks now close
+  their driver (an LDAP or SQL connection was left open); `createIntegration`
+  no longer builds a connector just to read its (always empty) capabilities.
+
+**Boundary test** (`connector-boundary.test.ts`): `modules/integrations/gateway/`
+joins the outbound allowlist (it is the requirement itself); new checks
+that drivers (`httpDriver`, `mcpDriver`, `ldapDriver`, `sqlDriver`,
+`guardedFetch`, `resolveSafeHost`) are built only in the gateway and the
+files defining them, that `DefinitionConnector` is constructed only from a
+gateway session's drivers, and that the receivers route through the gateway.
+
+**Verified (code only):**
+
+- `npm run typecheck` clean; eslint clean on every changed file.
+- `npx vitest run modules/integrations tests/architecture lib/security`:
+  24 files passed, 1 skipped (live), 219 tests. Full `npx vitest run`: 110
+  files passed, 1 skipped, 896 tests. New:
+  - `gateway/gatewayRules.test.ts`: 14 (host-only, labels, aggregation,
+    token bucket, budget, disabled, classification);
+  - `gateway/gateway.test.ts`: 10 (caps passed to the transport, rate
+    limit, disabled refused, budget, failure categories, MCP labels, socket
+    drivers, no secrets in rows, accounting failure tolerated, inbound);
+  - `framework/receiveGateway.test.ts`: 4 (accepted, unauthenticated,
+    disabled, unknown connection);
+  - `connector-boundary.test.ts`: 3 more (7 in all).
+- `tests/integrations/connector-traffic-isolation.sql` written (read own
+  only, no client writes or function calls, bucket merge, cross-tenant
+  connection refused, purge). Not yet run.
+
+**Open:** migration 0110 is not applied, and the isolation SQL has not been
+run against the dev project; until 0110 is applied, flushes log
+"traffic not recorded" and the Gateway page cannot load. The file driver
+being added in parallel must be wired in `gateway.ts` with
+`meteredDriver()` when it merges.

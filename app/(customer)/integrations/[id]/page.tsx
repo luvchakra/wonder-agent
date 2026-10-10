@@ -10,6 +10,8 @@ import { parseConnectorConfig } from "@/modules/integrations/framework/engine";
 import type { ConnectorDefinition } from "@/modules/integrations/framework/types";
 import { connectionTypeOf } from "@/modules/integrations/framework/typeSummary";
 import { ConnectorCredentialsForm, ReceiverSecretForm } from "../types/ConnectorForms";
+import { Suspense } from "react";
+import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
 
 const JOB_STATUS_TONE: Record<string, BadgeTone> = {
   queued: "neutral",
@@ -211,6 +213,10 @@ export default async function IntegrationDetailPage({
           </Card>
         </>
       ) : null}
+
+      <Suspense fallback={<TrafficCardSkeleton />}>
+        <TrafficCard tenantId={ctx.tenantId!} integrationId={id} />
+      </Suspense>
     </div>
   );
 }

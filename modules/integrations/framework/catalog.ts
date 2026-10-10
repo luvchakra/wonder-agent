@@ -10,6 +10,7 @@ import { setCredential } from "../credentials";
 import { BUILTIN_DEFINITIONS } from "./definitions";
 import { capabilitiesOf, parseConnectorConfig } from "./engine";
 import { createDefinitionConnector } from "./connector";
+import { openGateway } from "../gateway/gateway";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { protocolLabel } from "./typeSummary";
 import { RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type DefinitionIssue, type ResourceKind, type ResourceSpec } from "./types";
@@ -277,7 +278,9 @@ export async function previewConnector(
     ...def,
     resources: Object.fromEntries(Object.entries(def.resources).map(([k, r]) => [k, Array.isArray(r) ? r.map((x) => cap(x, k)) : r && cap(r, k)])),
   } as ConnectorDefinition;
-  const connector = createDefinitionConnector();
+  // A preview has no connection yet: its traffic is the organization's, recorded with no connection.
+  const gateway = openGateway({ tenantId, integrationId: null, status: "configured" });
+  const connector = createDefinitionConnector(gateway);
   let result: PreviewResult;
   try {
     await connector.authenticate({ definition: { key: def.key, version: def.version, origin: "custom" }, manifest: capped, settings } as unknown as Record<string, unknown>, secret);
@@ -295,6 +298,7 @@ export async function previewConnector(
     result = { ok: false, message: err instanceof Error ? err.message : "The preview failed", resource, count: 0, records: [], samples: [], issues: connector.drainIssues() };
   } finally {
     await connector.close();
+    await gateway.flush();
   }
   await writeAudit({
     tenantId,

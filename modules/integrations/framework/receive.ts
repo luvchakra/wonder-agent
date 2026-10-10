@@ -13,6 +13,7 @@ import {
   parseGatewayRequest,
   quarantineEvent,
 } from "@/modules/runtime-assurance/service";
+import { openGateway } from "../gateway/gateway";
 import { parseConnectorConfig } from "./engine";
 import { readPath } from "./mapping";
 import { eventRecords, mapRuntimeEvent, verifySender, type ReceivedRuntimeEvent } from "./receiveRules";
@@ -34,8 +35,9 @@ export type ReceiveResult = { status: number; body: Record<string, unknown> };
 
 const fail = (status: number, code: string, message: string): ReceiveResult => ({ status, body: { ok: false, error: { code, message } } });
 
-type Connection = { id: string; tenantId: string; name: string; def: ConnectorDefinition };
+type Connection = { id: string; tenantId: string; name: string; status: string; def: ConnectorDefinition };
 
+/** A connector connection by id, disabled ones included (the gateway refuses those); null when there is none. */
 async function loadConnection(connectionId: string): Promise<Connection | null> {
   if (!/^[0-9a-f-]{36}$/i.test(connectionId)) return null;
   const { data, error } = await supabaseServiceRole()
@@ -44,9 +46,9 @@ async function loadConnection(connectionId: string): Promise<Connection | null> 
     .eq("id", connectionId)
     .maybeSingle<{ id: string; tenant_id: string; name: string; status: string; integration_type_id: string; config: Record<string, unknown> }>();
   if (error) throw new ApiError(503, "UNAVAILABLE", "The connection could not be read");
-  if (!data || data.integration_type_id !== "connector" || data.status === "disabled") return null;
+  if (!data || data.integration_type_id !== "connector") return null;
   try {
-    return { id: data.id, tenantId: data.tenant_id, name: data.name, def: parseConnectorConfig(data.config).def };
+    return { id: data.id, tenantId: data.tenant_id, name: data.name, status: data.status, def: parseConnectorConfig(data.config).def };
   } catch {
     return null;
   }
@@ -74,7 +76,7 @@ async function touch(tenantId: string, connectionId: string) {
  */
 export async function rotateReceiverSecret(tenantId: string, actorId: string, connectionId: string): Promise<string> {
   const conn = await loadConnection(connectionId);
-  if (!conn || conn.tenantId !== tenantId) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
+  if (!conn || conn.tenantId !== tenantId || conn.status === "disabled") throw new ApiError(404, "INTEGRATION_NOT_FOUND");
   const r = conn.def.receive;
   if (!r?.runtimeEvents && !r?.webhook) throw new ApiError(400, "NOT_A_RECEIVER", "This connection receives nothing that needs a secret");
   const secret = `wr_${randomBytes(32).toString("base64url")}`;
@@ -303,6 +305,26 @@ export async function receive(connectionId: string, channel: string, rawBody: st
     return fail(503, "UNAVAILABLE", "Try again shortly");
   }
   if (!conn) return fail(404, "NOT_FOUND", "No such connection");
+  // Every request a connection receives passes its Connector Gateway session,
+  // which refuses a disabled connection and records the request (by channel
+  // and outcome only: never the body, the sender's address or its secret).
+  const gateway = openGateway({ tenantId: conn.tenantId, integrationId: conn.id, status: conn.status });
+  const started = Date.now();
+  const admitted = gateway.admits();
+  const result = admitted ? await dispatch(conn, channel, rawBody, headers) : fail(404, "NOT_FOUND", "No such connection");
+  gateway.recordInbound({
+    channel,
+    status: result.status,
+    bytesIn: Buffer.byteLength(rawBody, "utf8"),
+    bytesOut: Buffer.byteLength(JSON.stringify(result.body), "utf8"),
+    durationMs: Date.now() - started,
+    refusal: admitted ? undefined : "disabled",
+  });
+  await gateway.flush();
+  return result;
+}
+
+async function dispatch(conn: Connection, channel: string, rawBody: string, headers: Headers): Promise<ReceiveResult> {
   try {
     if (channel === "events") return await receiveRuntimeEvents(conn, rawBody, headers);
     if (channel === "webhook") return await receiveWebhook(conn, rawBody, headers);
@@ -311,7 +333,7 @@ export async function receive(connectionId: string, channel: string, rawBody: st
     return fail(404, "NOT_FOUND", "No such channel");
   } catch (err) {
     if (err instanceof ApiError && err.status < 500) return fail(err.status, err.code, err.message);
-    console.error("receive failed", { connectionId, channel, code: err instanceof ApiError ? err.code : undefined });
+    console.error("receive failed", { connectionId: conn.id, channel, code: err instanceof ApiError ? err.code : undefined });
     return fail(500, "INTERNAL_ERROR", "The request could not be processed; retry it");
   }
 }

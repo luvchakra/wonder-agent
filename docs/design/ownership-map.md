@@ -102,6 +102,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `integration_mappings` | INT | Field/object mapping configuration per integration |
 | `connector_receivers` | INT | A connection's receiving secret (encrypted, server-only; migration 0109) |
 | `connector_definitions` | INT | An organization's own connector definitions (immutable versions; built-in definitions live in `modules/integrations/framework/definitions`) |
+| `connector_traffic` | INT | The Connector Gateway's traffic ledger: per connection, per minute, requests, errors, blocked, bytes and duration by host only (service-role writes, member reads; migration 0110) |
 | `notifications` | OA | In-app/email notification records |
 | `reports` | OA | Saved/scheduled report definitions |
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
@@ -286,7 +287,7 @@ consume and persist into their own tables.
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |
 | `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
-| `/api/v1/privacy` (settings, processing-activities, consent-purposes, consents, requests, retention, legal-holds, breaches, `me/*` self-service) and `/api/cron/privacy` | CA |
+| `/api/v1/privacy` (settings, processing-activities, consent-purposes, consents, requests, retention, legal-holds, breaches, `me/*` self-service) and `/api/cron/privacy` (which also calls INT's `purgeConnectorTraffic()`, 2026-10-10) | CA |
 | `/api/v1/billing` (overview, profile, checkout, portal, subscription, invoices, `webhooks/stripe`, `webhooks/razorpay`) | PA (customer-facing billing; Platform owns billing end to end) |
 | `/api/v1/audit/integrity` | FA (verification primitive `lib/audit/integrity.ts`; Operations keeps the audit views) |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs`, `/api/v1/exports` (object-page CSV export and import templates; registry `modules/operations/exportRegistry.ts`) | OA |
