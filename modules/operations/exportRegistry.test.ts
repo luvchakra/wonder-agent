@@ -84,16 +84,19 @@ describe("objectActionsFor — what the Actions menu offers", () => {
     expect(objectActionsFor(["agent.read", EXPORT_PERMISSION], ["agents"]).exports).toEqual([{ label: "Export CSV", href: "/api/v1/exports/agents" }]);
   });
 
-  it("offers import only for importable kinds and only with the import permission", () => {
+  it("offers import only for importable kinds, with the import permission and the page's manage permission", () => {
     expect(objectActionsFor(["agent.read", IMPORT_PERMISSION], ["agents"]).imports).toEqual([]);
-    expect(objectActionsFor(["access.read"], ["accounts"]).imports).toEqual([]);
-    const [item] = objectActionsFor(["access.read", IMPORT_PERMISSION], ["accounts"]).imports;
-    expect(item).toMatchObject({ kind: "account", label: "Import CSV…", templateHref: "/api/v1/exports/accounts?template=1" });
+    expect(objectActionsFor(["access.read", "access.manage"], ["accounts"]).imports).toEqual([]);
+    expect(objectActionsFor(["access.read", IMPORT_PERMISSION], ["accounts"]).imports).toEqual([]);
+    const [item] = objectActionsFor(["access.read", "access.manage", IMPORT_PERMISSION], ["accounts"]).imports;
+    expect(item).toMatchObject({ kind: "account", scope: "accounts", label: "Import CSV…", templateHref: "/api/v1/exports/accounts?template=1" });
     expect(item!.required).toEqual(["externalId"]);
+    expect(objectActionsFor(["identity.read", "identity.manage", IMPORT_PERMISSION], ["people"]).imports[0]).toMatchObject({ kind: "identity", scope: "people" });
+    expect(objectActionsFor(["identity.read", "access.manage", IMPORT_PERMISSION], ["people"]).imports).toEqual([]);
   });
 
   it("labels each object when a page offers several", () => {
-    const a = objectActionsFor(["access.read", EXPORT_PERMISSION, IMPORT_PERMISSION], ["applications", "entitlements", "access-grants"]);
+    const a = objectActionsFor(["access.read", "access.manage", EXPORT_PERMISSION, IMPORT_PERMISSION], ["applications", "entitlements", "access-grants"]);
     expect(a.exports.map((e) => e.label)).toEqual(["Export applications", "Export entitlements", "Export access grants"]);
     expect(a.imports.map((i) => i.kind)).toEqual(["application", "entitlement", "access_grant"]);
   });

@@ -41,6 +41,8 @@ export type CorrelationCandidate = {
   username: string | null;
   startDate: string | null;
   status: IdentityStatus;
+  /** The identity's id in the system it came from (an import's external id). */
+  sourceNativeId: string | null;
 };
 
 /** The tenant's identities of the given types, for a source to correlate against. */
@@ -50,7 +52,7 @@ export async function listIdentitiesForCorrelation(tenantId: string, types: Iden
   for (let from = 0; from < MAX_IDENTITIES; from += PAGE) {
     const { data, error } = await supabase
       .from("identities")
-      .select("id, identity_type, display_name, email, username, start_date, status")
+      .select("id, identity_type, display_name, email, username, start_date, status, source_native_id")
       .eq("tenant_id", tenantId)
       .in("identity_type", types.filter((t) => t !== "AI_AGENT"))
       .order("id")
@@ -65,6 +67,7 @@ export async function listIdentitiesForCorrelation(tenantId: string, types: Iden
         username: (r.username as string | null) ?? null,
         startDate: (r.start_date as string | null) ?? null,
         status: r.status as IdentityStatus,
+        sourceNativeId: (r.source_native_id as string | null) ?? null,
       });
     }
     if (!data || data.length < PAGE) break;
@@ -73,7 +76,8 @@ export async function listIdentitiesForCorrelation(tenantId: string, types: Iden
 }
 
 export type SourcedOp =
-  | { op: "create"; ref: string; identityType: IdentityType; fields: SourcedFields }
+  /** `nativeId`: kept as the identity's source reference, so a later import of the same record finds it. */
+  | { op: "create"; ref: string; identityType: IdentityType; fields: SourcedFields; nativeId?: string }
   | { op: "update"; ref: string; identityId: string; fields: SourcedFields }
   | { op: "leaver"; ref: string; identityId: string };
 
@@ -196,6 +200,7 @@ export async function applySourcedIdentities(
             external: op.identityType === "EXTERNAL",
             lifecycle_state: PERSON_TYPES.has(op.identityType) ? lifecycleFor(status, op.fields.startDate ?? null, today) : null,
             source_system: source.sourceName.slice(0, 100),
+            ...(op.nativeId ? { source_native_id: op.nativeId.slice(0, 300) } : {}),
             field_provenance: provenance,
           })
           .select("id")
@@ -306,4 +311,49 @@ export async function applySourcedIdentities(
     }
   }
   return results;
+}
+
+export type SourcedPreview = {
+  ref: string;
+  identityId: string | null;
+  action: "create" | "update" | "unchanged" | "error";
+  changes: { field: SourcedIdentityField; from: string | null; to: string | null }[];
+  /** Fields left as they are: a higher-precedence source set them, or this source only fills blanks. */
+  skipped: { field: SourcedIdentityField; reason: "higher_precedence" | "not_authoritative" }[];
+  error?: string;
+};
+
+/**
+ * What `applySourcedIdentities` would change, without writing anything: the
+ * same precedence rules (mergeSourcedFields) over the same rows, for a
+ * preview a person confirms first. Leavers are not previewed here.
+ */
+export async function previewSourcedIdentities(tenantId: string, source: SourceAuthority, ops: SourcedOp[]): Promise<SourcedPreview[]> {
+  const supabase = supabaseServiceRole();
+  const now = new Date().toISOString();
+  const ids = [...new Set(ops.filter((o) => o.op === "update").map((o) => (o as { identityId: string }).identityId))];
+  const existing = new Map<string, Record<string, unknown>>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const { data, error } = await supabase
+      .from("identities")
+      .select("id, field_provenance, " + Object.values(COLUMN).join(", "))
+      .eq("tenant_id", tenantId)
+      .in("id", ids.slice(i, i + 200));
+    if (error) throw new Error(`previewSourcedIdentities: ${error.message}`);
+    for (const r of (data ?? []) as unknown as Record<string, unknown>[]) existing.set(r.id as string, r);
+  }
+  return ops.map((op): SourcedPreview => {
+    if (op.op === "create") {
+      const changes = (Object.entries(op.fields) as [SourcedIdentityField, string | null][]).filter(([, v]) => v !== null).map(([field, to]) => ({ field, from: null, to }));
+      return { ref: op.ref, identityId: null, action: "create", changes, skipped: [] };
+    }
+    if (op.op === "leaver") return { ref: op.ref, identityId: op.identityId, action: "error", changes: [], skipped: [], error: "leavers are not previewed" };
+    const row = existing.get(op.identityId);
+    if (!row) return { ref: op.ref, identityId: op.identityId, action: "error", changes: [], skipped: [], error: "identity not found in this organization" };
+    const current: SourcedFields = {};
+    for (const [k, col] of Object.entries(COLUMN) as [SourcedIdentityField, string][]) current[k] = (row[col] as string | null) ?? null;
+    const merge = mergeSourcedFields(current, (row.field_provenance as FieldProvenance) ?? {}, op.fields, source, now);
+    const changes = (Object.entries(merge.changes) as [SourcedIdentityField, string | null][]).map(([field, to]) => ({ field, from: current[field] ?? null, to }));
+    return { ref: op.ref, identityId: op.identityId, action: changes.length ? "update" : "unchanged", changes, skipped: merge.skipped };
+  });
 }

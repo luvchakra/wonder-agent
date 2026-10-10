@@ -1688,3 +1688,79 @@ driver in the gateway (3). The boundary test now also checks that
   exported grant does not keep its exported `externalId`.
 - Schedules have UI only on file connections; other connections can be
   scheduled through `setConnectionSchedule()` but have no control yet.
+
+### 2026-10-10 — Object-page CSV import: preview first, then an additive import
+
+**Why.** User decision (2026-10-10): an import from an object page puts its
+rows straight into that page's list, but safely. New records are added and
+existing ones updated. Nothing missing from the file is removed or
+deactivated. The person first sees a preview of the parsed data, laid out
+in the page's own columns, and then clicks **Confirm import** or **Cancel
+import**.
+
+**What changed (Integration).**
+- `POST /api/v1/imports/preview` (new) and `previewFileForObject()`.
+  - The file is read and mapped exactly as the File imports connection's
+    sync will read it: same definition, same settings, same column renames.
+  - Each record is then matched against the page's records.
+  - Nothing is stored, synced or audited.
+  - The answer holds the counts (new, update, unchanged, invalid, review)
+    for the whole file and up to 500 rows, problem rows first.
+- `POST /api/v1/imports` now completes the import before it answers.
+  1. The File imports connection's sync stores the file.
+  2. The records that sync stored are read back, by `sync_job_id`, and
+     handed to the owning module.
+  3. The answer is `200 { counts: { created, updated, unchanged, skipped,
+     failed }, problems }`.
+  - A sync that fails answers `502 SYNC_FAILED` and adds nothing.
+  - Was: `202 { sync: completed | running }`. The background path is gone.
+- New limits. A page import is capped at 5,000 rows, renamed
+  `PAGE_IMPORT_MAX_ROWS` (was `INLINE_SYNC_MAX_ROWS`). The whole file is
+  refused when:
+  - a record appears twice (the sync would keep only the last);
+  - an account or entitlement file has no `application` column.
+- Both calls also need the page's manage permission: `identity.manage`, or
+  `access.manage` for the access kinds, on top of `integration.execute`.
+- Identities: Integration decides which identity each record is, as it does
+  for identity sources. Matching order:
+  1. the WonderID id;
+  2. the source reference;
+  3. email;
+  4. username.
+
+  Several matches, or a second row for an identity already matched, are
+  held as **needs review**, never applied to the closest guess (§17.6).
+  The pure rules are in `fileImportPlan.ts`.
+  - Identity's `applySourcedIdentities` writes the records, under authority
+    precedence 1000 (the lowest), so a source of record such as HR keeps the
+    fields it owns.
+  - An empty cell changes nothing.
+  - No leaver op is ever produced.
+- `normalizeRecord()` takes `{ requireDisplayName: false }`, so an update
+  row may omit the name. A new identity still needs one.
+- Audit: `integration.file_applied` records the counts. Like
+  `integration.file_imported`, it never carries row values.
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on every changed file.
+- Vitest across integrations, access-governance, agent-identity, operations,
+  ui and architecture: 74 files, 617 tests passed, 1 skipped (live).
+  - New: `fileImportPlan.test.ts` (9).
+  - Rewritten: `fileImports.test.ts` (7). It covers:
+    - the preview stores nothing;
+    - only what the sync stored is applied;
+    - no leaver ever;
+    - a failed sync adds nothing.
+- `tests/e2e/file-import.spec.ts` was rewritten. It covers:
+  - preview → confirm → the list;
+  - a later file updating one record and leaving the omitted one active;
+  - the dialog's preview table, Confirm and Cancel;
+  - cross-tenant and read-only refusals.
+
+  It runs on Vercel (the nightly harness); see the QA log for the result.
+
+**Left out.**
+- Background imports above 5,000 rows. Use a CSV file connection on a
+  schedule instead.
+- An account file's `entitlements` column is mapped but not turned into
+  access; import access rows on Access instead.

@@ -59,8 +59,10 @@ export {
 export {
   listIdentitiesForCorrelation,
   applySourcedIdentities,
+  previewSourcedIdentities,
   type CorrelationCandidate,
   type SourcedOp,
+  type SourcedPreview,
   type SourcedResult,
 } from "./sourcedIdentities";
 export {

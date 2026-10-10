@@ -899,3 +899,17 @@ framework, non-negotiable #20) is the Integration Agent's.
 - `tsc --noEmit` is clean except the `@/assets/*.png` declarations, which
   need the build-generated `next-env.d.ts` that this worktree lacks.
 - No migration. No database access.
+
+### 2026-10-10 — Import menu items need the page's manage permission
+
+- `objectActionsFor()` offers **Import CSV…** only to a viewer who has both:
+  - `integration.execute`;
+  - the permission that manages the page's records
+    (`IMPORT_MANAGE_PERMISSIONS`: `identity.manage` or `access.manage`).
+
+  This matches the import endpoints, which now check both. An import adds
+  and updates the page's records.
+- Each item carries `scope`, the page's export key, so a new identity takes
+  that page's type.
+- `exportRegistry.test.ts` was updated; the operations suite is green within
+  the 617-test run recorded in the Integration log.

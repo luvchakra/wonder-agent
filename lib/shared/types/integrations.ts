@@ -352,3 +352,38 @@ export type PendingCorrelation = {
   resolvedIdentityId: string | null;
   createdAt: string;
 };
+
+// ---------------------------------------------------------------------------
+// Importing a CSV from an object page (2026-10-10, user decision): a preview
+// first, then an additive apply. New records are added and existing ones
+// updated; a record missing from the file is never removed or deactivated.
+// ---------------------------------------------------------------------------
+
+/** One record of an imported file, after the connector definition mapped it (canonical field names). */
+export type ImportRecord = { row: number | null; externalId: string; values: Record<string, unknown> };
+
+/** What the import would do with one record. */
+export type ImportDecision = "new" | "update" | "unchanged" | "invalid" | "review";
+
+export type ImportFieldChange = { field: string; from: string | null; to: string | null };
+
+/**
+ * One record's plan. `review`: it matches several existing records, so a
+ * person decides; it is never applied to the closest guess (§17.6).
+ * `note` says why a record is invalid or held, or what is kept as it is.
+ */
+export type ImportPlanRow = {
+  row: number | null;
+  externalId: string;
+  decision: ImportDecision;
+  targetId: string | null;
+  changes: ImportFieldChange[];
+  note: string | null;
+};
+
+export type ImportApplyOutcome = "created" | "updated" | "unchanged" | "skipped" | "failed";
+
+export type ImportApplyRow = { row: number | null; externalId: string; outcome: ImportApplyOutcome; targetId: string | null; message: string | null };
+
+export type ImportCounts = Record<ImportDecision, number>;
+export type ImportOutcomeCounts = Record<ImportApplyOutcome, number>;

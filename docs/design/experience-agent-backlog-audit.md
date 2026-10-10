@@ -3496,3 +3496,41 @@ only `app/icon.png`, `app/apple-icon.png` (180, opaque) and `app/favicon.ico`.
   without the event; Close and Install write the expected memory.
 - Not verified: a real device install, and the signed-in shell itself.
   No E2E run (the suite needs service-role secrets).
+
+### 2026-10-10 — Import dialog: a preview table, then Confirm import or Cancel import
+
+User request: "a preview screen should be shown with nicely laid out version
+of same data in ui, it should have confirm or cancel import button".
+
+**The dialog (`ObjectActionsMenu.tsx`) now has three steps.**
+1. Choose the file, then **Preview**.
+2. A wide preview with:
+   - the file name and row count;
+   - one badge per result;
+   - a three-way filter: All / New and updates / Not imported.
+   It also has a scrolling table with a sticky header, in the page's own
+   columns plus Row, Result and Notes:
+   - an **Update** row shows each changed cell as old → new, highlighted;
+   - **Not imported** and **Needs review** rows give the reason.
+   Its buttons:
+   - **Confirm import (N)**, disabled as "Nothing to import" when nothing
+     would change;
+   - **Cancel import**;
+   - **Choose another file**.
+3. The result, taken only from the import's own counts:
+   - one line saying what was added, updated, or already up to date, and
+     how many rows were not imported;
+   - those rows in a folded list;
+   - the page's list is refreshed (`router.refresh()`).
+
+**Behaviour and states.**
+- Escape and clicking outside are blocked while a request runs.
+- If the import's answer is lost, the dialog says so and asks the person to
+  check before retrying. It never guesses success (§17.5).
+
+**Logic.** In `importCsv.ts`: `previewResponseState`, `importResultState`,
+`columnLabel`, `outcomeSummary` and `importableRows`. Covered by 12 tests.
+
+**Verified.** Typecheck and eslint clean. The dialog flow, including Cancel
+storing nothing, is covered by `file-import.spec.ts` on Vercel; see the QA
+log.

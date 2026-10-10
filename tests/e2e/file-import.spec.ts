@@ -3,54 +3,124 @@ import { authFile } from "./support/testUsers";
 
 /**
  * Object-page CSV import and export, against the real app and database
- * (2026-10-10, non-negotiable #20). An import is a file the organization's
- * "File imports" connection receives and syncs through the connector
- * framework: it is checked before it is stored, synced inline when small,
- * and visible only to its own organization. Export streams the page's list
- * as CSV for the signed-in organization only.
+ * (2026-10-10, non-negotiable #20, and the user's decision on imports): a
+ * file is previewed first, without storing anything; confirming it makes it
+ * an upload of the organization's "File imports" connection, which syncs it
+ * through the connector framework, and its records are then added to the
+ * page's list or update the ones already there. Additive only: a record
+ * missing from a later file stays as it was. Everything is visible only to
+ * its own organization. Export streams the page's list as CSV.
  */
 
 const stamp = Date.now();
-const csv = (rows: string[]) => ["externalId,displayName,email", ...rows].join("\r\n") + "\r\n";
-const upload = (kind: string, body: string, name = `e2e-${stamp}.csv`) => ({
-  multipart: { kind, file: { name, mimeType: "text/csv", buffer: Buffer.from(body, "utf8") } },
+const csv = (rows: string[], header = "externalId,displayName,email,department") => [header, ...rows].join("\r\n") + "\r\n";
+const upload = (kind: string, body: string, name = `e2e-${stamp}.csv`, scope = "people") => ({
+  multipart: { kind, scope, file: { name, mimeType: "text/csv", buffer: Buffer.from(body, "utf8") } },
 });
+const one = `e2e-imp-${stamp}-1`;
+const two = `e2e-imp-${stamp}-2`;
 
 let connectionId = "";
 
 test.describe.serial("object-page CSV import and export", () => {
   test.use({ storageState: authFile("adminOne") });
 
-  test("a valid file is received by the File imports connection and synced", async ({ request }) => {
-    const res = await request.post(
-      "/api/v1/imports",
-      upload("identity", csv([`e2e-imp-${stamp}-1,E2E Import One,e2e-imp-1-${stamp}@example.test`, `e2e-imp-${stamp}-2,"Import, Two",e2e-imp-2-${stamp}@example.test`])),
-    );
-    expect(res.status(), await res.text()).toBe(202);
+  test("the preview plans every row and stores nothing", async ({ request }) => {
+    const file = csv([`${one},E2E Import One,e2e-imp-1-${stamp}@example.test,Ops`, `${two},"Import, Two",e2e-imp-2-${stamp}@example.test,Finance`, `,No Id,,`]);
+    const res = await request.post("/api/v1/imports/preview", upload("identity", file));
+    expect(res.status(), await res.text()).toBe(200);
+    const data = (await res.json()).data;
+    expect(data.rows).toBe(3);
+    expect(data.counts).toMatchObject({ new: 2, invalid: 1 });
+    expect(data.columns).toEqual(["externalId", "displayName", "email", "department"]);
+    expect(data.shown[1].values.displayName).toBe("Import, Two");
+
+    const list = await request.get(`/api/v1/identities?q=${encodeURIComponent(`e2e-imp-1-${stamp}`)}`);
+    expect((await list.json()).data).toHaveLength(0);
+  });
+
+  test("confirming adds the records to the list, through the File imports connection", async ({ request }) => {
+    const file = csv([`${one},E2E Import One,e2e-imp-1-${stamp}@example.test,Ops`, `${two},"Import, Two",e2e-imp-2-${stamp}@example.test,Finance`]);
+    const res = await request.post("/api/v1/imports", upload("identity", file));
+    expect(res.status(), await res.text()).toBe(200);
     const data = (await res.json()).data;
     expect(data.rows).toBe(2);
-    expect(data.sync).toBe("completed");
+    expect(data.counts).toEqual({ created: 2, updated: 0, unchanged: 0, skipped: 0, failed: 0 });
     connectionId = data.integrationId;
 
-    // The same connection takes the next import: one per organization.
-    const again = await request.post("/api/v1/imports", upload("identity", csv([`e2e-imp-${stamp}-3,E2E Import Three,`])));
-    expect(again.status(), await again.text()).toBe(202);
-    expect((await again.json()).data.integrationId).toBe(connectionId);
+    const list = await request.get(`/api/v1/identities?q=${encodeURIComponent(`e2e-imp-1-${stamp}`)}`);
+    const rows = (await list.json()).data as { displayName: string; department: string | null; identityType: string; status: string }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ displayName: "E2E Import One", department: "Ops", identityType: "HUMAN", status: "active" });
 
     const conn = await request.get(`/api/v1/integrations/${connectionId}`);
     expect(conn.status()).toBe(200);
     expect((await conn.json()).data.name).toBe("File imports");
   });
 
+  test("a later file updates existing records and leaves the ones it omits alone", async ({ request }) => {
+    const file = csv([`${one},E2E Import One,e2e-imp-1-${stamp}@example.test,Security`]);
+    const preview = await request.post("/api/v1/imports/preview", upload("identity", file));
+    const planned = (await preview.json()).data;
+    expect(planned.counts).toMatchObject({ update: 1, new: 0 });
+    expect(planned.shown[0].changes).toEqual([{ field: "department", from: "Ops", to: "Security" }]);
+
+    const res = await request.post("/api/v1/imports", upload("identity", file));
+    expect(res.status(), await res.text()).toBe(200);
+    const data = (await res.json()).data;
+    expect(data.counts).toMatchObject({ created: 0, updated: 1 });
+    // The same connection takes every import: one per organization.
+    expect(data.integrationId).toBe(connectionId);
+
+    const updated = (await (await request.get(`/api/v1/identities?q=${encodeURIComponent(`e2e-imp-1-${stamp}`)}`)).json()).data;
+    expect(updated[0].department).toBe("Security");
+    const omitted = (await (await request.get(`/api/v1/identities?q=${encodeURIComponent(`e2e-imp-2-${stamp}`)}`)).json()).data;
+    expect(omitted).toHaveLength(1);
+    expect(omitted[0]).toMatchObject({ status: "active", department: "Finance" });
+  });
+
+  test("the page shows a preview table, and Confirm import adds the row to the list", async ({ page }) => {
+    const id = `e2e-ui-${stamp}`;
+    await page.goto("/identities/humans");
+    await page.getByRole("button", { name: "Actions" }).click();
+    await page.getByRole("menuitem", { name: "Import CSV…" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel(/CSV file/).setInputFiles({ name: "people.csv", mimeType: "text/csv", buffer: Buffer.from(csv([`${id},E2E Dialog Person,${id}@example.test,Design`]), "utf8") });
+    await dialog.getByRole("button", { name: "Preview" }).click();
+    await expect(dialog.getByRole("table")).toContainText("E2E Dialog Person");
+    await expect(dialog.getByRole("table")).toContainText("New");
+    await dialog.getByRole("button", { name: /Confirm import \(1\)/ }).click();
+    await expect(dialog.getByRole("status")).toContainText("1 added");
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await page.goto(`/identities/humans?q=${encodeURIComponent(id)}`);
+    await expect(page.getByRole("link", { name: "E2E Dialog Person" })).toBeVisible();
+  });
+
+  test("Cancel import stores nothing", async ({ page, request }) => {
+    const id = `e2e-cancel-${stamp}`;
+    await page.goto("/identities/humans");
+    await page.getByRole("button", { name: "Actions" }).click();
+    await page.getByRole("menuitem", { name: "Import CSV…" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel(/CSV file/).setInputFiles({ name: "people.csv", mimeType: "text/csv", buffer: Buffer.from(csv([`${id},E2E Cancelled,,`]), "utf8") });
+    await dialog.getByRole("button", { name: "Preview" }).click();
+    await expect(dialog.getByRole("table")).toContainText("E2E Cancelled");
+    await dialog.getByRole("button", { name: "Cancel import" }).click();
+    await expect(dialog).toBeHidden();
+    const list = await request.get(`/api/v1/identities?q=${encodeURIComponent("E2E Cancelled")}`);
+    expect((await list.json()).data).toHaveLength(0);
+  });
+
   test("a file without the required column is refused before anything is stored", async ({ request }) => {
-    const res = await request.post("/api/v1/imports", upload("identity", "displayName,email\r\nNo Id,x@example.test\r\n"));
-    expect(res.status()).toBe(400);
-    const body = await res.json();
-    expect(body.error.message).toMatch(/externalId/);
+    for (const path of ["/api/v1/imports/preview", "/api/v1/imports"]) {
+      const res = await request.post(path, upload("identity", "displayName,email\r\nNo Id,x@example.test\r\n"));
+      expect(res.status()).toBe(400);
+      expect((await res.json()).error.message).toMatch(/externalId/);
+    }
   });
 
   test("an unknown kind is refused", async ({ request }) => {
-    const res = await request.post("/api/v1/imports", upload("tenant", csv(["a,b,c"])));
+    const res = await request.post("/api/v1/imports", upload("tenant", csv(["a,b,c,d"])));
     expect(res.status()).toBe(400);
   });
 
@@ -72,14 +142,18 @@ test.describe.serial("object-page CSV import and export", () => {
     expect((await request.get("/api/v1/exports/not-an-object")).status()).toBe(404);
   });
 
-  test("another organization cannot see the connection, and a read-only member cannot import", async ({ browser }) => {
-    const two = await browser.newContext({ storageState: authFile("adminTwo") });
-    expect((await two.request.get(`/api/v1/integrations/${connectionId}`)).status()).toBe(404);
-    await two.close();
+  test("another organization sees neither the connection nor the records, and a read-only member cannot import", async ({ browser }) => {
+    const other = await browser.newContext({ storageState: authFile("adminTwo") });
+    expect((await other.request.get(`/api/v1/integrations/${connectionId}`)).status()).toBe(404);
+    const theirs = await other.request.get(`/api/v1/identities?q=${encodeURIComponent(`e2e-imp-1-${stamp}`)}`);
+    expect((await theirs.json()).data).toHaveLength(0);
+    await other.close();
 
     const ro = await browser.newContext({ storageState: authFile("readOnly") });
-    const res = await ro.request.post("/api/v1/imports", upload("identity", csv([`e2e-ro-${stamp},Read Only,`])));
-    expect(res.status()).toBe(403);
+    for (const path of ["/api/v1/imports/preview", "/api/v1/imports"]) {
+      const res = await ro.request.post(path, upload("identity", csv([`e2e-ro-${stamp},Read Only,,`])));
+      expect(res.status()).toBe(403);
+    }
     await ro.close();
   });
 });

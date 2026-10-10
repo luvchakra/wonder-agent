@@ -15,8 +15,12 @@ export const IMPORT_KINDS = ["identity", "account", "entitlement", "access_grant
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
 export const MAX_IMPORT_BYTES = MAX_CSV_BYTES;
-/** Up to this many rows the sync runs before the response; a larger file syncs in the background. */
-export const INLINE_SYNC_MAX_ROWS = 5_000;
+/**
+ * Rows per import from an object page. The import is previewed, then synced
+ * and applied before the response, so the person sees what it did; a
+ * larger file is split, or sent to a CSV file connection instead.
+ */
+export const PAGE_IMPORT_MAX_ROWS = 5_000;
 
 export const FILE_IMPORTS_PURPOSE = "file_imports";
 export const FILE_IMPORTS_NAME = "File imports";
@@ -58,4 +62,20 @@ export function tooLargeForImport(contentLength: string | null): boolean {
   const n = Number(contentLength);
   // Multipart adds a boundary and part headers around the file.
   return Number.isFinite(n) && n > MAX_IMPORT_BYTES + 64 * 1024;
+}
+
+/** Importing writes the page's records, so it also needs the permission that manages them. */
+export const IMPORT_MANAGE_PERMISSION: Record<ImportKind, string> = {
+  identity: "identity.manage",
+  application: "access.manage",
+  entitlement: "access.manage",
+  account: "access.manage",
+  access_grant: "access.manage",
+};
+
+/** The identity pages an import may come from; each creates its own type by default. */
+export const IMPORT_SCOPES = ["identities", "people", "external-identities", "machine-identities"] as const;
+
+export function importScope(value: unknown): string | null {
+  return typeof value === "string" && (IMPORT_SCOPES as readonly string[]).includes(value) ? value : null;
 }
