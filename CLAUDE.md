@@ -1321,11 +1321,18 @@ budget, with production first.
 0. **Build on Vercel only when the owner says so (owner decision,
    2026-10-10).** Anything that makes Vercel build happens only when the
    owner's message contains **"merge now"** or **"build now"**:
-   - **"merge now"**: merge the pull requests that are ready (green CI). Each
-     merge to `main` is a production build, so open as few pull requests as
-     possible and merge them together.
-   - **"build now"**: a Vercel build without a merge, such as a production
-     redeploy or an E2E run on Vercel (`e2e/nightly`).
+   - **"merge now"** covers **every** pull request that is open and waiting at
+     that moment, not only the latest one:
+     - bring each up to date with `main`;
+     - merge every one whose CI is green, one after another;
+     - report any that cannot merge (red CI, a conflict needing a decision)
+       with the reason, and leave those open.
+
+     Each merge to `main` is a production build, so keep pull requests few
+     and combine related work into one.
+   - **"build now"** likewise covers every Vercel build waiting at that
+     moment, such as a production redeploy or an E2E run on Vercel
+     (`e2e/nightly`). Start each once.
 
    Without either phrase:
    - push branches and open pull requests (they cost nothing, rule 1);

@@ -1510,6 +1510,10 @@ happens unless the owner's message says "merge now" (merge the ready pull
 requests) or "build now" (a redeploy or an E2E run on Vercel).
 
 - Pull requests are still pushed and opened. Each waits, green, until then.
+- "merge now" covers every pull request open and waiting at that moment
+  (owner clarification, same day). Every green one is merged; any that
+  cannot merge are reported with the reason. "build now" likewise covers
+  every waiting Vercel build.
 - Checks run locally.
 - The nightly suite is unchanged.
 
