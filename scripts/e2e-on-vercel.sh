@@ -39,6 +39,10 @@ if [ -n "$missing" ]; then
 fi
 
 log "Building the app"
+# A Preview build adds the Vercel Toolbar's script to every page; the app's
+# CSP rightly blocks it, and the suite fails on that console error. Production
+# builds never carry it, so it is switched off for this build only.
+export VERCEL_PREVIEW_FEEDBACK_ENABLED=0
 npm run build || { log "next build failed"; exit 1; }
 
 SPECS=""
