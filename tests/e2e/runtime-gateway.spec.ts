@@ -1,5 +1,6 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
+import { openConnection, type ReceivingConnection } from "./support/connections";
 
 /**
  * RUNTIME-P0-15 — the Runtime Gateway, against the real app and database.
@@ -11,7 +12,11 @@ import { authFile } from "./support/testUsers";
  * - idempotency: the same request id returns the same stored decision
  * - OBSERVE_ONLY: a request the engine would DENY is recorded as DENY,
  *   and the caller is told ALLOW
- * - isolation: another organization never sees these decisions
+ * - isolation: another organization never sees these decisions, and an
+ *   agent key never works at another organization's connection
+ *
+ * Agents reach the gateway through their runtime's connection
+ * (non-negotiable #20): /api/connect/v1/<connection>/gateway/authorize.
  */
 
 async function registerAgent(page: Page, name: string): Promise<string> {
@@ -28,9 +33,10 @@ let agentName = "";
 let secret = "";
 let keyId = "";
 let anon: APIRequestContext;
+let conn: ReceivingConnection;
 
 const authorize = (headers: Record<string, string>, data: unknown) =>
-  anon.post("/api/gateway/v1/authorize", { headers: { "content-type": "application/json", ...headers }, data });
+  anon.post(conn.authorize, { headers: { "content-type": "application/json", ...headers }, data });
 
 test.describe.serial("runtime gateway", () => {
   test.use({ storageState: authFile("adminOne") });
@@ -43,8 +49,9 @@ test.describe.serial("runtime gateway", () => {
     await anon?.dispose();
   });
 
-  test("setup: an agent with an API key", async ({ page }) => {
+  test("setup: an agent with an API key, and its runtime's connection", async ({ page }) => {
     agentName = `E2E Gateway Agent ${Date.now()}`;
+    conn = await openConnection(page.request, "runtime-gateway", `E2E runtime ${Date.now()}`);
     agentId = await registerAgent(page, agentName);
     const res = await page.request.post(`/api/v1/agents/${agentId}/api-keys`, { data: { name: "gateway e2e" } });
     expect(res.status()).toBe(201);
@@ -59,8 +66,20 @@ test.describe.serial("runtime gateway", () => {
     expect((await authorize({ authorization: "Bearer not-a-key" }, { requestId: "x", action: "READ" })).status()).toBe(401);
     expect((await authorize({ authorization: `Bearer wa_ak_${"A".repeat(43)}` }, { requestId: "x", action: "READ" })).status()).toBe(401);
     // A signed-in administrator's session is not an agent credential.
-    const withSession = await page.request.post("/api/gateway/v1/authorize", { data: { requestId: "x", action: "READ" } });
+    const withSession = await page.request.post(conn.authorize, { data: { requestId: "x", action: "READ" } });
     expect(withSession.status()).toBe(401);
+    // The retired direct route is gone.
+    expect((await anon.post("/api/gateway/v1/authorize", { headers: { authorization: `Bearer ${secret}` }, data: { requestId: "x", action: "READ" } })).status()).toBe(404);
+  });
+
+  test("an agent key is refused at another organization's connection, and at a connection that does not exist", async ({ browser, baseURL }) => {
+    const other = await browser.newContext({ storageState: authFile("adminTwo"), baseURL });
+    const otherConn = await openConnection(other.request, "runtime-gateway", `E2E other runtime ${Date.now()}`);
+    await other.close();
+    const res = await anon.post(otherConn.authorize, { headers: { authorization: `Bearer ${secret}` }, data: { requestId: "x-org", action: "READ" } });
+    expect(res.status()).toBe(401);
+    const none = await anon.post("/api/connect/v1/00000000-0000-4000-8000-000000000000/gateway/authorize", { headers: { authorization: `Bearer ${secret}` }, data: { requestId: "x", action: "READ" } });
+    expect(none.status()).toBe(404);
   });
 
   test("validates the body", async () => {

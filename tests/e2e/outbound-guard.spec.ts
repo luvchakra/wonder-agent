@@ -39,18 +39,21 @@ test.describe("outbound SSRF guard", () => {
       "gopher://127.0.0.1:6379/_",
       "https://user:secret@example.com/api",
     ]) {
-      const res = await request.post("/api/v1/integrations", { data: { integrationTypeId: "mcp", name: `E2E SSRF ${stamp}`, config: { baseUrl } } });
+      const res = await request.post("/api/v1/integrations/connectors/connect", {
+        data: { origin: "builtin", key: "mcp-server", name: `E2E SSRF ${stamp}`, settings: { baseUrl } },
+      });
       expect(res.status(), baseUrl).toBe(400);
-      expect((await res.json()).error.code, baseUrl).toBe("OUTBOUND_BLOCKED");
+      // Refused either as a malformed address or by the outbound guard; never stored.
+      expect(["OUTBOUND_BLOCKED", "DEFINITION_INVALID"], baseUrl).toContain((await res.json()).error.code);
     }
   });
 
   test("a redirect toward cloud metadata is refused at request time, and nothing leaks into the message", async ({ request }) => {
-    const created = await request.post("/api/v1/integrations", {
-      data: { integrationTypeId: "mcp", name: `E2E SSRF redirect ${stamp}`, config: { baseUrl: redirectUrl } },
+    const created = await request.post("/api/v1/integrations/connectors/connect", {
+      data: { origin: "builtin", key: "mcp-server", name: `E2E SSRF redirect ${stamp}`, settings: { baseUrl: redirectUrl } },
     });
     expect(created.status(), await created.text()).toBe(201);
-    const id = (await created.json()).data.id as string;
+    const id = (await created.json()).data.integration.id as string;
     const tested = await request.post(`/api/v1/integrations/${id}/test`);
     expect(tested.status()).toBe(200);
     const result = (await tested.json()).data as { ok: boolean; message?: string };

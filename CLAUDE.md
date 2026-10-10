@@ -41,6 +41,23 @@ this file the repository's security controls, ownership and working implementati
 win (spec, "Final Claude Code operating instruction"). Phase plan and story IDs:
 `docs/plan/WONDERID-ROADMAP.md`.
 
+**2026-10-10 — the connector boundary (explicit user decision).** The user set the
+rule that there is no direct connection between WonderID and any organization's data:
+every flow, in and out, goes through the connector framework
+(`modules/integrations/framework`). Asked directly, the user also decided:
+
+- the Runtime Gateway goes through the framework too, as a receiving connection per
+  agent runtime;
+- the older direct paths (the Saviynt, generic REST and MCP adapters, inbound
+  webhooks, MCP events and the session-based event API) are migrated into the
+  framework and then removed;
+- the rule is non-negotiable #20.
+
+On files, the user decided that CSV is a connector type for scheduled ingestion, and
+that each object page may also import and export CSV directly, through the framework.
+Reference: `docs/integrations/CONNECTOR-FRAMEWORK.md`; the boundary is enforced by
+`tests/architecture/connector-boundary.test.ts`.
+
 **2026-10-09 — working rules adopted (explicit user decision).** The user supplied a
 general "working rules for Claude" template and chose to adopt it, including its
 workflow. Work now ships through a branch, a pull request and a squash merge once
@@ -137,6 +154,19 @@ log entry.
     agent proposed it, how harmless it appears, or how confident the model is.
     (§17 operationalizes this; adopted 2026-09-23 from the user's supplied safe
     AI engineering instructions.)
+20. There is no direct connection between WonderID and an organization's data. Every
+    flow of an organization's data into or out of WonderID goes through the connector
+    framework (`modules/integrations/framework`):
+    - outbound: only the framework's drivers call an organization's systems;
+    - inbound: only a connection's receivers (`/api/connect/v1/<connection>/…`,
+      including the Runtime Gateway) accept data from them;
+    - files: a CSV is read by a connector, whether on a schedule or imported from an
+      object page.
+    Product modules read only what the framework stored. A new external path, of any
+    kind, is a framework connector or driver, never a route or client in another
+    module. `tests/architecture/connector-boundary.test.ts` enforces this; widening its
+    allowlists needs explicit user approval. (Adopted 2026-10-10 by explicit user
+    decision.)
 
 ---
 

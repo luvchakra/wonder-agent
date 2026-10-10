@@ -6,7 +6,7 @@ import { getConnectorDefinition } from "@/modules/integrations/framework/catalog
 import { RESOURCE_KINDS } from "@/modules/integrations/framework/types";
 import { Card, CardBody, CardHeader } from "@/modules/ui";
 import { ConnectForm } from "../../ConnectorForms";
-import { RESOURCE_LABEL } from "../../labels";
+import { connectorSummary } from "../../labels";
 
 export default async function ConnectPage({ params }: { params: Promise<{ origin: string; key: string }> }) {
   const { origin, key } = await params;
@@ -21,7 +21,10 @@ export default async function ConnectPage({ params }: { params: Promise<{ origin
   const def = await getConnectorDefinition(ctx.tenantId!, origin, key);
   if (!def) notFound();
   const secretFields = def.auth.type === "none" ? [] : def.auth.fields;
-  const reads = RESOURCE_KINDS.filter((k) => def.resources[k]).map((k) => RESOURCE_LABEL[k]);
+  const summary = connectorSummary(
+    RESOURCE_KINDS.filter((k) => def.resources[k]),
+    Object.keys(def.receive ?? {}),
+  );
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -30,7 +33,7 @@ export default async function ConnectPage({ params }: { params: Promise<{ origin
       </Link>
       <div>
         <h1 className="text-xl font-semibold text-foreground">Connect {def.name}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Read only. Imports {reads.join(", ")}.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Never changes anything in the system. {summary}.</p>
       </div>
       <Card>
         <CardHeader title="Connection" />

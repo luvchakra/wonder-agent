@@ -1372,3 +1372,101 @@ Product facts found while certifying them:
 - write and remediation (INTEGRATION-P0-13).
 - Two test connections named "Live Gitea…" remain in the dev project's
   adminOne fixture organization: their cleanup was declined.
+
+---
+
+## 2026-10-10 — The connector boundary, non-negotiable #20 (INTEGRATION-P0-16)
+
+User decision: "there should be no direct connection between WonderID and any
+external organisation data … connection should be via the connector
+framework". Asked directly, the user also decided:
+
+- the Runtime Gateway goes through the framework (a receiving connection per
+  agent runtime);
+- the older direct paths move into the framework and are removed;
+- the rule becomes non-negotiable #20;
+- CSV is a scheduled connector type, and object pages may import and export
+  CSV directly through the framework (PRs B and C, to follow).
+
+**Built:**
+
+- **The receiving side** (`framework/receive.ts`, `receiveRules.ts`,
+  `/api/connect/v1/<connection>/{events,webhook,gateway/authorize,gateway/tools/filter}`):
+  - A definition's `receive` section declares what a connection's systems
+    may send.
+  - Senders authenticate with the connection's receiving secret (bearer or
+    HMAC-SHA256), or, for the gateway, with the agent's own API key, which
+    must belong to the connection's organization.
+  - The organization always comes from the connection row. A disabled
+    connection receives nothing.
+  - The sender is authenticated before the body is parsed. Bodies are capped
+    at 1 MB (16 KB for the gateway).
+  - Events are mapped by the definition, kept as `activity` evidence and
+    recorded through Runtime's `ingestRuntimeEventByReference()`
+    (quarantine and dedupe unchanged). A batch of up to 500 gets one outcome
+    per event.
+  - Receiving secrets are issued once, kept only encrypted in
+    `connector_receivers`, and audited (`integration.receiver_secret_rotated`).
+- **The mcp driver** (`drivers/mcp.ts`): Streamable HTTP and JSON-RPC, with
+  `initialize`, the `Mcp-Session-Id` header, server-sent-event or JSON
+  replies, and `nextCursor` paging. It calls only `initialize` and `*/list`.
+  Tools are classified by the existing deterministic `classifyToolOperation`.
+- **Framework additions:**
+  - kinds `policy`, `mcp_server`, `mcp_tool` and `mcp_resource`;
+  - driver `none` (receive only);
+  - offset paging in the POST body;
+  - repeated query values, records paths and field paths tried in order;
+  - optional secret fields;
+  - a connection may name a built-in by key and version instead of copying it;
+  - a credential saved as one plain string still fits a one-field definition.
+- **New built-in definitions:** `saviynt` (from the old adapter's verified
+  paths), `zendesk`, `mcp-server`, `runtime-gateway` and `webhook`.
+- **Removed:**
+  - the Saviynt, generic REST and MCP adapters, and `restHttpClient`;
+  - `webhooks.ts` and `mcpEvents.ts`;
+  - `/api/gateway/v1/*`, `/api/v1/integrations/webhooks/:id` and
+    `/api/v1/integrations/mcp/:id/events`;
+  - `POST /api/v1/runtime/events` (GET stays);
+  - the generic `/integrations/new` page and `POST /api/v1/integrations`
+    (connections come only from the catalog);
+  - the generic credentials route, and field mappings (definitions carry
+    their own).
+  - `syncJobs` now runs every connection's kinds through the framework.
+- **Integration page:** a "Receiving" card shows the connection's endpoint
+  addresses and issues or replaces the receiving secret (shown once). The
+  generic credential and mapping cards are gone.
+- **Enforcement:** `tests/architecture/connector-boundary.test.ts` scans the
+  source:
+  - only the framework (plus WonderID's own AI model and email providers)
+    calls out from the server;
+  - browser code calls only WonderID's own API;
+  - the only routes without a session are `/api/connect`, cron, billing
+    webhooks and SSO domain lookup;
+  - the retired routes are gone.
+- **Migration 0109** (not yet applied, see below):
+  - the `connector_receivers` table (RLS on, no client policies);
+  - converts connections on the retired types to connector connections that
+    name the equivalent built-in;
+  - MCP secrets become receiving secrets;
+  - the Zendesk connection's unusable single-string secret is removed;
+  - anything else is disabled with its old settings kept;
+  - the retired integration types are removed.
+
+**Verified (code only):**
+
+- `npm run typecheck` is clean; eslint is clean on the changed files.
+- Full `npx vitest run`: 107 files, 865 tests passed. New tests:
+  - `receive.test.ts`: 8 tests (sender checks, event mapping, refusals);
+  - `mcp.test.ts`: 4 tests (SSE, sessions, paging, classification,
+    read-only calls, body paging, the plain-string credential);
+  - `connector-boundary.test.ts`: 4 tests.
+- E2E specs were updated for the receiving routes: runtime-gateway, including
+  a new cross-organization key refusal; emergency-controls;
+  gateway-enforcement; policy-publish; shadow-ai; mcp-bridge; mcp-inventory;
+  outbound-guard; integrations; navigation-smoke. They have not been run yet:
+  they need migration 0109.
+
+**Open:** applying migration 0109 was cancelled at the permission prompt.
+It changes live rows (the four WonderArk connections) and removes the
+retired types. The change must not merge until it is applied, so the pull
+request is a draft.

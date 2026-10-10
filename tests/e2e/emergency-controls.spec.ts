@@ -1,5 +1,6 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
+import { openConnection, type ReceivingConnection } from "./support/connections";
 
 /**
  * RUNTIME-P0-18 — emergency controls and tool filtering, against the real
@@ -30,13 +31,14 @@ async function registerAgent(page: Page, name: string): Promise<string> {
 let agentId = "";
 let secret = "";
 let anon: APIRequestContext;
+let conn: ReceivingConnection;
 const tool = `e2e_delete_customer_${Date.now()}`;
 
 type Step = { step: string; code: string };
 const emergencyStep = (steps: Step[]) => steps.find((s) => s.step === "emergency")?.code;
 
 async function decide(data: Record<string, unknown>) {
-  const res = await anon.post("/api/gateway/v1/authorize", { headers: { authorization: `Bearer ${secret}` }, data });
+  const res = await anon.post(conn.authorize, { headers: { authorization: `Bearer ${secret}` }, data });
   expect(res.status()).toBe(200);
   return (await res.json()).data as { steps: Step[]; effectiveDecision: string };
 }
@@ -69,6 +71,7 @@ test.describe.serial("emergency controls", () => {
   });
 
   test("setup", async ({ page }) => {
+    conn = await openConnection(page.request, "runtime-gateway", `E2E emergency runtime ${Date.now()}`);
     agentId = await registerAgent(page, `E2E Emergency Agent ${Date.now()}`);
     const res = await page.request.post(`/api/v1/agents/${agentId}/api-keys`, { data: { name: "emergency e2e" } });
     secret = (await res.json()).data.secret;
@@ -112,7 +115,7 @@ test.describe.serial("emergency controls", () => {
     const d = await decide({ requestId: `ts-${Date.now()}`, action: "DELETE", tool });
     expect(emergencyStep(d.steps)).toBe("TOOL_SUSPENDED");
 
-    const filter = await anon.post("/api/gateway/v1/tools/filter", {
+    const filter = await anon.post(conn.toolsFilter, {
       headers: { authorization: `Bearer ${secret}` },
       data: { tools: [tool, "get_customer"] },
     });
@@ -129,7 +132,7 @@ test.describe.serial("emergency controls", () => {
   });
 
   test("the tool filter requires an agent key", async () => {
-    const res = await anon.post("/api/gateway/v1/tools/filter", { data: { tools: ["x"] } });
+    const res = await anon.post(conn.toolsFilter, { data: { tools: ["x"] } });
     expect(res.status()).toBe(401);
   });
 
@@ -146,7 +149,7 @@ test.describe.serial("emergency controls", () => {
     await page.goto(`/agents/${agentId}`);
     await page.getByRole("button", { name: "Revoke all keys" }).click();
     await confirmWithReason(page, "Revoke all keys", "E2E credential compromise drill");
-    const res = await anon.post("/api/gateway/v1/authorize", { headers: { authorization: `Bearer ${secret}` }, data: { requestId: "x", action: "READ" } });
+    const res = await anon.post(conn.authorize, { headers: { authorization: `Bearer ${secret}` }, data: { requestId: "x", action: "READ" } });
     expect(res.status()).toBe(401);
   });
 });

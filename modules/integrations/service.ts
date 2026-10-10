@@ -10,7 +10,7 @@ import "server-only";
  * getDecryptedCredential() (modules/integrations/credentials.ts) is
  * intentionally NOT re-exported here — it exists only for this module's own
  * connector-invocation code paths (testIntegrationConnection, runSyncJob,
- * webhooks, MCP event ingestion).
+ * the connector framework's receiving side).
  */
 
 export {
@@ -24,11 +24,9 @@ export {
 export { setCredential } from "./credentials";
 export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs, listLatestCompletedSyncStarts } from "./syncJobs";
 export { getNormalizedObjects, getNormalizedObjectsForTenant } from "./objects";
-export { createMapping, listMappings } from "./mappings";
 export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";
-export { receiveWebhook, type WebhookResult } from "./webhooks";
-export { ingestMcpRuntimeEvent, parseMcpEvent, type McpEventResult, type McpRuntimeOutcome } from "./mcpEvents";
+export { rotateReceiverSecret, getReceiverStatus } from "./framework/receive";
 export {
   listIdentitySources,
   getIdentitySource,

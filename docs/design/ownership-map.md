@@ -100,6 +100,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `integration_sync_jobs` | INT | Async job records (status, counts, errors, correlation id) |
 | `integration_objects` | INT | Raw imported objects prior to normalization |
 | `integration_mappings` | INT | Field/object mapping configuration per integration |
+| `connector_receivers` | INT | A connection's receiving secret (encrypted, server-only; migration 0109) |
 | `connector_definitions` | INT | An organization's own connector definitions (immutable versions; built-in definitions live in `modules/integrations/framework/definitions`) |
 | `notifications` | OA | In-app/email notification records |
 | `reports` | OA | Saved/scheduled report definitions |
@@ -194,9 +195,11 @@ The user answered every open question in
 These are the current assignments. The stories are in each module's
 `## Requirements Refresh — 2026-09-25` section.
 
-- **Runtime Gateway: inside this app.** It is the `/api/gateway/v1/*`
+- **Runtime Gateway: inside this app.** It was the `/api/gateway/v1/*`
   subtree of this Next.js app on Vercel, not a separate service, so there
-  is no change to `CLAUDE.md` §2.
+  is no change to `CLAUDE.md` §2. Since 2026-10-10 (non-negotiable #20) it
+  is served through an agent runtime's connection,
+  `/api/connect/v1/:connection/gateway/…`.
 - **Gateway ownership is split between Access and Runtime.**
   - **Access Agent** owns the deterministic decision function
     `evaluateRuntimeRequest()` (ACCESS-P0-11). There is one policy engine,
@@ -239,7 +242,7 @@ through RLS; only the gateway writes it, through the service role.
 `runtime_emergency_controls` (RA) now exists: migration `0064`,
 RUNTIME-P0-18. Members can read it; only the service role writes it,
 behind `runtime.emergency`. Controls are lifted, never deleted.
-`/api/gateway/v1/tools/filter` is RA's, like `/authorize`.
+The gateway's tool filter is RA's, like `/authorize`; since 2026-10-10 both are served through a connection's receiver, `/api/connect/v1/:connection/gateway/…` (INT routes, RA logic).
 
 `data_sources` (AA) now exists: migration `0070`, ACCESS-P0-13. It has
 tenant-scoped RLS (select, insert, update; no delete, since sources are
@@ -287,7 +290,7 @@ consume and persist into their own tables.
 | `/api/v1/billing` (overview, profile, checkout, portal, subscription, invoices, `webhooks/stripe`, `webhooks/razorpay`) | PA (customer-facing billing; Platform owns billing end to end) |
 | `/api/v1/audit/integrity` | FA (verification primitive `lib/audit/integrity.ts`; Operations keeps the audit views) |
 | `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
-| `/api/gateway/v1/*` (`/authorize` live since RUNTIME-P0-15) | RA — the endpoint, which authenticates agents with API keys (FA) and calls AA's `evaluateRuntimeRequest()` for the decision |
+| `/api/connect/v1/:connection/*` (`events`, `webhook`, `gateway/authorize`, `gateway/tools/filter`) | INT — the connector framework's receivers, the only inbound path for an organization's data (non-negotiable #20, 2026-10-10). The gateway channels authenticate agents with API keys (FA) and call RA's `authorizeRuntimeRequest()` / `filterGatewayTools()`; the decision logic stays RA's. Replaces `/api/gateway/v1/*`, `/api/v1/integrations/webhooks/:id`, `/api/v1/integrations/mcp/:id/events` and `POST /api/v1/runtime/events`. |
 | `/api/v1/ai/summarize` | FA — pure passthrough wrapper over `lib/ai/summarize.ts` (FOUNDATION-P0-16); added by Experience Agent to unblock `EXPERIENCE-P0-14`, since no domain module owns this cross-cutting primitive |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 

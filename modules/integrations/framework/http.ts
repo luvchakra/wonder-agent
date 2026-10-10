@@ -127,9 +127,12 @@ export class HttpSession {
       case "basic":
         headers.Authorization = `Basic ${Buffer.from(`${fillTemplate(auth.username, scope)}:${fillTemplate(auth.password, scope)}`).toString("base64")}`;
         return;
-      case "bearer":
-        headers.Authorization = `Bearer ${fillTemplate(auth.token, scope)}`;
+      case "bearer": {
+        // An optional token (an MCP server without auth) sends no header at all.
+        const token = fillTemplate(auth.token, scope, { allowMissing: true });
+        if (token) headers.Authorization = `Bearer ${token}`;
         return;
+      }
       case "header":
         headers[fillTemplate(auth.name, scope)] = fillTemplate(auth.value, scope);
         return;
@@ -150,11 +153,20 @@ export class HttpSession {
    * Error messages carry the path, never the query string (a query-string
    * credential must not reach a log).
    */
-  async send(spec: HttpRequestSpec, scope: TemplateScope, extraQuery: Record<string, string> = {}, absoluteUrl?: string): Promise<{ json: unknown; headers: Headers }> {
+  async send(
+    spec: HttpRequestSpec,
+    scope: TemplateScope,
+    extraQuery: Record<string, string> = {},
+    absoluteUrl?: string,
+    extraBody?: Record<string, unknown>,
+  ): Promise<{ json: unknown; headers: Headers }> {
     if (++this.requestCount > LIMITS.requestsPerSession) throw new ConnectorRequestError(`Stopped after ${LIMITS.requestsPerSession} requests`);
     const url = absoluteUrl ? this.resolve(absoluteUrl) : this.resolve(fillTemplate(spec.path, scope, { encode: true }));
     if (!absoluteUrl) {
-      for (const [k, v] of Object.entries(spec.query ?? {})) url.searchParams.set(k, fillTemplate(v, scope, { allowMissing: true }));
+      for (const [k, v] of Object.entries(spec.query ?? {})) {
+        if (Array.isArray(v)) for (const item of v) url.searchParams.append(k, fillTemplate(item, scope, { allowMissing: true }));
+        else url.searchParams.set(k, fillTemplate(v, scope, { allowMissing: true }));
+      }
     }
     for (const [k, v] of Object.entries(extraQuery)) url.searchParams.set(k, v);
     const label = `${spec.method ?? "GET"} ${url.pathname}`;
@@ -164,9 +176,10 @@ export class HttpSession {
       const target = new URL(url);
       await this.authApply(target, headers, attempt > 0);
       let body: string | undefined;
-      if (spec.body !== undefined) {
+      if (spec.body !== undefined || extraBody) {
         headers["Content-Type"] = "application/json";
-        body = JSON.stringify(spec.body);
+        const base = spec.body && typeof spec.body === "object" && !Array.isArray(spec.body) ? spec.body : spec.body === undefined ? {} : spec.body;
+        body = JSON.stringify(extraBody && typeof base === "object" && !Array.isArray(base) ? { ...base, ...extraBody } : base);
       }
       await this.throttle();
       const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body });
@@ -186,7 +199,7 @@ export class HttpSession {
   /** Every record of a request, page by page, up to `maxRecords`. */
   async fetchAll(
     spec: HttpRequestSpec,
-    recordsPath: string | undefined,
+    recordsPath: string | string[] | undefined,
     pagination: Pagination | undefined,
     scope: TemplateScope,
     maxRecords: number,
@@ -194,14 +207,24 @@ export class HttpSession {
   ): Promise<unknown[]> {
     const p = pagination ?? { type: "none" };
     const out: unknown[] = [];
+    const paths = recordsPath === undefined ? [p.type === "scim" ? "Resources" : ""] : Array.isArray(recordsPath) ? recordsPath : [recordsPath];
     const take = (json: unknown) => {
-      const data = readPath(json, recordsPath ?? (p.type === "scim" ? "Resources" : ""));
+      // The first records path that holds a list (or, when none does, the first that holds anything).
+      let data: unknown = undefined;
+      for (const path of paths) {
+        const candidate = readPath(json, path);
+        if (Array.isArray(candidate)) {
+          data = candidate;
+          break;
+        }
+        if (data === undefined && candidate !== undefined && candidate !== null) data = candidate;
+      }
       const isMap = keyed && data !== null && typeof data === "object" && !Array.isArray(data);
       const items = isMap
         ? Object.entries(data as Record<string, unknown>).map(([k, v]) => (v && typeof v === "object" && !Array.isArray(v) ? { ...v, _key: k } : { value: v, _key: k }))
         : Array.isArray(data)
           ? data
-          : data && typeof data === "object" && recordsPath
+          : data && typeof data === "object" && paths.some((path) => path !== "")
             ? [data]
             : [];
       // A list of plain values (ids, names) becomes records of { value }.
@@ -220,6 +243,9 @@ export class HttpSession {
         const q: Record<string, string> = { [p.param]: String((p.start ?? 1) + page) };
         if (p.sizeParam) q[p.sizeParam] = String(p.size);
         got = take((await this.send(spec, scope, q)).json);
+        if (got < p.size) break;
+      } else if (p.type === "offset" && p.in === "body") {
+        got = take((await this.send(spec, scope, {}, undefined, { [p.param]: page * p.size, [p.sizeParam]: p.size })).json);
         if (got < p.size) break;
       } else if (p.type === "offset") {
         got = take((await this.send(spec, scope, { [p.param]: String(page * p.size), [p.sizeParam]: String(p.size) })).json);

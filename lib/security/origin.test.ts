@@ -17,7 +17,10 @@ describe("isCrossSiteApiWrite — FOUNDATION-P0-30", () => {
   });
   it("leaves third-party callbacks to their own signature checks", () => {
     expect(isCrossSiteApiWrite({ ...base, pathname: "/api/v1/billing/webhooks/stripe", origin: "https://stripe.com" })).toBe(false);
-    expect(isCrossSiteApiWrite({ ...base, pathname: "/api/gateway/v1/authorize", origin: "https://agent.example" })).toBe(false);
+    expect(isCrossSiteApiWrite({ ...base, pathname: "/api/connect/v1/c1/gateway/authorize", origin: "https://agent.example" })).toBe(false);
+    // The retired direct routes are no longer exempt (non-negotiable #20).
+    expect(isCrossSiteApiWrite({ ...base, pathname: "/api/gateway/v1/authorize", origin: "https://agent.example" })).toBe(true);
+    expect(isCrossSiteApiWrite({ ...base, pathname: "/api/v1/runtime/events", origin: "https://agent.example" })).toBe(true);
   });
   it("ignores non-API paths (server actions have Next's own origin check)", () => {
     expect(isCrossSiteApiWrite({ ...base, pathname: "/settings/billing", origin: "https://evil.example" })).toBe(false);

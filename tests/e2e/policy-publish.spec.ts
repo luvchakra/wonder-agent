@@ -1,5 +1,6 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
+import { openConnection } from "./support/connections";
 
 /**
  * ACCESS-P0-12 — policy targets and the publish step, against the real app,
@@ -36,8 +37,9 @@ test.describe.serial("policy targets and publishing", () => {
   test("a draft has no effect; publishing makes it apply to its target only", async ({ page, browser }) => {
     const agentId = await registerAgent(page);
     const secret = (await (await page.request.post(`/api/v1/agents/${agentId}/api-keys`, { data: { name: "policy e2e" } })).json()).data.secret;
+    const conn = await openConnection(page.request, "runtime-gateway", `E2E policy runtime ${Date.now()}`);
     const policyStep = async (requestTool: string) => {
-      const res = await anon.post("/api/gateway/v1/authorize", {
+      const res = await anon.post(conn.authorize, {
         headers: { authorization: `Bearer ${secret}` },
         data: { requestId: `pub-${Date.now()}-${Math.random()}`, action: "READ", tool: requestTool },
       });

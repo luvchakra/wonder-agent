@@ -7,6 +7,21 @@ Code: `modules/integrations/framework`. Built-in connectors:
 `modules/integrations/framework/definitions`. Storage of organizations' own
 connectors: `connector_definitions` (migration 0108).
 
+## The rule (non-negotiable #20)
+
+There is no direct connection between WonderID and an organization's data.
+Every flow goes through this framework:
+
+- **Outbound.** Only the framework's drivers call an organization's systems.
+- **Inbound.** Only a connection's receivers accept data from them, at
+  `/api/connect/v1/<connection id>/…`. This includes the Runtime Gateway.
+- **Files.** A CSV is read by a connector.
+
+Product modules read only what the framework stored.
+`tests/architecture/connector-boundary.test.ts` scans the source and fails
+when any other module calls out or opens a machine route. Widening its
+allowlists needs the user's approval.
+
 ## The idea
 
 A connector is a **definition**: JSON that describes one product's API. It
@@ -30,9 +45,9 @@ product takes a definition, not new code.
 definition (JSON) ──validate──▶ catalog ──connect──▶ integration (type "connector")
                                                         │  settings + encrypted secret
                                                         ▼
-                                 sync job ─▶ engine ─▶ driver (http | ldap | sql)
+                                 sync job ─▶ engine ─▶ driver (http | ldap | sql | mcp)
                                                         ▼
-                                 integration_objects (identity, account, entitlement, access_grant, application)
+                                 integration_objects (identity, account, entitlement, access_grant, application, policy, mcp_*)
                                                         ▼
                                  identity sources, account inventory, access, risk
 ```
@@ -68,9 +83,46 @@ owner's action.
 | `postgresql` | database | sql | logins, group roles with their table privileges, membership |
 | `openbao` | secrets | http | AppRoles, userpass logins, policies, assignments |
 | `kubernetes` | infrastructure | http | service accounts, Roles and ClusterRoles, bindings |
+| `saviynt` | identity provider | http | identities, accounts, endpoints, entitlements, assignments, security systems |
+| `zendesk` | application | http | staff accounts, groups, membership |
+| `mcp-server` | AI runtime | mcp | server, tools (classified read/write), resources; **receives** tool calls |
+| `runtime-gateway` | AI runtime | none | **receives** Runtime Gateway calls and agent activity |
+| `webhook` | event source | none | **receives** signed events from any system |
 
 Each one is verified against a real system by
 `modules/integrations/framework/live.test.ts` (see "Certifying a connector").
+
+## Receiving: how systems send WonderID data
+
+A definition's `receive` section declares what the organization's systems
+may send. Each channel is served per connection:
+
+| Channel | Path | Sender proves itself with | What happens |
+|---|---|---|---|
+| `runtimeEvents` | `POST /api/connect/v1/<id>/events` | the connection's receiving secret, as `Authorization: Bearer …` or an HMAC-SHA256 (hex) of the raw body | Each event is mapped by the definition, validated, kept as the connection's `activity` evidence, and recorded by Runtime as DID. An unknown or ambiguous agent is quarantined (Shadow AI), never recorded. One event, or a list of up to 500. |
+| `webhook` | `POST /api/connect/v1/<id>/webhook` | the receiving secret (bearer or HMAC) | The event is kept as an `activity` record; a redelivery with the same id is stored once. |
+| `gateway` | `POST /api/connect/v1/<id>/gateway/authorize` and `…/gateway/tools/filter` | the agent's own API key, which must belong to the connection's organization | Runtime's decision (or tool filter) for that agent. |
+
+The rules every receiver follows:
+
+- **Organization.** The organization is always the connection's own; nothing
+  in a request can choose it, the connection or the event's source.
+- **Disabled connections.** A connection that is disabled or deleted receives
+  nothing.
+- **Order of checks.** The sender is authenticated before the body is even
+  parsed, so an unauthenticated sender learns nothing about the expected
+  shape. Bodies are capped (1 MB for events and webhooks, 16 KB for the
+  gateway).
+- **The receiving secret.** WonderID issues it from the connection's page
+  ("Issue secret") or `POST /api/v1/integrations/<id>/receiver-secret`. It is
+  shown once and kept only encrypted. Replacing it stops the old one at once.
+
+A runtime event maps to: `eventTime`, `action` and `success` (required);
+`externalId` (makes redelivery a duplicate); `agentIdentityRef` (the agent's
+WonderID id, or a reference an identity of it is linked under); `tool`,
+`application`, `resource`, `dataClassification`, `eventType`, `sessionId`,
+`correlationId` and `mcpServer`. WonderID's own format uses these names
+directly (`definitions/runtime-event-fields.ts`).
 
 ## Writing a connector
 
@@ -138,22 +190,23 @@ The same operations are available over the API (session authentication):
 | `key` | Stable id: lowercase letters, digits and dashes, 2–63 characters. The keys of built-in connectors are reserved. |
 | `version` | `major.minor.patch`. A published version never changes. |
 | `category` | `hr`, `identity_provider`, `directory`, `application`, `database`, `secrets`, `infrastructure` or `other` |
-| `driver` | `http` (REST/JSON), `ldap` (LDAPS) or `sql` (PostgreSQL) |
+| `driver` | `http` (REST/JSON), `ldap` (LDAPS), `sql` (PostgreSQL), `mcp` (an MCP server over Streamable HTTP), or `none` (receives only) |
 | `settings` | Non-secret values the organization enters. `type` is `url`, `string`, `number`, `boolean` or `select` (with `options`). Each has an optional `default`. One `url` setting is the base address (`baseUrl` when present). |
 | `auth` | How to authenticate. Secret values are declared in `auth.fields` and referenced only as `{secret.<key>}`. |
-| `test` | A cheap authenticated call (`request`, `search` or `query`) that proves the connection works. |
+| `test` | A cheap authenticated call (`request`, `search`, `query` or `rpc`) that proves the connection works. A `none` connector has none. |
+| `receive` | What the organization's systems may send WonderID (see "Receiving"). |
 | `application` | The application name recorded on accounts and entitlements. It may use `{settings.…}`. |
-| `resources` | One request per canonical kind, or a list of up to 10 whose records are combined. |
+| `resources` | One request per canonical kind, or a list of up to 10 whose records are combined. Empty for a `none` connector. |
 | `rateLimitPerSecond` | Request rate. The default is 10. |
 
 ### Authentication (`auth.type`)
 
 | Type | Driver | Fields |
 |---|---|---|
-| `none` | http | |
+| `none` | http, mcp, none | |
 | `basic` | http | `username`, `password` |
-| `bearer` | http | `token` |
-| `header` | http | `name` and `value`, for example `Authorization: token {secret.key}:{secret.secret}` |
+| `bearer` | http, mcp | `token` (an optional token field sends no header when empty) |
+| `header` | http, mcp | `name` and `value`, for example `Authorization: token {secret.key}:{secret.secret}` |
 | `query` | http | `name` and `value` (avoid it where the API offers a header) |
 | `oauth2_client_credentials` | http | `tokenUrl` (relative, or starting with a url setting), `clientId`, `clientSecret`, optional `scope`, `clientAuth` (`body` or `basic`). The token is cached, and refreshed once on a 401. |
 | `ldap_simple` | ldap | `bindDn`, `password` |
@@ -170,6 +223,10 @@ The same operations are available over the API (session authentication):
 | `entitlement` | `externalId`, `name` | `application`, `type`, `description`, `privilegeLevel`, `dataClassification` |
 | `access_grant` | `externalId`, `accountExternalId`, `entitlementExternalId` | `grantType` |
 | `application` | `externalId`, `name` | `category`, `description` |
+| `policy` | `externalId`, `name` | `type`, `description` |
+| `mcp_server` | `externalId` | `endpoint`, `serverName`, `serverVersion`, `protocolVersion` |
+| `mcp_tool` | `externalId`, `name` | `description`, `operation`, `operationBasis`, `destructive`, `inputSchema` |
+| `mcp_resource` | `externalId`, `uri` | `name`, `mimeType` |
 
 Conventions the built-in connectors follow, so downstream modules can rely on them:
 
@@ -183,11 +240,12 @@ Conventions the built-in connectors follow, so downstream modules can rely on th
 | Field | Driver | Meaning |
 |---|---|---|
 | `request` | http | `{ path, method?, query?, headers?, body? }`. `path` must be relative. Templates may use `{settings.…}`, and `{parent.…}` under `forEach`. |
-| `records` | http | Dot path to the list in the response (`"data"`, `"ocs.data.users"`). `""` means the response is the list. Plain values (ids, names) become `{ "value": … }`. |
+| `records` | http, mcp | Dot path to the list in the response (`"data"`, `"ocs.data.users"`). `""` means the response is the list. A list of paths is tried in order (Saviynt: `["userlist", ""]`). Plain values (ids, names) become `{ "value": … }`. |
 | `recordsKeyed` | http | The `records` path holds an object keyed by id. Each value is one record, and its key is available as `_key`. |
 | `pagination` | http | See below |
 | `search` | ldap | `{ base, filter, scope?, attributes? }`. Paged automatically. Under `forEach`, template values are LDAP-escaped. |
 | `query` | sql | One `SELECT` or `WITH` statement, with no templates. It runs in a read-only transaction with a row limit. |
+| `rpc` | mcp | `{ method }`: `initialize` (the server itself), `tools/list`, `resources/list` or `prompts/list`. Paged by `nextCursor`. Each tool gains `_operation`, `_operationBasis` and `_destructive` from the deterministic classification. |
 | `forEach` | all | Runs the request once per record of another kind, which is available as `{parent.…}` (for example, a group's members). |
 | `forEachRequest` | all | When that kind lists several requests, follows only this one (0-based). |
 | `unwind` | all | Turns each record into one record per item of this list field. The record itself becomes the parent. |
@@ -202,7 +260,7 @@ Conventions the built-in connectors follow, so downstream modules can rely on th
 |---|---|---|
 | `none` | | One request returns everything |
 | `page` | `param`, `sizeParam?`, `size`, `start?` (1 by default) | Page numbers |
-| `offset` | `param`, `sizeParam`, `size` | Item offsets, such as Keycloak's `first`/`max` |
+| `offset` | `param`, `sizeParam`, `size`, `in?` (`query` or `body`) | Item offsets, such as Keycloak's `first`/`max`; `in: "body"` puts them in a POST's JSON body (Saviynt) |
 | `cursor` | `param`, `from` (path to the next token), `sizeParam?`, `size?` | Kubernetes `continue`, cursor APIs |
 | `link_header` | `sizeParam?`, `size?` | RFC 8288 `Link: <…>; rel="next"`, as in Gitea and GitHub-style APIs. The next link must stay on the same origin. |
 | `scim` | `size` | SCIM 2.0 `startIndex` and `count` |
@@ -214,7 +272,8 @@ Conventions the built-in connectors follow, so downstream modules can rely on th
 - `{ "template": "{record.a} {record.b}" }`;
 - `{ "value": constant }`.
 
-Each form also takes an optional `transform` list and a `default`. In a path:
+Each form also takes an optional `transform` list and a `default`. A `path`
+may be a list, tried in order: the first non-empty value wins. In a path:
 
 - `a.b` reads a nested field;
 - `list[]` spreads a list, and `list[0]` indexes it;
@@ -258,6 +317,13 @@ These hold for built-in and custom definitions alike:
 
 Records that cannot be mapped (for example, a missing `externalId`) are
 counted and reported on the sync job. They are not stored half-filled.
+
+A secret field may be marked `optional` (an MCP server that needs no token).
+A query parameter may be a list, which repeats it (`role[]=agent&role[]=admin`).
+
+A connection made from a built-in may store the definition's key and version
+instead of a copy (`{ definition: { key, version, origin: "builtin" } }`). The
+engine then uses exactly that version from code, and refuses a mismatch.
 
 ## Certifying a connector
 

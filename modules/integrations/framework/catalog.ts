@@ -33,6 +33,8 @@ export type DefinitionSummary = {
   driver: ConnectorDefinition["driver"];
   description: string;
   resources: ResourceKind[];
+  /** What the connection's systems can send WonderID: runtimeEvents, webhook, gateway. */
+  receives: string[];
   createdAt: string | null;
 };
 
@@ -47,6 +49,7 @@ function summarize(def: ConnectorDefinition, origin: DefinitionOrigin, createdAt
     driver: def.driver,
     description: def.description,
     resources: RESOURCE_KINDS.filter((k) => def.resources[k]),
+    receives: Object.keys(def.receive ?? {}),
     createdAt,
   };
 }

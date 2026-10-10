@@ -154,7 +154,12 @@ export function mapField(mapping: FieldMapping, scope: TemplateScope): unknown {
   else if (mapping.template !== undefined) {
     const filled = fillTemplate(mapping.template, scope, { allowMissing: true }).replace(/\s+/g, " ").trim();
     value = filled === "" ? undefined : filled;
-  } else if (mapping.path !== undefined) value = readField(scope, mapping.path);
+  } else if (mapping.path !== undefined) {
+    for (const p of Array.isArray(mapping.path) ? mapping.path : [mapping.path]) {
+      value = readField(scope, p);
+      if (clean(value) !== undefined && value !== null) break;
+    }
+  }
   for (const t of mapping.transform ?? []) value = applyTransform(value, t);
   value = clean(value);
   if ((value === undefined || value === null || value === "") && mapping.default !== undefined) value = mapping.default;
@@ -211,7 +216,8 @@ export function mapRecord(
       else if (value.length) normalized[target] = typeof value[0] === "object" ? JSON.stringify(value[0]) : value.map(String).join(", ");
       continue;
     }
-    normalized[target] = typeof value === "object" ? JSON.stringify(value) : value;
+    // A canonical object field (an MCP tool's input schema) stays structured.
+    normalized[target] = typeof value === "object" && !CANONICAL_FIELDS[kind].objects?.includes(target) ? JSON.stringify(value) : value;
   }
   if ((kind === "account" || kind === "entitlement") && normalized.application === undefined && defaults.application) {
     normalized.application = defaults.application;

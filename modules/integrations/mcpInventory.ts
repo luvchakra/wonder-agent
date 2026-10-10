@@ -3,6 +3,7 @@ import "server-only";
 import type { Integration, IntegrationObject, McpResource, McpServerInventory, McpTool, McpToolOperation } from "@/lib/shared/types/integrations";
 import { listIntegrations } from "./integrations";
 import { getNormalizedObjectsForTenant } from "./objects";
+import { connectionDriver } from "./framework/engine";
 
 /**
  * INTEGRATION-P0-06 (master P0-10) — the published MCP inventory: every
@@ -22,7 +23,8 @@ const basisOf = (v: unknown): McpTool["operationBasis"] => (v === "annotation" |
 
 /** Pure: groups the three object families under their integration. */
 export function buildMcpInventory(integrations: Integration[], objects: IntegrationObject[]): McpServerInventory[] {
-  const mcp = integrations.filter((i) => i.integrationTypeId === "mcp");
+  // An MCP connection is one whose connector definition uses the mcp driver.
+  const mcp = integrations.filter((i) => i.integrationTypeId === "connector" && connectionDriver(i.config) === "mcp");
   const byIntegration = new Map<string, IntegrationObject[]>();
   for (const o of objects) {
     const list = byIntegration.get(o.integrationId) ?? [];
@@ -70,7 +72,7 @@ export function buildMcpInventory(integrations: Integration[], objects: Integrat
     return {
       integrationId: integration.id,
       integrationName: integration.name,
-      endpoint: str(server?.normalized.endpoint) ?? str(integration.config.baseUrl),
+      endpoint: str(server?.normalized.endpoint) ?? str(integration.config.baseUrl) ?? str((integration.config.settings as Record<string, unknown> | undefined)?.baseUrl),
       serverName: str(server?.normalized.serverName),
       serverVersion: str(server?.normalized.serverVersion),
       protocolVersion: str(server?.normalized.protocolVersion),

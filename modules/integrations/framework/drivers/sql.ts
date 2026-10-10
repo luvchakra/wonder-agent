@@ -46,8 +46,8 @@ export const sqlDriver: DriverFactory = async (def, settings, secrets) => {
 
   return {
     async test() {
-      if (!def.test.query) throw new Error("This definition has no test query");
-      await readOnly(def.test.query, 1);
+      if (!def.test?.query) throw new Error("This definition has no test query");
+      await readOnly(def.test?.query, 1);
     },
     async fetch(resource, _scope, max) {
       if (!resource.query) throw new Error("This resource has no query");

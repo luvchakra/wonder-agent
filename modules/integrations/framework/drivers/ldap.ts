@@ -58,8 +58,8 @@ export const ldapDriver: DriverFactory = async (def, settings, secrets) => {
 
   return {
     async test() {
-      if (!def.test.search) throw new Error("This definition has no test search");
-      await search({ ...def.test.search, scope: def.test.search.scope ?? "base" }, { settings }, 1);
+      if (!def.test?.search) throw new Error("This definition has no test search");
+      await search({ ...def.test?.search, scope: def.test?.search.scope ?? "base" }, { settings }, 1);
     },
     async fetch(resource, tplScope, max) {
       if (!resource.search) throw new Error("This resource has no search");

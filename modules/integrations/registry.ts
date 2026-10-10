@@ -1,29 +1,19 @@
 import "server-only";
 
-import type { ConnectorAdapter } from "./connector";
-import { GenericRestConnector } from "./connectors/genericRest";
-import { SaviyntConnector } from "./connectors/saviynt";
-import { McpConnector } from "./connectors/mcp";
+import { ApiError } from "@/lib/shared/types/foundation";
+import type { DefinitionConnector } from "./framework/engine";
 import { createDefinitionConnector } from "./framework/connector";
 
 /**
- * Factory mapping integration_type_id to a fresh connector instance.
- * 'webhook' is intentionally absent — it's a push-based ingestion path, not
- * a pull connector, and has no ConnectorAdapter of its own (see
- * modules/integrations/webhooks.ts).
+ * Every integration runs through the connector framework (non-negotiable
+ * #20): one adapter that runs the connection's definition. The adapters
+ * that once talked to Saviynt, generic REST APIs and MCP servers directly
+ * are gone; those products are definitions now (migration 0109 converted
+ * existing connections).
  */
-export function createConnector(integrationTypeId: string): ConnectorAdapter {
-  switch (integrationTypeId) {
-    case "generic_rest":
-      return new GenericRestConnector();
-    case "saviynt":
-      return new SaviyntConnector();
-    case "mcp":
-      return new McpConnector();
-    // The connector framework: one adapter that runs any connector definition.
-    case "connector":
-      return createDefinitionConnector();
-    default:
-      throw new Error(`No connector implementation for integration type: ${integrationTypeId}`);
+export function createConnector(integrationTypeId: string): DefinitionConnector {
+  if (integrationTypeId !== "connector") {
+    throw new ApiError(400, "UNSUPPORTED_INTEGRATION", "This integration type is no longer supported; connect the system again from the connector catalog");
   }
+  return createDefinitionConnector();
 }

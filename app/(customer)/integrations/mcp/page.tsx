@@ -129,7 +129,7 @@ export default async function McpInventoryPage() {
             actually invoked is on the Runtime pages.
           </p>
         </div>
-        <LinkButton href="/integrations/new" variant="outline" size="sm">
+        <LinkButton href="/integrations/connectors/builtin/mcp-server" variant="outline" size="sm">
           + Connect an MCP server
         </LinkButton>
       </div>

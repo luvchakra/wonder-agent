@@ -26,19 +26,32 @@ export const CONNECTOR_CATEGORIES = [
   "database",
   "secrets",
   "infrastructure",
+  "ai_runtime",
+  "event_source",
   "other",
 ] as const;
 export type ConnectorCategory = (typeof CONNECTOR_CATEGORIES)[number];
 
-export const CONNECTOR_DRIVERS = ["http", "ldap", "sql"] as const;
+/** `none`: a connector that only receives (events, webhooks, gateway calls) and reads nothing. */
+export const CONNECTOR_DRIVERS = ["http", "ldap", "sql", "mcp", "none"] as const;
 export type ConnectorDriver = (typeof CONNECTOR_DRIVERS)[number];
 
 /** The canonical object families a definition can produce (integration_objects.object_type). */
-export const RESOURCE_KINDS = ["identity", "account", "entitlement", "access_grant", "application"] as const;
+export const RESOURCE_KINDS = [
+  "identity",
+  "account",
+  "entitlement",
+  "access_grant",
+  "application",
+  "policy",
+  "mcp_server",
+  "mcp_tool",
+  "mcp_resource",
+] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
 
 /** Canonical fields per family. `externalId` is required everywhere. */
-export const CANONICAL_FIELDS: Record<ResourceKind, { required: readonly string[]; optional: readonly string[]; arrays?: readonly string[] }> = {
+export const CANONICAL_FIELDS: Record<ResourceKind, { required: readonly string[]; optional: readonly string[]; arrays?: readonly string[]; objects?: readonly string[] }> = {
   identity: {
     required: ["externalId"],
     optional: [
@@ -78,7 +91,42 @@ export const CANONICAL_FIELDS: Record<ResourceKind, { required: readonly string[
     required: ["externalId", "name"],
     optional: ["category", "description"],
   },
+  policy: {
+    required: ["externalId", "name"],
+    optional: ["type", "description"],
+  },
+  // The MCP families keep the field names Integration's MCP inventory reads (mcpInventory.ts).
+  mcp_server: {
+    required: ["externalId"],
+    optional: ["endpoint", "serverName", "serverVersion", "protocolVersion"],
+  },
+  mcp_tool: {
+    required: ["externalId", "name"],
+    optional: ["description", "operation", "operationBasis", "destructive", "inputSchema"],
+    objects: ["inputSchema"],
+  },
+  mcp_resource: {
+    required: ["externalId", "uri"],
+    optional: ["name", "mimeType"],
+  },
 };
+
+/** What an inbound runtime event maps to before Runtime records it (runtime_events). */
+export const RUNTIME_EVENT_FIELDS = {
+  required: ["eventTime", "action", "success"],
+  optional: [
+    "externalId",
+    "agentIdentityRef",
+    "tool",
+    "application",
+    "resource",
+    "dataClassification",
+    "eventType",
+    "sessionId",
+    "correlationId",
+    "mcpServer",
+  ],
+} as const;
 
 export type SettingField = {
   key: string;
@@ -90,7 +138,8 @@ export type SettingField = {
   help?: string;
 };
 
-export type SecretField = { key: string; label: string; help?: string };
+/** A secret value the organization enters. `optional` ones may be left empty (an MCP server without auth). */
+export type SecretField = { key: string; label: string; help?: string; optional?: boolean };
 
 /** Authentication. Secret values are only ever referenced here, as `{secret.<key>}`. */
 export type AuthSpec =
@@ -116,8 +165,8 @@ export type Pagination =
   | { type: "none" }
   /** Page numbers: ?page=1,2,3… */
   | { type: "page"; param: string; sizeParam?: string; size: number; start?: number }
-  /** Item offsets: ?first=0,100,200… (Keycloak), ?start=… */
-  | { type: "offset"; param: string; sizeParam: string; size: number }
+  /** Item offsets: ?first=0,100,200… (Keycloak). `in: "body"` sends them in a POST's JSON body (Saviynt). */
+  | { type: "offset"; param: string; sizeParam: string; size: number; in?: "query" | "body" }
   /** A token from the response feeds the next request (Kubernetes `continue`). */
   | { type: "cursor"; param: string; from: string; sizeParam?: string; size?: number }
   /** RFC 8288 `Link: <…>; rel="next"` (Gitea, GitHub-style APIs). */
@@ -128,7 +177,8 @@ export type Pagination =
 export type HttpRequestSpec = {
   method?: "GET" | "POST";
   path: string;
-  query?: Record<string, string>;
+  /** A list repeats the parameter (role[]=admin&role[]=agent). */
+  query?: Record<string, string | string[]>;
   headers?: Record<string, string>;
   body?: unknown;
 };
@@ -151,7 +201,14 @@ export type Transform =
  */
 export type FieldMapping =
   | string
-  | { path?: string; template?: string; value?: string | number | boolean | null; transform?: Transform[]; default?: string | number | boolean | null };
+  | {
+      /** A list is tried in order; the first non-empty value wins ("username", then "id"). */
+      path?: string | string[];
+      template?: string;
+      value?: string | number | boolean | null;
+      transform?: Transform[];
+      default?: string | number | boolean | null;
+    };
 
 /** Keeps a record when every given test passes. A path starting `parent.` reads the parent record. */
 export type RecordFilter = {
@@ -168,8 +225,8 @@ export type RecordFilter = {
 export type ResourceSpec = {
   /** http driver */
   request?: HttpRequestSpec;
-  /** Dot path to the array of records in the response; "" when the response is the array. */
-  records?: string;
+  /** Dot path to the array of records in the response; "" when the response is the array. A list is tried in order. */
+  records?: string | string[];
   /** The records path holds an object keyed by id (Nextcloud): each value is a record, its key `_key`. */
   recordsKeyed?: boolean;
   pagination?: Pagination;
@@ -177,6 +234,8 @@ export type ResourceSpec = {
   search?: { base: string; filter: string; scope?: "base" | "one" | "sub"; attributes?: string[] };
   /** sql driver: one read-only statement. */
   query?: string;
+  /** mcp driver: a JSON-RPC list method (tools/list, resources/list) or initialize. Paged by nextCursor. */
+  rpc?: { method: "initialize" | "tools/list" | "resources/list" | "prompts/list" };
   /**
    * Run the request once per record of another resource, with that record
    * as `{parent.…}` (group → its members; user → its roles).
@@ -213,23 +272,67 @@ export type ConnectorDefinition = {
   /** Non-secret settings the organization fills in. One `url` setting is the base address. */
   settings: SettingField[];
   auth: AuthSpec;
-  /** A cheap authenticated call proving the connection works. */
-  test: { request?: HttpRequestSpec; search?: ResourceSpec["search"]; query?: string };
+  /** A cheap authenticated call proving the connection works (none for a receive-only connector). */
+  test?: { request?: HttpRequestSpec; search?: ResourceSpec["search"]; query?: string; rpc?: ResourceSpec["rpc"] };
   /** The application name recorded on accounts and entitlements ("{settings.realm}" allowed). */
   application?: string;
   /** One request per kind, or several whose records are combined (groups and roles). */
   resources: Partial<Record<ResourceKind, ResourceSpec | ResourceSpec[]>>;
+  /** What the organization's systems may send WonderID (see ReceiveSpec). */
+  receive?: ReceiveSpec;
   /** Requests per second (default 10). */
   rateLimitPerSecond?: number;
   /** Where an integrator can read about this product's API. */
   documentationUrl?: string;
 };
 
+export type RuntimeEventField = (typeof RUNTIME_EVENT_FIELDS.required)[number] | (typeof RUNTIME_EVENT_FIELDS.optional)[number];
+
+/**
+ * The receiving side: the only way an organization's systems may send data
+ * to WonderID (CLAUDE.md non-negotiable #20). Each channel is served at
+ * /api/connect/v1/<connection id>/<channel> and authenticated per
+ * connection; nothing is accepted for a connection that is disabled.
+ */
+export type ReceiveSpec = {
+  /**
+   * Agent activity (tool calls, data access), recorded by Runtime as DID.
+   * Authenticated by the connection's receiving secret: as a bearer token,
+   * or as an HMAC-SHA256 signature of the raw body.
+   */
+  runtimeEvents?: {
+    source: "mcp" | "rest" | "webhook";
+    auth: "bearer" | "hmac_sha256";
+    /** Header carrying the hex signature for hmac_sha256 (default x-wonderid-signature). */
+    signatureHeader?: string;
+    /** Path to a list of events in the body, for batches; "" or absent means the body is one event. */
+    records?: string;
+    fields: Partial<Record<RuntimeEventField, FieldMapping>>;
+  };
+  /** Any event, kept as an `activity` record for later processing. */
+  webhook?: {
+    auth: "bearer" | "hmac_sha256";
+    signatureHeader?: string;
+    /** Field holding the sender's event id, so a redelivery is not stored twice. */
+    externalId?: string;
+  };
+  /**
+   * The Runtime Gateway: an agent asks before it acts (authorize) and asks
+   * which tools it may see (tools/filter). Authenticated by the agent's own
+   * API key, which must belong to this connection's organization.
+   */
+  gateway?: { authorize: boolean; toolsFilter: boolean };
+};
+
 /** What an organization stores on an integration of type `connector`. */
 export type ConnectorIntegrationConfig = {
   definition: { key: string; version: string; origin: "builtin" | "custom" };
-  /** The validated definition, snapshotted when the integration was created. */
-  manifest: ConnectorDefinition;
+  /**
+   * The validated definition, snapshotted when the integration was created.
+   * A connection to a built-in may omit it; the engine then uses exactly the
+   * named built-in key and version from code.
+   */
+  manifest?: ConnectorDefinition;
   settings: Record<string, string | number | boolean>;
   /** The url setting the existing outbound guard checks at creation. */
   baseUrl?: string;
