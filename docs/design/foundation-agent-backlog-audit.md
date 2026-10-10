@@ -2624,3 +2624,10 @@ Verified: `proxy.test.ts` has two new matcher tests
 affected E2E specs (`auth`, `navigation-smoke`) should be run by hand or
 checked in the next nightly; they were not run here (they need
 service-role secrets).
+
+### 2026-10-10 — Leaked-password protection: won't do (owner decision)
+
+The owner decided Supabase Auth's leaked-password protection stays off. It
+is no longer an open item. The security advisor's warning for it is
+accepted. CLAUDE.md §18.1 and `docs/security/SECURITY-CONTROLS.md` now say
+so.

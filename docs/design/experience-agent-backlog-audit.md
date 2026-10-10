@@ -3534,3 +3534,21 @@ of same data in ui, it should have confirm or cancel import button".
 **Verified.** Typecheck and eslint clean. The dialog flow, including Cancel
 storing nothing, is covered by `file-import.spec.ts` on Vercel; see the QA
 log.
+
+### 2026-10-10 — Dashboard: no queries for a user without an organization
+
+**Found in the database logs.** In the 24 hours to 2026-10-10 11:50 UTC
+there were 757 requests with `tenant_id=eq.null`, all answered 400. Every
+one came from the dashboard's five queries: `agents`, `risk_findings`,
+`runtime_events` and its two counts.
+
+**Cause.** For a signed-in user with no organization, the customer layout
+redirects to onboarding or no-access. Next renders the page alongside the
+layout, though, so `app/(customer)/page.tsx` had already queried with
+`ctx.tenantId!` (null).
+
+**Fix.** The page returns nothing when there is no organization, and lets
+the layout's redirect stand. No other page appears in the logs.
+
+**Verified.** Typecheck and eslint clean on the changed file. After the
+deploy, the logs should show no new `eq.null` requests from the dashboard.

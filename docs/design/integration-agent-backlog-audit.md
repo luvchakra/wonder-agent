@@ -1764,3 +1764,24 @@ import**.
   schedule instead.
 - An account file's `entitlements` column is mapped but not turned into
   access; import access rows on Access instead.
+
+### 2026-10-10 — Foreign-key indexes, cleanup of retired types, tracker
+
+- **0112 (applied):** two covering indexes on `(integration_id, tenant_id)`,
+  for `connector_files` and `connector_traffic`. Their composite foreign keys
+  had none (performance advisor 0001), so deleting a connection scanned both
+  tables.
+- **0113 (written, not applied):** deletes what 0109 left behind.
+  - Delete the retired integration types `saviynt`, `generic_rest`, `mcp`
+    and `webhook`.
+    - No connection uses them; all 7 connections are `connector`.
+    - Their only foreign key is `integrations.integration_type_id`.
+    - `registry.ts` already refuses them.
+  - Delete the stale Zendesk credential: the old single secret, from
+    2026-08-16, never rotated. Only a pre-0109, never-rotated row qualifies.
+  - Not yet run: the database tool cancels statements that delete until the
+    owner confirms them, as it did on 2026-10-10. It runs once they confirm.
+- **Tracker:** INTEGRATION-P0-16 (connector boundary) and INTEGRATION-P0-17
+  (CSV through the framework) are now Done; both were still marked Partial
+  pending migrations that have since been applied and verified (QA log:
+  isolation 14/14 and 8/8). `npm run progress`: 198 of 250 (79%).

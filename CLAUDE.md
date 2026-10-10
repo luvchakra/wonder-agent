@@ -987,10 +987,10 @@ What the full code review found before the work, and what now holds:
   transaction that stores them (`assign_invoice_number()`), let only one processor
   claim a webhook event (`claimed_at`), and refuse a second checkout while one is
   open.
-- **Still open, needs the owner.** Supabase Auth's leaked-password protection is off.
-  It is a project dashboard setting this sandbox cannot change. The CSP still allows
-  `'unsafe-inline'` scripts for Next's bootstrap; moving to per-request nonces is a
-  recorded follow-up.
+- **Won't do (owner decision, 2026-10-10).** Supabase Auth's leaked-password protection
+  stays off. Don't raise it again as an open item; the advisor warning is accepted.
+- **Still open.** The CSP still allows `'unsafe-inline'` scripts for Next's bootstrap;
+  moving to per-request nonces is a recorded follow-up.
 
 ### 18.2 Payments (Stripe, Razorpay)
 
