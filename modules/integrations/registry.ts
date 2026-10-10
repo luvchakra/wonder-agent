@@ -4,6 +4,7 @@ import type { ConnectorAdapter } from "./connector";
 import { GenericRestConnector } from "./connectors/genericRest";
 import { SaviyntConnector } from "./connectors/saviynt";
 import { McpConnector } from "./connectors/mcp";
+import { createDefinitionConnector } from "./framework/connector";
 
 /**
  * Factory mapping integration_type_id to a fresh connector instance.
@@ -19,6 +20,9 @@ export function createConnector(integrationTypeId: string): ConnectorAdapter {
       return new SaviyntConnector();
     case "mcp":
       return new McpConnector();
+    // The connector framework: one adapter that runs any connector definition.
+    case "connector":
+      return createDefinitionConnector();
     default:
       throw new Error(`No connector implementation for integration type: ${integrationTypeId}`);
   }

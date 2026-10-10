@@ -19,7 +19,7 @@ export default async function IntegrationsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold text-foreground">Integrations</h1>
-        <LinkButton href="/integrations/new">+ Add integration</LinkButton>
+        <LinkButton href="/integrations/connectors">+ Connect a system</LinkButton>
       </div>
 
       <Card>

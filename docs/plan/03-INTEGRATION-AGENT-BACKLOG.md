@@ -38,6 +38,8 @@ for every non-"Done" row is in
 | INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Partial — 2026-09-26: SSRF guard on every connector request and at configuration, capability model, idempotent write interface (0087) done; the write interface gets its end-to-end caller with INTEGRATION-P0-13 |
 | INTEGRATION-P0-12 | AI-assisted onboarding proposals | Done — 2026-09-26, migration 0091 |
 | INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Not Started — 2026-09-26, WonderID |
+| INTEGRATION-P0-14 | Connector framework: declarative definitions, http/ldap/sql drivers, catalog, authoring, preview (INTEG-P2-01/P2-03 brought forward by user request) | Done — 2026-10-10, migration 0108 |
+| INTEGRATION-P0-15 | Built-in connectors: Frappe HR, ERPNext, LDAP, Keycloak, Gitea, Mattermost, Nextcloud, PostgreSQL, OpenBao, Kubernetes | Done — 2026-10-10, each certified live against the Planet Express demo company |
 
 ---
 
@@ -54,7 +56,8 @@ for every non-"Done" row is in
 ## Owned entities
 
 `integrations`, `integration_types`, `integration_credentials`,
-`integration_sync_jobs`, `integration_objects`, `integration_mappings`.
+`integration_sync_jobs`, `integration_objects`, `integration_mappings`,
+`connector_definitions` (0108).
 
 ## Consumed entities
 

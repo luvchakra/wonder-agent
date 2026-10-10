@@ -87,6 +87,9 @@ export async function listLatestCompletedSyncStarts(tenantId: string): Promise<M
   return latest;
 }
 
+/** integration_objects rows stored per request. */
+const UPSERT_CHUNK = 500;
+
 const IMPORTERS: {
   capabilityKey: keyof ConnectorCapabilities;
   objectType: IntegrationObjectType;
@@ -164,6 +167,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       let mappings: Awaited<ReturnType<typeof listMappings>> = [];
       try {
         const records = (await importFn(connector)) ?? [];
+        const rows: Record<string, unknown>[] = [];
         for (const record of records) {
           try {
             let normalized = record.normalized as Record<string, unknown> | undefined;
@@ -173,28 +177,40 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
               }
               normalized = applyMappings(record.raw, mappings);
             }
-
-            const { error: upsertError } = await supabase.from("integration_objects").upsert(
-              {
-                tenant_id: tenantId,
-                integration_id: integration.id,
-                object_type: objectType,
-                external_id: record.externalId,
-                raw: record.raw,
-                normalized,
-                sync_job_id: jobId,
-              },
-              { onConflict: "integration_id,object_type,external_id" },
-            );
-            if (upsertError) throw new Error(upsertError.message);
-            recordsProcessed += 1;
+            rows.push({
+              tenant_id: tenantId,
+              integration_id: integration.id,
+              object_type: objectType,
+              external_id: record.externalId,
+              raw: record.raw,
+              normalized,
+              sync_job_id: jobId,
+            });
           } catch (err) {
             recordsFailed += 1;
-            errors.push({
-              objectType,
-              message: err instanceof Error ? err.message : "Unknown error",
-            });
+            errors.push({ objectType, message: err instanceof Error ? err.message : "Unknown error" });
           }
+        }
+        // Stored 500 at a time; a chunk that fails is retried row by row so
+        // each bad record is counted and named, never the whole chunk.
+        for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
+          const chunk = rows.slice(i, i + UPSERT_CHUNK);
+          const { error: chunkError } = await supabase.from("integration_objects").upsert(chunk, { onConflict: "integration_id,object_type,external_id" });
+          if (!chunkError) {
+            recordsProcessed += chunk.length;
+            continue;
+          }
+          for (const row of chunk) {
+            const { error: upsertError } = await supabase.from("integration_objects").upsert(row, { onConflict: "integration_id,object_type,external_id" });
+            if (upsertError) {
+              recordsFailed += 1;
+              errors.push({ objectType, message: upsertError.message });
+            } else recordsProcessed += 1;
+          }
+        }
+        // The connector framework reports records it could not map.
+        for (const issue of (connector as { drainIssues?: () => { objectType: string; message: string }[] }).drainIssues?.() ?? []) {
+          errors.push(issue);
         }
       } catch (err) {
         errors.push({
@@ -203,6 +219,9 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
         });
       }
     }
+
+    // LDAP and SQL drivers hold a connection open for the run.
+    await (connector as { close?: () => Promise<void> }).close?.();
 
     const finalStatus = errors.length === 0 ? "succeeded" : recordsProcessed > 0 ? "partial" : "failed";
 

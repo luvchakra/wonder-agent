@@ -1231,3 +1231,144 @@ connector capabilities. Written as `docs/plan/DEMO-ORG-INTEGRATION-PLAN.md`.
   - the MCP connector ignores `Mcp-Session-Id` and streamed replies;
   - page-number-only paging.
 - Nothing built or deployed. No code changed.
+
+---
+
+## 2026-10-10 — Connector framework, ten built-in connectors, Planet Express kit (INTEGRATION-P0-14/15)
+
+User request: "build the deployment kit… the integration with WonderID should
+be generic… build a connector framework first, such that WonderID (and later
+system integrators) can use it… separate connector for HR data, separate for
+each application." This brings INTEG-P2-01 (catalog) and INTEG-P2-03 (SDK,
+contract tests, certification) forward by explicit user request.
+
+**Framework** (`modules/integrations/framework`, reference
+`docs/integrations/CONNECTOR-FRAMEWORK.md`):
+
+- A connector is a JSON definition: settings, auth, requests per canonical
+  kind (identity, account, entitlement, access_grant, application) and field
+  mappings. One engine (`DefinitionConnector`) runs every definition through
+  a driver:
+  - `http`, over `guardedFetch` with rate limiting, OAuth token refresh and
+    six pagination styles;
+  - `ldap`, LDAPS only, through `ldapts`;
+  - `sql`, PostgreSQL with verified TLS, one read-only statement in a
+    READ ONLY transaction, through `pg`.
+- Definitions can also list several requests per kind, run `forEach` parents
+  (`forEachRequest`), `unwind` lists, filter (`where`, including `parent.` and
+  prefix tests), mark requests `optional` (404 = none) and read keyed maps
+  (`recordsKeyed`).
+- Mappings use paths, templates and a closed transform list (no code).
+- `validate.ts` enforces the security rules for built-in and custom
+  definitions alike:
+  - secrets only in `auth`;
+  - relative paths only;
+  - token URLs from settings;
+  - requests restricted to the settings' origins;
+  - TLS for LDAP and SQL;
+  - read-only single-statement SQL;
+  - a 256 KB size cap.
+- Integration type `connector` (0108): each connection snapshots its
+  definition, so a newer version never changes a running connection.
+  `syncJobs` now upserts in chunks of 500 (per-row fallback), records
+  unmappable records as job errors, and closes driver sessions.
+- `connector_definitions` (0108): an organization's own definitions.
+  - RLS: members read; publishing requires `integration.create`.
+  - No update or delete policy, and a trigger makes versions immutable even
+    for the service role.
+- Catalog service, routes and screens:
+  - `/integrations/connectors` (catalog), `/connectors/{origin}/{key}`
+    (schema-driven connect form) and `/connectors/new` (authoring, with live
+    validation, "Try it against a system" preview, and publish);
+  - connector credentials on the integration page;
+  - API under `/api/v1/integrations/connectors` and
+    `/api/v1/integrations/:id/connector-credentials`.
+  - Credentials are tested before they are stored. A failed test leaves the
+    connection without credentials and says so (§17.5).
+  - Preview and publish are audited.
+- The "Integration" identity-source preset now maps every canonical field
+  from `normalized.*`, so an HR connector feeds identity sources directly.
+- The Integrations page's main action is now "+ Connect a system". The
+  generic form no longer offers the `connector` type.
+
+**Built-in connectors** (`definitions/`): frappe-hr, erpnext, ldap-directory,
+keycloak, gitea, mattermost, nextcloud, postgresql, openbao, kubernetes.
+Product facts found while certifying them:
+
+- **Keycloak.** `/users` leaves out service accounts unless `exact=false`, and
+  its list entries carry no `serviceAccountClientId`, so the
+  `service-account-` prefix marks them.
+- **Mattermost.** A non-admin sees only its own row in
+  `/teams/{id}/members`, so membership comes from `users?in_team=`.
+- **Nextcloud.** It returns users keyed by id. It invalidates app passwords
+  some minutes after the account password changes. It has no read-only
+  administrator.
+- **OpenBao.** An empty LIST is a 404.
+
+**Planet Express kit** (`demo-org/`, README there):
+
+- Docker Compose with Caddy, Frappe HR/ERPNext, Keycloak, OpenLDAP, Gitea,
+  Mattermost, Nextcloud, PostgreSQL, SeaweedFS, OpenBao and k3s.
+- Python seed for 260 people and the planted scenarios.
+- `gcp/create-vm.sh` (Cloud Shell): VM, static IP, firewall, and an
+  08:00–20:00 IST schedule.
+- Caddy verifies the k3s API certificate against the cluster CA (no
+  `tls_insecure_skip_verify`).
+- Every password is generated on the machine. `.env`, `certs/` and
+  `generated/` are git-ignored.
+
+**Verified:**
+
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `npx vitest run modules/integrations "app/(customer)/integrations"`:
+  16 files, 138 tests passed. The framework's own tests are 38, plus 11 for
+  the definitions.
+- Live contract test (`live.test.ts`, 10/10) against the running demo company,
+  through the production engine and outbound guard:
+
+  | Connector | Imported |
+  |---|---|
+  | frappe-hr | 250 identities |
+  | erpnext | 38 accounts, 51 roles, 124 grants |
+  | ldap-directory | 29 / 3 / 12 |
+  | keycloak | 267 / 22 / 1,063 |
+  | gitea | 97 / 5 / 95 |
+  | mattermost | 238 / 4 / 408 |
+  | nextcloud | 169 / 9 / 170 |
+  | postgresql | 25 / 12 / 33 |
+  | openbao | 17 / 7 / 18 |
+  | kubernetes | 13 / 12 / 10 |
+
+  0 unmappable records.
+- Through the app: connecting the demo Gitea in the UI tested and stored the
+  credentials, and "Run sync now" finished `succeeded`: 197 records, 0 failed.
+- Playwright `tests/e2e/integrations.spec.ts`: 12/12 passed, including new
+  tests for:
+  - the catalog;
+  - an unreachable system saved without credentials;
+  - live validation on the authoring page.
+- Migration 0108 applied to the dev project:
+  - security advisors show nothing new;
+  - performance advisors show only "unused index" on the empty table.
+- `tests/integrations/connector-definitions-isolation.sql`: 9/9 checks as
+  expected, run in a rolled-back transaction:
+  - a member reads only their own organization's definitions;
+  - publishing needs `integration.create`, and only into the member's own
+    organization;
+  - no client can update or delete a definition;
+  - the service role cannot edit a version (23514).
+
+**Left out / follow-ups:**
+
+- scheduled connector syncs (stored schedules still are not executed,
+  INTEGRATION-P0-08);
+- Keycloak nested subgroups (top-level groups only);
+- LDAP `uniqueMember`;
+- Kubernetes User/Group subjects (only ServiceAccount grants are imported);
+- Gitea tokens and deploy keys (no admin API for other users' tokens);
+- Nextcloud shares;
+- a SeaweedFS connector;
+- a private CA for the http driver (it uses public certificates only);
+- write and remediation (INTEGRATION-P0-13).
+- Two test connections named "Live Gitea…" remain in the dev project's
+  adminOne fixture organization: their cleanup was declined.

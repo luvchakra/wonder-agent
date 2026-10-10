@@ -1075,3 +1075,26 @@ tests run nightly; per-change CI runs feature-specific tests only.
   - The likely cause: `npm audit fix` replaced `node_modules` under the
     running server mid-run. This is not proven. None of the three touch
     the sign-up change.
+
+## 2026-10-10 — Isolation proof for connector_definitions (migration 0108)
+
+`tests/integrations/connector-definitions-isolation.sql` was run against the
+dev project as one transaction, then rolled back. It reuses the FinanceBot
+fixture (Tenants A5/B5). All 9 checks came out as expected:
+
+- tenant A reads its own definitions and none of tenant B's, and B reads none
+  of A's;
+- a member without `integration.create` cannot publish (42501);
+- an IAM Admin publishes into their own organization but not into another
+  (42501);
+- client updates and deletes affect 0 rows;
+- the immutability trigger refuses a service-role edit (23514).
+
+Nothing persisted, as a follow-up count confirmed. Security advisors after
+0108 show no new findings.
+
+The connector framework also gets a live contract test,
+`modules/integrations/framework/live.test.ts`. It is skipped unless
+`CONNECTOR_LIVE_FILE` is set, and it is run by hand against the Planet
+Express demo company (10/10 connectors pass). Recorded in the Integration
+audit log.
