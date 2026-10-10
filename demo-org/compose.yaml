@@ -287,7 +287,7 @@ services:
     command: [server, -config=/etc/openbao/bao.hcl]
     volumes:
       - ./openbao/bao.hcl:/etc/openbao/bao.hcl:ro
-      - openbao-data:/openbao/data
+      - openbao-data:/openbao/file
     networks: [corp]
 
   # ---------- Workloads (Kubernetes) ----------

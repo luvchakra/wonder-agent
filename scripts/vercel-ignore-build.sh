@@ -6,7 +6,8 @@
 #   off, as the project was already configured (the owner tests on production).
 # - A production deploy is skipped when nothing the app is built from changed
 #   since the last deployment: docs, tests, CI, Supabase migrations (applied
-#   separately) and maintenance scripts never change what Vercel serves.
+#   separately), maintenance scripts and the demo organization's kit
+#   (demo-org/) never change what Vercel serves.
 # - Any doubt (no previous deployment, its commit not in the shallow clone)
 #   builds. Skipping is only an optimisation; building is always safe.
 
@@ -38,7 +39,7 @@ fi
 
 if git diff --quiet "$prev" HEAD -- . \
   ':(exclude)docs' ':(exclude)tests' ':(exclude)*.md' ':(exclude).github' \
-  ':(exclude)supabase' ':(exclude)scripts' ':(exclude).claude' \
+  ':(exclude)supabase' ':(exclude)scripts' ':(exclude).claude' ':(exclude)demo-org' \
   ':(exclude)playwright.config.ts' ':(exclude)vitest.config.ts' ':(exclude)vitest.setup.ts' \
   ':(exclude)**/*.test.ts' ':(exclude)**/*.test.tsx'; then
   echo "Only docs, tests, CI, migrations or scripts changed since ${prev:0:7}; skipping."

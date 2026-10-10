@@ -1798,3 +1798,25 @@ migration themselves in the Supabase SQL editor.
 - all 7 connections are still present, all `connector`.
 
 **Recorded:** the INTEGRATION-P0-16 tracker row is updated.
+
+### 2026-10-10 — Planet Express kit: OpenBao could not write its data
+
+The owner's first `create-vm.sh` run stopped after "Frappe HR ready", while
+`up.sh` waited for OpenBao.
+
+- **Cause.** `bao.hcl` stored Raft data in `/openbao/data`, a named volume.
+  The image has no such folder, so Docker creates it owned by root. The
+  entrypoint gives only `/openbao/config`, `/openbao/logs` and
+  `/openbao/file` to the `openbao` user it runs as, so OpenBao could not
+  write its data and kept restarting. (Read from OpenBao 2.7.1's
+  `.release/docker/docker-entrypoint.sh`.)
+- **Fix.** Raft data and the volume now live in `/openbao/file`.
+- **Existing VM.** Repair it by handing the folder over once, then re-run
+  `up.sh`:
+
+  ```
+  docker compose run --rm --no-deps --user root --entrypoint chown openbao -R openbao:openbao /openbao/data
+  ```
+
+- `scripts/vercel-ignore-build.sh` also skips production builds for
+  `demo-org/` changes, which never change the app.
