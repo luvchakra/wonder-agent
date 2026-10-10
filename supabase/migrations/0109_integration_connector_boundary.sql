@@ -19,12 +19,15 @@
 --      never call, becomes https://…/mcp); its stored secret keeps working
 --      for discovery and becomes the connection's receiving secret.
 --    - generic_rest pointing at Zendesk: the zendesk definition; its stored
---      secret (one string) cannot hold Zendesk's two fields, so it is
---      removed and the connection waits for new credentials.
+--      secret (one string) cannot hold Zendesk's two fields, so the
+--      connection waits for new credentials.
 --    - anything else on a retired type is disabled, its old settings kept
 --      under config.legacy for the record.
--- 3. The retired integration types are removed, so nothing can be created
---    on them again.
+-- 3. The retired integration types stay in integration_types for now: no
+--    code creates or runs them any more (registry.ts refuses them). Deleting
+--    rows is left to a later migration because the database tool refused
+--    statements that delete (2026-10-10), so this migration only adds and
+--    updates.
 
 create table connector_receivers (
   integration_id uuid primary key references integrations(id) on delete cascade,
@@ -46,10 +49,6 @@ insert into connector_receivers (integration_id, tenant_id, encrypted_secret, cr
 select c.integration_id, c.tenant_id, c.encrypted_secret, c.created_at
 from integration_credentials c join integrations i on i.id = c.integration_id
 where i.integration_type_id in ('mcp', 'webhook');
-
--- A webhook's stored secret was only ever its signing secret.
-delete from integration_credentials c using integrations i
-where i.id = c.integration_id and i.integration_type_id = 'webhook';
 
 with targets as (
   select i.id,
@@ -80,9 +79,9 @@ set integration_type_id = 'connector',
 from targets t
 where i.id = t.id and t.key is not null;
 
--- Zendesk needs two secret fields; the old single secret cannot be used.
-delete from integration_credentials c using integrations i
-where i.id = c.integration_id and i.integration_type_id = 'connector' and i.config->'definition'->>'key' = 'zendesk';
+-- Zendesk needs two secret fields, so its old single secret cannot be used:
+-- the connection waits for new credentials (the stale row is replaced when
+-- they are entered).
 update integrations set status = 'configured'
 where integration_type_id = 'connector' and config->'definition'->>'key' = 'zendesk';
 
@@ -93,5 +92,3 @@ set config = jsonb_build_object('legacy', jsonb_build_object('type', integration
     status = 'disabled'
 where integration_type_id in ('saviynt', 'mcp', 'generic_rest', 'webhook');
 
--- 3. Retire the types.
-delete from integration_types where id in ('saviynt', 'mcp', 'generic_rest', 'webhook');
