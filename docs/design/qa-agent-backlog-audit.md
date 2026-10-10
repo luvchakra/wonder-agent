@@ -1315,3 +1315,15 @@ test branches (#18).
   shared database, while a run on Vercel is in progress. The suites share
   the same test users, and their setup signs those users in again, which
   ends the other run's sessions.
+
+### 2026-10-10 — Nightly E2E paused
+
+- The owner cancelled the second half of the clean run and asked for no
+  more runs for now.
+- The nightly schedule in `e2e.yml` is commented out. A run can still be
+  started by hand.
+- The other Vercel project (`kunals-projects-9f64757f/wonder-id`) is the
+  owner's, and the owner has paused it.
+- The one open issue is the sign-in screenshot baselines for the Vercel
+  builder (Amazon Linux rendering). Restore the schedule once they are
+  recorded.
