@@ -36,6 +36,9 @@ import {
   Globe,
   Server,
   UserPlus,
+  Building2,
+  SlidersHorizontal,
+  UserRound,
   type LucideIcon,
 } from "lucide-react";
 
@@ -46,6 +49,9 @@ import {
  * layout can pass it straight into client components.
  */
 const ICONS: Record<string, LucideIcon> = {
+  Building2,
+  SlidersHorizontal,
+  UserRound,
   Globe,
   Server,
   UserPlus,

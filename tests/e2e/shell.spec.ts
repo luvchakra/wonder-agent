@@ -9,7 +9,8 @@ import { authFile } from "./support/testUsers";
  * are an accordion (the current one opens by itself) with groups nested
  * inline; collapsed, it becomes an icon rail whose sections open flyouts,
  * a group opening as a third-level flyout. The current page carries
- * aria-current="page".
+ * aria-current="page". Organization administration has its own sidebar,
+ * opened from "Admin", the main sidebar's last entry (2026-10-10).
  */
 test.describe("customer shell", () => {
   test.use({ storageState: authFile("adminOne") });
@@ -29,11 +30,34 @@ test.describe("customer shell", () => {
     await expect(nav.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
   });
 
+  test("Admin is the main sidebar's last entry and opens the Admin sidebar, with a way back home", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    const main = page.getByRole("navigation", { name: "Main" });
+    const entries = main.locator(":scope > ul > li");
+    await expect(entries.first()).toContainText("Home");
+    await expect(entries.last()).toContainText("Admin");
+    // Administration lives only in the Admin sidebar.
+    await expect(main.getByRole("button", { name: "Integrations" })).toHaveCount(0);
+
+    await main.getByRole("link", { name: "Admin" }).click();
+    await expect(page).toHaveURL("/settings");
+    const admin = page.getByRole("navigation", { name: "Admin" });
+    await expect(admin.getByRole("heading", { name: "Admin" })).toBeVisible();
+    await expect(admin.getByRole("button", { name: "Integrations" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(0);
+
+    await admin.getByRole("link", { name: "Back to Home" }).click();
+    await expect(page).toHaveURL("/");
+    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Admin" })).toBeVisible();
+  });
+
   test("the current section opens by itself, and the others stay closed", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/settings/roles");
-    const nav = page.getByRole("navigation", { name: "Main" });
-    await expect(nav.getByRole("button", { name: "Permissions (WonderID)" })).toHaveAttribute("aria-expanded", "true");
+    // An admin page shows the Admin sidebar.
+    const nav = page.getByRole("navigation", { name: "Admin" });
+    await expect(nav.getByRole("button", { name: "Users & Permissions" })).toHaveAttribute("aria-expanded", "true");
     await expect(nav.getByRole("link", { name: "WonderID Roles" })).toHaveAttribute("aria-current", "page");
     // Another section's pages stay collapsed.
     await expect(nav.getByRole("link", { name: "Sync Jobs" })).toHaveCount(0);

@@ -30,7 +30,7 @@ export { BrowserFrame, PhoneFrame } from "./ProductShot";
 export { FlowDiagram } from "./FlowDiagram";
 export { AppSidebar, MobileNavDrawer, MobileNavTrigger, openMobileNav, type SidebarUser } from "./AppSidebar";
 export { MobileTabBar } from "./MobileTabBar";
-export { SHELL_NAV, MOBILE_TABS, isNavItemActive, activeChildHref, type ShellNavItem, type ShellNavLink, type ShellBadgeCounts } from "./shell-nav";
+export { SHELL_NAV, ADMIN_NAV, MOBILE_TABS, navFor, isAdminPath, adminLanding, isNavItemActive, activeChildHref, type ShellNavItem, type ShellNavLink, type ShellBadgeCounts } from "./shell-nav";
 export { NavIcon } from "./NavIcon";
 export { AccountPanel, type TenantOption } from "./AccountPanel";
 export { KpiCard, type KpiTone } from "./KpiCard";
