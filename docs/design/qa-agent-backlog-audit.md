@@ -1267,3 +1267,26 @@ pipeline on Vercel:
 The remaining failures in that run came from the Vercel Toolbar script that
 Preview builds inject, which the app's CSP blocks. It is switched off for the
 test build (#16).
+
+### 2026-10-10 — The other Vercel project, and fuller failure output
+
+- A second Vercel project (`kunals-projects-9f64757f/wonder-id`) is connected
+  to this repository.
+  - It started building the test branches too, and failed, because it has
+    none of the suite's variables.
+  - It posts its status under the same name ("Vercel – wonder-id"), so the
+    workflow read its failure as the suite's result.
+  - Fixed in three places:
+    - the ignore script builds the test branches only in this project
+      (`VERCEL_PROJECT_ID`, or the service role key being present);
+    - the test build stops at once without those variables;
+    - the workflow reads only statuses linking to
+      `luvchakras-projects/wonder-id`.
+- First two-half result, half 1: 182 passed, 2 failed, 3 skipped, 30 min.
+  - `branding.spec.ts:47`: the sign-in screenshot baseline was recorded on
+    Ubuntu, and the Vercel builder runs Amazon Linux, so text renders
+    differently there.
+  - `gateway-enforcement.spec.ts:83`: `toHaveURL` after registering an
+    agent. The spec passes locally, 11/11 on the same commit. The
+    difference is under investigation; the summary now prints six lines of
+    each error to show where the page went.
