@@ -1462,3 +1462,27 @@ started for most pull requests, UI work included.
 - **Unchanged.** The nightly full suite still runs every night, and a red
   nightly run is still fixed before anything else merges.
 - **Where.** `CLAUDE.md` §17.8 and `docs/ORCHESTRATION.md` §3.
+
+### 2026-10-10 — Vercel's daily deployment limit blocked production
+
+At 13:16 UTC Vercel refused every deployment: "Resource is limited — try
+again in 24 hours (more than 100, code: api-deployments-free-per-day)".
+That covered the production deploys of PR #30 (sidebar) and PR #33, PR #32's
+preview and its E2E run.
+
+- **Cause.** Of the last 100 deployments (06:51–13:12 UTC):
+  - 68 were builds the ignore script cancelled: 51 on working branches and
+    17 docs-only pushes to main. A cancelled deployment still counts toward
+    the free plan's 100 a day.
+  - 12 were E2E runs, 13 were production builds that went live, and 1 was a
+    preview that went live; 6 had states the listing cut off.
+- **Fix.** `vercel.json` `git.deploymentEnabled` turns off deployments for
+  `claude/**` and `module/**` branches. Previews were already off by
+  design, so nothing is lost. Production (`main`) and the `e2e/nightly*`
+  branches still deploy.
+- **Also.** Pre-merge E2E runs are limited to security-sensitive changes
+  (previous entry).
+- **Still to do once the window frees.**
+  - Redeploy production, so #30 and #33 go live.
+  - The nightly run may be refused tonight; if so, it is re-run, not
+    treated as a test failure.
