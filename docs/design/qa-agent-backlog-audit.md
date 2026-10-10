@@ -1424,3 +1424,23 @@ marker commit on `e2e/nightly` with `specs: tests/e2e/file-import.spec.ts`).
     - another organization and a read-only member are refused.
 - PR CI (typecheck, lint, test, security) was green. `next build` passed
   locally.
+
+### 2026-10-10 — Vercel Toolbar back in the test build: the switch moved
+
+The run of the sidebar specs for PR #30 (deployment
+`DnfiK9hmUTgoG5emJyk6EHMa4HRW`) failed `navigation-smoke.spec.ts` on almost
+every route. Each page logged the same console error: the CSP blocked
+`https://vercel.live/_next-live/feedback/feedback.js`.
+
+- **Cause.** Vercel now builds Next.js 16 through its build adapter
+  (`@vercel/next` 22, "Applying modifyConfig from Vercel" in the log). The
+  adapter injects the toolbar into every page through
+  `instrumentationClientInject` when `VERCEL_PREVIEW_COMMENTS_ENABLED=1`. The
+  older builder read `VERCEL_PREVIEW_FEEDBACK_ENABLED`, which is the only
+  variable PR #16 switched off.
+  - The clean two-half run earlier today came before the change.
+- **Fix.** `scripts/e2e-on-vercel.sh` now also exports
+  `VERCEL_PREVIEW_COMMENTS_ENABLED=0`, for the test build only. Production
+  never carries the script, and the app's CSP is unchanged.
+- The result of the re-run is recorded in the experience audit log's
+  sidebar entry.

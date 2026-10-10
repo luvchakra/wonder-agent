@@ -45,8 +45,12 @@ fi
 log "Building the app"
 # A Preview build adds the Vercel Toolbar's script to every page; the app's
 # CSP rightly blocks it, and the suite fails on that console error. Production
-# builds never carry it, so it is switched off for this build only.
+# builds never carry it, so it is switched off for this build only. Vercel's
+# Next.js build adapter (@vercel/next, `modifyConfig`) injects it when
+# VERCEL_PREVIEW_COMMENTS_ENABLED is 1; the older builder read
+# VERCEL_PREVIEW_FEEDBACK_ENABLED. Both are switched off.
 export VERCEL_PREVIEW_FEEDBACK_ENABLED=0
+export VERCEL_PREVIEW_COMMENTS_ENABLED=0
 npm run build || { log "next build failed"; exit 1; }
 
 SPECS=""
