@@ -2631,3 +2631,19 @@ The owner decided Supabase Auth's leaked-password protection stays off. It
 is no longer an open item. The security advisor's warning for it is
 accepted. CLAUDE.md §18.1 and `docs/security/SECURITY-CONTROLS.md` now say
 so.
+
+### 2026-10-10 — Google sign-in enabled; `security.txt` contact set (owner)
+
+**Google sign-in: closed.** The owner set up the Google sign-in steps
+recorded above, so the item is closed:
+- a Google OAuth client;
+- the Google provider turned on in Supabase;
+- the redirect URLs.
+
+**`security.txt`:** filled in with the owner's details (`public/.well-known/security.txt`).
+- `Contact` is `mailto:connect@wonderapps.biz`, given by the owner.
+- `Policy` and `Canonical` now point at the production domain,
+  `id.wonderapps.biz`; they were `wonderid.example` placeholders.
+- `Expires` stays 2027-10-01, under a year away.
+- `docs/security/SECURITY-CONTROLS.md` no longer lists the contact as an
+  owner action.

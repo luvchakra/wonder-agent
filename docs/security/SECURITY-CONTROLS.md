@@ -92,8 +92,9 @@ them under the ePrivacy rules.
   payloads and error text (`lib/security/redact.ts`).
 - CI: `.github/workflows/security.yml` runs typecheck, lint, unit tests,
   `npm audit --omit=dev --audit-level=high` and a committed-secret scan.
-- `/.well-known/security.txt` (RFC 9116) for vulnerability reports. Replace
-  the placeholder contact before production.
+- `/.well-known/security.txt` (RFC 9116) for vulnerability reports. Keep its
+  `Expires` date under a year away (now 2027-10-01).
 - **Won't do (owner decision, 2026-10-10):** Supabase Auth leaked-password
   protection stays off; the advisor warning is accepted.
-- **Owner action required.** Set a real `security.txt` contact.
+- `security.txt` contact set to `connect@wonderapps.biz` (owner, 2026-10-10), with
+  the policy and canonical addresses on `id.wonderapps.biz`.
