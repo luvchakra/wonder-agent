@@ -1529,3 +1529,23 @@ The "share its Vercel preview URL" steps were dropped. Working branches have
 had no previews since PR #34.
 
 This change is itself waiting for "merge now".
+
+### 2026-10-10 — Nightly E2E did not run (GitHub schedule did not fire)
+
+The 21:30 UTC scheduled run of `e2e.yml` had not started by 22:45 UTC: the
+latest run is a manual one at 10:18 UTC, and the newest builds on
+`e2e/nightly-1` and `e2e/nightly-2` are from this morning's 09:01 UTC run.
+GitHub delays or drops scheduled runs under load; the workflow and its cron
+(`30 21 * * *`) are unchanged.
+
+Not started by hand: the project had 82 deployments in the last 24 hours,
+above §19.9's limit of 70 for E2E runs (34 were cancelled builds of an old
+working branch early in the day). A check-in at about 02:00 UTC reads the
+run if GitHub started it late; otherwise it starts the nightly by hand once
+the count is under 70.
+
+Known state for the next run: three tests that would have failed tonight
+were fixed in #39 (two sign-in provider tests left stale by #31, and two
+"AI Agents" heading lookups made ambiguous by the sidebar's area menu, #38);
+the file-import spec has not yet run in the full suite on Vercel.
+
