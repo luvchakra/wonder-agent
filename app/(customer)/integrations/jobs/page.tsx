@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getJobStatusSummary } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardHeader, CardBody, EmptyState, TableContainer, Thead, Th, Td, Tr, type BadgeTone } from "@/modules/ui";
+import { Badge, Card, CardHeader, CardBody, EmptyState, TableContainer, Thead, Th, Td, Tr, type BadgeTone, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   succeeded: "success",
@@ -32,9 +33,12 @@ export default async function JobStatusPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">Job Status</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Connector sync/job health across every integration in this tenant.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold text-foreground">Job Status</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Connector sync/job health across every integration in this tenant.</p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["sync-jobs"])} />
       </div>
 
       <Card>

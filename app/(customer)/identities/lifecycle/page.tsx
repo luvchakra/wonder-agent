@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listLifecycleTasks } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { LIFECYCLE_EVENT_LABEL, LIFECYCLE_TASK_LABEL } from "../labels";
 
 // IDENTITY-P0-18 — the organization's lifecycle work: what joiners,
@@ -35,12 +36,15 @@ export default async function LifecycleWorkPage({ searchParams }: { searchParams
         <span aria-hidden> / </span>
         <span className="text-foreground">Lifecycle work</span>
       </nav>
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Lifecycle work</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Joiners, movers, leavers and rehires open governed work here. Nothing is granted or removed automatically: each task is done by a
-          person and closed with a note, on the person&apos;s Lifecycle tab.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Lifecycle work</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Joiners, movers, leavers and rehires open governed work here. Nothing is granted or removed automatically: each task is done by a
+            person and closed with a note, on the person&apos;s Lifecycle tab.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["lifecycle-tasks"])} />
       </div>
       <Card className="p-4">
         <nav className="-mx-1 flex gap-1 border-b border-border" aria-label="Task views">

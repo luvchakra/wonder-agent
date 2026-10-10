@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAttributeDefinitions } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { AttributeActiveButton, AttributeDefinitionForm } from "../IdentityForms";
 import { IDENTITY_TYPE_LABEL } from "../labels";
 
@@ -25,12 +26,15 @@ export default async function IdentityAttributesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Identity attributes</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Fields your organization adds to identities, such as cost center or region. Values are checked against the type and rules
-          here whenever an identity is saved.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Identity attributes</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Fields your organization adds to identities, such as cost center or region. Values are checked against the type and rules
+            here whenever an identity is saved.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["identity-attributes"])} />
       </div>
 
       <Card>

@@ -4,7 +4,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { buildNhiInventory } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { NhiInventoryEntry, NhiStatus } from "@/lib/shared/types/agent-identity";
-import { Badge, Card, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
+import { Badge, Card, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 
 // IDENTITY-P0-11 (master P0-08) — the non-human identity inventory: every
 // service account, workload, OAuth client, API key and MCP server identity
@@ -87,9 +88,12 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
             are not AI agents; each unlinked identity shows how likely it is to be one.
           </p>
         </div>
-        <LinkButton href="/agents/discovery" variant="outline" size="sm">
-          Discovery inbox
-        </LinkButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["non-human-identities"])} />
+          <LinkButton href="/agents/discovery" variant="outline" size="sm">
+            Discovery inbox
+          </LinkButton>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

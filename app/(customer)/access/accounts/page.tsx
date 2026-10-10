@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ACCOUNT_VIEWS, DORMANT_WINDOWS, getAccountSummary, getApplicationDetail, listAccountInventory, parseDormantDays, type AccountView } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, SelectField, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, SelectField, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { cn } from "@/lib/utils";
 import { ACCOUNT_TYPE_LABEL, CORRELATION_LABEL, IDENTITY_TYPE_LABEL, VIEW_LABEL, when } from "./labels";
 
@@ -60,20 +61,23 @@ export default async function AccountInventoryPage({
 
   return (
     <div className="space-y-5">
-      <div className="min-w-0">
-        {app ? (
-          <nav aria-label="Breadcrumb" className="mb-1 text-xs text-muted-foreground">
-            <Link href={`/access/applications/${app.id}`} className="hover:text-foreground hover:underline">
-              {app.displayName ?? app.name}
-            </Link>
-            <span aria-hidden> / </span>
-            <span className="text-foreground">Accounts</span>
-          </nav>
-        ) : null}
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{app ? `${app.displayName ?? app.name} accounts` : "Accounts"}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Every account in a governed application and who it belongs to. An orphan has no owner; a dormant account has not been used in {days} days.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          {app ? (
+            <nav aria-label="Breadcrumb" className="mb-1 text-xs text-muted-foreground">
+              <Link href={`/access/applications/${app.id}`} className="hover:text-foreground hover:underline">
+                {app.displayName ?? app.name}
+              </Link>
+              <span aria-hidden> / </span>
+              <span className="text-foreground">Accounts</span>
+            </nav>
+          ) : null}
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{app ? `${app.displayName ?? app.name} accounts` : "Accounts"}</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Every account in a governed application and who it belongs to. An orphan has no owner; a dormant account has not been used in {days} days.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["accounts"])} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">

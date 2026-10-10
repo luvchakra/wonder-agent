@@ -4,7 +4,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents, listOwnersForTenant } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, KpiCard, LinkButton } from "@/modules/ui";
+import { Card, KpiCard, LinkButton, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { AgentsTable, type AgentRow } from "./AgentsTable";
 
 // EXPERIENCE-P0-08 — the agent inventory. Rebuilt 2026-09-25 to the
@@ -95,6 +96,7 @@ export default async function AgentsPage() {
           <LinkButton href="/agents/duplicates" variant="outline" size="sm">
             Duplicate review
           </LinkButton>
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["agents"])} />
           <LinkButton href="/agents/new" size="sm">
             + Register agent
           </LinkButton>

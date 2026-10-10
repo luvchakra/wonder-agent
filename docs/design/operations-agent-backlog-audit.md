@@ -829,3 +829,73 @@ suppressible. They are produced by `modules/billing/webhooks.ts` and
 `wasRecentlyNotified()`, addressed to permission holders, not broadcast.
 Nothing in Operations' own code changed. This was done under the user's
 explicit request. Recorded here per non-negotiable #14.
+
+---
+
+## 2026-10-10 — Object-page CSV export (`/api/v1/exports/:object`)
+
+User requirement: "csv should be allowed to be imported in the ui directly
+for each object, page for each object should have an action drop down with
+import and export options." This entry is the export half and the import
+templates. The import itself (`POST /api/v1/imports`, through the connector
+framework, non-negotiable #20) is the Integration Agent's.
+
+**Built:**
+
+- `modules/operations/exportRegistry.ts`: one entry per object list page,
+  30 in all. Each entry has a source (a tenant table, or for two computed
+  inventories the owning module's published service), its columns (header
+  → field, with optional same-tenant id → name lookups), the page's own
+  read permission and the audit prefix. `objectActionsFor()` gives each
+  page the items of its Actions menu. Importable kinds (identity, account,
+  entitlement, access_grant, application) export under the framework's
+  `CANONICAL_FIELDS` names, so an exported file imports back unchanged.
+  The template header comes from `CANONICAL_FIELDS`.
+- `modules/operations/csvWriter.ts`: RFC 4180 quoting with CRLF line ends,
+  a UTF-8 BOM, and a formula-injection guard. A text cell that starts with
+  `= + - @`, a tab or CR gets a leading `'`. Numbers and booleans are written
+  as they are.
+- `modules/operations/exports.ts` and `app/api/v1/exports/[object]/route.ts`:
+  - The tenant comes from `requirePermission()` only.
+  - The caller needs the page's read permission **and** `report.export`, as
+    every other export path here does.
+  - Reads use the user-scoped client (RLS) plus an explicit `tenant_id`
+    filter. Roles also include the built-in (`tenant_id is null`) rows the
+    page lists.
+  - Rows are range-paged at the database 1,000 at a time and stop at 50,000
+    (`X-Export-Row-Cap`). A truncated file says so on its last line.
+  - The first page is read before the response starts, so a failing query
+    returns an error status, not a cut-off 200.
+  - Responses are `Content-Disposition: attachment` with a dated name and
+    `Cache-Control: no-store`.
+  - Each export writes an audit event `<module>.exported` with the object,
+    row count, filters and truncation flag, on success, failure or cancel
+    (#11).
+  - `?template=1` returns only the canonical header row, and needs only the
+    read permission.
+- The identity directory views pass their `status` filter through, checked
+  against an allow-list. Other page filters are not applied (the export is
+  the whole list).
+- The audit page's old "Export CSV" link (to `/api/v1/audit/export`) is
+  replaced by the menu. That route is kept for existing callers.
+
+**Not exportable (no menu):**
+
+- `/settings/users`: the directory is served only through a service-role
+  RPC, and this export never uses the service role.
+- Review queues and derived views: `/agents/discovery`, `/agents/duplicates`,
+  `/integrations/correlations`, `/risk/rogue` (findings cover it),
+  `/access/catalog`.
+- `/integrations/connectors`, which is the product catalog, not tenant
+  records.
+- Dashboards and settings pages.
+
+**Verified:**
+
+- `npx vitest run modules/ui modules/operations lib tests/architecture app`:
+  287/287. New tests: csvWriter 7, exportRegistry 13, importCsv 8,
+  ObjectActionsMenu 2.
+- eslint clean on every changed file.
+- `tsc --noEmit` is clean except the `@/assets/*.png` declarations, which
+  need the build-generated `next-env.d.ts` that this worktree lacks.
+- No migration. No database access.

@@ -4,7 +4,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listPackages } from "@/modules/access-governance/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, LinkButton, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, LinkButton, fieldInputClass, fieldLabelClass, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { cn } from "@/lib/utils";
 import { APPROVAL, RISK_TONE, STATUS_TONE } from "./labels";
 
@@ -46,11 +47,14 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Access packages</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Bundles of access for a job or a purpose — requested, approved, granted and removed together.</p>
         </div>
-        {canManage ? (
-          <LinkButton href="/access/packages/new" size="sm">
-            New package
-          </LinkButton>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["access-packages"])} />
+          {canManage ? (
+            <LinkButton href="/access/packages/new" size="sm">
+              New package
+            </LinkButton>
+          ) : null}
+        </div>
       </div>
 
       {canManage ? (

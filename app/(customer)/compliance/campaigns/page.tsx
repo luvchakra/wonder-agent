@@ -3,7 +3,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listCampaigns, listCampaignItems } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { launchCampaignAction } from "@/app/actions/compliance";
-import { Card, CardHeader, CardBody, Button, TextField, SelectField } from "@/modules/ui";
+import { Card, CardHeader, CardBody, Button, TextField, SelectField, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CampaignsList, type CampaignRow } from "./CampaignsList";
 
 export default async function CampaignsPage() {
@@ -36,11 +37,14 @@ export default async function CampaignsPage() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Certification</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Campaigns that put a named human behind every agent&rsquo;s access.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Certification</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Campaigns that put a named human behind every agent&rsquo;s access.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["campaigns"])} />
       </div>
 
       <CampaignsList campaigns={rows} />

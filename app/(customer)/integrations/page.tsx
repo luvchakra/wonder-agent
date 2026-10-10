@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listIntegrations } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardHeader, CardBody, LinkButton } from "@/modules/ui";
+import { Card, CardHeader, CardBody, LinkButton, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { IntegrationsTable } from "./IntegrationsTable";
 
 export default async function IntegrationsPage() {
@@ -17,9 +18,12 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-foreground">Integrations</h1>
-        <LinkButton href="/integrations/connectors">+ Connect a system</LinkButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["integrations"])} />
+          <LinkButton href="/integrations/connectors">+ Connect a system</LinkButton>
+        </div>
       </div>
 
       <Card>

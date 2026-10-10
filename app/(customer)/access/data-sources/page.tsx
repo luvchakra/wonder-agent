@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listApplications, listDataSources, listEntitlementsForTenant } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, TableContainer, Td, Th, Thead, Tr, type BadgeTone, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CreateDataSourceForm, LinkEntitlementForm, ReclassifyForm } from "./DataSourceForms";
 
 // ACCESS-P0-13 (master P0-11) — where data lives and which agents can
@@ -50,12 +51,15 @@ export default async function DataSourcesPage() {
         <span className="text-foreground">Data sources</span>
       </nav>
 
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Data sources</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Where your data lives, how it is classified, and which agents can technically reach it (CAN) through the entitlements
-          that open it.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Data sources</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Where your data lives, how it is classified, and which agents can technically reach it (CAN) through the entitlements
+            that open it.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["data-sources"])} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

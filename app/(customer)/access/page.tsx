@@ -11,7 +11,8 @@ import {
   type ApplicationType,
   type CatalogLevel,
 } from "@/lib/shared/types/access-governance";
-import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, SelectField, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, SelectField, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL } from "./applications/labels";
 
 // ACCESS-P0-15 — the application catalog and inventory. Filters and paging
@@ -68,7 +69,8 @@ export default async function ApplicationInventoryPage({
             Every application this organization governs access to: who owns it, how sensitive it is, and where it is in onboarding.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["applications", "entitlements", "access-grants"])} />
           <LinkButton href="/access/requests" variant="outline" size="sm">
             Access requests
           </LinkButton>

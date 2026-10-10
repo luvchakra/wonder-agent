@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { DISCOVERY_STATUSES, getDiscoveryCounts, listDiscoveries, listIntegrations, type DiscoveryStatus } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { cn } from "@/lib/utils";
 import { DiscoverFromConnectorForm, SubmitDiscoveryForm } from "./DiscoveryForms";
 import { DISCOVERY_SOURCE_LABEL, DISCOVERY_STATUS_LABEL, when } from "./labels";
@@ -56,11 +57,14 @@ export default async function ApplicationDiscoveryPage({ searchParams }: { searc
 
   return (
     <div className="space-y-5">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Application discovery</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Applications found by connectors, API documents and people, matched to the catalog. An unrecognized application waits for someone to register it, link it, record an exception or ignore it with a reason.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Application discovery</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Applications found by connectors, API documents and people, matched to the catalog. An unrecognized application waits for someone to register it, link it, record an exception or ignore it with a reason.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["application-discoveries"])} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

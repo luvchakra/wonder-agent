@@ -3291,3 +3291,52 @@ difference is the two buttons.
   yearly INR), the NHI panel, the product grid (dark), and the header at
   1024 and 1440.
 - No horizontal overflow at 390 or 1440.
+
+---
+
+## 2026-10-10 — Actions menu (CSV export and import) on every object list page
+
+User requirement: every object page gets an action drop-down with import and
+export. What changed:
+
+- `modules/ui/ObjectActionsMenu.tsx`: a Radix DropdownMenu with an outline
+  "Actions" trigger, placed in the page header next to the primary action.
+  It is the only new control on each page, and it renders nothing when the
+  viewer has no item. Its items come from Operations'
+  `objectActionsFor()`:
+  - "Export CSV", when the viewer has the page's read permission and
+    `report.export`;
+  - "Import CSV…", for identity, account, entitlement, access_grant and
+    application, when the viewer has `integration.execute`.
+- Import opens a Radix Dialog:
+  - a `.csv` file input, up to 10 MB, checked before upload;
+  - one line naming the required canonical columns, with a link to the
+    template;
+  - a submit button that is disabled and spins while uploading.
+- The dialog POSTs to `/api/v1/imports`. `modules/ui/importCsv.ts` maps the
+  answer to what the dialog shows:
+  - 202: "Import started — N rows", with a link to Jobs. The import has
+    started; nothing is shown as finished.
+  - 400: the message and up to five row/column details.
+  - Anything else: a failure with the server's message.
+  - A 202 without a row count is shown as a failure.
+- Pages with a menu:
+  - Agents: agents and non-human identities.
+  - Identities: all, people, external and machine identities; lifecycle
+    work; attributes.
+  - Access: applications (one menu with applications, entitlements and
+    access grants), accounts, requests, packages, request policies and
+    data sources.
+  - Governance and operations: policies, risk findings, investigations,
+    runtime events, the audit trail, certification campaigns.
+  - Integrations: integrations, jobs, identity sources, application
+    discovery and MCP servers.
+  - Settings: groups, roles and authorization policies.
+- Headers that had no action area now wrap with
+  `flex flex-wrap items-start justify-between gap-3`, so the menu drops
+  below the title on a phone.
+- The menu uses only theme tokens (`popover`, `accent`, `border`), so it
+  follows light and dark mode. It is keyboard-operable through Radix.
+
+Verification is in the Operations audit entry of the same date. Not checked
+in a browser: this session runs no dev server.

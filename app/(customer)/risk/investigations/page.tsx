@@ -6,7 +6,8 @@ import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings, listInvestigations } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { InvestigationStatus } from "@/lib/shared/types/risk";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, SeverityBadge, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, SeverityBadge, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CreateInvestigationForm } from "./InvestigationForms";
 import { STATUS_BADGE } from "./labels";
 import { isFindingOpen } from "@/modules/risk/investigationRules";
@@ -62,12 +63,15 @@ export default async function InvestigationsPage({ searchParams }: { searchParam
         <span className="text-foreground">Investigations</span>
       </nav>
 
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Investigations</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Related findings grouped into one tracked piece of work, with an owner and a timeline. An investigation is resolved only once
-          none of its findings is still open.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Investigations</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Related findings grouped into one tracked piece of work, with an owner and a timeline. An investigation is resolved only once
+            none of its findings is still open.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["investigations"])} />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
