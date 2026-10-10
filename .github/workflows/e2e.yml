@@ -27,6 +27,11 @@ on:
         description: "Spec files to run (space-separated); empty runs the full suite"
         required: false
         default: ""
+      record_baselines:
+        description: "Record missing screenshot baselines for the Vercel builder (with chosen specs only); they are published with the preview deployment for review"
+        type: boolean
+        required: false
+        default: false
 
 concurrency:
   group: e2e
@@ -54,6 +59,7 @@ jobs:
         id: push
         env:
           SPECS: ${{ inputs.specs }}
+          RECORD: ${{ inputs.record_baselines }}
         run: |
           git config user.name "luvchakra"
           git config user.email "luvchakra@gmail.com"
@@ -67,7 +73,9 @@ jobs:
             shas="$shas $(git rev-parse HEAD)"
           }
           if [ -n "$SPECS" ]; then
-            mark e2e/nightly "E2E run on Vercel ($stamp)" "specs: $SPECS"
+            body="specs: $SPECS"
+            if [ "$RECORD" = "true" ]; then body="$body"$'\n'"record-baselines: yes"; fi
+            mark e2e/nightly "E2E run on Vercel ($stamp)" "$body"
           else
             mark e2e/nightly-1 "Nightly E2E run on Vercel, half 1 of 2 ($stamp)"
             mark e2e/nightly-2 "Nightly E2E run on Vercel, half 2 of 2 ($stamp)"

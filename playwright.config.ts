@@ -47,6 +47,14 @@ const BASE_URL = EXTERNAL_BASE_URL ?? `http://localhost:${PORT}`;
 export default defineConfig({
   testDir: "./tests/e2e",
   outputDir: "./test-results",
+  // Screenshot baselines are per rendering environment: the same page
+  // rasterizes text slightly differently on Ubuntu (local, `*-linux.png`)
+  // and on the Vercel build machine (Amazon Linux, `*-linux-vercel.png`,
+  // E2E_SNAPSHOT_ENV=vercel set by scripts/e2e-on-vercel.sh). Each
+  // environment is compared with its own recording, at the same tolerance.
+  ...(process.env.E2E_SNAPSHOT_ENV
+    ? { snapshotPathTemplate: `{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}{-projectName}{-snapshotSuffix}-${process.env.E2E_SNAPSHOT_ENV}{ext}` }
+    : {}),
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
