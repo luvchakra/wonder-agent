@@ -1470,3 +1470,58 @@ framework". Asked directly, the user also decided:
 It changes live rows (the four WonderArk connections) and removes the
 retired types. The change must not merge until it is applied, so the pull
 request is a draft.
+
+## 2026-10-10 — Connection types and connections: Integrations on two levels
+
+User request: "connections need to be on 2 levels, first a menu of
+connection types, where all the connection types with protocol details will
+be listed / another menu, connections, which will use these defined types to
+create an actual connection."
+
+Built on the connector-boundary work above (the `receive` spec, the `mcp`
+and `none` drivers, every connection of type `connector`).
+
+**What changed:**
+
+- `framework/typeSummary.ts` (new, pure): `describeConnectionType()` turns a
+  definition into its protocol details:
+  - protocol per driver: `http` HTTP REST, `mcp` MCP (Streamable HTTP),
+    `ldap` LDAP v3 (LDAPS), `sql` SQL (PostgreSQL, TLS), `none` Receive only;
+  - the authentication method, with the labels of its secret fields and the
+    header or query parameter that carries a key (never a value or a
+    `{secret.}` template);
+  - pagination styles, what it reads (canonical kinds in plain words),
+    settings, rate limit (default 10), origin, vendor and API reference;
+  - what it receives, from `def.receive`: each channel with its paths under
+    `/api/connect/v1/<connection>/` and how the sender authenticates
+    (receiving secret as bearer, HMAC-SHA256 with its signature header, or
+    the agent's own API key for the Runtime Gateway).
+
+  `connectionTypeOf()` names and links the type a connection was created
+  from, from its snapshot or, without one, from the built-in in code; a
+  config naming no definition shows "Connector", unlinked.
+- The screen folder's `labels.ts` (`CATEGORY_LABEL`, `RESOURCE_LABEL`,
+  `RECEIVE_LABEL`, `connectorSummary()`) moved into `typeSummary.ts`
+  unchanged, so there is one copy of the wording.
+- `DefinitionSummary` (the catalog list and
+  `GET /api/v1/integrations/connectors`) gained `protocol`. Additive;
+  `receives` keeps its channel keys.
+- Publishing a definition now opens the new type's page.
+
+**Verified:**
+
+- `npm run typecheck` clean; eslint clean on every changed file (one
+  existing warning in `rotateReceiverSecretAction`, not touched).
+- `npx vitest run modules/integrations modules/ui tests/architecture app`:
+  27 files (1 skipped), 221 tests passed, including the connector boundary
+  test and the new `typeSummary.test.ts` (every built-in described and
+  reading or receiving, no secret template in any summary, the MCP, LDAP,
+  SQL and receive-only protocols, the Runtime Gateway and webhook channels,
+  `connectorSummary`, connection-to-type links and fallbacks).
+- Playwright was not run here. `integrations`, `navigation-smoke`,
+  `design-review`, `mcp-bridge` and `mcp-inventory` specs now use the new
+  URLs.
+
+**Left out:** no schema change. The API paths under
+`/api/v1/integrations/connectors` keep their names. The screens are recorded
+in the Experience Agent's audit log, same date.

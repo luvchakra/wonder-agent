@@ -52,9 +52,35 @@ definition (JSON) ──validate──▶ catalog ──connect──▶ integra
                                  identity sources, account inventory, access, risk
 ```
 
+## Connection types and connections
+
+Integrations has two levels (user decision, 2026-10-10):
+
+- A **connection type** is a definition: one kind of system and its
+  protocol. **Integrations → Connection Types** (`/integrations/types`) lists
+  the built-in types and your organization's, grouped by category, with the
+  protocol, what each reads and receives, and its version. A type's page
+  (`/integrations/types/{builtin|custom}/{key}`) shows the protocol details:
+  driver (HTTP REST, MCP Streamable HTTP, LDAP, SQL, or receive only),
+  authentication method and the fields it asks for (never their values),
+  settings, pagination, rate limit, what it receives (each channel's path
+  under `/api/connect/v1/<connection>/` and how the sender authenticates),
+  origin, vendor and API reference. Its one action is **Create connection**.
+- A **connection** is one of your organization's systems, connected with a
+  type: its own settings, encrypted credentials, schedule and sync history.
+  **Integrations → Connections** (`/integrations`) lists them with the type
+  each was created from. **New connection** starts from the types list.
+
+`describeConnectionType()` in `typeSummary.ts` derives the protocol details
+from a definition, so the screens and the catalog summary say the same
+thing; the receiving side comes from the definition's `receive`. The old `/integrations/connectors` pages redirect to the
+new ones; the API paths below are unchanged.
+
 ## Using a connector
 
-1. Go to **Integrations → Connect a system** and pick the product.
+1. Go to **Integrations → Connection Types**, open the product's type and
+   select **Create connection**
+   (`/integrations/types/{origin}/{key}/connect`).
 2. Enter a name, the settings and the credentials, then select **Connect**.
    - WonderID tests the credentials before storing them, and encrypts them
      (AES-256-GCM).
@@ -126,13 +152,14 @@ directly (`definitions/runtime-event-fields.ts`).
 
 ## Writing a connector
 
-Go to **Integrations → Connect a system → Write a connector**, or start from
-an existing one ("Use as a starting point" on its connect page).
+Go to **Integrations → Connection Types → Write a connection type**
+(`/integrations/types/new`), or start from an existing one ("Use as a
+starting point" under "Definition" on its type page).
 
 The page checks the definition as you type, using the same rules the server
 applies. **Try it against a system** runs one resource against a real system
 without saving anything; that run is audited. **Publish** saves the
-version for your organization only.
+version for your organization only and opens its type page.
 
 Versions are immutable. To change a definition, raise `version` and publish
 again. Existing connections keep the version they were created with.
