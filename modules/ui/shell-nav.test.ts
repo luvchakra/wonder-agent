@@ -7,10 +7,14 @@ describe("the area list (owner decision, 2026-10-10)", () => {
   it("starts with Home and ends with Admin, which holds all organization administration", () => {
     expect(SHELL_NAV[0]).toMatchObject({ label: "Home", href: "/" });
     expect(SHELL_NAV[SHELL_NAV.length - 1]).toBe(ADMIN_AREA);
-    expect(SHELL_NAV.map((s) => s.label)).toEqual(["Home", "Identities", "Applications", "Certifications", "Risk & Security", "AI Agents", "Insights", "Admin"]);
-    for (const href of ["/settings", "/settings/users", "/settings/roles", "/integrations", "/settings/sso", "/policies"]) {
+    expect(SHELL_NAV.map((s) => s.label)).toEqual(["Home", "Intelligence", "Onboarding", "Control Center", "SOD", "Certifications", "AI Agents", "Admin"]);
+    for (const href of ["/settings", "/settings/users", "/settings/roles", "/integrations", "/settings/sso", "/identities", "/access"]) {
       expect(allHrefs([ADMIN_AREA])).toContain(href);
     }
+  });
+
+  it("opens Admin with its four object lists, then identities and applications as groups", () => {
+    expect(ADMIN_AREA.children?.slice(0, 6).map((e) => e.label)).toEqual(["Accounts", "Entitlements", "Roles", "User Groups", "Identities", "Applications"]);
   });
 
   it("keeps a member's day-to-day work in Home", () => {
@@ -30,10 +34,16 @@ describe("the area list (owner decision, 2026-10-10)", () => {
     // A member's own pages under an admin prefix stay in Home.
     expect(activeArea(SHELL_NAV, "/settings/security")?.label).toBe("Home");
     expect(activeArea(SHELL_NAV, "/access/requests/req-1")?.label).toBe("Home");
-    expect(activeArea(SHELL_NAV, "/integrations/discovery")?.label).toBe("Applications");
-    expect(activeArea(SHELL_NAV, "/access/agents/agent-1")?.label).toBe("Applications");
-    expect(activeArea(SHELL_NAV, "/identities/humans")?.label).toBe("Identities");
-    expect(activeArea(SHELL_NAV, "/agents/discovery")?.label).toBe("AI Agents");
+    expect(activeArea(SHELL_NAV, "/integrations/discovery")?.label).toBe("Onboarding");
+    expect(activeArea(SHELL_NAV, "/agents/discovery")?.label).toBe("Onboarding");
+    expect(activeArea(SHELL_NAV, "/access/applications/new")?.label).toBe("Onboarding");
+    expect(activeArea(SHELL_NAV, "/access/applications/app-1")?.label).toBe("Admin");
+    expect(activeArea(SHELL_NAV, "/identities/humans")?.label).toBe("Admin");
+    expect(activeArea(SHELL_NAV, "/access/entitlements")?.label).toBe("Admin");
+    expect(activeArea(SHELL_NAV, "/policies/pol-1")?.label).toBe("Control Center");
+    expect(activeArea(SHELL_NAV, "/sod/conflicts")?.label).toBe("SOD");
+    expect(activeArea(SHELL_NAV, "/risk/rogue")?.label).toBe("Intelligence");
+    expect(activeArea(SHELL_NAV, "/agents/agent-1")?.label).toBe("AI Agents");
     expect(isAdminPath("/settings")).toBe(true);
     expect(isAdminPath("/settings/security")).toBe(false);
   });
@@ -46,13 +56,13 @@ describe("the area list (owner decision, 2026-10-10)", () => {
 describe("navFor", () => {
   it("shows a member only the pages they may open, and drops empty areas", () => {
     const nav = navFor(SHELL_NAV, ["access.read"]);
-    expect(nav.map((s) => s.label)).toEqual(["Home", "Applications"]);
+    expect(nav.map((s) => s.label)).toEqual(["Home", "Admin"]);
     expect(sectionPages(nav[0]).map((p) => p.label)).toEqual(["Home", "Request Access", "My Privacy", "Sign-in Security", "Access Requests", "Access Packages"]);
-    expect(sectionPages(nav[1]).map((p) => p.label)).toEqual(["Application Inventory", "Accounts", "Data Sources"]);
+    expect(sectionPages(nav[1]).map((p) => p.label)).toEqual(["Accounts", "Entitlements", "Application Inventory", "Data Sources"]);
   });
 
   it("gives a member with no admin permission no Admin area", () => {
-    expect(navFor(SHELL_NAV, ["access.read", "identity.read"]).map((s) => s.label)).not.toContain("Admin");
+    expect(navFor(SHELL_NAV, ["agent.read", "risk.read"]).map((s) => s.label)).not.toContain("Admin");
   });
 
   it("keeps only the admin groups the viewer may open, and leads Admin to the first", () => {
@@ -72,8 +82,9 @@ describe("navFor", () => {
 describe("searchNav (the sidebar's menu search)", () => {
   it("finds pages by name, group or area, with where they live", () => {
     expect(searchNav(SHELL_NAV, "sync")).toEqual([{ label: "Sync Jobs", href: "/integrations/jobs", trail: ["Admin", "Integrations"] }]);
-    expect(searchNav(SHELL_NAV, "people")).toEqual([{ label: "People", href: "/identities/humans", trail: ["Identities"] }]);
-    expect(searchNav(SHELL_NAV, "admin roles").map((m) => m.label)).toEqual(["WonderID Roles"]);
+    expect(searchNav(SHELL_NAV, "people")).toEqual([{ label: "People", href: "/identities/humans", trail: ["Admin", "Identities"] }]);
+    expect(searchNav(SHELL_NAV, "admin roles").map((m) => m.label)).toEqual(["Roles"]);
+    expect(searchNav(SHELL_NAV, "conflicts")).toEqual([{ label: "SoD Conflicts", href: "/sod/conflicts", trail: ["SOD"] }]);
   });
 
   it("returns nothing for an empty or unmatched query, and at most the limit", () => {
@@ -84,5 +95,16 @@ describe("searchNav (the sidebar's menu search)", () => {
 
   it("searches only what the viewer may open", () => {
     expect(searchNav(navFor(SHELL_NAV, ["access.read"]), "sync")).toEqual([]);
+  });
+
+});
+
+describe("area menus", () => {
+  it("gives every direct page of an area an icon, and every group one, so each menu row reads like an area row", () => {
+    for (const area of SHELL_NAV) {
+      for (const entry of area.children ?? []) {
+        expect(entry.icon, `${area.label} › ${entry.label}`).toBeTruthy();
+      }
+    }
   });
 });

@@ -329,6 +329,13 @@ through `modules/privacy/service.ts`, since no other module consumes them yet);
 `/audit/integrity` composes FA's `lib/audit/integrity.ts`; `/platform-admin/billing`
 is PA's.
 
+2026-10-10 additions: `/sod` and `/sod/conflicts` compose AA's
+`listSoDRules()` / `toSoDConflict()` (`modules/access-governance/sodRules.ts`)
+and OA's `listAuditLogs()`; `/access/entitlements` composes AA's
+`listEntitlementInventory()`; `/controls` (Control Center overview) composes
+AA's policy, SoD and request-policy reads, FA's `listAuthorizationPolicies()`
+and OA's `listAuditLogs()`. The sidebar's areas are EA's `modules/ui/shell-nav.ts`.
+
 ## 4. Shared TypeScript contracts
 
 Location: `lib/shared/types/`.

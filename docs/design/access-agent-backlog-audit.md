@@ -2157,3 +2157,33 @@ module's object tables: `applications`, `accounts`, `entitlements`, `access_gran
 CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
 log, the page work in the Experience log. A new object table of this module
 follows the same pattern and joins `lib/provenance/tables.ts`.
+
+## 2026-10-10 — ACCESS-P0-26: SoD rules and conflicts pages; organization-wide entitlement list
+
+**Why.** Owner request: a SOD area with real pages, and Entitlements under
+Admin. SoD rules lived only inside identity policies, and entitlements
+were listed only per application.
+
+**What changed.**
+- `modules/access-governance/sodRules.ts`: `listSoDRules()` reads identity
+  policies with their rules under RLS and by tenant, and `sodRulesFrom()`
+  keeps exactly the rules `checkSoD()` enforces (an `rbac` rule with two or
+  more distinct string `conflictingActions`), never another tenant's,
+  ordered in effect, draft, then the rest. `toSoDConflict()` reads one
+  `access.sod_conflict` audit entry (`SOD_CONFLICT_ACTION`); a refused
+  conflict is `blocking: true` or a failed outcome.
+- `modules/access-governance/entitlements.ts`: `listEntitlementInventory()`
+  pages and counts at the database (50, at most 200), ordered by name then
+  id, searching one escaped `ilike` on the name (no string-built `or()`
+  filter, §18.3.8).
+- Pages: `/sod` (`policy.read`), `/sod/conflicts` (`audit.read`, through
+  Operations' `listAuditLogs()`, keyset on the audit time),
+  `/access/entitlements` (`access.read`). Rules are still added on the
+  policy's page; entitlements are still changed on the application's page.
+- `modules/access-governance/sodRules.test.ts`: 6 tests.
+
+**Security.** All reads run as the user under RLS with an explicit tenant
+filter; no service role. The conflicts page needs `audit.read` because it
+shows audit records. No schema change.
+
+**Verified.** As in the Experience log for EXPERIENCE-P0-27.

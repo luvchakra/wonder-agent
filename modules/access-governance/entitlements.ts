@@ -77,6 +77,41 @@ export async function listEntitlementsForTenant(tenantId: string): Promise<Entit
   }));
 }
 
+/** LIKE wildcards in a search match only themselves. */
+const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/**
+ * Every entitlement in the organization, with its application, a page at a
+ * time (the Admin › Entitlements list, owner request 2026-10-10). Paged and
+ * counted at the database (§15); the search is one escaped `ilike` on the
+ * name, never a string-built filter.
+ */
+export async function listEntitlementInventory(
+  tenantId: string,
+  { q = "", page = 1, pageSize = 50 }: { q?: string; page?: number; pageSize?: number } = {},
+): Promise<{ rows: (EntitlementWithContext & { applicationDisplayName: string | null })[]; total: number }> {
+  const supabase = await supabaseServer();
+  const size = Math.min(Math.max(pageSize, 1), 200);
+  const from = (Math.max(page, 1) - 1) * size;
+  let query = supabase
+    .from("entitlements")
+    .select("*, applications(name, display_name)", { count: "exact" })
+    .eq("tenant_id", tenantId)
+    .order("name", { ascending: true })
+    .order("id", { ascending: true })
+    .range(from, from + size - 1);
+  const term = q.trim().slice(0, 100);
+  if (term) query = query.ilike("name", `%${escapeLike(term)}%`);
+  const { data, error, count } = await query;
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = (data ?? []).map((row: Record<string, unknown> & { applications: { name: string; display_name: string | null } | null }) => ({
+    ...toEntitlement(row),
+    applicationName: row.applications?.name ?? "",
+    applicationDisplayName: row.applications?.display_name ?? null,
+  }));
+  return { rows, total: count ?? rows.length };
+}
+
 /**
  * ACCESS-P0-19 — names the person who approves requests for this
  * entitlement (ahead of the application's business owner), or clears it

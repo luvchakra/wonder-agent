@@ -36,6 +36,8 @@ export type ShellNavLink = {
   href: string;
   /** Any one of these permissions lets the viewer open the page; none listed: every member. */
   permission?: string[];
+  /** The page's icon in its area's menu (a direct page of the area; pages inside a group have none). */
+  icon?: string;
 };
 
 /** A second-level entry: a page, or a named group of pages (third level). */
@@ -60,21 +62,44 @@ export type ShellNavItem = {
   children?: ShellNavEntry[];
 };
 
-const link = (label: string, href: string, ...permission: string[]): ShellNavEntry => ({
+const link = (label: string, href: string, icon: string, ...permission: string[]): ShellNavEntry => ({
   kind: "link",
   label,
   href,
+  icon,
   ...(permission.length ? { permission } : {}),
 });
 const page = (label: string, href: string, ...permission: string[]): ShellNavLink => ({ label, href, ...(permission.length ? { permission } : {}) });
 const group = (label: string, children: ShellNavLink[], icon?: string): ShellNavEntry => ({ kind: "group", label, icon, children });
 
-/** The Admin area: administering the organization, always the last area. */
+/**
+ * The Admin area: administering the organization, always the last area.
+ * Its four object lists come first as its own pages (owner request,
+ * 2026-10-10); identities and applications are groups inside it.
+ */
 export const ADMIN_AREA: ShellNavItem = {
   label: "Admin",
-  href: "/settings",
+  href: "/access/accounts",
   icon: "Settings",
   children: [
+    link("Accounts", "/access/accounts", "IdCard", "access.read"),
+    link("Entitlements", "/access/entitlements", "KeyRound", "access.read"),
+    link("Roles", "/settings/roles", "UserCog", "roles.view", "role.manage"),
+    link("User Groups", "/settings/groups", "Users", "groups.view"),
+    group(
+      "Identities",
+      [
+        page("Overview", "/identities", "identity.read"),
+        page("All Identities", "/identities/all", "identity.read"),
+        page("People", "/identities/humans", "identity.read"),
+        page("External Identities", "/identities/external", "identity.read"),
+        page("Machine Identities", "/identities/machines", "identity.read"),
+        page("Lifecycle Work", "/identities/lifecycle", "identity.read"),
+        page("Identity Attributes", "/identities/attributes", "identity.manage"),
+      ],
+      "UserRound",
+    ),
+    group("Applications", [page("Application Inventory", "/access", "access.read"), page("Data Sources", "/access/data-sources", "access.read")], "Box"),
     group(
       "Organization",
       [
@@ -85,17 +110,7 @@ export const ADMIN_AREA: ShellNavItem = {
       ],
       "Building2",
     ),
-    group(
-      "Users & Permissions",
-      [
-        page("Users", "/settings/users", "users.view"),
-        page("Groups", "/settings/groups", "groups.view"),
-        page("WonderID Roles", "/settings/roles", "roles.view", "role.manage"),
-        page("Permission Catalog", "/settings/permissions", "permissions.view"),
-        page("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
-      ],
-      "UserCog",
-    ),
+    group("Users & Permissions", [page("Users", "/settings/users", "users.view"), page("Permission Catalog", "/settings/permissions", "permissions.view")], "UserCog"),
     group("Authentication", [page("Single Sign-On", "/settings/sso", "sso.manage")], "Fingerprint"),
     group(
       "Integrations",
@@ -104,94 +119,95 @@ export const ADMIN_AREA: ShellNavItem = {
         page("Connection Types", "/integrations/types", "integration.read"),
         page("Gateway", "/integrations/gateway", "integration.read"),
         page("Identity Sources", "/integrations/sources", "integration.read"),
-        page("Pending Matches", "/integrations/correlations", "integration.read"),
         page("MCP Servers", "/integrations/mcp", "integration.read"),
         page("Sync Jobs", "/integrations/jobs", "integration.read"),
       ],
       "Link2",
     ),
-    group("Identity Configuration", [page("Identity Attributes", "/identities/attributes", "identity.manage")], "SlidersHorizontal"),
     group(
-      "Policies & Compliance",
-      [
-        page("Policies", "/policies", "policy.read"),
-        page("Request Policies", "/access/request-policies", "access.manage"),
-        page("Privacy & Data Protection", "/settings/privacy", "privacy.view"),
-        page("Audit Integrity", "/audit/integrity", "audit.read"),
-      ],
+      "Compliance",
+      [page("Privacy & Data Protection", "/settings/privacy", "privacy.view"), page("Audit Integrity", "/audit/integrity", "audit.read")],
       "FileText",
     ),
   ],
 };
 
-/** The area list: Home first, the governance work areas, Admin last. */
+/**
+ * The area list (owner decisions, 2026-10-10): Home first, then
+ * Intelligence, Onboarding, Control Center, SOD and Certifications, AI
+ * Agents, and Admin last. Every area opens its own menu.
+ */
 export const SHELL_NAV: ShellNavItem[] = [
   {
     label: "Home",
     href: "/",
     icon: "Home",
     children: [
-      link("Home", "/"),
+      link("Home", "/", "Home"),
       group("My Access", [page("Request Access", "/access/catalog", "access.read"), page("My Privacy", "/my-privacy"), page("Sign-in Security", "/settings/security")], "UserRound"),
       group("Access Governance", [page("Access Requests", "/access/requests", "access.read"), page("Access Packages", "/access/packages", "access.read")], "KeyRound"),
     ],
   },
   {
-    label: "Identities",
-    href: "/identities",
-    icon: "Users",
+    label: "Intelligence",
+    href: "/risk",
+    icon: "BarChart3",
+    badge: "risk",
     children: [
-      link("Overview", "/identities", "identity.read"),
-      link("All Identities", "/identities/all", "identity.read"),
-      link("People", "/identities/humans", "identity.read"),
-      link("External Identities", "/identities/external", "identity.read"),
-      link("Machine Identities", "/identities/machines", "identity.read"),
-      link("Lifecycle Work", "/identities/lifecycle", "identity.read"),
-      link("Non-human Identities", "/agents/identities", "agent.read"),
+      link("Risk Overview", "/risk", "ShieldAlert", "risk.read"),
+      link("Investigations", "/risk/investigations", "FileSearch", "risk.read"),
+      link("Rogue Agents", "/risk/rogue", "Siren", "risk.read"),
+      link("Reports", "/reports", "FileBarChart", "report.read"),
+      link("Audit Trail", "/audit", "ScrollText", "audit.read"),
     ],
   },
   {
-    label: "Applications",
-    href: "/access",
-    icon: "Box",
-    match: ["/access/agents"],
+    label: "Onboarding",
+    href: "/access/applications/new",
+    icon: "Plug",
+    badge: "discovery",
     children: [
-      link("Application Inventory", "/access", "access.read"),
-      link("Discovery", "/integrations/discovery", "integration.read"),
-      link("Accounts", "/access/accounts", "access.read"),
-      link("Data Sources", "/access/data-sources", "access.read"),
+      link("New Application", "/access/applications/new", "Box", "access.manage"),
+      link("Application Discovery", "/integrations/discovery", "Radar", "integration.read"),
+      link("Register Agent", "/agents/new", "UserPlus", "agent.create"),
+      link("Agent Discovery", "/agents/discovery", "Search", "agent.read"),
+      link("Duplicate Review", "/agents/duplicates", "Network", "agent.create"),
+      link("Pending Matches", "/integrations/correlations", "Link2", "integration.read"),
     ],
+  },
+  {
+    label: "Control Center",
+    href: "/controls",
+    icon: "Gauge",
+    children: [
+      link("Overview", "/controls", "LayoutDashboard", "policy.read"),
+      link("Policies", "/policies", "Scale", "policy.read"),
+      link("Request Policies", "/access/request-policies", "ClipboardList", "access.manage"),
+      link("Authorization Policies", "/settings/authorization-policies", "KeyRound", "permissions.view", "tenant.security.manage"),
+    ],
+  },
+  {
+    label: "SOD",
+    href: "/sod",
+    icon: "Ban",
+    children: [link("SoD Rules", "/sod", "Scale", "policy.read"), link("SoD Conflicts", "/sod/conflicts", "TriangleAlert", "audit.read")],
   },
   {
     label: "Certifications",
     href: "/compliance/campaigns",
     icon: "ShieldCheck",
     match: ["/compliance"],
-    children: [link("Certification Campaigns", "/compliance/campaigns", "compliance.read")],
-  },
-  {
-    label: "Risk & Security",
-    href: "/risk",
-    icon: "TriangleAlert",
-    badge: "risk",
-    children: [link("Risk Overview", "/risk", "risk.read"), link("Investigations", "/risk/investigations", "risk.read")],
+    children: [link("Certification Campaigns", "/compliance/campaigns", "ClipboardCheck", "compliance.read")],
   },
   {
     label: "AI Agents",
     href: "/agents",
     icon: "Bot",
-    badge: "discovery",
     children: [
-      group("Agent Inventory", [page("All Agents", "/agents", "agent.read"), page("Register Agent", "/agents/new", "agent.create")], "Bot"),
-      group("Agent Discovery", [page("Discovery Inbox", "/agents/discovery", "agent.read"), page("Duplicate Review", "/agents/duplicates", "agent.create")], "Search"),
-      group("Agent Monitoring", [page("Runtime Activity", "/runtime", "runtime.read"), page("Rogue Agents", "/risk/rogue", "risk.read")], "Activity"),
+      link("All Agents", "/agents", "Bot", "agent.read"),
+      link("Non-human Identities", "/agents/identities", "Server", "agent.read"),
+      link("Runtime Activity", "/runtime", "Activity", "runtime.read"),
     ],
-  },
-  {
-    label: "Insights",
-    href: "/reports",
-    icon: "BarChart3",
-    children: [link("Reports", "/reports", "report.read"), link("Audit Trail", "/audit", "audit.read")],
   },
   ADMIN_AREA,
 ];

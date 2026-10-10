@@ -6,12 +6,14 @@ import { authFile } from "./support/testUsers";
  * EXPERIENCE-P0-23)
  * from `lg` up, a bottom tab bar plus drawer below it, and one header
  * carrying search / notifications / help / account. The sidebar is an area
- * list (owner decision, 2026-10-10): an area opens its own menu in place of
- * the list, with a back arrow, its pages as rows and its groups folding
- * open; the menu follows the page, and a menu search sits above it.
- * Collapsed, it becomes an icon rail whose areas open flyouts, a group
- * opening as a second flyout. The current page carries aria-current="page".
- * "Admin" is the last area and holds the organization's administration.
+ * list (owner decisions, 2026-10-10): Home, Intelligence, Onboarding,
+ * Control Center, SOD, Certifications, AI Agents and Admin. An area opens
+ * its own menu in place of the list, with a back arrow, its pages as rows
+ * and its groups folding open; the menu follows the page, and a menu
+ * search sits above it. A hamburger-style toggle at the top right
+ * collapses it to an icon rail (toggle, search icon, area icons) whose
+ * areas open flyouts, a group opening as a second flyout. The current page
+ * carries aria-current="page". "Admin" is the last area.
  */
 test.describe("customer shell", () => {
   test.use({ storageState: authFile("adminOne") });
@@ -31,7 +33,6 @@ test.describe("customer shell", () => {
     await expect(page).toHaveURL("/");
     await expect(nav.getByRole("heading", { name: "AI Agents" })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Home" })).toHaveCount(0);
-    await nav.getByRole("button", { name: "Agent Inventory" }).click();
     await nav.getByRole("link", { name: "All Agents" }).click();
     await expect(page).toHaveURL("/agents");
     await expect(nav.getByRole("link", { name: "All Agents" })).toHaveAttribute("aria-current", "page");
@@ -79,11 +80,13 @@ test.describe("customer shell", () => {
 
   test("an admin page opens the Admin menu with its group open, and nothing else", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/settings/roles");
+    await page.goto("/settings/users");
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("heading", { name: "Admin" })).toBeVisible();
+    // Admin opens with its four object lists, then its groups.
+    for (const name of ["Accounts", "Entitlements", "Roles", "User Groups"]) await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Users & Permissions" })).toHaveAttribute("aria-expanded", "true");
-    await expect(nav.getByRole("link", { name: "WonderID Roles" })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "Users", exact: true })).toHaveAttribute("aria-current", "page");
     // Another group's pages stay folded.
     await expect(nav.getByRole("link", { name: "Sync Jobs" })).toHaveCount(0);
   });
@@ -98,14 +101,14 @@ test.describe("customer shell", () => {
 
   test("a page inside a group opens that group, and only its page is current", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/agents/discovery");
+    await page.goto("/identities/humans");
     const nav = page.getByRole("navigation", { name: "Main" });
-    await expect(nav.getByRole("heading", { name: "AI Agents" })).toBeVisible();
-    await expect(nav.getByRole("button", { name: "Agent Discovery" })).toHaveAttribute("aria-expanded", "true");
-    await expect(nav.getByRole("link", { name: "Discovery Inbox" })).toHaveAttribute("aria-current", "page");
-    // The inventory group stays closed; its pages are not current.
-    await expect(nav.getByRole("button", { name: "Agent Inventory" })).toHaveAttribute("aria-expanded", "false");
-    await expect(nav.getByRole("link", { name: "All Agents" })).toHaveCount(0);
+    await expect(nav.getByRole("heading", { name: "Admin" })).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Identities" })).toHaveAttribute("aria-expanded", "true");
+    await expect(nav.getByRole("link", { name: "People" })).toHaveAttribute("aria-current", "page");
+    // The Applications group stays closed; its pages are not current.
+    await expect(nav.getByRole("button", { name: "Applications" })).toHaveAttribute("aria-expanded", "false");
+    await expect(nav.getByRole("link", { name: "Application Inventory" })).toHaveCount(0);
   });
 
   test("collapsed, a section opens a flyout and a group a third-level flyout, and the choice is remembered", async ({ page }) => {
@@ -113,15 +116,28 @@ test.describe("customer shell", () => {
     await page.goto("/");
     await page.getByRole("button", { name: "Collapse navigation" }).click();
     const nav = page.getByRole("navigation", { name: "Main" });
-    await nav.getByRole("button", { name: "AI Agents" }).click();
-    await page.getByRole("menuitem", { name: "Agent Discovery" }).hover();
-    await page.getByRole("menuitem", { name: "Duplicate Review" }).click();
-    await expect(page).toHaveURL("/agents/duplicates");
+    await nav.getByRole("button", { name: "Admin" }).click();
+    await page.getByRole("menuitem", { name: "Identities" }).hover();
+    await page.getByRole("menuitem", { name: "People" }).click();
+    await expect(page).toHaveURL("/identities/humans");
 
     await page.reload();
     await expect(page.getByRole("button", { name: "Expand navigation" })).toBeVisible();
     await page.getByRole("button", { name: "Expand navigation" }).click();
-    await expect(nav.getByRole("link", { name: "Duplicate Review" })).toHaveAttribute("aria-current", "page");
+    await expect(nav.getByRole("link", { name: "People" })).toHaveAttribute("aria-current", "page");
+  });
+
+  test("collapsed, the rail's search icon opens the sidebar straight into its search", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "Collapse navigation" }).click();
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await nav.getByRole("button", { name: "Search menu" }).click();
+    const box = nav.getByRole("searchbox", { name: "Search menu" });
+    await expect(box).toBeFocused();
+    await box.fill("conflicts");
+    await nav.getByRole("link", { name: /SoD Conflicts/ }).click();
+    await expect(page).toHaveURL("/sod/conflicts");
   });
 
   test("the search field opens with its advertised shortcut", async ({ page }) => {
@@ -141,8 +157,8 @@ test.describe("customer shell", () => {
 
     await tabs.getByRole("button", { name: "More" }).click();
     const drawer = page.getByRole("dialog", { name: "Main navigation" });
-    await drawer.getByRole("button", { name: "Insights" }).click();
-    await expect(drawer.getByRole("heading", { name: "Insights" })).toBeVisible();
+    await drawer.getByRole("button", { name: "Intelligence" }).click();
+    await expect(drawer.getByRole("heading", { name: "Intelligence" })).toBeVisible();
     await expect(drawer.getByRole("link", { name: "Audit Trail" })).toBeVisible();
 
     await drawer.getByRole("link", { name: "Audit Trail" }).click();

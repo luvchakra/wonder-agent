@@ -12,6 +12,7 @@ export {
   createEntitlement,
   listEntitlementsForApplication,
   listEntitlementsForTenant,
+  listEntitlementInventory,
   getEntitlement,
   setEntitlementOwner,
   type EntitlementWithContext,
@@ -42,6 +43,7 @@ export {
 } from "./policies";
 export { evaluatePolicies, listPolicyEvaluations, hasOpenPolicyViolation } from "./evaluate";
 export { checkSoD, enforceSoD, type SoDCheckResult } from "./sod";
+export { listSoDRules, toSoDConflict, SOD_CONFLICT_ACTION, type SoDRule, type SoDConflict } from "./sodRules";
 export { getAccessGraph } from "./graph";
 export { compareAccessToContract } from "./comparison";
 export { classifyAction, classifyActionsForAgent } from "./actionGovernance";

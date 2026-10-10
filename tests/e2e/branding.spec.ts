@@ -68,9 +68,9 @@ test.describe("branding — in the product", () => {
     const nav = page.locator("aside");
     await logoRendered(page, 'aside a img[alt="WonderID"][src$="/brand/logo/wonderid-logo.png"]');
     await page.getByRole("button", { name: "Collapse navigation" }).click();
-    const expand = nav.getByRole("button", { name: "Expand navigation" });
-    await expect(expand.locator('img[src*="/brand/logo/wonderid-mark"]:visible')).toHaveCount(1);
-    await expand.click();
+    // Collapsed, the W mark sits at the rail's foot (the toggle is on top).
+    await expect(nav.getByRole("link", { name: "WonderID home" }).locator('img[src*="/brand/logo/wonderid-mark"]:visible')).toHaveCount(1);
+    await nav.getByRole("button", { name: "Expand navigation" }).click();
     await expect(page.getByRole("button", { name: "Collapse navigation" })).toBeVisible();
 
     // The brand palette is on the page as tokens (the build normalizes the

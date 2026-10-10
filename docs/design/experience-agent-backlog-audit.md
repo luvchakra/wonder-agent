@@ -3714,3 +3714,76 @@ page opens Home's menu), and `integrations`, `identities` and
 
 **Left out.** Lists (§19.5). Pages that are views of an agent (access,
 runtime, risk, rogue) show nothing extra; the agent's own page has the line.
+
+## 2026-10-10 — Every area opens its own menu; each page in it has an icon
+
+**Why.** The owner sent a screenshot of Saviynt's Certifications menu: the
+area opens into its own list (back chevron, the area's icon and name), and
+each page in it is a row with its own icon. In WonderID, Certifications (one
+page) went straight to that page, and the pages in an area's menu were plain
+text. As before, only the arrangement was taken; the menus, colours and
+type are WonderID's.
+
+**What changed.**
+- `modules/ui/AppSidebar.tsx`: an area with any pages, even one, opens its
+  menu; only an area with no pages is a link. An area's direct pages render
+  at area-row size with their icon; a group heading shows the icon it
+  already declared (never rendered before); pages inside a group stay
+  text, under the heading's label. The collapsed rail's flyouts show the
+  same icons.
+- `modules/ui/shell-nav.ts`: `link()` takes an icon; every area page has
+  one (e.g. Certification Campaigns `ClipboardCheck`, Accounts `IdCard`,
+  Data Sources `Database`, Investigations `FileSearch`). `NavIcon` gained
+  `IdCard`, `Database` and `FileSearch`.
+- `modules/ui/shell-nav.test.ts`: every area page and group has an icon.
+- CLAUDE.md §13's navigation note says so.
+
+**Not done.** Saviynt's Certifications menu also lists a dashboard,
+campaign templates and scheduled campaigns. WonderID has no such pages
+(Compliance Agent scope); they are not added to the menu until they exist.
+
+**Verified.** Typecheck and eslint clean; `shell-nav` unit tests 13/13;
+screenshots of the Certifications, Identities, AI Agents and Admin menus
+in light and dark mode at 1440 px; local Playwright below.
+
+## 2026-10-10 — EXPERIENCE-P0-27: new areas, Admin's object lists, collapsible rail, Control Center
+
+**Why.** Owner decisions the same day, in order: Identities and
+Applications belong under Admin; the area list is Home, Intelligence,
+Onboarding, Control Center, SOD and Certifications (asked directly: build
+real Control Center and SOD pages, and the arrangement as proposed, with
+Risk and Insights folded into Intelligence, agent registration and
+discovery into Onboarding, AI Agents kept); Admin gets Accounts,
+Entitlements, Roles and User Groups; the sidebar collapses from a
+hamburger-style toggle at its top right, as in Saviynt's screenshots
+(arrangement only, WonderID's colours and logo kept).
+
+**What changed.**
+- `modules/ui/shell-nav.ts`: the new areas and Admin (its four object
+  lists as direct pages, then Identities, Applications, Organization,
+  Users & Permissions, Authentication, Integrations, Compliance). Policies,
+  Request Policies and Authorization Policies moved to Control Center;
+  Pending Matches to Onboarding; Rogue Agents, Reports and Audit Trail to
+  Intelligence. Every route is still listed once.
+- `modules/ui/AppSidebar.tsx`: the toggle is `ListIndentDecrease` at the
+  top right when open and `ListIndentIncrease` at the top of the rail when
+  collapsed; the rail has a search icon that opens the sidebar with the
+  focus in its search box; the W mark moved to the rail's foot as a link
+  home (BRAND-004 still holds).
+- `app/(customer)/controls/page.tsx`: the Control Center overview. Every
+  number is a count of the tenant's own records, each card links to its
+  list, and a card is left out (not shown as zero) for a viewer who may not
+  open its list. The SoD and entitlement pages are in the Access log.
+- `NavIcon` gained `Gauge`.
+- The owner's working copy of the menu: the Google Sheet "WonderID sidebar
+  menus" (55 rows, generated from `shell-nav.ts`: area, group, item, path,
+  icon, permission, page status and a change-request column). CLAUDE.md §13
+  says to read it and apply the owner's changes.
+
+**Verified.** Typecheck and eslint clean; unit tests `shell-nav` 14/14 and
+`sodRules` 6/6; `next build` passed; screenshots of the area list, the
+collapsed rail, Control Center, SOD, Entitlements and Admin at 1440 px with
+no page errors. Local Playwright (headless Chromium): shell,
+navigation-smoke, branding and design-review 90/91 on the first run; the
+one failure was the mobile test still opening the old "Insights" area,
+fixed to "Intelligence", after which `shell.spec.ts` passed 19/19.
