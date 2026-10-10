@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { ABSOLUTE_SESSION_MAX_MS, IDLE_TIMEOUT_MS, checkSessionExpiry } from "./sessionSecurity";
+import { ABSOLUTE_SESSION_MAX_MS, IDLE_TIMEOUT_MS, checkSessionExpiry, sessionLimitsFrom } from "./sessionSecurity";
 
 describe("checkSessionExpiry — FOUNDATION-P0-09", () => {
   const now = 1_000_000_000_000;
@@ -38,5 +38,23 @@ describe("isAuthServiceUnavailable", () => {
     expect(isAuthServiceUnavailable({ name: "AuthApiError", status: 403 })).toBe(false);
     expect(isAuthServiceUnavailable({ name: "AuthSessionMissingError", status: 400 })).toBe(false);
     expect(isAuthServiceUnavailable(null)).toBe(false);
+  });
+});
+
+describe("an organization's session limits (Global Configuration)", () => {
+  const now = 1_800_000_000_000;
+  it("expire a session sooner when the organization says so", () => {
+    const limits = sessionLimitsFrom({ idleMinutes: 10, maxHours: 2 });
+    expect(checkSessionExpiry(now - 3_600_000, now - 11 * 60_000, now, limits)).toEqual({ expired: true, reason: "idle" });
+    expect(checkSessionExpiry(now - 3 * 3_600_000, now - 60_000, now, limits)).toEqual({ expired: true, reason: "absolute" });
+    expect(checkSessionExpiry(now - 3_600_000, now - 9 * 60_000, now, limits)).toEqual({ expired: false });
+  });
+
+  it("never lengthen a session past the global limits, whatever they are given", () => {
+    expect(sessionLimitsFrom({ idleMinutes: 600, maxHours: 99 })).toEqual({ idleMs: IDLE_TIMEOUT_MS, absoluteMs: ABSOLUTE_SESSION_MAX_MS });
+    expect(sessionLimitsFrom(null)).toEqual({ idleMs: IDLE_TIMEOUT_MS, absoluteMs: ABSOLUTE_SESSION_MAX_MS });
+    expect(sessionLimitsFrom({ idleMinutes: "x", maxHours: -1 })).toEqual({ idleMs: IDLE_TIMEOUT_MS, absoluteMs: ABSOLUTE_SESSION_MAX_MS });
+    // Even limits passed straight in cannot exceed the ceiling.
+    expect(checkSessionExpiry(null, now - IDLE_TIMEOUT_MS - 1, now, { idleMs: 10 * IDLE_TIMEOUT_MS, absoluteMs: 10 * ABSOLUTE_SESSION_MAX_MS })).toEqual({ expired: true, reason: "idle" });
   });
 });

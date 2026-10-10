@@ -76,8 +76,9 @@ export function unapprovedToolUse(agentName: string, unapprovedTools: string[], 
   };
 }
 
-const ROTATION_DAYS = 90;
-const MAX_ACTIVE_KEYS = 3;
+/** Defaults; each organization can set its own (Global Configuration). */
+export const ROTATION_DAYS = 90;
+export const MAX_ACTIVE_KEYS = 3;
 
 /**
  * Credential health of the agent's own runtime credentials (its Runtime
@@ -85,12 +86,16 @@ const MAX_ACTIVE_KEYS = 3;
  * with no expiry (rotation overdue), or when more than 3 keys are active
  * at once (sprawl).
  */
-export function credentialHealth(keys: AgentApiKey[], now: Date): { unhealthy: boolean; reasons: string[] } {
+export function credentialHealth(
+  keys: AgentApiKey[],
+  now: Date,
+  { rotationDays = ROTATION_DAYS, maxActiveKeys = MAX_ACTIVE_KEYS }: { rotationDays?: number; maxActiveKeys?: number } = {},
+): { unhealthy: boolean; reasons: string[] } {
   const active = keys.filter((k) => k.status === "active");
   const reasons: string[] = [];
-  const stale = active.filter((k) => !k.expiresAt && now.getTime() - new Date(k.createdAt).getTime() > ROTATION_DAYS * 24 * 60 * 60 * 1000);
-  if (stale.length > 0) reasons.push(`${stale.length} active key(s) older than ${ROTATION_DAYS} days with no expiry`);
-  if (active.length > MAX_ACTIVE_KEYS) reasons.push(`${active.length} active keys (more than ${MAX_ACTIVE_KEYS})`);
+  const stale = active.filter((k) => !k.expiresAt && now.getTime() - new Date(k.createdAt).getTime() > rotationDays * 24 * 60 * 60 * 1000);
+  if (stale.length > 0) reasons.push(`${stale.length} active key(s) older than ${rotationDays} days with no expiry`);
+  if (active.length > maxActiveKeys) reasons.push(`${active.length} active keys (more than ${maxActiveKeys})`);
   return { unhealthy: reasons.length > 0, reasons };
 }
 

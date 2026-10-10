@@ -86,6 +86,7 @@ export const ADMIN_AREA: ShellNavItem = {
     link("Entitlements", "/access/entitlements", "KeyRound", "access.read"),
     link("Roles", "/settings/roles", "UserCog", "roles.view", "role.manage"),
     link("User Groups", "/settings/groups", "Users", "groups.view"),
+    link("Global Configuration", "/settings/configuration", "SlidersHorizontal", "tenant.settings", "tenant.security.manage"),
     group(
       "Identities",
       [

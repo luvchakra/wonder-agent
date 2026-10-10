@@ -3798,3 +3798,27 @@ read as the group's name); Control Center holds its overview. Verified:
 `shell-nav` unit tests 14/14, typecheck and eslint clean, and local
 Playwright `shell` + `navigation-smoke` 64/64 on a fresh build.
 
+## 2026-10-10 — Global Configuration page; help guide brought up to date
+
+**Why.** Owner requests: Global Configuration under Admin, and "update the
+help guide".
+
+**What changed.**
+- `/settings/configuration` (Admin › Global Configuration, after User
+  Groups): one form in six sections, each setting with one line of help and
+  its default, read-only where the member lacks its permission, one Save;
+  a folded change history with who, when and each change from and to, and
+  Restore on earlier versions. A member without either permission is sent
+  to Administration, like the other admin pages.
+- Help guide (`modules/ui/help/content.ts`): every menu path rewritten to
+  the new sidebar (42 paths); "Finding your way around" rewritten for areas,
+  the collapsible rail, menu search, the version footer and record history;
+  new articles Global Configuration, Control Center and Separation of duties
+  (SOD); Accounts gains Entitlements and the configured dormant threshold;
+  Integrations rewritten for connection types and connections, settings and
+  masked credentials; sign-in notes shorter organization session limits.
+  `content.test.ts` requires the three new articles.
+- `tests/e2e/global-configuration.spec.ts`: an administrator changes the
+  dormant threshold, the Accounts page follows it, the history shows it,
+  and it is put back; saving with no change says so; a read-only member has
+  no menu entry and is sent back from the page.

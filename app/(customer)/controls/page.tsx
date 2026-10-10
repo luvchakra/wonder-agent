@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { listAuthorizationPolicies } from "@/lib/rbac/authorizationPolicies";
 import { listPolicies, listRequestPolicies, listSoDRules, SOD_CONFLICT_ACTION } from "@/modules/access-governance/service";
 import { listAuditLogs } from "@/modules/operations/service";
@@ -14,7 +15,6 @@ import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard } from "@/module
 // viewer may not open is left out rather than shown empty.
 
 const CATEGORY: Record<string, string> = { identity: "Identity", access: "Access", runtime: "Runtime", agent: "Agent", lifecycle: "Lifecycle" };
-const CONFLICT_WINDOW_DAYS = 30;
 const CONFLICT_CAP = 200;
 /** The start of the conflict window, read once per request on the server. */
 const windowStart = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
@@ -29,7 +29,9 @@ export default async function ControlCenterPage() {
   }
   const tenantId = ctx.tenantId!;
   const can = (...keys: string[]) => keys.some((k) => ctx.permissions.includes(k));
-  const since = windowStart(CONFLICT_WINDOW_DAYS);
+  // The organization's window (Global Configuration).
+  const conflictWindowDays = (await getTenantConfig(tenantId))["sod.conflictWindowDays"];
+  const since = windowStart(conflictWindowDays);
   const [policies, sodRules, conflicts, requestPolicies, authzPolicies] = await Promise.all([
     listPolicies(tenantId),
     listSoDRules(tenantId),
@@ -61,7 +63,7 @@ export default async function ControlCenterPage() {
             size="sm"
             icon="ShieldAlert"
             tone={conflicts.entries.length ? "warning" : "neutral"}
-            label={`SoD conflicts, ${CONFLICT_WINDOW_DAYS} days`}
+            label={`SoD conflicts, ${conflictWindowDays} days`}
             value={conflicts.nextCursor ? `${CONFLICT_CAP}+` : conflicts.entries.length}
             footnote={conflicts.entries.length ? `${blocked} refused` : undefined}
             href="/sod/conflicts"

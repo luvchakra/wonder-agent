@@ -31,7 +31,7 @@ for every row is in `docs/design/platform-agent-backlog-audit.md`.
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 | PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Partial — 2026-09-25: 13 master rollout flags seeded (`0065`, safe-rollout defaults); flags now enforced at the gateway (`runtime_observe`/`runtime_enforce`/`tool_filtering` — ENFORCE really enforces, per tenant) and at runtime ingestion, remediation, connector creation and certification launch; batched `getFeatureFlags()`. Remaining: `ai_assistant` (defaults OFF while AI summaries are live — needs a platform decision before enforcing) and the not-yet-built features' flags; see audit log |
-| PLATFORM-P0-13 | Configuration Studio | Not Started — 2026-09-26, WonderID |
+| PLATFORM-P0-13 | Configuration Studio | Partial — 2026-10-10: Global Configuration (versioned organization settings with history and restore, migration 0116); the declarative objects, draft/simulate/approve and environment promotion not yet |
 | PLATFORM-P0-14 | Tenant list with tenant URLs and the create-tenant wizard | Not Started — 2026-09-26, WonderID Phase 4b |
 | PLATFORM-P1-04 | Billing integration: Stripe (USD/EUR) and Razorpay (INR), invoices, GST, maker-checker adjustments (brought forward by explicit user request, 2026-10-01) | Done — 2026-10-01 (`0102`, `modules/billing`, `/settings/billing`, `/platform-admin/billing`, webhooks; 30+ unit tests. Not exercised against live provider accounts: no keys in this sandbox, see audit log) |
 

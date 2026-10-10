@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import type { NotifyEvent } from "@/lib/shared/types/operations";
 import type { GatewayDecision } from "@/lib/shared/types/runtime";
 import type { RuntimeRequest } from "@/lib/shared/types/access-governance";
@@ -36,13 +37,14 @@ export function notificationForDecision(
   agentName: string,
   decision: DecisionFacts,
   request: Pick<RuntimeRequest, "action" | "application" | "resource" | "tool">,
+  throttleMinutes: number = THROTTLE_MINUTES,
 ): NotifyEvent | null {
   if (!decision.enforced) return null;
   const target = [request.tool && `tool ${request.tool}`, request.application && `application ${request.application}`, request.resource && `resource ${request.resource}`]
     .filter(Boolean)
     .join(", ");
   const what = `${request.action}${target ? ` on ${target}` : ""}`;
-  const detail = `${decision.reason.replace(/\.$/, "")} (${decision.code}; request ${decision.requestId}). Further decisions for this agent in the next ${THROTTLE_MINUTES} minutes are listed on the Runtime page without a new notification.`;
+  const detail = `${decision.reason.replace(/\.$/, "")} (${decision.code}; request ${decision.requestId}). Further decisions for this agent in the next ${throttleMinutes} minutes are listed on the Runtime page without a new notification.`;
 
   if (decision.effectiveDecision === "DENY") {
     return {
@@ -77,9 +79,11 @@ export async function notifyForDecision(
     // Cheap exit first: most decisions raise nothing.
     const draft = notificationForDecision(tenantId, agentId, "", decision, request);
     if (!draft) return;
-    if (await wasRecentlyNotified(tenantId, draft.type, agentId, THROTTLE_MINUTES / (24 * 60))) return;
+    // The organization's throttle (Global Configuration); THROTTLE_MINUTES is its default.
+    const throttleMinutes = (await getTenantConfig(tenantId))["runtime.alertThrottleMinutes"] ?? THROTTLE_MINUTES;
+    if (await wasRecentlyNotified(tenantId, draft.type, agentId, throttleMinutes / (24 * 60))) return;
     const agentName = (await getAgentDisplayName(tenantId, agentId)) ?? "An agent";
-    const event = notificationForDecision(tenantId, agentId, agentName, decision, request);
+    const event = notificationForDecision(tenantId, agentId, agentName, decision, request, throttleMinutes);
     if (event) await notify(event);
   } catch (err) {
     console.error("notifyForDecision failed", { decisionId: decision.decisionId, err });

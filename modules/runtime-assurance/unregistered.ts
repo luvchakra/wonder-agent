@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RuntimeEvent, RuntimeEventInput, UnregisteredAgentActivity } from "@/lib/shared/types/runtime";
@@ -55,7 +56,9 @@ export function groupUnregisteredActivity(rows: Row[]): UnregisteredAgentActivit
 
 export async function listUnregisteredAgentActivity(tenantId: string): Promise<UnregisteredAgentActivity[]> {
   const supabase = await supabaseServer();
-  const since = new Date(Date.now() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  // The organization's window (Global Configuration); WINDOW_DAYS is its default.
+  const windowDays = (await getTenantConfig(tenantId))["runtime.unregisteredWindowDays"] ?? WINDOW_DAYS;
+  const since = new Date(Date.now() - windowDays * 24 * 60 * 60 * 1000).toISOString();
   const { data, error } = await supabase
     .from("runtime_event_quarantine")
     .select("observed_agent_ref, source, application, tool, action, received_at")

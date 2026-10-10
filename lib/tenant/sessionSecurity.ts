@@ -23,6 +23,24 @@ export const ABSOLUTE_SESSION_MAX_MS = 12 * 60 * 60 * 1000; // 12 hours from sig
 export type SessionExpiryCheck = { expired: boolean; reason?: "idle" | "absolute" };
 
 /**
+ * The limits to apply. An organization's Global Configuration can shorten
+ * them (my_session_policy(), migration 0116); nothing can lengthen them past
+ * the two constants above, which stay the ceiling here as well.
+ */
+export type SessionLimits = { idleMs: number; absoluteMs: number };
+export const GLOBAL_SESSION_LIMITS: SessionLimits = { idleMs: IDLE_TIMEOUT_MS, absoluteMs: ABSOLUTE_SESSION_MAX_MS };
+
+/** Limits from an organization's policy (minutes idle, hours in all), never looser than the global ones. */
+export function sessionLimitsFrom(policy: { idleMinutes?: unknown; maxHours?: unknown } | null | undefined): SessionLimits {
+  const idle = Number(policy?.idleMinutes);
+  const hours = Number(policy?.maxHours);
+  return {
+    idleMs: Number.isFinite(idle) && idle > 0 ? Math.min(idle * 60_000, IDLE_TIMEOUT_MS) : IDLE_TIMEOUT_MS,
+    absoluteMs: Number.isFinite(hours) && hours > 0 ? Math.min(hours * 3_600_000, ABSOLUTE_SESSION_MAX_MS) : ABSOLUTE_SESSION_MAX_MS,
+  };
+}
+
+/**
  * Pure function (no cookie I/O) so it's unit-testable — proxy.ts reads the
  * two cookie values and calls this to decide whether to force sign-out.
  * Missing cookie values (e.g. a session established before this story
@@ -33,11 +51,14 @@ export function checkSessionExpiry(
   startedAtMs: number | null,
   lastSeenMs: number | null,
   now: number = Date.now(),
+  limits: SessionLimits = GLOBAL_SESSION_LIMITS,
 ): SessionExpiryCheck {
-  if (startedAtMs !== null && now - startedAtMs > ABSOLUTE_SESSION_MAX_MS) {
+  const absoluteMs = Math.min(limits.absoluteMs, ABSOLUTE_SESSION_MAX_MS);
+  const idleMs = Math.min(limits.idleMs, IDLE_TIMEOUT_MS);
+  if (startedAtMs !== null && now - startedAtMs > absoluteMs) {
     return { expired: true, reason: "absolute" };
   }
-  if (lastSeenMs !== null && now - lastSeenMs > IDLE_TIMEOUT_MS) {
+  if (lastSeenMs !== null && now - lastSeenMs > idleMs) {
     return { expired: true, reason: "idle" };
   }
   return { expired: false };

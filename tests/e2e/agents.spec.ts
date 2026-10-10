@@ -7,7 +7,7 @@ test.describe("Identity module — agents", () => {
 
   test("list page shows the register-agent entry point", async ({ page }) => {
     await page.goto("/agents");
-    await expect(page.getByRole("heading", { name: "AI Agents" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "AI Agents" })).toBeVisible();
     await expect(page.getByRole("link", { name: "+ Register agent" })).toBeVisible();
   });
 

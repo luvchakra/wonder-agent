@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -170,7 +171,11 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     const agents = await listAgents(tenantId);
     await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.privilegeLevel === "elevated" || grant.privilegeLevel === "admin");
   } else if (input.scopeType === "high_risk_agent") {
-    const threshold = typeof input.scope?.minRiskScore === "number" ? (input.scope.minRiskScore as number) : HIGH_RISK_SCORE_THRESHOLD;
+    // The campaign's own threshold, else the organization's (Global Configuration), else HIGH_RISK_SCORE_THRESHOLD.
+    const threshold =
+      typeof input.scope?.minRiskScore === "number"
+        ? (input.scope.minRiskScore as number)
+        : ((await getTenantConfig(tenantId))["certification.highRiskScore"] ?? HIGH_RISK_SCORE_THRESHOLD);
     const agents = (await listAgents(tenantId)).filter((a) => a.riskScore !== null && a.riskScore >= threshold);
     await populateCertificationItems(tenantId, campaign.id, agents, input);
   }

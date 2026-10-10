@@ -1403,6 +1403,33 @@ budget, with production first.
    "Deployment was blocked" statuses. It counts against its own account,
    not this one, but it should be disconnected when the owner can.
 
+### 19.11 Global Configuration (adopted 2026-10-10)
+
+Owner request: an organization-wide settings page (Admin › Global
+Configuration, `/settings/configuration`) for the rules that shape how
+WonderID behaves.
+
+1. **One registry.** Every setting is defined once in
+   `lib/config/registry.ts`: key, section, label, one line of help, type,
+   bounds, default and the permission that changes it. Code reads values
+   with `getTenantConfig(tenantId)` (`lib/config/tenantConfig.ts`).
+2. **Only settings that do something.** A setting is added to the registry
+   only together with the code that reads it. Its default is the behaviour
+   before the setting existed. A rule nobody runs (for example a cadence
+   no job applies) is not exposed.
+3. **Safe values.** Stored values are checked on read; a missing, unknown or
+   out-of-range value is the default. An unreadable store means defaults,
+   logged. Session settings can only tighten the global limits in
+   `lib/tenant/sessionSecurity.ts`; `proxy.ts` applies the strictest of a
+   member's organizations (`my_session_policy()`).
+4. **Versioned and audited.** Every save is a version
+   (`tenant_config_versions`, append-only) written by
+   `save_tenant_config()` only if the saver saw the latest version, and an
+   audit event (`tenant.config_updated` / `tenant.config_restored`) with
+   each change from and to. Restore makes a new version.
+5. **Help.** A new setting is described in the help guide's Global
+   Configuration article.
+
 ### 19.10 Record provenance on every object (adopted 2026-10-10)
 
 Owner decision: every object shows **created by, created on, updated by and

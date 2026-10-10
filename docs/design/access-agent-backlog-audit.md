@@ -2187,3 +2187,9 @@ filter; no service role. The conflicts page needs `audit.read` because it
 shows audit records. No schema change.
 
 **Verified.** As in the Experience log for EXPERIENCE-P0-27.
+
+### 2026-10-10 — Reads the organization's Global Configuration (owner request)
+
+`modules/access-governance/accounts.ts` and `accountRules.ts`: the dormant threshold, when not given, is the organization's setting (`access.dormantDays`); `parseDormantDays()` takes a fallback; the Accounts page and `/api/v1/access/accounts` start from it. Defaults equal the previous constants. Cross-module change by explicit
+owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
+Foundation log).

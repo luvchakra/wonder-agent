@@ -928,3 +928,14 @@ module's object tables: `billing_profiles`, `feature_flags`. Additive; no servic
 CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
 log, the page work in the Experience log. A new object table of this module
 follows the same pattern and joins `lib/provenance/tables.ts`.
+
+### 2026-10-10 — PLATFORM-P0-13 first slice: Global Configuration (owner request)
+
+The customer-facing Configuration Studio starts as Admin › Global
+Configuration: versioned organization settings with history and restore,
+built on Foundation's `tenant_settings` (migration 0116, `lib/config`).
+Detail and verification are in the Foundation and Experience logs. The
+vendor-only `/platform-admin` boundary is unchanged. Still to do: the
+declarative configuration objects the spec lists (identity types,
+templates, workflows, terminology, navigation visibility), draft, simulate,
+approve and environment promotion.

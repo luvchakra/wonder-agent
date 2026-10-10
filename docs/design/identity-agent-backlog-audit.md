@@ -1530,3 +1530,9 @@ module's object tables: `agents`, `agent_identities`, `agent_contracts`, `agent_
 CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
 log, the page work in the Experience log. A new object table of this module
 follows the same pattern and joins `lib/provenance/tables.ts`.
+
+### 2026-10-10 — Reads the organization's Global Configuration (owner request)
+
+`modules/agent-identity/duplicates.ts`: the duplicate match threshold is the organization's setting (`agents.duplicateMatchPercent`, default 60%). Defaults equal the previous constants. Cross-module change by explicit
+owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
+Foundation log).

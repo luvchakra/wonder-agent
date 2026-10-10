@@ -4,12 +4,40 @@ import { getOptionalSupabasePublishableKey, getOptionalSupabaseUrl } from "@/lib
 import {
   SESSION_LAST_SEEN_COOKIE,
   SESSION_STARTED_COOKIE,
+  GLOBAL_SESSION_LIMITS,
   checkSessionExpiry,
   isAuthServiceUnavailable,
+  sessionLimitsFrom,
+  type SessionLimits,
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 import { baseAppHost, parseTenantHost } from "@/lib/tenant/host";
 import { isCrossSiteApiWrite } from "@/lib/security/origin";
+
+/**
+ * Session limits per user, from their organizations' Global Configuration
+ * (my_session_policy(), migration 0116: the strictest, never looser than
+ * the global limits). Held for a minute per user so a page costs no extra
+ * round trip; bounded, and keyed by user id, never shared between users
+ * (§14). A failed read applies the global limits, which are the ceiling
+ * anyway, so a failure never lengthens a session.
+ */
+const SESSION_POLICY_TTL_MS = 60_000;
+const SESSION_POLICY_MAX = 5_000;
+const sessionPolicyCache = new Map<string, { limits: SessionLimits; at: number }>();
+
+async function sessionLimitsFor(supabase: ReturnType<typeof createServerClient>, userId: string): Promise<SessionLimits> {
+  const now = Date.now();
+  const hit = sessionPolicyCache.get(userId);
+  if (hit && now - hit.at < SESSION_POLICY_TTL_MS) return hit.limits;
+  const { data, error } = await supabase.rpc("my_session_policy");
+  if (error) return GLOBAL_SESSION_LIMITS;
+  const row = (Array.isArray(data) ? data[0] : data) as { idle_minutes?: number; max_hours?: number } | null;
+  const limits = sessionLimitsFrom({ idleMinutes: row?.idle_minutes, maxHours: row?.max_hours });
+  if (sessionPolicyCache.size >= SESSION_POLICY_MAX) sessionPolicyCache.clear();
+  sessionPolicyCache.set(userId, { limits, at: now });
+  return limits;
+}
 
 /**
  * Reachable without a session. Everything else under the matcher needs one.
@@ -227,6 +255,8 @@ export async function proxy(request: NextRequest) {
     const { expired } = checkSessionExpiry(
       startedAt ? Number(startedAt) : null,
       lastSeen ? Number(lastSeen) : null,
+      Date.now(),
+      await sessionLimitsFor(supabase, user.id),
     );
 
     if (expired) {
