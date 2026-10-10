@@ -1,0 +1,58 @@
+# Planet Express public endpoints. Caddy obtains a certificate per host.
+# CADDY_GLOBAL_OPTIONS lets a local test use its own CA ("local_certs").
+{
+	email {$ACME_EMAIL}
+	{$CADDY_GLOBAL_OPTIONS}
+}
+
+(common) {
+	encode gzip
+	header -Server
+}
+
+hr.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy frappe-frontend:8080
+}
+
+sso.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy keycloak:8080
+}
+
+git.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy gitea:3000
+}
+
+chat.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy mattermost:8065
+}
+
+files.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy nextcloud:80
+}
+
+vault.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy openbao:8200
+}
+
+s3.{$DEMO_DOMAIN} {
+	import common
+	reverse_proxy seaweedfs:8333
+}
+
+k8s.{$DEMO_DOMAIN} {
+	import common
+	# The API server's certificate is checked against the cluster's own CA
+	# (up.sh copies it out of the kubeconfig k3s writes).
+	reverse_proxy https://k3s:6443 {
+		transport http {
+			tls_trust_pool file /etc/caddy/kube/k3s-ca.crt
+			tls_server_name k3s
+		}
+	}
+}

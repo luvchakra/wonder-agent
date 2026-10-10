@@ -12,7 +12,8 @@ export default async function NewIntegrationPage() {
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const types = await listIntegrationTypes();
+  // Connector integrations are created from the connector catalog, which supplies their definition.
+  const types = (await listIntegrationTypes()).filter((t) => t.id !== "connector");
 
   return (
     <div className="mx-auto max-w-lg space-y-4">

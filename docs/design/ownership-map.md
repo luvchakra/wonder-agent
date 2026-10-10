@@ -100,6 +100,7 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `integration_sync_jobs` | INT | Async job records (status, counts, errors, correlation id) |
 | `integration_objects` | INT | Raw imported objects prior to normalization |
 | `integration_mappings` | INT | Field/object mapping configuration per integration |
+| `connector_definitions` | INT | An organization's own connector definitions (immutable versions; built-in definitions live in `modules/integrations/framework/definitions`) |
 | `notifications` | OA | In-app/email notification records |
 | `reports` | OA | Saved/scheduled report definitions |
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
@@ -277,7 +278,7 @@ consume and persist into their own tables.
 | `/api/v1/auth`, `/api/v1/users`, `/api/v1/roles`, `/api/v1/tenant`, `/api/v1/sso` | FA |
 | `/api/v1/agents`, `/api/v1/agents/:id` | IA |
 | `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `:id/lifecycle`, `relationships/:id`, `attributes`, `lifecycle-tasks`) | IA |
-| `/api/v1/integrations` (incl. `identity-sources`, `correlations`) | INT |
+| `/api/v1/integrations` (incl. `identity-sources`, `correlations`, `connectors`, `:id/connector-credentials`) | INT |
 | `/api/v1/access`, `/api/v1/policies` | AA |
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |

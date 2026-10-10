@@ -1,0 +1,335 @@
+# Planet Express — an open-source company for WonderID to govern.
+# See demo-org/README.md. Every value comes from .env (scripts/init-env.sh).
+#
+# Public endpoints (Caddy, automatic HTTPS):
+#   hr.<domain>     Frappe HR + ERPNext      sso.<domain>   Keycloak
+#   git.<domain>    Gitea                    chat.<domain>  Mattermost
+#   files.<domain>  Nextcloud                vault.<domain> OpenBao
+#   s3.<domain>     SeaweedFS (S3 API)       k8s.<domain>   Kubernetes API (k3s)
+# Direct TLS ports, certificates from the company's internal CA:
+#   ldap.<domain>:636  OpenLDAP (LDAPS)      db.<domain>:5432 PostgreSQL
+
+name: planet-express
+
+x-frappe: &frappe
+  image: ghcr.io/frappe/hrms:v16.50.0
+  restart: unless-stopped
+  volumes:
+    - frappe-sites:/home/frappe/frappe-bench/sites
+    - frappe-logs:/home/frappe/frappe-bench/logs
+  networks: [corp]
+
+services:
+  caddy:
+    image: caddy:2.11.7-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DEMO_DOMAIN: ${DEMO_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL}
+      CADDY_GLOBAL_OPTIONS: ${CADDY_GLOBAL_OPTIONS:-}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./generated/kube:/etc/caddy/kube:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [corp]
+
+  # ---------- Infrastructure databases (internal only) ----------
+  appdb:
+    image: postgres:17.11
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${APPDB_PASSWORD}
+      APP_PASSWORD: ${APPDB_PASSWORD}
+    volumes:
+      - appdb-data:/var/lib/postgresql/data
+      - ./postgres/appdb-init.sh:/docker-entrypoint-initdb.d/10-apps.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+    networks: [corp]
+
+  mariadb:
+    image: mariadb:11.8.9
+    restart: unless-stopped
+    command: [--character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci, --skip-character-set-client-handshake]
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+    volumes: [mariadb-data:/var/lib/mysql]
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      retries: 30
+    networks: [corp]
+
+  redis-cache:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+    networks: [corp]
+
+  redis-queue:
+    image: redis:6.2-alpine
+    restart: unless-stopped
+    volumes: [redis-queue-data:/data]
+    networks: [corp]
+
+  # ---------- HR (system of record) and finance: Frappe HR + ERPNext ----------
+  frappe-configurator:
+    <<: *frappe
+    restart: "no"
+    entrypoint: [bash, -c]
+    command:
+      - >
+        ls -1 apps > sites/apps.txt;
+        bench set-config -g db_host mariadb;
+        bench set-config -gp db_port 3306;
+        bench set-config -g redis_cache redis://redis-cache:6379;
+        bench set-config -g redis_queue redis://redis-queue:6379;
+        bench set-config -g redis_socketio redis://redis-queue:6379;
+        bench set-config -gp socketio_port 9000;
+    depends_on:
+      mariadb: { condition: service_healthy }
+
+  frappe-create-site:
+    <<: *frappe
+    restart: "no"
+    entrypoint: [bash, -c]
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      FRAPPE_ADMIN_PASSWORD: ${FRAPPE_ADMIN_PASSWORD}
+    command:
+      - >
+        wait-for-it -t 180 mariadb:3306;
+        until grep -qs redis_queue sites/common_site_config.json; do sleep 3; done;
+        if [ -d sites/frontend ]; then echo "site exists"; else
+        bench new-site frontend --mariadb-user-host-login-scope='%'
+        --admin-password="$$FRAPPE_ADMIN_PASSWORD" --db-root-username=root
+        --db-root-password="$$MARIADB_ROOT_PASSWORD"
+        --install-app erpnext --install-app hrms --set-default; fi
+    depends_on:
+      frappe-configurator: { condition: service_completed_successfully }
+
+  frappe-backend:
+    <<: *frappe
+    depends_on:
+      frappe-create-site: { condition: service_completed_successfully }
+
+  frappe-frontend:
+    <<: *frappe
+    command: [nginx-entrypoint.sh]
+    environment:
+      BACKEND: frappe-backend:8000
+      SOCKETIO: frappe-websocket:9000
+      FRAPPE_SITE_NAME_HEADER: frontend
+      UPSTREAM_REAL_IP_ADDRESS: 0.0.0.0/0
+      UPSTREAM_REAL_IP_HEADER: X-Forwarded-For
+      UPSTREAM_REAL_IP_RECURSIVE: "off"
+      PROXY_READ_TIMEOUT: 120
+      CLIENT_MAX_BODY_SIZE: 50m
+    depends_on: [frappe-backend, frappe-websocket]
+
+  frappe-websocket:
+    <<: *frappe
+    command: [node, /home/frappe/frappe-bench/apps/frappe/socketio.js]
+    depends_on:
+      frappe-configurator: { condition: service_completed_successfully }
+
+  frappe-worker:
+    <<: *frappe
+    command: [bench, worker, --queue, "long,default,short"]
+    depends_on:
+      frappe-create-site: { condition: service_completed_successfully }
+
+  frappe-scheduler:
+    <<: *frappe
+    command: [bench, schedule]
+    depends_on:
+      frappe-create-site: { condition: service_completed_successfully }
+
+  # ---------- Workforce identity provider ----------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    restart: unless-stopped
+    command: [start, --optimized=false]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://appdb:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${APPDB_PASSWORD}
+      KC_HOSTNAME: https://sso.${DEMO_DOMAIN}
+      KC_PROXY_HEADERS: xforwarded
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      JAVA_OPTS_APPEND: -Xms256m -Xmx768m
+    depends_on:
+      appdb: { condition: service_healthy }
+    networks: [corp]
+
+  # ---------- Legacy directory (the original Planet Express LDAP) ----------
+  openldap:
+    image: rroemhild/test-openldap:2.1
+    restart: unless-stopped
+    ports: ["636:10636"]
+    volumes:
+      - ./certs/ldap.crt:/etc/ldap/ssl/ldap.crt:ro
+      - ./certs/ldap.key:/etc/ldap/ssl/ldap.key:ro
+    networks: [corp]
+
+  # ---------- Applications ----------
+  gitea:
+    image: gitea/gitea:28.1.0
+    restart: unless-stopped
+    environment:
+      USER_UID: "1000"
+      USER_GID: "1000"
+      GITEA__database__DB_TYPE: postgres
+      GITEA__database__HOST: appdb:5432
+      GITEA__database__NAME: gitea
+      GITEA__database__USER: gitea
+      GITEA__database__PASSWD: ${APPDB_PASSWORD}
+      GITEA__server__ROOT_URL: https://git.${DEMO_DOMAIN}/
+      GITEA__server__DOMAIN: git.${DEMO_DOMAIN}
+      GITEA__security__INSTALL_LOCK: "true"
+      GITEA__service__DISABLE_REGISTRATION: "true"
+      GITEA__actions__ENABLED: "true"
+    volumes: [gitea-data:/data]
+    depends_on:
+      appdb: { condition: service_healthy }
+    networks: [corp]
+
+  mattermost:
+    image: mattermost/mattermost-team-edition:11.7.12
+    restart: unless-stopped
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: postgres://mattermost:${APPDB_PASSWORD}@appdb:5432/mattermost?sslmode=disable&connect_timeout=10
+      MM_SERVICESETTINGS_SITEURL: https://chat.${DEMO_DOMAIN}
+      MM_SERVICESETTINGS_ENABLELOCALMODE: "true"
+      MM_SERVICESETTINGS_ENABLEUSERACCESSTOKENS: "true"
+      MM_SERVICESETTINGS_ENABLEBOTACCOUNTCREATION: "true"
+      MM_SERVICESETTINGS_ENABLEINCOMINGWEBHOOKS: "true"
+      MM_TEAMSETTINGS_ENABLEOPENSERVER: "false"
+      MM_TEAMSETTINGS_MAXUSERSPERTEAM: "1000"
+      MM_PLUGINSETTINGS_ENABLEUPLOADS: "false"
+    volumes:
+      - mattermost-data:/mattermost/data
+      - mattermost-config:/mattermost/config
+    depends_on:
+      appdb: { condition: service_healthy }
+    networks: [corp]
+
+  nextcloud:
+    image: nextcloud:32.0.15-apache
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: appdb
+      POSTGRES_DB: nextcloud
+      POSTGRES_USER: nextcloud
+      POSTGRES_PASSWORD: ${APPDB_PASSWORD}
+      NEXTCLOUD_ADMIN_USER: admin
+      NEXTCLOUD_ADMIN_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_TRUSTED_DOMAINS: files.${DEMO_DOMAIN} nextcloud
+      OVERWRITEPROTOCOL: https
+      OVERWRITEHOST: files.${DEMO_DOMAIN}
+      TRUSTED_PROXIES: 172.16.0.0/12 10.0.0.0/8 192.168.0.0/16
+    volumes: [nextcloud-data:/var/www/html]
+    depends_on:
+      appdb: { condition: service_healthy }
+    networks: [corp]
+
+  # ---------- Business data (governed database; LDAPS-style direct TLS) ----------
+  corpdb:
+    image: postgres:17.11
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    # PostgreSQL insists its key is private to the postgres user, so the
+    # certificate pair is copied in with that ownership before start.
+    entrypoint: [bash, -c]
+    command:
+      - >
+        install -o postgres -g postgres -m 600 /certs/db.key /var/lib/postgresql/server.key &&
+        install -o postgres -g postgres -m 644 /certs/db.crt /var/lib/postgresql/server.crt &&
+        exec docker-entrypoint.sh postgres -c ssl=on
+        -c ssl_cert_file=/var/lib/postgresql/server.crt -c ssl_key_file=/var/lib/postgresql/server.key
+        -c password_encryption=scram-sha-256 -c log_connections=on
+    environment:
+      POSTGRES_PASSWORD: ${CORPDB_PASSWORD}
+      POSTGRES_DB: delivery
+    volumes:
+      - corpdb-data:/var/lib/postgresql/data
+      - ./certs/db.crt:/certs/db.crt:ro
+      - ./certs/db.key:/certs/db.key:ro
+      - ./postgres/corpdb-hba.sh:/docker-entrypoint-initdb.d/00-hba.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      retries: 20
+    networks: [corp]
+
+  # ---------- Object storage ----------
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.99
+    restart: unless-stopped
+    command: [server, -dir=/data, -s3, -s3.port=8333, -s3.config=/etc/seaweedfs/s3.json, -master.volumeSizeLimitMB=256, -volume.max=20]
+    volumes:
+      - seaweedfs-data:/data
+      - ./generated/s3.json:/etc/seaweedfs/s3.json:ro
+    networks: [corp]
+
+  # ---------- Secrets ----------
+  openbao:
+    image: openbao/openbao:2.7.1
+    restart: unless-stopped
+    command: [server, -config=/etc/openbao/bao.hcl]
+    volumes:
+      - ./openbao/bao.hcl:/etc/openbao/bao.hcl:ro
+      - openbao-data:/openbao/data
+    networks: [corp]
+
+  # ---------- Workloads (Kubernetes) ----------
+  k3s:
+    image: rancher/k3s:v1.35.9-k3s1
+    restart: unless-stopped
+    privileged: true
+    command: [server, --disable=traefik, --disable=metrics-server, "--tls-san=k8s.${DEMO_DOMAIN}", --tls-san=k3s, --write-kubeconfig-mode=644, --kubelet-arg=fail-cgroupv1=false]
+    tmpfs: [/run, /var/run]
+    volumes:
+      - k3s-data:/var/lib/rancher/k3s
+      - ./generated/kube:/output
+    environment:
+      K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
+    networks: [corp]
+
+  # ---------- One-shot jobs ----------
+  seed:
+    build: ./seed
+    profiles: [tools]
+    env_file: .env
+    volumes:
+      - ./generated:/generated
+      - ./certs:/certs:ro
+    networks: [corp]
+
+volumes:
+  caddy-data:
+  caddy-config:
+  appdb-data:
+  corpdb-data:
+  mariadb-data:
+  redis-queue-data:
+  frappe-sites:
+  frappe-logs:
+  gitea-data:
+  mattermost-data:
+  mattermost-config:
+  nextcloud-data:
+  seaweedfs-data:
+  openbao-data:
+  k3s-data:
+
+networks:
+  corp:

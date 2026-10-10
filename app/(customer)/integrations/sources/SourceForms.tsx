@@ -71,11 +71,8 @@ const TEMPLATE_MAPPINGS: Record<string, AttributeMapping[]> = {
     { source: "name", target: "displayName" },
     { source: "email", target: "email" },
   ],
-  integration: [
-    { source: "externalId", target: "externalId" },
-    { source: "normalized.displayName", target: "displayName" },
-    { source: "normalized.email", target: "email" },
-  ],
+  // Connectors normalize records to the same field names (modules/integrations/framework).
+  integration: IDENTITY_SOURCE_TARGETS.map((target) => ({ source: target === "externalId" ? "externalId" : `normalized.${target}`, target })),
 };
 
 function MappingEditor({ initial }: { initial: AttributeMapping[] }) {
