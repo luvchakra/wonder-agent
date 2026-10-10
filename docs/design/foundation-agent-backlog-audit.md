@@ -2763,3 +2763,24 @@ function) is intended, like `current_tenant_ids()`. No secret is stored.
 agent defaults and audit retention (the rest of FOUNDATION-P0-27); the
 declarative configuration objects, draft/simulate/approve and environment
 promotion (the rest of PLATFORM-P0-13).
+
+### 2026-10-10 — Browser run for Global Configuration; stale auth tests fixed
+
+Local Playwright on a fresh build: `global-configuration`, `auth`,
+`authorization`, `tenant-address`, `shell`, `navigation-smoke` and
+`account-inventory`: 111 of 114 passed. The three failures were not from
+this change and are fixed in it:
+- `auth.spec.ts` "each button really starts its OAuth flow" and "when a
+  social provider is not enabled…" still expected the behaviour before #31,
+  which shows a provider that is not switched on as disabled ("Not available
+  yet"); the sign-in page reads that on the server, so the browser stub did
+  not apply. They now check that every enabled button starts its flow
+  (sign-up stubbed enabled; sign-in per the real project) and that a
+  provider that is off is disabled and never leaves the app. 3/3 passed.
+- `auth.spec.ts` "a REQUESTER … can view agents" and `agents.spec.ts`
+  looked up the heading "AI Agents", which since #38 also names the open
+  area menu in the sidebar; they now target the page title (level 1).
+  15/15 passed.
+One later local setup sign-in stalled on the sign-in page (auth
+rate-limiting after many local runs this hour); the tests that need no
+signed-in user were run without it.

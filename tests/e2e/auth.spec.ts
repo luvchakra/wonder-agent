@@ -92,17 +92,17 @@ test.describe("unauthenticated", () => {
     { name: "LinkedIn", provider: "linkedin_oidc" },
   ] as const;
 
-  test("both auth screens offer Google, Microsoft and LinkedIn, and each button really starts its OAuth flow", async ({ page }) => {
+  test("both auth screens offer Google, Microsoft and LinkedIn, and each enabled button really starts its OAuth flow", async ({ page }) => {
     // Asserts each button is wired, not merely present, without depending on
     // anything outside this app: the click is expected to navigate to
     // Supabase Auth's own /auth/v1/authorize endpoint (which is what then
     // forwards to the provider), so the request is intercepted there and its
-    // URL is checked. Deliberately not asserting a real trip to the provider
-    // — that needs it enabled on the project AND egress this sandbox's
-    // TLS-intercepting proxy doesn't allow.
-    // Each button first asks Supabase Auth whether its provider is enabled
-    // (none is on the dev project), so that answer is stubbed to "enabled"
-    // here; the disabled path has its own test below.
+    // URL is checked. Deliberately not asserting a real trip to the provider.
+    // Since 2026-10-10 (#31) a provider Supabase Auth has not turned on is
+    // shown disabled. Sign-up reads that in the browser, so it is stubbed to
+    // "enabled" there; sign-in reads it on the server from the real project,
+    // so there each button is either enabled (and must start its flow) or
+    // disabled and says "not available yet".
     await page.route("**/auth/v1/settings**", (route) =>
       route.fulfill({
         status: 200,
@@ -110,7 +110,7 @@ test.describe("unauthenticated", () => {
         body: JSON.stringify({ external: { google: true, azure: true, linkedin_oidc: true, email: true } }),
       }),
     );
-    for (const path of ["/sign-in", "/sign-up"]) {
+    for (const [path, verb] of [["/sign-up", "Sign up"], ["/sign-in", "Sign in"]] as const) {
       for (const { name, provider } of SOCIAL) {
         let authorizeUrl: string | null = null;
         await page.route("**/auth/v1/authorize**", async (route) => {
@@ -122,8 +122,14 @@ test.describe("unauthenticated", () => {
         });
 
         await page.goto(path);
-        const button = page.getByRole("button", { name: new RegExp(`with ${name}$`) });
+        const button = page.getByRole("button", { name: new RegExp(`^${verb} with ${name}(, not available yet)?$`) });
         await expect(button).toBeVisible();
+        if (await button.isDisabled()) {
+          expect(path, `${name} is disabled on ${path}`).toBe("/sign-in");
+          await expect(button).toContainText("Not available yet");
+          await page.unroute("**/auth/v1/authorize**");
+          continue;
+        }
         await button.click();
 
         await page.waitForURL(new RegExp(`/auth/v1/authorize\\?.*provider=${provider}(&|$)`), { timeout: 10_000 });
@@ -155,7 +161,7 @@ test.describe("unauthenticated", () => {
     await expect(page).toHaveURL(/\/sign-in\?reason=oauth_failed$/);
   });
 
-  test("when a social provider is not enabled, its button says so instead of leaving the app", async ({ page }) => {
+  test("a social provider that is not set up is shown disabled and never leaves the app", async ({ page }) => {
     await page.route("**/auth/v1/settings**", (route) =>
       route.fulfill({
         status: 200,
@@ -168,14 +174,13 @@ test.describe("unauthenticated", () => {
       authorizeCalled = true;
       await route.abort();
     });
-    for (const path of ["/sign-in", "/sign-up"]) {
-      await page.goto(path);
-      for (const { name } of SOCIAL) {
-        await page.getByRole("button", { name: new RegExp(`with ${name}$`) }).click();
-        await expect(page.getByText(`${name} sign-in is not enabled`, { exact: false })).toBeVisible();
-        await expect(page).toHaveURL(new RegExp(`${path}$`));
-      }
+    await page.goto("/sign-up");
+    for (const { name } of SOCIAL) {
+      const button = page.getByRole("button", { name: `Sign up with ${name}, not available yet` });
+      await expect(button).toBeDisabled();
+      await expect(button).toContainText("Not available yet");
     }
+    await expect(page).toHaveURL(/\/sign-up$/);
     expect(authorizeCalled).toBe(false);
   });
 
@@ -542,7 +547,7 @@ test.describe("RBAC — negative permission checks", () => {
     const context = await browser.newContext({ storageState: authFile("requester") });
     const page = await context.newPage();
     await page.goto("/agents");
-    await expect(page.getByRole("heading", { name: "AI Agents" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "AI Agents" })).toBeVisible();
 
     await page.goto("/policies");
     await expect(page.getByText(/an unexpected error occurred/i)).toBeVisible();
