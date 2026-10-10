@@ -3629,6 +3629,12 @@ default scrollbar, a bright light track on the dark rail. It now uses a
 
 Checked by rendering the CSS in Chromium with scrollbars on: a resting
 sidebar shows no bar, a hovered one a thin muted thumb.
+
+**Browser tests on Vercel (before merging PR #30).** The specs were shell,
+design-review, navigation-smoke, branding, permission-catalog and
+first-organization (deployment `DGq3WSvPVtVidTk6buK3Hq5jgCyk`): **87 passed,
+0 failed, 0 flaky**, in 13 min. The first attempt failed only on the Vercel
+Toolbar's script; the cause and fix are in the QA log.
 ### 2026-10-10 — Sign-in: methods that are not set up show disabled
 
 **Why.** Owner request: "unless these options are working keep them
