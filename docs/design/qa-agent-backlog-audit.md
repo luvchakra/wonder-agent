@@ -1290,3 +1290,28 @@ test build (#16).
     agent. The spec passes locally, 11/11 on the same commit. The
     difference is under investigation; the summary now prints six lines of
     each error to show where the page went.
+
+### 2026-10-10 — Clean two-half run on Vercel
+
+This was the first run after the other Vercel project stopped building the
+test branches (#18).
+
+- **Half 1** (`e2e/nightly-1`, 2 cores, iad1): **185 passed, 1 failed,
+  1 flaky, 25 min.**
+  - `gateway-enforcement`, which had failed while the other project's
+    suite ran at the same time, passed.
+  - The only failure was `branding.spec.ts:47`, the sign-in screenshot:
+    5,023 pixels (2%) differed, against a 1% tolerance. The baselines are
+    Ubuntu renders (`*-chromium-linux.png`), and the builder renders text on
+    Amazon Linux 2023.
+  - Next step: environment-specific baselines recorded on the Vercel
+    builder, not a looser tolerance.
+- **Half 2** (`e2e/nightly-2`) was CANCELED about 4 minutes into its tests,
+  after 26 minutes queued behind half 1.
+  - The build log ends mid-run with no error.
+  - No other deployment of the project was created at that time.
+  - The cause is not known.
+- **Rule:** never run Playwright locally, or anywhere else against the
+  shared database, while a run on Vercel is in progress. The suites share
+  the same test users, and their setup signs those users in again, which
+  ends the other run's sessions.
