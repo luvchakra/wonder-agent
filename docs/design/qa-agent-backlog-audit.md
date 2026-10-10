@@ -1444,3 +1444,21 @@ every route. Each page logged the same console error: the CSP blocked
   never carries the script, and the app's CSP is unchanged.
 - The result of the re-run is recorded in the experience audit log's
   sidebar entry.
+
+### 2026-10-10 — Fewer E2E runs before merging (owner decision)
+
+The owner asked for fewer E2E runs. Pre-merge spec runs on Vercel had been
+started for most pull requests, UI work included.
+
+- **Decision.** Affected specs run before a merge only for a
+  security-sensitive change:
+  - sign-in, sessions or `proxy.ts`;
+  - tenant resolution;
+  - RBAC and permissions;
+  - RLS and migrations;
+  - connectors, with their webhooks and file imports.
+
+  Everything else, UI work included, waits for the nightly full suite.
+- **Unchanged.** The nightly full suite still runs every night, and a red
+  nightly run is still fixed before anything else merges.
+- **Where.** `CLAUDE.md` §17.8 and `docs/ORCHESTRATION.md` §3.

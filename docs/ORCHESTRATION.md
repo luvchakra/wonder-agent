@@ -110,9 +110,10 @@ CI then runs, in parallel:
 - the dependency audit and secret scan.
 
 Do not merge until it is green. The full Playwright suite runs nightly
-(`e2e.yml`), and a red nightly run is fixed before anything else merges. For a
-genuinely risky change, run the affected specs first, locally or through a
-hand-started `e2e.yml` run.
+(`e2e.yml`), and a red nightly run is fixed before anything else merges. Run
+the affected specs before merging only for a security-sensitive change (the
+list in `CLAUDE.md` §17.8, narrowed by the owner on 2026-10-10), locally or
+through a hand-started `e2e.yml` run.
 
 ## 4. Shared database changes require ownership discipline
 
