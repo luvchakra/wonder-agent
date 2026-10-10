@@ -10,6 +10,7 @@ import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { ConnectorCapabilities, Integration, IntegrationType } from "@/lib/shared/types/integrations";
 import { toIntegration, toIntegrationType } from "./mappers";
 import { createConnector } from "./registry";
+import { capabilitiesOf, parseConnectorConfig } from "./framework/engine";
 import { getDecryptedCredential } from "./credentials";
 import { requireFeature } from "@/modules/platform-admin/service";
 
@@ -90,10 +91,16 @@ export async function createIntegration(
   let declared = (typeRow.default_capabilities ?? {}) as ConnectorCapabilities;
   if (input.capabilities !== undefined) {
     let supported: ConnectorCapabilities = typeRow.default_capabilities ?? {};
-    try {
+    if (input.integrationTypeId === "connector") {
+      // A connector connection supports exactly what its definition reads
+      // and receives, not the generic type's catalog defaults.
+      try {
+        supported = capabilitiesOf(parseConnectorConfig(input.config ?? {}).def);
+      } catch (err) {
+        throw new ApiError(400, "INVALID_INPUT", err instanceof Error ? err.message : "Invalid connector definition");
+      }
+    } else {
       supported = { ...supported, ...createConnector(input.integrationTypeId).capabilities };
-    } catch {
-      // Push-only types (webhook) have no connector: their catalog defaults are all they support.
     }
     declared = validateDeclaredCapabilities(input.capabilities, supported);
   }

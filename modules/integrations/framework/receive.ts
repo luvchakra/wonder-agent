@@ -125,7 +125,9 @@ const OUTCOME_FOR_CODE: Record<string, RuntimeOutcome> = {
   FEATURE_DISABLED: "monitoring_disabled",
 };
 
-async function recordEvent(conn: Connection, source: "mcp" | "rest" | "webhook", event: ReceivedRuntimeEvent): Promise<RuntimeOutcome> {
+type EventResult = { outcome: RuntimeOutcome; reason?: string; agentId?: string; eventId?: string };
+
+async function recordEvent(conn: Connection, source: "mcp" | "rest" | "webhook", event: ReceivedRuntimeEvent): Promise<EventResult> {
   const externalId = event.externalId ?? randomUUID();
   // The connection keeps its own evidence record of what it received.
   const { error } = await supabaseServiceRole()
@@ -143,10 +145,10 @@ async function recordEvent(conn: Connection, source: "mcp" | "rest" | "webhook",
       tool: event.tool,
       submittedEventTime: event.eventTime,
     });
-    return "quarantined_missing_agent_reference";
+    return { outcome: "quarantined_missing_agent_reference" };
   }
   try {
-    const { deduped } = await ingestRuntimeEventByReference(conn.tenantId, null, event.agentIdentityRef, {
+    const { event: recorded, deduped } = await ingestRuntimeEventByReference(conn.tenantId, null, event.agentIdentityRef, {
       eventTime: event.eventTime,
       source,
       tool: event.tool,
@@ -163,10 +165,11 @@ async function recordEvent(conn: Connection, source: "mcp" | "rest" | "webhook",
       // A redelivery of the same event maps to the same runtime event.
       dedupeKey: event.externalId ? `connect:${conn.id}:${event.externalId}` : undefined,
     });
-    return deduped ? "duplicate" : "recorded";
+    // The sender learns which agent its reference resolved to, as the old endpoint told it.
+    return { outcome: deduped ? "duplicate" : "recorded", agentId: recorded.agentId, eventId: recorded.id };
   } catch (err) {
     const outcome = err instanceof ApiError ? OUTCOME_FOR_CODE[err.code] : undefined;
-    if (outcome) return outcome;
+    if (outcome) return { outcome };
     throw err;
   }
 }
@@ -185,14 +188,14 @@ async function receiveRuntimeEvents(conn: Connection, rawBody: string, headers: 
   }
   const records = eventRecords(spec, body);
   if (typeof records === "string") return fail(400, "INVALID_INPUT", records);
-  const outcomes: { outcome: RuntimeOutcome; reason?: string }[] = [];
+  const outcomes: EventResult[] = [];
   for (const record of records) {
     const event = mapRuntimeEvent(spec, record);
     if (typeof event === "string") {
       outcomes.push({ outcome: "rejected", reason: event });
       continue;
     }
-    outcomes.push({ outcome: await recordEvent(conn, spec.source, event) });
+    outcomes.push(await recordEvent(conn, spec.source, event));
   }
   await touch(conn.tenantId, conn.id);
   const counts: Record<string, number> = {};
@@ -211,7 +214,7 @@ async function receiveRuntimeEvents(conn: Connection, rawBody: string, headers: 
   if (single) {
     const [o] = outcomes;
     if (o.outcome === "rejected") return fail(400, "INVALID_INPUT", o.reason ?? "invalid event");
-    return { status: 202, body: { ok: true, data: { runtime: o.outcome } } };
+    return { status: 202, body: { ok: true, data: { runtime: o.outcome, ...(o.agentId ? { agentId: o.agentId, eventId: o.eventId } : {}) } } };
   }
   return { status: 202, body: { ok: true, data: { received: outcomes.length, counts, outcomes } } };
 }

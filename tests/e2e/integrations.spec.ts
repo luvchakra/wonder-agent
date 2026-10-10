@@ -12,7 +12,9 @@ test.describe("Integration module", () => {
     await expect(page.getByRole("heading", { name: "Connect a system" })).toBeVisible();
     await expect(page.getByText("Frappe HR", { exact: true })).toBeVisible();
     // Every connection comes from a connector; the generic form is gone.
-    expect((await page.goto("/integrations/new"))?.status()).toBe(404);
+    // The customer layout streams, so a not-found page can answer 200: check what it shows.
+    await page.goto("/integrations/new");
+    await expect(page.getByText("This page could not be found.")).toBeVisible();
     await page.goto("/integrations/connectors/builtin/keycloak");
     await expect(page.getByRole("heading", { name: "Connect Keycloak" })).toBeVisible();
     await expect(page.getByLabel("Client secret")).toHaveAttribute("type", "password");

@@ -54,6 +54,8 @@ export default async function IntegrationDetailPage({
     throw err;
   }
 
+  // Not a connection id at all (e.g. /integrations/new): not found, not an error.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const integration = await getIntegration(ctx.tenantId!, id);
   if (!integration) notFound();
   const connector = connectorDefinition(integration);
