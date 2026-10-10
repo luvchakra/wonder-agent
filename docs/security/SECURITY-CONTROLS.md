@@ -94,5 +94,6 @@ them under the ePrivacy rules.
   `npm audit --omit=dev --audit-level=high` and a committed-secret scan.
 - `/.well-known/security.txt` (RFC 9116) for vulnerability reports. Replace
   the placeholder contact before production.
-- **Owner action required.** Turn on Supabase Auth leaked-password protection
-  (Dashboard → Authentication → Passwords). Set a real `security.txt` contact.
+- **Won't do (owner decision, 2026-10-10):** Supabase Auth leaked-password
+  protection stays off; the advisor warning is accepted.
+- **Owner action required.** Set a real `security.txt` contact.

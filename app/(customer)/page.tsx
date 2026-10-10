@@ -107,7 +107,11 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const rangeDays = RANGES.some((r) => r.value === rangeParam) ? Number(rangeParam) : DEFAULT_RANGE;
 
   const ctx = await getTenantContext();
-  const tenantId = ctx.tenantId!;
+  // Without an organization the layout redirects (onboarding or no-access),
+  // but Next renders this page alongside it; query nothing rather than send
+  // tenant_id=null to the database.
+  if (!ctx.tenantId) return null;
+  const tenantId = ctx.tenantId;
 
   const nowMs = new Date().getTime();
   const from = new Date(nowMs - rangeDays * DAY_MS).toISOString();
