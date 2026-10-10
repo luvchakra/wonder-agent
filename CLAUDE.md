@@ -1297,6 +1297,10 @@ beats exhaustive pre-push verification.
     scripts (`scripts/vercel-ignore-build.sh`).
   - It skips `next build`'s TypeScript pass, which CI's typecheck job already
     covers (`next.config.ts`).
+  - Working branches (`claude/**`, `module/**`) create no Vercel deployment
+    at all (`git.deploymentEnabled` in `vercel.json`). A skipped deployment
+    still counts toward the free plan's 100 deployments a day; on 2026-10-10
+    that limit blocked production.
 - Before changing navigation or information architecture, read:
   - `docs/design/UI-UX-DESIGN-RULES.md`;
   - `modules/ui/shell-nav.ts`;
