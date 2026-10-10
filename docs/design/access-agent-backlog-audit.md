@@ -2127,7 +2127,18 @@ labelled rogue yet (ACCESS-P0-25).
   (their indexes show as unused only because they are new).
 - E2E: `file-import.spec.ts` has a new test that imports a person's
   application, entitlement, account and access, then checks that their
-  Access tab shows "No approval found" twice. It runs on Vercel with this PR.
+  Access tab shows "No approval found" twice.
+  - Run locally, not on Vercel: Vercel's daily deployment limit was
+    reached.
+  - `file-import.spec.ts` + `identities.spec.ts`: **27 passed, 0 failed** in
+    2.6 min.
+  - The first local run failed 2 tests:
+    - The new test hit the 30 s timeout. Four imports through the File
+      imports connection take longer, so it is now `test.slow()`.
+    - `identities.spec.ts`, "the overview … links to each list", did not
+      find its machine identity on page one of the list. The shared E2E
+      organization keeps every run's identities (77 machine identities), so
+      the test now searches for its own.
 
 **Left out / handed on.**
 - ROGUE and LEGACY_EXCEPTION, and the drift findings, belong to

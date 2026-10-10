@@ -80,6 +80,8 @@ test.describe.serial("object-page CSV import and export", () => {
   });
 
   test("a person's access from a file is recorded, and their Access tab says no approval was found (ACCESS-P0-24)", async ({ page, request }) => {
+    // Four imports, each through the File imports connection.
+    test.slow();
     const app = `E2E Ledger App ${stamp}`;
     const ent = `E2E Ledger Read ${stamp}`;
     const acc = `e2e-ledger-acc-${stamp}`;
