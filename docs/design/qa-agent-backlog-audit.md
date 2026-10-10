@@ -1333,3 +1333,42 @@ test branches (#18).
 The owner asked for the schedule back, so it is restored (03:00 IST). Until
 the sign-in screenshot baselines are recorded for the Vercel builder, the
 nightly run is expected to fail on `branding.spec.ts:47` alone.
+
+### 2026-10-10 — Screenshot baselines per rendering environment
+
+**Diagnosis:**
+- On the sign-in page, every glyph is drawn in the Geist web font.
+  Chromium's `CSS.getPlatformFontsForNode`, run over the whole page,
+  reported only "Geist (web font)", and the page has no characters outside
+  ASCII, so no system font fallback is involved.
+- The 2% difference on the Vercel builder is therefore rasterization: the
+  same font hinted and anti-aliased by Amazon Linux's FreeType and font
+  configuration rather than Ubuntu's. No single setting makes the two
+  identical.
+
+**Fix:** each environment is compared with its own recording, at the same
+tolerance.
+- `playwright.config.ts` names baselines `*-linux-vercel.png` when
+  `E2E_SNAPSHOT_ENV=vercel`, which only `scripts/e2e-on-vercel.sh` sets.
+  Local runs keep `*-linux.png`.
+- **Recording:** the workflow's `record_baselines` input, used with chosen
+  specs, adds `record-baselines: yes` to the marker commit. The Vercel build
+  then:
+  1. runs `--update-snapshots=missing`, which never overwrites an existing
+     baseline;
+  2. copies the new images into `public/__e2e-baselines/` and builds again,
+     so that preview deployment serves them;
+  3. finishes successfully, even though Playwright marks the run failed
+     because it had to write baselines.
+
+  The images are reviewed and committed by hand.
+
+**Verified locally:**
+- Default paths: branding baseline spec 8/8 passed.
+- `E2E_SNAPSHOT_ENV=vercel`: the test looks for and writes
+  `sign-in-{desktop,mobile}-chromium-linux-vercel.png`.
+
+  The `-vercel` images written locally were Ubuntu renders and were
+  deleted, never committed.
+- Workflow marker commit and message parsing, checked against a throwaway
+  remote.
