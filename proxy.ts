@@ -270,8 +270,11 @@ export async function proxy(request: NextRequest) {
 
 // Public static files skip the proxy: the build's assets, the site icons,
 // the brand artwork (public/brand/), which the sign-in page shows before
-// anyone has a session, and the RFC 9116 security.txt
-// (public/.well-known/), which must be public. None of it is tenant data.
+// anyone has a session, the RFC 9116 security.txt (public/.well-known/),
+// which must be public, and the web app manifest (app/manifest.ts,
+// EXPERIENCE-P0-26), which browsers fetch without cookies, so behind the
+// session check it would be a redirect to /sign-in and the app could never
+// be installed. None of it is tenant data.
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|brand/|\.well-known/).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|icon.png|apple-icon.png|manifest.webmanifest|brand/|\.well-known/).*)"],
 };

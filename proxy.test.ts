@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
+import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
 
 let getUserResult: { data: { user: null }; error: unknown } = { data: { user: null }, error: null };
 // FOUNDATION-P0-22 — which labels name an organization, and how often the lookup is asked.
@@ -13,7 +14,7 @@ vi.mock("@supabase/ssr", () => ({ createServerClient: () => ({ auth: { getUser: 
 vi.mock("@/lib/db/env", () => ({ getOptionalSupabaseUrl: () => "https://example.supabase.co", getOptionalSupabasePublishableKey: () => "pk" }));
 vi.mock("@/lib/tenant/getTenantContext", () => ({ TENANT_COOKIE_NAME: "wa_tenant" }));
 
-import { proxy } from "./proxy";
+import { config, proxy } from "./proxy";
 
 const withSession = (path: string) => new NextRequest(`http://localhost${path}`, { headers: { cookie: "sb-abc-auth-token=x" } });
 
@@ -112,5 +113,20 @@ describe("proxy on tenant addresses (FOUNDATION-P0-22)", () => {
     expect((await proxy(at("wonderid.example", "/help"))).status).toBe(200);
     expect((await proxy(at("preview.vercel.app", "/help"))).status).toBe(200);
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+describe("proxy matcher (which paths skip the session check)", () => {
+  const matches = (url: string) => unstable_doesMiddlewareMatch({ config, url });
+
+  it("lets the web app manifest and the app icons through without a session (EXPERIENCE-P0-26)", () => {
+    // Browsers fetch the manifest without cookies; behind the proxy it would redirect to /sign-in.
+    expect(matches("/manifest.webmanifest")).toBe(false);
+    expect(matches("/brand/app/icon-512.png")).toBe(false);
+    expect(matches("/apple-icon.png")).toBe(false);
+  });
+
+  it("still runs on every page and API route", () => {
+    for (const path of ["/", "/sign-in", "/agents", "/platform-admin", "/api/v1/search", "/manifest"]) expect(matches(path), path).toBe(true);
   });
 });
