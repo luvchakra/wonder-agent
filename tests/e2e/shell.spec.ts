@@ -5,68 +5,102 @@ import { authFile } from "./support/testUsers";
  * EXPERIENCE-P0-18 — the WonderID shell (2026-09-26): a sidebar (light since
  * EXPERIENCE-P0-23)
  * from `lg` up, a bottom tab bar plus drawer below it, and one header
- * carrying search / notifications / help / account. The sidebar's sections
- * are an accordion (the current one opens by itself) with groups nested
- * inline; collapsed, it becomes an icon rail whose sections open flyouts,
- * a group opening as a third-level flyout. The current page carries
- * aria-current="page". Organization administration has its own sidebar,
- * opened from "Admin", the main sidebar's last entry (2026-10-10).
+ * carrying search / notifications / help / account. The sidebar is an area
+ * list (owner decision, 2026-10-10): an area opens its own menu in place of
+ * the list, with a back arrow, its pages as rows and its groups folding
+ * open; the menu follows the page, and a menu search sits above it.
+ * Collapsed, it becomes an icon rail whose areas open flyouts, a group
+ * opening as a second flyout. The current page carries aria-current="page".
+ * "Admin" is the last area and holds the organization's administration.
  */
 test.describe("customer shell", () => {
   test.use({ storageState: authFile("adminOne") });
 
-  test("desktop shows the sidebar, and it marks the current page", async ({ page }) => {
+  test("desktop shows the area list, and an area opens its own menu, which marks the current page", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
     const nav = page.getByRole("navigation", { name: "Main" });
-    await expect(nav.getByRole("link", { name: "Home" })).toHaveAttribute("aria-current", "page");
+    // The area list: Home first, Admin last, each area a row.
+    const areas = nav.locator(":scope ul > li");
+    await expect(areas.first()).toContainText("Home");
+    await expect(areas.last()).toContainText("Admin");
+    await expect(nav.getByRole("button", { name: "Home" })).toHaveAttribute("data-active", "true");
 
+    // Opening an area shows its menu in the sidebar, without leaving the page.
     await nav.getByRole("button", { name: "AI Agents" }).click();
+    await expect(page).toHaveURL("/");
+    await expect(nav.getByRole("heading", { name: "AI Agents" })).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Home" })).toHaveCount(0);
     await nav.getByRole("button", { name: "Agent Inventory" }).click();
     await nav.getByRole("link", { name: "All Agents" }).click();
     await expect(page).toHaveURL("/agents");
-    await expect(nav.getByRole("button", { name: "AI Agents" })).toHaveAttribute("data-active", "true");
     await expect(nav.getByRole("link", { name: "All Agents" })).toHaveAttribute("aria-current", "page");
-    await expect(nav.getByRole("link", { name: "Home" })).not.toHaveAttribute("aria-current");
+
+    // The back arrow returns to the area list, where the page's area is current.
+    await nav.getByRole("button", { name: "All areas" }).click();
+    await expect(nav.getByRole("button", { name: "AI Agents" })).toHaveAttribute("data-active", "true");
+    await expect(nav.getByRole("button", { name: "Home" })).not.toHaveAttribute("data-active");
   });
 
-  test("Admin is the main sidebar's last entry and opens the Admin sidebar, with a way back home", async ({ page }) => {
+  test("Admin is the last area and holds the organization's administration, in groups", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/");
-    const main = page.getByRole("navigation", { name: "Main" });
-    const entries = main.locator(":scope > ul > li");
-    await expect(entries.first()).toContainText("Home");
-    await expect(entries.last()).toContainText("Admin");
-    // Administration lives only in the Admin sidebar.
-    await expect(main.getByRole("button", { name: "Integrations" })).toHaveCount(0);
-
-    await main.getByRole("link", { name: "Admin" }).click();
-    await expect(page).toHaveURL("/settings");
-    const admin = page.getByRole("navigation", { name: "Admin" });
-    await expect(admin.getByRole("heading", { name: "Admin" })).toBeVisible();
-    await expect(admin.getByRole("button", { name: "Integrations" })).toBeVisible();
-    await expect(page.getByRole("navigation", { name: "Main" })).toHaveCount(0);
-
-    await admin.getByRole("link", { name: "Back to Home" }).click();
-    await expect(page).toHaveURL("/");
-    await expect(page.getByRole("navigation", { name: "Main" }).getByRole("link", { name: "Admin" })).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "Main" });
+    // Administration lives only inside Admin.
+    await expect(nav.getByRole("button", { name: "Integrations" })).toHaveCount(0);
+    await nav.getByRole("button", { name: "Admin" }).click();
+    await expect(nav.getByRole("heading", { name: "Admin" })).toBeVisible();
+    await expect(nav.getByRole("button", { name: "Integrations" })).toBeVisible();
+    await nav.getByRole("button", { name: "Integrations" }).click();
+    await nav.getByRole("link", { name: "Sync Jobs" }).click();
+    await expect(page).toHaveURL("/integrations/jobs");
+    await expect(nav.getByRole("link", { name: "Sync Jobs" })).toHaveAttribute("aria-current", "page");
   });
 
-  test("the current section opens by itself, and the others stay closed", async ({ page }) => {
+  test("the menu search finds pages across every area, and only the menu", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await nav.getByRole("searchbox", { name: "Search menu" }).fill("sync");
+    const results = nav.getByRole("list", { name: "Matching pages" });
+    await expect(results.getByRole("link", { name: /Sync Jobs/ })).toContainText("Admin › Integrations");
+    await expect(nav.getByRole("button", { name: "Home" })).toHaveCount(0);
+    await nav.getByRole("searchbox", { name: "Search menu" }).fill("zzzz");
+    await expect(nav.getByRole("status")).toHaveText("No menu item matches.");
+    await nav.getByRole("searchbox", { name: "Search menu" }).fill("");
+    await expect(nav.getByRole("button", { name: "Home" })).toBeVisible();
+  });
+
+  test("the footer names the version", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await expect(page.locator("aside").getByText(/^WonderID v\d+\.\d+\.\d+/)).toBeVisible();
+  });
+
+  test("an admin page opens the Admin menu with its group open, and nothing else", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/settings/roles");
-    // An admin page shows the Admin sidebar.
-    const nav = page.getByRole("navigation", { name: "Admin" });
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("heading", { name: "Admin" })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Users & Permissions" })).toHaveAttribute("aria-expanded", "true");
     await expect(nav.getByRole("link", { name: "WonderID Roles" })).toHaveAttribute("aria-current", "page");
-    // Another section's pages stay collapsed.
+    // Another group's pages stay folded.
     await expect(nav.getByRole("link", { name: "Sync Jobs" })).toHaveCount(0);
+  });
+
+  test("a member's own page under /settings stays in Home, not Admin", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/settings/security");
+    const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("heading", { name: "Home" })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "Sign-in Security" })).toHaveAttribute("aria-current", "page");
   });
 
   test("a page inside a group opens that group, and only its page is current", async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto("/agents/discovery");
     const nav = page.getByRole("navigation", { name: "Main" });
+    await expect(nav.getByRole("heading", { name: "AI Agents" })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Agent Discovery" })).toHaveAttribute("aria-expanded", "true");
     await expect(nav.getByRole("link", { name: "Discovery Inbox" })).toHaveAttribute("aria-current", "page");
     // The inventory group stays closed; its pages are not current.
@@ -108,6 +142,7 @@ test.describe("customer shell", () => {
     await tabs.getByRole("button", { name: "More" }).click();
     const drawer = page.getByRole("dialog", { name: "Main navigation" });
     await drawer.getByRole("button", { name: "Insights" }).click();
+    await expect(drawer.getByRole("heading", { name: "Insights" })).toBeVisible();
     await expect(drawer.getByRole("link", { name: "Audit Trail" })).toBeVisible();
 
     await drawer.getByRole("link", { name: "Audit Trail" }).click();

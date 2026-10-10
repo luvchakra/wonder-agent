@@ -15,7 +15,8 @@ import { AccountPanel } from "@/modules/ui/AccountPanel";
 import { ShellGlobalSearch, ShellNotifications } from "@/modules/ui/ShellSearchAndNotifications";
 import { AnnouncementsBanner } from "@/modules/ui/AnnouncementsBanner";
 import { getActiveAnnouncements } from "@/modules/platform-admin/service";
-import { ADMIN_NAV, NAV_COOKIE, SHELL_NAV, navFor, type ShellBadgeCounts } from "@/modules/ui/shell-nav";
+import { NAV_COOKIE, SHELL_NAV, navFor, type ShellBadgeCounts } from "@/modules/ui/shell-nav";
+import pkg from "@/package.json";
 import { brandTitle, wonderIdBrand } from "@/modules/ui/brand";
 import { roleLabel } from "@/lib/users/userRules";
 import { WonderIDLogo } from "@/modules/ui/Logo";
@@ -105,10 +106,11 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     roleLabel: ctx.roles[0] ? roleLabel(ctx.roles[0]) : null,
     isPlatformAdmin: isAdmin,
   };
-  // Each sidebar lists only what this member may open (owner decision, 2026-10-10).
+  // The sidebar lists only the areas and pages this member may open (owner decision, 2026-10-10).
+  const commit = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7);
   const shellProps = {
     nav: navFor(SHELL_NAV, ctx.permissions),
-    adminNav: navFor(ADMIN_NAV, ctx.permissions),
+    version: commit ? `v${pkg.version} · ${commit}` : `v${pkg.version}`,
     badges,
     tenants: tenantOptions,
     onSelectTenant: selectTenantAction,
