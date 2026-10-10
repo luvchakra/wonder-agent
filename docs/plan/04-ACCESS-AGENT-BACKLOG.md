@@ -41,7 +41,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
-| ACCESS-P0-24 | Access ledger and provenance | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 
 ---

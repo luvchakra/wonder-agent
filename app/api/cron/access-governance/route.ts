@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { sweepApprovalTimeouts, sweepPackageExpiry } from "@/modules/access-governance/service";
+import { refreshAccessLedgerForAllTenants, sweepApprovalTimeouts, sweepPackageExpiry } from "@/modules/access-governance/service";
 
 /**
  * Access governance's daily sweep, wired to Vercel Cron via `vercel.json`;
@@ -9,7 +9,9 @@ import { sweepApprovalTimeouts, sweepPackageExpiry } from "@/modules/access-gove
  * - ACCESS-P0-19: approval steps past their due time escalate to access
  *   managers once, or expire the request, per each request's policy;
  * - ACCESS-P0-20: package assignments past their end expire, and what they
- *   granted becomes revocation work.
+ *   granted becomes revocation work;
+ * - ACCESS-P0-24: every organization's access ledger is recomputed, so an
+ *   approval that expired overnight no longer shows as current.
  * Each sweep filters every write by the row's own tenant. Signed-in views
  * also sweep their own tenant, so nothing shows as current past its time.
  */
@@ -27,5 +29,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
   }
   const [approvals, packages] = await Promise.all([sweepApprovalTimeouts(null), sweepPackageExpiry(null)]);
-  return NextResponse.json({ ok: true, data: { approvals, packages } });
+  // After the sweeps, so expiries they recorded are reflected.
+  const ledger = await refreshAccessLedgerForAllTenants();
+  return NextResponse.json({ ok: true, data: { approvals, packages, ledger } });
 }

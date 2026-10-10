@@ -2030,3 +2030,110 @@ nothing absent from the file is removed, revoked or deactivated.
 
 **Left out.** Revoking access, deactivating accounts, or deleting anything
 missing from a file. That is deliberately not part of an import.
+
+## 2026-10-10 — ACCESS-P0-24: access ledger and provenance; people's access from files
+
+Owner decisions: record people's access (yes); the go-live cut-off that
+would classify access as ROGUE or LEGACY is deferred, so nothing is
+labelled rogue yet (ACCESS-P0-25).
+
+**What changed.**
+- Migration `0114_access_ledger.sql` (applied to the dev database).
+  - `access_ledger`: one row per account and per entitlement of an account
+    (unique `(tenant_id, account_id, entitlement_id) nulls not distinct`).
+    Same-tenant composite foreign keys to the account, entitlement,
+    application, identity, request, package assignment and integration.
+  - `access_ledger_events`: the history. It is append-only through a
+    trigger; only the cascade of a deleted organization may delete from it.
+  - RLS: members read their own organization's rows. There is no client
+    write policy; the service writes.
+- Rules, `ledgerRules.ts` (pure, deterministic, #9). Evidence is a WonderID
+  record only:
+  - an approved or fulfilled `grant` request for the same person or agent,
+    application and entitlement (a request for an entitlement also
+    explains the account);
+  - a fulfilled item of an access-package assignment;
+  - an administrator's grant, from `createManualAccessGrant`'s
+    `access.grant_created` audit event. This counts only for access
+    WonderID granted, never for access a connection reported.
+
+  Status:
+
+  | Status | When |
+  |---|---|
+  | VALID | the evidence is current |
+  | EXPIRED | the request's expiry or the assignment has passed |
+  | REVOKED | the access was revoked in WonderID, or its assignment was revoked |
+  | UNPROVEN | there is no evidence; the source is IMPORT when a connection or file reported it, otherwise UNKNOWN |
+
+  - Current evidence wins over ended evidence.
+  - Missing evidence is never filled in.
+  - History events: recorded, changed (status or source),
+    missing_from_source, seen_again.
+- Service, `ledger.ts`: `refreshAccessLedger(tenantId, { identityId? })`.
+  - It uses the service role, with every query filtered on the tenant and
+    every row checked against it (§14).
+  - It pages past PostgREST's 1,000-row cap.
+  - Inserts tolerate a concurrent refresh (`ignoreDuplicates`).
+  - A row is updated only when a value changed, compared as instants and
+    key-order-free JSON; a second run writes nothing.
+
+  It runs:
+  - after a file import of accounts or access;
+  - after an account reconciliation;
+  - on the daily `/api/cron/access-governance` sweep, for all
+    organizations, after the expiry sweeps;
+  - for one identity when its Access tab opens.
+
+  A failed refresh never undoes the import that triggered it.
+- View: an **Access** tab on the identity page (`access.read`) answers "why
+  does this identity have this access?".
+  - One line per account or entitlement, with the source, a link to the
+    request, approval and end dates, and "not found in the source".
+  - Status badges: Approved, Approval expired, Revoked, No approval found.
+  - If the refresh fails, the tab says the list may be out of date
+    (§17.5).
+- **People's access from files.** A CSV of access is now recorded for any
+  account (a person's or an agent's) as what the target system reports.
+  - It is written to `access_grants` with `source_integration_id` set to the
+    File imports connection, plus one `access_grant.imported` audit event.
+  - It no longer goes through `createManualAccessGrant`: a file is not a
+    grant someone made, so it carries no approval and the ledger shows it
+    as UNPROVEN.
+  - Separation of duties still guards grants made by hand.
+  - New rule: an entitlement must belong to the account's application.
+
+**Verified.**
+- `npx vitest run modules/access-governance/ledgerRules.test.ts
+  modules/access-governance/fileImportRules.test.ts`: 27 passed.
+- `npm run typecheck`: clean. eslint on every changed file: clean.
+- `tests/access/access-ledger-isolation.sql`: 12 of 15 checks run through
+  execute_sql, all passed. It runs in one block that rolls itself back.
+  - Uniqueness ×2.
+  - Cross-tenant account, entitlement and identity refused.
+  - Unknown status refused.
+  - History update refused.
+  - A member sees their own 2 rows and 1 event, and 0 of another
+    organization's.
+  - A member's update changes 0 rows; a member's insert into either table
+    is refused (42501).
+  - The 3 `[delete]` checks need the SQL editor: the tool refuses
+    statements containing a delete.
+- A live refresh of the demo organization (Northwind) recorded 3
+  relationships, all UNKNOWN / UNPROVEN: the seed data has no approvals,
+  which is the truthful answer. A second run changed nothing. The view's
+  embedded select was checked against the same rows.
+- Advisors: no new security or performance finding for the new tables
+  (their indexes show as unused only because they are new).
+- E2E: `file-import.spec.ts` has a new test that imports a person's
+  application, entitlement, account and access, then checks that their
+  Access tab shows "No approval found" twice. It runs on Vercel with this PR.
+
+**Left out / handed on.**
+- ROGUE and LEGACY_EXCEPTION, and the drift findings, belong to
+  ACCESS-P0-25, after the owner sets the cut-off.
+- The role, lifecycle, emergency, legacy and agent-authorization sources
+  wait for those features.
+- Connectors reconcile accounts only (`reconcileApplicationAccounts`).
+  Their entitlements and access reach the ledger once connector access
+  reconciliation exists (Integration follow-up).

@@ -1,13 +1,13 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentityType } from "@/lib/shared/types/agent-identity";
 import type { ImportApplyRow, ImportPlanRow, ImportRecord } from "@/lib/shared/types/integrations";
 import { listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { registerApplication, updateApplication } from "./catalog";
-import { createManualAccessGrant } from "./grants";
+import { refreshAccessLedger } from "./ledger";
 import { planAccessImport, type AccessImportKind, type AccessLookups, type AccessPlanRow } from "./fileImportRules";
 
 /**
@@ -21,9 +21,11 @@ import { planAccessImport, type AccessImportKind, type AccessLookups, type Acces
  * Additive only: records are added or updated; nothing absent from the
  * file is removed, revoked or deactivated. The caller has checked
  * integration.execute and access.manage; reads and writes run as that
- * user under RLS, each filtered on `tenantId` as well (§14). Access goes
- * through createManualAccessGrant, so it meets the same rules (an AI
- * agent's account, separation of duties) as access granted by hand.
+ * user under RLS, each filtered on `tenantId` as well (§14). Access is
+ * recorded as the target system reports it, for any account, with the
+ * file's connection as its source: it is not a grant anyone made, so the
+ * access ledger marks it unproven until it finds a WonderID approval
+ * behind it (ACCESS-P0-24).
  */
 
 const PAGE = 1000;
@@ -98,8 +100,8 @@ const message = (err: unknown) => (err instanceof Error ? err.message : "failed"
  * Inserts rows in batches; a batch the database refuses is retried one row
  * at a time, so each failure is reported against its own record.
  */
-async function insertRows(table: string, tenantId: string, plans: AccessPlanRow[], results: Map<AccessPlanRow, ImportApplyRow>) {
-  const supabase = await supabaseServer();
+async function insertRows(table: string, tenantId: string, plans: AccessPlanRow[], results: Map<AccessPlanRow, ImportApplyRow>, serviceRole = false) {
+  const supabase = serviceRole ? supabaseServiceRole() : await supabaseServer();
   for (let i = 0; i < plans.length; i += 500) {
     const batch = plans.slice(i, i + 500);
     const { data, error } = await supabase
@@ -187,18 +189,13 @@ export async function applyAccessImport(
         results.set(p, { row: p.row, externalId: p.externalId, outcome: "failed", targetId: p.targetId, message: message(err) });
       }
     }
-  } else if (kind === "access_grant") {
-    for (const p of creates) {
-      try {
-        const grant = await createManualAccessGrant(tenantId, actorId, p.insert!.account_id as string, p.insert!.entitlement_id as string, p.insert!.grant_type as never);
-        results.set(p, { row: p.row, externalId: p.externalId, outcome: "created", targetId: grant.id, message: null });
-      } catch (err) {
-        results.set(p, { row: p.row, externalId: p.externalId, outcome: "failed", targetId: null, message: message(err) });
-      }
-    }
   } else {
-    const table = kind === "entitlement" ? "entitlements" : "accounts";
-    await insertRows(table, tenantId, creates, results);
+    const table = kind === "access_grant" ? "access_grants" : kind === "entitlement" ? "entitlements" : "accounts";
+    // access_grants has no client write policy (0027): reported access is
+    // written with the service role. Its account and entitlement were
+    // resolved above from this tenant's own rows, and the row carries the
+    // tenant explicitly (§14).
+    await insertRows(table, tenantId, creates, results, kind === "access_grant");
     await updateRows(table, tenantId, updates, results, kind === "account");
     // One audit event per import for these inventories, with the records it touched (ids, never values).
     const touched = [...results.values()].filter((r) => r.outcome === "created" || r.outcome === "updated");
@@ -207,7 +204,7 @@ export async function applyAccessImport(
         tenantId,
         actorId,
         actorType: "user",
-        action: kind === "entitlement" ? "entitlement.imported" : "account.imported",
+        action: kind === "access_grant" ? "access_grant.imported" : kind === "entitlement" ? "entitlement.imported" : "account.imported",
         objectType: "integration",
         objectId: origin.integrationId,
         outcome: [...results.values()].some((r) => r.outcome === "failed") ? "failure" : "success",
@@ -220,6 +217,11 @@ export async function applyAccessImport(
         },
       });
     }
+  }
+  // Accounts and access changed: the ledger looks for the approval behind each (ACCESS-P0-24).
+  // A failed refresh does not undo the import; the daily sweep and the identity's Access tab refresh it again.
+  if ((kind === "account" || kind === "access_grant") && [...results.values()].some((r) => r.outcome === "created" || r.outcome === "updated")) {
+    await refreshAccessLedger(tenantId).catch(() => undefined);
   }
   return plans.map((p) => results.get(p) ?? { row: p.row, externalId: p.externalId, outcome: "failed", targetId: null, message: "not applied" });
 }
