@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { countPendingCorrelations, listIdentitySources, listReconciliationRuns } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { RUN_STATUS, TEMPLATE_LABEL } from "./labels";
 
 // INTEGRATION-P0-08 — the organization's identity sources, in precedence order.
@@ -31,7 +32,8 @@ export default async function IdentitySourcesPage() {
             updates the fields a source owns, and sends anything ambiguous to a person.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["identity-sources"])} />
           <LinkButton href="/integrations/correlations" variant="outline" size="sm">
             Pending matches{pending ? ` (${pending})` : ""}
           </LinkButton>

@@ -48,3 +48,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 .eslintcache
+
+# Temporary git worktrees of parallel Claude Code agents
+.claude/worktrees/

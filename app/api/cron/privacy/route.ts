@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { runPrivacyJobs } from "@/modules/privacy/service";
+import { purgeConnectorTraffic } from "@/modules/integrations/service";
 
 /**
  * COMPLIANCE-P0-12 — the daily privacy job, wired to Vercel Cron in
@@ -25,6 +26,14 @@ export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
   }
-  const result = await runPrivacyJobs();
-  return NextResponse.json({ ok: true, data: { tenants: result.tenants } });
+  // The same daily retention run also ages out the Connector Gateway's traffic ledger (30 days, migration 0110).
+  // A failed purge reports null and is retried by the next run; it never fails the privacy job.
+  const [result, connectorTrafficPurged] = await Promise.all([
+    runPrivacyJobs(),
+    purgeConnectorTraffic().catch(() => {
+      console.error("cron: connector traffic purge failed");
+      return null;
+    }),
+  ]);
+  return NextResponse.json({ ok: true, data: { tenants: result.tenants, connectorTrafficPurged } });
 }

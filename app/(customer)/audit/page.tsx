@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAuditLogs } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardBody, Badge, Button, EmptyState, TextField, TableContainer, Thead, Th, Td, Tr } from "@/modules/ui";
+import { Card, CardBody, Badge, Button, EmptyState, TextField, TableContainer, Thead, Th, Td, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 
 /** First 8 characters of a UUID-like id, enough to tell rows apart at a glance. */
 function shortId(id: string): string {
@@ -28,11 +29,9 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-foreground">Audit Trail</h1>
-        <a href="/api/v1/audit/export?format=csv" className="text-sm text-primary hover:underline">
-          Export CSV
-        </a>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["audit-events"])} />
       </div>
 
       <Card>

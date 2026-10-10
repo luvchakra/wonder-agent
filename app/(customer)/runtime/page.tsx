@@ -5,7 +5,8 @@ import { listAgents } from "@/modules/agent-identity/service";
 import { listEmergencyControls, listRuntimeDecisions, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { EmergencyControlsPanel } from "./EmergencyControlsPanel";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { ACCESS_VIEW, Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
+import { ACCESS_VIEW, Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { RuntimeActivity, type ActivityRow } from "./RuntimeActivity";
 
 const WINDOW_SIZE = 200;
@@ -81,9 +82,12 @@ export default async function RuntimeIndexPage() {
             What your AI agents actually did: {ACCESS_VIEW.did}, compared with {ACCESS_VIEW.should} and {ACCESS_VIEW.can}.
           </p>
         </div>
-        <LinkButton href="/reports" variant="outline" size="sm">
-          Reports &amp; export
-        </LinkButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["runtime-events"])} />
+          <LinkButton href="/reports" variant="outline" size="sm">
+            Reports &amp; export
+          </LinkButton>
+        </div>
       </div>
 
       <EmergencyControlsPanel controls={controls} canManage={ctx.permissions.includes("runtime.emergency")} />
@@ -97,7 +101,7 @@ export default async function RuntimeIndexPage() {
           {decisions.length === 0 ? (
             <EmptyState
               title="No gateway requests yet"
-              description="Agents ask through their runtime's connection (Integrations → Connect a system → Agent runtime), with their own API key, before acting."
+              description="Agents ask through their runtime's connection (Integrations → Connection Types → Agent runtime), with their own API key, before acting."
             />
           ) : (
             <TableContainer label="Authorization decisions" bare>

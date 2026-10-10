@@ -4,7 +4,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getMcpInventory } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { McpServerInventory, McpToolOperation } from "@/lib/shared/types/integrations";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, type BadgeTone, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { DiscoverMcpButton } from "./DiscoverMcpButton";
 
 // INTEGRATION-P0-06 (master P0-10) — the MCP inventory: each connected MCP
@@ -129,9 +130,12 @@ export default async function McpInventoryPage() {
             actually invoked is on the Runtime pages.
           </p>
         </div>
-        <LinkButton href="/integrations/connectors/builtin/mcp-server" variant="outline" size="sm">
-          + Connect an MCP server
-        </LinkButton>
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["mcp-servers"])} />
+          <LinkButton href="/integrations/types/builtin/mcp-server/connect" variant="outline" size="sm">
+            + Connect an MCP server
+          </LinkButton>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

@@ -1109,3 +1109,12 @@ front. `advanceRequest("approve")` now refuses with 403 `FOUR_EYES_REQUIRED`
 when the approver is the subject, and audits the refusal.
 `tests/e2e/trust-compliance.spec.ts` covers the processor case (see the QA
 entry).
+
+## 2026-10-10 — Daily retention cron also purges the connector traffic ledger (Integration Agent)
+
+`/api/cron/privacy` now also calls Integration's `purgeConnectorTraffic()`
+(rows of `connector_traffic` older than 30 days, migration 0110), in
+parallel with `runPrivacyJobs()`. A failed purge is logged and reported as
+`connectorTrafficPurged: null`; it never fails the privacy job. No change to
+the privacy module itself. Recorded here because the route is Compliance's;
+details in the Integration audit log ("The Connector Gateway").

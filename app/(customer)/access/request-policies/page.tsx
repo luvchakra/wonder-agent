@@ -2,7 +2,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listApplicationsForMatching, listEntitlementsForApplication, listRequestPolicies } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Button, Card, CardBody, CardHeader, EmptyState, SelectField, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Button, Card, CardBody, CardHeader, EmptyState, SelectField, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { PolicyForm } from "./PolicyForm";
 
 // ACCESS-P0-18 — request policies (spec §11.4): who may request what, for
@@ -46,11 +47,14 @@ export default async function RequestPoliciesPage({ searchParams }: { searchPara
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Request policies</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          What people can request and on what terms. An entitlement&apos;s policy wins over its application&apos;s, which wins over the organization default. Without any policy, nothing is requestable.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Request policies</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            What people can request and on what terms. An entitlement&apos;s policy wins over its application&apos;s, which wins over the organization default. Without any policy, nothing is requestable.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["request-policies"])} />
       </div>
 
       <Card className="p-4">

@@ -101,7 +101,9 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `integration_objects` | INT | Raw imported objects prior to normalization |
 | `integration_mappings` | INT | Field/object mapping configuration per integration |
 | `connector_receivers` | INT | A connection's receiving secret (encrypted, server-only; migration 0109) |
+| `connector_files` | INT | CSV files received by a file connection or imported from an object page, until a sync reads them (server-only, no client policy; migration 0111). Also `integrations.schedule` and `integration_sync_jobs.schedule_window` (0111) |
 | `connector_definitions` | INT | An organization's own connector definitions (immutable versions; built-in definitions live in `modules/integrations/framework/definitions`) |
+| `connector_traffic` | INT | The Connector Gateway's traffic ledger: per connection, per minute, requests, errors, blocked, bytes and duration by host only (service-role writes, member reads; migration 0110) |
 | `notifications` | OA | In-app/email notification records |
 | `reports` | OA | Saved/scheduled report definitions |
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
@@ -286,11 +288,12 @@ consume and persist into their own tables.
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |
 | `/api/v1/findings`, `/api/v1/risk` | RiskA |
 | `/api/v1/compliance` (campaigns, control-mappings, controls, items) | CA |
-| `/api/v1/privacy` (settings, processing-activities, consent-purposes, consents, requests, retention, legal-holds, breaches, `me/*` self-service) and `/api/cron/privacy` | CA |
+| `/api/v1/privacy` (settings, processing-activities, consent-purposes, consents, requests, retention, legal-holds, breaches, `me/*` self-service) and `/api/cron/privacy` (which also calls INT's `purgeConnectorTraffic()`, 2026-10-10) | CA |
 | `/api/v1/billing` (overview, profile, checkout, portal, subscription, invoices, `webhooks/stripe`, `webhooks/razorpay`) | PA (customer-facing billing; Platform owns billing end to end) |
 | `/api/v1/audit/integrity` | FA (verification primitive `lib/audit/integrity.ts`; Operations keeps the audit views) |
-| `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs` | OA |
-| `/api/connect/v1/:connection/*` (`events`, `webhook`, `gateway/authorize`, `gateway/tools/filter`) | INT — the connector framework's receivers, the only inbound path for an organization's data (non-negotiable #20, 2026-10-10). The gateway channels authenticate agents with API keys (FA) and call RA's `authorizeRuntimeRequest()` / `filterGatewayTools()`; the decision logic stays RA's. Replaces `/api/gateway/v1/*`, `/api/v1/integrations/webhooks/:id`, `/api/v1/integrations/mcp/:id/events` and `POST /api/v1/runtime/events`. |
+| `/api/v1/reports`, `/api/v1/audit`, `/api/v1/search`, `/api/v1/notifications`, `/api/v1/notification-preferences`, `/api/v1/jobs`, `/api/v1/exports` (object-page CSV export and import templates; registry `modules/operations/exportRegistry.ts`) | OA |
+| `/api/v1/imports` (CSV import from an object page, through the tenant's File imports connection) and `/api/cron/connector-syncs` (scheduled connector syncs, received-file retention) | INT (2026-10-10, migration 0111) |
+| `/api/connect/v1/:connection/*` (`events`, `webhook`, `file`, `gateway/authorize`, `gateway/tools/filter`) | INT — the connector framework's receivers, the only inbound path for an organization's data (non-negotiable #20, 2026-10-10). The gateway channels authenticate agents with API keys (FA) and call RA's `authorizeRuntimeRequest()` / `filterGatewayTools()`; the decision logic stays RA's. Replaces `/api/gateway/v1/*`, `/api/v1/integrations/webhooks/:id`, `/api/v1/integrations/mcp/:id/events` and `POST /api/v1/runtime/events`. |
 | `/api/v1/ai/summarize` | FA — pure passthrough wrapper over `lib/ai/summarize.ts` (FOUNDATION-P0-16); added by Experience Agent to unblock `EXPERIENCE-P0-14`, since no domain module owns this cross-cutting primitive |
 | `/api/platform/v1/tenants`, `/api/platform/v1/subscriptions`, `/api/platform/v1/features`, and all other `/api/platform/v1/*` | PA |
 

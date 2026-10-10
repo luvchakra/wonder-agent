@@ -4,7 +4,8 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { IDENTITY_STATUSES, type IdentityStatus } from "@/lib/shared/types/agent-identity";
-import { Badge, Card, EmptyState, LinkButton, SelectField, TableContainer, Td, Th, Thead, Tr, Button } from "@/modules/ui";
+import { Badge, Card, EmptyState, LinkButton, ObjectActionsMenu, SelectField, TableContainer, Td, Th, Thead, Tr, Button } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { DIRECTORY_VIEWS, IDENTITY_TYPE_LABEL, STATUS_LABEL, STATUS_TONE, type DirectoryView } from "./labels";
 import { DirectorySearch } from "./IdentityForms";
 
@@ -12,6 +13,7 @@ import { DirectorySearch } from "./IdentityForms";
 // and paging are URL-driven and paged at the database (§15).
 
 const PAGE_SIZE = 50;
+const EXPORT_KEY: Record<DirectoryView, string> = { all: "identities", humans: "people", external: "external-identities", machines: "machine-identities" };
 
 export async function IdentityDirectory({ view, searchParams }: { view: DirectoryView; searchParams: Promise<{ q?: string; status?: string; page?: string }> }) {
   let ctx;
@@ -55,11 +57,14 @@ export async function IdentityDirectory({ view, searchParams }: { view: Director
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{config.title}</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{config.description}</p>
         </div>
-        {canManage ? (
-          <LinkButton href={`/identities/new?type=${newType}`} size="sm">
-            New identity
-          </LinkButton>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, [EXPORT_KEY[view]], { status })} />
+          {canManage ? (
+            <LinkButton href={`/identities/new?type=${newType}`} size="sm">
+              New identity
+            </LinkButton>
+          ) : null}
+        </div>
       </div>
 
       <Card className="p-4">

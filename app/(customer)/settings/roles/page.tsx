@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listRoles, type RoleSummary } from "@/lib/rbac/customRoles";
-import { Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 
 // FOUNDATION-P0-25 — Roles (spec §15, 22; mockups 4–8): the system roles
 // WonderID defines, read-only, and this organization's custom roles, with
@@ -74,11 +75,14 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
             . System roles are defined by WonderID; custom roles are your organization&apos;s own.
           </p>
         </div>
-        {ctx.permissions.includes("roles.create") ? (
-          <LinkButton href="/settings/roles/new" size="sm">
-            Create role
-          </LinkButton>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["roles"])} />
+          {ctx.permissions.includes("roles.create") ? (
+            <LinkButton href="/settings/roles/new" size="sm">
+              Create role
+            </LinkButton>
+          ) : null}
+        </div>
       </div>
 
       {sp.deleted ? (

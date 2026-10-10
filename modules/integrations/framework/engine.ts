@@ -26,11 +26,24 @@ import { ConnectorRequestError, HttpSession, LIMITS, type FetchLike } from "./ht
 /** A protocol driver: how records are fetched. Mapping is the engine's job. */
 export interface ConnectorDriverSession {
   test(): Promise<void>;
-  fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number): Promise<unknown[]>;
+  /** `kind` is the canonical kind the resource produces (the file driver reads that kind's uploads). */
+  fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number, kind: ResourceKind): Promise<unknown[]>;
   close?(): Promise<void>;
 }
 
-export type DriverFactory = (def: ConnectorDefinition, settings: Record<string, string | number | boolean>, secrets: Record<string, string>) => Promise<ConnectorDriverSession>;
+/**
+ * The stored connection a run is for, when there is one (a sync; not a
+ * preview). `tenantId` is the connection row's own tenant_id, never a
+ * value from a request (§14).
+ */
+export type DriverContext = { tenantId: string; integrationId: string };
+
+export type DriverFactory = (
+  def: ConnectorDefinition,
+  settings: Record<string, string | number | boolean>,
+  secrets: Record<string, string>,
+  context?: DriverContext,
+) => Promise<ConnectorDriverSession>;
 
 export function httpDriver(fetchImpl: FetchLike): DriverFactory {
   return async (def, settings, secrets) => {
@@ -108,11 +121,14 @@ export class DefinitionConnector implements ConnectorAdapter {
   /** Raw records already fetched this run, so forEach children reuse their parents. */
   private rawCache = new Map<ResourceKind, Row[]>();
   private issues: { objectType: string; message: string }[] = [];
+  private context: DriverContext | undefined;
 
   constructor(private readonly drivers: DriverFactories) {}
 
-  async authenticate(config: ConnectorConfig, secret: string | null): Promise<void> {
+  /** `context` names the stored connection a sync runs for (absent for a preview). */
+  async authenticate(config: ConnectorConfig, secret: string | null, context?: DriverContext): Promise<void> {
     const { def, settings } = parseConnectorConfig(config);
+    this.context = context;
     this.def = def;
     this.settings = settings;
     this.capabilities = capabilitiesOf(def);
@@ -142,7 +158,7 @@ export class DefinitionConnector implements ConnectorAdapter {
     if (this.session) return this.session;
     const factory = this.drivers[this.def.driver];
     if (!factory) throw new Error(`The ${this.def.driver} driver is not available`);
-    this.session = await factory(this.def, this.settings, this.secrets);
+    this.session = await factory(this.def, this.settings, this.secrets, this.context);
     return this.session;
   }
 
@@ -177,22 +193,22 @@ export class DefinitionConnector implements ConnectorAdapter {
     const cached = this.rawCache.get(kind);
     if (cached) return cached;
     const all: Row[] = [];
-    for (const spec of specsOf(this.def, kind)) all.push(...(await this.fetchSpec(spec)));
+    for (const spec of specsOf(this.def, kind)) all.push(...(await this.fetchSpec(spec, kind)));
     this.rawCache.set(kind, all);
     return all;
   }
 
   /** One driver fetch; for an `optional` request a 404 is no records rather than a failure. */
-  private async fetchOptional(session: ConnectorDriverSession, spec: ResourceSpec, scope: TemplateScope, max: number): Promise<unknown[]> {
+  private async fetchOptional(session: ConnectorDriverSession, spec: ResourceSpec, scope: TemplateScope, max: number, kind: ResourceKind): Promise<unknown[]> {
     try {
-      return await session.fetch(spec, scope, max);
+      return await session.fetch(spec, scope, max, kind);
     } catch (err) {
       if (spec.optional && err instanceof ConnectorRequestError && err.status === 404) return [];
       throw err;
     }
   }
 
-  private async fetchSpec(spec: ResourceSpec): Promise<Row[]> {
+  private async fetchSpec(spec: ResourceSpec, kind: ResourceKind): Promise<Row[]> {
     const session = await this.open();
     const max = spec.maxRecords ?? LIMITS.defaultMaxRecords;
     const rows: Row[] = [];
@@ -201,11 +217,11 @@ export class DefinitionConnector implements ConnectorAdapter {
       for (const { record: parent, spec: from } of await this.rawRecords(spec.forEach)) {
         if (only && from !== only) continue;
         if (rows.length >= max) break;
-        const children = await this.fetchOptional(session, spec, { settings: this.settings, parent }, max - rows.length);
+        const children = await this.fetchOptional(session, spec, { settings: this.settings, parent }, max - rows.length, kind);
         for (const record of children) rows.push({ record, parent, spec });
       }
     } else if (spec.unwind) {
-      for (const parent of await this.fetchOptional(session, spec, { settings: this.settings }, max)) {
+      for (const parent of await this.fetchOptional(session, spec, { settings: this.settings }, max, kind)) {
         const items = readPath(parent, spec.unwind);
         for (const item of Array.isArray(items) ? items : items === undefined || items === null ? [] : [items]) {
           if (rows.length >= max) break;
@@ -213,7 +229,7 @@ export class DefinitionConnector implements ConnectorAdapter {
         }
       }
     } else {
-      for (const record of await this.fetchOptional(session, spec, { settings: this.settings }, max)) rows.push({ record, spec });
+      for (const record of await this.fetchOptional(session, spec, { settings: this.settings }, max, kind)) rows.push({ record, spec });
     }
     return rows.filter((r) => matchesFilters(r.record, spec.where, r.parent));
   }
@@ -228,7 +244,9 @@ export class DefinitionConnector implements ConnectorAdapter {
     for (const { record, parent, spec } of rows) {
       const mapped = mapRecord(kind, spec.fields, { record, parent, settings: this.settings }, { application });
       if ("invalid" in mapped) {
-        if (++invalid <= 20) this.issues.push({ objectType: kind, message: mapped.invalid });
+        // A CSV record carries its spreadsheet row, so the message can point at it.
+        const row = (record as { _row?: unknown } | null)?._row;
+        if (++invalid <= 20) this.issues.push({ objectType: kind, message: typeof row === "number" ? `${mapped.invalid} (row ${row})` : mapped.invalid });
         continue;
       }
       const raw = (record && typeof record === "object" ? record : { value: record }) as Record<string, unknown>;

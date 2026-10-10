@@ -5,7 +5,8 @@ import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
 import { listUnregisteredAgentActivity } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardHeader, CardBody, LinkButton } from "@/modules/ui";
+import { Card, CardHeader, CardBody, LinkButton, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { RiskAgentsTable } from "./RiskAgentsTable";
 import { FindingsList, type FindingRow } from "./FindingsList";
 
@@ -78,7 +79,8 @@ export default async function RiskIndexPage() {
           <h1 className="text-xl font-semibold tracking-[-0.01em] text-foreground">Risks &amp; alerts</h1>
           <p className="mt-1 text-sm text-muted-foreground">Every open finding, most severe first.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["findings"])} />
           <LinkButton href="/risk/investigations" variant="outline" size="sm">
             Investigations
           </LinkButton>

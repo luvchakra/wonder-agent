@@ -3,7 +3,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const authenticate = vi.fn();
 const testConnection = vi.fn();
-const createConnectorMock = vi.fn(() => ({ authenticate, testConnection }));
+const close = vi.fn();
+const createConnectorMock = vi.fn(() => ({ authenticate, testConnection, close }));
 vi.mock("./registry", () => ({ createConnector: () => createConnectorMock() }));
 
 vi.mock("@/lib/security/encryptSecret", () => ({
@@ -47,7 +48,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  createConnectorMock.mockReturnValue({ authenticate, testConnection });
+  createConnectorMock.mockReturnValue({ authenticate, testConnection, close });
   existingCredentialRow = { integration_id: "int-1" };
 });
 

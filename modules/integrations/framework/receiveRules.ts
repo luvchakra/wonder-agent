@@ -1,7 +1,34 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { RUNTIME_EVENT_TYPES, type RuntimeEventType } from "@/lib/shared/types/runtime";
 import { mapField, readPath } from "./mapping";
-import type { ReceiveSpec } from "./types";
+import { fileAddress } from "./drivers/file";
+import { RESOURCE_KINDS, type ConnectorDefinition, type ReceiveSpec, type ResourceKind, type ResourceSpec } from "./types";
+
+/**
+ * The resource a received file is for, from its `x-wonderid-kind` header:
+ * one the definition reads from received files (a kind the connection
+ * fetches from an address does not also take uploads, which would be
+ * silently ignored).
+ */
+export function uploadTarget(
+  def: ConnectorDefinition,
+  settings: Record<string, unknown>,
+  kindHeader: string | null,
+): { kind: ResourceKind; spec: ResourceSpec } | { status: number; message: string } {
+  if (def.driver !== "file" || !def.receive?.file) return { status: 404, message: "This connection does not receive files" };
+  const kind = (kindHeader ?? "").trim().toLowerCase();
+  const kinds = RESOURCE_KINDS.filter((k) => def.resources[k] && !Array.isArray(def.resources[k]));
+  if (!(kinds as readonly string[]).includes(kind)) return { status: 400, message: `x-wonderid-kind: one of ${kinds.join(", ")}` };
+  const spec = def.resources[kind as ResourceKind] as ResourceSpec;
+  if (fileAddress(spec, settings)) return { status: 409, message: `This connection reads ${kind} from an address, not from received files` };
+  return { kind: kind as ResourceKind, spec };
+}
+
+/** A sender's file name, kept for the record only: printable, at most 200 characters. */
+export function uploadFilename(header: string | null): string | null {
+  const name = [...(header ?? "")].filter((c) => c.charCodeAt(0) >= 0x20 && c.charCodeAt(0) !== 0x7f).join("").trim();
+  return name ? name.slice(0, 200) : null;
+}
 
 /**
  * Pure rules for the receiving side (receive.ts does the I/O): checking a

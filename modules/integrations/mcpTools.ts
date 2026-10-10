@@ -3,6 +3,7 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { createConnector } from "./registry";
+import { openGateway } from "./gateway/gateway";
 import { getDecryptedCredential } from "./credentials";
 import { toIntegrationObject } from "./mappers";
 import type { IntegrationObject } from "@/lib/shared/types/integrations";
@@ -37,7 +38,9 @@ export async function discoverMcpTools(tenantId: string, integrationId: string):
     .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!integration) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
-  const connector = createConnector(integration.integration_type_id);
+  // Discovery's requests pass the connection's Connector Gateway session, flushed when it ends.
+  const gateway = openGateway({ tenantId, integrationId, status: integration.status });
+  const connector = createConnector(integration.integration_type_id, gateway);
   await connector.authenticate(integration.config ?? {}, await getDecryptedCredential(tenantId, integrationId));
   const kinds = connector.kinds().filter((k) => MCP_KINDS.includes(k));
   if (!kinds.includes("mcp_server")) throw new ApiError(400, "INVALID_INPUT", "Not an MCP connection");
@@ -63,6 +66,7 @@ export async function discoverMcpTools(tenantId: string, integrationId: string):
     }
   } finally {
     await connector.close();
+    await gateway.flush();
   }
   return rows.map(toIntegrationObject);
 }

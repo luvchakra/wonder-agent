@@ -23,8 +23,8 @@ import { OutboundBlockedError, checkOutboundUrl, isBlockedAddress, outboundPolic
  */
 
 const MAX_REDIRECTS = 3;
-const DEFAULT_TIMEOUT_MS = 20_000;
-const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_TIMEOUT_MS = 20_000;
+export const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
 
 export type GuardedInit = {
   method?: string;

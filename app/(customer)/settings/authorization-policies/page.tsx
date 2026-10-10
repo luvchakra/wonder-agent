@@ -4,7 +4,8 @@ import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listAuthorizationPolicies } from "@/lib/rbac/authorizationPolicies";
 import { describeScope } from "@/lib/rbac/authorizeCore";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { PolicyForm } from "./PolicyForm";
 import { loadPolicyFormData } from "./data";
 
@@ -33,11 +34,14 @@ export default async function AuthorizationPoliciesPage({ searchParams }: { sear
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Authorization policies</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Explicit rules that override what roles allow: deny an action, or hold it for approval, across the organization or in a scope. A policy never grants anything.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Authorization policies</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Explicit rules that override what roles allow: deny an action, or hold it for approval, across the organization or in a scope. A policy never grants anything.
+          </p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["authorization-policies"])} />
       </div>
       {sp.deleted ? (
         <p role="status" className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">

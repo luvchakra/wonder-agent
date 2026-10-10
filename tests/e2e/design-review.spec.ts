@@ -37,6 +37,9 @@ const ROUTES = [
   "/risk/investigations",
   "/integrations/jobs",
   "/integrations/mcp",
+  // Connection types (two-level Integrations, 2026-10-10).
+  "/integrations/types",
+  "/integrations/types/builtin/keycloak",
   "/settings/roles",
   // WonderID identity directory (IDENTITY-P0-17).
   "/identities",

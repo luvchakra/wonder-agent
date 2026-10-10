@@ -1470,3 +1470,221 @@ framework". Asked directly, the user also decided:
 It changes live rows (the four WonderArk connections) and removes the
 retired types. The change must not merge until it is applied, so the pull
 request is a draft.
+
+## 2026-10-10 — Connection types and connections: Integrations on two levels
+
+User request: "connections need to be on 2 levels, first a menu of
+connection types, where all the connection types with protocol details will
+be listed / another menu, connections, which will use these defined types to
+create an actual connection."
+
+Built on the connector-boundary work above (the `receive` spec, the `mcp`
+and `none` drivers, every connection of type `connector`).
+
+**What changed:**
+
+- `framework/typeSummary.ts` (new, pure): `describeConnectionType()` turns a
+  definition into its protocol details:
+  - protocol per driver: `http` HTTP REST, `mcp` MCP (Streamable HTTP),
+    `ldap` LDAP v3 (LDAPS), `sql` SQL (PostgreSQL, TLS), `none` Receive only;
+  - the authentication method, with the labels of its secret fields and the
+    header or query parameter that carries a key (never a value or a
+    `{secret.}` template);
+  - pagination styles, what it reads (canonical kinds in plain words),
+    settings, rate limit (default 10), origin, vendor and API reference;
+  - what it receives, from `def.receive`: each channel with its paths under
+    `/api/connect/v1/<connection>/` and how the sender authenticates
+    (receiving secret as bearer, HMAC-SHA256 with its signature header, or
+    the agent's own API key for the Runtime Gateway).
+
+  `connectionTypeOf()` names and links the type a connection was created
+  from, from its snapshot or, without one, from the built-in in code; a
+  config naming no definition shows "Connector", unlinked.
+- The screen folder's `labels.ts` (`CATEGORY_LABEL`, `RESOURCE_LABEL`,
+  `RECEIVE_LABEL`, `connectorSummary()`) moved into `typeSummary.ts`
+  unchanged, so there is one copy of the wording.
+- `DefinitionSummary` (the catalog list and
+  `GET /api/v1/integrations/connectors`) gained `protocol`. Additive;
+  `receives` keeps its channel keys.
+- Publishing a definition now opens the new type's page.
+
+**Verified:**
+
+- `npm run typecheck` clean; eslint clean on every changed file (one
+  existing warning in `rotateReceiverSecretAction`, not touched).
+- `npx vitest run modules/integrations modules/ui tests/architecture app`:
+  27 files (1 skipped), 221 tests passed, including the connector boundary
+  test and the new `typeSummary.test.ts` (every built-in described and
+  reading or receiving, no secret template in any summary, the MCP, LDAP,
+  SQL and receive-only protocols, the Runtime Gateway and webhook channels,
+  `connectorSummary`, connection-to-type links and fallbacks).
+- Playwright was not run here. `integrations`, `navigation-smoke`,
+  `design-review`, `mcp-bridge` and `mcp-inventory` specs now use the new
+  URLs.
+
+**Left out:** no schema change. The API paths under
+`/api/v1/integrations/connectors` keep their names. The screens are recorded
+in the Experience Agent's audit log, same date.
+## 2026-10-10 — The Connector Gateway: one gateway for every connection's traffic
+
+User requirement: "all such connections should pass through one gateway
+which sits between WonderID and external world".
+
+**Built:**
+
+- **`modules/integrations/gateway/`** (`gateway.ts`, pure rules in
+  `gatewayRules.ts`, reads in `traffic.ts`). `openGateway({ tenantId,
+  integrationId, status })` opens a session for one run. Its `drivers`
+  (http, mcp, ldap, sql) are the only driver instances in the product.
+  Every outbound request passes, in order:
+  - the connection is not disabled;
+  - the run's request budget (10,000 across every driver);
+  - the definition's `rateLimitPerSecond` as a token bucket (moved out of
+    `HttpSession`, so it no longer double-limits and now also covers MCP,
+    LDAP and SQL);
+  - `guardedFetch` with explicit timeout and size caps (HTTP, MCP), or the
+    driver's `resolveSafeHost` (LDAP, SQL).
+- **Every caller** opens a session and flushes it in a `finally`:
+  `syncJobs`, `mcpTools`, `testIntegrationConnection`, `setCredential`
+  (verification), `connectorWrites`, the catalog preview, and the live test
+  (never flushed). `createDefinitionConnector(gateway)` and
+  `createConnector(type, gateway)` now require a session.
+- **Inbound:** `receive()` opens a session per request on the connection
+  row. The gateway refuses a disabled connection (recorded as `blocked`,
+  `disabled`); every answered request is recorded by channel and status (an
+  authentication failure is `blocked`, `unauthenticated`), with no body,
+  sender address or secret.
+- **Ledger, migration 0110** (`connector_traffic`): aggregated in memory per
+  session and written once on flush through `record_connector_traffic()`,
+  which adds to the minute's row (one row per minute per direction,
+  operation, host, outcome and error category, never one per request).
+  - Host name only.
+  - Same-tenant foreign key to `integrations`; `integration_id` is null only
+    for previews of unsaved definitions (decision: record them, under the
+    organization, as "Connector previews").
+  - RLS with a member SELECT policy (as `integration_sync_jobs`), no client
+    write policy. The record and purge functions are executable by the
+    service role only. `connector_traffic_summary()` (SECURITY INVOKER)
+    totals and pages per connection in the database.
+  - 30-day retention: `purge_connector_traffic()`, called by the daily
+    `/api/cron/privacy` run (no new cron entry; a failed purge reports null
+    and never fails the privacy job). That route is Compliance's; the
+    one-line addition is recorded in its audit log too.
+- **UI:** `/integrations/gateway` lists the last 24 hours per connection
+  (requests, errors, blocked, data in and out, average duration), paged in
+  the database, with an empty state. The integration page gets a "Traffic
+  (24h)" card in its own Suspense boundary. The nav entry is left to the
+  lead (`shell-nav.ts` untouched).
+- **Small fixes on the way:** a refused test of a disabled connection no
+  longer marks it `error`; connection tests and credential checks now close
+  their driver (an LDAP or SQL connection was left open); `createIntegration`
+  no longer builds a connector just to read its (always empty) capabilities.
+
+**Boundary test** (`connector-boundary.test.ts`): `modules/integrations/gateway/`
+joins the outbound allowlist (it is the requirement itself); new checks
+that drivers (`httpDriver`, `mcpDriver`, `ldapDriver`, `sqlDriver`,
+`guardedFetch`, `resolveSafeHost`) are built only in the gateway and the
+files defining them, that `DefinitionConnector` is constructed only from a
+gateway session's drivers, and that the receivers route through the gateway.
+
+**Verified (code only):**
+
+- `npm run typecheck` clean; eslint clean on every changed file.
+- `npx vitest run modules/integrations tests/architecture lib/security`:
+  24 files passed, 1 skipped (live), 219 tests. Full `npx vitest run`: 110
+  files passed, 1 skipped, 896 tests. New:
+  - `gateway/gatewayRules.test.ts`: 14 (host-only, labels, aggregation,
+    token bucket, budget, disabled, classification);
+  - `gateway/gateway.test.ts`: 10 (caps passed to the transport, rate
+    limit, disabled refused, budget, failure categories, MCP labels, socket
+    drivers, no secrets in rows, accounting failure tolerated, inbound);
+  - `framework/receiveGateway.test.ts`: 4 (accepted, unauthenticated,
+    disabled, unknown connection);
+  - `connector-boundary.test.ts`: 3 more (7 in all).
+- `tests/integrations/connector-traffic-isolation.sql` written (read own
+  only, no client writes or function calls, bucket merge, cross-tenant
+  connection refused, purge). Not yet run.
+
+**Open:** migration 0110 is not applied, and the isolation SQL has not been
+run against the dev project; until 0110 is applied, flushes log
+"traffic not recorded" and the Gateway page cannot load. The file driver
+being added in parallel must be wired in `gateway.ts` with
+`meteredDriver()` when it merges.
+
+## 2026-10-10 — CSV through the connector framework: file driver, schedules, object-page imports (INTEGRATION-P0-17)
+
+**Why:** the user asked for CSV to be a connector type for scheduled,
+job-based ingestion, and for each object page to import CSV directly. By
+non-negotiable #20 both run through the framework: there is one path, a
+file connection's sync.
+
+**Built:**
+
+- **`file` driver** (`framework/drivers/file.ts`, `framework/csv.ts`): an
+  RFC 4180 parser (quoted fields with separators, line breaks and doubled
+  quotes; CRLF, LF, CR; BOM), strict about structure (unterminated quote,
+  text after a closing quote, ragged rows, unnamed or duplicate columns,
+  more than 50,000 rows refuse the whole file with its row). Columns match
+  in any case, ignoring spaces, `_` and `-`; a `columns` setting renames
+  headers per connection; unknown columns are ignored, so a WonderID
+  export imports back. A resource reads its `file.url` address (through the
+  Connector Gateway: policies, accounting, SSRF guard, 10 MB cap) or the
+  newest unread file received for its kind, marked read at the end of the
+  run. Registered in `gateway.ts` with `withDefinition(meteredFetch("file"))`
+  rather than `meteredDriver()`, so only real fetches are accounted, by
+  host; reading a received file is not outbound traffic. The gateway gives
+  the driver its own session's connection (a caller cannot name another),
+  and a preview reads no received files.
+- **`csv-file`** built-in: five optional addresses, an application name,
+  column renames, an optional Bearer token, and the `file` receiver.
+  Validation: an address comes only from a url setting, renames only from a
+  string setting, one file per kind, no MCP kinds, no `forEach`/`unwind`,
+  no `test`, `receive.file` only on a file connector.
+- **Receiver** `POST /api/connect/v1/<id>/file` (receiving secret, 10 MB,
+  `x-wonderid-kind`): authenticated first, then the file is checked
+  (structure, then a column for every required field), stored in
+  `connector_files`, and a sync is started after the response. Audited
+  `integration.file_received` with counts and SHA-256 only.
+- **Schedules:** `integrations.schedule` (manual, daily, hourly) and a new
+  daily cron `/api/cron/connector-syncs` (`vercel.json`, 20:45 UTC). Due
+  connections run as `scheduled` sync jobs for their own tenant, a few at a
+  time within a 240 s budget; `integration_sync_jobs.schedule_window` with a
+  unique index makes each window run once. On the daily-only plan, hourly
+  means "at each cron run". The cron also purges read files beyond each
+  connection's newest five (never an unread one).
+- **Imports:** `POST /api/v1/imports` (`integration.execute`, the same
+  permission the Actions menu checks) and `importFileForObject()`: the file
+  becomes an upload of the tenant's single **File imports** connection
+  (created on first use; a unique index keeps it single), checked before it
+  is stored, then synced before the response up to 5,000 rows, else in the
+  background. 400 answers carry `details: [{ row, column, message }]`.
+  Audited `integration.file_imported` with counts only.
+- **Page:** a Files card on a file connection (schedule select, last file
+  received, the upload endpoint folded away).
+- **Migration 0111:** `connector_files` (RLS on, no client policy: a file is
+  raw organization data, and hiding one column from a select policy would
+  need column grants that are easy to undo), the schedule column, the
+  schedule window column and the tightened client insert policy, the single
+  File imports index, and `connector_definitions` accepting the `mcp`,
+  `file` and `none` drivers and the `ai_runtime`/`event_source` categories
+  (0108's check was missing them). Additive; nothing is deleted.
+
+**Verified (code only):** `npm run typecheck` clean; eslint clean on the
+changed files; `npx vitest run modules/integrations tests/architecture app
+lib`: 51 files, 422 tests passed, 1 file skipped (live). New tests: CSV parser
+and columns (15), file driver, validation and upload targets (13), file
+receiver (5), import rules (6) and service (4), schedule rules (6), the file
+driver in the gateway (3). The boundary test now also checks that
+`fileDriver(` is built only in the gateway.
+
+**Open:**
+
+- Migration 0111 is not applied and `tests/integration/connector-files-isolation.sql`
+  has not been run against the dev project.
+- Vercel accepts request bodies up to 4.5 MB, so a file sent to the receiver
+  or imported through the hosted app is limited to that; an address can
+  serve 10 MB.
+- An access row's id is always `<account>:<entitlement>`, so re-importing an
+  exported grant does not keep its exported `externalId`.
+- Schedules have UI only on file connections; other connections can be
+  scheduled through `setConnectionSchedule()` but have no control yet.

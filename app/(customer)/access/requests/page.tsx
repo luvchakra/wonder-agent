@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listRequestIdsAwaiting, listRequests, repairApprovalChains, sweepApprovalTimeouts } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, type BadgeTone, Card, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, type BadgeTone, Card, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { cn } from "@/lib/utils";
 import { RequestActions } from "./RequestActions";
 
@@ -76,7 +77,8 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
             Requests for access, who they are for, how risky they are and where they stand. A person never decides their own request.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["access-requests"])} />
           {ctx.permissions.includes("access.manage") ? (
             <LinkButton href="/access/request-policies" variant="outline" size="sm">
               Request policies

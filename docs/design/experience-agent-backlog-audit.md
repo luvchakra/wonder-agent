@@ -3291,3 +3291,112 @@ difference is the two buttons.
   yearly INR), the NHI panel, the product grid (dark), and the header at
   1024 and 1440.
 - No horizontal overflow at 390 or 1440.
+
+---
+
+## 2026-10-10 — Actions menu (CSV export and import) on every object list page
+
+User requirement: every object page gets an action drop-down with import and
+export. What changed:
+
+- `modules/ui/ObjectActionsMenu.tsx`: a Radix DropdownMenu with an outline
+  "Actions" trigger, placed in the page header next to the primary action.
+  It is the only new control on each page, and it renders nothing when the
+  viewer has no item. Its items come from Operations'
+  `objectActionsFor()`:
+  - "Export CSV", when the viewer has the page's read permission and
+    `report.export`;
+  - "Import CSV…", for identity, account, entitlement, access_grant and
+    application, when the viewer has `integration.execute`.
+- Import opens a Radix Dialog:
+  - a `.csv` file input, up to 10 MB, checked before upload;
+  - one line naming the required canonical columns, with a link to the
+    template;
+  - a submit button that is disabled and spins while uploading.
+- The dialog POSTs to `/api/v1/imports`. `modules/ui/importCsv.ts` maps the
+  answer to what the dialog shows:
+  - 202: "Import started — N rows", with a link to Jobs. The import has
+    started; nothing is shown as finished.
+  - 400: the message and up to five row/column details.
+  - Anything else: a failure with the server's message.
+  - A 202 without a row count is shown as a failure.
+- Pages with a menu:
+  - Agents: agents and non-human identities.
+  - Identities: all, people, external and machine identities; lifecycle
+    work; attributes.
+  - Access: applications (one menu with applications, entitlements and
+    access grants), accounts, requests, packages, request policies and
+    data sources.
+  - Governance and operations: policies, risk findings, investigations,
+    runtime events, the audit trail, certification campaigns.
+  - Integrations: integrations, jobs, identity sources, application
+    discovery and MCP servers.
+  - Settings: groups, roles and authorization policies.
+- Headers that had no action area now wrap with
+  `flex flex-wrap items-start justify-between gap-3`, so the menu drops
+  below the title on a phone.
+- The menu uses only theme tokens (`popover`, `accent`, `border`), so it
+  follows light and dark mode. It is keyboard-operable through Radix.
+
+Verification is in the Operations audit entry of the same date. Not checked
+in a browser: this session runs no dev server.
+## 2026-10-10 — Integrations on two levels: Connection types and Connections (user request)
+
+User request: a menu of connection types that lists every type with its
+protocol details, and a menu of connections created from those types.
+
+**Routes, before → after:**
+
+| Before | After |
+|---|---|
+| `/integrations` "Integrations", "+ Connect a system" | `/integrations` "Connections". One primary action, "New connection", goes to the types list. The Type column names the type and version and links its type page. |
+| `/integrations/connectors` (catalog of cards) | `/integrations/types` "Connection types": one dense table per category (Type, Protocol, Reads, Receives, Version). Below `md`, rows stack into labelled cards (shared `TableContainer`). |
+| (none) | `/integrations/types/{origin}/{key}`: protocol details as a description list, with one primary action, "Create connection". The definition and "Use as a starting point" are folded under "Definition". |
+| `/integrations/connectors/{origin}/{key}` (connect form) | `/integrations/types/{origin}/{key}/connect`, with a back link to its type |
+| `/integrations/connectors/new` | `/integrations/types/new` "Write a connection type" |
+
+- The old URLs are page-level `permanentRedirect()` files, so
+  `next.config.ts` is unchanged; `?from=` is kept.
+- The connection page's header now reads "Type: Keycloak v1.0.0", linked to
+  its type, and its back link reads "← Connections".
+- A receive-only type (Agent runtime, Webhook) shows no authentication,
+  pagination or rate limit rows, since WonderID makes no requests to it;
+  its Receives row lists each channel's path and how the sender
+  authenticates. The connection page keeps its Receiving card and receiver
+  secret form unchanged.
+- The "add a generic integration" link is gone with the generic form; the
+  MCP Servers page and the Runtime empty state point at the new URLs.
+
+**Navigation** (`modules/ui/shell-nav.ts`), Integrations:
+
+- Connections;
+- Connection Types;
+- Gateway (`/integrations/gateway`, a page built in a parallel change);
+- Identity Sources, Pending Matches, MCP Servers and Sync Jobs, unchanged.
+
+Longest-prefix matching keeps Connection Types current on its sub-pages.
+
+**Minimal UI (§19.5):**
+
+- The list page lost its "Connected systems" card header.
+- The types list has no buttons: each name is the row's one link.
+- The type page has one button.
+- Server components throughout, two queries in parallel on the connections
+  page, tokens only (light and dark), no new dependency.
+- No route-level `loading.tsx` was added. None of the Integrations pages had
+  one, and `app/(customer)/loading.tsx` covers them.
+
+**Verified:**
+
+- typecheck and eslint clean; vitest 221/221 (27 files, 1 skipped) in
+  `modules/integrations modules/ui tests/architecture app`.
+- E2E specs updated, not run here:
+  - `integrations.spec.ts`: the new flow through types, the type page and
+    its connect form, the redirects, and the authoring page;
+  - `mcp-bridge.spec.ts` and `mcp-inventory.spec.ts`: the MCP server's
+    connect form at its new URL;
+  - `navigation-smoke.spec.ts`: the headings Connections and Connection
+    types, and a type page;
+  - `design-review.spec.ts`: the types list and a type page at every width
+    and in both themes.
+- The user-facing help guide was not changed (§19.7).

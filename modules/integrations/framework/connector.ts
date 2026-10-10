@@ -1,17 +1,15 @@
 import "server-only";
 
-import { guardedFetch } from "../outboundFetch";
-import { DefinitionConnector, httpDriver } from "./engine";
-import { ldapDriver } from "./drivers/ldap";
-import { sqlDriver } from "./drivers/sql";
-import { mcpDriver } from "./drivers/mcp";
+import { DefinitionConnector } from "./engine";
+import type { GatewaySession } from "../gateway/gateway";
 
-/** The production connector for integrations of type `connector`: every request through the SSRF guard. */
-export function createDefinitionConnector(): DefinitionConnector {
-  return new DefinitionConnector({
-    http: httpDriver((url, init) => guardedFetch(url, init)),
-    ldap: ldapDriver,
-    sql: sqlDriver,
-    mcp: mcpDriver((url, init) => guardedFetch(url, init)),
-  });
+/**
+ * The production connector for integrations of type `connector`. Its
+ * drivers come only from a Connector Gateway session, so every request it
+ * makes passes the gateway's policies and is accounted
+ * (modules/integrations/gateway). The caller opens the session and
+ * flushes it when the run ends.
+ */
+export function createDefinitionConnector(gateway: GatewaySession): DefinitionConnector {
+  return new DefinitionConnector(gateway.drivers);
 }

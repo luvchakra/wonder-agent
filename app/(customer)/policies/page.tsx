@@ -5,7 +5,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { POLICY_TARGET_TYPES, type PolicyTargetType } from "@/lib/shared/types/access-governance";
 import { createPolicyAction } from "@/app/actions/access";
 import { PoliciesTable } from "./PoliciesTable";
-import { Card, CardHeader, CardBody, Button, TextField, SelectField } from "@/modules/ui";
+import { Card, CardHeader, CardBody, Button, TextField, SelectField, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 
 const CATEGORIES = ["identity", "access", "runtime", "agent", "lifecycle"] as const;
 const ACTIONS = ["flag", "restrict", "block"] as const;
@@ -31,7 +32,10 @@ export default async function PoliciesPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold text-foreground">Policies</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold text-foreground">Policies</h1>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["policies"])} />
+      </div>
 
       <Card>
         <CardHeader title="Policies" description={`${policies.length} defined`} />

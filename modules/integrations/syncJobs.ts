@@ -9,6 +9,7 @@ import type { IntegrationSyncJob, SyncJobTrigger } from "@/lib/shared/types/inte
 import { toSyncJob } from "./mappers";
 import { createConnector } from "./registry";
 import { getDecryptedCredential } from "./credentials";
+import { openGateway, type GatewaySession } from "./gateway/gateway";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -33,6 +34,31 @@ export async function createSyncJob(
   if (error || !data) {
     throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create sync job");
   }
+  return toSyncJob(data);
+}
+
+/**
+ * A job created by WonderID itself, with no user session: a scheduled run
+ * (cron) or the sync a received file starts. Service role, so `tenantId`
+ * must be the connection row's own tenant_id, which the callers read from
+ * that row (§14); the insert names it and the same-tenant foreign key
+ * (0076) refuses any other. `scheduleWindow` makes a scheduled run
+ * idempotent: a second job for the same connection and window is refused
+ * by a unique index (0111), and this returns null.
+ */
+export async function createSystemSyncJob(
+  tenantId: string,
+  integrationId: string,
+  trigger: SyncJobTrigger,
+  scheduleWindow: string | null = null,
+): Promise<IntegrationSyncJob | null> {
+  const { data, error } = await supabaseServiceRole()
+    .from("integration_sync_jobs")
+    .insert({ tenant_id: tenantId, integration_id: integrationId, trigger, schedule_window: scheduleWindow })
+    .select()
+    .single();
+  if (error?.code === "23505" && scheduleWindow) return null;
+  if (error || !data) throw new ApiError(500, "CREATE_FAILED", "The sync job could not be created");
   return toSyncJob(data);
 }
 
@@ -123,6 +149,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
   const errors: { objectType?: string; message: string }[] = [];
   let recordsProcessed = 0;
   let recordsFailed = 0;
+  // The run's Connector Gateway session: every request of this sync passes it; flushed at the end.
+  let gateway: GatewaySession | null = null;
 
   try {
     const { data: integration, error: integrationError } = await supabase
@@ -136,7 +164,9 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     }
 
     const secret = await getDecryptedCredential(tenantId, integration.id);
-    const connector = createConnector(integration.integration_type_id);
+    // The gateway session names the connection (its own tenant); the file driver reads received files for it only.
+    gateway = openGateway({ tenantId, integrationId: integration.id, status: integration.status });
+    const connector = createConnector(integration.integration_type_id, gateway);
     await connector.authenticate(integration.config ?? {}, secret);
 
     // Every kind the connection's definition reads, in import order (an MCP
@@ -258,5 +288,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       referenceType: "integration_sync_job",
       referenceId: jobId,
     });
+  } finally {
+    await gateway?.flush();
   }
 }

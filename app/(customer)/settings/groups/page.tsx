@@ -3,7 +3,8 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listGroups } from "@/lib/users/groups";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { GroupDetailsForm } from "./GroupForms";
 
 // FOUNDATION-P0-26 — Groups (spec §11–12): people grouped to manage access
@@ -25,9 +26,12 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Groups</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Give roles to a team once instead of person by person. Everyone in a group holds its roles.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Groups</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Give roles to a team once instead of person by person. Everyone in a group holds its roles.</p>
+        </div>
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["groups"])} />
       </div>
       {sp.deleted ? (
         <p role="status" className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">

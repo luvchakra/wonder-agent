@@ -1112,3 +1112,72 @@ audit log.
 - a retired direct route reappears.
 
 Widening an allowlist needs the user's approval. 4/4 pass.
+
+## 2026-10-10 — Two-level connections, the Connector Gateway, CSV files and object-page import/export: integration and verification
+
+Four slices built in parallel worktrees (Integration, Experience and
+Operations Agent scope), reviewed and integrated by the lead session into
+one branch:
+
+- **Connection types and connections:** two levels under Integrations.
+  `/integrations/types` lists every type with its protocol details; the
+  old catalog URLs redirect to it. `/integrations` is the list of actual
+  connections, each made from a type.
+- **Connector Gateway:** every connection's traffic, in both directions,
+  passes `modules/integrations/gateway`. It checks, in order, that the
+  connection is enabled, then the request budget, then the rate limit, and
+  writes a per-minute traffic ledger (`connector_traffic`, migration 0110).
+  The `/integrations/gateway` page and a Traffic card show it.
+  - The boundary test's outbound allowlist now names the gateway. This is
+    the user's 2026-10-10 requirement that all connections pass one
+    gateway.
+- **CSV files:** the `file` driver and the `csv-file` type, read from an
+  HTTPS address or pushed to `/api/connect/v1/<id>/file`.
+  - Connection schedules run through the daily cron
+    `/api/cron/connector-syncs`.
+  - `POST /api/v1/imports` puts an object page's file through the
+    organization's "File imports" connection (migration 0111).
+- **Actions menu:** "Export CSV", plus "Import CSV…" where the kind is
+  importable, on 28 list pages, behind `GET /api/v1/exports/<object>`.
+
+Lead fixes made while integrating:
+- Capability validation for connector connections is checked against their
+  definition, which kept the 0109 fix through the gateway merge.
+- The import dialog now says where the rows went (the File imports
+  connection) and links to it. It no longer implies they are already in the
+  page's list.
+- Vitest skips agent worktrees.
+
+Verification:
+- **Unit tests:** `npm run typecheck` clean; vitest 995/995 (122 files); eslint
+  shows 0 errors on the changed files.
+- **Migrations:** 0110 and 0111 applied to the dev/prod project. The
+  isolation SQL for each ran in one transaction that was aborted, so it left
+  nothing behind.
+  - `connector_traffic`: 14/14 checks as expected. Each organization reads
+    only its own rows. A row naming another organization's connection is
+    refused by the foreign key. Clients cannot insert, update, delete, record
+    or purge. The purge keeps recent rows.
+  - `connector_files`: 8/8 checks as expected. Files are invisible and
+    immutable to clients, and a client job cannot claim a schedule window.
+    The same-organization foreign key and the single File imports connection
+    both hold.
+- **Playwright, run locally against a production build:**
+  - Connection types/connections and exports: integrations, navigation-smoke,
+    mcp-bridge, mcp-inventory, design-review and the audit specs, 83/83.
+  - Gateway: runtime-gateway, emergency-controls, gateway-enforcement,
+    policy-publish, shadow-ai, mcp-bridge, mcp-inventory, outbound-guard,
+    integrations, account-inventory and navigation-smoke, 95/95.
+  - CSV: the new `file-import.spec.ts` plus the integration and gateway
+    specs, 85/85.
+
+Open, for the owner:
+- Rows imported from an object page land in the File imports connection's
+  staging records. They reach the directory or inventory only when that
+  connection is reconciled (Identity Sources, application onboarding).
+  Reconciling automatically from a partial file could treat everyone
+  missing from it as a leaver, so it is not done.
+- Vercel caps request bodies at 4.5 MB. Uploads through the hosted app top
+  out there; files fetched from an address can be 10 MB.
+- The retired integration types and the stale Zendesk credential still need
+  a delete migration. The database tool refused delete statements in 0109.

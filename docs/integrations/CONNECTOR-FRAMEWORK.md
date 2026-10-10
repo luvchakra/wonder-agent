@@ -15,12 +15,77 @@ Every flow goes through this framework:
 - **Outbound.** Only the framework's drivers call an organization's systems.
 - **Inbound.** Only a connection's receivers accept data from them, at
   `/api/connect/v1/<connection id>/…`. This includes the Runtime Gateway.
-- **Files.** A CSV is read by a connector.
+- **Files.** A CSV is read by a connector (the `file` driver), whether it
+  is fetched on a schedule, sent to a connection, or imported from an
+  object page (see "Files, schedules and imports").
 
 Product modules read only what the framework stored.
 `tests/architecture/connector-boundary.test.ts` scans the source and fails
 when any other module calls out or opens a machine route. Widening its
 allowlists needs the user's approval.
+
+## The Connector Gateway
+
+User requirement (2026-10-10): "all such connections should pass through one
+gateway which sits between WonderID and external world". Code:
+`modules/integrations/gateway` (`gateway.ts`, with its pure rules in
+`gatewayRules.ts`).
+
+```text
+WonderID ── sync, test, MCP discovery, preview ──▶ ┌─────────────────────┐ ──▶ organization's systems
+                                                   │  Connector Gateway  │
+WonderID ◀── /api/connect receivers ────────────── │  policies + ledger  │ ◀── organization's systems
+                                                   └─────────────────────┘
+```
+
+- **One place.** The http, mcp, ldap and sql drivers are built only inside
+  the gateway. A connector gets its drivers from a gateway session
+  (`createDefinitionConnector(gateway)`), and every receiver request passes a
+  session too (`receive.ts`). `connector-boundary.test.ts` fails if a driver
+  is built anywhere else, or if a receiver stops going through it.
+- **A session is one run**: a sync, a connection test, a credential check,
+  an MCP discovery, a preview, or one received request. The caller opens it
+  with the connection row (`openGateway({ tenantId, integrationId, status })`)
+  and calls `flush()` in a `finally`.
+- **Policies, in this order, for every outbound request:**
+  1. the connection is not disabled (a disabled connection also receives
+     nothing);
+  2. the run's request budget is not spent (10,000 requests across every
+     driver);
+  3. the definition's `rateLimitPerSecond` (default 10) is honoured, as a
+     token bucket. This used to live in the http driver alone; it now
+     covers MCP, LDAP and SQL too.
+  4. HTTP and MCP then go through `guardedFetch` (SSRF guard, redirects,
+     20 s timeout, 10 MB response cap). LDAP and PostgreSQL connect only
+     to an address `resolveSafeHost` vetted, with their own timeouts and
+     row limits.
+- **Traffic ledger** (`connector_traffic`, migration 0110). Each request is
+  counted in memory per session: direction, operation (`http GET`,
+  `mcp tools/list`, `ldap search`, `sql query`, `receive events`), host,
+  outcome (`ok`, `error`, `blocked`), error category, bytes in and out, and
+  duration. `flush()` writes once per session through
+  `record_connector_traffic()`, which adds to the minute's row, so a busy
+  connection produces at most one row per minute per kind of traffic.
+  - Only the host name is recorded: never a path, query string, header,
+    body, error message or credential. For inbound traffic the sender's
+    address is not recorded at all.
+  - Receivers record an authentication failure as `blocked`
+    (`unauthenticated`), and a disabled connection as `blocked`
+    (`disabled`). A request for a connection that does not exist is not
+    recorded: there is no organization to account it to.
+  - A preview of an unsaved definition is recorded under the organization
+    with no connection ("Connector previews").
+  - A failure to record is logged and never fails the run: the traffic
+    already happened.
+  - Members of the organization read it; only the service role writes it.
+    Rows older than 30 days are purged by the daily retention cron
+    (`/api/cron/privacy` calls `purge_connector_traffic()`).
+- **Where to see it:** **Integrations → Gateway** (`/integrations/gateway`)
+  shows the last 24 hours per connection, and each integration's page has a
+  "Traffic (24h)" card.
+- **Adding a driver** (for example a file driver): build it inside
+  `gateway.ts` with `meteredDriver("<kind>", factory)` and add it to the
+  session's `drivers`. Nothing else may construct it.
 
 ## The idea
 
@@ -45,22 +110,49 @@ product takes a definition, not new code.
 definition (JSON) ──validate──▶ catalog ──connect──▶ integration (type "connector")
                                                         │  settings + encrypted secret
                                                         ▼
-                                 sync job ─▶ engine ─▶ driver (http | ldap | sql | mcp)
+                                 sync job ─▶ engine ─▶ gateway ─▶ driver (http | ldap | sql | mcp | file)
                                                         ▼
                                  integration_objects (identity, account, entitlement, access_grant, application, policy, mcp_*)
                                                         ▼
                                  identity sources, account inventory, access, risk
 ```
 
+## Connection types and connections
+
+Integrations has two levels (user decision, 2026-10-10):
+
+- A **connection type** is a definition: one kind of system and its
+  protocol. **Integrations → Connection Types** (`/integrations/types`) lists
+  the built-in types and your organization's, grouped by category, with the
+  protocol, what each reads and receives, and its version. A type's page
+  (`/integrations/types/{builtin|custom}/{key}`) shows the protocol details:
+  driver (HTTP REST, MCP Streamable HTTP, LDAP, SQL, or receive only),
+  authentication method and the fields it asks for (never their values),
+  settings, pagination, rate limit, what it receives (each channel's path
+  under `/api/connect/v1/<connection>/` and how the sender authenticates),
+  origin, vendor and API reference. Its one action is **Create connection**.
+- A **connection** is one of your organization's systems, connected with a
+  type: its own settings, encrypted credentials, schedule and sync history.
+  **Integrations → Connections** (`/integrations`) lists them with the type
+  each was created from. **New connection** starts from the types list.
+
+`describeConnectionType()` in `typeSummary.ts` derives the protocol details
+from a definition, so the screens and the catalog summary say the same
+thing; the receiving side comes from the definition's `receive`. The old `/integrations/connectors` pages redirect to the
+new ones; the API paths below are unchanged.
+
 ## Using a connector
 
-1. Go to **Integrations → Connect a system** and pick the product.
+1. Go to **Integrations → Connection Types**, open the product's type and
+   select **Create connection**
+   (`/integrations/types/{origin}/{key}/connect`).
 2. Enter a name, the settings and the credentials, then select **Connect**.
    - WonderID tests the credentials before storing them, and encrypts them
      (AES-256-GCM).
    - If the test fails, the integration is saved without credentials and
      the page says so.
-3. On the integration's page, select **Run sync now**, or let the schedule run.
+3. On the integration's page, select **Run sync now**, or set a schedule
+   (see "Files, schedules and imports").
 4. For an HR connector, create an **identity source** with the source type
    "Integration" and choose the connection. The suggested mappings already
    read every canonical field (`normalized.*`).
@@ -88,6 +180,7 @@ owner's action.
 | `mcp-server` | AI runtime | mcp | server, tools (classified read/write), resources; **receives** tool calls |
 | `runtime-gateway` | AI runtime | none | **receives** Runtime Gateway calls and agent activity |
 | `webhook` | event source | none | **receives** signed events from any system |
+| `csv-file` | other | file | identities, accounts, entitlements, access, applications from CSV files at HTTPS addresses; **receives** CSV files |
 
 Each one is verified against a real system by
 `modules/integrations/framework/live.test.ts` (see "Certifying a connector").
@@ -102,6 +195,7 @@ may send. Each channel is served per connection:
 | `runtimeEvents` | `POST /api/connect/v1/<id>/events` | the connection's receiving secret, as `Authorization: Bearer …` or an HMAC-SHA256 (hex) of the raw body | Each event is mapped by the definition, validated, kept as the connection's `activity` evidence, and recorded by Runtime as DID. An unknown or ambiguous agent is quarantined (Shadow AI), never recorded. One event, or a list of up to 500. |
 | `webhook` | `POST /api/connect/v1/<id>/webhook` | the receiving secret (bearer or HMAC) | The event is kept as an `activity` record; a redelivery with the same id is stored once. |
 | `gateway` | `POST /api/connect/v1/<id>/gateway/authorize` and `…/gateway/tools/filter` | the agent's own API key, which must belong to the connection's organization | Runtime's decision (or tool filter) for that agent. |
+| `file` | `POST /api/connect/v1/<id>/file`, the CSV as the body, header `x-wonderid-kind` (and optionally `x-wonderid-filename`) | the receiving secret (bearer or HMAC) | The file is checked, stored (`connector_files`) and read by the sync it starts. See "Files, schedules and imports". |
 
 The rules every receiver follows:
 
@@ -111,8 +205,8 @@ The rules every receiver follows:
   nothing.
 - **Order of checks.** The sender is authenticated before the body is even
   parsed, so an unauthenticated sender learns nothing about the expected
-  shape. Bodies are capped (1 MB for events and webhooks, 16 KB for the
-  gateway).
+  shape. Bodies are capped (1 MB for events and webhooks, 10 MB for a file,
+  16 KB for the gateway).
 - **The receiving secret.** WonderID issues it from the connection's page
   ("Issue secret") or `POST /api/v1/integrations/<id>/receiver-secret`. It is
   shown once and kept only encrypted. Replacing it stops the old one at once.
@@ -124,15 +218,114 @@ WonderID id, or a reference an identity of it is linked under); `tool`,
 `correlationId` and `mcpServer`. WonderID's own format uses these names
 directly (`definitions/runtime-event-fields.ts`).
 
+## Files, schedules and imports
+
+CSV is a connector type: the `file` driver. Every way a file reaches
+WonderID ends in the same place, a file connection's sync, which maps the
+rows with the definition and stores them in `integration_objects` like any
+other connector.
+
+### The file driver
+
+- **One file per kind.** Each resource reads one CSV. Its `file.url` names a
+  url setting holding the HTTPS address; when that is empty, the resource
+  reads the newest file the connection received for its kind.
+- **From an address.** Fetched through the Connector Gateway like the http
+  driver (its policies and accounting, the SSRF guard), with the
+  definition's auth (`none`, `bearer`, `basic` or
+  `header`), a 20 s timeout and a 10 MB cap. Testing the connection reads
+  each address and checks its columns.
+- **Received files.** A sync reads the newest unread file per kind and marks
+  it, and any older unread file of that kind, as read when the run ends. A
+  newer file supersedes an older one that was never read.
+- **The format.** RFC 4180: quoted fields with separators, line breaks and
+  doubled quotes; CRLF, LF or CR; a byte-order mark. The first row names the
+  columns. A file that has an unterminated quote, text after a closing
+  quote, a row with a different number of fields, an unnamed or duplicate
+  column, or more than 50,000 rows is refused whole, with the row.
+- **Columns.** A record's keys are the column names, matched in any case and
+  ignoring spaces, `_` and `-`: "Work Email" is read by the path
+  `workemail`. A mapping usually lists alternatives
+  (`{ "path": ["externalid", "id", "employeeid"] }`). `file.columns` names a
+  string setting of renames, `identity.email = Work Email; account.username =
+  Login`, so one connection can read its own headers without a new
+  definition. Empty cells are left out, so a mapping's `default` applies.
+  Columns no mapping reads are ignored (kept in the record's `raw`), so a
+  WonderID export, which uses the canonical field names, imports back.
+- **Before storing.** A received or imported file is checked first: its
+  structure, then that the columns can fill every required field of the
+  kind. A row that still cannot be mapped (an empty id) is reported on the
+  sync job with its row number.
+
+`csv-file` is the generic definition: five optional addresses (identities,
+accounts, entitlements, access, applications), an application name for
+accounts and entitlements without one, the column renames, an optional
+Bearer token for the addresses, and the `file` receiver. By default each
+column is read as the canonical field of the same name; an access row needs
+`accountExternalId` and `entitlementExternalId` (its id is the two joined).
+
+### Schedules
+
+A connection's `schedule` (`integrations.schedule`) is `manual` (the
+default), `daily` or `hourly`, set on its page ("Files" card for a file
+connection). `GET /api/cron/connector-syncs` (Vercel Cron, bearer
+`CRON_SECRET`) runs every due connection as an ordinary sync job of trigger
+`scheduled`, for the connection's own tenant, audited as the system
+(`integration.scheduled_sync_started`, then `integration.sync_completed`).
+Each run is idempotent per connection and window (`d:2026-10-10` or
+`h:2026-10-10T05`): a unique index refuses a second job for the same window.
+
+The current Vercel plan allows daily crons only, so the cron runs once a day
+(20:45 UTC). A daily connection runs once per day; an hourly one runs at
+every cron run, which today is also daily. `hourly` is kept as chosen and
+takes effect when the cron runs more often. A run that does not start within
+the cron's time budget waits for the next run.
+
+The same cron keeps each connection's newest five received files and
+deletes older files a sync has read. An unread file is never deleted.
+
+### Importing from an object page
+
+`POST /api/v1/imports` (session, `integration.execute`, the permission that
+runs a sync), `multipart/form-data`:
+
+| Field | Value |
+|---|---|
+| `kind` | `identity`, `account`, `entitlement`, `access_grant` or `application` |
+| `file` | the CSV, at most 10 MB |
+
+The file becomes an upload of the organization's single **File imports**
+connection (`csv-file`, created on first use, `config.purpose =
+"file_imports"`), and that connection's sync reads it: before the response
+for up to 5,000 rows, in the background above that.
+
+- `202 { ok, data: { jobId, integrationId, rows, sync } }`: `sync` is
+  `completed` (the job holds the outcome) or `running`.
+- `400 { ok: false, error: { code: "INVALID_FILE", message, details: [{ row,
+  column?, message }] } }`: the file was refused and nothing was stored.
+  Row 1 is the header.
+- `409`: the File imports connection is disabled, or reads that kind from
+  an address.
+
+The service function is `importFileForObject(ctx, kind, filename, csvText)`
+in `modules/integrations/service.ts`. Every import is audited
+(`integration.file_imported`) with the kind, row count, size and SHA-256,
+never the rows.
+
+**Platform limit.** Vercel accepts request bodies up to 4.5 MB, so a file
+sent or imported through the hosted app is limited to that; a file fetched
+from an address can be 10 MB.
+
 ## Writing a connector
 
-Go to **Integrations → Connect a system → Write a connector**, or start from
-an existing one ("Use as a starting point" on its connect page).
+Go to **Integrations → Connection Types → Write a connection type**
+(`/integrations/types/new`), or start from an existing one ("Use as a
+starting point" under "Definition" on its type page).
 
 The page checks the definition as you type, using the same rules the server
 applies. **Try it against a system** runs one resource against a real system
 without saving anything; that run is audited. **Publish** saves the
-version for your organization only.
+version for your organization only and opens its type page.
 
 Versions are immutable. To change a definition, raise `version` and publish
 again. Existing connections keep the version they were created with.
@@ -190,10 +383,10 @@ The same operations are available over the API (session authentication):
 | `key` | Stable id: lowercase letters, digits and dashes, 2–63 characters. The keys of built-in connectors are reserved. |
 | `version` | `major.minor.patch`. A published version never changes. |
 | `category` | `hr`, `identity_provider`, `directory`, `application`, `database`, `secrets`, `infrastructure` or `other` |
-| `driver` | `http` (REST/JSON), `ldap` (LDAPS), `sql` (PostgreSQL), `mcp` (an MCP server over Streamable HTTP), or `none` (receives only) |
+| `driver` | `http` (REST/JSON), `ldap` (LDAPS), `sql` (PostgreSQL), `mcp` (an MCP server over Streamable HTTP), `file` (CSV files), or `none` (receives only) |
 | `settings` | Non-secret values the organization enters. `type` is `url`, `string`, `number`, `boolean` or `select` (with `options`). Each has an optional `default`. One `url` setting is the base address (`baseUrl` when present). |
 | `auth` | How to authenticate. Secret values are declared in `auth.fields` and referenced only as `{secret.<key>}`. |
-| `test` | A cheap authenticated call (`request`, `search`, `query` or `rpc`) that proves the connection works. A `none` connector has none. |
+| `test` | A cheap authenticated call (`request`, `search`, `query` or `rpc`) that proves the connection works. A `none` or `file` connector has none (a file connection's test reads its addresses). |
 | `receive` | What the organization's systems may send WonderID (see "Receiving"). |
 | `application` | The application name recorded on accounts and entitlements. It may use `{settings.…}`. |
 | `resources` | One request per canonical kind, or a list of up to 10 whose records are combined. Empty for a `none` connector. |
@@ -203,10 +396,10 @@ The same operations are available over the API (session authentication):
 
 | Type | Driver | Fields |
 |---|---|---|
-| `none` | http, mcp, none | |
-| `basic` | http | `username`, `password` |
-| `bearer` | http, mcp | `token` (an optional token field sends no header when empty) |
-| `header` | http, mcp | `name` and `value`, for example `Authorization: token {secret.key}:{secret.secret}` |
+| `none` | http, mcp, file, none | |
+| `basic` | http, file | `username`, `password` |
+| `bearer` | http, mcp, file | `token` (an optional token field sends no header when empty) |
+| `header` | http, mcp, file | `name` and `value`, for example `Authorization: token {secret.key}:{secret.secret}` |
 | `query` | http | `name` and `value` (avoid it where the API offers a header) |
 | `oauth2_client_credentials` | http | `tokenUrl` (relative, or starting with a url setting), `clientId`, `clientSecret`, optional `scope`, `clientAuth` (`body` or `basic`). The token is cached, and refreshed once on a 401. |
 | `ldap_simple` | ldap | `bindDn`, `password` |
@@ -246,6 +439,7 @@ Conventions the built-in connectors follow, so downstream modules can rely on th
 | `search` | ldap | `{ base, filter, scope?, attributes? }`. Paged automatically. Under `forEach`, template values are LDAP-escaped. |
 | `query` | sql | One `SELECT` or `WITH` statement, with no templates. It runs in a read-only transaction with a row limit. |
 | `rpc` | mcp | `{ method }`: `initialize` (the server itself), `tools/list`, `resources/list` or `prompts/list`. Paged by `nextCursor`. Each tool gains `_operation`, `_operationBasis` and `_destructive` from the deterministic classification. |
+| `file` | file | `{ url?, columns?, delimiter? }`: `url` is `{settings.<url setting>}` (empty: read received files), `columns` is `{settings.<string setting>}` holding renames, `delimiter` is `,` (default), `;`, tab or `\|`. One resource per kind; no `forEach` or `unwind`. |
 | `forEach` | all | Runs the request once per record of another kind, which is available as `{parent.…}` (for example, a group's members). |
 | `forEachRequest` | all | When that kind lists several requests, follows only this one (0-based). |
 | `unwind` | all | Turns each record into one record per item of this list field. The record itself becomes the parent. |

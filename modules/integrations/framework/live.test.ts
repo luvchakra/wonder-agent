@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { BUILTIN_DEFINITIONS } from "./definitions";
 import { createDefinitionConnector } from "./connector";
+import { openGateway } from "../gateway/gateway";
 import { RESOURCE_KINDS } from "./types";
 
 /**
@@ -25,7 +26,8 @@ describe.skipIf(!file)("live connectors", () => {
     it(`${c.connector}: ${c.system}`, { timeout: 300_000 }, async () => {
       const def = BUILTIN_DEFINITIONS.find((d) => d.key === c.connector);
       expect(def, `no built-in connector ${c.connector}`).toBeDefined();
-      const connector = createDefinitionConnector();
+      // Through the production gateway (policies and guard); this run is not recorded: it has no organization.
+      const connector = createDefinitionConnector(openGateway({ tenantId: "live-test", integrationId: null, status: "connected" }));
       await connector.authenticate({ definition: { key: def!.key, version: def!.version, origin: "builtin" }, manifest: def, settings: c.settings }, JSON.stringify(c.secret));
       expect(await connector.testConnection()).toEqual({ ok: true });
       const summary: Record<string, number> = {};
