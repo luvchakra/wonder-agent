@@ -1502,3 +1502,23 @@ The owner asked for a strategy to use fewer build slots, recorded in
   - what to do when the limit is hit.
 - This entry rides with PR #32 rather than its own docs-only pull request,
   per rule 2.
+
+### 2026-10-10 — Vercel builds only on "merge now" or "build now" (owner decision)
+
+The owner set a rule to cut builds further: nothing that makes Vercel build
+happens unless the owner's message says "merge now" (merge the ready pull
+requests) or "build now" (a redeploy or an E2E run on Vercel).
+
+- Pull requests are still pushed and opened. Each waits, green, until then.
+- Checks run locally.
+- The nightly suite is unchanged.
+
+Recorded in:
+- `CLAUDE.md` §19.9, rule 0, with §4 step 7, §12 and §19.6 amended to
+  match;
+- `docs/ORCHESTRATION.md` §2.
+
+The "share its Vercel preview URL" steps were dropped. Working branches have
+had no previews since PR #34.
+
+This change is itself waiting for "merge now".
