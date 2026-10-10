@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -6,7 +7,7 @@ import { getRoleDetail } from "@/lib/rbac/customRoles";
 import { MODULE_LABEL, PERMISSION_MODULES, listPermissionCatalog } from "@/lib/rbac/permissionCatalog";
 import { moduleSummary } from "@/lib/rbac/roleRules";
 import { STATUS_LABEL, type MembershipStatus } from "@/lib/users/userRules";
-import { Badge, Card, CardBody, CardHeader, EmptyState, LinkButton } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, LinkButton } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE, formatDate } from "../../users/labels";
 import { RoleStatusActions } from "./RoleStatusActions";
@@ -34,7 +35,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
     throw err;
   }
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const [role, catalog] = await Promise.all([getRoleDetail(ctx.tenantId!, id), listPermissionCatalog()]);
+  const [role, catalog, provenance] = await Promise.all([getRoleDetail(ctx.tenantId!, id), listPermissionCatalog(), getRecordProvenance(ctx.tenantId!, "roles", id)]);
   if (!role) notFound();
   const tab = TABS.find((t) => t.key === sp.tab)?.key ?? "permissions";
   const summary = moduleSummary(role.permissions, catalog);
@@ -64,6 +65,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
             <Badge tone={role.custom ? "info" : "accent"}>{role.custom ? "Custom role" : "System role"}</Badge>
             {role.custom ? <Badge tone={role.status === "active" ? "success" : "neutral"}>{role.status === "active" ? "Active" : "Inactive"}</Badge> : null}
           </div>
+          <RecordProvenance record={provenance} className="mt-1" />
           {role.description ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{role.description}</p> : null}
           <p className="mt-1 text-xs text-muted-foreground">
             {role.custom ? `Updated ${formatDate(role.updatedAt)}` : "Defined by WonderID; can't be edited."}

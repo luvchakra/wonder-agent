@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
@@ -16,7 +17,7 @@ import {
 } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getIdentityAccessLedger, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type IdentityAccessEntry, type LedgerStatus } from "@/modules/access-governance/service";
-import { Badge, Card, EmptyState, LinkButton, TabPanel, Tabs } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, EmptyState, LinkButton, TabPanel, Tabs } from "@/modules/ui";
 import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm } from "../IdentityForms";
 import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
 
@@ -109,7 +110,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   if (!identity) notFound();
 
   const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
-  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger] = await Promise.all([
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
@@ -118,6 +119,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     personIdentity ? listHumanLifecycleEvents(tenantId, id) : Promise.resolve([]),
     personIdentity ? listLifecycleTasks(tenantId, { identityId: id }) : Promise.resolve([]),
     canReadAccess ? getIdentityAccessLedger(tenantId, id) : Promise.resolve(null),
+    getRecordProvenance(tenantId, "identities", id),
   ]);
   const openTasks = lifecycleTasks.filter((t) => t.status === "open");
   const footprint = openTasks.some((t) => t.taskType === "transfer_ownership") ? await getOwnershipFootprint(tenantId, id) : null;
@@ -167,6 +169,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">{identity.displayName}</h1>
+          <RecordProvenance record={provenance} className="mt-1" />
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <Badge tone="info">{IDENTITY_TYPE_LABEL[identity.identityType]}</Badge>
             <Badge tone={STATUS_TONE[identity.status]}>{STATUS_LABEL[identity.status]}</Badge>

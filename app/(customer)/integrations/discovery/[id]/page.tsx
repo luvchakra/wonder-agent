@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { allowedDecisions, getDiscovery, getIntegration } from "@/modules/integrations/service";
@@ -6,7 +7,7 @@ import { getApplicationDetail, listApplicationsForMatching } from "@/modules/acc
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { APPLICATION_TYPES, CATALOG_LEVELS, DATA_CLASSIFICATION_LEVELS } from "@/lib/shared/types/access-governance";
-import { Badge, Card, CardBody, CardHeader } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader } from "@/modules/ui";
 import { APP_TYPE_LABEL } from "../../../access/applications/labels";
 import { DecisionForms } from "../DiscoveryForms";
 import { DISCOVERY_SOURCE_LABEL, DISCOVERY_STATUS_LABEL, when } from "../labels";
@@ -61,12 +62,13 @@ export default async function DiscoveryDetailPage({ params }: { params: Promise<
   const canManageCatalog = canUpdate && ctx.permissions.includes("access.manage");
   const allowed = canUpdate ? allowedDecisions(d.status) : [];
   const needsLists = canManageCatalog && (allowed.includes("register") || allowed.includes("link"));
-  const [app, suggested, integration, people, catalog] = await Promise.all([
+  const [app, suggested, integration, people, catalog, provenance] = await Promise.all([
     d.applicationId && ctx.permissions.includes("access.read") ? getApplicationDetail(tenantId, d.applicationId) : Promise.resolve(null),
     d.suggestedApplicationId && ctx.permissions.includes("access.read") ? getApplicationDetail(tenantId, d.suggestedApplicationId) : Promise.resolve(null),
     d.sourceIntegrationId ? getIntegration(tenantId, d.sourceIntegrationId) : Promise.resolve(null),
     needsLists ? listAccountableHumans(tenantId) : Promise.resolve([]),
     needsLists ? listApplicationsForMatching(tenantId) : Promise.resolve([]),
+    getRecordProvenance(tenantId, "application_discoveries", id),
   ]);
   const status = DISCOVERY_STATUS_LABEL[d.status];
   const evidence = Object.entries(d.evidence).filter(([, v]) => v !== null && v !== undefined);
@@ -82,6 +84,7 @@ export default async function DiscoveryDetailPage({ params }: { params: Promise<
       </nav>
       <div>
         <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">{d.name}</h1>
+        <RecordProvenance record={provenance} className="mt-1" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge tone={status.tone}>{status.label}</Badge>
           <Badge tone="neutral">{DISCOVERY_SOURCE_LABEL[d.source]}</Badge>

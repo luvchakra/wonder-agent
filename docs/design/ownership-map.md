@@ -18,6 +18,16 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 
 ## 1. Database tables
 
+**Record provenance (0115, 2026-10-10, owner decision; CLAUDE.md §19.10).**
+Every object table below carries `created_at`, `updated_at`, `created_by` and
+`updated_by`, filled by Foundation's `record_provenance` trigger from
+`current_actor_id()`. The mechanism (functions, header, `lib/provenance`,
+`modules/ui/RecordProvenance`) is Foundation-owned; the columns are additive
+on each module's tables, and each module's object pages show them. A new
+object table adds the same columns and trigger in its own migration and joins
+`lib/provenance/tables.ts`. Append-only, event, run and snapshot tables are
+excluded (list in the migration's header).
+
 | Table | Owner | Notes |
 |---|---|---|
 | `tenants` | FA | Core tenant record. Slug is the tenant's address: policy-checked, immutable; `suspended_at`/`suspension_reason` (FOUNDATION-P0-22, 0095) |

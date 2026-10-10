@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getRequestWithApprovals, listRequestIdsAwaiting, sweepApprovalTimeouts, type ApprovalView } from "@/modules/access-governance/service";
-import { Badge, type BadgeTone, Card, CardBody, CardHeader } from "@/modules/ui";
+import { RecordProvenance, Badge, type BadgeTone, Card, CardBody, CardHeader } from "@/modules/ui";
 import { RequestActions } from "../RequestActions";
 
 // ACCESS-P0-19 — one access request and its approval chain (spec §11.1
@@ -98,9 +99,10 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   const tenantId = ctx.tenantId!;
   const canApprove = ctx.permissions.includes("access.approve");
   await sweepApprovalTimeouts(tenantId);
-  const [found, awaiting] = await Promise.all([
+  const [found, awaiting, provenance] = await Promise.all([
     getRequestWithApprovals(tenantId, id),
     listRequestIdsAwaiting(tenantId, { userId: ctx.userId, canApproveAsAccessManager: canApprove }),
+    getRecordProvenance(tenantId, "access_requests", id),
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
@@ -127,6 +129,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
             {found.packageName ?? found.applicationName ?? "Application"}
             <span className="text-muted-foreground"> · {r.accessPackageId ? "access package" : (found.entitlementName ?? "Application access")}</span>
           </h1>
+          <RecordProvenance record={provenance} className="mt-1" />
           <p className="mt-1 text-sm text-muted-foreground">
             For{" "}
             {r.subjectIdentityId ? (

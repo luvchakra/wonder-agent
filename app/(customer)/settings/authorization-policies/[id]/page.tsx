@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getAuthorizationPolicy } from "@/lib/rbac/authorizationPolicies";
 import { describeScope } from "@/lib/rbac/authorizeCore";
 import { listAssignableRoles } from "@/lib/rbac/roles";
-import { Badge, Card, CardBody, CardHeader } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader } from "@/modules/ui";
 import { PolicyForm, PolicyStatusActions } from "../PolicyForm";
 import { loadPolicyFormData } from "../data";
 
@@ -25,10 +26,11 @@ export default async function AuthorizationPolicyPage({ params, searchParams }: 
   }
   const canManage = ctx.permissions.includes("tenant.security.manage");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const [policy, form, roles] = await Promise.all([
+  const [policy, form, roles, provenance] = await Promise.all([
     getAuthorizationPolicy(ctx.tenantId!, id),
     canManage ? loadPolicyFormData(ctx.tenantId!) : Promise.resolve(null),
     listAssignableRoles(ctx.tenantId!),
+    getRecordProvenance(ctx.tenantId!, "authorization_policies", id),
   ]);
   if (!policy) notFound();
   const exempt = policy.exemptRoleIds.map((r) => roles.find((x) => x.id === r)?.displayName ?? "A role no longer available");
@@ -54,6 +56,7 @@ export default async function AuthorizationPolicyPage({ params, searchParams }: 
             <Badge tone={policy.effect === "DENY" ? "danger" : "warning"}>{policy.effect === "DENY" ? "Deny" : "Require approval"}</Badge>
             <Badge tone={policy.status === "active" ? "success" : "neutral"}>{policy.status === "active" ? "Active" : "Inactive"}</Badge>
           </div>
+          <RecordProvenance record={provenance} className="mt-1" />
           {policy.description ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{policy.description}</p> : null}
         </div>
         {canManage ? <PolicyStatusActions id={policy.id} status={policy.status} /> : null}

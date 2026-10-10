@@ -4,6 +4,7 @@ import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { actorAwareFetch } from "@/lib/security/actorHeader";
 import {
   getSupabasePublishableKey,
   getSupabaseServiceRoleKey,
@@ -54,9 +55,15 @@ export const supabaseServer = cache(async () => {
  * The `server-only` import above already prevents this module from being
  * bundled into client code; `getSupabaseServiceRoleKey()` adds a second,
  * independent runtime guard.
+ *
+ * Every request names the acting user in the `x-wonderid-actor` header
+ * when one is signed in, so the database's record_provenance trigger
+ * (migration 0115) can record who created or changed a row even though
+ * the connection itself carries no session.
  */
 export function supabaseServiceRole() {
   return createClient(getSupabaseUrl(), getSupabaseServiceRoleKey(), {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: { fetch: actorAwareFetch() },
   });
 }

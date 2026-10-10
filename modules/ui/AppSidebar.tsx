@@ -245,19 +245,22 @@ function SearchResults({ nav, query, onNavigate }: { nav: ShellNavItem[]; query:
 }
 
 /**
- * The expanded body's navigation: the area list, or the open area's menu,
+ * The expanded body's navigation: the area list (on Home), or the open area's menu,
  * or the search results. The open area follows the page; the back arrow
  * shows the list without leaving the page.
  */
 function ExpandedNav({ nav, badges, pathname, onNavigate }: { nav: ShellNavItem[]; badges: ShellBadgeCounts; pathname: string; onNavigate?: () => void }) {
   const current = activeArea(nav, pathname);
-  const [openLabel, setOpenLabel] = useState<string | null>(current?.label ?? null);
+  // The front door ("/") shows the area list; any other page opens its
+  // area's menu with the page marked current.
+  const auto = current && pathname !== "/" ? current.label : null;
+  const [openLabel, setOpenLabel] = useState<string | null>(auto);
   // Arriving on another area's page opens that area (state derived from a
   // changing prop, adjusted during render).
-  const [wasCurrent, setWasCurrent] = useState(current?.label ?? null);
-  if ((current?.label ?? null) !== wasCurrent) {
-    setWasCurrent(current?.label ?? null);
-    setOpenLabel(current?.label ?? null);
+  const [wasCurrent, setWasCurrent] = useState(auto);
+  if (auto !== wasCurrent) {
+    setWasCurrent(auto);
+    setOpenLabel(auto);
   }
   const [query, setQuery] = useState("");
   const open = openLabel ? nav.find((a) => a.label === openLabel) : undefined;

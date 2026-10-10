@@ -1,10 +1,11 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getInventoryAccount } from "@/modules/access-governance/service";
 import { listIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Button, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { RecordProvenance, Badge, Button, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { LinkAccountForm } from "../AccountForms";
 import { ACCOUNT_TYPE_LABEL, CORRELATION_LABEL, IDENTITY_TYPE_LABEL, when } from "../labels";
 
@@ -32,7 +33,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
   const find = ((await searchParams).find ?? "").slice(0, 100);
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
-  const account = await getInventoryAccount(tenantId, id);
+  const [account, provenance] = await Promise.all([getInventoryAccount(tenantId, id), getRecordProvenance(tenantId, "accounts", id)]);
   if (!account) notFound();
   const identities =
     canManage && !account.agentId
@@ -52,6 +53,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
       </nav>
       <div>
         <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">{title}</h1>
+        <RecordProvenance record={provenance} className="mt-1" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge tone={corr.tone}>{corr.label}</Badge>
           <Badge tone={account.status === "active" ? "success" : "neutral"}>{account.status === "active" ? "Active" : "Disabled"}</Badge>

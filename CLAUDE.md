@@ -594,6 +594,9 @@ A feature is complete only when:
   data, on top of the base tenant-isolation check above.
 - Slow operations (§15) show a real loading/progress state and avoid sequential
   fetch waterfalls.
+- Every object's page shows who created it and when, and who last changed it
+  and when (§19.10); a new object table has the four provenance columns and
+  the `record_provenance` trigger.
 - TypeScript/lint/build checks pass where applicable.
 - The module's own audit log is updated.
 - CI is green on the pull request. For shared-infrastructure changes (the list
@@ -624,11 +627,14 @@ light mode, a dark surface in dark mode, active items in Electric Blue on a soft
 blue tint. Brand assets, colours and the logo come only from `modules/ui/brand.ts`
 and `public/brand/` (the user's brand sheet). Content surfaces, tokens and both
 themes are unchanged, and a sidebar item appears only when its route and
-capability exist. Since 2026-10-10 (owner decision) there are two sidebars: the
-main one (Home first, then My Access and the governance work areas) for every
-member, and an Admin sidebar for administering the organization, opened from
-"Admin" (always the main sidebar's last entry) with a back button to Home. Each
-lists only the pages the viewer's permissions open (`modules/ui/shell-nav.ts`).
+capability exist. Since 2026-10-10 (owner decision, after a study of how Saviynt
+arranges its menu; concept only, nothing copied) the sidebar is a list of
+**areas** (Home first, then Identities, Applications, Certifications, Risk &
+Security, AI Agents, Insights, and Admin always last); opening an area shows
+that area's menu, in folding groups, with a back arrow to the area list. The
+sidebar has a search box that matches menu items only (never data), and a
+footer with the product version and commit. Each area lists only the pages the
+viewer's permissions open (`modules/ui/shell-nav.ts`).
 
 **The full, binding rule set is
 [`docs/design/UI-UX-DESIGN-RULES.md`](docs/design/UI-UX-DESIGN-RULES.md) — read it in
@@ -1387,3 +1393,42 @@ budget, with production first.
    paused `kunals-projects-9f64757f/wonder-id` project only posts
    "Deployment was blocked" statuses. It counts against its own account,
    not this one, but it should be disconnected when the owner can.
+
+### 19.10 Record provenance on every object (adopted 2026-10-10)
+
+Owner decision: every object shows **created by, created on, updated by and
+updated on**. Objects are the records a page is about: identities, agents,
+accounts, applications, entitlements, access requests and packages,
+policies, roles, groups, authorization policies, connections and their
+credentials, identity sources, discoveries, campaigns, investigations,
+privacy requests and breaches, reports, memberships, and anything added
+later. Append-only and event tables (audit logs, ledgers, runtime events,
+traffic, runs and jobs, synced snapshots) keep their own actor and time
+columns and are out of scope.
+
+1. **The database records it, not each service.** Migration 0115 gives every
+   object table `created_at`, `updated_at`, `created_by` and `updated_by`
+   and the `record_provenance` trigger, which fills them on insert and
+   update and never rewrites `created_*`. A new object table gets the same
+   four columns and the same trigger in its own migration, and is added to
+   `lib/provenance/tables.ts` (a unit test keeps the list and the
+   migration in step).
+2. **The actor is the signed-in user.** A request made as the user is known
+   to PostgreSQL (`auth.uid()`). A service-role request carries no session,
+   so `supabaseServiceRole()` names the acting user in the
+   `x-wonderid-actor` header from the request's own session;
+   `current_actor_id()` trusts that header only when there is no session
+   and only as a UUID. A job or cron has no actor and records none.
+   `created_by`/`updated_by` are plain uuids (no foreign key), so a person
+   who left never blocks a write.
+3. **Every object page shows one line under its title** —
+   `<RecordProvenance record={…} />` fed by
+   `getRecordProvenance(tenantId, table, id)`, which reads as the user under
+   RLS, filtered by tenant. Wording: "Created by Ada Lovelace on
+   10 Oct 2026, 09:00 UTC · Updated by Bob Ross on 10 Oct 2026, 15:30 UTC".
+   A missing name shows the date alone; a person who left shows "A former
+   member"; an update within a second of creation is not shown. Nothing is
+   invented (§19.2).
+4. **Lists stay minimal (§19.5).** The line belongs on the object's own page;
+   a list may sort or show `updated_at` but does not add provenance to each
+   row.

@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
@@ -6,7 +7,7 @@ import { listCampaignItems, getCampaignMetrics } from "@/modules/certification-c
 import { ApiError } from "@/lib/shared/types/foundation";
 import { CampaignItemsTable } from "./CampaignItemsTable";
 import { EvidenceDrawerClient } from "./EvidenceDrawerClient";
-import { Card, CardBody, EmptyState } from "@/modules/ui";
+import { RecordProvenance, Card, CardBody, EmptyState } from "@/modules/ui";
 
 export default async function CampaignItemsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: campaignId } = await params;
@@ -18,7 +19,7 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
     throw err;
   }
 
-  const [items, metrics] = await Promise.all([listCampaignItems(ctx.tenantId!, campaignId), getCampaignMetrics(ctx.tenantId!, campaignId)]);
+  const [items, metrics, provenance] = await Promise.all([listCampaignItems(ctx.tenantId!, campaignId), getCampaignMetrics(ctx.tenantId!, campaignId), getRecordProvenance(ctx.tenantId!, "certification_campaigns", campaignId)]);
 
   return (
     <div className="space-y-4">
@@ -27,6 +28,7 @@ export default async function CampaignItemsPage({ params }: { params: Promise<{ 
       </Link>
       <div>
         <h1 className="text-xl font-semibold text-foreground">Certification Items</h1>
+        <RecordProvenance record={provenance} className="mt-1" />
         <p className="mt-1 text-sm text-muted-foreground">
           {metrics.totalItems} total · {metrics.pendingItems} pending · {metrics.decidedItems} decided · {metrics.overdueItems} overdue ·{" "}
           {metrics.escalatedItems} escalated

@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass, type BadgeTone } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass, type BadgeTone } from "@/modules/ui";
 import { breachFacts, getBreach } from "@/modules/privacy/service";
 import { REGIME_LABEL, breachObligations, type BreachObligation } from "@/modules/privacy/rules";
 import { updateBreachAction } from "@/app/actions/privacy";
@@ -27,7 +28,7 @@ export default async function BreachPage({ params }: { params: Promise<{ id: str
   }
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const breach = await getBreach(ctx.tenantId!, id);
+  const [breach, provenance] = await Promise.all([getBreach(ctx.tenantId!, id), getRecordProvenance(ctx.tenantId!, "privacy_breach_incidents", id)]);
   if (!breach) notFound();
   const obligations = breachObligations(breachFacts(breach), new Date());
   const canManage = ctx.permissions.includes("privacy.incidents.manage") && breach.status !== "closed";
@@ -55,6 +56,7 @@ export default async function BreachPage({ params }: { params: Promise<{ id: str
         <Badge tone={breach.severity === "critical" || breach.severity === "high" ? "danger" : "warning"}>{breach.severity}</Badge>
         <Badge tone={breach.status === "closed" ? "neutral" : "warning"}>{breach.status}</Badge>
       </div>
+      <RecordProvenance record={provenance} className="-mt-3" />
 
       <Card>
         <CardHeader title="Statutory notifications" description={`Clocks run from detection: ${fmt(breach.detectedAt)}. Laws: ${breach.regimes.map((r) => REGIME_LABEL[r]).join(", ")}.`} />

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -6,7 +7,7 @@ import { listAssignableRoles } from "@/lib/rbac/roles";
 import { getAccessHistory, getUserDetail, listUserSessions } from "@/lib/users/users";
 import { ACCOUNT_TYPE_LABEL, AUTH_METHOD_LABEL, STATUS_LABEL, roleLabel } from "@/lib/users/userRules";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { RemoveRoleButton } from "../../roles/RemoveRoleButton";
 import { STATUS_TONE, formatDate, initials, relativeTime } from "../labels";
@@ -65,13 +66,14 @@ export default async function UserDetailPage({
   // Assigning roles: roles.assign, or the legacy role.manage (FOUNDATION-P0-24/25).
   const canAssign = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "roles") as TabKey;
-  const [user, identity, history, sessions, assignable, scope] = await Promise.all([
+  const [user, identity, history, sessions, assignable, scope, provenance] = await Promise.all([
     getUserDetail(ctx.tenantId!, userId),
     getIdentityForUser(ctx.tenantId!, userId).catch(() => null),
     tab === "history" ? getAccessHistory(ctx.tenantId!, userId) : Promise.resolve(null),
     tab === "sessions" ? listUserSessions(ctx.tenantId!, userId).catch(() => null) : Promise.resolve(null),
     canAssign ? listAssignableRoles(ctx.tenantId!) : Promise.resolve([]),
     loadScopeOptions(ctx.tenantId!),
+    getRecordProvenance(ctx.tenantId!, "tenant_memberships", userId, "user_id"),
   ]);
   // Names for application and agent scopes (FOUNDATION-P0-19).
   const scopeName = new Map([...scope.applications, ...scope.agents].map((o) => [o.id, o.label]));
@@ -116,6 +118,7 @@ export default async function UserDetailPage({
                 <>
                   <h1 className="mt-3 break-words text-lg font-semibold text-foreground">{user.displayName}</h1>
                   <p className="break-all text-sm text-muted-foreground">{user.email}</p>
+                  <RecordProvenance record={provenance} className="mt-1" />
                 </>
               ) : (
                 // No name on the account: the address is the name, shown once.

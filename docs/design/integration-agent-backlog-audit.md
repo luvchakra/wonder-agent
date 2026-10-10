@@ -1820,3 +1820,41 @@ The owner's first `create-vm.sh` run stopped after "Frappe HR ready", while
 
 - `scripts/vercel-ignore-build.sh` also skips production builds for
   `demo-org/` changes, which never change the app.
+
+### 2026-10-10 — A connection shows and edits everything its type declares
+
+**Why.** Owner, on the connection page: "show all the various attributes
+and parameters that was configured, it should be open to be updated by the
+user with required permission. show the sensitive info as masked but dont
+keep it blank. all the info mentioned in the type protocol should be
+present in the connection"; and, on the reconciliation run page, "such
+pages should always be paginated".
+
+**What changed.**
+- `modules/integrations/framework/catalog.ts`: `getConnectorConfiguration()`
+  returns the definition, name, every declared setting's stored value and
+  every declared credential masked (`maskSecret`: the last four characters
+  when the value is 12 or longer, bullets otherwise, never blank);
+  `updateConnectorSettings()` (audit `integration.settings_updated`, with
+  which settings changed) and `setConnectorCredentials()` now keeps a stored
+  credential when its field is left empty ("Enter at least one credential
+  to change").
+- `app/(customer)/integrations/[id]/page.tsx`: a Settings card and a
+  Credentials card for every connection of a declared type. With
+  `integration.update` they are forms (`ConnectorSettingsForm`,
+  `ConnectorCredentialsForm`; the hint "Saved: ••••. Leave empty to keep
+  it."); without it, read-only lists with the same masking.
+- `app/actions/connectors.ts`: `updateConnectorSettingsAction`.
+- Reconciliation run changes (`sources/[sourceId]/runs/[runId]`): 50 per
+  page with Previous/Next.
+- Every connection and identity-source page shows who created and last
+  changed it (CLAUDE.md §19.10). Foundation's migration 0115 added the
+  provenance columns and trigger to `integrations`,
+  `integration_credentials`, `identity_sources`,
+  `pending_identity_correlations`, `connector_receivers`,
+  `onboarding_proposals` and `application_discoveries`; additive, no
+  service changed.
+
+**Verified.** `maskSecret` unit tests; typecheck and eslint clean; local
+Playwright: `integrations.spec.ts` passed in a 52/52 run with the identities
+and design-review specs.
