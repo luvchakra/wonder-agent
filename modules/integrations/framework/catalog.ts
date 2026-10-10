@@ -11,6 +11,7 @@ import { BUILTIN_DEFINITIONS } from "./definitions";
 import { capabilitiesOf, parseConnectorConfig } from "./engine";
 import { createDefinitionConnector } from "./connector";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
+import { protocolLabel } from "./typeSummary";
 import { RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type DefinitionIssue, type ResourceKind, type ResourceSpec } from "./types";
 
 /**
@@ -33,6 +34,8 @@ export type DefinitionSummary = {
   driver: ConnectorDefinition["driver"];
   description: string;
   resources: ResourceKind[];
+  /** The protocol, in words ("HTTP REST (JSON)"; typeSummary.ts). */
+  protocol: string;
   /** What the connection's systems can send WonderID: runtimeEvents, webhook, gateway. */
   receives: string[];
   createdAt: string | null;
@@ -49,6 +52,7 @@ function summarize(def: ConnectorDefinition, origin: DefinitionOrigin, createdAt
     driver: def.driver,
     description: def.description,
     resources: RESOURCE_KINDS.filter((k) => def.resources[k]),
+    protocol: protocolLabel(def.driver),
     receives: Object.keys(def.receive ?? {}),
     createdAt,
   };

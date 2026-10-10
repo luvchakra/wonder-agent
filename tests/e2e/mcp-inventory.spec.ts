@@ -55,7 +55,7 @@ test.describe.serial("MCP inventory", () => {
   });
 
   test("discovering a server lists its tools, classified, and its resources, without calling any tool", async ({ page }) => {
-    await page.goto("/integrations/connectors/builtin/mcp-server");
+    await page.goto("/integrations/types/builtin/mcp-server/connect");
     await page.getByLabel("Name").fill(name);
     await page.getByLabel("MCP endpoint").fill(stubUrl);
     // Connecting with a token tests it against the server first.

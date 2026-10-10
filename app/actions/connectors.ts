@@ -13,9 +13,10 @@ import {
   type DefinitionOrigin,
   type PreviewResult,
 } from "@/modules/integrations/framework/catalog";
+import { connectionTypeHref } from "@/modules/integrations/framework/typeSummary";
 
 /**
- * Connector catalog forms. Each returns the real outcome (§17.5): a
+ * Connection type and connection forms. Each returns the real outcome (§17.5): a
  * connection whose credential test failed says so instead of claiming
  * success. Secret values are read from the form and passed straight to the
  * catalog service, which tests and encrypts them; they are never returned.
@@ -69,13 +70,14 @@ export async function setConnectorCredentialsAction(integrationId: string, _prev
 
 export async function publishDefinitionAction(_prev: ConnectorFormState, formData: FormData): Promise<ConnectorFormState> {
   const ctx = await requirePermission("integration.create");
+  let key: string;
   try {
-    await saveCustomDefinition(ctx.tenantId!, ctx.userId, JSON.parse(String(formData.get("definition") ?? "")));
+    ({ key } = await saveCustomDefinition(ctx.tenantId!, ctx.userId, JSON.parse(String(formData.get("definition") ?? ""))));
   } catch (err) {
     return formError(err);
   }
-  revalidatePath("/integrations/connectors");
-  redirect("/integrations/connectors");
+  revalidatePath("/integrations/types");
+  redirect(connectionTypeHref("custom", key));
 }
 
 export type PreviewState = { status: "idle" } | { status: "error"; message: string } | { status: "done"; result: PreviewResult };

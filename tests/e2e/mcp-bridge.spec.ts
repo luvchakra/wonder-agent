@@ -56,7 +56,7 @@ test.describe.serial("MCP events bridge into runtime", () => {
   });
 
   test("setup: an MCP connection, and its receiving secret", async ({ page }) => {
-    await page.goto("/integrations/connectors/builtin/mcp-server");
+    await page.goto("/integrations/types/builtin/mcp-server/connect");
     await page.getByLabel("Name").fill(`E2E MCP ${Date.now()}`);
     await page.getByLabel("MCP endpoint").fill(mcpStubUrl);
     await page.getByRole("button", { name: "Connect" }).click();

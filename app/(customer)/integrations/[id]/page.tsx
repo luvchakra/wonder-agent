@@ -8,7 +8,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
 import { parseConnectorConfig } from "@/modules/integrations/framework/engine";
 import type { ConnectorDefinition } from "@/modules/integrations/framework/types";
-import { ConnectorCredentialsForm, ReceiverSecretForm } from "../connectors/ConnectorForms";
+import { connectionTypeOf } from "@/modules/integrations/framework/typeSummary";
+import { ConnectorCredentialsForm, ReceiverSecretForm } from "../types/ConnectorForms";
 
 const JOB_STATUS_TONE: Record<string, BadgeTone> = {
   queued: "neutral",
@@ -68,6 +69,7 @@ export default async function IntegrationDetailPage({
     receive ? ownOrigin() : Promise.resolve(""),
   ]);
   const reads = connector ? Object.keys(connector.resources).length > 0 : false;
+  const type = connectionTypeOf(integration);
   const testConnectionWithId = testConnectionAction.bind(null, id);
   const triggerSyncWithId = triggerSyncAction.bind(null, id);
   const endpoint = (channel: string) => `${origin}/api/connect/v1/${id}/${channel}`;
@@ -75,7 +77,7 @@ export default async function IntegrationDetailPage({
   return (
     <div className="space-y-4">
       <Link href="/integrations" className="text-sm text-primary hover:underline">
-        ← All integrations
+        ← Connections
       </Link>
       <div>
         <div className="flex flex-wrap items-center gap-2">
@@ -83,7 +85,14 @@ export default async function IntegrationDetailPage({
           <Badge tone={integration.status === "connected" ? "success" : integration.status === "error" ? "danger" : "neutral"}>{integration.status}</Badge>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {connector ? `${connector.name} connector (v${connector.version})` : "Connector"}
+          Type:{" "}
+          {type.href ? (
+            <Link href={type.href} className="text-primary hover:underline">
+              {type.version ? `${type.name} v${type.version}` : type.name}
+            </Link>
+          ) : (
+            type.name
+          )}
           {reads ? ` · Has credentials: ${integration.hasCredentials ? "yes" : "no"} · Last sync: ${integration.lastSyncAt ?? "never"}` : ""}
         </p>
       </div>

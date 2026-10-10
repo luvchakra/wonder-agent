@@ -132,7 +132,7 @@ export default async function McpInventoryPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["mcp-servers"])} />
-          <LinkButton href="/integrations/connectors/builtin/mcp-server" variant="outline" size="sm">
+          <LinkButton href="/integrations/types/builtin/mcp-server/connect" variant="outline" size="sm">
             + Connect an MCP server
           </LinkButton>
         </div>

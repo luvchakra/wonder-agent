@@ -141,7 +141,9 @@ export const SHELL_NAV: ShellNavItem[] = [
     href: "/integrations",
     icon: "Link2",
     children: [
-      link("Connectors", "/integrations"),
+      link("Connections", "/integrations"),
+      link("Connection Types", "/integrations/types"),
+      link("Gateway", "/integrations/gateway"),
       link("Identity Sources", "/integrations/sources"),
       link("Pending Matches", "/integrations/correlations"),
       link("MCP Servers", "/integrations/mcp"),

@@ -101,7 +101,7 @@ export default async function RuntimeIndexPage() {
           {decisions.length === 0 ? (
             <EmptyState
               title="No gateway requests yet"
-              description="Agents ask through their runtime's connection (Integrations → Connect a system → Agent runtime), with their own API key, before acting."
+              description="Agents ask through their runtime's connection (Integrations → Connection Types → Agent runtime), with their own API key, before acting."
             />
           ) : (
             <TableContainer label="Authorization decisions" bare>
