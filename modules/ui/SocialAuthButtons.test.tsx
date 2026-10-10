@@ -8,7 +8,7 @@ vi.mock("@/lib/db/supabaseBrowser", () => ({
   supabaseBrowser: () => ({ auth: { signInWithOAuth } }),
 }));
 
-import { isOAuthProviderEnabled, providerNotEnabledMessage, SocialAuthButtons } from "./SocialAuthButtons";
+import { isOAuthProviderEnabled, NOT_AVAILABLE_HINT, providerNotEnabledMessage, SocialAuthButtons } from "./SocialAuthButtons";
 
 function settingsResponse(body: unknown, ok = true) {
   return vi.fn(async () => ({ ok, json: async () => body }) as Response);
@@ -58,7 +58,8 @@ describe("SocialAuthButtons — Google, Microsoft and LinkedIn", () => {
     ["LinkedIn", "linkedin_oidc"],
   ] as const)("says %s is not enabled, and does not redirect, when it is off", async (name, provider) => {
     vi.stubGlobal("fetch", settingsResponse(ALL_OFF));
-    render(<SocialAuthButtons verb="Sign in" />);
+    // Status unknown when the page rendered: the click-time check still tells the truth.
+    render(<SocialAuthButtons verb="Sign in" status={null} />);
     fireEvent.click(screen.getByRole("button", { name: `Sign in with ${name}` }));
     expect(await screen.findByRole("alert")).toHaveTextContent(providerNotEnabledMessage(provider));
     expect(signInWithOAuth).not.toHaveBeenCalled();
@@ -81,6 +82,24 @@ describe("SocialAuthButtons — Google, Microsoft and LinkedIn", () => {
     fireEvent.click(screen.getByRole("button", { name: "Sign in with LinkedIn" }));
     await vi.waitFor(() => expect(signInWithOAuth).toHaveBeenCalledTimes(3));
     expect(signInWithOAuth).toHaveBeenLastCalledWith({ provider: "linkedin_oidc", options: { redirectTo } });
+  });
+
+  it("shows a method that is not turned on as disabled, and the rest as usable (owner request, 2026-10-10)", async () => {
+    render(<SocialAuthButtons verb="Sign in" status={{ google: true, azure: false, linkedin_oidc: false, sso: false }} />);
+    expect(screen.getByRole("button", { name: "Sign in with Google" })).toBeEnabled();
+    for (const name of ["Microsoft", "LinkedIn"]) {
+      const button = screen.getByRole("button", { name: `Sign in with ${name}, ${NOT_AVAILABLE_HINT.toLowerCase()}` });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+    }
+    expect(signInWithOAuth).not.toHaveBeenCalled();
+  });
+
+  it("reads the status itself when the page did not give one", async () => {
+    vi.stubGlobal("fetch", settingsResponse({ external: { google: true, azure: false, linkedin_oidc: true } }));
+    render(<SocialAuthButtons verb="Sign up" />);
+    expect(await screen.findByRole("button", { name: `Sign up with Microsoft, ${NOT_AVAILABLE_HINT.toLowerCase()}` })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Sign up with LinkedIn" })).toBeEnabled();
   });
 
   it("still lets Supabase decide when the settings check cannot be made", async () => {

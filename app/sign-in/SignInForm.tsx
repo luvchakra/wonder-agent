@@ -5,20 +5,22 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { signInAction } from "@/app/actions/auth";
-import { AuthShell, Button, SocialAuthButtons, TenantLogo, TextField } from "@/modules/ui";
+import { AuthShell, Button, NOT_AVAILABLE_HINT, SocialAuthButtons, TenantLogo, TextField, type AuthProviderStatus } from "@/modules/ui";
 
 /** The organization an address names, as the sign-in page may show it (FOUNDATION-P0-22). */
 export type SignInTenant = { name: string; suspended: boolean } | null;
 
-export function SignInFormBoundary({ tenant }: { tenant: SignInTenant }) {
+export function SignInFormBoundary({ tenant, providers }: { tenant: SignInTenant; providers: AuthProviderStatus | null }) {
   return (
     <Suspense>
-      <SignInForm tenant={tenant} />
+      <SignInForm tenant={tenant} providers={providers} />
     </Suspense>
   );
 }
 
-function SignInForm({ tenant }: { tenant: SignInTenant }) {
+function SignInForm({ tenant, providers }: { tenant: SignInTenant; providers: AuthProviderStatus | null }) {
+  // A method Supabase Auth has not turned on shows disabled (owner request, 2026-10-10).
+  const ssoOff = providers?.sso === false;
   const router = useRouter();
   const searchParams = useSearchParams();
   const reason = searchParams.get("reason");
@@ -168,9 +170,18 @@ function SignInForm({ tenant }: { tenant: SignInTenant }) {
 
       <div className="space-y-2">
         {/* On an organization's address, only its own sign-in methods: the social providers' redirect allowlists do not include tenant addresses. */}
-        {tenant ? null : <SocialAuthButtons verb="Sign in" />}
-        <Button type="button" variant="outline" onClick={handleSsoSignIn} disabled={ssoChecking || Boolean(tenant?.suspended)} className="w-full">
+        {tenant ? null : <SocialAuthButtons verb="Sign in" status={providers} />}
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleSsoSignIn}
+          disabled={ssoChecking || ssoOff || Boolean(tenant?.suspended)}
+          title={ssoOff ? `SSO sign-in: ${NOT_AVAILABLE_HINT.toLowerCase()}` : undefined}
+          aria-label={ssoOff ? `Sign in with SSO, ${NOT_AVAILABLE_HINT.toLowerCase()}` : undefined}
+          className="w-full"
+        >
           {ssoChecking ? "Checking…" : "Sign in with SSO"}
+          {ssoOff ? <span className="text-xs font-normal text-muted-foreground">· {NOT_AVAILABLE_HINT}</span> : null}
         </Button>
       </div>
     </AuthShell>
