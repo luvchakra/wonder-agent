@@ -1198,3 +1198,36 @@ service writes it, conditional on PROPOSED (409 otherwise).
 - YAML;
 - role-hierarchy inference;
 - generated provisioning mappings (INTEGRATION-P0-13).
+
+---
+
+## 2026-10-10 — Demo organisation integration plan (design only)
+
+User request: an integration plan for an open-source dummy organisation that
+WonderID governs end to end, human and non-human identities, ignoring current
+connector capabilities. Written as `docs/plan/DEMO-ORG-INTEGRATION-PLAN.md`.
+
+- **The company.** Planet Express: about 230 employees, 20 contractors, 10
+  partners, 125 machine identities and 5 AI agents. It is built from open-source
+  systems:
+  - Frappe HR as the system of record;
+  - Keycloak as the identity provider, federating the Planet Express OpenLDAP;
+  - ERPNext, Gitea, Mattermost, Nextcloud, PostgreSQL, SeaweedFS, OpenBao and
+    k3s;
+  - MCP-based agents.
+- **Planted scenarios.** 16 known problems, each with the WonderID outcome it
+  should produce.
+- **Delivery.** Six phases, each with exit criteria.
+- **Choices made on research.**
+  - SeaweedFS instead of MinIO: MinIO's community edition was archived in
+    2025.
+  - Frappe HR instead of OrangeHRM: OrangeHRM's REST API may be a paid-tier
+    feature.
+  - Keycloak SCIM is only a preview in 26.7, so the admin REST API is the
+    default.
+- **Known connector gaps**, recorded for later stories, not built:
+  - no LDAP reader;
+  - no OAuth token refresh;
+  - the MCP connector ignores `Mcp-Session-Id` and streamed replies;
+  - page-number-only paging.
+- Nothing built or deployed. No code changed.
