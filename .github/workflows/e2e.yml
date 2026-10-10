@@ -19,11 +19,8 @@ name: E2E (Playwright on Vercel)
 # No secrets are needed here; GITHUB_TOKEN pushes the branches and reads the
 # statuses.
 on:
-  # Nightly schedule paused 2026-10-10 at the owner's request, until the
-  # sign-in screenshot baselines are recorded for the Vercel builder.
-  # Restore it with:
-  #   schedule:
-  #     - cron: "30 21 * * *" # 03:00 IST
+  schedule:
+    - cron: "30 21 * * *" # 03:00 IST
   workflow_dispatch:
     inputs:
       specs:
