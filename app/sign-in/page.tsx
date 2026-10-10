@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { brandTitle } from "@/modules/ui/brand";
+import { fetchAuthProviderStatus } from "@/modules/ui/authProviderStatus";
 import { SignInFormBoundary } from "./SignInForm";
 
 // FOUNDATION-P0-22 — on an organization's own address
@@ -16,7 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function SignInPage() {
-  const host = await getHostTenant();
+  // Which sign-in methods are turned on, so the rest show disabled (re-read every 5 minutes).
+  const [host, providers] = await Promise.all([getHostTenant(), fetchAuthProviderStatus(fetch, { next: { revalidate: 300 } })]);
   const tenant = host.tenant ? { name: host.tenant.name, suspended: host.tenant.status !== "active" } : null;
-  return <SignInFormBoundary tenant={tenant} />;
+  return <SignInFormBoundary tenant={tenant} providers={providers} />;
 }

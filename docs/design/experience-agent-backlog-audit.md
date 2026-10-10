@@ -3552,3 +3552,28 @@ the layout's redirect stand. No other page appears in the logs.
 
 **Verified.** Typecheck and eslint clean on the changed file. After the
 deploy, the logs should show no new `eq.null` requests from the dashboard.
+
+### 2026-10-10 — Sign-in: methods that are not set up show disabled
+
+**Why.** Owner request: "unless these options are working keep them
+hidden", then "instead of hidden show them disabled".
+
+**What changed.**
+- The sign-in page reads which methods Supabase Auth has turned on, from
+  `/auth/v1/settings`, server-side and re-read every 5 minutes.
+- Methods that are off show disabled, with "Not available yet". On
+  2026-10-10 that was Microsoft, LinkedIn and SSO; Google and email were on.
+- A method becomes active by itself once enabled.
+- The sign-up page reads the same status in the browser.
+- An unreadable status leaves every method on: Supabase stays the
+  authority.
+- Code: `modules/ui/authProviderStatus.ts`, `SocialAuthButtons`, and the
+  SSO button in `app/sign-in/SignInForm.tsx`.
+
+**Verified.**
+- Unit tests: 13 pass.
+- Sign-in baselines re-recorded and reviewed:
+  - Ubuntu: the mobile image locally; the desktop image stayed within
+    tolerance.
+  - Vercel builder: both images in a recording run, in which the other 11
+    branding tests passed.
