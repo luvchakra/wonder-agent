@@ -1229,3 +1229,41 @@ dependencies, contracts and shared numbers are fixed up front. Finished
 slices are rebased and re-verified one at a time. The first parallel run
 broke this: two of its four agents started from `main` without the
 unmerged work they built on.
+
+### 2026-10-10 — First full run on Vercel; the suite now runs in two halves
+
+The first full run on Vercel reached test 355 of 367 before the 38-minute cap
+stopped it.
+
+Measured cause:
+- 367 tests take about 12.8 s per test per worker. That is the same in this
+  Ohio container and in Vercel's Washington builds, so the distance to the
+  Singapore database is not the difference.
+- With 2 workers, the whole suite needs about 39 minutes anywhere.
+- On Vercel's 2-core build machine, the app server and two browsers compete
+  for CPU. The heaviest pages (`/runtime`, `/risk`) then missed the 10 s
+  heading check, which they pass on 4 cores.
+
+Changes:
+- The full suite runs as two halves (`--shard=1/2`, `--shard=2/2`) on the
+  `e2e/nightly-1` and `e2e/nightly-2` branches. Each is about 20 minutes, with
+  a 35-minute cap. The workflow waits for both.
+- `E2E_SLOW_MACHINE` (set only in the Vercel build) doubles Playwright's
+  timeouts there: 60 s per test, 20 s per expectation. Local runs keep
+  30 s and 10 s.
+- The build log ends with a compact summary written from Playwright's JSON
+  report: counts, then each failed test with the first line of its error.
+  Playwright is interrupted with SIGINT on time-out, so the report is
+  written even when a run is cut short.
+- Checked locally: `bash -n`, the summary parser against a sample report
+  and a missing one, and the workflow's branch marking against a throwaway
+  remote.
+
+Earlier in the day, the trial run of one spec (navigation-smoke) proved the
+pipeline on Vercel:
+- the `dnf` libraries and Playwright's Chromium installed;
+- the app built and the suite ran: 14 passed.
+
+The remaining failures in that run came from the Vercel Toolbar script that
+Preview builds inject, which the app's CSP blocks. It is switched off for the
+test build (#16).

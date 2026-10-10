@@ -50,7 +50,16 @@ specs_line=$(printf '%s\n' "${VERCEL_GIT_COMMIT_MESSAGE:-}" | grep -m1 '^specs:'
 for s in $specs_line; do
   if [[ "$s" =~ ^tests/e2e/[A-Za-z0-9._/-]+\.spec\.ts$ ]] && [ -f "$s" ]; then SPECS="$SPECS $s"; fi
 done
-log "Running: ${SPECS:-the full suite}"
+# The full suite is split in two: e2e/nightly-1 and e2e/nightly-2 each run
+# one half (about 20 minutes on a Vercel build machine). A run of chosen
+# specs uses e2e/nightly and is not split.
+SHARD=""
+case "${VERCEL_GIT_COMMIT_REF:-}" in
+  e2e/nightly-1) SHARD="--shard=1/2" ;;
+  e2e/nightly-2) SHARD="--shard=2/2" ;;
+esac
+[ -n "$SPECS" ] && SHARD=""
+log "Running: ${SPECS:-the full suite} ${SHARD} on $(nproc) cores"
 
 PORT=3100
 OUTBOUND_ALLOW_PRIVATE_NETWORKS=true BASE_APP_HOST=localhost npx next start -p "$PORT" >/tmp/e2e-server.log 2>&1 &
@@ -60,13 +69,35 @@ for _ in $(seq 1 60); do
   sleep 1
 done
 
-# Vercel stops a build at 45 minutes; the suite gets 38 of them.
-E2E_BASE_URL="http://localhost:$PORT" timeout 2280 npx playwright test $SPECS --reporter=line
+# Vercel stops a build at 45 minutes; the suite gets 35 of them. On time-out
+# Playwright is interrupted (SIGINT), so it still writes its report.
+REPORT=/tmp/e2e-report.json
+E2E_BASE_URL="http://localhost:$PORT" E2E_SLOW_MACHINE=1 \
+  PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT" PLAYWRIGHT_JSON_OUTPUT_NAME="$REPORT" \
+  timeout -s INT -k 60 2100 npx playwright test $SPECS $SHARD --reporter=line,json
 status=$?
 kill "$server" 2>/dev/null
 
+# One compact summary at the end of the log: counts, then each failed test
+# with the first line of its error.
+node -e '
+  const fs = require("fs");
+  let r; try { r = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { console.log("[e2e] No Playwright report was written."); process.exit(0); }
+  const s = r.stats || {};
+  console.log(`[e2e] Summary: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped, ${Math.round((s.duration ?? 0) / 60000)} min`);
+  const walk = (suite, path) => {
+    for (const sp of suite.specs || []) for (const t of sp.tests || []) {
+      if (t.status !== "unexpected") continue;
+      const err = (t.results || []).map((x) => x.error && x.error.message).find(Boolean) || "";
+      console.log(`[e2e] FAILED ${sp.file}:${sp.line} ${[...path, sp.title].join(" › ")} :: ${err.replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0].slice(0, 300)}`);
+    }
+    for (const c of suite.suites || []) walk(c, [...path, c.title]);
+  };
+  for (const s2 of r.suites || []) walk(s2, []);
+' "$REPORT"
+
 if [ "$status" = "124" ]; then
-  log "The suite did not finish within 38 minutes"
+  log "The suite did not finish within 35 minutes"
 elif [ "$status" != "0" ]; then
   log "The suite failed (exit $status); the last server log lines:"
   tail -40 /tmp/e2e-server.log

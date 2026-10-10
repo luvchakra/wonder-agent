@@ -11,10 +11,12 @@
 #   builds. Skipping is only an optimisation; building is always safe.
 
 # The nightly Playwright run builds its own branch (scripts/e2e-on-vercel.sh).
-if [ "$VERCEL_GIT_COMMIT_REF" = "e2e/nightly" ]; then
-  echo "Nightly E2E run; building."
-  exit 1
-fi
+case "$VERCEL_GIT_COMMIT_REF" in
+  e2e/nightly|e2e/nightly-1|e2e/nightly-2)
+    echo "Nightly E2E run; building."
+    exit 1
+    ;;
+esac
 
 if [ "$VERCEL_ENV" != "production" ]; then
   echo "Preview deployments are off; skipping."
