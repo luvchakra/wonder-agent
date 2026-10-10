@@ -631,8 +631,8 @@ capability exist. Since 2026-10-10 (owner decisions, after a study of how
 Saviynt arranges its menu; arrangement only, nothing copied) the sidebar is a
 list of **areas**: Home, Intelligence, Onboarding, Control Center, SOD,
 Certifications, AI Agents, and Admin always last. Admin opens with Accounts,
-Entitlements, Roles and User Groups, then Identities, Applications and the
-administration groups. Opening an area, even one with a single page, shows
+Entitlements, Roles and User Groups, then Identities, Applications, Policies
+and the administration groups. Opening an area, even one with a single page, shows
 that area's menu, with a back arrow to the area list. Each of the menu's
 pages and groups has its own icon, at the size of an area row; pages inside a
 group are listed under it without icons. A hamburger-style toggle at the

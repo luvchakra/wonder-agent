@@ -75,7 +75,7 @@ const group = (label: string, children: ShellNavLink[], icon?: string): ShellNav
 /**
  * The Admin area: administering the organization, always the last area.
  * Its four object lists come first as its own pages (owner request,
- * 2026-10-10); identities and applications are groups inside it.
+ * 2026-10-10); identities, applications and policies are groups inside it.
  */
 export const ADMIN_AREA: ShellNavItem = {
   label: "Admin",
@@ -100,6 +100,15 @@ export const ADMIN_AREA: ShellNavItem = {
       "UserRound",
     ),
     group("Applications", [page("Application Inventory", "/access", "access.read"), page("Data Sources", "/access/data-sources", "access.read")], "Box"),
+    group(
+      "Policies",
+      [
+        page("Policies", "/policies", "policy.read"),
+        page("Request Policies", "/access/request-policies", "access.manage"),
+        page("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
+      ],
+      "Scale",
+    ),
     group(
       "Organization",
       [
@@ -179,12 +188,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     label: "Control Center",
     href: "/controls",
     icon: "Gauge",
-    children: [
-      link("Overview", "/controls", "LayoutDashboard", "policy.read"),
-      link("Policies", "/policies", "Scale", "policy.read"),
-      link("Request Policies", "/access/request-policies", "ClipboardList", "access.manage"),
-      link("Authorization Policies", "/settings/authorization-policies", "KeyRound", "permissions.view", "tenant.security.manage"),
-    ],
+    children: [link("Overview", "/controls", "LayoutDashboard", "policy.read")],
   },
   {
     label: "SOD",

@@ -3787,3 +3787,14 @@ no page errors. Local Playwright (headless Chromium): shell,
 navigation-smoke, branding and design-review 90/91 on the first run; the
 one failure was the mobile test still opening the old "Insights" area,
 fixed to "Intelligence", after which `shell.spec.ts` passed 19/19.
+
+### 2026-10-10 — Policies move into Admin (owner, from the menu sheet)
+
+The owner reviewed the "WonderID sidebar menus" sheet ("this is okay,
+policies can go in admin") and moved Policies, Request Policies and
+Authorization Policies to Admin. They are now a Policies group in Admin,
+after Applications ("Policies" was typed in the sheet's area-icon column,
+read as the group's name); Control Center holds its overview. Verified:
+`shell-nav` unit tests 14/14, typecheck and eslint clean, and local
+Playwright `shell` + `navigation-smoke` 64/64 on a fresh build.
+

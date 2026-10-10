@@ -14,7 +14,7 @@ describe("the area list (owner decision, 2026-10-10)", () => {
   });
 
   it("opens Admin with its four object lists, then identities and applications as groups", () => {
-    expect(ADMIN_AREA.children?.slice(0, 6).map((e) => e.label)).toEqual(["Accounts", "Entitlements", "Roles", "User Groups", "Identities", "Applications"]);
+    expect(ADMIN_AREA.children?.slice(0, 7).map((e) => e.label)).toEqual(["Accounts", "Entitlements", "Roles", "User Groups", "Identities", "Applications", "Policies"]);
   });
 
   it("keeps a member's day-to-day work in Home", () => {
@@ -40,7 +40,9 @@ describe("the area list (owner decision, 2026-10-10)", () => {
     expect(activeArea(SHELL_NAV, "/access/applications/app-1")?.label).toBe("Admin");
     expect(activeArea(SHELL_NAV, "/identities/humans")?.label).toBe("Admin");
     expect(activeArea(SHELL_NAV, "/access/entitlements")?.label).toBe("Admin");
-    expect(activeArea(SHELL_NAV, "/policies/pol-1")?.label).toBe("Control Center");
+    expect(activeArea(SHELL_NAV, "/policies/pol-1")?.label).toBe("Admin");
+    expect(activeArea(SHELL_NAV, "/settings/authorization-policies")?.label).toBe("Admin");
+    expect(activeArea(SHELL_NAV, "/controls")?.label).toBe("Control Center");
     expect(activeArea(SHELL_NAV, "/sod/conflicts")?.label).toBe("SOD");
     expect(activeArea(SHELL_NAV, "/risk/rogue")?.label).toBe("Intelligence");
     expect(activeArea(SHELL_NAV, "/agents/agent-1")?.label).toBe("AI Agents");

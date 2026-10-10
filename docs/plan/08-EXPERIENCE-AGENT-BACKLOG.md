@@ -743,8 +743,9 @@ menu (arrangement only; WonderID's menus, colours and type).
 - Areas: Home, Intelligence, Onboarding, Control Center, SOD,
   Certifications, AI Agents, Admin (last). Every area opens its own menu;
   each direct page and group has an icon. Admin opens with Accounts,
-  Entitlements, Roles and User Groups, then Identities, Applications and
-  the administration groups.
+  Entitlements, Roles and User Groups, then Identities, Applications,
+  Policies (Policies, Request Policies, Authorization Policies) and the
+  administration groups. Control Center holds its overview.
 - A hamburger-style toggle at the sidebar's top right collapses it; the
   collapsed rail shows the toggle, a search icon that reopens the sidebar
   into its search box, then the area icons, with the W mark at its foot
