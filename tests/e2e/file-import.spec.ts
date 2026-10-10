@@ -79,6 +79,32 @@ test.describe.serial("object-page CSV import and export", () => {
     expect(omitted[0]).toMatchObject({ status: "active", department: "Finance" });
   });
 
+  test("a person's access from a file is recorded, and their Access tab says no approval was found (ACCESS-P0-24)", async ({ page, request }) => {
+    const app = `E2E Ledger App ${stamp}`;
+    const ent = `E2E Ledger Read ${stamp}`;
+    const acc = `e2e-ledger-acc-${stamp}`;
+    const steps: [string, string, string][] = [
+      ["application", "externalId,name,category,description", `e2e-ledger-app-${stamp},${app},Data,`],
+      ["entitlement", "externalId,name,application,privilegeLevel,dataClassification", `e2e-ledger-ent-${stamp},${ent},${app},standard,`],
+      ["account", "externalId,application,username,owner,status,accountType,lastLoginAt", `${acc},${app},imp1,e2e-imp-1-${stamp}@example.test,active,standard,`],
+      ["access_grant", "accountExternalId,entitlementExternalId,grantType", `${acc},${ent},direct`],
+    ];
+    for (const [kind, header, row] of steps) {
+      const res = await request.post("/api/v1/imports", upload(kind, csv([row], header)));
+      expect(res.status(), `${kind}: ${await res.text()}`).toBe(200);
+      expect((await res.json()).data.counts, kind).toMatchObject({ created: 1, failed: 0, skipped: 0 });
+    }
+
+    const person = ((await (await request.get(`/api/v1/identities?q=${encodeURIComponent(`e2e-imp-1-${stamp}`)}`)).json()).data as { id: string }[])[0]!;
+    await page.goto(`/identities/${person.id}?tab=access`);
+    const panel = page.getByRole("tabpanel");
+    // The account and its entitlement, both reported by the file and with no WonderID approval behind them.
+    await expect(panel.getByText(app)).toHaveCount(2);
+    await expect(panel.getByText(ent)).toBeVisible();
+    await expect(panel.getByText("No approval found")).toHaveCount(2);
+    await expect(panel.getByText("Reported by a connection").first()).toBeVisible();
+  });
+
   test("the page shows a preview table, and Confirm import adds the row to the list", async ({ page }) => {
     const id = `e2e-ui-${stamp}`;
     await page.goto("/identities/humans");

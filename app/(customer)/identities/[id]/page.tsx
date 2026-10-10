@@ -15,6 +15,7 @@ import {
   HUMAN_TRANSITIONS,
 } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { getIdentityAccessLedger, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type IdentityAccessEntry, type LedgerStatus } from "@/modules/access-governance/service";
 import { Badge, Card, EmptyState, LinkButton, TabPanel, Tabs } from "@/modules/ui";
 import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm } from "../IdentityForms";
 import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
@@ -31,6 +32,57 @@ const HUMAN_LIFECYCLE_LABEL: Record<string, string> = {
   TERMINATED: "Terminated",
   ARCHIVED: "Archived",
 };
+
+const LEDGER_STATUS_TONE: Record<LedgerStatus, "success" | "warning" | "danger" | "neutral"> = {
+  VALID: "success",
+  EXPIRED: "warning",
+  REVOKED: "neutral",
+  UNPROVEN: "warning",
+  ROGUE: "danger",
+  LEGACY_EXCEPTION: "neutral",
+  PENDING_RECONCILIATION: "neutral",
+};
+
+// ACCESS-P0-24 — "why does this identity have this access?": each account and
+// entitlement with where it came from and the approval behind it, if any.
+function AccessLedgerList({ entries, refreshed }: { entries: IdentityAccessEntry[]; refreshed: boolean }) {
+  return (
+    <div className="space-y-3">
+      {!refreshed ? (
+        <p role="status" className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+          Could not recheck this access just now; showing what was last recorded.
+        </p>
+      ) : null}
+      {entries.length === 0 ? (
+        <EmptyState title="No access recorded" description="Accounts and access appear here once a connection or a file reports them." />
+      ) : (
+        <ul className="divide-y divide-border rounded-lg border border-border">
+          {entries.map((e) => (
+            <li key={e.id} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2.5 text-sm">
+              <span className="min-w-0">
+                <span className="font-medium text-foreground">{e.applicationName ?? "An application"}</span>
+                <span className="text-muted-foreground"> · {e.entitlementName ?? `account ${e.accountName ?? ""}`.trim()}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {e.requestId ? (
+                    <Link href={`/access/requests/${e.requestId}`} className="text-primary hover:underline">
+                      {LEDGER_SOURCE_LABEL[e.source]}
+                    </Link>
+                  ) : (
+                    LEDGER_SOURCE_LABEL[e.source]
+                  )}
+                  {e.approvedAt ? ` · approved ${e.approvedAt.slice(0, 10)}` : ""}
+                  {e.expiryAt ? ` · until ${e.expiryAt.slice(0, 10)}` : ""}
+                  {e.missingFromSourceAt ? ` · not found in the source since ${e.missingFromSourceAt.slice(0, 10)}` : ""}
+                </span>
+              </span>
+              <Badge tone={LEDGER_STATUS_TONE[e.status]}>{LEDGER_STATUS_LABEL[e.status]}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -52,11 +104,12 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   const [{ id }, { tab: requestedTab }] = await Promise.all([params, searchParams]);
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("identity.manage");
+  const canReadAccess = ctx.permissions.includes("access.read");
   const identity = await getIdentity(tenantId, id);
   if (!identity) notFound();
 
   const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
-  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks] = await Promise.all([
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
@@ -64,6 +117,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     canManage ? listIdentities(tenantId, { pageSize: 200 }).then((r) => r.rows.map((x) => ({ id: x.id, displayName: x.displayName, identityType: x.identityType }))) : Promise.resolve([]),
     personIdentity ? listHumanLifecycleEvents(tenantId, id) : Promise.resolve([]),
     personIdentity ? listLifecycleTasks(tenantId, { identityId: id }) : Promise.resolve([]),
+    canReadAccess ? getIdentityAccessLedger(tenantId, id) : Promise.resolve(null),
   ]);
   const openTasks = lifecycleTasks.filter((t) => t.status === "open");
   const footprint = openTasks.some((t) => t.taskType === "transfer_ownership") ? await getOwnershipFootprint(tenantId, id) : null;
@@ -94,6 +148,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   const tabs = [
     { value: "overview", label: "Overview" },
     ...(isPerson ? [{ value: "lifecycle", label: "Lifecycle", count: openTasks.length }] : []),
+    ...(ledger ? [{ value: "access", label: "Access", count: ledger.entries.length }] : []),
     { value: "relationships", label: "Relationships", count: current.length },
     { value: "attributes", label: "Attributes", count: storedKeys.length },
     ...(canManage ? [{ value: "edit", label: "Edit" }] : []),
@@ -245,6 +300,12 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
                   </p>
                 ) : null}
               </section>
+            </TabPanel>
+          ) : null}
+
+          {ledger ? (
+            <TabPanel value="access" className="pt-4">
+              <AccessLedgerList entries={ledger.entries} refreshed={ledger.refreshed} />
             </TabPanel>
           ) : null}
 

@@ -72,6 +72,8 @@ Legend: **FA**=Foundation Agent, **IA**=Identity Agent, **INT**=Integration Agen
 | `access_package_resources` | AA | ACCESS-P0-20: what a package includes (a live application's access or one of its entitlements). Members read only; the service writes |
 | `access_package_assignments` | AA | ACCESS-P0-20: who holds a package (from an approved request or a direct assignment), until when, and its state (provisioning, active, partially failed, expired, revoked); one live assignment per identity and package. Members read only; the service writes |
 | `access_package_assignment_items` | AA | ACCESS-P0-20: one work item per included resource — pending/fulfilled/failed on the way in, revoke-pending/revoked on the way out. Members read only; the service (later INTEGRATION-P0-13's pipeline) writes |
+| `access_ledger` | AA | ACCESS-P0-24: one row per account and per entitlement of an account — where the access came from (request, access package, administrator, connection, unknown), the WonderID evidence behind it (request, assignment, approver, justification, dates), last verified/used, missing-from-source, and status (VALID, EXPIRED, REVOKED, UNPROVEN; ROGUE and LEGACY_EXCEPTION reserved for ACCESS-P0-25). Recomputed by `refreshAccessLedger()`; members read only; the service writes |
+| `access_ledger_events` | AA | ACCESS-P0-24: the ledger's history, one row per recorded relationship and per change of status or source, missing from or seen again in its source. Append-only (trigger), members read only |
 | `runtime_events` | RA | Normalized runtime event stream |
 | `runtime_tools` | RA | Tool inventory observed/declared at runtime |
 | `runtime_resources` | RA | Resource inventory observed at runtime |

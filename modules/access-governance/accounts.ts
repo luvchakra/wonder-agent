@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentityType } from "@/lib/shared/types/agent-identity";
 import { getNormalizedObjects } from "@/modules/integrations/service";
 import { getIdentity, getIdentityNames, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
+import { refreshAccessLedger } from "./ledger";
 import {
   DEFAULT_DORMANT_DAYS,
   dormantCutoff,
@@ -381,6 +382,8 @@ export async function reconcileApplicationAccounts(tenantId: string, actorId: st
       not_in_source: c.notInSource,
     });
     await writeAudit({ tenantId, actorId, actorType: "user", action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c } });
+    // The ledger looks for the approval behind each account (ACCESS-P0-24); the daily sweep catches up if this fails.
+    await refreshAccessLedger(tenantId).catch(() => undefined);
     return run;
   } catch (err) {
     // Record the failure truthfully (§17.5), then report it.
