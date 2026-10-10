@@ -14,19 +14,19 @@ Generated 2026-10-10 from 11 module backlogs.
 
 ## Overall
 
-**195 of 247 tracked stories complete — 79%**
+**195 of 248 tracked stories complete — 79%**
 
 ```
-████████████████████████████████░░░░░░░░  79%
+███████████████████████████████░░░░░░░░░  79%
 ```
 
 | Status | Stories |
 |---|---|
 | Done | 195 |
-| Partial | 26 |
+| Partial | 27 |
 | Deferred | 1 |
 | Not Started | 25 |
-| **Total tracked** | **247** |
+| **Total tracked** | **248** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 2 | 0 | 3 | 43 | `████████████████░░` 88% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 18 | 3 | 0 | 1 | 22 | `███████████████░░░` 82% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 18 | 4 | 0 | 1 | 23 | `██████████████░░░░` 78% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
@@ -139,7 +139,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 18 done · 3 partial · 0 deferred · 1 not started (22 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 18 done · 4 partial · 0 deferred · 1 not started (23 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -165,6 +165,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Not Started — 2026-09-26, WonderID |
 | INTEGRATION-P0-14 | Connector framework: declarative definitions, http/ldap/sql drivers, catalog, authoring, preview (INTEG-P2-01/P2-03 brought forward by user request) | Done — 2026-10-10, migration 0108 |
 | INTEGRATION-P0-15 | Built-in connectors: Frappe HR, ERPNext, LDAP, Keycloak, Gitea, Mattermost, Nextcloud, PostgreSQL, OpenBao, Kubernetes | Done — 2026-10-10, each certified live against the Planet Express demo company |
+| INTEGRATION-P0-16 | Connector boundary (non-negotiable #20): receivers, Runtime Gateway, MCP driver, Saviynt/Zendesk/MCP/webhook definitions; old adapters and routes removed | Partial — 2026-10-10: built and tested; migration 0109 awaits the user's approval before it is applied and the change merged |
 
 ### 04 — Access Agent
 

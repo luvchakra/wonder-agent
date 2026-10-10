@@ -40,6 +40,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Not Started — 2026-09-26, WonderID |
 | INTEGRATION-P0-14 | Connector framework: declarative definitions, http/ldap/sql drivers, catalog, authoring, preview (INTEG-P2-01/P2-03 brought forward by user request) | Done — 2026-10-10, migration 0108 |
 | INTEGRATION-P0-15 | Built-in connectors: Frappe HR, ERPNext, LDAP, Keycloak, Gitea, Mattermost, Nextcloud, PostgreSQL, OpenBao, Kubernetes | Done — 2026-10-10, each certified live against the Planet Express demo company |
+| INTEGRATION-P0-16 | Connector boundary (non-negotiable #20): receivers, Runtime Gateway, MCP driver, Saviynt/Zendesk/MCP/webhook definitions; old adapters and routes removed | Partial — 2026-10-10: built and tested; migration 0109 awaits the user's approval before it is applied and the change merged |
 
 ---
 

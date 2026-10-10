@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
+import { openConnection, sendEvents, type ReceivingConnection } from "./support/connections";
 
 /**
  * IDENTITY-P0-11 / IDENTITY-P0-12 — Shadow AI and the non-human identity
@@ -11,15 +12,18 @@ import { authFile } from "./support/testUsers";
  * - registering it links the reference, so the agent's next event is
  *   recorded, and the Shadow AI entry is gone
  * - the registered identity is in the NHI inventory, linked to the agent
+ *
+ * Events arrive the only way an organization's systems may send them: an
+ * MCP connection's receiving side (non-negotiable #20).
  */
 
 const ref = `e2e-shadow-bot-${Date.now()}`;
 let agentId = "";
+let conn: ReceivingConnection;
 
 const sendEvent = (request: APIRequestContext, data: Record<string, unknown>) =>
-  request.post("/api/v1/runtime/events", {
-    data: { eventTime: new Date().toISOString(), source: "mcp", action: "READ", success: true, application: "Snowflake", tool: "query_customers", ...data },
-  });
+  sendEvents(request, conn, { eventTime: new Date().toISOString(), action: "READ", success: true, application: "Snowflake", tool: "query_customers", ...data });
+const outcome = async (res: import("@playwright/test").APIResponse) => (await res.json()).data?.runtime as string;
 
 async function shadowRow(page: Page) {
   await page.goto("/agents/discovery?tab=shadow_ai");
@@ -30,14 +34,17 @@ test.describe.serial("shadow AI discovery", () => {
   test.use({ storageState: authFile("adminOne") });
 
   test("an unregistered agent's event is quarantined, not recorded, and validated first", async ({ page }) => {
+    conn = await openConnection(page.request, "mcp-server", `E2E shadow MCP ${Date.now()}`, { baseUrl: "https://mcp.e2e-shadow.invalid/mcp" });
     const res = await sendEvent(page.request, { agentRef: ref });
-    expect(res.status()).toBe(404);
-    expect((await res.json()).error.code).toBe("AGENT_NOT_REGISTERED");
+    expect(res.status()).toBe(202);
+    expect(await outcome(res)).toBe("quarantined_unregistered_agent");
 
-    // Shape: exactly one of agentId / agentRef, and agentId is a UUID.
-    expect((await sendEvent(page.request, {})).status()).toBe(400);
-    expect((await sendEvent(page.request, { agentId: "not-a-uuid" })).status()).toBe(400);
-    expect((await sendEvent(page.request, { agentId: "00000000-0000-4000-8000-000000000000", agentRef: ref })).status()).toBe(400);
+    // Shape is checked before anything is stored; an event naming no agent is quarantined as such.
+    expect((await sendEvent(page.request, { agentRef: ref, eventTime: "yesterday" })).status()).toBe(400);
+    expect((await sendEvent(page.request, { agentRef: ref, success: "yes" })).status()).toBe(400);
+    expect(await outcome(await sendEvent(page.request, {}))).toBe("quarantined_missing_agent_reference");
+    // Without the connection's secret nothing is accepted at all.
+    expect((await page.request.post(conn.events, { data: { agentRef: ref } })).status()).toBe(401);
   });
 
   test("it is listed as Shadow AI in its own organization's discovery inbox only", async ({ page, browser }) => {
@@ -72,7 +79,8 @@ test.describe.serial("shadow AI discovery", () => {
     agentId = page.url().split("/agents/")[1];
 
     const res = await sendEvent(page.request, { agentRef: ref });
-    expect(res.status()).toBe(200);
+    expect(res.status()).toBe(202);
+    expect(await outcome(res)).toBe("recorded");
     expect((await res.json()).data.agentId).toBe(agentId);
 
     await page.goto("/agents/discovery?tab=shadow_ai");

@@ -25,7 +25,7 @@ insert into tenant_memberships (tenant_id, user_id, status) values
   ('aaaaaaaa-8100-0000-0000-000000000001', '22222222-8100-0000-0000-000000000002', 'active'),
   ('bbbbbbbb-8100-0000-0000-000000000002', '22222222-8100-0000-0000-000000000002', 'active');
 insert into integrations (id, tenant_id, integration_type_id, name) values
-  ('b8100000-0000-0000-0000-0000000000b9', 'bbbbbbbb-8100-0000-0000-000000000002', 'generic_rest', 'Int B81');
+  ('b8100000-0000-0000-0000-0000000000b9', 'bbbbbbbb-8100-0000-0000-000000000002', 'connector', 'Int B81');
 insert into identity_sources (id, tenant_id, name, template) values
   ('a8100000-0000-0000-0000-0000000000a5', 'aaaaaaaa-8100-0000-0000-000000000001', 'Source A81', 'csv'),
   ('b8100000-0000-0000-0000-0000000000b5', 'bbbbbbbb-8100-0000-0000-000000000002', 'Source B81', 'csv');

@@ -1,5 +1,7 @@
 import "server-only";
 
+import type { ConnectorAdapter } from "./connector";
+
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -108,7 +110,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
   const decision = decideWrite(request.operation, (integration.capabilities ?? {}) as ConnectorCapabilities, integration.status as string);
   if (!decision.run) return finish("blocked", null, decision.reason);
 
-  let connector;
+  let connector: ConnectorAdapter;
   try {
     connector = createConnector(integration.integration_type_id as string);
   } catch {

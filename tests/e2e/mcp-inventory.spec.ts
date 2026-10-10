@@ -39,10 +39,12 @@ test.describe.serial("MCP inventory", () => {
       let body = "";
       req.on("data", (c) => (body += c));
       req.on("end", () => {
-        const { method } = JSON.parse(body || "{}") as { method?: string };
+        const { method, id } = JSON.parse(body || "{}") as { method?: string; id?: number };
         calls.push(method ?? "");
+        // A notification (no id) gets no reply body.
+        if (id === undefined) return res.writeHead(202).end();
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ jsonrpc: "2.0", id: 1, result: RESULTS[method ?? ""] ?? {} }));
+        res.end(JSON.stringify({ jsonrpc: "2.0", id, result: RESULTS[method ?? ""] ?? {} }));
       });
     });
     await new Promise<void>((resolve) => stub.listen(0, "127.0.0.1", resolve));
@@ -53,14 +55,13 @@ test.describe.serial("MCP inventory", () => {
   });
 
   test("discovering a server lists its tools, classified, and its resources, without calling any tool", async ({ page }) => {
-    await page.goto("/integrations/new");
-    await page.getByLabel("Type").selectOption("mcp");
+    await page.goto("/integrations/connectors/builtin/mcp-server");
     await page.getByLabel("Name").fill(name);
-    await page.getByLabel("Base URL").fill(stubUrl);
-    await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}/);
-    await page.getByLabel("Secret / token").fill("e2e-inventory-secret");
-    await page.getByRole("button", { name: "Save credential", exact: true }).click();
+    await page.getByLabel("MCP endpoint").fill(stubUrl);
+    // Connecting with a token tests it against the server first.
+    await page.getByLabel("Bearer token").fill("e2e-inventory-secret");
+    await page.getByRole("button", { name: "Connect" }).click();
+    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}$/);
     await expect(page.getByText(/Has credentials: yes/)).toBeVisible();
 
     await page.goto("/integrations/mcp");

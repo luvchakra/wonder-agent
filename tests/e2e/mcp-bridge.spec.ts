@@ -5,8 +5,9 @@ import { authFile } from "./support/testUsers";
 
 /**
  * INTEGRATION-P0-07 (codebase-map D6) — MCP runtime events reach Runtime,
- * against the real app and database:
- * - the MCP endpoint refuses a missing or wrong integration secret
+ * against the real app and database, through the MCP connection's
+ * receiving side (non-negotiable #20):
+ * - the receiver refuses a missing or wrong connection secret
  * - an event for an agent nobody registered is accepted but quarantined,
  *   and says so; it then shows up as Shadow AI
  * - once that agent is registered, its MCP events are recorded as runtime
@@ -14,18 +15,18 @@ import { authFile } from "./support/testUsers";
  *   event
  */
 
-const secret = `e2e-mcp-secret-${Date.now()}`;
+let secret = "";
 const ref = `e2e-mcp-agent-${Date.now()}`;
 let integrationId = "";
 let agentId = "";
 let anon: APIRequestContext;
-// Saving an MCP credential verifies it against the server (tools/list), so
-// the spec runs a minimal local MCP server that answers that call.
+// Connecting an MCP server reads it, so the spec runs a minimal local MCP
+// server that answers initialize and tools/list.
 let mcpStub: Server;
 let mcpStubUrl = "";
 
 const post = (data: Record<string, unknown>, token: string | null = secret) =>
-  anon.post(`/api/v1/integrations/mcp/${integrationId}/events`, {
+  anon.post(`/api/connect/v1/${integrationId}/events`, {
     headers: token ? { authorization: `Bearer ${token}` } : {},
     data: { eventTime: new Date().toISOString(), action: "READ", success: true, tool: "query_customers", application: "Snowflake", ...data },
   });
@@ -36,8 +37,15 @@ test.describe.serial("MCP events bridge into runtime", () => {
   test.beforeAll(async ({ baseURL }) => {
     anon = await playwrightRequest.newContext({ baseURL });
     mcpStub = createServer((req, res) => {
-      res.writeHead(200, { "content-type": "application/json" });
-      res.end(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { tools: [] } }));
+      let raw = "";
+      req.on("data", (c) => (raw += c));
+      req.on("end", () => {
+        const msg = JSON.parse(raw || "{}");
+        if (msg.id === undefined) return res.writeHead(202).end();
+        const result = msg.method === "initialize" ? { protocolVersion: "2025-06-18", serverInfo: { name: "e2e-mcp", version: "1" } } : { tools: [] };
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result }));
+      });
     });
     await new Promise<void>((resolve) => mcpStub.listen(0, "127.0.0.1", resolve));
     mcpStubUrl = `http://127.0.0.1:${(mcpStub.address() as AddressInfo).port}/mcp`;
@@ -47,18 +55,19 @@ test.describe.serial("MCP events bridge into runtime", () => {
     await new Promise((resolve) => mcpStub?.close(resolve));
   });
 
-  test("setup: an MCP integration with a shared secret", async ({ page }) => {
-    await page.goto("/integrations/new");
-    await page.getByLabel("Type").selectOption("mcp");
+  test("setup: an MCP connection, and its receiving secret", async ({ page }) => {
+    await page.goto("/integrations/connectors/builtin/mcp-server");
     await page.getByLabel("Name").fill(`E2E MCP ${Date.now()}`);
-    await page.getByLabel("Base URL").fill(mcpStubUrl);
-    await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}/);
+    await page.getByLabel("MCP endpoint").fill(mcpStubUrl);
+    await page.getByRole("button", { name: "Connect" }).click();
+    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}$/);
     integrationId = page.url().split("/integrations/")[1];
-    await page.getByLabel("Secret / token").fill(secret);
-    await page.getByRole("button", { name: "Save credential", exact: true }).click();
-    // Wait for the real server result, not just the click.
-    await expect(page.getByText(/Has credentials: yes/)).toBeVisible();
+    await expect(page.getByText(`/api/connect/v1/${integrationId}/events`)).toBeVisible();
+    await page.getByRole("button", { name: "Issue secret" }).click();
+    // Wait for the real server result: the secret, shown once.
+    const shown = page.getByRole("status").locator("code");
+    await expect(shown).toHaveText(/^wr_/);
+    secret = (await shown.textContent())!.trim();
   });
 
   test("refuses a missing or wrong secret", async () => {

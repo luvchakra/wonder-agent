@@ -24,7 +24,7 @@ insert into agents (id, tenant_id, agent_name, agent_type) values ('a8900000-000
 insert into applications (id, tenant_id, name) values
   ('a8900000-0000-0000-0000-0000000000a1', 'aaaaaaaa-8900-0000-0000-000000000001', 'App A89'),
   ('b8900000-0000-0000-0000-0000000000b1', 'bbbbbbbb-8900-0000-0000-000000000002', 'App B89');
-insert into integrations (id, tenant_id, integration_type_id, name) values ('b8900000-0000-0000-0000-0000000000f1', 'bbbbbbbb-8900-0000-0000-000000000002', 'generic_rest', 'Conn B89');
+insert into integrations (id, tenant_id, integration_type_id, name) values ('b8900000-0000-0000-0000-0000000000f1', 'bbbbbbbb-8900-0000-0000-000000000002', 'connector', 'Conn B89');
 insert into accounts (id, tenant_id, application_id, external_account_ref, identity_id) values
   ('a8900000-0000-0000-0000-0000000000c1', 'aaaaaaaa-8900-0000-0000-000000000001', 'a8900000-0000-0000-0000-0000000000a1', 'person-1', 'a8900000-0000-0000-0000-0000000000d1'),
   ('a8900000-0000-0000-0000-0000000000c2', 'aaaaaaaa-8900-0000-0000-000000000001', 'a8900000-0000-0000-0000-0000000000a1', 'person-2', 'a8900000-0000-0000-0000-0000000000d2'),

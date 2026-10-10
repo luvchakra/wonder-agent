@@ -1,5 +1,6 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { TENANT_TWO, authFile } from "./support/testUsers";
+import { openConnection, type ReceivingConnection } from "./support/connections";
 
 /**
  * PLATFORM-P0-12 + RUNTIME-P0-15: real enforcement, switched per tenant by
@@ -45,6 +46,9 @@ test.describe.serial("gateway enforcement flags", () => {
   let keyOne = "";
   let adminOne: APIRequestContext;
   let adminTwo: APIRequestContext;
+  // Each organization's agents reach the gateway through their own runtime connection.
+  let connOne: ReceivingConnection;
+  let connTwo: ReceivingConnection;
 
   test.beforeAll(async ({ baseURL, browser }) => {
     platform = await playwrightRequest.newContext({ baseURL, storageState: authFile("platformAdmin") });
@@ -58,6 +62,8 @@ test.describe.serial("gateway enforcement flags", () => {
     observeAgent = `E2E Observe Agent ${Date.now()}`;
     keyTwo = await agentKey(authFile("adminTwo"), browser, enforceAgent);
     keyOne = await agentKey(authFile("adminOne"), browser, observeAgent);
+    connOne = await openConnection(adminOne, "runtime-gateway", `E2E enforcement runtime one ${Date.now()}`);
+    connTwo = await openConnection(adminTwo, "runtime-gateway", `E2E enforcement runtime two ${Date.now()}`);
   });
 
   test.afterAll(async () => {
@@ -72,7 +78,7 @@ test.describe.serial("gateway enforcement flags", () => {
     expect(res.status()).toBe(200);
   };
   const authorize = (key: string, requestId: string) =>
-    anon.post("/api/gateway/v1/authorize", { headers: { authorization: `Bearer ${key}` }, data: { requestId, action: "READ" } });
+    anon.post((key === keyTwo ? connTwo : connOne).authorize, { headers: { authorization: `Bearer ${key}` }, data: { requestId, action: "READ" } });
 
   test("runtime_enforce on for one tenant: its agent is told DENY; the other tenant still observes", async () => {
     await setFlag("runtime_enforce", true);

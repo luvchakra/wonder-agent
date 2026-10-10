@@ -25,8 +25,8 @@ insert into tenant_memberships (tenant_id, user_id, status) values
   ('bbbbbbbb-2000-0000-0000-000000000002', '22222222-2000-0000-0000-000000000002', 'active');
 
 insert into integrations (id, tenant_id, integration_type_id, name) values
-  ('cccc0001-0000-0000-0000-000000000001', 'aaaaaaaa-2000-0000-0000-000000000001', 'generic_rest', 'Fixture Integration A'),
-  ('dddd0002-0000-0000-0000-000000000002', 'bbbbbbbb-2000-0000-0000-000000000002', 'generic_rest', 'Fixture Integration B');
+  ('cccc0001-0000-0000-0000-000000000001', 'aaaaaaaa-2000-0000-0000-000000000001', 'connector', 'Fixture Integration A'),
+  ('dddd0002-0000-0000-0000-000000000002', 'bbbbbbbb-2000-0000-0000-000000000002', 'connector', 'Fixture Integration B');
 
 insert into integration_credentials (integration_id, tenant_id, auth_type, encrypted_secret) values
   ('cccc0001-0000-0000-0000-000000000001', 'aaaaaaaa-2000-0000-0000-000000000001', 'api_key', 'FAKE-ENCRYPTED-SECRET-A'),

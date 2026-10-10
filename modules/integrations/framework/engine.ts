@@ -7,9 +7,10 @@ import type {
   NormalizedEntitlement,
   NormalizedIdentity,
 } from "@/lib/shared/types/integrations";
-import type { ConnectorDefinition, ConnectorIntegrationConfig, ResourceKind, ResourceSpec } from "./types";
+import { RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type ResourceKind, type ResourceSpec } from "./types";
 import { fillTemplate, mapRecord, matchesFilters, readPath, type TemplateScope } from "./mapping";
 import { validateDefinition, validateSettings } from "./validate";
+import { BUILTIN_DEFINITIONS } from "./definitions";
 import { ConnectorRequestError, HttpSession, LIMITS, type FetchLike } from "./http";
 
 /**
@@ -36,8 +37,8 @@ export function httpDriver(fetchImpl: FetchLike): DriverFactory {
     const session = new HttpSession(def, settings, secrets, fetchImpl);
     return {
       async test() {
-        if (!def.test.request) throw new Error("This definition has no test request");
-        await session.send(def.test.request, { settings });
+        if (!def.test?.request) throw new Error("This definition has no test request");
+        await session.send(def.test?.request, { settings });
       },
       fetch(resource, scope, maxRecords) {
         if (!resource.request) throw new Error("This resource has no request");
@@ -52,6 +53,11 @@ export type DriverFactories = Partial<Record<ConnectorDefinition["driver"], Driv
 type Row = { record: unknown; parent?: unknown; spec: ResourceSpec };
 
 /** A resource may be one request or several whose records are combined (groups and roles). */
+/** The kinds a definition reads, in import order (an MCP server before its tools). */
+export function kindsOf(def: ConnectorDefinition): ResourceKind[] {
+  return RESOURCE_KINDS.filter((k) => specsOf(def, k).length > 0);
+}
+
 export function specsOf(def: ConnectorDefinition, kind: ResourceKind): ResourceSpec[] {
   const r = def.resources[kind];
   return r === undefined ? [] : Array.isArray(r) ? r : [r];
@@ -65,16 +71,28 @@ export function capabilitiesOf(def: ConnectorDefinition): ConnectorCapabilities 
     importEntitlements: Boolean(r.entitlement),
     importAccess: Boolean(r.access_grant),
     importApplications: Boolean(r.application),
-    importActivity: false,
+    importPolicies: Boolean(r.policy),
+    // MCP declarations and received runtime events are both activity sources.
+    importActivity: Boolean(r.mcp_server || r.mcp_tool || r.mcp_resource || def.receive?.runtimeEvents),
     provision: false,
     deprovision: false,
   };
 }
 
+/** The driver a stored connection uses, without validating it (its copy, or the built-in it names). */
+export function connectionDriver(config: ConnectorConfig): string | null {
+  const c = config as Partial<ConnectorIntegrationConfig>;
+  if (c.manifest && typeof c.manifest === "object") return (c.manifest as { driver?: string }).driver ?? null;
+  return BUILTIN_DEFINITIONS.find((d) => d.key === c.definition?.key && d.version === c.definition?.version)?.driver ?? null;
+}
+
 /** Reads and re-validates what an integration of type `connector` stores. */
 export function parseConnectorConfig(config: ConnectorConfig): { def: ConnectorDefinition; settings: Record<string, string | number | boolean> } {
   const c = config as Partial<ConnectorIntegrationConfig>;
-  const { definition, issues } = validateDefinition(c.manifest);
+  // A connection made from a built-in may name it instead of carrying a copy:
+  // exactly that key and version, from code, or nothing.
+  const named = c.definition?.origin === "builtin" && !c.manifest ? BUILTIN_DEFINITIONS.find((d) => d.key === c.definition?.key && d.version === c.definition?.version) : undefined;
+  const { definition, issues } = validateDefinition(c.manifest ?? named);
   if (!definition) throw new Error(`This integration's connector definition is invalid: ${issues[0]?.path} ${issues[0]?.message}`);
   const { settings, issues: settingIssues } = validateSettings(definition, c.settings);
   if (settingIssues.length) throw new Error(settingIssues[0].message);
@@ -98,14 +116,21 @@ export class DefinitionConnector implements ConnectorAdapter {
     this.def = def;
     this.settings = settings;
     this.capabilities = capabilitiesOf(def);
+    this.secrets = {};
     if (def.auth.type !== "none") {
+      const fields = def.auth.fields;
       let parsed: unknown = null;
       try {
         parsed = secret ? JSON.parse(secret) : null;
       } catch {
-        parsed = null;
+        // A credential saved before this connector existed is one plain string;
+        // it still fits a connector that has exactly one secret field (a token).
+        parsed = secret && fields.length === 1 ? { [fields[0].key]: secret } : null;
       }
-      if (!parsed || typeof parsed !== "object") throw new Error("This connection has no credentials yet");
+      if (!parsed || typeof parsed !== "object") {
+        if (!fields.every((f) => f.optional)) throw new Error("This connection has no credentials yet");
+        parsed = {};
+      }
       this.secrets = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
     }
     this.session = null;
@@ -122,6 +147,8 @@ export class DefinitionConnector implements ConnectorAdapter {
   }
 
   async testConnection(): Promise<{ ok: boolean; message?: string }> {
+    // A receive-only connector calls nothing; its senders prove it works.
+    if (this.def.driver === "none") return { ok: true, message: "Receives only" };
     try {
       await (await this.open()).test();
       return { ok: true };
@@ -132,6 +159,11 @@ export class DefinitionConnector implements ConnectorAdapter {
 
   healthCheck() {
     return this.testConnection();
+  }
+
+  /** The kinds this connection's definition reads, in import order. */
+  kinds(): ResourceKind[] {
+    return kindsOf(this.def);
   }
 
   /** Records that could not be mapped this run, for the sync job's error list. */

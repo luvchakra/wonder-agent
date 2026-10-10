@@ -11,8 +11,10 @@ test.describe("Integration module", () => {
     await expect(page).toHaveURL("/integrations/connectors");
     await expect(page.getByRole("heading", { name: "Connect a system" })).toBeVisible();
     await expect(page.getByText("Frappe HR", { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "add a generic integration" }).click();
-    await expect(page.getByRole("heading", { name: "Add an integration" })).toBeVisible();
+    // Every connection comes from a connector; the generic form is gone.
+    // The customer layout streams, so a not-found page can answer 200: check what it shows.
+    await page.goto("/integrations/new");
+    await expect(page.getByText("This page could not be found.")).toBeVisible();
     await page.goto("/integrations/connectors/builtin/keycloak");
     await expect(page.getByRole("heading", { name: "Connect Keycloak" })).toBeVisible();
     await expect(page.getByLabel("Client secret")).toHaveAttribute("type", "password");
@@ -36,21 +38,24 @@ test.describe("Integration module", () => {
     await expect(page.getByRole("alert").first()).toContainText("must be lowercase");
   });
 
-  test("creating an integration redirects to its detail page, and credential/connection/sync actions never hit the app's error boundary", async ({ page }) => {
+  test("a connection's credential, connection and sync actions never hit the app's error boundary", async ({ page }) => {
     const integrationName = `E2E Integration ${Date.now()}`;
-    await page.goto("/integrations/new");
+    await page.goto("/integrations/connectors/builtin/gitea");
     await page.getByLabel("Name").fill(integrationName);
     // .invalid is an RFC 2606-reserved TLD that never resolves — this
     // deliberately exercises the graceful external-failure path, not a
     // real successful connection.
-    await page.getByLabel("Base URL").fill("https://e2e-test-integration.invalid");
-    await page.getByRole("button", { name: "Create", exact: true }).click();
+    await page.getByLabel("Gitea address").fill("https://e2e-test-integration.invalid");
+    await page.getByRole("textbox", { name: "Organization" }).fill("acme");
+    await page.getByLabel("Access token").fill("e2e-fake-secret-value");
+    await page.getByRole("button", { name: "Connect" }).click();
 
     await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}/);
     await expect(page.getByRole("heading", { name: integrationName })).toBeVisible();
 
-    await page.getByLabel("Secret / token").fill("e2e-fake-secret-value");
-    await page.getByRole("button", { name: "Save credential", exact: true }).click();
+    await page.getByLabel("Access token").fill("e2e-fake-secret-value");
+    await page.getByRole("button", { name: "Save credentials", exact: true }).click();
+    await expect(page.getByRole("alert").filter({ hasText: /failed|HTTP|resolve/i }).first()).toBeVisible();
     await expect(page.getByText(/an unexpected error occurred/i)).not.toBeVisible();
 
     await page.getByRole("button", { name: "Test connection", exact: true }).click();

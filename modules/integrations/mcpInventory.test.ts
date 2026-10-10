@@ -7,12 +7,13 @@ vi.mock("./objects", () => ({ getNormalizedObjectsForTenant: vi.fn() }));
 import { buildMcpInventory } from "./mcpInventory";
 import type { Integration, IntegrationObject } from "@/lib/shared/types/integrations";
 
-const integration = (id: string, type: string, name = id): Integration => ({
+// Every connection is a connector; an MCP server is one whose definition uses the mcp driver.
+const integration = (id: string, kind: "mcp" | "http", name = id): Integration => ({
   id,
   tenantId: "t",
-  integrationTypeId: type,
+  integrationTypeId: "connector",
   name,
-  config: { baseUrl: `https://${id}.example.com` },
+  config: { baseUrl: `https://${id}.example.com`, manifest: { driver: kind } },
   capabilities: {} as Integration["capabilities"],
   status: "connected",
   lastSyncAt: null,
@@ -35,7 +36,7 @@ const obj = (integrationId: string, objectType: IntegrationObject["objectType"],
 describe("buildMcpInventory (INTEGRATION-P0-06)", () => {
   it("groups each MCP integration's server, tools and resources; other integration types are not MCP servers", () => {
     const inv = buildMcpInventory(
-      [integration("m1", "mcp", "Finance MCP"), integration("s1", "saviynt")],
+      [integration("m1", "mcp", "Finance MCP"), integration("s1", "http")],
       [
         obj("m1", "mcp_server", "server", { endpoint: "https://m1/mcp", serverName: "finance-mcp", serverVersion: "1.4.2", protocolVersion: "2025-06-18" }, "2026-09-25T10:00:00Z"),
         obj("m1", "mcp_tool", "query_ledger", { name: "query_ledger", operation: "read", operationBasis: "name" }, "2026-09-25T10:00:01Z"),

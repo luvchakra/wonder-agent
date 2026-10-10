@@ -23,7 +23,7 @@ export async function seedIntegrationWithAccounts(tenantSlug: string, name: stri
   const tenantId = await getTenantIdBySlug(tenantSlug);
   const { data: integration, error } = await supabase
     .from("integrations")
-    .insert({ tenant_id: tenantId, integration_type_id: "generic_rest", name, config: { baseUrl: "https://accounts.example.test" }, capabilities: { importAccounts: true }, status: "connected" })
+    .insert({ tenant_id: tenantId, integration_type_id: "connector", name, config: { baseUrl: "https://accounts.example.test" }, capabilities: { importAccounts: true }, status: "connected" })
     .select("id")
     .single();
   if (error || !integration) throw new Error(`seedIntegrationWithAccounts: integration insert failed: ${error?.message}`);

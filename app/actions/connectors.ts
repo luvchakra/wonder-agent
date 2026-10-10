@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { rotateReceiverSecret } from "@/modules/integrations/framework/receive";
 import {
   connectSystem,
   previewConnector,
@@ -89,6 +90,21 @@ export async function previewDefinitionAction(_prev: PreviewState, formData: For
       resource: String(formData.get("resource") ?? ""),
     });
     return { status: "done", result };
+  } catch (err) {
+    const e = formError(err);
+    return { status: "error", message: e.status === "error" ? e.message : "Something went wrong" };
+  }
+}
+
+export type ReceiverSecretState = { status: "idle" } | { status: "issued"; secret: string } | { status: "error"; message: string };
+
+/** Issues or replaces a connection's receiving secret; it is shown once, in this response only. */
+export async function rotateReceiverSecretAction(integrationId: string, _prev: ReceiverSecretState): Promise<ReceiverSecretState> {
+  const ctx = await requirePermission("integration.update");
+  try {
+    const secret = await rotateReceiverSecret(ctx.tenantId!, ctx.userId, integrationId);
+    revalidatePath(`/integrations/${integrationId}`);
+    return { status: "issued", secret };
   } catch (err) {
     const e = formError(err);
     return { status: "error", message: e.status === "error" ? e.message : "Something went wrong" };

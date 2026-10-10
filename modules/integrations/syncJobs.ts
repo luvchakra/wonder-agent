@@ -5,17 +5,10 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
-import type {
-  ConnectorCapabilities,
-  IntegrationObjectType,
-  IntegrationSyncJob,
-  SyncJobTrigger,
-} from "@/lib/shared/types/integrations";
+import type { IntegrationSyncJob, SyncJobTrigger } from "@/lib/shared/types/integrations";
 import { toSyncJob } from "./mappers";
 import { createConnector } from "./registry";
 import { getDecryptedCredential } from "./credentials";
-import { applyMappings, listMappings } from "./mappings";
-import type { ConnectorAdapter, ImportedRecord } from "./connector";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -90,19 +83,6 @@ export async function listLatestCompletedSyncStarts(tenantId: string): Promise<M
 /** integration_objects rows stored per request. */
 const UPSERT_CHUNK = 500;
 
-const IMPORTERS: {
-  capabilityKey: keyof ConnectorCapabilities;
-  objectType: IntegrationObjectType;
-  importFn: (connector: ConnectorAdapter) => Promise<ImportedRecord<unknown>[]> | undefined;
-}[] = [
-  { capabilityKey: "importIdentities", objectType: "identity", importFn: (c) => c.importIdentities?.() },
-  { capabilityKey: "importAccounts", objectType: "account", importFn: (c) => c.importAccounts?.() },
-  { capabilityKey: "importApplications", objectType: "application", importFn: (c) => c.importApplications?.() },
-  { capabilityKey: "importEntitlements", objectType: "entitlement", importFn: (c) => c.importEntitlements?.() },
-  { capabilityKey: "importAccess", objectType: "access_grant", importFn: (c) => c.importAccess?.() },
-  { capabilityKey: "importPolicies", objectType: "policy", importFn: (c) => c.importPolicies?.() },
-];
-
 /**
  * INTEGRATION-P0-01.3/02.1/03.1 (higher bar on job result integrity). The
  * actual sync worker. Must be invoked from a request context via
@@ -159,38 +139,20 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     const connector = createConnector(integration.integration_type_id);
     await connector.authenticate(integration.config ?? {}, secret);
 
-    const capabilities: ConnectorCapabilities = integration.capabilities ?? {};
-
-    for (const { capabilityKey, objectType, importFn } of IMPORTERS) {
-      if (!capabilities[capabilityKey]) continue;
-
-      let mappings: Awaited<ReturnType<typeof listMappings>> = [];
+    // Every kind the connection's definition reads, in import order (an MCP
+    // server before its tools, so the inventory can tell what is still declared).
+    for (const objectType of connector.kinds()) {
       try {
-        const records = (await importFn(connector)) ?? [];
-        const rows: Record<string, unknown>[] = [];
-        for (const record of records) {
-          try {
-            let normalized = record.normalized as Record<string, unknown> | undefined;
-            if (!normalized) {
-              if (mappings.length === 0) {
-                mappings = await listMappings(integration.id, tenantId, objectType);
-              }
-              normalized = applyMappings(record.raw, mappings);
-            }
-            rows.push({
-              tenant_id: tenantId,
-              integration_id: integration.id,
-              object_type: objectType,
-              external_id: record.externalId,
-              raw: record.raw,
-              normalized,
-              sync_job_id: jobId,
-            });
-          } catch (err) {
-            recordsFailed += 1;
-            errors.push({ objectType, message: err instanceof Error ? err.message : "Unknown error" });
-          }
-        }
+        const records = await connector.importKind(objectType);
+        const rows = records.map((record) => ({
+          tenant_id: tenantId,
+          integration_id: integration.id,
+          object_type: objectType,
+          external_id: record.externalId,
+          raw: record.raw,
+          normalized: record.normalized ?? {},
+          sync_job_id: jobId,
+        }));
         // Stored 500 at a time; a chunk that fails is retried row by row so
         // each bad record is counted and named, never the whole chunk.
         for (let i = 0; i < rows.length; i += UPSERT_CHUNK) {
@@ -208,8 +170,9 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
             } else recordsProcessed += 1;
           }
         }
-        // The connector framework reports records it could not map.
-        for (const issue of (connector as { drainIssues?: () => { objectType: string; message: string }[] }).drainIssues?.() ?? []) {
+        // Records the definition could not map are reported, not stored half-filled.
+        for (const issue of connector.drainIssues()) {
+          recordsFailed += 1;
           errors.push(issue);
         }
       } catch (err) {
@@ -221,7 +184,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     }
 
     // LDAP and SQL drivers hold a connection open for the run.
-    await (connector as { close?: () => Promise<void> }).close?.();
+    await connector.close();
 
     const finalStatus = errors.length === 0 ? "succeeded" : recordsProcessed > 0 ? "partial" : "failed";
 

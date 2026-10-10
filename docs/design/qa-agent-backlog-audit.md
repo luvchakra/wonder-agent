@@ -1098,3 +1098,17 @@ The connector framework also gets a live contract test,
 `CONNECTOR_LIVE_FILE` is set, and it is run by hand against the Planet
 Express demo company (10/10 connectors pass). Recorded in the Integration
 audit log.
+
+## 2026-10-10 — Architecture test for the connector boundary (non-negotiable #20)
+
+`tests/architecture/connector-boundary.test.ts` scans `app/`, `modules/` and
+`lib/` on every unit run and fails when:
+
+- any server code outside the connector framework calls out (the allowlist
+  is WonderID's own AI model and email providers);
+- browser code calls anything but WonderID's own API;
+- a route runs without a user session outside the allowlist (`/api/connect/`,
+  `/api/cron/`, billing webhooks, SSO domain lookup);
+- a retired direct route reappears.
+
+Widening an allowlist needs the user's approval. 4/4 pass.

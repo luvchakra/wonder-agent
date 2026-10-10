@@ -188,20 +188,35 @@ for (const [name, appName, cls, privilege, src] of ENTS) {
 }
 
 // ---------------------------------------------------------------- integrations
+// Every connection runs a connector definition (non-negotiable #20). A
+// connection to a built-in names it by key and version; the engine loads
+// exactly that version from code.
+const builtin = (key, settings) => ({ definition: { key, version: "1.0.0", origin: "builtin" }, settings, ...(settings.baseUrl ? { baseUrl: settings.baseUrl } : {}) });
 const saviynt = await ensure(
   "integrations",
-  { integration_type_id: "saviynt", name: "Saviynt — Production" },
-  { status: "connected", config: { baseUrl: "https://wonderark.saviyntcloud.com" }, capabilities: { read: true, write: false }, last_sync_at: ago(0, 3) },
+  { integration_type_id: "connector", name: "Saviynt — Production" },
+  {
+    status: "connected",
+    config: builtin("saviynt", { baseUrl: "https://wonderark.saviyntcloud.com" }),
+    capabilities: { importIdentities: true, importAccounts: true, importApplications: true, importEntitlements: true, importAccess: true, importPolicies: true },
+    last_sync_at: ago(0, 3),
+  },
 );
 const financeMcp = await ensure(
   "integrations",
-  { integration_type_id: "mcp", name: "MCP Runtime Gateway" },
-  { status: "connected", config: { baseUrl: "https://mcp.finance.wonderark.example/mcp" }, capabilities: { read: true, write: false }, last_sync_at: ago(0, 5) },
+  { integration_type_id: "connector", name: "MCP Runtime Gateway" },
+  { status: "connected", config: builtin("mcp-server", { baseUrl: "https://mcp.finance.wonderark.example/mcp" }), capabilities: { importActivity: true }, last_sync_at: ago(0, 5) },
 );
 const itopsMcp = await ensure(
   "integrations",
-  { integration_type_id: "mcp", name: "ITOps MCP" },
-  { status: "connected", config: { baseUrl: "https://mcp.itops.wonderark.example/mcp" }, capabilities: { read: true, write: false }, last_sync_at: ago(0, 2) },
+  { integration_type_id: "connector", name: "ITOps MCP" },
+  { status: "connected", config: builtin("mcp-server", { baseUrl: "https://mcp.itops.wonderark.example/mcp" }), capabilities: { importActivity: true }, last_sync_at: ago(0, 2) },
+);
+// The agent runtime the demo agents call the Runtime Gateway through.
+const agentRuntime = await ensure(
+  "integrations",
+  { integration_type_id: "connector", name: "Agent runtime" },
+  { status: "connected", config: builtin("runtime-gateway", {}), capabilities: { importActivity: true } },
 );
 
 /** A stable UUID from a string, so a re-run finds the same row. */
@@ -965,7 +980,7 @@ if (args.gateway) {
     );
     bump("api_keys");
     for (const [i, req] of requests.entries()) {
-      const res = await fetch(`${base}/api/gateway/v1/authorize`, {
+      const res = await fetch(`${base}/api/connect/v1/${agentRuntime.id}/gateway/authorize`, {
         method: "POST",
         headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
         body: JSON.stringify({ requestId: `demo-v2-${name}-${i}`, ...req, context: { source: "demo-seed" } }),

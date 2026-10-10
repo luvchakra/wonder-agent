@@ -857,3 +857,26 @@ database, for Operations' search (see that audit log).
   against the resolved agent. E2E `shadow-ai.spec.ts` covers the refusal, quarantine,
   inbox, registration and the event recorded afterwards, with tenant
   isolation.
+
+---
+
+## 2026-10-10 — The Runtime Gateway moves behind the connector boundary (non-negotiable #20)
+
+By user decision, agents now reach the gateway through their runtime's
+connection: `/api/connect/v1/<connection>/gateway/authorize` and
+`…/gateway/tools/filter`.
+
+- **Unchanged:**
+  - `authorizeRuntimeRequest()` and `filterGatewayTools()`;
+  - the decision logic;
+  - the agent API key model (FOUNDATION-P0-17).
+- **What the receiver adds:**
+  - the connection must exist and not be disabled;
+  - the agent key must belong to the connection's organization.
+- **Agent activity:** `POST /api/v1/runtime/events` (session-based) is
+  removed. Agent activity arrives through a connection's `events` receiver,
+  which calls `ingestRuntimeEventByReference()`, the same path the MCP bridge
+  used, so quarantine, dedupe and replay rules are unchanged. GET
+  `/api/v1/runtime/events` (the timeline) stays.
+
+Recorded in full in the Integration audit log (INTEGRATION-P0-16).

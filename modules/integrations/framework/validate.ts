@@ -4,6 +4,7 @@ import {
   CONNECTOR_DRIVERS,
   DEFINITION_SCHEMA_VERSION,
   RESOURCE_KINDS,
+  RUNTIME_EVENT_FIELDS,
   TRANSFORMS,
   type ConnectorDefinition,
   type DefinitionIssue,
@@ -38,7 +39,11 @@ const AUTH_BY_DRIVER: Record<string, string[]> = {
   http: ["none", "basic", "bearer", "header", "query", "oauth2_client_credentials"],
   ldap: ["ldap_simple"],
   sql: ["sql_password"],
+  mcp: ["none", "bearer", "header"],
+  none: ["none"],
 };
+
+const MCP_METHODS = ["initialize", "tools/list", "resources/list", "prompts/list"];
 
 type Ctx = { issues: DefinitionIssue[]; settings: Map<string, string>; secrets: Set<string> };
 
@@ -90,8 +95,12 @@ function checkRequest(ctx: Ctx, path: string, req: unknown, allowed: ("settings"
       continue;
     }
     for (const [k, val] of Object.entries(v)) {
-      if (typeof val !== "string") issue(ctx, `${path}.${key}.${k}`, "must be a string");
-      else checkTemplate(ctx, `${path}.${key}.${k}`, val, allowed);
+      const values = key === "query" && Array.isArray(val) ? val : [val];
+      if (values.length === 0 || values.length > 20) issue(ctx, `${path}.${key}.${k}`, "a list needs one to twenty values");
+      for (const item of values) {
+        if (typeof item !== "string") issue(ctx, `${path}.${key}.${k}`, key === "query" ? "must be a string or a list of strings" : "must be a string");
+        else checkTemplate(ctx, `${path}.${key}.${k}`, item, allowed);
+      }
       if (key === "headers" && /^(authorization|cookie|proxy-authorization|host)$/i.test(k)) issue(ctx, `${path}.headers.${k}`, "is set by the auth block, not here");
     }
   }
@@ -115,6 +124,7 @@ function checkPagination(ctx: Ctx, path: string, p: unknown) {
       if (!str(p.param, 50)) issue(ctx, `${path}.param`, "is required");
       if (!str(p.sizeParam, 50)) issue(ctx, `${path}.sizeParam`, "is required");
       size(p.size, true);
+      if (p.in !== undefined && p.in !== "query" && p.in !== "body") issue(ctx, `${path}.in`, "must be query or body");
       return;
     case "cursor":
       if (!str(p.param, 50)) issue(ctx, `${path}.param`, "is required");
@@ -132,7 +142,12 @@ function checkPagination(ctx: Ctx, path: string, p: unknown) {
   }
 }
 
-function checkMapping(ctx: Ctx, path: string, m: unknown, kind: ResourceKind) {
+function checkRecordsPath(ctx: Ctx, path: string, v: unknown) {
+  if (v === undefined || typeof v === "string") return;
+  if (!Array.isArray(v) || v.length === 0 || v.length > 5 || v.some((x) => typeof x !== "string")) issue(ctx, path, "must be a field path, or a list of up to five to try in order");
+}
+
+function checkMapping(ctx: Ctx, path: string, m: unknown, kind: ResourceKind | "runtime_event") {
   const allowed: ("settings" | "record" | "parent")[] = ["record", "parent", "settings"];
   if (typeof m === "string") {
     if (!m.trim()) issue(ctx, path, "must name a field");
@@ -141,6 +156,9 @@ function checkMapping(ctx: Ctx, path: string, m: unknown, kind: ResourceKind) {
   if (!isObj(m)) return issue(ctx, path, "must be a field path or an object");
   const sources = ["path", "template", "value"].filter((k) => m[k] !== undefined);
   if (sources.length !== 1) issue(ctx, path, "needs exactly one of path, template or value");
+  if (m.path !== undefined && !str(m.path, 300) && !(Array.isArray(m.path) && m.path.length > 0 && m.path.length <= 5 && m.path.every((x) => str(x, 300)))) {
+    issue(ctx, `${path}.path`, "must be a field path, or a list of up to five to try in order");
+  }
   if (m.template !== undefined) {
     if (typeof m.template !== "string") issue(ctx, `${path}.template`, "must be a string");
     else checkTemplate(ctx, `${path}.template`, m.template, allowed);
@@ -167,7 +185,7 @@ function checkResource(ctx: Ctx, def: Record<string, unknown>, kind: ResourceKin
   if (r.forEach && r.unwind) issue(ctx, `${path}.unwind`, "cannot be combined with forEach");
   if (driver === "http") {
     checkRequest(ctx, `${path}.request`, r.request, parentAllowed);
-    if (r.records !== undefined && typeof r.records !== "string") issue(ctx, `${path}.records`, "must be a field path (\"\" for the whole response)");
+    checkRecordsPath(ctx, `${path}.records`, r.records);
     if (r.recordsKeyed !== undefined && typeof r.recordsKeyed !== "boolean") issue(ctx, `${path}.recordsKeyed`, "must be true or false");
     checkPagination(ctx, `${path}.pagination`, r.pagination);
   } else if (driver === "ldap") {
@@ -182,6 +200,10 @@ function checkResource(ctx: Ctx, def: Record<string, unknown>, kind: ResourceKin
     }
   } else if (driver === "sql") {
     checkSql(ctx, `${path}.query`, r.query);
+  } else if (driver === "mcp") {
+    if (!isObj(r.rpc) || !MCP_METHODS.includes(String(r.rpc.method))) issue(ctx, `${path}.rpc.method`, `must be one of ${MCP_METHODS.join(", ")}`);
+    checkRecordsPath(ctx, `${path}.records`, r.records);
+    if (r.forEach !== undefined) issue(ctx, `${path}.forEach`, "is not available for the mcp driver");
   }
   if (r.forEach !== undefined) {
     if (!(RESOURCE_KINDS as readonly string[]).includes(String(r.forEach)) || r.forEach === kind) issue(ctx, `${path}.forEach`, "must name another resource");
@@ -231,6 +253,49 @@ function checkSql(ctx: Ctx, path: string, q: unknown) {
   checkTemplate(ctx, path, q, []);
 }
 
+const HEADER_RE = /^[a-zA-Z][a-zA-Z0-9-]{1,60}$/;
+
+function checkReceive(ctx: Ctx, rec: unknown) {
+  if (rec === undefined) return;
+  if (!isObj(rec)) return issue(ctx, "receive", "must be an object");
+  const known = new Set(["runtimeEvents", "webhook", "gateway"]);
+  for (const k of Object.keys(rec)) if (!known.has(k)) issue(ctx, `receive.${k}`, "must be runtimeEvents, webhook or gateway");
+  const checkAuth = (path: string, c: Record<string, unknown>) => {
+    if (c.auth !== "bearer" && c.auth !== "hmac_sha256") issue(ctx, `${path}.auth`, "must be bearer or hmac_sha256");
+    if (c.signatureHeader !== undefined && !(typeof c.signatureHeader === "string" && HEADER_RE.test(c.signatureHeader))) issue(ctx, `${path}.signatureHeader`, "must be a header name");
+  };
+  const ev = rec.runtimeEvents;
+  if (ev !== undefined) {
+    if (!isObj(ev)) issue(ctx, "receive.runtimeEvents", "must be an object");
+    else {
+      checkAuth("receive.runtimeEvents", ev);
+      if (!["mcp", "rest", "webhook"].includes(String(ev.source))) issue(ctx, "receive.runtimeEvents.source", "must be mcp, rest or webhook");
+      if (ev.records !== undefined && typeof ev.records !== "string") issue(ctx, "receive.runtimeEvents.records", "must be a field path");
+      if (!isObj(ev.fields)) issue(ctx, "receive.runtimeEvents.fields", "is required");
+      else {
+        const all = new Set<string>([...RUNTIME_EVENT_FIELDS.required, ...RUNTIME_EVENT_FIELDS.optional]);
+        for (const [target, mapping] of Object.entries(ev.fields)) {
+          if (!all.has(target)) issue(ctx, `receive.runtimeEvents.fields.${target}`, `is not a runtime event field (${[...all].join(", ")})`);
+          checkMapping(ctx, `receive.runtimeEvents.fields.${target}`, mapping, "runtime_event");
+        }
+        for (const req of RUNTIME_EVENT_FIELDS.required) if (!(req in ev.fields)) issue(ctx, `receive.runtimeEvents.fields.${req}`, "is required");
+      }
+    }
+  }
+  const wh = rec.webhook;
+  if (wh !== undefined) {
+    if (!isObj(wh)) issue(ctx, "receive.webhook", "must be an object");
+    else {
+      checkAuth("receive.webhook", wh);
+      if (wh.externalId !== undefined && !str(wh.externalId, 200)) issue(ctx, "receive.webhook.externalId", "must be a field path");
+    }
+  }
+  const gw = rec.gateway;
+  if (gw !== undefined && (!isObj(gw) || typeof gw.authorize !== "boolean" || typeof gw.toolsFilter !== "boolean")) {
+    issue(ctx, "receive.gateway", "must be { authorize: true|false, toolsFilter: true|false }");
+  }
+}
+
 export function validateDefinition(input: unknown): { definition: ConnectorDefinition | null; issues: DefinitionIssue[] } {
   const ctx: Ctx = { issues: [], settings: new Map(), secrets: new Set() };
   if (!isObj(input)) return { definition: null, issues: [{ path: "", message: "must be a JSON object" }] };
@@ -264,7 +329,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
       ctx.settings.set(s.key, String(s.type));
     });
   const urlSettings = [...ctx.settings].filter(([, t]) => t === "url").map(([k]) => k);
-  if (d.driver === "http" && urlSettings.length === 0) issue(ctx, "settings", "an http connector needs a url setting (the base address)");
+  if ((d.driver === "http" || d.driver === "mcp") && urlSettings.length === 0) issue(ctx, "settings", `an ${String(d.driver)} connector needs a url setting (the base address)`);
   if ((d.driver === "ldap" || d.driver === "sql") && urlSettings.length === 0) issue(ctx, "settings", "needs a url setting (ldaps://host:636 or postgres://host:5432/db)");
 
   // Auth
@@ -281,6 +346,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
           else if (ctx.secrets.has(f.key)) issue(ctx, `auth.fields[${i}].key`, "is listed twice");
           else ctx.secrets.add(f.key);
           if (!isObj(f) || !str(f.label, 80)) issue(ctx, `auth.fields[${i}].label`, "is required");
+          if (isObj(f) && f.optional !== undefined && typeof f.optional !== "boolean") issue(ctx, `auth.fields[${i}].optional`, "must be true or false");
         });
     }
     const templated: Record<string, string[]> = {
@@ -318,8 +384,12 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
   for (const p of leaks) issue(ctx, p, "secrets may only be used in the auth block");
 
   // Test
-  if (!isObj(d.test)) issue(ctx, "test", "is required (a cheap call that proves the connection works)");
-  else if (d.driver === "http") checkRequest(ctx, "test.request", d.test.request, ["settings"]);
+  if (d.driver === "none") {
+    if (d.test !== undefined) issue(ctx, "test", "a receive-only connector has nothing to test");
+  } else if (!isObj(d.test)) issue(ctx, "test", "is required (a cheap call that proves the connection works)");
+  else if (d.driver === "mcp") {
+    if (!isObj(d.test.rpc) || !MCP_METHODS.includes(String(d.test.rpc.method))) issue(ctx, "test.rpc.method", `must be one of ${MCP_METHODS.join(", ")}`);
+  } else if (d.driver === "http") checkRequest(ctx, "test.request", d.test.request, ["settings"]);
   else if (d.driver === "ldap") {
     if (!isObj(d.test.search) || !str(d.test.search.base, 500) || !str(d.test.search.filter, 500)) issue(ctx, "test.search", "needs a base and filter");
   } else if (d.driver === "sql") checkSql(ctx, "test.query", d.test.query);
@@ -329,8 +399,16 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
     else checkTemplate(ctx, "application", d.application, ["settings"]);
   }
 
+  // Receiving side
+  checkReceive(ctx, d.receive);
+
   // Resources
-  if (!isObj(d.resources) || Object.keys(d.resources).length === 0) issue(ctx, "resources", "needs at least one of identity, account, entitlement, access_grant, application");
+  const receives = isObj(d.receive) && Object.keys(d.receive).length > 0;
+  if (!isObj(d.resources)) issue(ctx, "resources", "must be an object");
+  else if (d.driver === "none") {
+    if (Object.keys(d.resources).length) issue(ctx, "resources", "a receive-only connector (driver none) reads nothing");
+    if (!receives) issue(ctx, "receive", "a connector with driver none must receive something");
+  } else if (Object.keys(d.resources).length === 0) issue(ctx, "resources", `needs at least one of ${RESOURCE_KINDS.join(", ")}`);
   else {
     const kinds = new Set(Object.keys(d.resources));
     for (const k of kinds) {
@@ -376,7 +454,7 @@ export function validateSettings(def: ConnectorDefinition, input: unknown): { se
         } catch {
           /* reported below */
         }
-        const devHttp = def.driver === "http" && u?.protocol === "http:";
+        const devHttp = (def.driver === "http" || def.driver === "mcp") && u?.protocol === "http:";
         if (!u || (u.protocol !== scheme && !(devHttp && process.env.OUTBOUND_ALLOW_PRIVATE_NETWORKS === "true") && !(def.driver === "sql" && u.protocol === "postgresql:"))) {
           issues.push({ path: `settings.${s.key}`, message: `${s.label} must be a ${scheme}// address` });
         } else if (u.username || u.password) issues.push({ path: `settings.${s.key}`, message: `${s.label} must not contain a user name or password` });
@@ -395,9 +473,11 @@ export function validateSecrets(def: ConnectorDefinition, input: unknown): { sec
   const out: Record<string, string> = {};
   for (const f of def.auth.fields) {
     const v = values[f.key];
+    if (f.optional && (v === undefined || v === null || (typeof v === "string" && !v.trim()))) continue;
     if (typeof v !== "string" || !v.trim()) issues.push({ path: `secret.${f.key}`, message: `${f.label} is required` });
     else if (v.length > 8000) issues.push({ path: `secret.${f.key}`, message: `${f.label} is too long` });
     else out[f.key] = v.trim();
   }
+  if (!issues.length && Object.keys(out).length === 0) return { secret: null, issues };
   return { secret: issues.length ? null : JSON.stringify(out), issues };
 }

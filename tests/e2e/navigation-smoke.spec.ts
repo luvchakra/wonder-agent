@@ -26,7 +26,7 @@ const ROUTES = [
   { path: "/risk/rogue", heading: "Rogue Agents" },
   { path: "/compliance/campaigns", heading: "Certification" },
   { path: "/integrations", heading: "Integrations" },
-  { path: "/integrations/new", heading: "Add an integration" },
+  { path: "/integrations/connectors", heading: "Connect a system" },
   { path: "/integrations/jobs", heading: "Job Status" },
   { path: "/integrations/discovery", heading: "Application discovery" },
   { path: "/audit", heading: "Audit Trail" },

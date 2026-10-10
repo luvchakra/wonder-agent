@@ -14,7 +14,7 @@ insert into auth.users (id, email) values ('11111111-9000-0000-0000-000000000001
 insert into users (id, email) values ('11111111-9000-0000-0000-000000000001', 'fixture-x90@example.test') on conflict (id) do nothing;
 insert into tenant_memberships (tenant_id, user_id, status) values ('aaaaaaaa-9000-0000-0000-000000000001', '11111111-9000-0000-0000-000000000001', 'active');
 insert into applications (id, tenant_id, name) values ('b9000000-0000-0000-0000-0000000000b1', 'bbbbbbbb-9000-0000-0000-000000000002', 'App B90');
-insert into integrations (id, tenant_id, integration_type_id, name) values ('b9000000-0000-0000-0000-0000000000f1', 'bbbbbbbb-9000-0000-0000-000000000002', 'generic_rest', 'Conn B90');
+insert into integrations (id, tenant_id, integration_type_id, name) values ('b9000000-0000-0000-0000-0000000000f1', 'bbbbbbbb-9000-0000-0000-000000000002', 'connector', 'Conn B90');
 insert into application_discoveries (id, tenant_id, source, source_key, name) values
   ('a9000000-0000-0000-0000-0000000000d1', 'aaaaaaaa-9000-0000-0000-000000000001', 'manual', 'figma', 'Figma'),
   ('b9000000-0000-0000-0000-0000000000d1', 'bbbbbbbb-9000-0000-0000-000000000002', 'manual', 'miro', 'Miro');

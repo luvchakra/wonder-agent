@@ -10,10 +10,10 @@ describe("built-in connector definitions", () => {
   });
 
   for (const def of BUILTIN_DEFINITIONS) {
-    it(`${def.key} is valid and declares what it imports`, () => {
+    it(`${def.key} is valid and declares what it imports or receives`, () => {
       expect(validateDefinition(def).issues).toEqual([]);
       const caps = capabilitiesOf(def);
-      expect(Object.values(caps).some(Boolean)).toBe(true);
+      expect(Object.values(caps).some(Boolean) || Object.keys(def.receive ?? {}).length > 0).toBe(true);
       expect(caps.provision).toBe(false);
     });
   }

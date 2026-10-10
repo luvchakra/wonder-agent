@@ -5,7 +5,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { listConnectorDefinitions } from "@/modules/integrations/framework/catalog";
 import { CONNECTOR_CATEGORIES } from "@/modules/integrations/framework/types";
 import { Badge, Card, CardBody, CardHeader, LinkButton } from "@/modules/ui";
-import { CATEGORY_LABEL, RESOURCE_LABEL } from "./labels";
+import { CATEGORY_LABEL, connectorSummary } from "./labels";
 
 export default async function ConnectorCatalogPage() {
   let ctx;
@@ -39,7 +39,7 @@ export default async function ConnectorCatalogPage() {
                         {d.origin === "custom" ? <Badge tone="info">Your organization · v{d.version}</Badge> : null}
                       </div>
                       <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">{d.description}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">Reads {d.resources.map((r) => RESOURCE_LABEL[r]).join(", ")}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{connectorSummary(d.resources, d.receives)}</p>
                     </div>
                     <LinkButton href={`/integrations/connectors/${d.origin}/${d.key}`} variant="secondary" className="shrink-0">
                       Connect
@@ -56,11 +56,7 @@ export default async function ConnectorCatalogPage() {
         <Link href="/integrations/connectors/new" className="text-primary hover:underline">
           Write a connector
         </Link>{" "}
-        for it, or{" "}
-        <Link href="/integrations/new" className="text-primary hover:underline">
-          add a generic integration
-        </Link>
-        .
+        for it.
       </p>
     </div>
   );

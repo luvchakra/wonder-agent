@@ -67,12 +67,13 @@ async function lookUpTenantHost(supabase: ReturnType<typeof createServerClient>,
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // RUNTIME-P0-15 — the Runtime Gateway is a separate boundary: agents
-  // authenticate every call with their own API key inside the route, and
-  // master stories §25 require the runtime path not to depend on dashboard
-  // request handling. So it skips the session refresh and its GoTrue round
-  // trip entirely; no cookie is read or written for it.
-  if (pathname.startsWith("/api/gateway/")) {
+  // The connector framework's receiving side (non-negotiable #20), which
+  // includes the Runtime Gateway, is a separate boundary: senders
+  // authenticate every call with their connection secret or agent API key
+  // inside the route, and the runtime path must not depend on dashboard
+  // request handling (master stories §25). So it skips the session refresh
+  // and its GoTrue round trip entirely; no cookie is read or written.
+  if (pathname.startsWith("/api/connect/")) {
     return NextResponse.next();
   }
 
@@ -167,8 +168,8 @@ export async function proxy(request: NextRequest) {
   // is distinguished from "no session at all": the former is refused on
   // every path, the latter is refused on protected pages and passed
   // through on the API, whose routes without a session (the cron job, the
-  // integration webhooks, the MCP ingest, the SSO domain lookup) hold
-  // their own credentials and gate themselves.
+  // billing webhooks, the SSO domain lookup) hold their own credentials and
+  // gate themselves.
   if (!user) {
     const presentedSession = request.cookies
       .getAll()
