@@ -479,7 +479,7 @@ function SidebarBody({
   return (
     <>
       <Brand collapsed={collapsed} onToggle={onToggle} />
-      <nav aria-label={admin ? "Admin" : "Main"} className={cn("flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
+      <nav aria-label={admin ? "Admin" : "Main"} className={cn("sidebar-scroll flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
         {admin ? <AdminHeader collapsed={collapsed} onNavigate={onNavigate} /> : null}
         <ul className={collapsed ? "space-y-1.5" : "space-y-1"}>
           {items.map((item) =>

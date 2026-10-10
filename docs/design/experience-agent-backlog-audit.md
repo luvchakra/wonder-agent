@@ -3618,3 +3618,14 @@ deploy, the logs should show no new `eq.null` requests from the dashboard.
 
 **Not changed.** The help guide (`modules/ui/help/content.ts`) still
 describes the old menu names; it is updated only when asked (§19.7).
+
+**Same day, sidebar scrollbar (owner request).** The sidebar used the browser's
+default scrollbar, a bright light track on the dark rail. It now uses a
+`.sidebar-scroll` class in `app/globals.css`:
+- a thin bar with a transparent track;
+- the thumb is drawn in `--sidebar-muted-foreground` at 35%, so it follows
+  both themes;
+- the thumb appears only while the sidebar is hovered or has focus.
+
+Checked by rendering the CSS in Chromium with scrollbars on: a resting
+sidebar shows no bar, a hovered one a thin muted thumb.
