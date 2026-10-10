@@ -7,13 +7,17 @@ name: E2E (Playwright on Vercel)
 # The suite runs on Vercel, not here (user decision 2026-10-10): it needs
 # the project's Sensitive variables (Supabase service role key, encryption
 # key, cron secret), which never leave Vercel. This workflow only:
-#   1. moves the `e2e/nightly` branch to the tip of main, with one marker
-#      commit so Vercel always sees a new commit to build;
-#   2. waits for Vercel's status on that commit. Its build runs the suite
-#      (scripts/vercel-build.sh → scripts/e2e-on-vercel.sh) and fails when a
-#      test fails, so this job goes red with it.
-# No secrets are needed here; GITHUB_TOKEN pushes the branch and reads the
-# status.
+#   1. moves the test branches to the tip of main, each with one marker
+#      commit so Vercel always sees a new commit to build:
+#      - the full suite: `e2e/nightly-1` and `e2e/nightly-2`, one half each
+#        (a Vercel build has 45 minutes and 2 cores; the whole suite needs
+#        about 40 minutes there);
+#      - chosen specs: `e2e/nightly`;
+#   2. waits for Vercel's status on each marker commit. Each build runs its
+#      part (scripts/vercel-build.sh → scripts/e2e-on-vercel.sh) and fails
+#      when a test fails, so this job goes red with it.
+# No secrets are needed here; GITHUB_TOKEN pushes the branches and reads the
+# statuses.
 on:
   schedule:
     - cron: "30 21 * * *" # 03:00 IST
@@ -35,52 +39,71 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
+    timeout-minutes: 130
     steps:
       - uses: actions/checkout@v4
         with:
           ref: main
           fetch-depth: 1
 
-      # The marker commit is attributed to the repository owner so Vercel
-      # builds it like the owner's own pushes. The input goes through an
+      # Marker commits are attributed to the repository owner so Vercel
+      # builds them like the owner's own pushes. The input goes through an
       # environment variable, never straight into the script; the build
       # accepts only tests/e2e/*.spec.ts paths from it.
-      - name: Move e2e/nightly to main
+      - name: Move the test branches to main
         id: push
         env:
           SPECS: ${{ inputs.specs }}
         run: |
           git config user.name "luvchakra"
           git config user.email "luvchakra@gmail.com"
-          msg="Nightly E2E run on Vercel ($(date -u +%Y-%m-%dT%H:%MZ))"
+          base=$(git rev-parse HEAD)
+          stamp=$(date -u +%Y-%m-%dT%H:%MZ)
+          shas=""
+          mark() { # <branch> <title> [body]
+            git reset -q --soft "$base"
+            if [ -n "${3:-}" ]; then git commit -q --allow-empty -m "$2" -m "$3"; else git commit -q --allow-empty -m "$2"; fi
+            git push -q --force origin "HEAD:refs/heads/$1"
+            shas="$shas $(git rev-parse HEAD)"
+          }
           if [ -n "$SPECS" ]; then
-            git commit --allow-empty -m "$msg" -m "specs: $SPECS"
+            mark e2e/nightly "E2E run on Vercel ($stamp)" "specs: $SPECS"
           else
-            git commit --allow-empty -m "$msg"
+            mark e2e/nightly-1 "Nightly E2E run on Vercel, half 1 of 2 ($stamp)"
+            mark e2e/nightly-2 "Nightly E2E run on Vercel, half 2 of 2 ($stamp)"
           fi
-          git push --force origin HEAD:refs/heads/e2e/nightly
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "shas=${shas# }" >> "$GITHUB_OUTPUT"
 
       - name: Wait for the suite on Vercel
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ steps.push.outputs.sha }}
+          SHAS: ${{ steps.push.outputs.shas }}
         run: |
-          # Vercel reports the build as a commit status. Up to 70 minutes:
-          # queueing behind another build, install, build and the suite.
-          for i in $(seq 1 140); do
-            state=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/statuses" \
-              --jq '[.[] | select(.context | startswith("Vercel"))][0] // empty | "\(.state) \(.target_url)"' 2>/dev/null || true)
-            case "$state" in
-              success*) echo "The suite passed on Vercel: ${state#success }"; exit 0 ;;
-              failure*|error*) echo "::error::The suite failed on Vercel. Build log: ${state#* }"; exit 1 ;;
-            esac
-            if [ "$i" = "12" ] && [ -z "$state" ]; then
-              echo "::error::Vercel did not start a build for ${SHA} within 6 minutes."
-              exit 1
-            fi
-            sleep 30
+          # Vercel reports each build as a commit status. The halves build one
+          # after the other; up to 120 minutes in all.
+          failed=0
+          start=$(date +%s)
+          deadline=$(( start + 7200 ))
+          first=${SHAS%% *}
+          for sha in $SHAS; do
+            seen=0
+            while :; do
+              state=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${sha}/statuses" \
+                --jq '[.[] | select(.context | startswith("Vercel"))][0] // empty | "\(.state) \(.target_url)"' 2>/dev/null || true)
+              case "$state" in
+                success*) echo "Passed on Vercel (${sha:0:7}): ${state#success }"; break ;;
+                failure*|error*) echo "::error::Failed on Vercel (${sha:0:7}). Build log: ${state#* }"; failed=1; break ;;
+              esac
+              [ -n "$state" ] && seen=1
+              if [ "$seen" = "0" ] && [ "$sha" = "$first" ] && [ "$(date +%s)" -gt $(( start + 360 )) ]; then
+                echo "::error::Vercel did not start a build for ${sha:0:7} within 6 minutes."
+                exit 1
+              fi
+              if [ "$(date +%s)" -gt "$deadline" ]; then
+                echo "::error::No result from Vercel for ${sha:0:7} within 120 minutes."
+                exit 1
+              fi
+              sleep 30
+            done
           done
-          echo "::error::No result from Vercel within 70 minutes."
-          exit 1
+          exit "$failed"

@@ -52,8 +52,11 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? [["html", { open: "never" }], ["github"], ["list"]] : [["html", { open: "never" }], ["list"]],
-  timeout: 30_000,
-  expect: { timeout: 10_000 },
+  // E2E_SLOW_MACHINE: the nightly run inside a Vercel build (2 cores shared by
+  // the app server and two browsers) gets twice the time. Local and CI runs
+  // keep the strict limits.
+  timeout: process.env.E2E_SLOW_MACHINE ? 60_000 : 30_000,
+  expect: { timeout: process.env.E2E_SLOW_MACHINE ? 20_000 : 10_000 },
   use: {
     baseURL: BASE_URL,
     trace: "on-first-retry",
