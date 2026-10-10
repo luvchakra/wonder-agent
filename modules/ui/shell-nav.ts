@@ -3,27 +3,33 @@
  * layout can filter it by the viewer's permissions and compute badge counts,
  * then hand it to the client sidebar / tab bar / drawer.
  *
- * Two sidebars (owner decision, 2026-10-10):
- * - **The main sidebar** is what a member uses day to day. It starts with
- *   Home and My Access (their own requests, privacy and sign-in security),
- *   then the governance work areas. "Admin" is always its last entry.
- * - **The Admin sidebar** holds everything that administers the
- *   organization: settings, users and permissions, authentication,
- *   integrations, identity configuration, and policies. Opening Admin
- *   re-renders the sidebar with "Admin" at the top and a back button to
- *   Home. Which sidebar shows follows the page, so a link to an admin page
- *   opens the Admin sidebar too.
+ * Arranged in areas (owner decision, 2026-10-10, after the way Saviynt
+ * Identity Cloud arranges its menu; only the arrangement was taken, every
+ * menu and name is WonderID's own):
+ * - **The area list** is the sidebar's first level: Home, then the
+ *   governance work areas, and "Admin" always last. Each area opens its own
+ *   menu in the sidebar; an area with a single page opens that page.
+ * - **An area's menu** shows the area's name at the top with a back arrow
+ *   to the area list, then its pages. A page is a plain row; a group of
+ *   pages folds open in place. Which area shows follows the page, so a link
+ *   into an admin page shows the Admin menu.
+ * - **Home** holds a member's day-to-day work: the dashboard, their own
+ *   access (requests, privacy, sign-in security) and access governance.
+ * - **Admin** holds everything that administers the organization, as
+ *   groups: organization settings, users and permissions, authentication,
+ *   integrations, identity configuration, and policies.
  *
  * Every entry names the permission its page requires (any of a list), and
- * the layout shows only what the viewer may open; Admin appears only when at
- * least one admin page does. Pages still check permissions themselves: this
+ * the layout shows only what the viewer may open; an area appears only when
+ * at least one of its pages does, so Admin is absent for a member without
+ * administration rights. Pages still check permissions themselves: this
  * only decides what is listed.
  *
- * Three levels: section → page, or section → group → page (the third level
- * opens as a flyout). Only pages that exist are listed (spec, "Do not expose
- * menu items whose underlying route/capability is not implemented"). Every
- * route appears once across both sidebars, so exactly one page and one
- * section can be current. `badge` names a counter the layout supplies.
+ * Three levels: area → page, or area → group → page. Only pages that exist
+ * are listed (spec, "Do not expose menu items whose underlying
+ * route/capability is not implemented"). Every route appears once, so
+ * exactly one page and one area can be current. `badge` names a counter
+ * the layout supplies.
  */
 export type ShellNavLink = {
   label: string;
@@ -63,17 +69,71 @@ const link = (label: string, href: string, ...permission: string[]): ShellNavEnt
 const page = (label: string, href: string, ...permission: string[]): ShellNavLink => ({ label, href, ...(permission.length ? { permission } : {}) });
 const group = (label: string, children: ShellNavLink[], icon?: string): ShellNavEntry => ({ kind: "group", label, icon, children });
 
-/** The main sidebar: Home first, then a member's own access, then the governance work areas. */
+/** The Admin area: administering the organization, always the last area. */
+export const ADMIN_AREA: ShellNavItem = {
+  label: "Admin",
+  href: "/settings",
+  icon: "Settings",
+  children: [
+    group(
+      "Organization",
+      [
+        page("Organization", "/settings", "tenant.settings"),
+        page("Notifications", "/settings/notifications", "notification.manage"),
+        page("AI Assistance", "/settings/ai", "ai.manage"),
+        page("Billing", "/settings/billing", "billing.view"),
+      ],
+      "Building2",
+    ),
+    group(
+      "Users & Permissions",
+      [
+        page("Users", "/settings/users", "users.view"),
+        page("Groups", "/settings/groups", "groups.view"),
+        page("WonderID Roles", "/settings/roles", "roles.view", "role.manage"),
+        page("Permission Catalog", "/settings/permissions", "permissions.view"),
+        page("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
+      ],
+      "UserCog",
+    ),
+    group("Authentication", [page("Single Sign-On", "/settings/sso", "sso.manage")], "Fingerprint"),
+    group(
+      "Integrations",
+      [
+        page("Connections", "/integrations", "integration.read"),
+        page("Connection Types", "/integrations/types", "integration.read"),
+        page("Gateway", "/integrations/gateway", "integration.read"),
+        page("Identity Sources", "/integrations/sources", "integration.read"),
+        page("Pending Matches", "/integrations/correlations", "integration.read"),
+        page("MCP Servers", "/integrations/mcp", "integration.read"),
+        page("Sync Jobs", "/integrations/jobs", "integration.read"),
+      ],
+      "Link2",
+    ),
+    group("Identity Configuration", [page("Identity Attributes", "/identities/attributes", "identity.manage")], "SlidersHorizontal"),
+    group(
+      "Policies & Compliance",
+      [
+        page("Policies", "/policies", "policy.read"),
+        page("Request Policies", "/access/request-policies", "access.manage"),
+        page("Privacy & Data Protection", "/settings/privacy", "privacy.view"),
+        page("Audit Integrity", "/audit/integrity", "audit.read"),
+      ],
+      "FileText",
+    ),
+  ],
+};
+
+/** The area list: Home first, the governance work areas, Admin last. */
 export const SHELL_NAV: ShellNavItem[] = [
-  { label: "Home", href: "/", icon: "Home" },
   {
-    label: "My Access",
-    href: "/access/catalog",
-    icon: "UserRound",
+    label: "Home",
+    href: "/",
+    icon: "Home",
     children: [
-      link("Request Access", "/access/catalog", "access.read"),
-      link("My Privacy", "/my-privacy"),
-      link("Sign-in Security", "/settings/security"),
+      link("Home", "/"),
+      group("My Access", [page("Request Access", "/access/catalog", "access.read"), page("My Privacy", "/my-privacy"), page("Sign-in Security", "/settings/security")], "UserRound"),
+      group("Access Governance", [page("Access Requests", "/access/requests", "access.read"), page("Access Packages", "/access/packages", "access.read")], "KeyRound"),
     ],
   },
   {
@@ -94,19 +154,13 @@ export const SHELL_NAV: ShellNavItem[] = [
     label: "Applications",
     href: "/access",
     icon: "Box",
+    match: ["/access/agents"],
     children: [
       link("Application Inventory", "/access", "access.read"),
       link("Discovery", "/integrations/discovery", "integration.read"),
       link("Accounts", "/access/accounts", "access.read"),
       link("Data Sources", "/access/data-sources", "access.read"),
     ],
-  },
-  {
-    label: "Access Governance",
-    href: "/access/requests",
-    icon: "KeyRound",
-    match: ["/access/agents"],
-    children: [link("Access Requests", "/access/requests", "access.read"), link("Access Packages", "/access/packages", "access.read")],
   },
   {
     label: "Certifications",
@@ -139,70 +193,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     icon: "BarChart3",
     children: [link("Reports", "/reports", "report.read"), link("Audit Trail", "/audit", "audit.read")],
   },
-];
-
-/** The Admin sidebar: administering the organization. */
-export const ADMIN_NAV: ShellNavItem[] = [
-  {
-    label: "Organization",
-    href: "/settings",
-    icon: "Building2",
-    children: [
-      link("Organization", "/settings", "tenant.settings"),
-      link("Notifications", "/settings/notifications", "notification.manage"),
-      link("AI Assistance", "/settings/ai", "ai.manage"),
-      link("Billing", "/settings/billing", "billing.view"),
-    ],
-  },
-  {
-    label: "Users & Permissions",
-    href: "/settings/users",
-    icon: "UserCog",
-    children: [
-      link("Users", "/settings/users", "users.view"),
-      link("Groups", "/settings/groups", "groups.view"),
-      link("WonderID Roles", "/settings/roles", "roles.view", "role.manage"),
-      link("Permission Catalog", "/settings/permissions", "permissions.view"),
-      link("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
-    ],
-  },
-  {
-    label: "Authentication",
-    href: "/settings/sso",
-    icon: "Fingerprint",
-    children: [link("Single Sign-On", "/settings/sso", "sso.manage")],
-  },
-  {
-    label: "Integrations",
-    href: "/integrations",
-    icon: "Link2",
-    children: [
-      link("Connections", "/integrations", "integration.read"),
-      link("Connection Types", "/integrations/types", "integration.read"),
-      link("Gateway", "/integrations/gateway", "integration.read"),
-      link("Identity Sources", "/integrations/sources", "integration.read"),
-      link("Pending Matches", "/integrations/correlations", "integration.read"),
-      link("MCP Servers", "/integrations/mcp", "integration.read"),
-      link("Sync Jobs", "/integrations/jobs", "integration.read"),
-    ],
-  },
-  {
-    label: "Identity Configuration",
-    href: "/identities/attributes",
-    icon: "SlidersHorizontal",
-    children: [link("Identity Attributes", "/identities/attributes", "identity.manage")],
-  },
-  {
-    label: "Policies & Compliance",
-    href: "/policies",
-    icon: "FileText",
-    children: [
-      link("Policies", "/policies", "policy.read"),
-      link("Request Policies", "/access/request-policies", "access.manage"),
-      link("Privacy & Data Protection", "/settings/privacy", "privacy.view"),
-      link("Audit Integrity", "/audit/integrity", "audit.read"),
-    ],
-  },
+  ADMIN_AREA,
 ];
 
 const allowed = (permission: string[] | undefined, permissions: ReadonlySet<string>) => !permission || permission.some((p) => permissions.has(p));
@@ -237,31 +228,48 @@ export function navFor(nav: ShellNavItem[], permissions: readonly string[]): She
   return out;
 }
 
-/** Where "Admin" leads: the first admin page the viewer may open, or null when there is none (no Admin entry). */
-export function adminLanding(adminNav: ShellNavItem[]): string | null {
-  return adminNav[0]?.href ?? null;
-}
-
-/**
- * Whether a page belongs to the Admin sidebar: the section owning the
- * longest prefix of the path, across both sidebars, is an admin section.
- */
-export function isAdminPath(pathname: string): boolean {
-  let best = -1;
-  let admin = false;
-  for (const [nav, isAdmin] of [
-    [SHELL_NAV, false],
-    [ADMIN_NAV, true],
-  ] as const) {
-    for (const item of nav) {
-      const len = bestPrefix(sectionPrefixes(item), pathname);
-      if (len > best) {
-        best = len;
-        admin = isAdmin;
-      }
+/** The area a page belongs to: the one owning the longest prefix of the path, if any. */
+export function activeArea(nav: ShellNavItem[], pathname: string): ShellNavItem | null {
+  let best: ShellNavItem | null = null;
+  let bestLen = -1;
+  for (const item of nav) {
+    const len = bestPrefix(sectionPrefixes(item), pathname);
+    if (len > bestLen) {
+      bestLen = len;
+      best = item;
     }
   }
-  return admin;
+  return best;
+}
+
+/** Whether a page belongs to the Admin area (across the whole area list, so a member's own page under /settings does not). */
+export function isAdminPath(pathname: string): boolean {
+  return activeArea(SHELL_NAV, pathname)?.label === ADMIN_AREA.label;
+}
+
+/** A page found by the sidebar's menu search, with where it lives. */
+export type NavMatch = { label: string; href: string; trail: string[] };
+
+/**
+ * The sidebar's menu search: every page whose name, group or area
+ * contains each word of the query, in menu order. It searches the menu
+ * only, never the data; the header's search (Ctrl+K) does that.
+ */
+export function searchNav(nav: ShellNavItem[], query: string, limit = 12): NavMatch[] {
+  const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!words.length) return [];
+  const out: NavMatch[] = [];
+  for (const area of nav) {
+    const entries: { label: string; href: string; trail: string[] }[] = area.children
+      ? area.children.flatMap((e) => (e.kind === "link" ? [{ label: e.label, href: e.href, trail: [area.label] }] : e.children.map((c) => ({ label: c.label, href: c.href, trail: [area.label, e.label] }))))
+      : [{ label: area.label, href: area.href, trail: [] }];
+    for (const e of entries) {
+      const hay = [e.label, ...e.trail].join(" ").toLowerCase();
+      if (words.every((w) => hay.includes(w))) out.push(e);
+      if (out.length >= limit) return out;
+    }
+  }
+  return out;
 }
 
 /**

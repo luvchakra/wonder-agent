@@ -3659,3 +3659,58 @@ hidden", then "instead of hidden show them disabled".
     tolerance.
   - Vercel builder: both images in a recording run, in which the other 11
     branding tests passed.
+
+## 2026-10-10 — Sidebar arranged in areas (after a study of Saviynt's menu)
+
+**Why.** Owner request: study how Saviynt arranges its sidebar from its
+public documentation and screenshots, take only the concept ("how it
+differentiates and arranges menu", the menu-only search box and the version
+in the footer; not the colours, fonts or UI), keep the existing menus, and
+implement it.
+
+**What changed.**
+- `modules/ui/shell-nav.ts`: `SHELL_NAV` is a list of areas — Home (Home,
+  My Access, Access Governance), Identities, Applications, Certifications,
+  Risk & Security, AI Agents, Insights, and `ADMIN_AREA` always last (its
+  groups: Organization, Users & Permissions, Authentication, Integrations,
+  Identity Configuration, Policies & Compliance). `activeArea()` picks the
+  area by longest path prefix; `isAdminPath()` uses it; `searchNav()`
+  matches menu labels only and returns each hit with its trail. The
+  separate `ADMIN_NAV` and `adminLanding` are gone.
+- `modules/ui/AppSidebar.tsx`: the area list, shown on the front door ("/")
+  and reached from any area with the back arrow ("All areas"); every other
+  page opens its area's menu, with folding groups, and marks the page; a search box ("Search menu") whose
+  results list is labelled "Matching pages", with "No menu item matches."
+  when empty; one `<nav aria-label="Main">`; a footer with the version
+  (`vX.Y.Z · commit`, from `package.json` and `VERCEL_GIT_COMMIT_SHA` in
+  `app/(customer)/layout.tsx`).
+- `modules/ui/shell-nav.test.ts` (12 tests) and `tests/e2e/shell.spec.ts`
+  rewritten for areas, search and the footer.
+- CLAUDE.md §13's navigation note now describes areas.
+
+**Verified.** Unit tests 12/12; typecheck and eslint clean; local
+Playwright (headless Chromium, `E2E_CHROMIUM_PATH`): `shell.spec.ts` 18/18
+after one fix (the area list is shown on "/" only; a member's own settings
+page opens Home's menu), and `integrations`, `identities` and
+`design-review` 52/52 in the same build.
+
+## 2026-10-10 — Every object page shows who created and changed it
+
+**Why.** Owner decision (CLAUDE.md §19.10; Foundation log, migration 0115).
+
+**What changed.**
+- `modules/ui/RecordProvenance.tsx`: one muted line under the title,
+  "Created by … on … · Updated by … on …" (en-GB, UTC); the date alone when
+  nobody is recorded; no "Updated" within a second of creation; nothing when
+  the record is unknown. `provenanceText()` is unit-tested (4 tests).
+- The line is on 18 object pages, loaded in the page's existing parallel
+  wave (no new waterfall): account, application, access package, access
+  request, agent, certification campaign, identity, application discovery,
+  policy, investigation, authorization policy, group, role, identity
+  source, connection, privacy breach, privacy request, and the member page
+  (its membership, found by `user_id`).
+- `tests/e2e/identities.spec.ts`: the newly created person's page shows
+  "Created by … on …".
+
+**Left out.** Lists (§19.5). Pages that are views of an agent (access,
+runtime, risk, rogue) show nothing extra; the agent's own page has the line.

@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIdentitySource, listIntegrations, listReconciliationRuns } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { CsvImportForm, IntegrationImportForm, RunAutoRefresh, SourceForm } from "../SourceForms";
 import { RUN_STATUS, TEMPLATE_LABEL } from "../labels";
 
@@ -19,7 +20,7 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
   }
   const { sourceId } = await params;
   const tenantId = ctx.tenantId!;
-  const [source, runs, integrations] = await Promise.all([getIdentitySource(tenantId, sourceId), listReconciliationRuns(tenantId, sourceId), listIntegrations(tenantId)]);
+  const [source, runs, integrations, provenance] = await Promise.all([getIdentitySource(tenantId, sourceId), listReconciliationRuns(tenantId, sourceId), listIntegrations(tenantId), getRecordProvenance(tenantId, "identity_sources", sourceId)]);
   if (!source) notFound();
   const canRun = ctx.permissions.includes("integration.execute") && source.status === "active";
   const canEdit = ctx.permissions.includes("integration.update");
@@ -38,6 +39,7 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
       </nav>
       <div>
         <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">{source.name}</h1>
+        <RecordProvenance record={provenance} className="mt-1" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge tone="neutral">{TEMPLATE_LABEL[source.template]}</Badge>
           {source.authoritative ? <Badge tone="info">Authoritative · precedence {source.priority}</Badge> : <Badge tone="neutral">Precedence {source.priority}</Badge>}

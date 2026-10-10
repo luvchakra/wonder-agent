@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { authorizeContext, requirePermissionFor } from "@/lib/rbac/authorize";
 import { agentResource } from "@/app/_shared/agentScope";
@@ -27,7 +28,7 @@ import {
 import { getGovernancePosture } from "@/modules/certification-compliance/service";
 import type { GovernancePosture } from "@/lib/shared/types/compliance";
 import type { OwnershipIssue } from "@/lib/shared/types/agent-identity";
-import { ACCESS_VIEW, Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, NavIcon } from "@/modules/ui";
+import { RecordProvenance, ACCESS_VIEW, Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, AgentTabs, EmptyState, NavIcon } from "@/modules/ui";
 import { DonutChart } from "@/modules/ui/charts.lazy";
 import { AgentPrimaryActionBar } from "./AgentPrimaryActionBar";
 import { AgentApiKeysPanel } from "./AgentApiKeysPanel";
@@ -193,6 +194,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
     findings,
     tenantOwners,
     apiKeys,
+    provenance,
   ] = await Promise.all([
       listOwners(ctx.tenantId!, id),
       getOwnershipIssues(ctx.tenantId!, id, agent.criticality),
@@ -218,6 +220,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
       listOwnersForTenant(ctx.tenantId!),
       // FOUNDATION-P0-17 — Runtime Gateway credentials (prefixes only).
       listAgentApiKeys(ctx.tenantId!, id),
+      getRecordProvenance(ctx.tenantId!, "agents", id),
     ]);
 
   const ownerNames = new Map(
@@ -276,6 +279,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             <SeverityBadge severity={agent.criticality} />
             <Badge tone="neutral">{agent.environment}</Badge>
           </div>
+          <RecordProvenance record={provenance} className="mt-1" />
           <p className="mt-1.5 max-w-3xl text-sm text-muted-foreground">
             {agent.description?.trim() || agent.purpose?.trim() || `${agent.agentType}${agent.sourceSystem ? ` · ${agent.sourceSystem}` : ""}`}
           </p>

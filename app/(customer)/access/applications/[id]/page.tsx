@@ -1,11 +1,12 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getAccountSummary, getApplicationDetail, getOnboarding, listEntitlementsForApplication, listReconciliationRuns } from "@/modules/access-governance/service";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton } from "@/modules/ui";
 import { ApplicationForm } from "../ApplicationForm";
 import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../labels";
 import { LifecycleForm } from "./onboarding/OnboardingForms";
@@ -40,13 +41,14 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration, onboarding, accountSummary, runs] = await Promise.all([
+  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
     getOnboarding(tenantId, id),
     getAccountSummary(tenantId, { applicationId: id }),
     listReconciliationRuns(tenantId, id, 1),
+    getRecordProvenance(tenantId, "applications", id),
   ]);
   const lastRun = runs[0] ?? null;
   const lifecycleActions = (
@@ -65,6 +67,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       </nav>
       <div>
         <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">{app.displayName ?? app.name}</h1>
+        <RecordProvenance record={provenance} className="mt-1" />
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Badge tone={status.tone}>{status.label}</Badge>
           <Badge tone="neutral">{APP_TYPE_LABEL[app.appType]}</Badge>

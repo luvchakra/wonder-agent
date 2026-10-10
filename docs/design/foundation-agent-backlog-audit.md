@@ -2647,3 +2647,57 @@ recorded above, so the item is closed:
 - `Expires` stays 2027-10-01, under a year away.
 - `docs/security/SECURITY-CONTROLS.md` no longer lists the contact as an
   owner action.
+
+## 2026-10-10 — Record provenance on every object (migration 0115)
+
+**Why.** Owner request: "show created by, updated by, create date, update
+date in all the objects including the ones above related to the
+connections, add this rule in claude.md, run it for all such objects." The
+rule is CLAUDE.md §19.10; the Definition of Done (§12) gained a bullet.
+
+**What changed.**
+- `supabase/migrations/0115_foundation_record_provenance.sql`: 66 object
+  tables across every module gain `created_at`, `updated_at`, `created_by`,
+  `updated_by` (`add column if not exists`; existing columns are kept) and
+  the `record_provenance` before-insert/update trigger. `current_actor_id()`
+  returns `auth.uid()`, or on a service-role request the
+  `x-wonderid-actor` header when it is a UUID; the trigger never rewrites
+  `created_*`, and a caller that sets `updated_by` itself keeps it. The two
+  functions are SECURITY INVOKER; `current_actor_id()` is executable by
+  `authenticated` and `service_role` only, the trigger function by nobody
+  directly. Append-only, event, run and snapshot tables are excluded (list
+  in the header). Applied to the dev project with the MCP tool (the first
+  version, with `drop trigger if exists`, was refused as destructive; the
+  trigger is now created only when missing).
+- `lib/security/actorHeader.ts`: `ACTOR_HEADER`, `currentActorId()` (the
+  request's session user, null outside a request) and `actorAwareFetch()`,
+  which `supabaseServiceRole()` now uses (`global.fetch`) so every
+  service-role write names the acting user without touching the 78 call
+  sites.
+- `lib/provenance/tables.ts` (the table list, typed), `tables.test.ts`
+  (equals the migration's list; excludes the append-only tables) and
+  `recordProvenance.ts` (`getRecordProvenance(tenantId, table, id, key)`:
+  reads as the user under RLS and by tenant; names from `users` via the
+  service role for the two ids only; "A former member" when gone).
+- `tests/foundation/record-provenance.sql`: seven checks.
+- `tests/architecture/connector-boundary.test.ts`: `lib/security/actorHeader.ts`
+  joins the outbound allowlist, with the same reasoning as `lib/ai/provider.ts`
+  and the email provider: it is the Supabase client's own transport to
+  WonderID's database, not a call to an organization's system. Non-negotiable
+  #20 says widening an allowlist needs the owner's approval; it is flagged in
+  the pull request for that.
+
+**Verified.**
+- `tests/foundation/record-provenance.sql` on the dev project: 7/7 true
+  (job write unnamed; header names the actor; malformed header ignored;
+  update keeps `created_*` and sets `updated_by`; `created_*` cannot be
+  rewritten; explicit `updated_by` kept; a signed-in user's id wins over a
+  header naming someone else).
+- Advisors after the migration: nothing new; the pre-existing items are
+  unchanged.
+- `lib/provenance` unit tests 2/2; typecheck and eslint clean.
+
+**Left out.** The columns are not foreign keys (a former member must not
+block a write) and are not indexed (nothing queries by them). Lists do not
+show provenance (§19.5); only object pages do. The experience log records
+the page work; the integration log the connection pages.

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
@@ -6,7 +7,7 @@ import { listAgents } from "@/modules/agent-identity/service";
 import { getInvestigation } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { InvestigationEvent } from "@/lib/shared/types/risk";
-import { Badge, Card, CardBody, CardHeader, EmptyState, SeverityBadge } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, SeverityBadge } from "@/modules/ui";
 import { AssignForm, NoteForm, StatusForm } from "../InvestigationForms";
 import { STATUS_BADGE } from "../labels";
 import { TRANSITIONS, isFindingOpen } from "@/modules/risk/investigationRules";
@@ -48,7 +49,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
   }
   const { id } = await params;
   const tenantId = ctx.tenantId!;
-  const [inv, members, agents] = await Promise.all([getInvestigation(tenantId, id), listTenantMembersWithRoles(tenantId), listAgents(tenantId)]);
+  const [inv, members, agents, provenance] = await Promise.all([getInvestigation(tenantId, id), listTenantMembersWithRoles(tenantId), listAgents(tenantId), getRecordProvenance(tenantId, "investigations", id)]);
   if (!inv) notFound();
 
   const canManage = ctx.permissions.includes("risk.manage");
@@ -71,6 +72,7 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
         <div className="min-w-0">
           <p className="font-mono text-xs text-muted-foreground">{inv.reference}</p>
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{inv.title}</h1>
+          <RecordProvenance record={provenance} className="mt-1" />
           {inv.summary ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{inv.summary}</p> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">

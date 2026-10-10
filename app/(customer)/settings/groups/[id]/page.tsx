@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -8,7 +9,7 @@ import { listAssignableRoles } from "@/lib/rbac/roles";
 import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
 import { loadScopeOptions } from "../../roles/scopeOptions";
 import { STATUS_LABEL, type MembershipStatus } from "@/lib/users/userRules";
-import { Badge, Card, CardBody, CardHeader, EmptyState } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState } from "@/modules/ui";
 import { STATUS_TONE, formatDate } from "../../users/labels";
 import { AddGroupRoleForm, AddMemberForm, DeleteGroupButton, GroupDetailsForm, RemoveGroupRoleButton, RemoveMemberButton } from "../GroupForms";
 
@@ -30,11 +31,12 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const can = (p: string) => ctx.permissions.includes(p);
   const canAssign = can("roles.assign") || can("role.manage");
-  const [group, people, assignable, scope] = await Promise.all([
+  const [group, people, assignable, scope, provenance] = await Promise.all([
     getGroup(ctx.tenantId!, id),
     can("groups.manage_members") ? listUsers(ctx.tenantId!, { pageSize: 100 }) : Promise.resolve({ items: [], total: 0 }),
     canAssign ? listAssignableRoles(ctx.tenantId!) : Promise.resolve([]),
     loadScopeOptions(ctx.tenantId!),
+    getRecordProvenance(ctx.tenantId!, "groups", id),
   ]);
   if (!group) notFound();
   const inGroup = new Set(group.members.map((m) => m.userId));
@@ -65,6 +67,7 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
       ) : null}
       <div>
         <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{group.name}</h1>
+        <RecordProvenance record={provenance} className="mt-1" />
         {group.description ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{group.description}</p> : null}
       </div>
 

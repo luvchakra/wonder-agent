@@ -1118,3 +1118,12 @@ parallel with `runPrivacyJobs()`. A failed purge is logged and reported as
 `connectorTrafficPurged: null`; it never fails the privacy job. No change to
 the privacy module itself. Recorded here because the route is Compliance's;
 details in the Integration audit log ("The Connector Gateway").
+
+### 2026-10-10 — Record provenance columns (Foundation migration 0115, owner request)
+
+Foundation's migration 0115 added `created_at`, `updated_at`, `created_by`
+and `updated_by` (where missing) and the `record_provenance` trigger to this
+module's object tables: `certification_campaigns`, `certification_items`, `control_mappings`, `governance_attestations`, `privacy_requests`, `privacy_breach_incidents`, `privacy_consent_purposes`, `privacy_processing_activities`, `privacy_retention_policies`, `privacy_legal_holds`, `privacy_settings`. Additive; no service changed. The rule is
+CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
+log, the page work in the Experience log. A new object table of this module
+follows the same pattern and joins `lib/provenance/tables.ts`.

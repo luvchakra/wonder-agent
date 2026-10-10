@@ -1521,3 +1521,12 @@ decision, 2026-10-10). All changes are additive; no existing caller changed.
   "kept by a source of record".
 - Verified: the agent-identity suite is green within the 617-test run
   recorded in the Integration log; typecheck clean.
+
+### 2026-10-10 — Record provenance columns (Foundation migration 0115, owner request)
+
+Foundation's migration 0115 added `created_at`, `updated_at`, `created_by`
+and `updated_by` (where missing) and the `record_provenance` trigger to this
+module's object tables: `agents`, `agent_identities`, `agent_contracts`, `agent_owners`, `agent_relationships`, `agent_duplicate_candidates`, `identities`, `identity_relationships`, `identity_lifecycle_tasks`, `identity_attribute_definitions`, `identity_source_links`. Additive; no service changed. The rule is
+CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
+log, the page work in the Experience log. A new object table of this module
+follows the same pattern and joins `lib/provenance/tables.ts`.

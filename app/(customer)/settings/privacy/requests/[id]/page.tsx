@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { getRequest } from "@/modules/privacy/service";
 import { REGIME_LABEL, REQUEST_TYPE_LABEL, deadlineState, maxExtendedDueAt, requiresApproval } from "@/modules/privacy/rules";
 import { advanceRequestAction } from "@/app/actions/privacy";
@@ -27,7 +28,7 @@ export default async function PrivacyRequestPage({ params }: { params: Promise<{
   }
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const req = await getRequest(ctx.tenantId!, id);
+  const [req, provenance] = await Promise.all([getRequest(ctx.tenantId!, id), getRecordProvenance(ctx.tenantId!, "privacy_requests", id)]);
   if (!req) notFound();
   const canProcess = ctx.permissions.includes("privacy.requests.process");
   const due = req.extendedDueAt ?? req.dueAt;
@@ -48,6 +49,7 @@ export default async function PrivacyRequestPage({ params }: { params: Promise<{
         <Badge tone={req.status === "completed" ? "success" : req.status === "rejected" ? "danger" : "info"}>{req.status.replace("_", " ")}</Badge>
         <Badge tone={state === "overdue" ? "danger" : state === "due_soon" ? "warning" : "neutral"}>{state === "closed" ? "Closed" : `Due ${fmt(due)}`}</Badge>
       </div>
+      <RecordProvenance record={provenance} className="-mt-3" />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <Card>

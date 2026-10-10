@@ -1,15 +1,17 @@
 import { notFound, redirect } from "next/navigation";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIntegration, getReceiverStatus, listSyncJobs } from "@/modules/integrations/service";
 import { testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
+import { RecordProvenance, Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
 import { parseConnectorConfig } from "@/modules/integrations/framework/engine";
 import type { ConnectorDefinition } from "@/modules/integrations/framework/types";
 import { connectionTypeOf } from "@/modules/integrations/framework/typeSummary";
-import { ConnectorCredentialsForm, ReceiverSecretForm } from "../types/ConnectorForms";
+import { ConnectorCredentialsForm, ConnectorSettingsForm, ReceiverSecretForm } from "../types/ConnectorForms";
+import { getConnectorConfiguration, type ConnectorConfiguration } from "@/modules/integrations/framework/catalog";
 import { Suspense } from "react";
 import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
 import { ConnectorFilesCard } from "./ConnectorFilesCard";
@@ -66,11 +68,14 @@ export default async function IntegrationDetailPage({
   const receive = connector?.receive;
   const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file);
 
-  const [jobs, receiver, origin] = await Promise.all([
+  const [jobs, receiver, origin, configuration, provenance] = await Promise.all([
     listSyncJobs(ctx.tenantId!, id),
     needsSecret ? getReceiverStatus(ctx.tenantId!, id) : Promise.resolve(null),
     receive ? ownOrigin() : Promise.resolve(""),
+    connector ? getConnectorConfiguration(ctx.tenantId!, id).catch(() => null as ConnectorConfiguration | null) : Promise.resolve(null),
+    getRecordProvenance(ctx.tenantId!, "integrations", id),
   ]);
+  const canEdit = ctx.permissions.includes("integration.update");
   const reads = connector ? Object.keys(connector.resources).length > 0 : false;
   const type = connectionTypeOf(integration);
   const testConnectionWithId = testConnectionAction.bind(null, id);
@@ -87,6 +92,7 @@ export default async function IntegrationDetailPage({
           <h1 className="text-xl font-semibold text-foreground">{integration.name}</h1>
           <Badge tone={integration.status === "connected" ? "success" : integration.status === "error" ? "danger" : "neutral"}>{integration.status}</Badge>
         </div>
+        <RecordProvenance record={provenance} className="mt-1" />
         <p className="mt-1 text-sm text-muted-foreground">
           Type:{" "}
           {type.href ? (
@@ -112,11 +118,31 @@ export default async function IntegrationDetailPage({
         </p>
       ) : null}
 
-      {connector && reads && connector.auth.type !== "none" ? (
+      {connector && configuration ? (
         <Card>
-          <CardHeader title="Credentials" />
+          <CardHeader title="Settings" description={`What this connection was set up with, as ${connector.name} declares it.`} />
           <CardBody>
-            <ConnectorCredentialsForm integrationId={id} secretFields={connector.auth.fields} />
+            <ConnectorSettingsForm integrationId={id} name={configuration.name} settings={connector.settings} values={configuration.settings} canEdit={canEdit} />
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {connector && connector.auth.type !== "none" ? (
+        <Card>
+          <CardHeader title="Credentials" description="Saved values are shown masked. Enter a value to replace it; leave a field empty to keep it." />
+          <CardBody>
+            {canEdit ? (
+              <ConnectorCredentialsForm integrationId={id} secretFields={connector.auth.fields} saved={configuration?.secrets ?? {}} />
+            ) : (
+              <dl className="grid gap-3 text-sm sm:grid-cols-2">
+                {connector.auth.fields.map((f) => (
+                  <div key={f.key}>
+                    <dt className="text-xs text-muted-foreground">{f.label}</dt>
+                    <dd className="font-mono text-foreground">{configuration?.secrets[f.key] || <span className="font-sans text-muted-foreground">Not saved</span>}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </CardBody>
         </Card>
       ) : null}

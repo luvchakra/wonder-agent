@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -11,7 +12,7 @@ import {
   sweepPackageExpiry,
 } from "@/modules/access-governance/service";
 import { getIdentityForUser, listAccountableHumans, listIdentities } from "@/modules/agent-identity/service";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, Button } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, Button } from "@/modules/ui";
 import { APPROVAL, ASSIGNMENT, ITEM, RISK_TONE, STATUS_TONE } from "../labels";
 import { AssignForm, ItemActions, PackageForm, PackageRequestForm, RemoveResource, ResourceForm, RevokeForm, StatusButtons } from "../PackageForms";
 
@@ -40,7 +41,7 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
   const canRequest = ctx.permissions.includes("access.request");
   const find = (sp.find ?? "").slice(0, 100);
   await sweepPackageExpiry(tenantId);
-  const [pkg, me] = await Promise.all([getPackage(tenantId, id), getIdentityForUser(tenantId, ctx.userId)]);
+  const [pkg, me, provenance] = await Promise.all([getPackage(tenantId, id), getIdentityForUser(tenantId, ctx.userId), getRecordProvenance(tenantId, "access_packages", id)]);
   if (!pkg) notFound();
   // Discoverability (spec §12.3): outside the managers, only eligible identities see a package that is live.
   const myEligibility = me ? checkPackageEligibility(pkg, { identityType: me.identityType, department: me.department, status: me.status }) : { eligible: false, reasons: ["Your account has no identity in this organization"] };
@@ -76,6 +77,7 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">{pkg.name}</h1>
+          <RecordProvenance record={provenance} className="mt-1" />
           {pkg.description ? <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{pkg.description}</p> : null}
           <p className="mt-1 text-xs text-muted-foreground">
             Owner: {pkg.ownerName ?? "none yet"} · for {pkg.eligibleIdentityTypes.map((t) => TYPE_LABEL[t] ?? t).join(", ")}

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getPolicy, listPolicyExceptions, listPolicyRules } from "@/modules/access-governance/service";
@@ -6,7 +7,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { addPolicyRuleAction, addPolicyExceptionAction, revokeExceptionAction } from "@/app/actions/access";
 import { targetsFromScope } from "@/modules/access-governance/policyTargets";
 import { PublishPolicyButton } from "./PublishPolicyButton";
-import { Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, EmptyState, TextField, SelectField } from "@/modules/ui";
+import { RecordProvenance, Badge, StatusBadge, SeverityBadge, Card, CardHeader, CardBody, Button, EmptyState, TextField, SelectField } from "@/modules/ui";
 
 const RULE_TYPES = ["rbac", "abac", "resource", "time"] as const;
 const RESIDUAL_RISKS = ["low", "medium", "high", "critical"] as const;
@@ -24,7 +25,7 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
   const policy = await getPolicy(id, ctx.tenantId!);
   if (!policy) notFound();
 
-  const [rules, exceptions] = await Promise.all([listPolicyRules(id, ctx.tenantId!), listPolicyExceptions(id, ctx.tenantId!)]);
+  const [rules, exceptions, provenance] = await Promise.all([listPolicyRules(id, ctx.tenantId!), listPolicyExceptions(id, ctx.tenantId!), getRecordProvenance(ctx.tenantId!, "policies", id)]);
   const targets = targetsFromScope(policy.scope);
   const canPublish = ctx.permissions.includes("policy.publish");
   const addRuleWithId = addPolicyRuleAction.bind(null, id);
@@ -45,6 +46,7 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
           {/* ACCESS-P0-12: a draft or disabled policy takes effect only when published. */}
           {policy.status !== "active" && canPublish ? <PublishPolicyButton policyId={policy.id} /> : null}
         </div>
+        <RecordProvenance record={provenance} className="mt-1" />
         <p className="mt-1 text-sm text-muted-foreground">
           Category: {policy.policyCategory} · Severity: <SeverityBadge severity={policy.severity} /> · Action: {policy.action} · Priority:{" "}
           {policy.priority ?? 0}

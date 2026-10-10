@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowLeft, ChevronDown, ChevronRight, ChevronsLeft, Menu, Settings, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, ChevronsLeft, Menu, Search, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
 import { WonderIDLogo } from "./Logo";
@@ -13,10 +13,10 @@ import type { TenantOption } from "./AccountPanel";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import {
   NAV_COOKIE,
+  activeArea,
   activeChildHref,
-  adminLanding,
-  isAdminPath,
   isNavItemActive,
+  searchNav,
   type ShellBadgeCounts,
   type ShellNavEntry,
   type ShellNavItem,
@@ -25,13 +25,17 @@ import {
 /**
  * The WonderID navigation (EXPERIENCE-P0-18, 2026-09-26; user decision to
  * adopt the WonderID mockups' dark navy sidebar; 2026-09-26 later, the
- * branding specification's light console — EXPERIENCE-P0-23).
+ * branding specification's light console — EXPERIENCE-P0-23; 2026-10-10,
+ * the owner's area arrangement, see shell-nav.ts).
  *
- * - **Expanded** (the default, `lg` and up): sections as an accordion.
- *   The current section opens by itself; any section opens on click. A
- *   section's groups nest inline beneath it, each collapsible.
- * - **Collapsed**: an icon rail. Each section opens a flyout on hover,
- *   click or keyboard, and a group inside it opens as a third-level
+ * - **Expanded** (the default, `lg` and up): the area list, each area a
+ *   row that opens the area's own menu in place of the list; the menu
+ *   starts with the area's name and a back arrow. A page is a plain row,
+ *   a group folds open beneath its row. The menu follows the page: opening
+ *   a page shows its area, with the page current and its group open. A
+ *   search box above filters the menu (pages only, never data).
+ * - **Collapsed**: an icon rail of the areas. Each opens a flyout on
+ *   hover, click or keyboard, and a group inside it opens as a second
  *   flyout. The choice is remembered in the `wa_nav` cookie, which the
  *   layout reads, so the server renders the right width with no jump.
  * - **Below `lg`**: the expanded body as a drawer, opened from the tab
@@ -40,7 +44,6 @@ import {
  * One body renders all three, so they cannot drift. Colours come from the
  * `--sidebar*` tokens in app/globals.css (light rail; dark in dark mode).
  */
-
 
 /** The signed-in user as the shell shows them (header account menu). */
 export type SidebarUser = {
@@ -51,10 +54,10 @@ export type SidebarUser = {
 };
 
 type SidebarProps = {
-  /** The main sidebar's sections this viewer may open (navFor(SHELL_NAV, permissions)). */
+  /** The areas and pages this viewer may open (navFor(SHELL_NAV, permissions)). */
   nav: ShellNavItem[];
-  /** The Admin sidebar's sections this viewer may open; empty: no Admin entry. */
-  adminNav: ShellNavItem[];
+  /** Shown in the footer, e.g. "v0.1.0 · 2cd03d4". */
+  version: string;
   badges: ShellBadgeCounts;
   tenants: TenantOption[];
   onSelectTenant: (formData: FormData) => void | Promise<void>;
@@ -138,23 +141,22 @@ function GroupEntry({ entry, currentHref, onNavigate }: { entry: Extract<ShellNa
   );
 }
 
-function ExpandedSection({ item, active, badges, pathname, onNavigate }: { item: ShellNavItem; active: boolean; badges: ShellBadgeCounts; pathname: string; onNavigate?: () => void }) {
-  const [open, setOpen] = useState(active);
-  // Following a link into another section opens it; leaving one does not
-  // close it, so a section the user opened stays open.
-  const [wasActive, setWasActive] = useState(active);
-  if (active !== wasActive) {
-    setWasActive(active);
-    if (active) setOpen(true);
-  }
-  const count = item.badge ? badges[item.badge] : undefined;
-  const rowClass = cn(
+const areaRowClass = (active: boolean) =>
+  cn(
     "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13.5px] transition-colors",
     focusRing,
     active
       ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm"
       : "font-medium text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
   );
+
+/**
+ * One row of the area list. An area with pages opens its menu in place of
+ * the list (no navigation: the member then picks a page); an area with a
+ * single page, or none, is a link to it.
+ */
+function AreaRow({ item, active, badges, onOpen, onNavigate }: { item: ShellNavItem; active: boolean; badges: ShellBadgeCounts; onOpen: () => void; onNavigate?: () => void }) {
+  const count = item.badge ? badges[item.badge] : undefined;
   const inner = (
     <>
       <NavIcon name={item.icon} className="size-[18px] shrink-0" />
@@ -162,39 +164,136 @@ function ExpandedSection({ item, active, badges, pathname, onNavigate }: { item:
       {count ? <CountBadge count={count} tone={item.badge!} /> : null}
     </>
   );
-
-  if (!item.children?.length) {
+  const single = !item.children?.length || (item.children.length === 1 && item.children[0].kind === "link");
+  if (single) {
     return (
       <li>
-        <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} data-active={active || undefined} className={rowClass}>
+        <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} data-active={active || undefined} className={areaRowClass(active)}>
           {inner}
         </Link>
       </li>
     );
   }
-
-  const currentHref = active ? activeChildHref(item, pathname) : null;
-  const listId = `nav-section-${item.label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <li>
-      <button type="button" aria-expanded={open} aria-controls={listId} data-active={active || undefined} onClick={() => setOpen((v) => !v)} className={rowClass}>
+      <button type="button" onClick={onOpen} data-active={active || undefined} aria-label={`${item.label}${count ? `, ${count} needing attention` : ""}`} className={areaRowClass(active)}>
         {inner}
-        <ChevronDown className={cn("size-4 shrink-0 transition-transform", !open && "-rotate-90")} aria-hidden="true" />
+        <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
       </button>
-      {open ? (
-        <ul id={listId} aria-label={`${item.label} pages`} className="mb-1.5 ml-[1.35rem] mt-1 space-y-0.5 border-l border-sidebar-border pl-2">
-          {item.children.map((entry) =>
-            entry.kind === "link" ? (
-              <li key={entry.href}>
-                <PageLink label={entry.label} href={entry.href} current={entry.href === currentHref} onNavigate={onNavigate} />
-              </li>
-            ) : (
-              <GroupEntry key={entry.label} entry={entry} currentHref={currentHref} onNavigate={onNavigate} />
-            ),
-          )}
-        </ul>
-      ) : null}
     </li>
+  );
+}
+
+/** An area's menu: its name with a back arrow to the area list, then its pages and groups. */
+function AreaMenu({ item, active, pathname, onBack, onNavigate }: { item: ShellNavItem; active: boolean; pathname: string; onBack: () => void; onNavigate?: () => void }) {
+  const currentHref = active ? activeChildHref(item, pathname) : null;
+  const listId = `nav-area-${item.label.replace(/\W+/g, "-").toLowerCase()}`;
+  return (
+    <>
+      <div className="mb-2 flex items-center gap-1 border-b border-sidebar-border pb-2">
+        <button
+          type="button"
+          onClick={onBack}
+          aria-label="All areas"
+          title="All areas"
+          className={cn("flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+        </button>
+        <h2 className="flex min-w-0 items-center gap-2 px-1 text-[13.5px] font-semibold text-sidebar-foreground">
+          <NavIcon name={item.icon} className="size-4 shrink-0 text-sidebar-ring" />
+          <span className="truncate">{item.label}</span>
+        </h2>
+      </div>
+      <ul id={listId} aria-label={`${item.label} pages`} className="space-y-0.5">
+        {(item.children ?? []).map((entry) =>
+          entry.kind === "link" ? (
+            <li key={entry.href}>
+              <PageLink label={entry.label} href={entry.href} current={entry.href === currentHref} onNavigate={onNavigate} />
+            </li>
+          ) : (
+            <GroupEntry key={entry.label} entry={entry} currentHref={currentHref} onNavigate={onNavigate} />
+          ),
+        )}
+      </ul>
+    </>
+  );
+}
+
+/** The menu search's results: matching pages with where they live. */
+function SearchResults({ nav, query, onNavigate }: { nav: ShellNavItem[]; query: string; onNavigate?: () => void }) {
+  const matches = searchNav(nav, query);
+  if (!matches.length) {
+    return (
+      <p role="status" className="px-3 py-2 text-[13px] text-sidebar-muted-foreground">
+        No menu item matches.
+      </p>
+    );
+  }
+  return (
+    <ul aria-label="Matching pages" className="space-y-0.5">
+      {matches.map((m) => (
+        <li key={m.href}>
+          <Link href={m.href} onClick={onNavigate} className={cn("block rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}>
+            <span className="block truncate font-medium text-sidebar-foreground">{m.label}</span>
+            {m.trail.length ? <span className="block truncate text-[11px]">{m.trail.join(" › ")}</span> : null}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The expanded body's navigation: the area list (on Home), or the open area's menu,
+ * or the search results. The open area follows the page; the back arrow
+ * shows the list without leaving the page.
+ */
+function ExpandedNav({ nav, badges, pathname, onNavigate }: { nav: ShellNavItem[]; badges: ShellBadgeCounts; pathname: string; onNavigate?: () => void }) {
+  const current = activeArea(nav, pathname);
+  // The front door ("/") shows the area list; any other page opens its
+  // area's menu with the page marked current.
+  const auto = current && pathname !== "/" ? current.label : null;
+  const [openLabel, setOpenLabel] = useState<string | null>(auto);
+  // Arriving on another area's page opens that area (state derived from a
+  // changing prop, adjusted during render).
+  const [wasCurrent, setWasCurrent] = useState(auto);
+  if (auto !== wasCurrent) {
+    setWasCurrent(auto);
+    setOpenLabel(auto);
+  }
+  const [query, setQuery] = useState("");
+  const open = openLabel ? nav.find((a) => a.label === openLabel) : undefined;
+  const openIsMenu = open && open.children && !(open.children.length === 1 && open.children[0].kind === "link");
+  const trimmed = query.trim();
+  return (
+    <>
+      <label className="relative mb-2 block">
+        <span className="sr-only">Search menu</span>
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-sidebar-muted-foreground" aria-hidden="true" />
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search menu"
+          className={cn(
+            "h-9 w-full rounded-md border border-sidebar-border bg-transparent pl-8 pr-2 text-[13px] text-sidebar-foreground placeholder:text-sidebar-muted-foreground",
+            focusRing,
+          )}
+        />
+      </label>
+      {trimmed ? (
+        <SearchResults nav={nav} query={trimmed} onNavigate={onNavigate} />
+      ) : openIsMenu ? (
+        <AreaMenu item={open} active={current?.label === open.label} pathname={pathname} onBack={() => setOpenLabel(null)} onNavigate={onNavigate} />
+      ) : (
+        <ul className="space-y-1">
+          {nav.map((item) => (
+            <AreaRow key={item.href} item={item} active={current?.label === item.label} badges={badges} onOpen={() => setOpenLabel(item.label)} onNavigate={onNavigate} />
+          ))}
+        </ul>
+      )}
+    </>
   );
 }
 
@@ -385,85 +484,9 @@ function AiEntry({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: (
   );
 }
 
-/**
- * The last entry of the main sidebar: opens the Admin sidebar (owner
- * decision, 2026-10-10). It leads to the first admin page the viewer may
- * open; the sidebar follows the page, so it re-renders as Admin there.
- */
-function AdminEntry({ href, collapsed, onNavigate }: { href: string; collapsed: boolean; onNavigate?: () => void }) {
-  if (collapsed) {
-    return (
-      <li className="flex justify-center">
-        <Link
-          href={href}
-          aria-label="Admin"
-          title="Admin"
-          className={cn(
-            "flex size-11 items-center justify-center rounded-lg text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-            focusRing,
-          )}
-        >
-          <Settings className="size-5" aria-hidden="true" />
-        </Link>
-      </li>
-    );
-  }
-  return (
-    <li>
-      <Link
-        href={href}
-        onClick={onNavigate}
-        className={cn(
-          "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13.5px] font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-          focusRing,
-        )}
-      >
-        <Settings className="size-[18px] shrink-0" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate">Admin</span>
-        <ChevronRight className="size-4 shrink-0" aria-hidden="true" />
-      </Link>
-    </li>
-  );
-}
-
-/** The Admin sidebar's header: a back button to Home, then "Admin". */
-function AdminHeader({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  if (collapsed) {
-    return (
-      <div className="mb-2 flex justify-center border-b border-sidebar-border pb-2">
-        <Link
-          href="/"
-          aria-label="Back to Home"
-          title="Back to Home"
-          className={cn("flex size-11 items-center justify-center rounded-lg text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}
-        >
-          <ArrowLeft className="size-5" aria-hidden="true" />
-        </Link>
-      </div>
-    );
-  }
-  return (
-    <div className="mb-2 flex items-center gap-1 border-b border-sidebar-border pb-2">
-      <Link
-        href="/"
-        onClick={onNavigate}
-        aria-label="Back to Home"
-        title="Back to Home"
-        className={cn("flex size-8 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}
-      >
-        <ArrowLeft className="size-4" aria-hidden="true" />
-      </Link>
-      <h2 className="flex min-w-0 items-center gap-2 px-1 text-[13.5px] font-semibold text-sidebar-foreground">
-        <Settings className="size-4 shrink-0 text-sidebar-ring" aria-hidden="true" />
-        <span className="truncate">Admin</span>
-      </h2>
-    </div>
-  );
-}
-
 function SidebarBody({
   nav,
-  adminNav,
+  version,
   badges,
   tenants,
   onSelectTenant,
@@ -472,29 +495,28 @@ function SidebarBody({
   onNavigate,
 }: SidebarProps & { collapsed: boolean; onToggle?: () => void; onNavigate?: () => void }) {
   const pathname = usePathname();
-  const adminHref = adminLanding(adminNav);
-  // The sidebar follows the page: an admin page shows the Admin sidebar.
-  const admin = adminHref !== null && isAdminPath(pathname);
-  const items = admin ? adminNav : nav;
   return (
     <>
       <Brand collapsed={collapsed} onToggle={onToggle} />
-      <nav aria-label={admin ? "Admin" : "Main"} className={cn("sidebar-scroll flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
-        {admin ? <AdminHeader collapsed={collapsed} onNavigate={onNavigate} /> : null}
-        <ul className={collapsed ? "space-y-1.5" : "space-y-1"}>
-          {items.map((item) =>
-            collapsed ? (
-              <CollapsedSection key={item.href} item={item} active={isNavItemActive(item, pathname, items)} badges={badges} pathname={pathname} />
-            ) : (
-              <ExpandedSection key={item.href} item={item} active={isNavItemActive(item, pathname, items)} badges={badges} pathname={pathname} onNavigate={onNavigate} />
-            ),
-          )}
-          {!admin && adminHref ? <AdminEntry href={adminHref} collapsed={collapsed} onNavigate={onNavigate} /> : null}
-        </ul>
+      <nav aria-label="Main" className={cn("sidebar-scroll flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
+        {collapsed ? (
+          <ul className="space-y-1.5">
+            {nav.map((item) => (
+              <CollapsedSection key={item.href} item={item} active={isNavItemActive(item, pathname, nav)} badges={badges} pathname={pathname} />
+            ))}
+          </ul>
+        ) : (
+          <ExpandedNav nav={nav} badges={badges} pathname={pathname} onNavigate={onNavigate} />
+        )}
       </nav>
       <div className={cn("shrink-0 space-y-1 border-t border-sidebar-border py-2", collapsed ? "px-2" : "px-3")}>
         <AiEntry collapsed={collapsed} onNavigate={onNavigate} />
         <WorkspaceSwitcher tenants={tenants} onSelectTenant={onSelectTenant} compact={collapsed} />
+        {collapsed ? null : (
+          <p className="truncate px-3 pt-1 text-[11px] text-sidebar-muted-foreground" title={`WonderID ${version}`}>
+            WonderID {version}
+          </p>
+        )}
       </div>
     </>
   );

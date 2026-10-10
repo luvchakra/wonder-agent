@@ -133,6 +133,8 @@ test.describe.serial("identity directory", () => {
     await expect(page).toHaveURL(/\/identities\/[0-9a-f-]{36}$/);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
     await expect(page.getByText("Finance")).toBeVisible();
+    // Every object's page says who created it and when (migration 0115).
+    await expect(page.getByTestId("record-provenance")).toContainText(/^Created by .+ on \d{1,2} \w{3} \d{4}, \d{2}:\d{2} UTC$/);
 
     // The external form insists on a sponsor before anything is written.
     await page.goto("/identities/new?type=EXTERNAL");

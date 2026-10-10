@@ -6,7 +6,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { AuthType, Integration } from "@/lib/shared/types/integrations";
 import { OutboundBlockedError, checkOutboundUrl, outboundPolicyFromEnv } from "../outboundPolicy";
 import { createIntegration } from "../integrations";
-import { setCredential } from "../credentials";
+import { getDecryptedCredential, setCredential } from "../credentials";
+import { maskSecret } from "./maskSecret";
 import { BUILTIN_DEFINITIONS } from "./definitions";
 import { capabilitiesOf, parseConnectorConfig } from "./engine";
 import { createDefinitionConnector } from "./connector";
@@ -224,19 +225,110 @@ export async function connectSystem(tenantId: string, actorId: string, input: Co
   return { integration, credentialError };
 }
 
-/** Saves (or rotates) a connector integration's credentials; the connection is tested first. */
-export async function setConnectorCredentials(tenantId: string, actorId: string, integrationId: string, secretInput: unknown): Promise<void> {
+async function loadConnectorRow(tenantId: string, integrationId: string) {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("integrations")
-    .select("config, integration_type_id")
+    .select("id, name, config, integration_type_id")
     .eq("id", integrationId)
     .eq("tenant_id", tenantId)
     .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!data || data.integration_type_id !== "connector") throw new ApiError(404, "INTEGRATION_NOT_FOUND");
-  const { def } = parseConnectorConfig(data.config ?? {});
-  const { secret, issues } = validateSecrets(def, secretInput);
+  return data as { id: string; name: string; config: Record<string, unknown> | null };
+}
+
+/** The secret fields saved for a connection, by key; null when none is stored. Internal: values are never returned by a service. */
+async function storedSecrets(tenantId: string, integrationId: string, def: ConnectorDefinition): Promise<Record<string, string> | null> {
+  if (def.auth.type === "none") return null;
+  const raw = await getDecryptedCredential(tenantId, integrationId);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? (parsed as Record<string, string>) : null;
+  } catch {
+    // A credential saved before this connector existed is one plain string (a token).
+    return def.auth.fields.length === 1 ? { [def.auth.fields[0].key]: raw } : null;
+  }
+}
+
+export type ConnectorConfiguration = {
+  def: ConnectorDefinition;
+  name: string;
+  /** Every setting the definition declares, with its stored value (or none). */
+  settings: Record<string, string | number | boolean | undefined>;
+  /** Every secret field the definition declares, masked (maskSecret); "" when none is stored. */
+  secrets: Record<string, string>;
+};
+
+/**
+ * Everything a connection was configured with, as its definition
+ * declares it, for the connection's page: the name, each setting's value,
+ * and each secret masked, never blank when one is stored (owner decision,
+ * 2026-10-10). The plaintext never leaves this module.
+ */
+export async function getConnectorConfiguration(tenantId: string, integrationId: string): Promise<ConnectorConfiguration> {
+  const row = await loadConnectorRow(tenantId, integrationId);
+  const { def, settings } = parseConnectorConfig(row.config ?? {});
+  const stored = await storedSecrets(tenantId, integrationId, def);
+  const secrets: Record<string, string> = {};
+  if (def.auth.type !== "none") for (const f of def.auth.fields) secrets[f.key] = maskSecret(stored?.[f.key]);
+  const shown: ConnectorConfiguration["settings"] = {};
+  for (const s of def.settings) shown[s.key] = settings[s.key];
+  return { def, name: row.name, settings: shown, secrets };
+}
+
+/**
+ * Updates a connection's name and settings (integration.update). The
+ * settings are validated against the definition and their addresses
+ * checked, as when the connection was made; the audit event names the
+ * settings that changed, never their values.
+ */
+export async function updateConnectorSettings(tenantId: string, actorId: string, integrationId: string, input: { name: unknown; settings: unknown }): Promise<void> {
+  const row = await loadConnectorRow(tenantId, integrationId);
+  const { def, settings: before } = parseConnectorConfig(row.config ?? {});
+  const name = typeof input.name === "string" ? input.name.trim() : "";
+  if (!name || name.length > 120) throw new ApiError(400, "INVALID_INPUT", "A name of up to 120 characters is required");
+  const { settings, issues } = validateSettings(def, input.settings);
+  if (issues.length) throw new DefinitionInvalidError(issues);
+  checkConnectorAddresses(def, settings);
+  const urlKeys = def.settings.filter((s) => s.type === "url").map((s) => s.key);
+  const baseUrl = settings[urlKeys.includes("baseUrl") ? "baseUrl" : urlKeys[0]];
+  const config = {
+    ...(row.config ?? {}),
+    settings,
+    ...(typeof baseUrl === "string" && /^https?:/.test(baseUrl) ? { baseUrl } : {}),
+  };
+  const supabase = await supabaseServer();
+  const { error } = await supabase.from("integrations").update({ name, config }).eq("id", integrationId).eq("tenant_id", tenantId);
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  const changed = def.settings.map((s) => s.key).filter((k) => before[k] !== settings[k]);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "integration.settings_updated",
+    objectType: "integration",
+    objectId: integrationId,
+    outcome: "success",
+    metadata: { renamed: row.name !== name, changedSettings: changed },
+  });
+}
+
+/**
+ * Saves (or rotates) a connector integration's credentials; the connection
+ * is tested first. A field left empty keeps its stored value, so one key
+ * can be rotated without re-entering the others.
+ */
+export async function setConnectorCredentials(tenantId: string, actorId: string, integrationId: string, secretInput: unknown): Promise<void> {
+  const row = await loadConnectorRow(tenantId, integrationId);
+  const { def } = parseConnectorConfig(row.config ?? {});
+  const entered = secretInput && typeof secretInput === "object" ? (secretInput as Record<string, unknown>) : {};
+  const stored = await storedSecrets(tenantId, integrationId, def);
+  const merged: Record<string, unknown> = { ...(stored ?? {}) };
+  for (const [k, v] of Object.entries(entered)) if (typeof v === "string" && v.trim()) merged[k] = v;
+  if (!Object.values(entered).some((v) => typeof v === "string" && v.trim())) throw new ApiError(400, "INVALID_INPUT", "Enter at least one credential to change");
+  const { secret, issues } = validateSecrets(def, merged);
   if (issues.length || !secret) throw new DefinitionInvalidError(issues);
   await setCredential(tenantId, actorId, integrationId, AUTH_TYPE_FOR[def.auth.type], secret);
 }

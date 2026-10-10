@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIdentitySource, getReconciliationRun } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { RunAutoRefresh } from "../../../SourceForms";
 import { RUN_STATUS, TARGET_LABEL } from "../../../labels";
 
@@ -22,7 +22,9 @@ const ACTION_LABEL: Record<string, string> = {
   would_leave: "Would become a leaver",
 };
 
-export default async function ReconciliationRunPage({ params }: { params: Promise<{ sourceId: string; runId: string }> }) {
+const CHANGES_PAGE = 50;
+
+export default async function ReconciliationRunPage({ params, searchParams }: { params: Promise<{ sourceId: string; runId: string }>; searchParams: Promise<{ page?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("integration.read");
@@ -30,10 +32,15 @@ export default async function ReconciliationRunPage({ params }: { params: Promis
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { sourceId, runId } = await params;
+  const [{ sourceId, runId }, sp] = await Promise.all([params, searchParams]);
   const [source, run] = await Promise.all([getIdentitySource(ctx.tenantId!, sourceId), getReconciliationRun(ctx.tenantId!, runId)]);
   if (!source || !run || run.sourceId !== source.id) notFound();
   const active = run.status === "queued" || run.status === "running";
+  // The changes are one stored list (at most 500); the page shows them 50 at a time (§15).
+  const pageCount = Math.max(1, Math.ceil(run.changes.length / CHANGES_PAGE));
+  const page = Math.min(pageCount, Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1));
+  const shown = run.changes.slice((page - 1) * CHANGES_PAGE, page * CHANGES_PAGE);
+  const pageHref = (p: number) => `/integrations/sources/${source.id}/runs/${run.id}${p > 1 ? `?page=${p}` : ""}`;
 
   return (
     <div className="space-y-5">
@@ -103,7 +110,7 @@ export default async function ReconciliationRunPage({ params }: { params: Promis
       ) : null}
 
       <Card>
-        <CardHeader title="Changes" description={run.changes.length >= 500 ? "The first 500 changes." : undefined} />
+        <CardHeader title="Changes" description={run.changes.length >= 500 ? "The first 500 changes are kept." : undefined} />
         <CardBody>
           {run.changes.length === 0 ? (
             <EmptyState title={active ? "Working…" : "No changes"} description={active ? undefined : "Every record matched an identity that was already up to date."} />
@@ -117,7 +124,7 @@ export default async function ReconciliationRunPage({ params }: { params: Promis
                 </tr>
               </Thead>
               <tbody>
-                {run.changes.map((c, i) => (
+                {shown.map((c, i) => (
                   <Tr key={`${c.ref}-${i}`}>
                     <Td>
                       {c.identityId ? (
@@ -137,6 +144,28 @@ export default async function ReconciliationRunPage({ params }: { params: Promis
               </tbody>
             </TableContainer>
           )}
+          {run.changes.length > 0 ? (
+            <nav className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm" aria-label="Pages">
+              <span className="text-muted-foreground">
+                {run.changes.length} {run.changes.length === 1 ? "change" : "changes"}
+                {pageCount > 1 ? ` · page ${page} of ${pageCount}` : ""}
+              </span>
+              {pageCount > 1 ? (
+                <span className="flex gap-2">
+                  {page > 1 ? (
+                    <LinkButton href={pageHref(page - 1)} variant="outline" size="sm">
+                      Previous
+                    </LinkButton>
+                  ) : null}
+                  {page < pageCount ? (
+                    <LinkButton href={pageHref(page + 1)} variant="outline" size="sm">
+                      Next
+                    </LinkButton>
+                  ) : null}
+                </span>
+              ) : null}
+            </nav>
+          ) : null}
         </CardBody>
       </Card>
     </div>

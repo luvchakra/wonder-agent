@@ -10,6 +10,7 @@ import {
   previewConnector,
   saveCustomDefinition,
   setConnectorCredentials,
+  updateConnectorSettings,
   type DefinitionOrigin,
   type PreviewResult,
 } from "@/modules/integrations/framework/catalog";
@@ -57,6 +58,18 @@ export async function connectSystemAction(origin: DefinitionOrigin, key: string,
   redirect(target);
 }
 
+export async function updateConnectorSettingsAction(integrationId: string, _prev: ConnectorFormState, formData: FormData): Promise<ConnectorFormState> {
+  const ctx = await requirePermission("integration.update");
+  try {
+    await updateConnectorSettings(ctx.tenantId!, ctx.userId, integrationId, { name: formData.get("name"), settings: prefixed(formData, "setting.") });
+  } catch (err) {
+    return formError(err);
+  }
+  revalidatePath(`/integrations/${integrationId}`);
+  revalidatePath("/integrations");
+  return { status: "saved", message: "Settings saved." };
+}
+
 export async function setConnectorCredentialsAction(integrationId: string, _prev: ConnectorFormState, formData: FormData): Promise<ConnectorFormState> {
   const ctx = await requirePermission("integration.update");
   try {
@@ -65,7 +78,7 @@ export async function setConnectorCredentialsAction(integrationId: string, _prev
     return formError(err);
   }
   revalidatePath(`/integrations/${integrationId}`);
-  return { status: "saved", message: "Connection tested and credentials saved." };
+  return { status: "saved", message: "Connection tested and credentials saved. A field left empty kept its saved value." };
 }
 
 export async function publishDefinitionAction(_prev: ConnectorFormState, formData: FormData): Promise<ConnectorFormState> {
