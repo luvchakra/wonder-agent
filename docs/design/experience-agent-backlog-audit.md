@@ -3553,6 +3553,88 @@ the layout's redirect stand. No other page appears in the logs.
 **Verified.** Typecheck and eslint clean on the changed file. After the
 deploy, the logs should show no new `eq.null` requests from the dashboard.
 
+### 2026-10-10 — Two sidebars: the main sidebar for members, an Admin sidebar for administration
+
+**What the owner asked for.**
+- Menus for end users come first, starting with Home.
+- Admin comes last.
+- Everything that administers the organization moves inside Admin.
+- Clicking Admin re-renders the sidebar with "Admin" at the top and a back
+  button to Home.
+- The default (landing) sidebar is a normal member's.
+
+**What changed.**
+- **Main sidebar.** In order:
+  - Home;
+  - My Access: Request Access, My Privacy, Sign-in Security (the member's
+    own MFA);
+  - Identities;
+  - Applications;
+  - Access Governance (Access Requests, Access Packages);
+  - Certifications;
+  - Risk & Security;
+  - AI Agents;
+  - Insights;
+  - **Admin** as the last entry.
+- **Admin sidebar** (`ADMIN_NAV`), headed by a back button and "Admin":
+  - Organization: Organization, Notifications, AI Assistance, Billing;
+  - Users & Permissions: Users, Groups, WonderID Roles, Permission Catalog,
+    Authorization Policies;
+  - Authentication: Single Sign-On;
+  - Integrations: Connections, Connection Types, Gateway, Identity Sources,
+    Pending Matches, MCP Servers, Sync Jobs;
+  - Identity Configuration: Identity Attributes;
+  - Policies & Compliance: Policies, Request Policies, Privacy & Data
+    Protection, Audit Integrity.
+- **Which sidebar shows** follows the page (`isAdminPath`, longest matching
+  section across both). Any link to an admin page therefore opens the Admin
+  sidebar; Back goes to Home. Collapsed, Admin is a gear icon and Back an
+  arrow.
+- **Permission filtering.**
+  - Every entry now names the permission its page requires, and the layout
+    filters both sidebars with the viewer's permissions (`navFor`).
+  - A member sees only what they can open.
+  - Admin appears only when at least one admin page is open to them, and
+    leads to the first such page.
+  - Pages still check permissions themselves; this only decides what is
+    listed.
+- **Unchanged.** The mobile tab bar. The drawer renders the same body, so
+  it gets both sidebars too.
+
+**Verified.**
+- `tsc` clean; eslint clean.
+- `modules/ui`: 85 of 85 tests pass, including the new `shell-nav.test.ts`
+  (7). It checks:
+  - Home is first and administration is out of the main sidebar;
+  - every route appears once;
+  - admin pages are detected by longest prefix;
+  - filtering by permission works;
+  - there is no Admin entry without an admin permission.
+- `tests/e2e/shell.spec.ts`:
+  - new: Admin is last, opens the Admin sidebar, and Back returns Home;
+  - the "current section opens" test now uses the Admin sidebar.
+
+  These run on Vercel; see the QA log.
+
+**Not changed.** The help guide (`modules/ui/help/content.ts`) still
+describes the old menu names; it is updated only when asked (§19.7).
+
+**Same day, sidebar scrollbar (owner request).** The sidebar used the browser's
+default scrollbar, a bright light track on the dark rail. It now uses a
+`.sidebar-scroll` class in `app/globals.css`:
+- a thin bar with a transparent track;
+- the thumb is drawn in `--sidebar-muted-foreground` at 35%, so it follows
+  both themes;
+- the thumb appears only while the sidebar is hovered or has focus.
+
+Checked by rendering the CSS in Chromium with scrollbars on: a resting
+sidebar shows no bar, a hovered one a thin muted thumb.
+
+**Browser tests on Vercel (before merging PR #30).** The specs were shell,
+design-review, navigation-smoke, branding, permission-catalog and
+first-organization (deployment `DGq3WSvPVtVidTk6buK3Hq5jgCyk`): **87 passed,
+0 failed, 0 flaky**, in 13 min. The first attempt failed only on the Vercel
+Toolbar's script; the cause and fix are in the QA log.
 ### 2026-10-10 — Sign-in: methods that are not set up show disabled
 
 **Why.** Owner request: "unless these options are working keep them

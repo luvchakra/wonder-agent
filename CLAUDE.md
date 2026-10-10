@@ -622,7 +622,11 @@ light mode, a dark surface in dark mode, active items in Electric Blue on a soft
 blue tint. Brand assets, colours and the logo come only from `modules/ui/brand.ts`
 and `public/brand/` (the user's brand sheet). Content surfaces, tokens and both
 themes are unchanged, and a sidebar item appears only when its route and
-capability exist.
+capability exist. Since 2026-10-10 (owner decision) there are two sidebars: the
+main one (Home first, then My Access and the governance work areas) for every
+member, and an Admin sidebar for administering the organization, opened from
+"Admin" (always the main sidebar's last entry) with a back button to Home. Each
+lists only the pages the viewer's permissions open (`modules/ui/shell-nav.ts`).
 
 **The full, binding rule set is
 [`docs/design/UI-UX-DESIGN-RULES.md`](docs/design/UI-UX-DESIGN-RULES.md) — read it in

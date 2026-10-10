@@ -1,30 +1,35 @@
 /**
- * The customer shell's primary navigation, as plain serializable data so
- * the server layout can compute badge counts and hand them to the client
- * sidebar / tab bar / drawer without three copies of the list.
+ * The customer shell's navigation, as plain serializable data so the server
+ * layout can filter it by the viewer's permissions and compute badge counts,
+ * then hand it to the client sidebar / tab bar / drawer.
  *
- * WonderID information architecture (EXPERIENCE-P0-18, 2026-09-26, the
- * user's WonderID mockups and specification §2): sections in the order
- * Home, My Access, Identities, Applications, Access Governance,
- * Certifications, Governance & Policies, Risk & Security, AI Agents,
- * Authentication, Workflows & Automation, Insights, Integrations,
- * Permissions (WonderID), Administration.
+ * Two sidebars (owner decision, 2026-10-10):
+ * - **The main sidebar** is what a member uses day to day. It starts with
+ *   Home and My Access (their own requests, privacy and sign-in security),
+ *   then the governance work areas. "Admin" is always its last entry.
+ * - **The Admin sidebar** holds everything that administers the
+ *   organization: settings, users and permissions, authentication,
+ *   integrations, identity configuration, and policies. Opening Admin
+ *   re-renders the sidebar with "Admin" at the top and a back button to
+ *   Home. Which sidebar shows follows the page, so a link to an admin page
+ *   opens the Admin sidebar too.
  *
- * Three levels: section → page, or section → group → page (the third
- * level opens as a flyout). Only pages that exist are listed; a section
- * with no page yet (My Access, Workflows & Automation) is left out
- * entirely. A link to an empty shell would be a fabricated capability
- * (spec, "Do not expose menu items whose underlying route/capability is
- * not implemented"). Each WonderID story adds its pages here in the same
- * commit that ships them.
+ * Every entry names the permission its page requires (any of a list), and
+ * the layout shows only what the viewer may open; Admin appears only when at
+ * least one admin page does. Pages still check permissions themselves: this
+ * only decides what is listed.
  *
- * Every route appears once, so exactly one page and one section can be
- * current. `badge` names a counter the layout supplies at render time
- * (see app/(customer)/layout.tsx), so this stays a static constant.
+ * Three levels: section → page, or section → group → page (the third level
+ * opens as a flyout). Only pages that exist are listed (spec, "Do not expose
+ * menu items whose underlying route/capability is not implemented"). Every
+ * route appears once across both sidebars, so exactly one page and one
+ * section can be current. `badge` names a counter the layout supplies.
  */
 export type ShellNavLink = {
   label: string;
   href: string;
+  /** Any one of these permissions lets the viewer open the page; none listed: every member. */
+  permission?: string[];
 };
 
 /** A second-level entry: a page, or a named group of pages (third level). */
@@ -38,6 +43,8 @@ export type ShellNavItem = {
   href: string;
   icon: string;
   badge?: "discovery" | "risk";
+  /** For a section without children: the permission its page requires. */
+  permission?: string[];
   /**
    * Extra URL prefixes that belong to this section without a link of
    * their own (detail routes such as /access/agents/:id). The section's
@@ -47,23 +54,40 @@ export type ShellNavItem = {
   children?: ShellNavEntry[];
 };
 
-const link = (label: string, href: string): ShellNavEntry => ({ kind: "link", label, href });
+const link = (label: string, href: string, ...permission: string[]): ShellNavEntry => ({
+  kind: "link",
+  label,
+  href,
+  ...(permission.length ? { permission } : {}),
+});
+const page = (label: string, href: string, ...permission: string[]): ShellNavLink => ({ label, href, ...(permission.length ? { permission } : {}) });
 const group = (label: string, children: ShellNavLink[], icon?: string): ShellNavEntry => ({ kind: "group", label, icon, children });
 
+/** The main sidebar: Home first, then a member's own access, then the governance work areas. */
 export const SHELL_NAV: ShellNavItem[] = [
   { label: "Home", href: "/", icon: "Home" },
+  {
+    label: "My Access",
+    href: "/access/catalog",
+    icon: "UserRound",
+    children: [
+      link("Request Access", "/access/catalog", "access.read"),
+      link("My Privacy", "/my-privacy"),
+      link("Sign-in Security", "/settings/security"),
+    ],
+  },
   {
     label: "Identities",
     href: "/identities",
     icon: "Users",
     children: [
-      link("Overview", "/identities"),
-      link("All Identities", "/identities/all"),
-      link("People", "/identities/humans"),
-      link("External Identities", "/identities/external"),
-      link("Machine Identities", "/identities/machines"),
-      link("Lifecycle Work", "/identities/lifecycle"),
-      link("Non-human Identities", "/agents/identities"),
+      link("Overview", "/identities", "identity.read"),
+      link("All Identities", "/identities/all", "identity.read"),
+      link("People", "/identities/humans", "identity.read"),
+      link("External Identities", "/identities/external", "identity.read"),
+      link("Machine Identities", "/identities/machines", "identity.read"),
+      link("Lifecycle Work", "/identities/lifecycle", "identity.read"),
+      link("Non-human Identities", "/agents/identities", "agent.read"),
     ],
   },
   {
@@ -71,10 +95,10 @@ export const SHELL_NAV: ShellNavItem[] = [
     href: "/access",
     icon: "Box",
     children: [
-      link("Application Inventory", "/access"),
-      link("Discovery", "/integrations/discovery"),
-      link("Accounts", "/access/accounts"),
-      link("Data Sources", "/access/data-sources"),
+      link("Application Inventory", "/access", "access.read"),
+      link("Discovery", "/integrations/discovery", "integration.read"),
+      link("Accounts", "/access/accounts", "access.read"),
+      link("Data Sources", "/access/data-sources", "access.read"),
     ],
   },
   {
@@ -82,27 +106,21 @@ export const SHELL_NAV: ShellNavItem[] = [
     href: "/access/requests",
     icon: "KeyRound",
     match: ["/access/agents"],
-    children: [link("Request Access", "/access/catalog"), link("Access Packages", "/access/packages"), link("Access Requests", "/access/requests"), link("Request Policies", "/access/request-policies")],
+    children: [link("Access Requests", "/access/requests", "access.read"), link("Access Packages", "/access/packages", "access.read")],
   },
   {
     label: "Certifications",
     href: "/compliance/campaigns",
     icon: "ShieldCheck",
     match: ["/compliance"],
-    children: [link("Certification Campaigns", "/compliance/campaigns")],
-  },
-  {
-    label: "Governance & Policies",
-    href: "/policies",
-    icon: "FileText",
-    children: [link("Policies", "/policies"), link("Privacy & Data Protection", "/settings/privacy"), link("Audit Integrity", "/audit/integrity")],
+    children: [link("Certification Campaigns", "/compliance/campaigns", "compliance.read")],
   },
   {
     label: "Risk & Security",
     href: "/risk",
     icon: "TriangleAlert",
     badge: "risk",
-    children: [link("Risk Overview", "/risk"), link("Investigations", "/risk/investigations")],
+    children: [link("Risk Overview", "/risk", "risk.read"), link("Investigations", "/risk/investigations", "risk.read")],
   },
   {
     label: "AI Agents",
@@ -110,65 +128,141 @@ export const SHELL_NAV: ShellNavItem[] = [
     icon: "Bot",
     badge: "discovery",
     children: [
-      group("Agent Inventory", [
-        { label: "All Agents", href: "/agents" },
-        { label: "Register Agent", href: "/agents/new" },
-      ], "Bot"),
-      group("Agent Discovery", [
-        { label: "Discovery Inbox", href: "/agents/discovery" },
-        { label: "Duplicate Review", href: "/agents/duplicates" },
-      ], "Search"),
-      group("Agent Monitoring", [
-        { label: "Runtime Activity", href: "/runtime" },
-        { label: "Rogue Agents", href: "/risk/rogue" },
-      ], "Activity"),
+      group("Agent Inventory", [page("All Agents", "/agents", "agent.read"), page("Register Agent", "/agents/new", "agent.create")], "Bot"),
+      group("Agent Discovery", [page("Discovery Inbox", "/agents/discovery", "agent.read"), page("Duplicate Review", "/agents/duplicates", "agent.create")], "Search"),
+      group("Agent Monitoring", [page("Runtime Activity", "/runtime", "runtime.read"), page("Rogue Agents", "/risk/rogue", "risk.read")], "Activity"),
     ],
-  },
-  {
-    label: "Authentication",
-    href: "/settings/security",
-    icon: "Fingerprint",
-    children: [link("Sign-in Security", "/settings/security"), link("Single Sign-On", "/settings/sso")],
   },
   {
     label: "Insights",
     href: "/reports",
     icon: "BarChart3",
-    children: [link("Reports", "/reports"), link("Audit Trail", "/audit")],
+    children: [link("Reports", "/reports", "report.read"), link("Audit Trail", "/audit", "audit.read")],
+  },
+];
+
+/** The Admin sidebar: administering the organization. */
+export const ADMIN_NAV: ShellNavItem[] = [
+  {
+    label: "Organization",
+    href: "/settings",
+    icon: "Building2",
+    children: [
+      link("Organization", "/settings", "tenant.settings"),
+      link("Notifications", "/settings/notifications", "notification.manage"),
+      link("AI Assistance", "/settings/ai", "ai.manage"),
+      link("Billing", "/settings/billing", "billing.view"),
+    ],
+  },
+  {
+    label: "Users & Permissions",
+    href: "/settings/users",
+    icon: "UserCog",
+    children: [
+      link("Users", "/settings/users", "users.view"),
+      link("Groups", "/settings/groups", "groups.view"),
+      link("WonderID Roles", "/settings/roles", "roles.view", "role.manage"),
+      link("Permission Catalog", "/settings/permissions", "permissions.view"),
+      link("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
+    ],
+  },
+  {
+    label: "Authentication",
+    href: "/settings/sso",
+    icon: "Fingerprint",
+    children: [link("Single Sign-On", "/settings/sso", "sso.manage")],
   },
   {
     label: "Integrations",
     href: "/integrations",
     icon: "Link2",
     children: [
-      link("Connections", "/integrations"),
-      link("Connection Types", "/integrations/types"),
-      link("Gateway", "/integrations/gateway"),
-      link("Identity Sources", "/integrations/sources"),
-      link("Pending Matches", "/integrations/correlations"),
-      link("MCP Servers", "/integrations/mcp"),
-      link("Sync Jobs", "/integrations/jobs"),
+      link("Connections", "/integrations", "integration.read"),
+      link("Connection Types", "/integrations/types", "integration.read"),
+      link("Gateway", "/integrations/gateway", "integration.read"),
+      link("Identity Sources", "/integrations/sources", "integration.read"),
+      link("Pending Matches", "/integrations/correlations", "integration.read"),
+      link("MCP Servers", "/integrations/mcp", "integration.read"),
+      link("Sync Jobs", "/integrations/jobs", "integration.read"),
     ],
   },
   {
-    label: "Permissions (WonderID)",
-    href: "/settings/roles",
-    icon: "UserCog",
-    children: [link("Users", "/settings/users"), link("Groups", "/settings/groups"), link("WonderID Roles", "/settings/roles"), link("Permission Catalog", "/settings/permissions"), link("Authorization Policies", "/settings/authorization-policies")],
+    label: "Identity Configuration",
+    href: "/identities/attributes",
+    icon: "SlidersHorizontal",
+    children: [link("Identity Attributes", "/identities/attributes", "identity.manage")],
   },
   {
-    label: "Administration",
-    href: "/settings",
-    icon: "Settings",
+    label: "Policies & Compliance",
+    href: "/policies",
+    icon: "FileText",
     children: [
-      link("Organization", "/settings"),
-      link("Identity Attributes", "/identities/attributes"),
-      link("Notifications", "/settings/notifications"),
-      link("AI Assistance", "/settings/ai"),
-      link("Billing", "/settings/billing"),
+      link("Policies", "/policies", "policy.read"),
+      link("Request Policies", "/access/request-policies", "access.manage"),
+      link("Privacy & Data Protection", "/settings/privacy", "privacy.view"),
+      link("Audit Integrity", "/audit/integrity", "audit.read"),
     ],
   },
 ];
+
+const allowed = (permission: string[] | undefined, permissions: ReadonlySet<string>) => !permission || permission.some((p) => permissions.has(p));
+
+/**
+ * The sections and pages this viewer may open. A section keeps only its
+ * allowed pages and is left out when none remain; its href moves to its
+ * first allowed page.
+ */
+export function navFor(nav: ShellNavItem[], permissions: readonly string[]): ShellNavItem[] {
+  const has = new Set(permissions);
+  const out: ShellNavItem[] = [];
+  for (const item of nav) {
+    if (!item.children) {
+      if (allowed(item.permission, has)) out.push(item);
+      continue;
+    }
+    const children: ShellNavEntry[] = [];
+    for (const e of item.children) {
+      if (e.kind === "link") {
+        if (allowed(e.permission, has)) children.push(e);
+      } else {
+        const pages = e.children.filter((c) => allowed(c.permission, has));
+        if (pages.length) children.push({ ...e, children: pages });
+      }
+    }
+    if (!children.length) continue;
+    const first = children[0].kind === "link" ? children[0].href : children[0].children[0].href;
+    const pages = children.flatMap((e) => (e.kind === "link" ? [e.href] : e.children.map((c) => c.href)));
+    out.push({ ...item, href: pages.includes(item.href) ? item.href : first, children });
+  }
+  return out;
+}
+
+/** Where "Admin" leads: the first admin page the viewer may open, or null when there is none (no Admin entry). */
+export function adminLanding(adminNav: ShellNavItem[]): string | null {
+  return adminNav[0]?.href ?? null;
+}
+
+/**
+ * Whether a page belongs to the Admin sidebar: the section owning the
+ * longest prefix of the path, across both sidebars, is an admin section.
+ */
+export function isAdminPath(pathname: string): boolean {
+  let best = -1;
+  let admin = false;
+  for (const [nav, isAdmin] of [
+    [SHELL_NAV, false],
+    [ADMIN_NAV, true],
+  ] as const) {
+    for (const item of nav) {
+      const len = bestPrefix(sectionPrefixes(item), pathname);
+      if (len > best) {
+        best = len;
+        admin = isAdmin;
+      }
+    }
+  }
+  return admin;
+}
 
 /**
  * The four destinations the mobile tab bar exposes. "More" is not a route
