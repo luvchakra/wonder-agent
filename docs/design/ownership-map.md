@@ -329,6 +329,12 @@ through `modules/privacy/service.ts`, since no other module consumes them yet);
 `/audit/integrity` composes FA's `lib/audit/integrity.ts`; `/platform-admin/billing`
 is PA's.
 
+2026-10-10 (Global Configuration): `tenant_config_versions`, `save_tenant_config()`,
+`my_session_policy()` (0116) and `lib/config/*` are FA's (shared primitives every
+module reads through `getTenantConfig()`); `/settings/configuration` is EA's page
+over them. It is the first slice of PA's PLATFORM-P0-13 Configuration Studio,
+built on FA's `tenant_settings`; the vendor-only platform boundary is unchanged.
+
 2026-10-10 additions: `/sod` and `/sod/conflicts` compose AA's
 `listSoDRules()` / `toSoDConflict()` (`modules/access-governance/sodRules.ts`)
 and OA's `listAuditLogs()`; `/access/entitlements` composes AA's

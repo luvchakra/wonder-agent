@@ -53,6 +53,9 @@ describe("user guide content", () => {
       "certification",
       "audit-integrity",
       "sso-security",
+      "global-configuration",
+      "control-center",
+      "separation-of-duties",
       "faq-something-wrong",
     ]) {
       expect(getSection(id), id).toBeDefined();

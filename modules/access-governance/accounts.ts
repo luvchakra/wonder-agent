@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -8,7 +9,6 @@ import { getNormalizedObjects } from "@/modules/integrations/service";
 import { getIdentity, getIdentityNames, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { refreshAccessLedger } from "./ledger";
 import {
-  DEFAULT_DORMANT_DAYS,
   dormantCutoff,
   isDormant,
   planReconciliation,
@@ -124,7 +124,8 @@ function applyView<Q extends { eq: (c: string, v: unknown) => Q; in: (c: string,
 export async function listAccountInventory(tenantId: string, filter: AccountFilter = {}): Promise<{ rows: InventoryAccount[]; total: number }> {
   const pageSize = Math.min(Math.max(filter.pageSize ?? 50, 1), 200);
   const page = Math.max(filter.page ?? 1, 1);
-  const days = filter.dormantDays ?? DEFAULT_DORMANT_DAYS;
+  // Unspecified: the organization's setting (Global Configuration).
+  const days = filter.dormantDays ?? (await getTenantConfig(tenantId))["access.dormantDays"];
   const now = new Date();
   const supabase = await supabaseServer();
   let query = supabase.from("accounts").select(COLUMNS, { count: "exact" }).eq("tenant_id", tenantId);
@@ -147,7 +148,7 @@ export type AccountSummary = { total: number; correlated: number; orphan: number
 /** The counts behind the inventory's cards, in parallel (§15). */
 export async function getAccountSummary(tenantId: string, opts: { applicationId?: string; dormantDays?: number } = {}): Promise<AccountSummary> {
   const supabase = await supabaseServer();
-  const cutoff = dormantCutoff(new Date(), opts.dormantDays ?? DEFAULT_DORMANT_DAYS);
+  const cutoff = dormantCutoff(new Date(), opts.dormantDays ?? (await getTenantConfig(tenantId))["access.dormantDays"]);
   const count = async (view: AccountView | "correlated") => {
     let query = supabase.from("accounts").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId);
     if (opts.applicationId && UUID_RE.test(opts.applicationId)) query = query.eq("application_id", opts.applicationId);
@@ -168,7 +169,8 @@ export async function getAccountSummary(tenantId: string, opts: { applicationId?
   return { total, correlated, orphan, ambiguous, dormant, privileged, missing };
 }
 
-export async function getInventoryAccount(tenantId: string, accountId: string, dormantDays = DEFAULT_DORMANT_DAYS): Promise<InventoryAccount | null> {
+export async function getInventoryAccount(tenantId: string, accountId: string, dormantDaysArg?: number): Promise<InventoryAccount | null> {
+  const dormantDays = dormantDaysArg ?? (await getTenantConfig(tenantId))["access.dormantDays"];
   if (!UUID_RE.test(accountId)) return null;
   const supabase = await supabaseServer();
   const { data, error } = await supabase.from("accounts").select(COLUMNS).eq("tenant_id", tenantId).eq("id", accountId).returns<Row[]>().maybeSingle();

@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -63,11 +64,13 @@ export async function findDuplicateCandidate(
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
 
   let best: { agent: Agent; score: number; matchedKeys: string[] } | null = null;
+  // The organization's threshold (Global Configuration); DUPLICATE_MATCH_THRESHOLD is its default.
+  const threshold = (await getTenantConfig(tenantId))["agents.duplicateMatchPercent"] / 100;
 
   for (const row of data ?? []) {
     const agent = toAgent(row);
     const { score, matchedKeys } = computeDuplicateScore(agent, input);
-    if (score >= DUPLICATE_MATCH_THRESHOLD && (!best || score > best.score)) {
+    if (score >= threshold && (!best || score > best.score)) {
       best = { agent, score, matchedKeys };
     }
   }

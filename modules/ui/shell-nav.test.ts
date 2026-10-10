@@ -14,7 +14,7 @@ describe("the area list (owner decision, 2026-10-10)", () => {
   });
 
   it("opens Admin with its four object lists, then identities and applications as groups", () => {
-    expect(ADMIN_AREA.children?.slice(0, 7).map((e) => e.label)).toEqual(["Accounts", "Entitlements", "Roles", "User Groups", "Identities", "Applications", "Policies"]);
+    expect(ADMIN_AREA.children?.slice(0, 8).map((e) => e.label)).toEqual(["Accounts", "Entitlements", "Roles", "User Groups", "Global Configuration", "Identities", "Applications", "Policies"]);
   });
 
   it("keeps a member's day-to-day work in Home", () => {

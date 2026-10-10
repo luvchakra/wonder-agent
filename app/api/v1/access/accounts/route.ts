@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ACCOUNT_VIEWS, getAccountSummary, listAccountInventory, parseDormantDays, type AccountView } from "@/modules/access-governance/service";
 import { errorResponse } from "@/modules/access-governance/http";
@@ -11,7 +12,7 @@ export async function GET(request: NextRequest) {
     const ctx = await requirePermission("access.read");
     const p = request.nextUrl.searchParams;
     const view = (ACCOUNT_VIEWS as string[]).includes(p.get("view") ?? "") ? (p.get("view") as AccountView) : "all";
-    const dormantDays = parseDormantDays(p.get("dormantDays"));
+    const dormantDays = parseDormantDays(p.get("dormantDays"), (await getTenantConfig(ctx.tenantId!))["access.dormantDays"]);
     const applicationId = p.get("applicationId") ?? undefined;
     const [list, summary] = await Promise.all([
       listAccountInventory(ctx.tenantId!, { view, applicationId, q: p.get("q") ?? undefined, dormantDays, page: Number(p.get("page")) || 1, pageSize: Number(p.get("pageSize")) || 50 }),

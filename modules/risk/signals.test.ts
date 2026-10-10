@@ -82,6 +82,15 @@ describe("credentialHealth", () => {
     expect(credentialHealth([key({}), key({ createdAt: "2026-01-01T00:00:00Z", expiresAt: "2026-12-31T00:00:00Z" })], now)).toEqual({ unhealthy: false, reasons: [] });
   });
 
+  it("uses the organization's limits when given (Global Configuration)", () => {
+    const keys = [key({ createdAt: "2026-08-01T00:00:00Z" }), key({}), key({})];
+    expect(credentialHealth(keys, now).unhealthy).toBe(false);
+    expect(credentialHealth(keys, now, { rotationDays: 30, maxActiveKeys: 2 }).reasons).toEqual([
+      "1 active key(s) older than 30 days with no expiry",
+      "3 active keys (more than 2)",
+    ]);
+  });
+
   it("flags rotation overdue and key sprawl; revoked keys do not count", () => {
     expect(credentialHealth([key({ createdAt: "2026-05-01T00:00:00Z" })], now).reasons).toEqual(["1 active key(s) older than 90 days with no expiry"]);
     expect(credentialHealth([key({}), key({}), key({}), key({})], now).reasons).toEqual(["4 active keys (more than 3)"]);

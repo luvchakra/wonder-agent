@@ -889,3 +889,9 @@ module's object tables: `runtime_tools`, `runtime_resources`, `runtime_emergency
 CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
 log, the page work in the Experience log. A new object table of this module
 follows the same pattern and joins `lib/provenance/tables.ts`.
+
+### 2026-10-10 — Reads the organization's Global Configuration (owner request)
+
+`modules/runtime-assurance/unregistered.ts` (window, `runtime.unregisteredWindowDays`) and `decisionNotifications.ts` (throttle, `runtime.alertThrottleMinutes`; `notificationForDecision()` takes it, default 15) read the organization's settings. Defaults equal the previous constants. Cross-module change by explicit
+owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
+Foundation log).

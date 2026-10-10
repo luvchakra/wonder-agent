@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, listLifecycleEvents, listRelationships, transitionAgentLifecycle, updateAgentRiskScore } from "@/modules/agent-identity/service";
 import { countOverdueCertificationItems } from "@/modules/certification-compliance/service";
 import { getMcpInventory } from "@/modules/integrations/service";
@@ -310,7 +311,12 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const hasElevatedOrAdminAccess = effectiveAccess.some((g) => g.privilegeLevel === "elevated" || g.privilegeLevel === "admin");
   const destructiveMcpTools = new Set(mcpInventory.flatMap((server) => server.tools.filter((t) => t.destructive && t.stillDeclared).map((t) => t.name.toLowerCase())));
   const destructive = destructiveCapability(effectiveAccess, destructiveMcpTools);
-  const credentials = credentialHealth(apiKeys, new Date());
+  // The organization's credential limits (Global Configuration).
+  const config = await getTenantConfig(tenantId);
+  const credentials = credentialHealth(apiKeys, new Date(), {
+    rotationDays: config["risk.keyRotationDays"],
+    maxActiveKeys: config["risk.maxActiveKeysPerAgent"],
+  });
 
   // RISK-P0-02.2 — weights come from this tenant's configured overrides
   // (falling back to the deterministic defaults), never hard-coded

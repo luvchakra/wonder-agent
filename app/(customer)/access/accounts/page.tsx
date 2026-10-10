@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { ACCOUNT_VIEWS, DORMANT_WINDOWS, getAccountSummary, getApplicationDetail, listAccountInventory, parseDormantDays, type AccountView } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Button, Card, EmptyState, KpiCard, LinkButton, SelectField, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, ObjectActionsMenu } from "@/modules/ui";
@@ -30,7 +31,8 @@ export default async function AccountInventoryPage({
   const sp = await searchParams;
   const view = (ACCOUNT_VIEWS as string[]).includes(sp.view ?? "") ? (sp.view as AccountView) : "all";
   const q = (sp.q ?? "").slice(0, 100);
-  const days = parseDormantDays(sp.days);
+  const config = await getTenantConfig(tenantId);
+  const days = parseDormantDays(sp.days, config["access.dormantDays"]);
   const applicationId = sp.app || undefined;
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   const [summary, { rows, total }, app] = await Promise.all([
@@ -45,7 +47,7 @@ export default async function AccountInventoryPage({
     if (v !== "all") u.set("view", v);
     if (applicationId) u.set("app", applicationId);
     if (q) u.set("q", q);
-    if (days !== 90) u.set("days", String(days));
+    if (days !== config["access.dormantDays"]) u.set("days", String(days));
     if ((over.page ?? 1) > 1) u.set("page", String(over.page));
     const s = u.toString();
     return `/access/accounts${s ? `?${s}` : ""}`;

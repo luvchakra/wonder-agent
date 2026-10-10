@@ -2701,3 +2701,65 @@ rule is CLAUDE.md §19.10; the Definition of Done (§12) gained a bullet.
 block a write) and are not indexed (nothing queries by them). Lists do not
 show provenance (§19.5); only object pages do. The experience log records
 the page work; the integration log the connection pages.
+
+## 2026-10-10 — Global Configuration: versioned organization settings; session timeouts per organization
+
+**Why.** Owner request: "under admin, create a global config, it should
+[have] many key settings that control entire app behavior, study deeply and
+implement". CLAUDE.md §19.11 records the rules.
+
+**Study.** Every hard-coded behaviour constant was inventoried. Most are
+technical safety limits (file sizes, row caps, provider timeouts) and stay
+in code. The business rules an organization would want to set were kept,
+each confirmed to be read by running code: session idle and absolute
+timeouts (proxy.ts), the dormant-account threshold, the duplicate-agent
+match threshold, the unregistered-activity window, the runtime-alert
+throttle, the credential rotation age and key count, the high-risk campaign
+score and the Control Center's SoD window. The control-evidence cadence
+(90 days) was left out: `recomputeStaleControlMappings()` is never called, so
+the setting would do nothing. `tenant_settings.settings` existed since 0001
+but nothing read it.
+
+**What changed (Foundation).**
+- `lib/config/registry.ts` (pure): the ten settings, defaults equal to the
+  previous behaviour, bounds, permissions (sessions need
+  `tenant.security.manage`, the rest `tenant.settings`), `resolveConfig()`,
+  `planConfigChange()` (all-or-nothing; per-setting permission).
+- `lib/config/tenantConfig.ts`: `getTenantConfig()` (per request, service
+  role pinned to the tenant, defaults on failure), `updateTenantConfig()`,
+  `restoreTenantConfigVersion()`, `listTenantConfigVersions()` (as the
+  member under RLS); audit `tenant.config_updated` / `tenant.config_restored`.
+- Migration `0116_foundation_tenant_config.sql`: `tenant_config_versions`
+  (RLS select for `tenant.settings` or `tenant.security.manage`; no client
+  writes; append-only trigger that lets a deleted organization's rows go),
+  `save_tenant_config()` (service role only; locks the tenant row; refuses a
+  stale version with 40001; writes the version and the current values in
+  one transaction), `my_session_policy()` (the caller's strictest active
+  organization, clamped to 5–30 minutes and 1–12 hours, defaults when unset).
+- `lib/tenant/sessionSecurity.ts`: `SessionLimits`, `sessionLimitsFrom()`;
+  `checkSessionExpiry()` takes limits and never exceeds the global ones.
+- `proxy.ts`: reads `my_session_policy()` per user, cached 60 seconds in a
+  bounded per-user map; a failed read applies the global limits.
+
+**Security.** Session settings can only shorten sessions. The policy is read
+with the member's own session (the function keys on `auth.uid()`); the cache
+is per user and holds only two numbers. The new advisor note on
+`my_session_policy()` (signed-in users can execute a SECURITY DEFINER
+function) is intended, like `current_tenant_ids()`. No secret is stored.
+
+**Verified.**
+- `tests/foundation/tenant-config-isolation.sql` on the dev project: 12/12
+  (version 1 first; stale save refused 40001; values stored; history
+  rewrite refused; admin reads own history, not another organization's; a
+  member can neither call `save_tenant_config()` nor write history (42501);
+  a read-only member reads none; strictest of two organizations 10 min/4 h;
+  a single organization's limits; out-of-range clamped and unset default).
+- Unit tests: `lib/config/registry.test.ts`, `sessionSecurity.test.ts`
+  (limits), plus the touched modules: 447 passed.
+- Supabase security advisors: only the intended note above is new.
+- Local Playwright: see the Experience log.
+
+**Left out.** SSO-required and MFA-required, the certification interval, AI
+agent defaults and audit retention (the rest of FOUNDATION-P0-27); the
+declarative configuration objects, draft/simulate/approve and environment
+promotion (the rest of PLATFORM-P0-13).

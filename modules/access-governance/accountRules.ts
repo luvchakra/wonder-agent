@@ -10,9 +10,10 @@ export const ACCOUNT_TYPES = ["standard", "privileged", "service", "shared"] as 
 export type AccountType = (typeof ACCOUNT_TYPES)[number];
 export type Correlation = "correlated" | "manual" | "orphan" | "ambiguous";
 
-export function parseDormantDays(v: unknown): number {
+/** A dormant window from a query value, else `fallback` (the organization's setting, Global Configuration). */
+export function parseDormantDays(v: unknown, fallback: number = DEFAULT_DORMANT_DAYS): number {
   const n = Number(v);
-  return (DORMANT_WINDOWS as readonly number[]).includes(n) ? n : DEFAULT_DORMANT_DAYS;
+  return (DORMANT_WINDOWS as readonly number[]).includes(n) ? n : fallback;
 }
 
 /** Not used within the window. Never used counts once the account is older than the window. */
