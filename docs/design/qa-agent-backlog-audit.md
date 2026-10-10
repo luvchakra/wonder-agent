@@ -1404,3 +1404,23 @@ tolerance.
 - **Object-page CSV import.** `tests/e2e/file-import.spec.ts` was rewritten
   for the preview-then-import flow. The spec run on Vercel is recorded in
   the next entry.
+
+### 2026-10-10 — `file-import.spec.ts` on Vercel: 16 passed
+
+The rewritten spec was run on the Vercel builder before merging PR #25 (a
+marker commit on `e2e/nightly` with `specs: tests/e2e/file-import.spec.ts`).
+
+- Deployment `H1MQ7uJgH47YVm3dR4zf1Z1uPz8t`: **16 passed, 0 failed, 0 flaky**
+  in 2.7 min.
+  - The 7 sign-in setups.
+  - The 9 import tests:
+    - the preview stores nothing;
+    - confirming adds the records to the list;
+    - a later file updates one record and leaves the omitted one active;
+    - the dialog's preview table, then Confirm import;
+    - Cancel import stores nothing;
+    - files and kinds that are refused;
+    - export;
+    - another organization and a read-only member are refused.
+- PR CI (typecheck, lint, test, security) was green. `next build` passed
+  locally.
