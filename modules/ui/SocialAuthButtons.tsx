@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getSupabasePublishableKey, getSupabaseUrl } from "@/lib/db/env";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { Button } from "./Button";
+import { fetchAuthProviderStatus, type AuthProviderStatus } from "./authProviderStatus";
 
 /**
  * Social sign-in for /sign-in and /sign-up: Google, Microsoft and LinkedIn.
@@ -90,7 +91,10 @@ export async function isOAuthProviderEnabled(
   }
 }
 
-export function OAuthProviderButton({ provider, verb }: { provider: SocialProvider; verb: string }) {
+/** Shown on a method that is not set up yet (its button is disabled). */
+export const NOT_AVAILABLE_HINT = "Not available yet";
+
+export function OAuthProviderButton({ provider, verb, available = null }: { provider: SocialProvider; verb: string; available?: boolean | null }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { name, scopes, Mark } = SOCIAL_PROVIDERS[provider];
@@ -123,9 +127,18 @@ export function OAuthProviderButton({ provider, verb }: { provider: SocialProvid
 
   return (
     <div className="space-y-2">
-      <Button type="button" variant="outline" onClick={handleClick} disabled={pending} className="w-full">
+      <Button
+        type="button"
+        variant="outline"
+        onClick={handleClick}
+        disabled={pending || available === false}
+        title={available === false ? `${name} sign-in: ${NOT_AVAILABLE_HINT.toLowerCase()}` : undefined}
+        aria-label={available === false ? `${label}, ${NOT_AVAILABLE_HINT.toLowerCase()}` : undefined}
+        className="w-full"
+      >
         <Mark />
         {pending ? "Redirecting…" : label}
+        {available === false ? <span className="text-xs font-normal text-muted-foreground">· {NOT_AVAILABLE_HINT}</span> : null}
       </Button>
       {error ? (
         <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -136,12 +149,36 @@ export function OAuthProviderButton({ provider, verb }: { provider: SocialProvid
   );
 }
 
-/** Google, Microsoft and LinkedIn, in that order. `verb` is "Sign in" or "Sign up". */
-export function SocialAuthButtons({ verb }: { verb: "Sign in" | "Sign up" }) {
+/**
+ * The status of each method, as given by the server or read once on mount.
+ * `undefined`: not known yet; `null`: unknown, every method stays on.
+ */
+export function useAuthProviderStatus(initial?: AuthProviderStatus | null): AuthProviderStatus | null | undefined {
+  const [status, setStatus] = useState<AuthProviderStatus | null | undefined>(initial);
+  useEffect(() => {
+    if (initial !== undefined) return;
+    let live = true;
+    void fetchAuthProviderStatus().then((s) => {
+      if (live) setStatus(s);
+    });
+    return () => {
+      live = false;
+    };
+  }, [initial]);
+  return status;
+}
+
+/**
+ * Google, Microsoft and LinkedIn, in that order. `verb` is "Sign in" or
+ * "Sign up". A method Supabase Auth has not turned on is shown disabled
+ * (owner request, 2026-10-10); it becomes active by itself once enabled.
+ */
+export function SocialAuthButtons({ verb, status }: { verb: "Sign in" | "Sign up"; status?: AuthProviderStatus | null }) {
+  const known = useAuthProviderStatus(status);
   return (
     <div className="space-y-2">
       {PROVIDER_ORDER.map((provider) => (
-        <OAuthProviderButton key={provider} provider={provider} verb={verb} />
+        <OAuthProviderButton key={provider} provider={provider} verb={verb} available={known ? known[provider] : null} />
       ))}
     </div>
   );
