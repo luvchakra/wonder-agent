@@ -351,8 +351,9 @@ Each agent works one story at a time from its own backlog doc:
 7. **Commit** with a focused message scoped to the story, then ship it per §19.6 and
    [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md):
    - push the task branch;
-   - open a pull request and share its Vercel preview URL;
-   - squash-merge as soon as CI is green, without asking first;
+   - open a pull request and share its link;
+   - squash-merge only when the owner's message says **"merge now"**, and CI
+     is green (§19.9, rule 0);
    - confirm the production deploy is ready.
 
    Never push directly to `main`.
@@ -599,7 +600,8 @@ A feature is complete only when:
   in §17.8), the nightly full Playwright run after the merge is green too, or a
   hand-started run of the affected specs passed before the merge.
 - The change is committed with a focused message on its own branch and
-  squash-merged through a pull request once CI is green (§19.6).
+  squash-merged through a pull request once CI is green and the owner has said
+  "merge now" (§19.9, rule 0).
 
 ---
 
@@ -1218,9 +1220,10 @@ beats exhaustive pre-push verification.
 
 - **Fastest path to something testable:**
   1. Commit and push the task branch.
-  2. Open a pull request and share its Vercel preview URL (posted on the pull
-     request, `*-luvchakras-projects.vercel.app`).
-  3. Squash-merge as soon as CI is green.
+  2. Open a pull request and share its link (working branches have no Vercel
+     preview, §19.9).
+  3. Squash-merge once CI is green and the owner's message says "merge now"
+     (§19.9, rule 0). Until then the pull request waits, ready.
   4. Confirm the production deploy on `id.wonderapps.biz` is ready.
 - **Before pushing, run only fast, relevant checks:**
   - `npm run typecheck`;
@@ -1315,6 +1318,32 @@ reached at 13:16 UTC. 68 of those 100 were cancelled builds, and production
 could not deploy until the window cleared. Treat deployments as a scarce
 budget, with production first.
 
+0. **Build on Vercel only when the owner says so (owner decision,
+   2026-10-10).** Anything that makes Vercel build happens only when the
+   owner's message contains **"merge now"** or **"build now"**:
+   - **"merge now"** covers **every** pull request that is open and waiting at
+     that moment, not only the latest one:
+     - bring each up to date with `main`;
+     - merge every one whose CI is green, one after another;
+     - report any that cannot merge (red CI, a conflict needing a decision)
+       with the reason, and leave those open.
+
+     Each merge to `main` is a production build, so keep pull requests few
+     and combine related work into one.
+   - **"build now"** likewise covers every Vercel build waiting at that
+     moment, such as a production redeploy or an E2E run on Vercel
+     (`e2e/nightly`). Start each once.
+
+   Without either phrase:
+   - push branches and open pull requests (they cost nothing, rule 1);
+   - run checks locally, including E2E specs with `E2E_CHROMIUM_PATH`;
+   - say which pull requests are ready to merge, and stop there.
+
+   This holds even when CI is green and the change is small or docs-only. A
+   docs-only merge still creates a deployment. The scheduled nightly suite
+   is not covered by this rule: it runs on its own, both halves, two Vercel
+   builds a night, so every test runs every night (owner decision,
+   2026-10-10).
 1. **Create no deployment you don't need.**
    - Working branches (`claude/**`, `module/**`) never deploy
      (`git.deploymentEnabled` in `vercel.json`). Previews stay off.
