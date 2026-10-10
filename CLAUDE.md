@@ -926,8 +926,13 @@ tool governance or autonomy, executors and connectors, webhooks, file processing
 or notifications, the **full** Playwright suite must pass, not just the module's
 specs. Since 2026-10-09 (user decision) the full suite runs nightly in CI
 (`e2e.yml`), not on every pull request.
-- For such a change, run the affected spec files before merging: locally, or
-  with a hand-started `e2e.yml` run given those specs.
+- Before merging, run the affected spec files (locally, or with a hand-started
+  `e2e.yml` run given those specs) only for a security-sensitive change:
+  sign-in, sessions or `proxy.ts`; tenant resolution; RBAC and permissions;
+  RLS and migrations; connectors, including their webhooks and file imports.
+  Any other change, including UI work and ordinary features, waits for the
+  nightly run. This narrower list was set by the owner on 2026-10-10 to cut
+  the number of E2E runs.
 - Check the next nightly run.
 - A red nightly run is fixed before anything else merges.
 An apparently isolated change can alter security behaviour: on 2026-09-18 a
