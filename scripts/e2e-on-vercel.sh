@@ -69,8 +69,10 @@ export E2E_SNAPSHOT_ENV=vercel
 # Recording mode (the workflow's "record baselines" input, a line
 # `record-baselines: yes` in the commit message, with chosen specs only):
 # missing baselines for this machine are written instead of failing, and
-# published with this preview deployment under /__e2e-baselines/ so they can
-# be reviewed and committed. Existing baselines are never overwritten.
+# published with this preview deployment under /brand/__e2e-baselines/ (a
+# path the sign-in proxy serves without a session; it exists only in this
+# build, never in the repository) so they can be reviewed and committed.
+# Existing baselines are never overwritten.
 RECORD=""
 if [ -n "$SPECS" ] && printf '%s\n' "${VERCEL_GIT_COMMIT_MESSAGE:-}" | grep -qx 'record-baselines: yes'; then
   RECORD="--update-snapshots=missing"
@@ -101,17 +103,17 @@ if [ -n "$RECORD" ]; then
   # public/ and the app built again so this deployment serves them; the
   # build then succeeds so the deployment exists. Nothing is committed here:
   # the owner of the run reviews the files and commits them.
-  mkdir -p public/__e2e-baselines
+  mkdir -p public/brand/__e2e-baselines
   found=0
   while IFS= read -r f; do
-    cp "$f" "public/__e2e-baselines/$(basename "$f")" && found=$((found + 1))
+    cp "$f" "public/brand/__e2e-baselines/$(basename "$f")" && found=$((found + 1))
     log "Recorded baseline: $f ($(wc -c <"$f") bytes)"
   done < <(find tests/e2e -path '*-snapshots/*-vercel.png' -newer "$REPORT.start" 2>/dev/null)
   if [ "$found" = "0" ]; then
     log "Recording run: no baseline was missing, nothing recorded"
     exit "$status"
   fi
-  log "Recording run: $found baseline(s) published at /__e2e-baselines/ (review the summary above before committing them)"
+  log "Recording run: $found baseline(s) published at /brand/__e2e-baselines/ (review the summary above before committing them)"
   npm run build >/dev/null || { log "Rebuild with the baselines failed"; exit 1; }
   exit 0
 fi

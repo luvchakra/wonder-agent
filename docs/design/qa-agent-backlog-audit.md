@@ -1356,7 +1356,8 @@ tolerance.
   then:
   1. runs `--update-snapshots=missing`, which never overwrites an existing
      baseline;
-  2. copies the new images into `public/__e2e-baselines/` and builds again,
+  2. copies the new images into `public/brand/__e2e-baselines/` (served
+     without a session; it exists in that build only) and builds again,
      so that preview deployment serves them;
   3. finishes successfully, even though Playwright marks the run failed
      because it had to write baselines.
