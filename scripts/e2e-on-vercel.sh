@@ -19,6 +19,10 @@
 set -uo pipefail
 
 log() { echo "[e2e] $*"; }
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ] || [ -z "${NEXT_PUBLIC_SUPABASE_URL:-}" ]; then
+  log "This project does not provide the suite's variables; nothing to run."
+  exit 1
+fi
 SUDO=""
 [ "$(id -u)" = "0" ] || SUDO="sudo"
 
@@ -89,7 +93,9 @@ node -e '
     for (const sp of suite.specs || []) for (const t of sp.tests || []) {
       if (t.status !== "unexpected") continue;
       const err = (t.results || []).map((x) => x.error && x.error.message).find(Boolean) || "";
-      console.log(`[e2e] FAILED ${sp.file}:${sp.line} ${[...path, sp.title].join(" › ")} :: ${err.replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0].slice(0, 300)}`);
+      const lines = err.replace(/\u001b\[[0-9;]*m/g, "").split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 6);
+      console.log(`[e2e] FAILED ${sp.file}:${sp.line} ${[...path, sp.title].join(" › ")}`);
+      for (const l of lines) console.log(`[e2e]     ${l.slice(0, 300)}`);
     }
     for (const c of suite.suites || []) walk(c, [...path, c.title]);
   };
