@@ -2604,3 +2604,23 @@ new organization" screen that followed sign-up.
 - Security advisor: one new expected WARN, that signed-in users can execute
   `create_first_tenant_for_current_user`. It is intended, like
   `create_tenant_with_owner`. No other change.
+
+## 2026-10-10 — Proxy matcher: the web app manifest is public (EXPERIENCE-P0-26)
+
+Cross-module change for Experience's installable app. Browsers fetch the
+web app manifest without cookies, so behind the session check
+`/manifest.webmanifest` redirected to `/sign-in` and the app could never be
+installed. The matcher in `proxy.ts` now excludes `manifest.webmanifest`,
+beside the site icons and `brand/`; nothing else changed. The manifest
+holds no tenant or user data (name, colours, icon paths, its own URL), and
+the app icons were already public under `brand/`. No CSP or header change:
+`default-src 'self'` and `img-src 'self'` already cover the manifest and
+icons.
+
+Verified: `proxy.test.ts` has two new matcher tests
+(`unstable_doesMiddlewareMatch`): the manifest and icons skip the proxy;
+`/`, `/sign-in`, `/agents`, `/platform-admin`, `/api/v1/search` and
+`/manifest` still run it. 12/12 pass. Because §17.8 lists `proxy.ts`, the
+affected E2E specs (`auth`, `navigation-smoke`) should be run by hand or
+checked in the next nightly; they were not run here (they need
+service-role secrets).

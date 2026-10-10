@@ -104,6 +104,19 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     ],
     keywords: ["navigation", "sidebar", "menu", "where is", "find", "theme", "dark mode", "light mode", "mobile", "search", "search box", "keyboard shortcut", "ctrl k", "bell", "account menu", "appearance"],
   },
+  {
+    id: "install-app",
+    title: "Installing WonderID on a phone or tablet",
+    category: "Getting started",
+    summary:
+      "On a phone or tablet you can add WonderID to your home screen, so approvals and findings are one tap away and it opens full screen.",
+    body: [
+      "Android (Chrome, Edge, Samsung Internet): when the browser can install WonderID, a banner at the top of the page offers Install; tap it and confirm. The browser menu's Install app does the same.",
+      "iPhone and iPad: tap Share in the browser (under ••• if you don't see it), then Add to Home Screen. The banner's How to button shows these two steps.",
+      "The installed app is the same WonderID, with the same sign-in and permissions. It needs a connection and does not send push notifications. Closing the banner hides it on that browser for 14 days; it never appears on a computer or once the app is installed.",
+    ],
+    keywords: ["install", "app", "home screen", "add to home screen", "mobile app", "phone", "tablet", "iphone", "ipad", "android", "pwa", "banner"],
+  },
   // ----------------------------------------------------------------- Core model
   {
     id: "should-can-did",

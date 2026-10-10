@@ -14,7 +14,7 @@ Generated 2026-10-10 from 11 module backlogs.
 
 ## Overall
 
-**195 of 249 tracked stories complete — 78%**
+**196 of 250 tracked stories complete — 78%**
 
 ```
 ███████████████████████████████░░░░░░░░░  78%
@@ -22,11 +22,11 @@ Generated 2026-10-10 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 195 |
+| Done | 196 |
 | Partial | 28 |
 | Deferred | 1 |
 | Not Started | 25 |
-| **Total tracked** | **249** |
+| **Total tracked** | **250** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -45,7 +45,7 @@ and are deliberately excluded from the counts above.
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 23 | 3 | 0 | 5 | 31 | `█████████████░░░░░` 74% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 24 | 3 | 0 | 5 | 32 | `██████████████░░░░` 75% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 13 | 1 | 1 | 2 | 17 | `██████████████░░░░` 76% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 3 | 28 | `████████░░░░░░░░░░` 46% |
@@ -280,7 +280,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 23 done · 3 partial · 0 deferred · 5 not started (31 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 24 done · 3 partial · 0 deferred · 5 not started (32 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -315,6 +315,7 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-23 | Brand in the shell and authentication (BRAND-004/005) | Done — 2026-09-26 |
 | EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
+| EXPERIENCE-P0-26 | Install the app on phones and tablets (web app manifest, icons, install banner) | Done — 2026-10-10: manifest, icons, iOS meta and a banner shown only where the browser can install the app; see audit log |
 
 ### 09 — Platform Agent
 

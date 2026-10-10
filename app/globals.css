@@ -338,3 +338,28 @@ body {
     opacity: 0.35;
   }
 }
+
+/*
+ * EXPERIENCE-P0-26 — the install banner eases in from zero height, so the
+ * page slides down under it instead of jumping. Off under reduced motion:
+ * the banner is simply there.
+ */
+@keyframes install-banner-in {
+  from {
+    grid-template-rows: 0fr;
+    opacity: 0;
+  }
+  to {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+}
+.install-banner-enter {
+  grid-template-rows: 1fr;
+  animation: install-banner-in 280ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .install-banner-enter {
+    animation: none;
+  }
+}

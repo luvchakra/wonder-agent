@@ -3400,3 +3400,99 @@ Longest-prefix matching keeps Connection Types current on its sub-pages.
   - `design-review.spec.ts`: the types list and a type page at every width
     and in both themes.
 - The user-facing help guide was not changed (§19.7).
+
+## 2026-10-10 — EXPERIENCE-P0-26: install the app on phones and tablets (founder request)
+
+Before this change WonderID had no web app manifest and no install support:
+only `app/icon.png`, `app/apple-icon.png` (180, opaque) and `app/favicon.ico`.
+
+**Built:**
+
+- **Manifest** — `app/manifest.ts` (Next's file convention, served at
+  `/manifest.webmanifest`), built by `modules/ui/install/manifest.ts`:
+  name and short name "WonderID", description, `id`/`start_url`/`scope` `/`,
+  `display: standalone`, `theme_color` `#ffffff` (`--card`, the header),
+  `background_color` `#f3f6fa` (`--background`), icons 192 and 512
+  (`any`) and a maskable 512, `related_applications` = this manifest's own
+  absolute URL (`platform: webapp`), `prefer_related_applications: false`.
+  It reads the request host per request (`ƒ` in the build), because each
+  organization address is its own origin; a host that is not a plain
+  hostname drops the self-reference. No service worker: Chrome no longer
+  needs one, and the app does not work offline or send push, so no copy
+  claims either.
+- **Icons** — `public/brand/app/icon-192.png`, `icon-512.png` (the brand
+  mark `public/brand/logo/wonderid-mark.png` on a white tile with rounded
+  transparent corners, mark at 66% width) and `icon-maskable-512.png`
+  (full-bleed white, mark at 56% width, its corners inside the 80% safe
+  circle: half-diagonal 174px against a 205px radius). Resampled with
+  Pillow from a scratch script outside the repo; nothing redrawn. Paths and
+  colours are in `wonderIdBrand.app` (`modules/ui/brand.ts`). The Apple
+  touch icon stays `app/apple-icon.png`, the sheet's own white app icon.
+- **Root layout** — `viewport.themeColor` (light `#ffffff`, dark `#13171f`,
+  `--card` in each theme); `appleWebApp` (capable, title "WonderID",
+  status bar `default`), plus `apple-mobile-web-app-capable` for older iOS
+  (Next emits only `mobile-web-app-capable`).
+- **Early capture** — `InstallPromptCapture`, an inline `<head>` script
+  beside `ThemeFlashGuard` (the CSP already allows inline scripts), catches
+  `beforeinstallprompt` before hydration, calls `preventDefault()` and
+  parks it on `window`; on `appinstalled` it records "installed".
+- **Banner** — `modules/ui/install/InstallAppBanner.tsx`, rendered first in
+  `<body>`, so it sits above every header (the customer shell, the landing
+  page, Get Help) in the document flow and pushes the page down; the
+  sticky header and the `lg` sidebar stick to the top once it scrolls away.
+  It decides with the pure `installBannerVariant()`
+  (`modules/ui/install/eligibility.ts`):
+  - shown only on a phone or tablet (`userAgentData.mobile`, or Android /
+    iPhone / iPod / iPad, or iPadOS-as-Mac with `maxTouchPoints > 1`, and
+    always a coarse primary pointer; a touch laptop does not count);
+  - hidden when running installed (standalone, fullscreen, minimal-ui,
+    window-controls-overlay, iOS `navigator.standalone`), when
+    `getInstalledRelatedApps()` returns an entry (it waits for the answer
+    rather than flashing), in in-app browsers and frames, on
+    `/platform-admin`, `/auth/*`, `/api/*` and any print/export/embed path;
+  - Chromium: one-tap **Install** only once `beforeinstallprompt` has fired;
+    it calls `prompt()` and awaits `userChoice`;
+  - iOS/iPadOS Safari, and other full iOS browsers from 16.4: **How to**
+    opens two steps (Share with the share glyph inline, then Add to Home
+    Screen) and "I've added it";
+  - Firefox on Android, webviews, desktop: nothing.
+  - Memory (`localStorage` key `wonderid-install-banner`, every access in
+    try/catch, no user or tenant data): installed or "I've added it" →
+    never again; Close or a declined prompt → 14 days.
+  - Design: the 40px app icon, "WonderID", one line ("Approvals and
+    findings on your home screen, full screen."), a pill Install / How to
+    button and a 44px Close; tokens only, both themes; `print:hidden`;
+    `env(safe-area-inset-top)`; eases in from zero height, off under
+    `prefers-reduced-motion`. `role="region"` labelled "Install the WonderID
+    app", named buttons, `aria-expanded` on How to, no autofocus. Minimal UI:
+    one primary action and Close.
+- **Get Help** — new "Installing WonderID on a phone or tablet" section
+  (Getting started), at the founder's request for this feature.
+- **Foundation** — `proxy.ts` matcher now skips `manifest.webmanifest`; see
+  the Foundation audit entry of the same date.
+
+**Verified:**
+
+- `npm run typecheck` clean (after `npx next typegen`); eslint clean on the
+  changed files (`npm run lint`: 0 errors, one existing warning in
+  `app/actions/connectors.ts`); `npx vitest run`: 1026 passed, 125 files
+  (1 skipped). New: `eligibility.test.ts` (15: desktop, standalone,
+  Chromium with and without the event, iOS Safari / iPadOS / Chrome 16.4+
+  and pre-16.4, Firefox Android and webviews, related apps, snooze,
+  routes), `manifest.test.ts` (6: fields, icon files and sizes, the
+  self-reference), `InstallAppBanner.test.tsx` (8: variants, prompt,
+  snooze, appinstalled, blocked storage), two proxy matcher tests.
+- `next build` passes; `/manifest.webmanifest` is dynamic.
+- Local `next dev` without Supabase variables, Playwright Chromium: the
+  manifest serves as `application/manifest+json` under the unchanged CSP,
+  and the head carries the manifest link, theme-color and Apple meta.
+  Screenshots at 390 (Android with a dispatched `beforeinstallprompt`, and
+  iOS Safari, collapsed and How to, light and dark), 320, 768 and 1180
+  (iPadOS with the sidebar), over the landing page and a scratch copy of
+  the customer shell's header, tab bar and sidebar (deleted before commit;
+  the real shell needs a session). 0px horizontal overflow; the header
+  starts exactly under the banner and sticks to the top on scroll; no
+  banner on desktop 1440, Firefox Android, `/platform-admin`, or Android
+  without the event; Close and Install write the expected memory.
+- Not verified: a real device install, and the signed-in shell itself.
+  No E2E run (the suite needs service-role secrets).

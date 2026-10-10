@@ -53,6 +53,24 @@ export const wonderIdBrand = {
     appleTouchIcon: asset("favicon/apple-touch-icon.png"),
     social: asset("social/wonderid-og.png"),
   },
+  /**
+   * EXPERIENCE-P0-26 — the installed app (web app manifest, home-screen
+   * icon, install banner). The icons are the mark above on a white tile,
+   * resampled, nothing redrawn: `icon*` have rounded transparent corners;
+   * `maskable512` is full-bleed with the mark inside the 80% safe circle.
+   * The Apple touch icon stays app/apple-icon.png (the sheet's app icon).
+   * Colours are theme tokens as hex, for the manifest and the theme-color
+   * meta, which CSS cannot reach: `--card` (the header) light and dark,
+   * and `--background` light.
+   */
+  app: {
+    themeColor: "#ffffff",
+    themeColorDark: "#13171f",
+    backgroundColor: "#f3f6fa",
+    icon192: { src: "/brand/app/icon-192.png", width: 192, height: 192 },
+    icon512: { src: "/brand/app/icon-512.png", width: 512, height: 512 },
+    maskable512: { src: "/brand/app/icon-maskable-512.png", width: 512, height: 512 },
+  },
 } as const;
 
 /**

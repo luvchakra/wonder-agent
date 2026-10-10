@@ -48,6 +48,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-23 | Brand in the shell and authentication (BRAND-004/005) | Done — 2026-09-26 |
 | EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
+| EXPERIENCE-P0-26 | Install the app on phones and tablets (web app manifest, icons, install banner) | Done — 2026-10-10: manifest, icons, iOS meta and a banner shown only where the browser can install the app; see audit log |
 
 ---
 
@@ -717,3 +718,19 @@ decisions are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
   sidebar expanded and collapsed, Agent 360, runtime, risk, Users, Roles,
   the permission catalog, tenant settings and mobile navigation (§75).
 
+## Installable app — 2026-10-10 (founder request)
+
+### EXPERIENCE-P0-26 — Install the app on phones and tablets
+
+- A web app manifest (`app/manifest.ts`): name, short name, description,
+  id, start URL, scope, `standalone`, theme and background colours from
+  the tokens, 192/512 and maskable 512 icons from the brand mark, and a
+  `related_applications` self-reference. No service worker.
+- iOS: the Apple touch icon (existing) and the apple-mobile-web-app meta.
+- A banner at the very top of the page, above the header, on phones and
+  tablets only, and only when the browser can install the app and it is
+  not installed: one-tap Install after `beforeinstallprompt` (Chromium),
+  two-tap instructions on iOS/iPadOS, nothing elsewhere. Dismiss or a
+  declined prompt snoozes it for 14 days; installed hides it for good.
+  Never on the vendor console, auth callbacks or print/export/embedded
+  views. Both themes, reduced motion, accessible.
