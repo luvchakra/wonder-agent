@@ -1785,3 +1785,16 @@ import**.
   (CSV through the framework) are now Done; both were still marked Partial
   pending migrations that have since been applied and verified (QA log:
   isolation 14/14 and 8/8). `npm run progress`: 198 of 250 (79%).
+
+### 2026-10-10 — Migration 0113 run by the owner
+
+The database tool cancelled 0113's deletes twice. The owner then ran the
+migration themselves in the Supabase SQL editor.
+
+**Checked afterwards:**
+- `integration_types` holds only `connector`;
+- the Zendesk connection has no credential, as expected, and waits for new
+  ones;
+- all 7 connections are still present, all `connector`.
+
+**Recorded:** the INTEGRATION-P0-16 tracker row is updated.
