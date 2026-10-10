@@ -1610,3 +1610,81 @@ run against the dev project; until 0110 is applied, flushes log
 "traffic not recorded" and the Gateway page cannot load. The file driver
 being added in parallel must be wired in `gateway.ts` with
 `meteredDriver()` when it merges.
+
+## 2026-10-10 — CSV through the connector framework: file driver, schedules, object-page imports (INTEGRATION-P0-17)
+
+**Why:** the user asked for CSV to be a connector type for scheduled,
+job-based ingestion, and for each object page to import CSV directly. By
+non-negotiable #20 both run through the framework: there is one path, a
+file connection's sync.
+
+**Built:**
+
+- **`file` driver** (`framework/drivers/file.ts`, `framework/csv.ts`): an
+  RFC 4180 parser (quoted fields with separators, line breaks and doubled
+  quotes; CRLF, LF, CR; BOM), strict about structure (unterminated quote,
+  text after a closing quote, ragged rows, unnamed or duplicate columns,
+  more than 50,000 rows refuse the whole file with its row). Columns match
+  in any case, ignoring spaces, `_` and `-`; a `columns` setting renames
+  headers per connection; unknown columns are ignored, so a WonderID
+  export imports back. A resource reads its `file.url` address (through the
+  Connector Gateway: policies, accounting, SSRF guard, 10 MB cap) or the
+  newest unread file received for its kind, marked read at the end of the
+  run. Registered in `gateway.ts` with `withDefinition(meteredFetch("file"))`
+  rather than `meteredDriver()`, so only real fetches are accounted, by
+  host; reading a received file is not outbound traffic. The gateway gives
+  the driver its own session's connection (a caller cannot name another),
+  and a preview reads no received files.
+- **`csv-file`** built-in: five optional addresses, an application name,
+  column renames, an optional Bearer token, and the `file` receiver.
+  Validation: an address comes only from a url setting, renames only from a
+  string setting, one file per kind, no MCP kinds, no `forEach`/`unwind`,
+  no `test`, `receive.file` only on a file connector.
+- **Receiver** `POST /api/connect/v1/<id>/file` (receiving secret, 10 MB,
+  `x-wonderid-kind`): authenticated first, then the file is checked
+  (structure, then a column for every required field), stored in
+  `connector_files`, and a sync is started after the response. Audited
+  `integration.file_received` with counts and SHA-256 only.
+- **Schedules:** `integrations.schedule` (manual, daily, hourly) and a new
+  daily cron `/api/cron/connector-syncs` (`vercel.json`, 20:45 UTC). Due
+  connections run as `scheduled` sync jobs for their own tenant, a few at a
+  time within a 240 s budget; `integration_sync_jobs.schedule_window` with a
+  unique index makes each window run once. On the daily-only plan, hourly
+  means "at each cron run". The cron also purges read files beyond each
+  connection's newest five (never an unread one).
+- **Imports:** `POST /api/v1/imports` (`integration.execute`, the same
+  permission the Actions menu checks) and `importFileForObject()`: the file
+  becomes an upload of the tenant's single **File imports** connection
+  (created on first use; a unique index keeps it single), checked before it
+  is stored, then synced before the response up to 5,000 rows, else in the
+  background. 400 answers carry `details: [{ row, column, message }]`.
+  Audited `integration.file_imported` with counts only.
+- **Page:** a Files card on a file connection (schedule select, last file
+  received, the upload endpoint folded away).
+- **Migration 0111:** `connector_files` (RLS on, no client policy: a file is
+  raw organization data, and hiding one column from a select policy would
+  need column grants that are easy to undo), the schedule column, the
+  schedule window column and the tightened client insert policy, the single
+  File imports index, and `connector_definitions` accepting the `mcp`,
+  `file` and `none` drivers and the `ai_runtime`/`event_source` categories
+  (0108's check was missing them). Additive; nothing is deleted.
+
+**Verified (code only):** `npm run typecheck` clean; eslint clean on the
+changed files; `npx vitest run modules/integrations tests/architecture app
+lib`: 51 files, 422 tests passed, 1 file skipped (live). New tests: CSV parser
+and columns (15), file driver, validation and upload targets (13), file
+receiver (5), import rules (6) and service (4), schedule rules (6), the file
+driver in the gateway (3). The boundary test now also checks that
+`fileDriver(` is built only in the gateway.
+
+**Open:**
+
+- Migration 0111 is not applied and `tests/integration/connector-files-isolation.sql`
+  has not been run against the dev project.
+- Vercel accepts request bodies up to 4.5 MB, so a file sent to the receiver
+  or imported through the hosted app is limited to that; an address can
+  serve 10 MB.
+- An access row's id is always `<account>:<entitlement>`, so re-importing an
+  exported grant does not keep its exported `externalId`.
+- Schedules have UI only on file connections; other connections can be
+  scheduled through `setConnectionSchedule()` but have no control yet.

@@ -32,8 +32,11 @@ export const CONNECTOR_CATEGORIES = [
 ] as const;
 export type ConnectorCategory = (typeof CONNECTOR_CATEGORIES)[number];
 
-/** `none`: a connector that only receives (events, webhooks, gateway calls) and reads nothing. */
-export const CONNECTOR_DRIVERS = ["http", "ldap", "sql", "mcp", "none"] as const;
+/**
+ * `none`: a connector that only receives (events, webhooks, gateway calls) and reads nothing.
+ * `file`: CSV files, fetched from an HTTPS address or sent to the connection's `file` receiver.
+ */
+export const CONNECTOR_DRIVERS = ["http", "ldap", "sql", "mcp", "file", "none"] as const;
 export type ConnectorDriver = (typeof CONNECTOR_DRIVERS)[number];
 
 /** The canonical object families a definition can produce (integration_objects.object_type). */
@@ -237,6 +240,14 @@ export type ResourceSpec = {
   /** mcp driver: a JSON-RPC list method (tools/list, resources/list) or initialize. Paged by nextCursor. */
   rpc?: { method: "initialize" | "tools/list" | "resources/list" | "prompts/list" };
   /**
+   * file driver: where this kind's CSV comes from. Each row is a record
+   * keyed by its column names, matched case-insensitively and ignoring
+   * spaces, `_` and `-` ("Work Email" is read as `workemail`). Without a
+   * `url` (or when it fills to nothing), the newest file sent to the
+   * connection's `file` receiver for this kind is read.
+   */
+  file?: FileSourceSpec;
+  /**
    * Run the request once per record of another resource, with that record
    * as `{parent.…}` (group → its members; user → its roles).
    */
@@ -256,6 +267,19 @@ export type ResourceSpec = {
   fields: Record<string, FieldMapping>;
   /** Hard ceiling for one sync (default 50 000). */
   maxRecords?: number;
+};
+
+export type FileSourceSpec = {
+  /** `{settings.<url setting>}`: the HTTPS address of the CSV. Empty means "read uploaded files". */
+  url?: string;
+  /**
+   * `{settings.<string setting>}` holding column renames, one per line or
+   * `;`-separated: `email = Work Email`, or `identity.email = Work Email`
+   * for one kind only. That column is then read as the field's name.
+   */
+  columns?: string;
+  /** Field separator (default `,`). */
+  delimiter?: "," | ";" | "\t" | "|";
 };
 
 export type ConnectorDefinition = {
@@ -322,6 +346,13 @@ export type ReceiveSpec = {
    * API key, which must belong to this connection's organization.
    */
   gateway?: { authorize: boolean; toolsFilter: boolean };
+  /**
+   * CSV files for a file connector: POST /api/connect/v1/<id>/file, one
+   * kind per request (header `x-wonderid-kind`), authenticated by the
+   * connection's receiving secret. The stored file is read by the sync the
+   * upload starts.
+   */
+  file?: { auth: "bearer" | "hmac_sha256"; signatureHeader?: string };
 };
 
 /** What an organization stores on an integration of type `connector`. */

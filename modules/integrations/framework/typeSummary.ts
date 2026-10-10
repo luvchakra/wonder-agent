@@ -56,6 +56,7 @@ export const RECEIVE_LABEL: Record<string, string> = {
   runtimeEvents: "agent activity",
   webhook: "webhooks",
   gateway: "Runtime Gateway calls",
+  file: "CSV files",
 };
 
 /** One line: what a connector reads and what it receives. */
@@ -76,6 +77,7 @@ const PROTOCOL_LABEL: Record<ConnectorDriver, string> = {
   ldap: "LDAP v3 (LDAPS)",
   sql: "SQL (PostgreSQL, TLS)",
   mcp: "MCP (Streamable HTTP)",
+  file: "CSV files (HTTPS or received)",
   none: "Receive only",
 };
 
@@ -171,6 +173,7 @@ export function paginationStyles(def: ConnectorDefinition): string[] {
   if (def.driver === "ldap") return ["LDAP paged results"];
   if (def.driver === "sql") return ["One query, row-limited"];
   if (def.driver === "mcp") return ["MCP nextCursor"];
+  if (def.driver === "file") return ["One file per kind"];
   return [...new Set(all.map((r) => PAGINATION_LABEL[r.pagination?.type ?? "none"]))];
 }
 
@@ -195,6 +198,9 @@ export function receiveChannels(def: ConnectorDefinition): ReceiveSummary[] {
       paths: [...(r.gateway.authorize ? ["gateway/authorize"] : []), ...(r.gateway.toolsFilter ? ["gateway/tools/filter"] : [])],
       auth: "The agent's own API key",
     });
+  }
+  if (r.file) {
+    out.push({ channel: "file", label: capitalize(RECEIVE_LABEL.file), paths: ["file"], auth: senderAuth(r.file.auth, r.file.signatureHeader) });
   }
   return out;
 }

@@ -65,7 +65,7 @@ const MACHINE_ROUTES_ALLOWED: Record<string, string> = {
 const DRIVER_CONSTRUCTION_ALLOWED: Record<string, string> = {
   "modules/integrations/gateway/": "the Connector Gateway: the only place drivers are built",
   "modules/integrations/framework/engine.ts": "defines httpDriver",
-  "modules/integrations/framework/drivers/": "define the ldap, sql and mcp drivers and their address guard",
+  "modules/integrations/framework/drivers/": "define the ldap, sql, mcp and file drivers and their address guard",
   "modules/integrations/outboundFetch.ts": "defines guardedFetch",
 };
 
@@ -103,7 +103,7 @@ describe("connector boundary (non-negotiable #20)", () => {
 
   it("the connector drivers are built only in the Connector Gateway", () => {
     const offenders = source
-      .filter((f) => /\b(httpDriver|mcpDriver|guardedFetch|guardedLookup|resolveSafeHost)\s*\(|\b(ldapDriver|sqlDriver|guardedFetch)\b/.test(withoutComments(f.text)))
+      .filter((f) => /\b(httpDriver|mcpDriver|fileDriver|guardedFetch|guardedLookup|resolveSafeHost)\s*\(|\b(ldapDriver|sqlDriver|guardedFetch)\b/.test(withoutComments(f.text)))
       .filter((f) => !allowed(f.path, DRIVER_CONSTRUCTION_ALLOWED))
       .map((f) => f.path);
     expect(offenders).toEqual([]);

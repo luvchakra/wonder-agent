@@ -28,6 +28,11 @@ export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";
 export { rotateReceiverSecret, getReceiverStatus } from "./framework/receive";
 export { listConnectorTraffic, purgeConnectorTraffic, TRAFFIC_PAGE_SIZE, type ConnectionTraffic } from "./gateway/traffic";
+export { importFileForObject, type FileImportResult } from "./fileImports";
+export { IMPORT_KINDS, INLINE_SYNC_MAX_ROWS, MAX_IMPORT_BYTES, FileImportInvalidError, checkImportForm, tooLargeForImport, type ImportKind } from "./fileImportRules";
+export { latestConnectorFile, type ConnectorFileInfo } from "./framework/files";
+export { setConnectionSchedule, getConnectionSchedule, runScheduledSyncs, type ScheduledRunSummary } from "./connectorSchedules";
+export { CONNECTION_SCHEDULES, type ConnectionSchedule } from "./connectorScheduleRules";
 export {
   listIdentitySources,
   getIdentitySource,

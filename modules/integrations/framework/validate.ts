@@ -40,10 +40,41 @@ const AUTH_BY_DRIVER: Record<string, string[]> = {
   ldap: ["ldap_simple"],
   sql: ["sql_password"],
   mcp: ["none", "bearer", "header"],
+  file: ["none", "bearer", "basic", "header"],
   none: ["none"],
 };
 
 const MCP_METHODS = ["initialize", "tools/list", "resources/list", "prompts/list"];
+
+/** The kinds a CSV can hold: rows of flat fields, not MCP declarations. */
+const FILE_KINDS = ["identity", "account", "entitlement", "access_grant", "application", "policy"];
+const FILE_DELIMITERS = [",", ";", "\t", "|"];
+const SETTING_REF_RE = /^\{settings\.([a-zA-Z][a-zA-Z0-9_]*)\}$/;
+
+/**
+ * A file resource's source: `url` is exactly one url setting (so the
+ * organization's own address decides the host, as for every driver) and
+ * `columns` exactly one string setting. A resource that has no address
+ * must be able to receive files, or it could never read anything.
+ */
+function checkFileSource(ctx: Ctx, path: string, kind: ResourceKind, r: Record<string, unknown>, receivesFiles: boolean) {
+  if (!FILE_KINDS.includes(kind)) issue(ctx, path, `a file connector reads ${FILE_KINDS.join(", ")}`);
+  if (r.forEach !== undefined || r.unwind !== undefined) issue(ctx, path, "forEach and unwind are not available for the file driver (one CSV row is one record)");
+  const f = r.file;
+  if (f !== undefined && !isObj(f)) return issue(ctx, `${path}.file`, "must be an object");
+  const file = (f ?? {}) as Record<string, unknown>;
+  for (const k of Object.keys(file)) if (!["url", "columns", "delimiter"].includes(k)) issue(ctx, `${path}.file.${k}`, "must be url, columns or delimiter");
+  const ref = (key: "url" | "columns", type: string) => {
+    const v = file[key];
+    if (v === undefined) return;
+    const m = typeof v === "string" ? SETTING_REF_RE.exec(v) : null;
+    if (!m || ctx.settings.get(m[1]) !== type) issue(ctx, `${path}.file.${key}`, `must be one ${type} setting, as {settings.<key>}`);
+  };
+  ref("url", "url");
+  ref("columns", "string");
+  if (file.delimiter !== undefined && !FILE_DELIMITERS.includes(String(file.delimiter))) issue(ctx, `${path}.file.delimiter`, 'must be ",", ";", "\\t" or "|"');
+  if (file.url === undefined && !receivesFiles) issue(ctx, `${path}.file.url`, "is required unless the connector receives files (receive.file)");
+}
 
 type Ctx = { issues: DefinitionIssue[]; settings: Map<string, string>; secrets: Set<string> };
 
@@ -188,6 +219,8 @@ function checkResource(ctx: Ctx, def: Record<string, unknown>, kind: ResourceKin
     checkRecordsPath(ctx, `${path}.records`, r.records);
     if (r.recordsKeyed !== undefined && typeof r.recordsKeyed !== "boolean") issue(ctx, `${path}.recordsKeyed`, "must be true or false");
     checkPagination(ctx, `${path}.pagination`, r.pagination);
+  } else if (driver === "file") {
+    checkFileSource(ctx, path, kind, r, isObj(def.receive) && def.receive.file !== undefined);
   } else if (driver === "ldap") {
     const s = r.search;
     if (!isObj(s)) issue(ctx, `${path}.search`, "is required for the ldap driver");
@@ -255,11 +288,11 @@ function checkSql(ctx: Ctx, path: string, q: unknown) {
 
 const HEADER_RE = /^[a-zA-Z][a-zA-Z0-9-]{1,60}$/;
 
-function checkReceive(ctx: Ctx, rec: unknown) {
+function checkReceive(ctx: Ctx, rec: unknown, driver: unknown) {
   if (rec === undefined) return;
   if (!isObj(rec)) return issue(ctx, "receive", "must be an object");
-  const known = new Set(["runtimeEvents", "webhook", "gateway"]);
-  for (const k of Object.keys(rec)) if (!known.has(k)) issue(ctx, `receive.${k}`, "must be runtimeEvents, webhook or gateway");
+  const known = new Set(["runtimeEvents", "webhook", "gateway", "file"]);
+  for (const k of Object.keys(rec)) if (!known.has(k)) issue(ctx, `receive.${k}`, "must be runtimeEvents, webhook, gateway or file");
   const checkAuth = (path: string, c: Record<string, unknown>) => {
     if (c.auth !== "bearer" && c.auth !== "hmac_sha256") issue(ctx, `${path}.auth`, "must be bearer or hmac_sha256");
     if (c.signatureHeader !== undefined && !(typeof c.signatureHeader === "string" && HEADER_RE.test(c.signatureHeader))) issue(ctx, `${path}.signatureHeader`, "must be a header name");
@@ -293,6 +326,13 @@ function checkReceive(ctx: Ctx, rec: unknown) {
   const gw = rec.gateway;
   if (gw !== undefined && (!isObj(gw) || typeof gw.authorize !== "boolean" || typeof gw.toolsFilter !== "boolean")) {
     issue(ctx, "receive.gateway", "must be { authorize: true|false, toolsFilter: true|false }");
+  }
+  const file = rec.file;
+  if (file !== undefined) {
+    if (!isObj(file)) issue(ctx, "receive.file", "must be an object");
+    else checkAuth("receive.file", file);
+    // Received files are read by the file driver's resources, so only a file connector receives them.
+    if (driver !== "file") issue(ctx, "receive.file", "only a file connector (driver file) receives files");
   }
 }
 
@@ -386,6 +426,9 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
   // Test
   if (d.driver === "none") {
     if (d.test !== undefined) issue(ctx, "test", "a receive-only connector has nothing to test");
+  } else if (d.driver === "file") {
+    // Testing a file connection reads each address it names; there is no separate call.
+    if (d.test !== undefined) issue(ctx, "test", "a file connector is tested by reading its files' addresses; leave test out");
   } else if (!isObj(d.test)) issue(ctx, "test", "is required (a cheap call that proves the connection works)");
   else if (d.driver === "mcp") {
     if (!isObj(d.test.rpc) || !MCP_METHODS.includes(String(d.test.rpc.method))) issue(ctx, "test.rpc.method", `must be one of ${MCP_METHODS.join(", ")}`);
@@ -400,7 +443,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
   }
 
   // Receiving side
-  checkReceive(ctx, d.receive);
+  checkReceive(ctx, d.receive, d.driver);
 
   // Resources
   const receives = isObj(d.receive) && Object.keys(d.receive).length > 0;
@@ -417,6 +460,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
         const value = (d.resources as Record<string, unknown>)[k];
         const list = Array.isArray(value) ? value : [value];
         if (list.length === 0 || list.length > 10) issue(ctx, `resources.${k}`, "needs one to ten requests");
+        if (d.driver === "file" && Array.isArray(value)) issue(ctx, `resources.${k}`, "a file connector reads one file per kind");
         list.forEach((spec, i) => checkResource(ctx, d, k as ResourceKind, spec, kinds, Array.isArray(value) ? `resources.${k}[${i}]` : `resources.${k}`));
       }
     }
@@ -454,7 +498,7 @@ export function validateSettings(def: ConnectorDefinition, input: unknown): { se
         } catch {
           /* reported below */
         }
-        const devHttp = (def.driver === "http" || def.driver === "mcp") && u?.protocol === "http:";
+        const devHttp = (def.driver === "http" || def.driver === "mcp" || def.driver === "file") && u?.protocol === "http:";
         if (!u || (u.protocol !== scheme && !(devHttp && process.env.OUTBOUND_ALLOW_PRIVATE_NETWORKS === "true") && !(def.driver === "sql" && u.protocol === "postgresql:"))) {
           issues.push({ path: `settings.${s.key}`, message: `${s.label} must be a ${scheme}// address` });
         } else if (u.username || u.password) issues.push({ path: `settings.${s.key}`, message: `${s.label} must not contain a user name or password` });

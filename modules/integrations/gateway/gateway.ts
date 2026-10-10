@@ -7,6 +7,8 @@ import { LIMITS, type FetchLike } from "../framework/http";
 import { ldapDriver } from "../framework/drivers/ldap";
 import { sqlDriver } from "../framework/drivers/sql";
 import { mcpDriver } from "../framework/drivers/mcp";
+import { fileDriver, type FileStoreFactory } from "../framework/drivers/file";
+import { connectorFileStore } from "../framework/files";
 import type { ConnectorDefinition } from "../framework/types";
 import {
   GatewayRefusedError,
@@ -66,6 +68,8 @@ export type GatewayOptions = {
   /** Tests only: the transport under the gateway (production: guardedFetch) and the socket drivers. */
   transport?: (url: string, init: GuardedInit) => Promise<Response>;
   socketDrivers?: { ldap?: DriverFactory; sql?: DriverFactory };
+  /** Tests only: where the file driver reads received files (production: connector_files). */
+  fileStore?: FileStoreFactory;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 };
@@ -111,6 +115,9 @@ export class GatewaySession {
       mcp: this.withDefinition(mcpDriver(this.meteredFetch("mcp"))),
       ldap: this.meteredDriver("ldap", opts.socketDrivers?.ldap ?? ldapDriver),
       sql: this.meteredDriver("sql", opts.socketDrivers?.sql ?? sqlDriver),
+      // CSV files: an address is fetched through the metered fetch (policies, guard, 10 MB cap);
+      // a received file is read from connector_files for this session's own connection only.
+      file: this.withDefinition(this.ownConnection(fileDriver({ fetch: this.meteredFetch("file"), store: opts.fileStore ?? connectorFileStore }))),
     };
   }
 
@@ -124,10 +131,20 @@ export class GatewaySession {
     this.bucket ??= new TokenBucket(this.opts.rateLimitPerSecond ?? def.rateLimitPerSecond ?? 10, 1, this.now);
   }
 
+  /**
+   * The driver's connection is this session's, whatever the caller passed:
+   * the organization and connection the gateway was opened for (§14). A
+   * preview (no connection) has none, so it reads no received files.
+   */
+  private ownConnection(factory: DriverFactory): DriverFactory {
+    const { tenantId, integrationId } = this.connection;
+    return (def, settings, secrets) => factory(def, settings, secrets, integrationId ? { tenantId, integrationId } : undefined);
+  }
+
   private withDefinition(factory: DriverFactory): DriverFactory {
-    return (def, settings, secrets) => {
+    return (def, settings, secrets, context) => {
       this.useDefinition(def);
-      return factory(def, settings, secrets);
+      return factory(def, settings, secrets, context);
     };
   }
 
@@ -149,11 +166,11 @@ export class GatewaySession {
   }
 
   /** HTTP and MCP: every request through the policies above, then guardedFetch. */
-  private meteredFetch(kind: "http" | "mcp"): FetchLike {
+  private meteredFetch(kind: "http" | "mcp" | "file"): FetchLike {
     const transport = this.opts.transport ?? guardedFetch;
     return async (url, init) => {
       const host = hostOf(url);
-      const operation = kind === "http" ? operationLabel("http", init.method ?? "GET") : operationLabel("mcp", rpcMethod(init.body));
+      const operation = kind === "mcp" ? operationLabel("mcp", rpcMethod(init.body)) : operationLabel(kind, init.method ?? "GET");
       await this.admit(operation, host);
       const started = this.now();
       const bytesOut = init.body ? Buffer.byteLength(init.body, "utf8") : 0;
@@ -201,13 +218,13 @@ export class GatewaySession {
    */
   meteredDriver(kind: string, factory: DriverFactory): DriverFactory {
     const verb = kind === "ldap" ? "search" : kind === "sql" ? "query" : "read";
-    return async (def, settings, secrets): Promise<ConnectorDriverSession> => {
+    return async (def, settings, secrets, context): Promise<ConnectorDriverSession> => {
       this.useDefinition(def);
       const host = hostOf(addressOf(def, settings));
-      const session = await this.metered(operationLabel(kind, "connect"), host, () => factory(def, settings, secrets));
+      const session = await this.metered(operationLabel(kind, "connect"), host, () => factory(def, settings, secrets, context));
       return {
         test: () => this.metered(operationLabel(kind, verb), host, () => session.test()),
-        fetch: (resource, scope, max) => this.metered(operationLabel(kind, verb), host, () => session.fetch(resource, scope, max), approximateBytes),
+        fetch: (resource, scope, max, resourceKind) => this.metered(operationLabel(kind, verb), host, () => session.fetch(resource, scope, max, resourceKind), approximateBytes),
         close: session.close ? () => session.close!() : undefined,
       };
     };

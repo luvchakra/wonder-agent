@@ -12,6 +12,7 @@ import { connectionTypeOf } from "@/modules/integrations/framework/typeSummary";
 import { ConnectorCredentialsForm, ReceiverSecretForm } from "../types/ConnectorForms";
 import { Suspense } from "react";
 import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
+import { ConnectorFilesCard } from "./ConnectorFilesCard";
 
 const JOB_STATUS_TONE: Record<string, BadgeTone> = {
   queued: "neutral",
@@ -63,7 +64,7 @@ export default async function IntegrationDetailPage({
   if (!integration) notFound();
   const connector = connectorDefinition(integration);
   const receive = connector?.receive;
-  const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook);
+  const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file);
 
   const [jobs, receiver, origin] = await Promise.all([
     listSyncJobs(ctx.tenantId!, id),
@@ -163,6 +164,8 @@ export default async function IntegrationDetailPage({
           </CardBody>
         </Card>
       ) : null}
+
+      {connector?.driver === "file" ? <ConnectorFilesCard tenantId={ctx.tenantId!} integrationId={id} uploadUrl={endpoint("file")} /> : null}
 
       {reads ? (
         <>

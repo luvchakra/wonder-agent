@@ -14,9 +14,13 @@ import {
   quarantineEvent,
 } from "@/modules/runtime-assurance/service";
 import { openGateway } from "../gateway/gateway";
+import { createSystemSyncJob, runSyncJob } from "../syncJobs";
 import { parseConnectorConfig } from "./engine";
 import { readPath } from "./mapping";
-import { eventRecords, mapRuntimeEvent, verifySender, type ReceivedRuntimeEvent } from "./receiveRules";
+import { MAX_CSV_BYTES, readCsvFile } from "./csv";
+import { storeConnectorFile } from "./files";
+import { fileColumns } from "./drivers/file";
+import { eventRecords, mapRuntimeEvent, uploadFilename, uploadTarget, verifySender, type ReceivedRuntimeEvent } from "./receiveRules";
 import type { ConnectorDefinition } from "./types";
 
 /**
@@ -31,11 +35,12 @@ import type { ConnectorDefinition } from "./types";
  * declare the channel receives nothing.
  */
 
-export type ReceiveResult = { status: number; body: Record<string, unknown> };
+/** `background` is work to run after the response is sent (the route passes it to after()). */
+export type ReceiveResult = { status: number; body: Record<string, unknown>; background?: () => Promise<void> };
 
 const fail = (status: number, code: string, message: string): ReceiveResult => ({ status, body: { ok: false, error: { code, message } } });
 
-type Connection = { id: string; tenantId: string; name: string; status: string; def: ConnectorDefinition };
+type Connection = { id: string; tenantId: string; name: string; status: string; def: ConnectorDefinition; settings: Record<string, string | number | boolean> };
 
 /** A connector connection by id, disabled ones included (the gateway refuses those); null when there is none. */
 async function loadConnection(connectionId: string): Promise<Connection | null> {
@@ -48,7 +53,8 @@ async function loadConnection(connectionId: string): Promise<Connection | null> 
   if (error) throw new ApiError(503, "UNAVAILABLE", "The connection could not be read");
   if (!data || data.integration_type_id !== "connector") return null;
   try {
-    return { id: data.id, tenantId: data.tenant_id, name: data.name, status: data.status, def: parseConnectorConfig(data.config).def };
+    const { def, settings } = parseConnectorConfig(data.config);
+    return { id: data.id, tenantId: data.tenant_id, name: data.name, status: data.status, def, settings };
   } catch {
     return null;
   }
@@ -78,7 +84,7 @@ export async function rotateReceiverSecret(tenantId: string, actorId: string, co
   const conn = await loadConnection(connectionId);
   if (!conn || conn.tenantId !== tenantId || conn.status === "disabled") throw new ApiError(404, "INTEGRATION_NOT_FOUND");
   const r = conn.def.receive;
-  if (!r?.runtimeEvents && !r?.webhook) throw new ApiError(400, "NOT_A_RECEIVER", "This connection receives nothing that needs a secret");
+  if (!r?.runtimeEvents && !r?.webhook && !r?.file) throw new ApiError(400, "NOT_A_RECEIVER", "This connection receives nothing that needs a secret");
   const secret = `wr_${randomBytes(32).toString("base64url")}`;
   const now = new Date().toISOString();
   const { error } = await supabaseServiceRole()
@@ -257,6 +263,49 @@ async function receiveWebhook(conn: Connection, rawBody: string, headers: Header
   return { status: 202, body: { ok: true, data: null } };
 }
 
+// ---------------------------------------------------------------- files
+
+/**
+ * A CSV sent to a file connection: authenticated, checked (header row,
+ * columns the kind needs, every row's field count) before anything is
+ * stored, then kept in connector_files and read by the sync this starts.
+ * A file that fails a check is refused whole, with the row and column.
+ */
+async function receiveFile(conn: Connection, rawBody: string, headers: Headers): Promise<ReceiveResult> {
+  const spec = conn.def.receive?.file;
+  if (!spec) return fail(404, "NOT_FOUND", "This connection does not receive files");
+  const secret = await receiverSecret(conn.tenantId, conn.id);
+  if (!secret || !verifySender(spec.auth, secret, rawBody, headers, spec.signatureHeader)) return fail(401, "UNAUTHENTICATED", "A valid connection secret is required");
+  const target = uploadTarget(conn.def, conn.settings, headers.get("x-wonderid-kind"));
+  if ("status" in target) return fail(target.status, target.status === 409 ? "CONFLICT" : "INVALID_INPUT", target.message);
+  const { records, issues } = readCsvFile(target.kind, target.spec, rawBody, fileColumns(target.spec, conn.settings));
+  if (issues.length) return { status: 400, body: { ok: false, error: { code: "INVALID_FILE", message: issues[0].message, details: issues.slice(0, 20) } } };
+  const stored = await storeConnectorFile(conn.tenantId, conn.id, {
+    kind: target.kind,
+    filename: uploadFilename(headers.get("x-wonderid-filename")),
+    content: rawBody,
+    rowCount: records.length,
+    createdBy: null,
+  });
+  const job = await createSystemSyncJob(conn.tenantId, conn.id, "manual");
+  await touch(conn.tenantId, conn.id);
+  await writeAudit({
+    tenantId: conn.tenantId,
+    actorType: "integration",
+    action: "integration.file_received",
+    objectType: "integration",
+    objectId: conn.id,
+    outcome: "success",
+    // Counts and a digest, never row contents.
+    metadata: { kind: target.kind, rows: records.length, bytes: stored.byteSize, sha256: stored.sha256, fileId: stored.id, jobId: job?.id ?? null },
+  });
+  return {
+    status: 202,
+    body: { ok: true, data: { fileId: stored.id, kind: target.kind, rows: records.length, jobId: job?.id ?? null } },
+    background: job ? () => runSyncJob(conn.tenantId, job.id) : undefined,
+  };
+}
+
 // ---------------------------------------------------------------- gateway
 
 async function receiveGateway(conn: Connection, which: "authorize" | "tools/filter", rawBody: string, headers: Headers): Promise<ReceiveResult> {
@@ -290,9 +339,9 @@ async function receiveGateway(conn: Connection, which: "authorize" | "tools/filt
 
 // ---------------------------------------------------------------- entry point
 
-export const MAX_RECEIVE_BYTES: Record<string, number> = { events: 1024 * 1024, webhook: 1024 * 1024, gateway: 16 * 1024 };
+export const MAX_RECEIVE_BYTES: Record<string, number> = { events: 1024 * 1024, webhook: 1024 * 1024, gateway: 16 * 1024, file: MAX_CSV_BYTES };
 
-/** One received request: `channel` is events, webhook, gateway/authorize or gateway/tools/filter. */
+/** One received request: `channel` is events, webhook, file, gateway/authorize or gateway/tools/filter. */
 export async function receive(connectionId: string, channel: string, rawBody: string, headers: Headers): Promise<ReceiveResult> {
   const kind = channel.startsWith("gateway/") ? "gateway" : channel;
   const limit = MAX_RECEIVE_BYTES[kind];
@@ -328,6 +377,7 @@ async function dispatch(conn: Connection, channel: string, rawBody: string, head
   try {
     if (channel === "events") return await receiveRuntimeEvents(conn, rawBody, headers);
     if (channel === "webhook") return await receiveWebhook(conn, rawBody, headers);
+    if (channel === "file") return await receiveFile(conn, rawBody, headers);
     if (channel === "gateway/authorize") return await receiveGateway(conn, "authorize", rawBody, headers);
     if (channel === "gateway/tools/filter") return await receiveGateway(conn, "tools/filter", rawBody, headers);
     return fail(404, "NOT_FOUND", "No such channel");

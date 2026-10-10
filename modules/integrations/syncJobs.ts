@@ -37,6 +37,31 @@ export async function createSyncJob(
   return toSyncJob(data);
 }
 
+/**
+ * A job created by WonderID itself, with no user session: a scheduled run
+ * (cron) or the sync a received file starts. Service role, so `tenantId`
+ * must be the connection row's own tenant_id, which the callers read from
+ * that row (§14); the insert names it and the same-tenant foreign key
+ * (0076) refuses any other. `scheduleWindow` makes a scheduled run
+ * idempotent: a second job for the same connection and window is refused
+ * by a unique index (0111), and this returns null.
+ */
+export async function createSystemSyncJob(
+  tenantId: string,
+  integrationId: string,
+  trigger: SyncJobTrigger,
+  scheduleWindow: string | null = null,
+): Promise<IntegrationSyncJob | null> {
+  const { data, error } = await supabaseServiceRole()
+    .from("integration_sync_jobs")
+    .insert({ tenant_id: tenantId, integration_id: integrationId, trigger, schedule_window: scheduleWindow })
+    .select()
+    .single();
+  if (error?.code === "23505" && scheduleWindow) return null;
+  if (error || !data) throw new ApiError(500, "CREATE_FAILED", "The sync job could not be created");
+  return toSyncJob(data);
+}
+
 export async function getSyncJob(tenantId: string, jobId: string): Promise<IntegrationSyncJob | null> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase.from("integration_sync_jobs").select().eq("id", jobId).eq("tenant_id", tenantId).maybeSingle();
@@ -139,6 +164,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     }
 
     const secret = await getDecryptedCredential(tenantId, integration.id);
+    // The gateway session names the connection (its own tenant); the file driver reads received files for it only.
     gateway = openGateway({ tenantId, integrationId: integration.id, status: integration.status });
     const connector = createConnector(integration.integration_type_id, gateway);
     await connector.authenticate(integration.config ?? {}, secret);
