@@ -1514,6 +1514,9 @@ requests) or "build now" (a redeploy or an E2E run on Vercel).
   (owner clarification, same day). Every green one is merged; any that
   cannot merge are reported with the reason. "build now" likewise covers
   every waiting Vercel build.
+- The nightly suite stays at two builds a night, both halves (owner
+  decision). One alternating half a night was considered and declined:
+  every test should run every night.
 - Checks run locally.
 - The nightly suite is unchanged.
 

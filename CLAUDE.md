@@ -1341,8 +1341,9 @@ budget, with production first.
 
    This holds even when CI is green and the change is small or docs-only. A
    docs-only merge still creates a deployment. The scheduled nightly suite
-   is not covered by this rule: it runs on its own, unless the owner pauses
-   it.
+   is not covered by this rule: it runs on its own, both halves, two Vercel
+   builds a night, so every test runs every night (owner decision,
+   2026-10-10).
 1. **Create no deployment you don't need.**
    - Working branches (`claude/**`, `module/**`) never deploy
      (`git.deploymentEnabled` in `vercel.json`). Previews stay off.
