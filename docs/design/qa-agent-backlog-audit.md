@@ -1486,3 +1486,19 @@ preview and its E2E run.
   - Redeploy production, so #30 and #33 go live.
   - The nightly run may be refused tonight; if so, it is re-run, not
     treated as a test failure.
+
+### 2026-10-10 — Build slot budget written into CLAUDE.md (owner request)
+
+The owner asked for a strategy to use fewer build slots, recorded in
+`CLAUDE.md` and also written generically for other apps.
+
+- `CLAUDE.md` §19.9 covers:
+  - no deployments for working branches;
+  - one production deployment per merge, so docs ride with code;
+  - E2E runs on Vercel only when needed, and locally first;
+  - verify before pushing;
+  - count the last 24 hours before deployment-heavy work, and keep the rest
+    for production above 70;
+  - what to do when the limit is hit.
+- This entry rides with PR #32 rather than its own docs-only pull request,
+  per rule 2.
