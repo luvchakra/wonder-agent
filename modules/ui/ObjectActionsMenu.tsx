@@ -111,12 +111,13 @@ function ImportCsvDialog({ item, onClose }: { item: ObjectImportItem; onClose: (
           {state.kind === "started" ? (
             <div className="mt-4" role="status">
               <p className="text-sm font-medium text-foreground">
-                Import started — {state.rows.toLocaleString()} {state.rows === 1 ? "row" : "rows"}.
+                {state.rows.toLocaleString()} {state.rows === 1 ? "row" : "rows"} received by the File imports connection
+                {state.synced ? " and synced." : "; syncing in the background."}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">
-                It runs in the background.{" "}
-                <Link href="/integrations/jobs" className="text-primary hover:underline">
-                  Follow it in Jobs
+                They appear on this page once that connection is reconciled.{" "}
+                <Link href={state.integrationId ? `/integrations/${state.integrationId}` : "/integrations/jobs"} className="text-primary hover:underline">
+                  Open the connection
                 </Link>
                 .
               </p>

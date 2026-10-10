@@ -17,7 +17,7 @@ export type ImportIssue = { row: number | null; column: string | null; message: 
 export type ImportUiState =
   | { kind: "idle" }
   | { kind: "uploading" }
-  | { kind: "started"; jobId: string | null; rows: number }
+  | { kind: "started"; jobId: string | null; integrationId: string | null; rows: number; synced: boolean }
   | { kind: "invalid"; message: string; details: ImportIssue[]; more: number }
   | { kind: "failed"; message: string };
 
@@ -44,7 +44,14 @@ export function importResponseState(status: number, body: unknown): ImportUiStat
     const data = obj(obj(body)?.data);
     const rows = data?.rows;
     if (data && typeof rows === "number" && Number.isFinite(rows)) {
-      return { kind: "started", jobId: typeof data.jobId === "string" ? data.jobId : null, rows };
+      return {
+        kind: "started",
+        jobId: typeof data.jobId === "string" ? data.jobId : null,
+        integrationId: typeof data.integrationId === "string" ? data.integrationId : null,
+        rows,
+        // Only an explicit "completed" counts as synced; anything else is still running.
+        synced: data.sync === "completed",
+      };
     }
     return { kind: "failed", message: "The import service gave an unexpected answer. Check Jobs before trying again." };
   }

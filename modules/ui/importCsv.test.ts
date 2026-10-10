@@ -16,7 +16,8 @@ describe("checkImportFile", () => {
 
 describe("importResponseState — never claims success before a 202", () => {
   it("202 with a row count is 'started', not finished", () => {
-    expect(importResponseState(202, { data: { jobId: "j1", integrationId: "i1", rows: 42 } })).toEqual({ kind: "started", jobId: "j1", rows: 42 });
+    expect(importResponseState(202, { data: { jobId: "j1", integrationId: "i1", rows: 42 } })).toEqual({ kind: "started", jobId: "j1", integrationId: "i1", rows: 42, synced: false });
+    expect(importResponseState(202, { data: { jobId: "j1", integrationId: "i1", rows: 42, sync: "completed" } })).toMatchObject({ synced: true });
   });
 
   it("202 without a row count is treated as a failure, not a success", () => {
