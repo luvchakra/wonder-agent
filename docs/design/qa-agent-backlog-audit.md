@@ -1327,3 +1327,9 @@ test branches (#18).
 - The one open issue is the sign-in screenshot baselines for the Vercel
   builder (Amazon Linux rendering). Restore the schedule once they are
   recorded.
+
+### 2026-10-10 — Nightly E2E schedule restored
+
+The owner asked for the schedule back, so it is restored (03:00 IST). Until
+the sign-in screenshot baselines are recorded for the Vercel builder, the
+nightly run is expected to fail on `branding.spec.ts:47` alone.
