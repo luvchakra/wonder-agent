@@ -34,6 +34,39 @@ resolution, producing misleading errors. Install dependencies fresh in every new
 worktree before the first build/test run. If an error looks inconsistent with what's
 actually on disk, verify which copy of a shared package is actually being resolved.
 
+### Parallel agents (user rule, 2026-10-10)
+
+Several agents may work at once only when none of them can work on old code,
+and the dependencies between them are understood and managed. Until then, run
+them one after another. The rule came from the first parallel run (four agents
+on the connector work). Two of the agents started from `main`, without the
+unmerged pull request they built on, and had to redo their work after a
+rebase.
+
+Before starting agents in parallel, the lead:
+
+1. **Merges the base first.** Every agent starts from a commit that is
+   already on `main`, or from one named commit the lead pushed.
+2. **Creates each worktree itself, from that exact commit:**
+   `git worktree add -b <branch> <path> <base-sha>`.
+   - The tool's own worktree isolation is not used, because it bases new
+     worktrees on the default branch and not on the lead's commit.
+   - The agent is told the path and the base SHA. Its first step is
+     `git merge-base --is-ancestor <base-sha> HEAD`. If that fails, it stops.
+3. **Maps the dependencies before starting anything:**
+   - which files and tables each slice changes;
+   - which contracts each slice consumes or provides (routes, function
+     signatures, migration numbers, permission keys).
+4. **Runs in parallel only slices that are independent.** They change
+   disjoint files and depend on no unmerged work. Any slice that needs
+   another's code waits until that slice is merged. A shared contract is
+   fixed in writing, in each agent's prompt, before either starts.
+5. **Allocates the shared numbers up front:** migration numbers, route
+   prefixes and permission keys.
+6. **Rebases each finished slice onto the current integration head and
+   re-verifies it before merging.** Slices merge one at a time, and the next
+   one is rebased and re-checked after each merge.
+
 ## 2. Merge mechanics
 
 **Since 2026-10-09 (explicit user decision, `CLAUDE.md` §19): every change ships
@@ -53,7 +86,8 @@ On a branch only you push to, follow the merge-or-rebase rule of `CLAUDE.md` §4
 once an agent finishes every story in its own backlog, it starts the next dormant
 agent per `docs/RUN_ORDER.md`'s order automatically — no need to ask the user
 first. This replaced the original "user must manually dispatch every agent" rule.
-What still holds: only one agent's work is ever in flight at a time (auto-chaining
+What still holds: only one agent's work is ever in flight at a time, except as
+§1's "Parallel agents" allows (auto-chaining
 starts the next agent only after the current one has fully finished, verified, and
 reported — never concurrently), and an agent never invokes another module's agent
 mid-story to help with its own work.

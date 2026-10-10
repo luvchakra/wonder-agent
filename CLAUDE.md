@@ -1275,8 +1275,11 @@ beats exhaustive pre-push verification.
   - `.github/workflows/security.yml`, feature-specific on pull requests and
     complete on `main` and nightly;
   - `.github/workflows/e2e.yml`, the full Playwright suite, nightly and on
-    demand.
-- Deploy: Vercel builds production only.
+    demand. Since 2026-10-10 (user decision) the suite runs inside a Vercel
+    build of the `e2e/nightly` branch (`scripts/e2e-on-vercel.sh`), where
+    the project's Sensitive variables are available. The workflow moves
+    that branch and waits for Vercel's result, and needs no GitHub secrets.
+- Deploy: Vercel builds production, plus the `e2e/nightly` test branch.
   - It skips a deploy whose changes are all docs, tests, CI, migrations or
     scripts (`scripts/vercel-ignore-build.sh`).
   - It skips `next build`'s TypeScript pass, which CI's typecheck job already

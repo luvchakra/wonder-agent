@@ -1181,3 +1181,51 @@ Open, for the owner:
   out there; files fetched from an address can be 10 MB.
 - The retired integration types and the stale Zendesk credential still need
   a delete migration. The database tool refused delete statements in 0109.
+
+## 2026-10-10 — The nightly Playwright suite runs on Vercel; parallel-agent rule
+
+**Why:** the nightly `e2e.yml` run had been running zero tests. Its five
+GitHub Actions secrets were empty, so sign-in failed in setup. The owner
+decided the suite should run on Vercel, where the variables are already
+defined.
+- Three of them (service role key, encryption key, cron secret) are
+  Sensitive in Vercel. Vercel never hands those out, through the API or
+  `vercel env pull`, so they cannot be copied to a GitHub runner.
+- This session also cannot write GitHub Actions secrets: the proxy refuses
+  that path.
+
+**What changed:**
+- `vercel.json` `buildCommand` → `scripts/vercel-build.sh`. Every deployment
+  still runs `npm run build`.
+- On the `e2e/nightly` branch only, the build runs `scripts/e2e-on-vercel.sh`.
+  It:
+  1. installs Chromium's system libraries with `dnf` (Amazon Linux 2023);
+  2. installs Playwright's headless Chromium and checks with `ldd` that no
+     library is missing;
+  3. builds the app, starts it on localhost:3100 with private-network stubs
+     allowed, as playwright.config.ts's webServer does (that process only);
+  4. runs the suite with a 38-minute cap under Vercel's 45-minute build limit.
+
+  A failure fails the build.
+- `scripts/vercel-ignore-build.sh` builds that branch even though preview
+  deployments are otherwise off.
+- `.github/workflows/e2e.yml` no longer runs the suite and needs no secrets.
+  - It moves `e2e/nightly` to main with one marker commit, attributed to the
+    owner so Vercel builds it. A manual run's `specs:` line goes in that
+    commit's message.
+  - It then waits for Vercel's commit status, so a red suite still shows red
+    in the Actions tab.
+- The dependency list came from a probe in a Vercel Sandbox: `ldd` on the
+  headless shell showed exactly which libraries it needs. The sandbox's image
+  was Ubuntu, not the build's Amazon Linux, so the first real nightly build
+  is the confirmation.
+- Trade-off: while the nightly build runs (03:00 IST), it holds Vercel's
+  single build slot, so a production deploy at that hour queues behind it.
+
+**Parallel agents:** the owner's rule is now in `docs/ORCHESTRATION.md` §1.
+Several agents may work at once only on independent slices, each in a
+worktree the lead creates from an exact, already-pushed base commit. The
+dependencies, contracts and shared numbers are fixed up front. Finished
+slices are rebased and re-verified one at a time. The first parallel run
+broke this: two of its four agents started from `main` without the
+unmerged work they built on.
