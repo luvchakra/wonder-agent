@@ -627,11 +627,20 @@ light mode, a dark surface in dark mode, active items in Electric Blue on a soft
 blue tint. Brand assets, colours and the logo come only from `modules/ui/brand.ts`
 and `public/brand/` (the user's brand sheet). Content surfaces, tokens and both
 themes are unchanged, and a sidebar item appears only when its route and
-capability exist. Since 2026-10-10 (owner decision, after a study of how Saviynt
-arranges its menu; concept only, nothing copied) the sidebar is a list of
-**areas** (Home first, then Identities, Applications, Certifications, Risk &
-Security, AI Agents, Insights, and Admin always last); opening an area shows
-that area's menu, in folding groups, with a back arrow to the area list. The
+capability exist. Since 2026-10-10 (owner decisions, after a study of how
+Saviynt arranges its menu; arrangement only, nothing copied) the sidebar is a
+list of **areas**: Home, Intelligence, Onboarding, Control Center, SOD,
+Certifications, AI Agents, and Admin always last. Admin opens with Accounts,
+Entitlements, Roles and User Groups, then Identities, Applications, Policies
+and the administration groups. Opening an area, even one with a single page, shows
+that area's menu, with a back arrow to the area list. Each of the menu's
+pages and groups has its own icon, at the size of an area row; pages inside a
+group are listed under it without icons. A hamburger-style toggle at the
+sidebar's top right collapses it to an icon rail: the toggle, a search icon
+that reopens the sidebar into its search box, the area icons, and the W mark
+at its foot. The owner's working copy of the menu is the Google Sheet
+"WonderID sidebar menus" (created 2026-10-10 from `shell-nav.ts`); when the
+owner updates it, read it and apply the changes to `shell-nav.ts`. The
 sidebar has a search box that matches menu items only (never data), and a
 footer with the product version and commit. Each area lists only the pages the
 viewer's permissions open (`modules/ui/shell-nav.ts`).

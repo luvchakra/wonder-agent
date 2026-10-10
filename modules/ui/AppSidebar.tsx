@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowLeft, ChevronRight, ChevronsLeft, Menu, Search, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, ListIndentDecrease, ListIndentIncrease, Menu, Search, Sparkles, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
 import { WonderIDLogo } from "./Logo";
@@ -81,22 +81,23 @@ function CountBadge({ count, tone }: { count: number; tone: "risk" | "discovery"
 
 // ---------------------------------------------------------------- expanded
 
-function PageLink({ label, href, current, onNavigate, inset }: { label: string; href: string; current: boolean; onNavigate?: () => void; inset?: boolean }) {
+function PageLink({ label, href, current, onNavigate, inset, icon }: { label: string; href: string; current: boolean; onNavigate?: () => void; inset?: boolean; icon?: string }) {
   return (
     <Link
       href={href}
       onClick={onNavigate}
       aria-current={current ? "page" : undefined}
       className={cn(
-        "relative block truncate rounded-md py-1.5 pr-3 text-[13px] transition-colors",
-        inset ? "pl-4" : "pl-3",
+        "relative flex items-center gap-3 rounded-md pr-3 transition-colors",
+        icon ? "py-2 pl-3 text-[13.5px]" : cn("py-1.5 text-[13px]", inset ? "pl-4" : "pl-3"),
         focusRing,
         current
           ? "bg-sidebar-accent font-semibold text-sidebar-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-0.5 before:rounded-full before:bg-sidebar-ring"
           : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
       )}
     >
-      {label}
+      {icon ? <NavIcon name={icon} className="size-[18px] shrink-0" /> : null}
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   );
 }
@@ -120,16 +121,17 @@ function GroupEntry({ entry, currentHref, onNavigate }: { entry: Extract<ShellNa
         aria-controls={id}
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "flex w-full items-center gap-2 rounded-md px-3 py-1.5 text-left text-[13px] transition-colors",
+          "flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-[13.5px] transition-colors",
           focusRing,
           containsCurrent ? "font-semibold text-sidebar-foreground" : "text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
         )}
       >
+        {entry.icon ? <NavIcon name={entry.icon} className="size-[18px] shrink-0" /> : null}
         <span className="min-w-0 flex-1 truncate">{entry.label}</span>
         <ChevronRight className={cn("size-3.5 shrink-0 transition-transform", open && "rotate-90")} aria-hidden="true" />
       </button>
       {open ? (
-        <ul id={id} aria-label={entry.label} className="mb-1 ml-3 mt-0.5 space-y-0.5 border-l border-sidebar-border">
+        <ul id={id} aria-label={entry.label} className={cn("mb-1 mt-0.5 space-y-0.5 border-l border-sidebar-border", entry.icon ? "ml-[21px]" : "ml-3")}>
           {entry.children.map((c) => (
             <li key={c.href}>
               <PageLink label={c.label} href={c.href} current={c.href === currentHref} onNavigate={onNavigate} inset />
@@ -151,9 +153,9 @@ const areaRowClass = (active: boolean) =>
   );
 
 /**
- * One row of the area list. An area with pages opens its menu in place of
- * the list (no navigation: the member then picks a page); an area with a
- * single page, or none, is a link to it.
+ * One row of the area list. An area with pages, even one, opens its menu in
+ * place of the list (no navigation: the member then picks a page), so every
+ * area behaves the same; an area with no pages is a link.
  */
 function AreaRow({ item, active, badges, onOpen, onNavigate }: { item: ShellNavItem; active: boolean; badges: ShellBadgeCounts; onOpen: () => void; onNavigate?: () => void }) {
   const count = item.badge ? badges[item.badge] : undefined;
@@ -164,8 +166,7 @@ function AreaRow({ item, active, badges, onOpen, onNavigate }: { item: ShellNavI
       {count ? <CountBadge count={count} tone={item.badge!} /> : null}
     </>
   );
-  const single = !item.children?.length || (item.children.length === 1 && item.children[0].kind === "link");
-  if (single) {
+  if (!item.children?.length) {
     return (
       <li>
         <Link href={item.href} onClick={onNavigate} aria-current={active ? "page" : undefined} data-active={active || undefined} className={areaRowClass(active)}>
@@ -209,7 +210,7 @@ function AreaMenu({ item, active, pathname, onBack, onNavigate }: { item: ShellN
         {(item.children ?? []).map((entry) =>
           entry.kind === "link" ? (
             <li key={entry.href}>
-              <PageLink label={entry.label} href={entry.href} current={entry.href === currentHref} onNavigate={onNavigate} />
+              <PageLink label={entry.label} href={entry.href} current={entry.href === currentHref} onNavigate={onNavigate} icon={entry.icon} />
             </li>
           ) : (
             <GroupEntry key={entry.label} entry={entry} currentHref={currentHref} onNavigate={onNavigate} />
@@ -249,7 +250,19 @@ function SearchResults({ nav, query, onNavigate }: { nav: ShellNavItem[]; query:
  * or the search results. The open area follows the page; the back arrow
  * shows the list without leaving the page.
  */
-function ExpandedNav({ nav, badges, pathname, onNavigate }: { nav: ShellNavItem[]; badges: ShellBadgeCounts; pathname: string; onNavigate?: () => void }) {
+function ExpandedNav({
+  nav,
+  badges,
+  pathname,
+  onNavigate,
+  focusSearch,
+}: {
+  nav: ShellNavItem[];
+  badges: ShellBadgeCounts;
+  pathname: string;
+  onNavigate?: () => void;
+  focusSearch?: boolean;
+}) {
   const current = activeArea(nav, pathname);
   // The front door ("/") shows the area list; any other page opens its
   // area's menu with the page marked current.
@@ -264,7 +277,7 @@ function ExpandedNav({ nav, badges, pathname, onNavigate }: { nav: ShellNavItem[
   }
   const [query, setQuery] = useState("");
   const open = openLabel ? nav.find((a) => a.label === openLabel) : undefined;
-  const openIsMenu = open && open.children && !(open.children.length === 1 && open.children[0].kind === "link");
+  const openIsMenu = Boolean(open?.children?.length);
   const trimmed = query.trim();
   return (
     <>
@@ -273,6 +286,8 @@ function ExpandedNav({ nav, badges, pathname, onNavigate }: { nav: ShellNavItem[
         <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-sidebar-muted-foreground" aria-hidden="true" />
         <input
           type="search"
+          // Opened from the collapsed rail's search icon: straight into the box.
+          autoFocus={focusSearch}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search menu"
@@ -284,7 +299,7 @@ function ExpandedNav({ nav, badges, pathname, onNavigate }: { nav: ShellNavItem[
       </label>
       {trimmed ? (
         <SearchResults nav={nav} query={trimmed} onNavigate={onNavigate} />
-      ) : openIsMenu ? (
+      ) : openIsMenu && open ? (
         <AreaMenu item={open} active={current?.label === open.label} pathname={pathname} onBack={() => setOpenLabel(null)} onNavigate={onNavigate} />
       ) : (
         <ul className="space-y-1">
@@ -381,6 +396,7 @@ function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavIt
               entry.kind === "link" ? (
                 <DropdownMenu.Item key={entry.href} asChild className={cn(flyoutItem, entry.href === currentHref && "bg-sidebar-accent font-semibold text-sidebar-foreground")}>
                   <Link href={entry.href} aria-current={entry.href === currentHref ? "page" : undefined}>
+                    {entry.icon ? <NavIcon name={entry.icon} className="size-4" /> : null}
                     {entry.label}
                   </Link>
                 </DropdownMenu.Item>
@@ -416,44 +432,44 @@ function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavIt
 
 // ---------------------------------------------------------------- body
 
+const toggleClass = cn(
+  "flex size-9 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
+  focusRing,
+);
+
 function Brand({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => void }) {
-  // BRAND-004: the lockup, following the theme (a light rail in light mode,
-  // a dark one in dark mode); collapsed, the W mark alone — which is then the expand control.
+  // Collapsed, the top of the rail is the expand toggle (the W mark moves
+  // to the rail's foot, BRAND-004); expanded, the lockup with the collapse
+  // toggle at its top right (owner request, 2026-10-10).
   if (collapsed && onToggle) {
     return (
       <div className="flex h-16 shrink-0 items-center justify-center border-b border-sidebar-border px-2">
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label="Expand navigation"
-          title="Expand navigation"
-          className={cn("flex size-11 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent", focusRing)}
-        >
-          <WonderIDLogo showWordmark={false} size={26} alt="" />
+        <button type="button" onClick={onToggle} aria-label="Expand navigation" title="Expand navigation" className={toggleClass}>
+          <ListIndentIncrease className="size-5" aria-hidden="true" />
         </button>
       </div>
     );
   }
   return (
-    <div className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border px-4">
+    <div className="flex h-16 shrink-0 items-center gap-2 border-b border-sidebar-border pl-4 pr-3">
       <Link href="/" className={cn("flex min-w-0 flex-1 items-center rounded-md", focusRing)}>
         <WonderIDLogo size={28} priority />
       </Link>
       {onToggle ? (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-label="Collapse navigation"
-          title="Collapse navigation"
-          className={cn(
-            "flex size-8 shrink-0 items-center justify-center rounded-md border border-sidebar-border text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-            focusRing,
-          )}
-        >
-          <ChevronsLeft className="size-4" aria-hidden="true" />
+        <button type="button" onClick={onToggle} aria-label="Collapse navigation" title="Collapse navigation" className={toggleClass}>
+          <ListIndentDecrease className="size-5" aria-hidden="true" />
         </button>
       ) : null}
     </div>
+  );
+}
+
+/** The W mark at the foot of the collapsed rail: the brand, and the way home (BRAND-004). */
+function RailMark() {
+  return (
+    <Link href="/" aria-label="WonderID home" title="WonderID" className={cn("mx-auto flex size-11 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent", focusRing)}>
+      <WonderIDLogo showWordmark={false} size={24} alt="" />
+    </Link>
   );
 }
 
@@ -492,8 +508,10 @@ function SidebarBody({
   onSelectTenant,
   collapsed,
   onToggle,
+  onSearch,
+  focusSearch,
   onNavigate,
-}: SidebarProps & { collapsed: boolean; onToggle?: () => void; onNavigate?: () => void }) {
+}: SidebarProps & { collapsed: boolean; onToggle?: () => void; onSearch?: () => void; focusSearch?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   return (
     <>
@@ -501,15 +519,29 @@ function SidebarBody({
       <nav aria-label="Main" className={cn("sidebar-scroll flex-1 overflow-y-auto py-3", collapsed ? "px-2" : "px-3")}>
         {collapsed ? (
           <ul className="space-y-1.5">
+            {onSearch ? (
+              <li className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={onSearch}
+                  aria-label="Search menu"
+                  title="Search menu"
+                  className={cn("flex size-11 items-center justify-center rounded-lg text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}
+                >
+                  <Search className="size-5" aria-hidden="true" />
+                </button>
+              </li>
+            ) : null}
             {nav.map((item) => (
               <CollapsedSection key={item.href} item={item} active={isNavItemActive(item, pathname, nav)} badges={badges} pathname={pathname} />
             ))}
           </ul>
         ) : (
-          <ExpandedNav nav={nav} badges={badges} pathname={pathname} onNavigate={onNavigate} />
+          <ExpandedNav nav={nav} badges={badges} pathname={pathname} onNavigate={onNavigate} focusSearch={focusSearch} />
         )}
       </nav>
       <div className={cn("shrink-0 space-y-1 border-t border-sidebar-border py-2", collapsed ? "px-2" : "px-3")}>
+        {collapsed ? <RailMark /> : null}
         <AiEntry collapsed={collapsed} onNavigate={onNavigate} />
         <WorkspaceSwitcher tenants={tenants} onSelectTenant={onSelectTenant} compact={collapsed} />
         {collapsed ? null : (
@@ -525,12 +557,20 @@ function SidebarBody({
 /** The permanently-visible sidebar, `lg` and up. */
 export function AppSidebar({ initialCollapsed = false, ...props }: SidebarProps & { initialCollapsed?: boolean }) {
   const [collapsed, setCollapsed] = useState(initialCollapsed);
-  const toggle = () => {
-    const next = !collapsed;
+  const [focusSearch, setFocusSearch] = useState(false);
+  const setAndRemember = (next: boolean) => {
     setCollapsed(next);
     // A per-viewer convenience: a cookie so the server renders the same
     // width on the next page (a year; lax; nothing sensitive).
     document.cookie = `${NAV_COOKIE}=${next ? "collapsed" : "expanded"}; path=/; max-age=31536000; samesite=lax`;
+  };
+  const toggle = () => {
+    setFocusSearch(false);
+    setAndRemember(!collapsed);
+  };
+  const search = () => {
+    setFocusSearch(true);
+    setAndRemember(false);
   };
   return (
     <aside
@@ -540,7 +580,7 @@ export function AppSidebar({ initialCollapsed = false, ...props }: SidebarProps 
         collapsed ? "w-[76px]" : "w-64",
       )}
     >
-      <SidebarBody {...props} collapsed={collapsed} onToggle={toggle} />
+      <SidebarBody {...props} collapsed={collapsed} onToggle={toggle} onSearch={search} focusSearch={focusSearch} />
     </aside>
   );
 }

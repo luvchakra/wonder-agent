@@ -49,6 +49,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-24 | Brand across core components, product modules and administration (BRAND-007/008/009) | Not Started — 2026-09-26, WonderID Phase 4c |
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
 | EXPERIENCE-P0-26 | Install the app on phones and tablets (web app manifest, icons, install banner) | Done — 2026-10-10: manifest, icons, iOS meta and a banner shown only where the browser can install the app; see audit log |
+| EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
 
 ---
 
@@ -734,3 +735,22 @@ decisions are in `docs/plan/WONDERID-ROADMAP.md` § Phase 4c.
   declined prompt snoozes it for 14 days; installed hides it for good.
   Never on the vendor console, auth callbacks or print/export/embedded
   views. Both themes, reduced motion, accessible.
+
+### EXPERIENCE-P0-27 — Sidebar areas, collapsible rail and the Control Center overview
+
+Owner decisions, 2026-10-10, after a study of how Saviynt arranges its
+menu (arrangement only; WonderID's menus, colours and type).
+- Areas: Home, Intelligence, Onboarding, Control Center, SOD,
+  Certifications, AI Agents, Admin (last). Every area opens its own menu;
+  each direct page and group has an icon. Admin opens with Accounts,
+  Entitlements, Roles and User Groups, then Identities, Applications,
+  Policies (Policies, Request Policies, Authorization Policies) and the
+  administration groups. Control Center holds its overview.
+- A hamburger-style toggle at the sidebar's top right collapses it; the
+  collapsed rail shows the toggle, a search icon that reopens the sidebar
+  into its search box, then the area icons, with the W mark at its foot
+  (BRAND-004).
+- Control Center overview (`/controls`, `policy.read`): policies in
+  effect, SoD rules in effect, SoD conflicts in the last 30 days, request
+  and authorization policies (each card only for a viewer who may open its
+  list), policies in effect by category, and the policies not in effect.

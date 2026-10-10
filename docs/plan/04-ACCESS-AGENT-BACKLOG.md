@@ -43,6 +43,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |
 
 ---
 
@@ -647,3 +648,18 @@ Append-only ledger per identity-access relationship with source (request, role, 
 ### ACCESS-P0-25 — Imported access classification and drift findings
 
 Desired vs actual reconciliation: target-only, WonderID-only, attribute, ownership, status and privilege drift; imported access classified AUTHORIZED, LEGACY, UNPROVEN or ROGUE by configurable rules so pre-go-live access is not labelled malicious.
+
+### ACCESS-P0-26 — SoD rules and conflicts pages; organization-wide entitlement list
+
+Owner request, 2026-10-10 (the SOD area and Admin › Entitlements).
+- SoD Rules (`/sod`, `policy.read`): every SoD rule as `checkSoD()` reads
+  it (an `rbac` rule with two or more `conflictingActions` on an
+  `identity` policy), with its policy, whether a conflict is refused or
+  allowed and recorded, and whether the policy is in effect. Rules are
+  still added and changed on the policy's page.
+- SoD Conflicts (`/sod/conflicts`, `audit.read`): every conflict
+  `enforceSoD()` audited, newest first, keyset-paged on the audit time,
+  with the person, the two actions, the agent, the outcome and the policy.
+- Entitlements (`/access/entitlements`, `access.read`): every entitlement
+  across applications, paged and counted at the database, searched by an
+  escaped `ilike` on the name.
