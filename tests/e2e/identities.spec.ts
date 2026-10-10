@@ -145,6 +145,8 @@ test.describe.serial("identity directory", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Identities" })).toBeVisible();
     await page.getByRole("link", { name: /Machine/ }).first().click();
     await expect(page).toHaveURL(/\/identities\/machines/);
+    // Searched for: the shared E2E organization keeps every run's machine identities, so this one may not be on the first page.
+    await page.goto(`/identities/machines?q=${encodeURIComponent(`svc-e2e-${stamp}`)}`);
     await expect(page.getByRole("link", { name: `svc-e2e-${stamp}` })).toBeVisible();
   });
 });

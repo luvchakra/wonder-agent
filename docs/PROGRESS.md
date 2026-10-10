@@ -14,18 +14,18 @@ Generated 2026-10-10 from 11 module backlogs.
 
 ## Overall
 
-**198 of 250 tracked stories complete — 79%**
+**199 of 250 tracked stories complete — 80%**
 
 ```
-████████████████████████████████░░░░░░░░  79%
+████████████████████████████████░░░░░░░░  80%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 198 |
+| Done | 199 |
 | Partial | 26 |
 | Deferred | 1 |
-| Not Started | 25 |
+| Not Started | 24 |
 | **Total tracked** | **250** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -41,7 +41,7 @@ and are deliberately excluded from the counts above.
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 2 | 0 | 3 | 43 | `████████████████░░` 88% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 20 | 3 | 0 | 1 | 24 | `███████████████░░░` 83% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 21 | 0 | 0 | 5 | 26 | `███████████████░░░` 81% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 22 | 0 | 0 | 4 | 26 | `███████████████░░░` 85% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
@@ -172,7 +172,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 21 done · 0 partial · 0 deferred · 5 not started (26 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 22 done · 0 partial · 0 deferred · 4 not started (26 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -200,7 +200,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
-| ACCESS-P0-24 | Access ledger and provenance | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 
 ### 05 — Runtime Agent

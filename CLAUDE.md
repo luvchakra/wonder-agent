@@ -1305,3 +1305,56 @@ beats exhaustive pre-push verification.
   - `docs/design/UI-UX-DESIGN-RULES.md`;
   - `modules/ui/shell-nav.ts`;
   - `docs/plan/WONDERID-ROADMAP.md`.
+
+### 19.9 Build slot budget (adopted 2026-10-10)
+
+The Vercel project is on the free plan, which allows **100 deployments a
+day**. Every deployment Vercel *creates* counts: a build the ignore script
+cancels counts the same as one that goes live. On 2026-10-10 the limit was
+reached at 13:16 UTC. 68 of those 100 were cancelled builds, and production
+could not deploy until the window cleared. Treat deployments as a scarce
+budget, with production first.
+
+1. **Create no deployment you don't need.**
+   - Working branches (`claude/**`, `module/**`) never deploy
+     (`git.deploymentEnabled` in `vercel.json`). Previews stay off.
+   - Don't rely on the ignore script to save a slot; it only saves build
+     time.
+   - Any other branch prefix used for work gets added to that list first.
+2. **One merge to `main` is one production deployment, so merge less often
+   and in bigger pieces.**
+   - Squash-merge, and put the docs, audit-log, tracker and test updates
+     for a change in the same pull request as the code.
+   - Never open a docs-only pull request when a code pull request is open
+     or about to open; add the docs to it.
+   - A docs-only change that cannot wait is still one deployment.
+3. **E2E on Vercel costs one deployment per run.**
+   - The nightly suite is two (one per half).
+   - Pre-merge spec runs follow §17.8: only for security-sensitive changes,
+     and locally (`E2E_CHROMIUM_PATH`, see `playwright.config.ts`) when that
+     is possible, before using a Vercel run.
+   - Never re-run a Vercel E2E run to "see if it passes": find the cause
+     first.
+4. **Verify before pushing, so no fix-up pushes or re-runs are needed.**
+   - Run typecheck, eslint, the touched unit tests and, for app changes,
+     `next build` locally.
+   - Push a branch when it is ready, not after every commit (working
+     branches cost nothing now, but `main` and `e2e/*` do).
+5. **Watch the budget.**
+   - Before deployment-heavy work (several merges, E2E runs), count the
+     project's deployments in the last 24 hours (`list_deployments` with
+     `since`).
+   - Above 70, keep the rest for production: no E2E runs, no docs-only
+     merges.
+6. **When the limit is hit:**
+   - stop pushing to `main` and `e2e/*`; a refused push does not queue;
+   - schedule a check-in for when the oldest counted deployment is
+     24 hours old;
+   - then redeploy only the latest `main` once.
+
+   A rate-limited status on a pull request is infrastructure, not a test
+   failure (§19.7): one comment, no code change.
+7. **No second project on the same repository builds this code.** The
+   paused `kunals-projects-9f64757f/wonder-id` project only posts
+   "Deployment was blocked" statuses. It counts against its own account,
+   not this one, but it should be disconnected when the owner can.

@@ -308,7 +308,14 @@ export function planAccounts(records: ImportRecord[], lookups: AccessLookups, or
 
 // ---------------------------------------------------------------- access grants
 
-export function planGrants(records: ImportRecord[], lookups: AccessLookups): AccessPlanRow[] {
+/**
+ * Access a file reports is what the target system holds: it is recorded
+ * for any account (a person's, an agent's, any identity's) with the file's
+ * connection as its source, never as a grant someone made. The access
+ * ledger (ACCESS-P0-24) then looks for the WonderID approval behind it and
+ * marks it unproven when there is none (owner decision, 2026-10-10).
+ */
+export function planGrants(records: ImportRecord[], lookups: AccessLookups, origin: { integrationId: string } = { integrationId: "" }): AccessPlanRow[] {
   const accounts = lookups.accounts ?? [];
   const ents = lookups.entitlements ?? [];
   const accountsById = new Map(accounts.map((a) => [a.id, a]));
@@ -323,10 +330,13 @@ export function planGrants(records: ImportRecord[], lookups: AccessLookups): Acc
     const accountMatches = UUID_RE.test(accountRef) && accountsById.has(accountRef.toLowerCase()) ? [accountsById.get(accountRef.toLowerCase())!] : (accountsByRef.get(accountRef) ?? []);
     if (accountMatches.length === 0) return invalid(r, `no account "${accountRef.slice(0, 80)}" (import it on Accounts first)`);
     if (accountMatches.length > 1) return review(r, `${accountMatches.length} accounts have the id "${accountRef.slice(0, 80)}"; use the account's WonderID id`);
-    const entMatches = UUID_RE.test(entRef) && entsById.has(entRef.toLowerCase()) ? [entsById.get(entRef.toLowerCase())!] : (entsByName.get(lower(entRef)) ?? []);
-    if (entMatches.length === 0) return invalid(r, `no entitlement "${entRef.slice(0, 80)}" (import it on Entitlements first)`);
-    if (entMatches.length > 1) return review(r, `${entMatches.length} entitlements are named "${entRef.slice(0, 80)}"; use the entitlement's WonderID id`);
     const account = accountMatches[0];
+    // An account holds entitlements of its own application only.
+    const entMatches = (UUID_RE.test(entRef) && entsById.has(entRef.toLowerCase()) ? [entsById.get(entRef.toLowerCase())!] : (entsByName.get(lower(entRef)) ?? [])).filter(
+      (e) => e.applicationId === account.applicationId,
+    );
+    if (entMatches.length === 0) return invalid(r, `no entitlement "${entRef.slice(0, 80)}" in the account's application (import it on Entitlements first)`);
+    if (entMatches.length > 1) return review(r, `${entMatches.length} entitlements are named "${entRef.slice(0, 80)}"; use the entitlement's WonderID id`);
     const ent = entMatches[0];
     const grantType = text(r.values.grantType, 40)?.toLowerCase() ?? "direct";
     if (!(GRANT_TYPES as readonly string[]).includes(grantType)) return invalid(r, `grantType "${grantType}" is not one of ${GRANT_TYPES.join(", ")}`);
@@ -338,15 +348,13 @@ export function planGrants(records: ImportRecord[], lookups: AccessLookups): Acc
     if (existing) {
       return { ...base(r), decision: "unchanged", targetId: null, changes: [], note: existing.grantType !== grantType ? `already granted as ${existing.grantType}; kept` : null };
     }
-    // The same rule as a grant made by hand (createManualAccessGrant).
-    if (!account.agentId) return invalid(r, "access for accounts that are not an AI agent's is not supported yet");
     return {
       ...base(r),
       decision: "new",
       targetId: null,
       changes: diff({}, { account: accountRef, entitlement: ent.name, grantType }),
       note: null,
-      insert: { account_id: account.id, entitlement_id: ent.id, grant_type: grantType },
+      insert: { account_id: account.id, entitlement_id: ent.id, grant_type: grantType, source_integration_id: origin.integrationId || null },
     };
   });
 }
@@ -355,5 +363,5 @@ export function planAccessImport(kind: AccessImportKind, records: ImportRecord[]
   if (kind === "application") return planApplications(records, lookups);
   if (kind === "entitlement") return planEntitlements(records, lookups);
   if (kind === "account") return planAccounts(records, lookups, origin);
-  return planGrants(records, lookups);
+  return planGrants(records, lookups, origin);
 }

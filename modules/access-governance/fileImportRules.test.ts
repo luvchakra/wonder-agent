@@ -82,7 +82,7 @@ describe("planAccounts", () => {
 });
 
 describe("planGrants", () => {
-  it("adds access for an AI agent's account, skips existing access, and refuses other accounts", () => {
+  it("records reported access for any account, an agent's or a person's, with the file's connection as its source", () => {
     const plan = planGrants(
       [
         rec("svc-financebot:CustomerDB Read", { accountExternalId: "svc-financebot", entitlementExternalId: "CustomerDB Read" }),
@@ -90,11 +90,19 @@ describe("planGrants", () => {
         rec("nope:x", { accountExternalId: "nope", entitlementExternalId: "x" }),
       ],
       lookups,
+      { integrationId: "int-csv" },
     );
-    expect(plan.map((p) => p.decision)).toEqual(["new", "invalid", "invalid"]);
-    expect(plan[0]!.insert).toEqual({ account_id: AGENT_ACC, entitlement_id: ENT, grant_type: "direct" });
-    expect(plan[1]!.note).toContain("not supported yet");
+    expect(plan.map((p) => p.decision)).toEqual(["new", "new", "invalid"]);
+    expect(plan[0]!.insert).toEqual({ account_id: AGENT_ACC, entitlement_id: ENT, grant_type: "direct", source_integration_id: "int-csv" });
+    expect(plan[1]!.insert).toEqual({ account_id: ACC, entitlement_id: ENT, grant_type: "direct", source_integration_id: "int-csv" });
     const again = planGrants([rec("svc:e", { accountExternalId: AGENT_ACC, entitlementExternalId: ENT })], { ...lookups, grants: [{ accountId: AGENT_ACC, entitlementId: ENT, grantType: "direct" }] });
     expect(again[0]).toMatchObject({ decision: "unchanged" });
+  });
+
+  it("refuses an entitlement of another application than the account's", () => {
+    const sapAcc = { ...lookups.accounts![0]!, id: "cccccccc-cccc-4ccc-8ccc-eeeeeeeeeeee", applicationId: APP2, externalAccountRef: "sap-ada" };
+    const plan = planGrants([rec("sap-ada:e", { accountExternalId: "sap-ada", entitlementExternalId: ENT })], { ...lookups, accounts: [...lookups.accounts!, sapAcc] });
+    expect(plan[0]).toMatchObject({ decision: "invalid" });
+    expect(plan[0]!.note).toContain("in the account's application");
   });
 });
