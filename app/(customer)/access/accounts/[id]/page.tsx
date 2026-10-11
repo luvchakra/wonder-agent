@@ -163,7 +163,10 @@ export default async function AccountDetailPage({ params, searchParams }: { para
                   <li key={e.id} className="flex flex-wrap items-center gap-2 py-2">
                     <span className="min-w-0 flex-1 text-foreground">{e.entitlementName ?? "The account itself"}</span>
                     <Badge tone={STATUS_TONE[e.status]}>{LEDGER_STATUS_LABEL[e.status]}</Badge>
-                    <span className="text-xs text-muted-foreground">{LEDGER_SOURCE_LABEL[e.source]}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {LEDGER_SOURCE_LABEL[e.source]}
+                      {e.lastVerifiedAt ? ` · last seen at source ${when(e.lastVerifiedAt)}` : ""}
+                    </span>
                     {e.missingFromSourceAt ? <Badge tone="neutral">Gone from source</Badge> : null}
                     {finding ? <Badge tone="danger">Finding open</Badge> : null}
                   </li>

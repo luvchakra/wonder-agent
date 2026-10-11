@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getAccountSummary, getApplicationDetail, getOnboarding, listEntitlementsForApplication, listReconciliationRuns } from "@/modules/access-governance/service";
+import { getAccountSummary, getApplicationDetail, getOnboarding, listAccessReconciliationRuns, listEntitlementsForApplication, listReconciliationRuns } from "@/modules/access-governance/service";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -41,7 +41,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance] = await Promise.all([
+  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
@@ -49,8 +49,11 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     getAccountSummary(tenantId, { applicationId: id }),
     listReconciliationRuns(tenantId, id, 1),
     getRecordProvenance(tenantId, "applications", id),
+    // EXPERIENCE-P0-28: the last applied entitlement and access reconciliation, if any.
+    listAccessReconciliationRuns(tenantId, id, 10).catch(() => []),
   ]);
   const lastRun = runs[0] ?? null;
+  const lastAccessRun = accessRuns.find((r) => !r.dryRun) ?? null;
   const lifecycleActions = (
     app.onboardingStatus === "ACTIVE" ? ["suspend", "retire"] : app.onboardingStatus === "SUSPENDED" ? ["resume", "retire"] : app.onboardingStatus === "RETIRED" ? [] : ["retire"]
   ) as ("suspend" | "resume" | "retire")[];
@@ -220,6 +223,12 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             {canManage && onboarding?.promotedAt && onboarding.config.entitlementSource === "connector" ? (
               <ReconcileAccessForm applicationId={id} disabledReason={null} />
             ) : null}
+            {lastAccessRun ? (
+              <p className={lastAccessRun.status === "failed" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+                Access last reconciled {when(lastAccessRun.startedAt)}
+                {lastAccessRun.status === "failed" ? `: failed. ${lastAccessRun.error ?? ""}` : "."}
+              </p>
+            ) : null}
           </CardBody>
         </Card>
         {canManage && lifecycleActions.length ? (
@@ -243,3 +252,5 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     </div>
   );
 }
+
+const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
