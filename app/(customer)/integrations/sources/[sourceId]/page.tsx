@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIdentitySource, listIntegrations, listReconciliationRuns } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { listAttributeDefinitions } from "@/modules/agent-identity/service";
 import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { CsvImportForm, IntegrationImportForm, RunAutoRefresh, SourceForm } from "../SourceForms";
 import { RUN_STATUS, TEMPLATE_LABEL } from "../labels";
@@ -20,7 +21,13 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
   }
   const { sourceId } = await params;
   const tenantId = ctx.tenantId!;
-  const [source, runs, integrations, provenance] = await Promise.all([getIdentitySource(tenantId, sourceId), listReconciliationRuns(tenantId, sourceId), listIntegrations(tenantId), getRecordProvenance(tenantId, "identity_sources", sourceId)]);
+  const [source, runs, integrations, provenance, definitions] = await Promise.all([
+    getIdentitySource(tenantId, sourceId),
+    listReconciliationRuns(tenantId, sourceId),
+    listIntegrations(tenantId),
+    getRecordProvenance(tenantId, "identity_sources", sourceId),
+    listAttributeDefinitions(tenantId),
+  ]);
   if (!source) notFound();
   const canRun = ctx.permissions.includes("integration.execute") && source.status === "active";
   const canEdit = ctx.permissions.includes("integration.update");
@@ -122,7 +129,7 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
         <Card>
           <CardHeader title="Configuration" />
           <CardBody>
-            <SourceForm source={source} integrations={[]} />
+            <SourceForm source={source} integrations={[]} attributes={definitions.filter((d) => d.active).map((d) => ({ name: d.name, displayName: d.displayName }))} />
           </CardBody>
         </Card>
       ) : null}

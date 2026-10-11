@@ -71,9 +71,14 @@ are the extensions in the design's §5.8.2 (F3, F7).
 | Custom identity attributes: type, required, sensitive, unique, enum values, pattern | Admin → Identities → Identity Attributes (`/identities/attributes`); `/api/v1/identities/attributes` | `identity.manage` |
 | Bulk import from CSV on any object page (people, accounts, entitlements, applications, access): preview, then apply, with a template to download | the page's Actions menu → Import; `POST /api/v1/imports[/preview]` | the page's own manage permission |
 
-Mapping targets are the standard identity fields today; custom attributes as
-targets are INTEGRATION-P0-20 (F1). A source's schedule is stored but not yet
-run: run it by hand, or wait for INTEGRATION-P0-19 (F1).
+Mapping targets are the standard identity fields and, since INTEGRATION-P0-20,
+the organization's active custom attributes for the source's identity type
+(`attribute:<name>`). A mapping to an attribute that does not exist, is
+retired or is for another identity type is refused. Values are typed by the
+attribute's data type; an invalid value or a unique value another identity
+holds leaves that record unapplied and reported. An authoritative source owns
+the attributes it maps; others only fill blanks. A source's schedule runs with
+its connection (INTEGRATION-P0-19).
 
 ## 4. Onboard the people who sign in
 

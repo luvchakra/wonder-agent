@@ -14,7 +14,7 @@ Generated 2026-10-11 from 11 module backlogs.
 
 ## Overall
 
-**208 of 268 tracked stories complete — 78%**
+**209 of 268 tracked stories complete — 78%**
 
 ```
 ███████████████████████████████░░░░░░░░░  78%
@@ -22,10 +22,10 @@ Generated 2026-10-11 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 208 |
+| Done | 209 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 31 |
+| Not Started | 30 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 3 | 0 | 4 | 45 | `███████████████░░░` 84% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 22 | 3 | 0 | 2 | 27 | `███████████████░░░` 81% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 23 | 3 | 0 | 1 | 27 | `███████████████░░░` 85% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 25 | 0 | 0 | 8 | 33 | `██████████████░░░░` 76% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
@@ -142,7 +142,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 22 done · 3 partial · 0 deferred · 2 not started (27 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 23 done · 3 partial · 0 deferred · 1 not started (27 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -172,7 +172,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-17 | CSV through the framework (user request 2026-10-10): `file` driver, `csv-file` connector, file receiver, connection schedules and daily cron, object-page imports (`POST /api/v1/imports`) | Done — 2026-10-10: migrations 0110/0111 applied (isolation SQL 14/14 and 8/8); object-page import now previews first and then adds/updates records additively (PR #25, `file-import.spec.ts` 16/16 on Vercel); FK indexes 0112 applied |
 | INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
 | INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Done — 2026-10-11: migration 0118 (isolation SQL 7/7); identities and accounts chained after every full sync; entitlements and grants follow with ACCESS-P0-27 |
-| INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Not Started |
+| INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Done — 2026-10-11: `attribute:<name>` targets validated on save, typed and written with provenance by Identity; schedule on every reading connection and `/api/v1/integrations/<id>/schedule` |
 
 ### 04 — Access Agent
 

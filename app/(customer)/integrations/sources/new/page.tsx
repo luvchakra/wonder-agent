@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listIntegrations } from "@/modules/integrations/service";
+import { listAttributeDefinitions } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardBody, CardHeader } from "@/modules/ui";
 import { SourceForm } from "../SourceForms";
@@ -14,7 +15,9 @@ export default async function NewIdentitySourcePage() {
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const integrations = (await listIntegrations(ctx.tenantId!)).map((i) => ({ id: i.id, name: i.name }));
+  const [all, definitions] = await Promise.all([listIntegrations(ctx.tenantId!), listAttributeDefinitions(ctx.tenantId!)]);
+  const integrations = all.map((i) => ({ id: i.id, name: i.name }));
+  const attributes = definitions.filter((d) => d.active).map((d) => ({ name: d.name, displayName: d.displayName }));
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <nav aria-label="Breadcrumb" className="text-xs text-muted-foreground">
@@ -28,7 +31,7 @@ export default async function NewIdentitySourcePage() {
       <Card>
         <CardHeader title="Source" description="Nothing is imported until you run it; you can review every setting first." />
         <CardBody>
-          <SourceForm integrations={integrations} />
+          <SourceForm integrations={integrations} attributes={attributes} />
         </CardBody>
       </Card>
     </div>

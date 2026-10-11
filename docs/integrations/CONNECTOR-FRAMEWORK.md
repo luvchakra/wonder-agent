@@ -270,8 +270,10 @@ column is read as the canonical field of the same name; an access row needs
 ### Schedules
 
 A connection's `schedule` (`integrations.schedule`) is `manual` (the
-default), `daily` or `hourly`, set on its page ("Files" card for a file
-connection). `GET /api/cron/connector-syncs` (Vercel Cron, bearer
+default), `daily` or `hourly`, set on every connection that reads, on its
+page (the Sync jobs card) or with `GET`/`PUT /api/v1/integrations/<id>/schedule`
+(`{ "schedule": "daily" }`; reading needs `integration.read`, changing it
+`integration.update`; audited as `integration.schedule_changed`). `GET /api/cron/connector-syncs` (Vercel Cron, bearer
 `CRON_SECRET`) runs every due connection as an ordinary sync job of trigger
 `scheduled`, for the connection's own tenant, audited as the system
 (`integration.scheduled_sync_started`, then `integration.sync_completed`).

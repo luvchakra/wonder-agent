@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { correlate, normalizeRecord, parseCsv, planLeavers, validateSourceConfig, type NormalizedSourceRecord } from "./identitySourceRules";
-import { mergeSourcedFields } from "@/modules/agent-identity/sourcedMerge";
+import { correlate, normalizeRecord, parseCsv, planLeavers, validateMappings, validateSourceConfig, type NormalizedSourceRecord } from "./identitySourceRules";
+import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields } from "@/modules/agent-identity/sourcedMerge";
 
 const err = (fn: () => unknown) => {
   try {
@@ -74,7 +74,18 @@ describe("parseCsv", () => {
 describe("normalizeRecord", () => {
   it("maps, lower-cases email, reads status words and dates, keeps the manager reference", () => {
     const n = normalizeRecord({ "Employee ID": "E1", Name: "Ada", Email: "Ada@Example.test", Dept: "Finance", Status: "Terminated", Start: "2026-01-05T00:00:00Z", "Manager ID": "E0" }, MAPPINGS);
-    expect(n).toEqual({ externalId: "E1", managerExternalId: "E0", fields: { displayName: "Ada", email: "ada@example.test", department: "Finance", status: "terminated", startDate: "2026-01-05" } });
+    expect(n).toEqual({ externalId: "E1", managerExternalId: "E0", fields: { displayName: "Ada", email: "ada@example.test", department: "Finance", status: "terminated", startDate: "2026-01-05" }, attributes: {} });
+  });
+
+  it("carries custom attribute values as the source sent them, a blank as null", () => {
+    const n = normalizeRecord({ id: "E1", name: "Ada", cc: " 4100 ", badge: "" }, [
+      { source: "id", target: "externalId" },
+      { source: "name", target: "displayName" },
+      { source: "cc", target: "attribute:cost_center" },
+      { source: "badge", target: "attribute:badge_number" },
+    ]);
+    expect(n).toMatchObject({ externalId: "E1", attributes: { cost_center: "4100", badge_number: null } });
+    expect((n as { fields: Record<string, unknown> }).fields).not.toHaveProperty("attribute:cost_center");
   });
 
   it("reports why a record cannot be used, instead of applying part of it", () => {
@@ -96,8 +107,34 @@ describe("normalizeRecord", () => {
   });
 });
 
+describe("validateMappings: custom attributes (INTEGRATION-P0-20)", () => {
+  const base = [
+    { source: "id", target: "externalId" },
+    { source: "name", target: "displayName" },
+  ];
+  const defs = [
+    { name: "cost_center", identityType: null, active: true },
+    { name: "clearance", identityType: "HUMAN", active: true },
+    { name: "old_code", identityType: null, active: false },
+  ];
+  it("accepts an active attribute that applies to the source's identity type", () => {
+    const out = validateMappings([...base, { source: "cc", target: "attribute:cost_center" }, { source: "lvl", target: "attribute:clearance" }], defs, "HUMAN");
+    expect(out.map((m) => m.target)).toContain("attribute:clearance");
+  });
+  it("refuses an attribute that does not exist or is retired", () => {
+    expect(() => validateMappings([...base, { source: "x", target: "attribute:nope" }], defs, "HUMAN")).toThrow(/does not exist/);
+    expect(() => validateMappings([...base, { source: "x", target: "attribute:old_code" }], defs, "HUMAN")).toThrow(/does not exist/);
+  });
+  it("refuses an attribute for another identity type", () => {
+    expect(() => validateMappings([...base, { source: "lvl", target: "attribute:clearance" }], defs, "SERVICE_ACCOUNT")).toThrow(/for HUMAN identities, not SERVICE_ACCOUNT/);
+  });
+  it("refuses the same attribute twice", () => {
+    expect(() => validateMappings([...base, { source: "a", target: "attribute:cost_center" }, { source: "b", target: "attribute:cost_center" }], defs, "HUMAN")).toThrow(/mapped twice/);
+  });
+});
+
 describe("correlate", () => {
-  const rec = (fields: NormalizedSourceRecord["fields"]): NormalizedSourceRecord => ({ externalId: "E9", fields: { displayName: "Ada", ...fields }, managerExternalId: null });
+  const rec = (fields: NormalizedSourceRecord["fields"]): NormalizedSourceRecord => ({ externalId: "E9", fields: { displayName: "Ada", ...fields }, managerExternalId: null, attributes: {} });
   const index = [
     { id: "i1", email: "ada@example.test", username: "ada", displayName: "Ada", startDate: "2026-01-05" },
     { id: "i2", email: "twin@example.test", username: "twin", displayName: "Twin", startDate: null },
@@ -172,5 +209,47 @@ describe("mergeSourcedFields (Identity precedence)", () => {
     expect(mergeSourcedFields({ title: "CFO" }, {}, { title: "CFO" }, hr, at).changes).toEqual({});
     const own = mergeSourcedFields({ title: "CFO" }, { title: { sourceId: "hr", priority: 10, at } }, { title: "CEO" }, hr, at);
     expect(own.changes).toEqual({ title: "CEO" });
+  });
+});
+
+describe("custom attributes from a source (Identity, INTEGRATION-P0-20)", () => {
+  const at = "2026-10-11T00:00:00Z";
+  const hr = { sourceId: "hr", priority: 10, authoritativeFields: [], ownsAttributes: true };
+  const dir = { sourceId: "dir", priority: 50, authoritativeFields: [], ownsAttributes: true };
+  const sheet = { sourceId: "sheet", priority: 90, authoritativeFields: [], ownsAttributes: false };
+  const def = (name: string, dataType: "string" | "number" | "boolean" | "date" | "enum", extra: Record<string, unknown> = {}) => ({
+    name,
+    displayName: name,
+    identityType: null,
+    dataType,
+    required: true,
+    allowedValues: [] as string[],
+    validationRegex: null,
+    active: true,
+    ...extra,
+  });
+  const defs = [def("cost_center", "string"), def("grade", "number"), def("contractor", "boolean"), def("level", "enum", { allowedValues: ["L1", "L2"] }), def("old", "string", { active: false })];
+
+  it("types each value, keeps a blank as null, leaves out retired ones and does not require the rest", () => {
+    const r = coerceSourcedAttributes({ cost_center: "4100", grade: "7", contractor: "false", level: null, old: "x" }, defs, "HUMAN");
+    expect(r).toEqual({ values: { cost_center: "4100", grade: 7, contractor: false, level: null } });
+  });
+
+  it("reports an invalid value instead of applying part of the record", () => {
+    expect(coerceSourcedAttributes({ grade: "seven" }, defs, "HUMAN")).toMatchObject({ invalid: expect.stringMatching(/grade: must be a number/) });
+    expect(coerceSourcedAttributes({ level: "L9" }, defs, "HUMAN")).toMatchObject({ invalid: expect.stringMatching(/level: one of L1, L2/) });
+  });
+
+  it("an owning source sets its attributes with provenance; a higher-precedence one wins; others only fill blanks", () => {
+    const set = mergeSourcedAttributes({ cost_center: "1000" }, {}, { cost_center: "4100" }, hr, at);
+    expect(set.changes).toEqual({ cost_center: "4100" });
+    expect(set.provenance["attributes.cost_center"]).toEqual({ sourceId: "hr", priority: 10, at });
+
+    const blocked = mergeSourcedAttributes({ cost_center: "4100" }, { "attributes.cost_center": { sourceId: "hr", priority: 10, at } }, { cost_center: "9" }, dir, at);
+    expect(blocked.changes).toEqual({});
+    expect(blocked.skipped).toEqual([{ field: "cost_center", reason: "higher_precedence" }]);
+
+    expect(mergeSourcedAttributes({}, {}, { grade: 7 }, sheet, at).changes).toEqual({ grade: 7 });
+    expect(mergeSourcedAttributes({ grade: 5 }, {}, { grade: 7 }, sheet, at).changes).toEqual({});
   });
 });

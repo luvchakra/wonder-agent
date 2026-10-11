@@ -52,3 +52,10 @@ export async function entitlementIdByRef(tenantId: string, applicationId: string
   const { data } = await adminClient().from("entitlements").select("id").eq("tenant_id", tenantId).eq("application_id", applicationId).eq("external_ref", ref).maybeSingle();
   return (data?.id as string | undefined) ?? null;
 }
+
+/** INTEGRATION-P0-20: which source set each field of an identity (not returned by the identity API). */
+export async function fieldProvenanceOf(tenantId: string, identityId: string): Promise<Record<string, { sourceId: string; priority: number }>> {
+  const { data, error } = await adminClient().from("identities").select("field_provenance").eq("tenant_id", tenantId).eq("id", identityId).single();
+  if (error) throw new Error(`fieldProvenanceOf: ${error.message}`);
+  return (data?.field_provenance ?? {}) as Record<string, { sourceId: string; priority: number }>;
+}

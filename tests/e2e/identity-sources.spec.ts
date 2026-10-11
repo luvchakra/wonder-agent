@@ -1,5 +1,7 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { authFile } from "./support/testUsers";
+import { authFile, TENANT_ONE } from "./support/testUsers";
+import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
+import { fieldProvenanceOf } from "./support/readAccessGovernance";
 
 /**
  * INTEGRATION-P0-08/09 — identity sources and reconciliation, against the
@@ -207,5 +209,84 @@ test.describe("identity sources — other organizations and roles", () => {
     expect((await ro.request.post("/api/v1/integrations/identity-sources", { data: { name: "forged", template: "csv", attributeMappings: MAPPINGS } })).status()).toBe(403);
     expect((await ro.request.post("/api/v1/integrations/correlations/00000000-0000-4000-8000-000000000000", { data: { action: "dismiss" } })).status()).toBe(403);
     await ro.close();
+  });
+});
+
+test.describe.serial("identity sources — custom attributes (INTEGRATION-P0-20)", () => {
+  test.use({ storageState: authFile("adminOne") });
+  const cc = `e2e_cc_${stamp}`;
+  const grade = `e2e_grade_${stamp}`;
+  const svcOnly = `e2e_svc_${stamp}`;
+  const defIds: string[] = [];
+  const header = "employee_id,full_name,email,cost_center,grade";
+  const attrMappings = [
+    { source: "employee_id", target: "externalId" },
+    { source: "full_name", target: "displayName" },
+    { source: "email", target: "email" },
+    { source: "cost_center", target: `attribute:${cc}` },
+    { source: "grade", target: `attribute:${grade}` },
+  ];
+
+  test("a mapping must name an existing attribute of the source's identity type; values are typed, unique and carry provenance", async ({ request }) => {
+    for (const data of [
+      { name: cc, displayName: `E2E Cost centre ${stamp}`, dataType: "string", identityType: "HUMAN", uniqueValue: true },
+      { name: grade, displayName: `E2E Grade ${stamp}`, dataType: "number", identityType: "HUMAN" },
+      { name: svcOnly, displayName: `E2E Service tier ${stamp}`, dataType: "string", identityType: "SERVICE_ACCOUNT" },
+    ]) {
+      const res = await request.post("/api/v1/identities/attributes", { data });
+      expect(res.status(), await res.text()).toBe(201);
+      defIds.push((await res.json()).data.id as string);
+    }
+
+    const unknown = await request.post("/api/v1/integrations/identity-sources", {
+      data: { name: `E2E attr bad ${stamp}`, template: "csv", attributeMappings: [...attrMappings, { source: "x", target: "attribute:not_defined_here" }] },
+    });
+    expect(unknown.status()).toBe(400);
+    expect(await unknown.text()).toMatch(/does not exist/);
+    const wrongType = await request.post("/api/v1/integrations/identity-sources", {
+      data: { name: `E2E attr bad2 ${stamp}`, template: "csv", attributeMappings: [...attrMappings, { source: "tier", target: `attribute:${svcOnly}` }] },
+    });
+    expect(wrongType.status()).toBe(400);
+    expect(await wrongType.text()).toMatch(/for SERVICE_ACCOUNT identities/);
+
+    const created = await request.post("/api/v1/integrations/identity-sources", {
+      data: { name: `E2E attr HR ${stamp}`, template: "csv", authoritative: true, priority: 10, attributeMappings: attrMappings },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const sourceId = (await created.json()).data.id as string;
+
+    const run = await runCsv(
+      request,
+      sourceId,
+      [
+        header,
+        `A1,E2E Attr One ${stamp},${mail("attr1")},CC-100,3`,
+        `A2,E2E Attr Two ${stamp},${mail("attr2")},CC-200,not-a-number`,
+        `A3,E2E Attr Three ${stamp},${mail("attr3")},CC-100,4`,
+      ].join("\n"),
+    );
+    // A2's grade is not a number and A3 repeats A1's unique cost centre: neither is applied.
+    expect(run).toMatchObject({ createdCount: 1 });
+    const find = async (who: string) => ((await (await request.get(`/api/v1/identities?type=HUMAN&q=${encodeURIComponent(mail(who))}`)).json()).data as { id: string }[]);
+    const [one] = await find("attr1");
+    expect(await identity(request, one.id)).toMatchObject({ attributes: { [cc]: "CC-100", [grade]: 3 } });
+    expect(await find("attr2")).toHaveLength(0);
+    expect(await find("attr3")).toHaveLength(0);
+
+    const tenantId = await getTenantIdBySlug(TENANT_ONE.slug);
+    const provenance = await fieldProvenanceOf(tenantId, one.id);
+    expect(provenance[`attributes.${cc}`]).toMatchObject({ sourceId, priority: 10 });
+
+    // The source owns what it maps: a change at the source is applied.
+    const again = await runCsv(request, sourceId, [header, `A1,E2E Attr One ${stamp},${mail("attr1")},CC-300,3`].join("\n"), "partial");
+    expect(again).toMatchObject({ updatedCount: 1 });
+    expect(await identity(request, one.id)).toMatchObject({ attributes: { [cc]: "CC-300", [grade]: 3 } });
+  });
+
+  test.afterAll(async ({ browser }) => {
+    // Retired, so they never appear on other tests' forms.
+    const ctx = await browser.newContext({ storageState: authFile("adminOne") });
+    for (const id of defIds) await ctx.request.patch(`/api/v1/identities/attributes/${id}`, { data: { active: false } });
+    await ctx.close();
   });
 });

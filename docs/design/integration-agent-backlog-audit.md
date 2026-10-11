@@ -1995,3 +1995,55 @@ starting it, and one job shows every step.
   interrupted import already does; a sweep for stale runs is a follow-up.
 - Frequency follows the daily cron (decision D10, recommendation: daily plus
   run now). `hourly` takes effect when the cron runs more often.
+
+### 2026-10-11 — INTEGRATION-P0-20: custom attributes as mapping targets; schedule on every connection (#66)
+
+**Custom attributes.**
+- A mapping target is an identity field or `attribute:<name>`
+  (`ATTRIBUTE_TARGET_PREFIX`, `lib/shared/types/integrations.ts`).
+- `validateMappings()` / `validateSourceConfig()` take the organization's
+  attribute definitions. They refuse an attribute that does not exist, is
+  retired, or is for another identity type than the source's, and the same
+  attribute mapped twice. Creating or updating a source loads the
+  definitions through Identity's `listAttributeDefinitions()`.
+- `normalizeRecord()` carries the values as text under `attributes`. A blank
+  becomes null.
+- The values reach Identity's `applySourcedIdentities()` on create and update
+  ops, including a pending match decided later. Identity types them and
+  writes them with provenance (see the Identity audit log).
+- The authority passed is `ownsAttributes: source.authoritative`.
+- The source form lists the active custom attributes after the standard
+  fields, on the new and edit pages.
+
+**Schedule on every connection.**
+- `ConnectionScheduleForm` sits on the Sync jobs card of every connection that
+  reads. It is no longer only on the file connection's Files card, which now
+  shows just the last file.
+- New route `GET`/`PUT /api/v1/integrations/<id>/schedule`
+  (`integration.read` / `integration.update`). It uses the existing
+  `setConnectionSchedule()`, which now returns 404 for an id that is not a
+  UUID, and audits `integration.schedule_changed`.
+- Every connection in dev is a `connector` (checked), so the service's type
+  filter covers them all.
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `vitest run modules/integrations modules/agent-identity modules/access-governance`:
+  588/588. New tests:
+  - attribute target validation (+4);
+  - attribute values carried by `normalizeRecord` (+1);
+  - typing and merge of attributes (+3).
+- E2E, run locally against dev Supabase:
+  - `identity-sources.spec.ts` 18/18, with a new test. Unknown and wrong-type
+    attributes are refused (400). Values are typed, so a non-number grade is
+    not applied. A repeated unique value is not applied. Provenance is
+    `attributes.<name>` with the source's id. A later change from the
+    authoritative source is applied.
+  - New `connection-schedule.spec.ts` 9/9. It covers the API (an invalid
+    value gives 400), the page form, another organization (404) and a
+    read-only member (403).
+
+**Left out.**
+- File imports from object pages (`/api/v1/imports`) still map the standard
+  fields only.
+- The identity-source preview does not list attribute changes.

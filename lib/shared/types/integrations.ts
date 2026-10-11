@@ -317,7 +317,10 @@ export const IDENTITY_SOURCE_TARGETS = [
   "status",
 ] as const;
 export type IdentitySourceTarget = (typeof IDENTITY_SOURCE_TARGETS)[number];
-export type AttributeMapping = { source: string; target: IdentitySourceTarget };
+/** INTEGRATION-P0-20: a column can also go to one of the tenant's custom identity attributes, as `attribute:<name>`. */
+export const ATTRIBUTE_TARGET_PREFIX = "attribute:";
+export type AttributeTarget = `attribute:${string}`;
+export type AttributeMapping = { source: string; target: IdentitySourceTarget | AttributeTarget };
 
 export const CORRELATION_KINDS = ["email", "username", "composite"] as const;
 export type CorrelationRule = { kind: (typeof CORRELATION_KINDS)[number]; fields?: _SourcedIdentityField[] };

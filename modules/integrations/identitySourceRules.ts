@@ -1,6 +1,7 @@
 import { ApiError } from "@/lib/shared/types/foundation";
 import { SOURCED_IDENTITY_FIELDS, type IdentityStatus, type SourcedFields, type SourcedIdentityField } from "@/lib/shared/types/agent-identity";
 import {
+  ATTRIBUTE_TARGET_PREFIX,
   CORRELATION_KINDS,
   IDENTITY_SOURCE_TARGETS,
   IDENTITY_SOURCE_TEMPLATES,
@@ -55,7 +56,20 @@ function parseJsonish<T>(value: unknown, field: string): T {
   }
 }
 
-export function validateMappings(value: unknown): AttributeMapping[] {
+/** INTEGRATION-P0-20: what a mapping to a custom attribute is checked against. */
+export type AttributeTargetDefinition = { name: string; identityType: string | null; active: boolean };
+
+/** The custom attribute a target names, or null for an identity field. */
+export function attributeNameOf(target: string): string | null {
+  return target.startsWith(ATTRIBUTE_TARGET_PREFIX) ? target.slice(ATTRIBUTE_TARGET_PREFIX.length) : null;
+}
+
+/**
+ * A mapping's target is an identity field or `attribute:<name>`, one of the
+ * organization's custom attributes that is active and applies to the
+ * source's identity type.
+ */
+export function validateMappings(value: unknown, attributes: AttributeTargetDefinition[] = [], identityType = "HUMAN"): AttributeMapping[] {
   const raw = parseJsonish<unknown>(value ?? [], "attributeMappings");
   if (!Array.isArray(raw)) fail("attributeMappings: a list of { source, target }");
   const out: AttributeMapping[] = [];
@@ -65,12 +79,17 @@ export function validateMappings(value: unknown): AttributeMapping[] {
     const target = (m as AttributeMapping)?.target;
     if (!source && !target) continue;
     if (!source || source.length > 120) fail("attributeMappings: every mapping needs a source column of at most 120 characters");
-    if (typeof target !== "string" || !(IDENTITY_SOURCE_TARGETS as readonly string[]).includes(target)) {
+    const attribute = typeof target === "string" ? attributeNameOf(target) : null;
+    if (attribute !== null) {
+      const def = attributes.find((d) => d.name === attribute && d.active);
+      if (!def) fail(`attributeMappings: "${source}" maps to custom attribute ${attribute.slice(0, 80)}, which does not exist`);
+      if (def!.identityType !== null && def!.identityType !== identityType) fail(`attributeMappings: custom attribute ${attribute} is for ${def!.identityType} identities, not ${identityType}`);
+    } else if (typeof target !== "string" || !(IDENTITY_SOURCE_TARGETS as readonly string[]).includes(target)) {
       fail(`attributeMappings: "${source}" maps to an unknown field`);
     }
-    if (targets.has(target)) fail(`attributeMappings: ${target} is mapped twice`);
-    targets.add(target);
-    out.push({ source, target: target as IdentitySourceTarget });
+    if (targets.has(target as string)) fail(`attributeMappings: ${target} is mapped twice`);
+    targets.add(target as string);
+    out.push({ source, target: target as AttributeMapping["target"] });
   }
   if (out.length > 40) fail("attributeMappings: at most 40 mappings");
   if (!targets.has("externalId")) fail("attributeMappings: map a column to externalId, the source's own unique id");
@@ -99,7 +118,7 @@ export function validateCorrelationRules(value: unknown): CorrelationRule[] {
   return out;
 }
 
-export function validateSourceConfig(input: SourceConfigInput) {
+export function validateSourceConfig(input: SourceConfigInput, attributes: AttributeTargetDefinition[] = []) {
   const name = typeof input.name === "string" ? input.name.trim() : "";
   if (!name || name.length > 120) fail("name: 1 to 120 characters");
   const template = input.template;
@@ -132,7 +151,7 @@ export function validateSourceConfig(input: SourceConfigInput) {
     authoritative,
     priority,
     authoritativeFields: authoritativeFields as SourcedIdentityField[],
-    attributeMappings: validateMappings(input.attributeMappings),
+    attributeMappings: validateMappings(input.attributeMappings, attributes, identityType as string),
     correlationRules: validateCorrelationRules(input.correlationRules ?? [{ kind: "email" }]),
     leaverStrategy: leaverStrategy as (typeof LEAVER_STRATEGIES)[number],
     leaverThresholdPercent,
@@ -224,6 +243,8 @@ export type NormalizedSourceRecord = {
   externalId: string;
   fields: SourcedFields;
   managerExternalId: string | null;
+  /** Custom attribute values as the source sent them (typed by the Identity module when applied). */
+  attributes: Record<string, string | null>;
 };
 
 /** Reads a dotted path ("profile.email") from a raw object. */
@@ -245,9 +266,16 @@ export function normalizeRecord(
   const fields: SourcedFields = {};
   let externalId = "";
   let managerExternalId: string | null = null;
-  for (const { source, target } of mappings) {
+  const attributes: Record<string, string | null> = {};
+  for (const { source, target: mapped } of mappings) {
     const value = read(raw, source);
     const text = value === undefined || value === null ? "" : String(value).trim();
+    const attribute = attributeNameOf(mapped);
+    if (attribute !== null) {
+      attributes[attribute] = text ? text.slice(0, 1000) : null;
+      continue;
+    }
+    const target = mapped as IdentitySourceTarget;
     if (target === "externalId") {
       externalId = text;
       continue;
@@ -278,7 +306,7 @@ export function normalizeRecord(
   if (externalId.length > 300) return { invalid: "external id longer than 300 characters" };
   if (!fields.displayName && opts.requireDisplayName !== false) return { invalid: "no display name" };
   if (fields.startDate && fields.endDate && fields.endDate < fields.startDate) return { invalid: "endDate is before startDate" };
-  return { externalId, fields, managerExternalId };
+  return { externalId, fields, managerExternalId, attributes };
 }
 
 // ---------------------------------------------------------------- correlation
