@@ -85,6 +85,19 @@ export const CONFIG_SETTINGS = [
     unit: "days",
   },
   {
+    // ACCESS-P0-29: read by openFulfilmentTask() (modules/access-governance/fulfilmentTasks.ts).
+    key: "access.fulfilmentSlaDays",
+    section: "access",
+    label: "Fulfil approved access within",
+    help: "A fulfilment task is due this long after approval, then overdue, with a daily reminder to its owner.",
+    permission: SETTINGS,
+    type: "int",
+    min: 1,
+    max: 30,
+    default: 3,
+    unit: "days",
+  },
+  {
     key: "agents.duplicateMatchPercent",
     section: "agents",
     label: "Possible duplicate at",

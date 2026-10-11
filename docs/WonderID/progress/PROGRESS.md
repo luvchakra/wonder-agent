@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-11 |
 | Current phase | F2 Access requests end to end (started 2026-10-11); F1 gating done |
-| Next story | ACCESS-P0-29, Fulfilment tasks (#51); FOUNDATION-P0-31 (F1) waits for D11 |
+| Next story | ACCESS-P0-30, Remove-access and account requests (#52); FOUNDATION-P0-31 (F1) waits for D11 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -20,7 +20,7 @@ passed. This file is hand-maintained; the generated programme rollup
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
 | F1 Import and reconciliation | 9 | 8 | 0 | Gating stories done; exit test passed (seeded staging); FOUNDATION-P0-31 waits for D11 |
-| F2 Access requests | 8 | 1 | 0 | In progress |
+| F2 Access requests | 8 | 2 | 0 | In progress |
 | F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
 | F5 Roles, SoD, delegation | 5 | 0 | 0 | Not started |
@@ -79,7 +79,7 @@ Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
 | ACCESS-P0-28 Approved requests become pending grants | Access | #50 | Done | Migration 0121. Approval (chain, auto-approval, agent path, package items) adds a pending grant, on a placeholder account when the subject has none; Mark fulfilled → not yet verified; reconciliation verifies. Pending grants are not effective access |
-| ACCESS-P0-29 Fulfilment tasks | Access | #51 | Not started | |
+| ACCESS-P0-29 Fulfilment tasks | Access | #51 | Done | Migration 0122. One task per pending grant for the application's owner; claim, done (grant unverified), fail with a reason; SLA in Global Configuration (3 days), daily reminder when overdue; closed as verified by reconciliation. Home › Access Governance › Fulfilment Tasks |
 | ACCESS-P0-30 Remove-access and account requests | Access | #52 | Not started | |
 | ACCESS-P0-31 Requests for non-human identities | Access + Identity | #53 | Not started | |
 | ACCESS-P0-32 Time-bound access | Access | #54 | Not started | |

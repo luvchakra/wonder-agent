@@ -922,3 +922,11 @@ module's object tables: `reports`, `notification_preferences`. Additive; no serv
 CLAUDE.md §19.10; the mechanism and its verification are in the Foundation
 log, the page work in the Experience log. A new object table of this module
 follows the same pattern and joins `lib/provenance/tables.ts`.
+
+### 2026-10-11 — Notification type `fulfilment_task` (added by the Access Agent, ACCESS-P0-29)
+
+Migration 0122 adds `fulfilment_task` to the `notifications` and
+`notification_preferences` type checks, additively (the 0085/0102 pattern),
+and to `NotificationType`. It is sent through `notify()` when a fulfilment
+task opens, and again once a day while it is overdue. It is not mandatory,
+so members can turn it off.

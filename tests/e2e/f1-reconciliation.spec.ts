@@ -40,6 +40,7 @@ let tenantId = "";
 let appId = "";
 let integrationId = "";
 let anaId = "";
+let fulfilmentTaskId = "";
 let agentId = "";
 type Account = { id: string; externalAccountRef: string; identityId: string | null; agentId: string | null; correlation: string; accountType: string };
 const accounts: Record<string, Account> = {};
@@ -196,7 +197,7 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(findings[0].status).toBe("resolved");
   });
 
-  test("ACCESS-P0-28: an approved request becomes a pending grant on a placeholder account; marked fulfilled it is unverified; the next reconciliations verify it", async ({ request }) => {
+  test("ACCESS-P0-28: an approved request becomes a pending grant on a placeholder account; marked fulfilled it is unverified; the next reconciliations verify it", async ({ request, page }) => {
     test.setTimeout(120_000);
     const cara = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E F2 Cara ${stamp}`, email: mail("cara") } });
     expect(cara.status(), await cara.text()).toBe(201);
@@ -222,10 +223,18 @@ test.describe.serial("F1 reconciliation chain", () => {
     const listed = (await (await request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`)).json()).data as { id: string; status: string; externalAccountRef: string }[];
     expect(listed.find((a) => a.id === placeholder)).toMatchObject({ status: "pending", externalAccountRef: `pending:${caraId}` });
 
-    // Marked fulfilled: someone says it was done, nobody has seen it yet.
-    const done = await request.post(`/api/v1/access/requests/${req.id}/decision`, { data: { decision: "fulfilled" } });
-    expect(done.status(), await done.text()).toBe(200);
+    // ACCESS-P0-29: a fulfilment task waits for the application's owner (Ana); an access manager may work it too.
+    const tasks = async () => (await (await request.get(`/api/v1/access/fulfilment-tasks?requestId=${req.id}`)).json()).data as { id: string; status: string; assigneeIdentityId: string | null; dueAt: string }[];
+    const [task] = await tasks();
+    expect(task).toMatchObject({ status: "open", assigneeIdentityId: anaId });
+    expect(Date.parse(task.dueAt)).toBeGreaterThan(Date.now());
+    const act = (action: string, note?: string) => request.post(`/api/v1/access/fulfilment-tasks/${task.id}`, { data: { action, note } });
+    expect((await act("complete")).status()).toBe(200);
+    expect((await tasks())[0].status).toBe("completed");
+    // Done: someone says it was done, nobody has seen it yet.
     expect((await view()).fulfilment).toBe("fulfilled_unverified");
+    expect((await act("fail")).status()).toBe(400);
+    expect((await act("claim")).status()).toBe(409);
 
     // The account appears at the source: the placeholder hands its grant over and goes.
     await replaceIntegrationObjects(integrationId, tenantId, "account", [...ACCOUNTS, { externalId: "uid=cara", raw: { id: "cara", username: "cara", email: mail("cara") } }]);
@@ -243,6 +252,11 @@ test.describe.serial("F1 reconciliation chain", () => {
     const counts = await reconcileAccess(request);
     expect(counts.grants).toMatchObject({ added: 0, verified: 1 });
     expect((await view()).fulfilment).toBe("verified");
+    expect((await tasks())[0].status).toBe("verified");
+    fulfilmentTaskId = task.id;
+    await page.goto("/access/fulfilment?view=all");
+    await expect(page.getByRole("heading", { name: "Fulfilment tasks" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Finance in E2E F1 App/ }).first()).toBeVisible();
     expect((await ledgerFor(tenantId, accounts.cara.id)).find((e) => e.entitlementId === finance)?.status).toBe("VALID");
     expect(await accessFindings(tenantId, accounts.cara.id)).toEqual([]);
   });
@@ -255,6 +269,9 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(((await list.json()).data ?? []).length).toBe(0);
     const ident = await other.request.get(`/api/v1/identities/${accounts["svc-backup"].identityId}`);
     expect(ident.status()).toBe(404);
+    const otherTasks = (await (await other.request.get("/api/v1/access/fulfilment-tasks?view=all")).json()).data as { id: string }[];
+    expect(otherTasks.map((t) => t.id)).not.toContain(fulfilmentTaskId);
+    expect((await other.request.post(`/api/v1/access/fulfilment-tasks/${fulfilmentTaskId}`, { data: { action: "claim" } })).status()).toBe(404);
     await other.close();
   });
 });

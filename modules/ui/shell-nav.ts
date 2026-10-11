@@ -165,7 +165,11 @@ export const SHELL_NAV: ShellNavItem[] = [
     children: [
       link("Home", "/", "Home"),
       group("My Access", [page("Request Access", "/access/catalog", "access.read"), page("My Privacy", "/my-privacy"), page("Sign-in Security", "/settings/security")], "UserRound"),
-      group("Access Governance", [page("Access Requests", "/access/requests", "access.read"), page("Access Packages", "/access/packages", "access.read")], "KeyRound"),
+      group(
+        "Access Governance",
+        [page("Access Requests", "/access/requests", "access.read"), page("Fulfilment Tasks", "/access/fulfilment", "access.read"), page("Access Packages", "/access/packages", "access.read")],
+        "KeyRound",
+      ),
     ],
   },
   {

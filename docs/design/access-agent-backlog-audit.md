@@ -2450,3 +2450,67 @@ tracking state on the request alone, was not chosen.
 - Fulfilment tasks (ACCESS-P0-29).
 - Verification from page CSV imports (`fileImport.ts`); connector syncs,
   file connections included, do verify.
+
+### 2026-10-11 — ACCESS-P0-29: fulfilment tasks (#51)
+
+**Built.**
+- **Migration 0122 (applied to dev):** `access_fulfilment_tasks`.
+  - One task per pending grant, with same-tenant keys to the grant, request,
+    application and assignee identity.
+  - Status is open, claimed, completed, failed, verified or cancelled. A
+    failure must carry a reason; a claim must say who.
+  - Due time, reminder time, members read their own organization's tasks,
+    and no client write policy.
+  - `access_grants` gains a `(id, tenant_id)` unique key for the
+    same-tenant key.
+  - The notification type `fulfilment_task` is added to Operations'
+    checks, additively, as in 0085 and 0102.
+- **Global Configuration** `access.fulfilmentSlaDays` (1–30, default 3).
+- **`fulfilmentTasks.ts`** (rules in `fulfilmentTaskRules.ts`):
+  - **Opening:** a task opens with each new pending grant
+    (`pendingGrants.pendGrant`). It is assigned to the application's
+    technical owner, else its business owner, who is notified when they
+    sign in to WonderID.
+  - **Actions:** claim (open or failed), complete with an optional note
+    (the grant becomes `fulfilled_unverified`), or fail with a reason. The
+    owner or anyone with `access.approve` may act; once claimed, only the
+    claimer or an access manager may finish it. Each action is a
+    conditional update and is audited.
+  - **Closing:** "Mark fulfilled" on a request or package item completes
+    the tasks. Withdrawn grants cancel them. Reconciliation closes them as
+    verified (`connectorAccess.applyGrants`).
+  - **Reminders:** the daily access-governance cron reminds the owner of
+    each overdue task, at most once a day.
+- **Page and API:**
+  - Home › Access Governance › Fulfilment Tasks (`/access/fulfilment`):
+    still-to-do tasks soonest due first, or all. Each row has one next
+    step: Claim, then Done with a note. "Report a problem" is folded.
+  - `GET /api/v1/access/fulfilment-tasks` (`?view=all`, `?requestId=`) and
+    `POST /api/v1/access/fulfilment-tasks/<id>` (`{ action, note }`).
+
+**Verified.**
+- `tests/access/fulfilment-tasks-isolation.sql` 8/8:
+  - a task naming another organization's grant is refused;
+  - a second task for the same grant is refused;
+  - a failure without a reason is refused;
+  - a member reads their own organization's tasks, but cannot complete or
+    create one;
+  - another organization sees none and can change none.
+- Vitest: `fulfilmentTaskRules.test.ts` (5); config and shell-nav tests
+  updated. Access, config and UI suites 347/347.
+- E2E (local):
+  - `f1-reconciliation` 15/15. Covered: a task opens for the application
+    owner; an access manager completes it; the request is then fulfilled
+    but not yet verified; a failure without a reason gives 400; claiming a
+    completed task gives 409; the task is verified after reconciliation;
+    the page lists it; another organization neither sees nor acts on it
+    (404).
+  - `access-packages`, `request-catalog` and `shell` also pass: 42/42 in
+    the run together with F1.
+
+**Left out.**
+- A group as assignee: applications have no fulfilment group yet (onboarding
+  templates, ACCESS-P0-34).
+- Tasks for applications with write capability go to provisioning in F3.
+  Until then every pending grant gets a task.
+- The single inbox for approvals and tasks is EXPERIENCE-P0-29.

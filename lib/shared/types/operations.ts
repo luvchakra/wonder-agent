@@ -53,7 +53,10 @@ export type NotificationType =
   | "billing_alert"
   // COMPLIANCE-P0-12 (0102): a privacy request or breach notification
   // deadline is near or passed; sent to the tenant's privacy staff.
-  | "privacy_deadline";
+  | "privacy_deadline"
+  // ACCESS-P0-29 (0122): approved access to fulfil on a target, sent to the
+  // application's owner; again daily once overdue. Not mandatory (a preference).
+  | "fulfilment_task";
 
 /**
  * Every P0 notification type is mandatory — never suppressible via

@@ -5,6 +5,7 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
+import { closeTasksForGrants } from "./fulfilmentTasks";
 import { accountRefOf } from "./accountRules";
 import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
 import {
@@ -427,4 +428,6 @@ async function applyGrants(admin: Admin, tenantId: string, integrationId: string
       .in("fulfilment_status", ["pending_fulfilment", "fulfilled_unverified"]);
     if (error) throw new ApiError(500, "WRITE_FAILED", `access_grants: ${error.message}`);
   }
+  // ACCESS-P0-29: their fulfilment tasks are done.
+  await closeTasksForGrants(tenantId, plan.verified.map((v) => v.id), "verified");
 }
