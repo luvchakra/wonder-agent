@@ -537,3 +537,14 @@ failed or ended. "Waiting for you" lists the fulfilment tasks waiting for
 you along with the approvals. The request form lists the people you manage
 and what you own under "For". QA-P0-24 (the request-to-verified suite) is
 next.
+
+## 2026-10-11 — QA-P0-24: request-to-verified suite; F2 exit test passes
+
+The F2 loop is proven end to end on the seeded test organization. A person,
+a service account they own and an AI agent within its contract are each
+requested, approved (never by the requester), turned into tasks, added on
+the target and verified by the next reconciliation. A removal and an expiry
+end revoked. Another organization sees none of it, and a repeated
+reconciliation changes nothing. FOUNDATION-P0-32 (bulk invitation) is F2's
+last story and does not gate the phase. F3 needs D3, F4 needs D12 and F6
+needs D2.

@@ -49,7 +49,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
 | QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
 | QA-P0-23 | Reconciliation suite (F1, #48) | Done |
-| QA-P0-24 | Request-to-verified suite (F2, #56) | Not Started |
+| QA-P0-24 | Request-to-verified suite (F2, #56) | Done — 2026-10-11: person, service account and agent to verified; removal and expiry revoked; approver ≠ requester; isolation SQL for 0123/0124; repeated reconciliation changes nothing |
 
 ---
 

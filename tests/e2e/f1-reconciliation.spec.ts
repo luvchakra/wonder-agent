@@ -44,6 +44,10 @@ let anaId = "";
 let fulfilmentTaskId = "";
 let caraId = "";
 let agentId = "";
+// ACCESS-P0-31's requests, carried to verified by QA-P0-24.
+let svcId = "";
+let svcRequestId = "";
+let agentRequestId = "";
 type Account = { id: string; externalAccountRef: string; identityId: string | null; agentId: string | null; correlation: string; accountType: string };
 const accounts: Record<string, Account> = {};
 
@@ -336,9 +340,9 @@ test.describe.serial("F1 reconciliation chain", () => {
     await db.from("entitlements").update({ data_classification: "financial" }).eq("tenant_id", tenantId).eq("id", reports);
     await db.from("entitlements").update({ data_classification: "customer" }).eq("tenant_id", tenantId).eq("id", ops);
 
-    const svc = await request.post("/api/v1/identities", { data: { identityType: "SERVICE_ACCOUNT", displayName: `E2E F2 svc-report ${stamp}`, ownerIdentityId: me!.id } });
+    const svc = await request.post("/api/v1/identities", { data: { identityType: "SERVICE_ACCOUNT", displayName: `E2E F2 svc-report ${stamp}`, email: mail("svc-report"), ownerIdentityId: me!.id } });
     expect(svc.status(), await svc.text()).toBe(201);
-    const svcId = (await svc.json()).data.id as string;
+    svcId = (await svc.json()).data.id as string;
     expect((await request.post(`/api/v1/agents/${agentId}/owners`, { data: { ownerType: "business_owner", userId: me!.user_id } })).status()).toBe(201);
     const contract = await request.post(`/api/v1/agents/${agentId}/contracts`, { data: { purpose: "Financial reporting", approvedApplications: [`E2E F1 App ${stamp}`], approvedData: ["financial"], approvedActions: ["READ"] } });
     expect(contract.status(), await contract.text()).toBe(201);
@@ -361,6 +365,7 @@ test.describe.serial("F1 reconciliation chain", () => {
       expect(forSvc.status(), await forSvc.text()).toBe(201);
       const svcRequest = (await forSvc.json()).data as { id: string; status: string; policyResult: { checks: { check: string; result: string }[] } };
       expect(svcRequest.status).toBe("pending");
+      svcRequestId = svcRequest.id;
       expect(svcRequest.policyResult.checks).toContainEqual({ check: "for", result: "an identity you own" });
       const notOwned = await ask(owner.request, accounts["svc-backup"].identityId!, ops);
       expect(notOwned.status()).toBe(403);
@@ -375,6 +380,7 @@ test.describe.serial("F1 reconciliation chain", () => {
       expect(inContract.status(), await inContract.text()).toBe(201);
       const agentRequest = (await inContract.json()).data as { id: string; agentId: string; subjectIdentityId: string };
       expect(agentRequest).toMatchObject({ agentId, subjectIdentityId: agentIdentity!.id });
+      agentRequestId = agentRequest.id;
       const outOfContract = await ask(owner.request, agentIdentity!.id, ops);
       expect(outOfContract.status()).toBe(403);
       expect((await outOfContract.json()).error.code).toBe("OUT_OF_CONTRACT");
@@ -504,6 +510,67 @@ test.describe.serial("F1 reconciliation chain", () => {
     await expect(forSelect.locator('optgroup[label="People you manage"] option', { hasText: fayName })).toHaveCount(1);
   });
 
+  test("QA-P0-24: the service account's and the agent's requests reach verified; nobody approves their own; a repeated reconciliation changes nothing", async ({ request, browser }) => {
+    test.setTimeout(180_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+    type View = { request: { status: string }; fulfilment: string; grants: { id: string; accountId: string }[]; tasks: { id: string; kind: string; status: string }[] };
+    const view = async (id: string) => (await (await request.get(`/api/v1/access/requests/${id}`)).json()).data as View;
+    const owner = await browser.newContext({ storageState: authFile("requester") });
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    try {
+      // The service account's owner asked; they cannot also approve it.
+      const own = await owner.request.post(`/api/v1/access/requests/${svcRequestId}/decision`, { data: { decision: "approved", comment: "my own" } });
+      expect(own.status()).not.toBe(200);
+      expect((await view(svcRequestId)).request.status).toBe("pending");
+      const approved = await iam.request.post(`/api/v1/access/requests/${svcRequestId}/decision`, { data: { decision: "approved", comment: "QA-P0-24" } });
+      expect(approved.status(), await approved.text()).toBe(200);
+    } finally {
+      await owner.close();
+      await iam.close();
+    }
+
+    // Both lines wait for fulfilment, each with one task; the change is made on the target.
+    for (const id of [svcRequestId, agentRequestId]) {
+      const v = await view(id);
+      expect(v).toMatchObject({ request: { status: "approved" }, fulfilment: "pending_fulfilment" });
+      expect(v.tasks.map((t) => t.kind)).toEqual(["grant"]);
+      expect((await request.post(`/api/v1/access/fulfilment-tasks/${v.tasks[0].id}`, { data: { action: "complete" } })).status()).toBe(200);
+    }
+
+    // The service account's account and both grants appear at the source: verified.
+    await replaceIntegrationObjects(integrationId, tenantId, "account", [
+      ...ACCOUNTS,
+      { externalId: "uid=cara", raw: { id: "cara", username: "cara", email: mail("cara"), status: "disabled" } },
+      { externalId: "uid=dan", raw: { id: "dan", username: "dan", email: mail("dan") } },
+      { externalId: "uid=eve", raw: { id: "eve", username: "eve", email: mail("eve") } },
+      { externalId: "uid=svcrep", raw: { id: "svcrep", username: "svcrep", email: mail("svc-report") } },
+    ]);
+    expect((await request.post(`/api/v1/access/applications/${appId}/reconciliations`)).status()).toBe(201);
+    await loadAccounts(request);
+    expect(accounts.svcrep).toMatchObject({ identityId: svcId, correlation: "correlated" });
+    await replaceIntegrationObjects(integrationId, tenantId, "access_grant", [...BASE_GRANTS, grant("uid=svcrep", "cn=ops"), grant("uid=bot", "cn=reports")]);
+    expect((await reconcileAccess(request)).grants).toMatchObject({ added: 0, verified: 2 });
+    const svcLine = await view(svcRequestId);
+    const agentLine = await view(agentRequestId);
+    expect(svcLine.fulfilment).toBe("verified");
+    expect(svcLine.grants.map((g) => g.accountId)).toEqual([accounts.svcrep.id]);
+    expect(agentLine.fulfilment).toBe("verified");
+    expect(agentLine.grants.map((g) => g.accountId)).toEqual([accounts.finbot.id]);
+
+    // Running it again changes nothing: no new grant, no task closed a second time.
+    const snapshot = async () => {
+      const [{ data: tasks }, { data: grants }] = await Promise.all([
+        db.from("access_fulfilment_tasks").select("id, status, closed_at, updated_at").eq("tenant_id", tenantId).in("request_id", [svcRequestId, agentRequestId]).order("id"),
+        db.from("access_grants").select("id, fulfilment_status, verified_at").eq("tenant_id", tenantId).in("account_id", [accounts.svcrep.id, accounts.finbot.id]).is("revoked_at", null).order("id"),
+      ]);
+      return { tasks, grants };
+    };
+    const before = await snapshot();
+    expect(before.tasks?.every((t) => t.status === "verified")).toBe(true);
+    expect((await reconcileAccess(request)).grants).toMatchObject({ added: 0, verified: 0, revoked: 0 });
+    expect(await snapshot()).toEqual(before);
+  });
+
   test("another organization sees none of it", async ({ browser }) => {
     const other = await browser.newContext({ storageState: authFile("adminTwo") });
     const runs = await other.request.get(`/api/v1/access/applications/${appId}/access-reconciliations`);
@@ -515,6 +582,9 @@ test.describe.serial("F1 reconciliation chain", () => {
     const otherTasks = (await (await other.request.get("/api/v1/access/fulfilment-tasks?view=all")).json()).data as { id: string }[];
     expect(otherTasks.map((t) => t.id)).not.toContain(fulfilmentTaskId);
     expect((await other.request.post(`/api/v1/access/fulfilment-tasks/${fulfilmentTaskId}`, { data: { action: "claim" } })).status()).toBe(404);
+    // QA-P0-24: nor the requests, nor a decision on one.
+    expect((await other.request.get(`/api/v1/access/requests/${svcRequestId}`)).status()).toBe(404);
+    expect((await other.request.post(`/api/v1/access/requests/${agentRequestId}/decision`, { data: { decision: "rejected" } })).ok()).toBe(false);
     await other.close();
   });
 });
