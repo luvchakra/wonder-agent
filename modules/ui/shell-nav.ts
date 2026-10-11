@@ -183,6 +183,7 @@ export const SHELL_NAV: ShellNavItem[] = [
       link("Agent Discovery", "/agents/discovery", "Search", "agent.read"),
       link("Duplicate Review", "/agents/duplicates", "Network", "agent.create"),
       link("Pending Matches", "/integrations/correlations", "Link2", "integration.read"),
+      link("Unowned Identities", "/identities/unowned", "UserX", "identity.read"),
     ],
   },
   {

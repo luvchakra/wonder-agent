@@ -7,7 +7,7 @@ import type { AccessRequest } from "@/lib/shared/types/access-governance";
 import { getIdentity, getIdentityForUser, getIdentityNames } from "@/modules/agent-identity/service";
 import { toAccessRequest } from "./mappers";
 import { startApprovalChain } from "./approvals";
-import { assessRisk, type RequestPolicy, type RiskLevel } from "./requestRules";
+import { assessRisk, isUnownedNonHuman, UNOWNED_MESSAGE, type RequestPolicy, type RiskLevel } from "./requestRules";
 import {
   assignmentExpiry,
   assignmentStatus,
@@ -338,6 +338,7 @@ export async function requestPackage(
   if (pkg.status !== "active" || !pkg.requestable) await refuse(409, "NOT_REQUESTABLE", "This package cannot be requested");
   const eligibility = checkEligibility(pkg, { identityType: subject.identityType, department: subject.department, status: subject.status });
   if (!eligibility.eligible) await refuse(403, "NOT_ELIGIBLE", eligibility.reasons.join("; "));
+  if (isUnownedNonHuman(subject)) await refuse(409, "SUBJECT_UNOWNED", UNOWNED_MESSAGE);
   const forSelf = requester?.id === subject.id;
   if (!forSelf) {
     const responsible = requester !== null && (subject.managerIdentityId === requester.id || (subject.identityType !== "HUMAN" && subject.ownerIdentityId === requester.id));

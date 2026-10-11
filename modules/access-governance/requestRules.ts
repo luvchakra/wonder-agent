@@ -80,7 +80,7 @@ export type RequestContext = {
   appActive: boolean;
   risk: RiskLevel;
   requesterIdentityId: string | null;
-  subject: { id: string; status: string; managerIdentityId: string | null; identityType: string };
+  subject: { id: string; status: string; managerIdentityId: string | null; identityType: string; ownerIdentityId?: string | null };
   requesterCanManageAccess: boolean;
   durationDays: number | null;
   justification: string;
@@ -105,6 +105,13 @@ const refuse = (status: 400 | 403 | 409, code: string, message: string): Request
  * allows it AND a risk below the policy's threshold; at or above the
  * threshold a person always approves (spec §11.5).
  */
+/** IDENTITY-P0-20: a service account, machine, workload, application or API identity needs an owner before access is requested for it. */
+const NON_HUMAN = ["MACHINE", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API"];
+export const UNOWNED_MESSAGE = "Assign an owner to this identity before requesting access for it";
+export function isUnownedNonHuman(subject: { identityType: string; ownerIdentityId?: string | null }): boolean {
+  return NON_HUMAN.includes(subject.identityType) && !subject.ownerIdentityId;
+}
+
 export function evaluateRequest(c: RequestContext): RequestDecision {
   const checks: { check: string; result: string }[] = [];
   if (!c.appActive) return refuse(409, "NOT_REQUESTABLE", "This application is not live yet; it is requestable once onboarding is promoted");
@@ -112,6 +119,7 @@ export function evaluateRequest(c: RequestContext): RequestDecision {
   checks.push({ check: "policy", result: c.policy.name });
   if (c.subject.identityType === "AI_AGENT") return refuse(400, "VALIDATION_FAILED", "An AI agent's access is requested from the agent");
   if (c.subject.status !== "active") return refuse(409, "SUBJECT_INACTIVE", "Access can only be requested for an active identity");
+  if (isUnownedNonHuman(c.subject)) return refuse(409, "SUBJECT_UNOWNED", UNOWNED_MESSAGE);
 
   const self = c.requesterIdentityId !== null && c.requesterIdentityId === c.subject.id;
   if (self) {

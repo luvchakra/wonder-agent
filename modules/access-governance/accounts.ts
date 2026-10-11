@@ -6,7 +6,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentityType } from "@/lib/shared/types/agent-identity";
 import { getNormalizedObjects, getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
-import { getIdentity, getIdentityNames, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
+import { ensureAccountIdentities, getIdentity, getIdentityNames, listAgentIdentifiers, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
 import {
   dormantCutoff,
@@ -367,9 +367,10 @@ async function reconcileAccounts(
   };
 
   try {
-    const [objects, identities, existingRows] = await Promise.all([
+    const [objects, identities, agentIdentifiers, existingRows] = await Promise.all([
       readObjects(tenantId, config.integrationId, "account"),
       listIdentitiesForCorrelation(tenantId, NON_AGENT_TYPES),
+      listAgentIdentifiers(tenantId),
       supabase
         .from("accounts")
         .select("id, external_account_ref, agent_id, identity_id, correlation, account_type, status, source, last_used_at")
@@ -397,7 +398,18 @@ async function reconcileAccounts(
       identities,
       existing,
       now: startedAt,
+      agentIdentifiers,
     });
+    // IDENTITY-P0-20: each non-human account no person matches gets its own governed identity.
+    const nonHuman = await ensureAccountIdentities(tenantId, applicationId, plan.nonHumanAccounts);
+    for (const u of plan.upserts) {
+      const identityId = nonHuman.get(u.external_account_ref);
+      if (!identityId || u.identity_id) continue;
+      u.identity_id = identityId;
+      u.correlation = "correlated";
+      plan.counts.orphan--;
+      plan.counts.correlated++;
+    }
     const nowIso = startedAt.toISOString();
     for (let i = 0; i < plan.upserts.length; i += 500) {
       const batch = plan.upserts.slice(i, i + 500).map((u) => ({

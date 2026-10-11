@@ -92,6 +92,14 @@ describe("evaluateRequest (spec §11.5)", () => {
     // Without a person identity, the requester is never "self" and never a manager.
     expect(evaluateRequest(ctx({ requesterIdentityId: null }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
   });
+  it("IDENTITY-P0-20: a non-human identity with no owner cannot be a request's subject; with an owner it can", () => {
+    const svc = { id: "svc", status: "active", managerIdentityId: null, identityType: "SERVICE_ACCOUNT" };
+    const manager = { requesterCanManageAccess: true, policy: policy({ allowForOthers: "access_managers" }) };
+    expect(evaluateRequest(ctx({ ...manager, subject: { ...svc, ownerIdentityId: null } }))).toMatchObject({ ok: false, status: 409, code: "SUBJECT_UNOWNED" });
+    expect(evaluateRequest(ctx({ ...manager, subject: { ...svc, ownerIdentityId: "owner-1" } })).ok).toBe(true);
+    // People never need an owner.
+    expect(evaluateRequest(ctx({ subject: { id: "me", status: "active", managerIdentityId: null, identityType: "HUMAN" } })).ok).toBe(true);
+  });
   it("self-requests can be turned off; inactive people, agents and applications not yet live are refused", () => {
     expect(evaluateRequest(ctx({ policy: policy({ allowSelf: false }) }))).toMatchObject({ ok: false, code: "NOT_ALLOWED" });
     expect(evaluateRequest(ctx({ subject: { id: "me", status: "disabled", managerIdentityId: null, identityType: "HUMAN" } }))).toMatchObject({ ok: false, code: "SUBJECT_INACTIVE" });

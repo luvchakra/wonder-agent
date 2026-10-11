@@ -488,3 +488,24 @@ export function LifecycleTaskActions({ taskId, taskType, people }: { taskId: str
     </form>
   );
 }
+
+/** IDENTITY-P0-20: give an unowned non-human identity an accountable person (audited as an identity update). */
+export function AssignOwnerForm({ identityId, people }: { identityId: string; people: PersonOption[] }) {
+  const [state, action, pending] = useActionState(updateIdentityAction.bind(null, identityId), IDLE);
+  if (state.status === "saved") return <span className="text-xs text-success">Owner assigned.</span>;
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <select name="ownerIdentityId" aria-label="Owner" required defaultValue="" className={`${fieldInputClass} sm:max-w-xs`}>
+        <option value="">Choose an owner</option>
+        {people.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.displayName}
+            {p.email ? ` (${p.email})` : ""}
+          </option>
+        ))}
+      </select>
+      <Submit pending={pending} idle="Assign" busy="Assigning…" variant="secondary" />
+      <Result state={state} />
+    </form>
+  );
+}
