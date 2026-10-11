@@ -6,7 +6,7 @@
 | Date | 2026-10-11 |
 | Scope | Identity governance for every identity type: people, external identities, service accounts, machine identities, workloads, APIs and AI agents. |
 | Companion files | `../run-order/RUN-ORDER.md` (the phases and stories, in order) and `../progress/PROGRESS.md` (live status). |
-| Sources | `docs/design/WONDERID-FOUNDATION-DESIGN.md` (the first design and its revisions, with the standards list, NIST mapping and coverage matrix), `docs/design/saviynt-reference-study.md` (a reading of a live Saviynt tenant), `docs/integrations/CONNECTOR-FRAMEWORK.md` (the connector reference), `docs/integrations/INTEGRATOR-GUIDE.md` (what is configurable today). |
+| Sources | `docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md` (the first design and its revisions, with the standards list, NIST mapping and coverage matrix), `docs/WonderID/reference/saviynt-reference-study.md` (a reading of a live Saviynt tenant), `docs/integrations/CONNECTOR-FRAMEWORK.md` (the connector reference), `docs/WonderID/reference/INTEGRATOR-GUIDE.md` (what is configurable today). |
 
 This file is the clean statement of the design as it stands after the three
 passes of 2026-10-11 (the foundation design, the delivery reordering, and the
@@ -794,7 +794,7 @@ required); a **sandbox** tenant promoted to production through
 workflows, definitions and templates, a diff against the target tenant,
 import with approval; PLATFORM-P0-13); per-tenant **labels** for terms such
 as "Application"; the **integrator guide**
-(`docs/integrations/INTEGRATOR-GUIDE.md`) kept in step with each phase.
+(`docs/WonderID/reference/INTEGRATOR-GUIDE.md`) kept in step with each phase.
 
 **Global Configuration rule.** A setting is added to `lib/config/registry.ts`
 only with the code that reads it (CLAUDE.md §19.11). Candidates from this
@@ -864,5 +864,5 @@ review, emergency sessions with post-use review); separation of duties
 (versioned rulesets, violations, mitigating controls and their tests);
 change management of WonderID itself (versioned configuration, approved
 publishes, hash-chained audit). The NIST SP 800-53 mapping and the standards
-list are in `docs/design/WONDERID-FOUNDATION-DESIGN.md` §2 and §7.4 and
+list are in `docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md` §2 and §7.4 and
 remain valid.

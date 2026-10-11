@@ -1181,7 +1181,7 @@ D11):
   starts from the same least-privilege set.
 - **Sandbox.** An integrator configures a test tenant and promotes to
   production with a reviewed diff (configuration bundles, F7).
-- **Guide.** `docs/integrations/INTEGRATOR-GUIDE.md` indexes what an
+- **Guide.** `docs/WonderID/reference/INTEGRATOR-GUIDE.md` indexes what an
   integrator can configure today, with paths and permissions. It points to
   this section for what is planned and is updated with each phase.
 

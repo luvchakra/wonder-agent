@@ -3,7 +3,7 @@
 For a system integrator setting WonderID up for a customer. It lists what is
 configurable now, where, and with which permission, and says what is still
 planned. The planned items and their phases are in
-`docs/design/WONDERID-FOUNDATION-DESIGN.md` §8.1 (the plan of record) and
+`docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md` §8.1 (the plan of record) and
 §10. Checked against the code on 2026-10-11; keep this file in step with each
 phase.
 
