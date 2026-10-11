@@ -277,6 +277,29 @@ Open items:
   `security.txt` contact.
 - Do the §32 design review of the new signed-in screens.
 
+## 2026-10-11 — WonderID foundation design (IGA and Agent ID)
+
+On the owner's request, an original design baseline was written:
+`docs/design/WONDERID-FOUNDATION-DESIGN.md`. It was built from three sources:
+- public standards: SCIM 2.0, NIST SP 800-53 AC/IA/AU, SOX ITGC, RFC 8693,
+  DPoP, SPIFFE, AuthZEN, SSF/CAEP and the IETF WIMSE AIMS draft;
+- Saviynt's public product pages and training guides, used for capabilities
+  only;
+- seven Saviynt documents the owner supplied.
+
+The document does these things:
+- takes stock of what is built;
+- designs the IGA and Agent ID gaps;
+- lists the changes needed per module;
+- divides the work into phases (first F1–F7; revised the same day to F1–F10,
+  next entry);
+- lists owner decisions (D1–D9; D10 added the same day).
+
+Documentation only: no code, migration or backlog row changed. New stories are
+added to module backlogs only after the owner approves D1. The Saviynt
+customer documentation site needs a sign-in and was not used. (First proposed
+in #40, carried into #65.)
+
 ## 2026-10-11 — IGA delivery order: import, reconciliation and requests first
 
 **Owner direction.** WonderID is IGA for human and non-human identities. Reconciliation, account import and access requests work first.
