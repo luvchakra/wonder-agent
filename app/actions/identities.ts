@@ -87,6 +87,7 @@ export async function updateIdentityAction(identityId: string, _prev: IdentityFo
     return formError(err);
   }
   revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/unowned");
   return { status: "saved", message: "Saved." };
 }
 

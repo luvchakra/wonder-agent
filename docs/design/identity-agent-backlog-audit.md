@@ -1536,3 +1536,44 @@ follows the same pattern and joins `lib/provenance/tables.ts`.
 `modules/agent-identity/duplicates.ts`: the duplicate match threshold is the organization's setting (`agents.duplicateMatchPercent`, default 60%). Defaults equal the previous constants. Cross-module change by explicit
 owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
 Foundation log).
+
+## 2026-10-11 — Non-human identities from accounts (IDENTITY-P0-20, F1, #46)
+
+Service, shared, machine, workload, application and API accounts found by a
+connector now become governed identities with an owner, or wait in a queue
+until they have one. An agent's accounts link to the agent by identifiers
+the agent declares.
+
+**What changed.** No migration; `identities` already has
+`owner_identity_id` and a unique `(tenant, source_system, source_native_id)`.
+- `accountIdentities.ts`:
+  - `ensureAccountIdentities()` finds or creates the identity for each
+    non-human account (source `account:<applicationId>`, the account key as
+    its native id). It sets the owner the source names when the identity has
+    none, and never replaces an owner set in WonderID. Audited
+    `identity.created_from_accounts`; service role with the tenant on every
+    statement.
+  - `listAgentIdentifiers()` reads `agent_identities.external_reference`,
+    leaving out human delegates; an identifier two agents declare links
+    neither.
+- `accountIdentityRules.resolveOwner()` (pure): one person by WonderID id,
+  source id, email or username; unknown or ambiguous names nobody, so there
+  is no guessed owner.
+- Onboarding › Unowned Identities (`/identities/unowned`, `identity.read`):
+  non-human identities with no owner. With `identity.manage`, Assign uses
+  `updateIdentity` (audited `identity.updated`).
+- `listIdentities()` gains an `unownedNonHuman` filter.
+- Access (recorded in its audit log): account reconciliation calls both;
+  access requests refuse an unowned non-human subject.
+
+**Verified.**
+- `accountIdentityRules.test.ts` 2.
+- Access rule tests (below).
+- Full suite 1191/1191.
+- Typecheck, eslint and `next build` are clean.
+
+**Left out.**
+- Configurable rules for which accounts are non-human: the source's
+  `accountType` decides for now.
+- Owner changes from the source after an owner is set: WonderID's owner
+  wins.

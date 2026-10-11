@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-11 |
 | Current phase | F1 Import and reconciliation (started 2026-10-11) |
-| Next story | IDENTITY-P0-20, Non-human identities from accounts (#46) |
+| Next story | EXPERIENCE-P0-28, Reconciliation console (#47) |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -19,7 +19,7 @@ passed. This file is hand-maintained; the generated programme rollup
 
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
-| F1 Import and reconciliation | 9 | 4 | 0 | In progress |
+| F1 Import and reconciliation | 9 | 5 | 0 | In progress |
 | F2 Access requests | 8 | 0 | 0 | Not started |
 | F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
@@ -64,8 +64,8 @@ status is shown per row below.
 | INTEGRATION-P0-18 Staging reflects the source | Integration | #42 | Done | PR #79; migration 0117; isolation SQL 19/19; held runs decided on the connection page |
 | INTEGRATION-P0-19 Scheduled import and promotion | Integration | #43 | Done | PR #80; migration 0118; identities then accounts after every full sync, steps on the job; source schedules run. Entitlements and grants join with ACCESS-P0-27 |
 | ACCESS-P0-27 Entitlement and grant reconciliation | Access | #44 | Done | PR #81; migration 0119; preview then apply on the application page; joins the post-sync chain; removal and return are ledger events |
-| ACCESS-P0-25 Imported access classification and drift findings | Access + Risk | #45 | Done | Migration 0120; baseline per application; legacy / authorized / unproven / rogue; one Risk finding per rogue access, resolved when approved or removed |
-| IDENTITY-P0-20 Non-human identities from accounts | Identity | #46 | Not started | |
+| ACCESS-P0-25 Imported access classification and drift findings | Access + Risk | #45 | Done | PR #82; migration 0120; baseline per application; legacy / authorized / unproven / rogue; one Risk finding per rogue access, resolved when approved or removed |
+| IDENTITY-P0-20 Non-human identities from accounts | Identity | #46 | Done | Service/shared/machine accounts become owned or queued identities; agents' accounts link by declared identifiers; unowned subjects refused for requests |
 | EXPERIENCE-P0-28 Reconciliation console | Experience | #47 | Not started | |
 | QA-P0-23 Reconciliation suite | QA | #48 | Not started | |
 | INTEGRATION-P0-20 Custom attributes as targets; schedule on every connection | Integration | #66 | Not started | Does not gate |
@@ -198,4 +198,5 @@ Exit test: not run.
 - 2026-10-11: D1 approved by the owner; F1 started. INTEGRATION-P0-18 done (migration 0117, PR #79).
 - 2026-10-11: INTEGRATION-P0-19 done (migration 0118, PR #80).
 - 2026-10-11: ACCESS-P0-27 done (migration 0119, PR #81).
-- 2026-10-11: ACCESS-P0-25 done (migration 0120).
+- 2026-10-11: ACCESS-P0-25 done (migration 0120, PR #82).
+- 2026-10-11: IDENTITY-P0-20 done (no migration).

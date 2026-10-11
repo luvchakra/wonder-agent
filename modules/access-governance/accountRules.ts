@@ -78,6 +78,32 @@ export function matchIdentity(rule: CorrelationRule, raw: Record<string, unknown
   return { correlation: "orphan", identityId: null };
 }
 
+/**
+ * IDENTITY-P0-20: the kind of non-human identity an account stands for, from
+ * the source's `accountType` (or `type`), or null for an ordinary account.
+ * Only an account that matches no person becomes such an identity.
+ */
+const NON_HUMAN_WORDS: Record<string, "SERVICE_ACCOUNT" | "MACHINE" | "WORKLOAD" | "APPLICATION" | "API"> = {
+  service: "SERVICE_ACCOUNT",
+  service_account: "SERVICE_ACCOUNT",
+  shared: "SERVICE_ACCOUNT",
+  system: "SERVICE_ACCOUNT",
+  technical: "SERVICE_ACCOUNT",
+  machine: "MACHINE",
+  device: "MACHINE",
+  workload: "WORKLOAD",
+  application: "APPLICATION",
+  app: "APPLICATION",
+  api: "API",
+};
+export function nonHumanTypeOf(raw: Record<string, unknown>): (typeof NON_HUMAN_WORDS)[string] | null {
+  const word = text(read(raw, "accountType") ?? read(raw, "type") ?? read(raw, "normalized.accountType")).toLowerCase().replace(/[\s-]+/g, "_");
+  return NON_HUMAN_WORDS[word] ?? null;
+}
+
+/** IDENTITY-P0-20: the source values an agent's declared identifier may appear in. */
+const AGENT_ID_KEYS = ["clientId", "client_id", "appId", "applicationId", "servicePrincipalId", "objectId", "externalId"];
+
 export type ExistingAccount = {
   id: string;
   externalAccountRef: string;
@@ -108,6 +134,8 @@ export type ReconciliationPlan = {
   /** Accounts reconciliation imported earlier that the source no longer lists. */
   missingIds: string[];
   counts: { sourceAccounts: number; created: number; updated: number; correlated: number; orphan: number; ambiguous: number; missingIdentifier: number; notInSource: number };
+  /** IDENTITY-P0-20: non-human accounts no person matches, for Identity to give each its own identity. */
+  nonHumanAccounts: { ref: string; displayName: string; identityType: "SERVICE_ACCOUNT" | "MACHINE" | "WORKLOAD" | "APPLICATION" | "API"; ownerRef: string | null }[];
 };
 
 /**
@@ -126,12 +154,15 @@ export function planReconciliation(input: {
   identities: CorrelationIdentity[];
   existing: ExistingAccount[];
   now: Date;
+  /** IDENTITY-P0-20: identifiers declared on agents (agent_identities), to the agent. */
+  agentIdentifiers?: Map<string, string>;
 }): ReconciliationPlan {
   const index = buildIndex(input.rule, input.identities);
   const byRef = new Map(input.existing.map((a) => [a.externalAccountRef, a]));
   const seen = new Set<string>();
   const counts: ReconciliationPlan["counts"] = { sourceAccounts: input.sourceAccounts.length, created: 0, updated: 0, correlated: 0, orphan: 0, ambiguous: 0, missingIdentifier: 0, notInSource: 0 };
   const upserts: AccountUpsert[] = [];
+  const nonHumanAccounts: ReconciliationPlan["nonHumanAccounts"] = [];
   const nowIso = input.now.toISOString();
 
   for (const raw of input.sourceAccounts) {
@@ -150,12 +181,22 @@ export function planReconciliation(input: {
 
     let identityId: string | null;
     let correlation: Correlation;
+    let agentId = current?.agentId ?? null;
+    // An agent's account: linked by an identifier the agent declares.
+    const declared = !agentId ? [ref, ...AGENT_ID_KEYS.map((k) => text(read(raw, k)))].find((v) => v && input.agentIdentifiers?.has(v)) : undefined;
+    if (declared) agentId = input.agentIdentifiers!.get(declared)!;
     if (current && (current.agentId || current.correlation === "manual")) {
       identityId = current.identityId;
       correlation = current.correlation;
+    } else if (declared) {
+      identityId = null;
+      correlation = "correlated";
     } else {
       ({ identityId, correlation } = matchIdentity(input.rule, raw, index));
     }
+    // A non-human account no person matches: its own governed identity (Identity creates or finds it).
+    const nonHuman = correlation === "orphan" && !agentId ? nonHumanTypeOf(raw) : null;
+    if (nonHuman) nonHumanAccounts.push({ ref, displayName: name.slice(0, 200), identityType: nonHuman, ownerRef: text(read(raw, "owner") ?? read(raw, "normalized.owner")) || null });
     if (correlation === "correlated" || correlation === "manual") counts.correlated++;
     else if (correlation === "ambiguous") counts.ambiguous++;
     else counts.orphan++;
@@ -165,10 +206,10 @@ export function planReconciliation(input: {
     upserts.push({
       external_account_ref: ref,
       account_name: name.slice(0, 300),
-      agent_id: current?.agentId ?? null,
+      agent_id: agentId,
       identity_id: identityId,
       correlation,
-      account_type: current && current.accountType !== "standard" ? current.accountType : privileged ? "privileged" : "standard",
+      account_type: current && current.accountType !== "standard" ? current.accountType : privileged ? "privileged" : nonHuman ? (text(read(raw, "accountType") ?? read(raw, "normalized.accountType")).toLowerCase() === "shared" ? "shared" : "service") : "standard",
       status: disabled ? "disabled" : "active",
       source: current?.source ?? "reconciliation",
       // Never move last use backwards.
@@ -178,5 +219,5 @@ export function planReconciliation(input: {
   }
   const missingIds = input.existing.filter((a) => a.source === "reconciliation" && !seen.has(a.externalAccountRef)).map((a) => a.id);
   counts.notInSource = missingIds.length;
-  return { upserts, missingIds, counts };
+  return { upserts, missingIds, counts, nonHumanAccounts };
 }

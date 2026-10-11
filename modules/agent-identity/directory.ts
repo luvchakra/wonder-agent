@@ -150,6 +150,8 @@ function writeError(error: { code?: string; message: string }, what: string): ne
 
 export type IdentityListFilter = {
   types?: IdentityType[];
+  /** IDENTITY-P0-20: only machine, service account, workload, application and API identities with no owner. */
+  unownedNonHuman?: boolean;
   status?: IdentityStatus;
   q?: string;
   page?: number;
@@ -172,6 +174,9 @@ export async function listIdentities(tenantId: string, filter: IdentityListFilte
   let query = supabase.from("identities").select(LIST_COLUMNS, { count: "exact" }).eq("tenant_id", tenantId);
   if (filter.types?.length) query = query.in("identity_type", filter.types);
   if (filter.status) query = query.eq("status", filter.status);
+  if (filter.unownedNonHuman) {
+    query = query.in("identity_type", ["MACHINE", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API"]).is("owner_identity_id", null).not("status", "in", "(terminated,archived)");
+  }
   const q = filter.q?.trim().replace(/[%_,()*\\]/g, " ").trim();
   if (q) query = query.or(`display_name.ilike.%${q}%,email.ilike.%${q}%,username.ilike.%${q}%`);
   const { data, error, count } = await query

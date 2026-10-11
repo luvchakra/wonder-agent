@@ -103,3 +103,51 @@ describe("planReconciliation", () => {
     expect(plan.upserts[0]).toMatchObject({ correlation: "orphan", identity_id: null });
   });
 });
+
+describe("IDENTITY-P0-20: non-human accounts and agents' declared identifiers", () => {
+  const base = { identifierField: "id", rule, identities, now, existing: [] as ExistingAccount[] };
+
+  it("a service or shared account no person matches is listed for its own identity, with the source's owner", () => {
+    const plan = planReconciliation({
+      ...base,
+      sourceAccounts: [
+        { id: "svc-backup", name: "Backup job", accountType: "Service", owner: "ana@example.com" },
+        { id: "ops-shared", accountType: "shared" },
+        { id: "build-box", normalized: { accountType: "machine" } },
+        { id: "nobody", email: "nobody@example.com" },
+      ],
+    });
+    expect(plan.nonHumanAccounts).toEqual([
+      { ref: "svc-backup", displayName: "Backup job", identityType: "SERVICE_ACCOUNT", ownerRef: "ana@example.com" },
+      { ref: "ops-shared", displayName: "ops-shared", identityType: "SERVICE_ACCOUNT", ownerRef: null },
+      { ref: "build-box", displayName: "build-box", identityType: "MACHINE", ownerRef: null },
+    ]);
+    expect(plan.upserts.map((u) => u.account_type)).toEqual(["service", "shared", "service", "standard"]);
+    // An ordinary account nobody matches stays an orphan; nothing is invented for it.
+    expect(plan.upserts[3]).toMatchObject({ correlation: "orphan", identity_id: null });
+  });
+
+  it("a service-typed account that matches a person stays the person's", () => {
+    const plan = planReconciliation({ ...base, sourceAccounts: [{ id: "a1", email: "ana@example.com", accountType: "service" }] });
+    expect(plan.nonHumanAccounts).toEqual([]);
+    expect(plan.upserts[0]).toMatchObject({ identity_id: "p1", correlation: "correlated" });
+  });
+
+  it("an agent's account links to the agent by an identifier the agent declares", () => {
+    const agentIdentifiers = new Map([["client-123", "agent-9"], ["spn-777", "agent-8"]]);
+    const plan = planReconciliation({
+      ...base,
+      agentIdentifiers,
+      sourceAccounts: [
+        { id: "finbot", clientId: "client-123", accountType: "service" },
+        { id: "spn-777" },
+        { id: "other", clientId: "client-999" },
+      ],
+    });
+    expect(plan.upserts[0]).toMatchObject({ agent_id: "agent-9", identity_id: null, correlation: "correlated" });
+    expect(plan.upserts[1]).toMatchObject({ agent_id: "agent-8", correlation: "correlated" });
+    expect(plan.upserts[2]).toMatchObject({ agent_id: null, correlation: "orphan" });
+    // An agent's account never becomes a separate service-account identity.
+    expect(plan.nonHumanAccounts).toEqual([]);
+  });
+});

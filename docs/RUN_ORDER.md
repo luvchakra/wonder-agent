@@ -439,3 +439,12 @@ approval is rogue and gets one Risk finding, resolved when an approval
 appears or the access goes. The classification is shown in the ledger and
 on the account page. CLAUDE.md §3 also gained the owner's simplicity rules.
 IDENTITY-P0-20 is next in F1.
+
+## 2026-10-11 — IDENTITY-P0-20: non-human identities from accounts
+
+Account reconciliation now gives service, shared and machine accounts that
+match no person their own governed identity, owned when the source names
+the owner and otherwise listed in Onboarding › Unowned Identities. Agents'
+accounts link by the identifiers the agent declares. Access cannot be
+requested for an unowned non-human identity. EXPERIENCE-P0-28
+(reconciliation console) is next in F1.

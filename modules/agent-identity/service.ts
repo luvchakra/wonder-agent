@@ -76,3 +76,5 @@ export {
   type LifecycleTaskView,
 } from "./humanLifecycleService";
 export { allowedTransitions, HUMAN_TRANSITIONS } from "./humanLifecycle";
+// IDENTITY-P0-20: non-human identities behind imported accounts, and agents' declared identifiers.
+export { ensureAccountIdentities, listAgentIdentifiers, accountSourceSystem, type AccountIdentityInput, type NonHumanType } from "./accountIdentities";

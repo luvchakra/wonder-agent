@@ -2323,3 +2323,24 @@ finding.
 - Risk's existing findings pages stay agent-only; listing access findings
   there belongs with RISK-P0-13 (remediation) in F3.
 - Readers of current access (CAN, runtime decisions) are unchanged.
+
+## 2026-10-11 — Non-human accounts and agent accounts in reconciliation (for IDENTITY-P0-20)
+
+- `accountRules.planReconciliation()`:
+  - links an account to the agent that declares one of its identifiers (the
+    account key, or `clientId`, `appId`, `servicePrincipalId`, `objectId` or
+    `externalId` in the source);
+  - lists non-human accounts no person matches (`nonHumanTypeOf()`, from the
+    source's `accountType`), with the source's `owner`, and types them
+    service or shared.
+- `reconcileAccounts()` loads the agents' identifiers, has Identity create or
+  find each non-human identity (`ensureAccountIdentities`), and links the
+  accounts to them (counted as correlated, not orphan).
+- `requestRules.isUnownedNonHuman()`: the request catalog and access packages
+  refuse an unowned machine, service account, workload, application or API
+  subject (409 `SUBJECT_UNOWNED`), on the server.
+
+**Verified.** `accountRules.test.ts` +3 (non-human listed with owner, and
+service/shared types; a person match wins; agent linked by declared
+identifier and never made a service identity); `requestRules.test.ts` +1;
+full suite 1191/1191.
