@@ -376,6 +376,8 @@ and event-driven rules, and manage AI agents, by configuration.
 - Eleven stories: FOUNDATION-P0-31/32, INTEGRATION-P0-20/21,
   IDENTITY-P0-21/22, ACCESS-P0-33/34, EXPERIENCE-P0-30, OPERATIONS-P0-11,
   QA-P0-25, placed in F1–F7. F1 and F2 exit tests are unchanged.
+- GitHub issues #66–#76, attached to their phase issues (F1 #41, F2 #49,
+  F3 #57, F4 #58, F6 #60, F7 #61).
 
 `docs/integrations/INTEGRATOR-GUIDE.md` is new: what an integrator can
 configure today, with paths and permissions.
