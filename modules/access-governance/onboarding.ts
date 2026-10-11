@@ -7,6 +7,7 @@ import type { ApplicationOnboardingStatus } from "@/lib/shared/types/access-gove
 import { getIntegration, getNormalizedObjects, listSyncJobs } from "@/modules/integrations/service";
 import { listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { getApplicationDetail } from "./catalog";
+import { belongsToApplication } from "./connectorAccessRules";
 import {
   EMPTY_CONFIG,
   blockReason,
@@ -243,6 +244,17 @@ async function checklistContext(tenantId: string, applicationId: string, config:
   return { app, integration };
 }
 
+/**
+ * Entitlements the application has, or, when they come from the connector,
+ * the ones its last sync staged for it: those are reconciled into WonderID
+ * only after promotion (ACCESS-P0-27), so validation counts what was found.
+ */
+async function discoveredEntitlementCount(tenantId: string, config: OnboardingConfig, app: { id: string; name: string; entitlementCount: number }): Promise<number> {
+  if (config.entitlementSource !== "connector" || !config.integrationId) return app.entitlementCount;
+  const staged = await getNormalizedObjects(tenantId, config.integrationId, "entitlement");
+  return Math.max(app.entitlementCount, staged.filter((o) => belongsToApplication(o.normalized ?? {}, app)).length);
+}
+
 /** Runs the §8.5 checklist on the current configuration. Reads only. */
 export async function validateOnboarding(tenantId: string, actorId: string, applicationId: string): Promise<ApplicationOnboarding> {
   const { o } = await requireOnboarding(tenantId, applicationId);
@@ -253,7 +265,7 @@ export async function validateOnboarding(tenantId: string, actorId: string, appl
     config: o.config,
     app: { businessOwnerIdentityId: app.businessOwnerIdentityId, technicalOwnerIdentityId: app.technicalOwnerIdentityId, riskLevel: app.riskLevel, dataClassification: app.dataClassification },
     integration,
-    entitlementCount: app.entitlementCount,
+    entitlementCount: await discoveredEntitlementCount(tenantId, o.config, app),
   });
   const passed = result.blockingFailures.length === 0;
   const status: OnboardingStatus = passed ? "VALIDATING" : "FAILED";
@@ -287,7 +299,7 @@ export async function simulateOnboarding(tenantId: string, actorId: string, appl
       : Promise.resolve([] as Record<string, unknown>[]),
     listIdentitiesForCorrelation(tenantId, ["HUMAN", "EXTERNAL", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API", "MACHINE"]),
   ]);
-  const result = runSimulation(o.config, accounts, identities, app.entitlementCount);
+  const result = runSimulation(o.config, accounts, identities, await discoveredEntitlementCount(tenantId, o.config, app));
   const now = new Date().toISOString();
   const updated = await transition(
     tenantId,

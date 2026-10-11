@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-11 |
 | Current phase | F1 Import and reconciliation (started 2026-10-11) |
-| Next story | QA-P0-23, Reconciliation suite (#48) |
+| Next story | INTEGRATION-P0-20, Custom attributes as targets (#66) |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -19,7 +19,7 @@ passed. This file is hand-maintained; the generated programme rollup
 
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
-| F1 Import and reconciliation | 9 | 6 | 0 | In progress |
+| F1 Import and reconciliation | 9 | 7 | 0 | Gating stories done; exit test passed (seeded staging) |
 | F2 Access requests | 8 | 0 | 0 | Not started |
 | F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
@@ -67,11 +67,11 @@ status is shown per row below.
 | ACCESS-P0-25 Imported access classification and drift findings | Access + Risk | #45 | Done | PR #82; migration 0120; baseline per application; legacy / authorized / unproven / rogue; one Risk finding per rogue access, resolved when approved or removed |
 | IDENTITY-P0-20 Non-human identities from accounts | Identity | #46 | Done | PR #83. Service/shared/machine accounts become owned or queued identities; agents' accounts link by declared identifiers; unowned subjects refused for requests |
 | EXPERIENCE-P0-28 Reconciliation console | Experience | #47 | Done | Held runs, run now with progress, chain steps, preview and apply, classification and last seen at source, on the connection, application and account pages |
-| QA-P0-23 Reconciliation suite | QA | #48 | Not started | |
+| QA-P0-23 Reconciliation suite | QA | #48 | Done | `tests/e2e/f1-reconciliation.spec.ts`, 7 tests (14 with sign-in setup) passed locally. Found and fixed: connector-sourced onboarding could never validate |
 | INTEGRATION-P0-20 Custom attributes as targets; schedule on every connection | Integration | #66 | Not started | Does not gate |
 | FOUNDATION-P0-31 Automation credentials | Foundation | #67 | Not started | Needs D11; does not gate |
 
-Exit test: not run.
+Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded into staging (a live target is not reachable from the test). A person, an owned service account and an agent show accounts, entitlements and grants; a grant removed at the source is marked missing and its finding resolves; a grant added after the baseline is rogue with one finding.
 
 ## F2: Access requests end to end
 

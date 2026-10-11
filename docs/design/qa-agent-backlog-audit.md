@@ -1581,3 +1581,49 @@ chain keeps growing.
 
 The file-import spec (10 tests, in half 1) ran in the full suite for the first time and passed.
 
+
+### 2026-10-11 — QA-P0-23: F1 reconciliation suite (#48)
+
+**Built.** `tests/e2e/f1-reconciliation.spec.ts`, one serial group, against
+the shared E2E tenant (`adminOne`) and checked from `adminTwo`:
+- **Setup.** A person (Ana), an agent declaring an OAuth client id, and a
+  connection whose staging holds what a sync leaves: four accounts (Ana; a
+  service account whose source names Ana as owner; the agent's account by
+  its client id; an unowned service account), two entitlements, three
+  grants. An application is onboarded with `entitlementSource: connector`,
+  validated, approved by `iamAdminOne` (four-eyes) and promoted.
+- **Accounts.** Ana correlates to her identity; the owned service account
+  gets a service identity owned by Ana; the agent's account links to the
+  agent, not a service identity; the unowned one is queued.
+- **Requests.** The unowned service account cannot be a request subject
+  (409 `SUBJECT_UNOWNED`) and is listed on Onboarding › Unowned Identities.
+- **Baseline.** The first preview and apply add 2 entitlements and 3
+  grants, apply equals preview, and what was found is `LEGACY_EXCEPTION`
+  with no finding. A second run changes nothing.
+- **Rogue.** A grant added at the source afterwards is `ROGUE` with exactly
+  one open finding; applying again opens no second one.
+- **Removed.** When the source drops it, the grant is marked missing (not
+  revoked), the ledger records `missing_from_source`, and the finding
+  resolves.
+- **Isolation.** The other organization sees no runs, no accounts and no
+  identity (404).
+
+Support: `tests/e2e/support/readAccessGovernance.ts` (service-role reads,
+every query filtered by tenant) and `seedIntegrationAccounts.ts`
+(entitlement and grant kinds, `normalized` values).
+
+**Defects found and fixed (owners' audit logs updated).**
+- Access: onboarding validation's "Entitlement model discovered" counted
+  only WonderID entitlements, which a connector-sourced application gets
+  only after promotion (ACCESS-P0-27). It now also counts what the
+  connector staged for the application. Without it no such application
+  could go live.
+- Access: the unowned-subject refusal now runs before the policy checks,
+  so the reason a request is refused is the subject, whatever the policy.
+
+**Verified.** Local run against dev Supabase (`E2E_CHROMIUM_PATH`): 14/14
+(7 sign-in setup, 7 suite), 2.9 min. `npm run typecheck` clean;
+`vitest run modules/access-governance` 222/222. No Vercel run (§19.9).
+
+**F1 exit test:** passed on seeded staging. A live connector is not part
+of it.

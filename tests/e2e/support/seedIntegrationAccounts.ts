@@ -16,7 +16,7 @@ function adminClient(): SupabaseClient {
   });
 }
 
-export type SeedAccount = { externalId: string; raw: Record<string, unknown> };
+export type SeedAccount = { externalId: string; raw: Record<string, unknown>; normalized?: Record<string, unknown> };
 
 export async function seedIntegrationWithAccounts(tenantSlug: string, name: string, accounts: SeedAccount[]): Promise<string> {
   const supabase = adminClient();
@@ -44,13 +44,19 @@ export async function replaceIntegrationAccounts(integrationId: string, tenantId
 }
 
 /** Exactly these imported objects of one type (INTEGRATION-P0-10 seeds `application` objects). */
-export async function replaceIntegrationObjects(integrationId: string, tenantId: string, objectType: "account" | "application", objects: SeedAccount[], syncJobId: string | null = null): Promise<void> {
+export async function replaceIntegrationObjects(
+  integrationId: string,
+  tenantId: string,
+  objectType: "account" | "application" | "entitlement" | "access_grant",
+  objects: SeedAccount[],
+  syncJobId: string | null = null,
+): Promise<void> {
   const supabase = adminClient();
   const { error: delError } = await supabase.from("integration_objects").delete().eq("tenant_id", tenantId).eq("integration_id", integrationId).eq("object_type", objectType);
   if (delError) throw new Error(`replaceIntegrationObjects: delete failed: ${delError.message}`);
   if (!objects.length) return;
   const { error } = await supabase.from("integration_objects").insert(
-    objects.map((a) => ({ tenant_id: tenantId, integration_id: integrationId, object_type: objectType, external_id: a.externalId, raw: a.raw, normalized: {}, sync_job_id: syncJobId })),
+    objects.map((a) => ({ tenant_id: tenantId, integration_id: integrationId, object_type: objectType, external_id: a.externalId, raw: a.raw, normalized: a.normalized ?? {}, sync_job_id: syncJobId })),
   );
   if (error) throw new Error(`replaceIntegrationObjects: insert failed: ${error.message}`);
 }
