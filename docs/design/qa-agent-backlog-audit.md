@@ -1627,3 +1627,44 @@ every query filtered by tenant) and `seedIntegrationAccounts.ts`
 
 **F1 exit test:** passed on seeded staging. A live connector is not part
 of it.
+
+### 2026-10-11 — QA-P0-24: request-to-verified suite (#56)
+
+**What was built.** The F2 loop is now proven end to end in
+`tests/e2e/f1-reconciliation.spec.ts`, run against the app's own routes with
+a connector's staged records standing in for the target. With the F2 stories'
+own tests, the suite covers each acceptance criterion:
+
+| Criterion | Where it is proven |
+|---|---|
+| A person: request → approve → task → added on the target → verified | ACCESS-P0-28 test |
+| A service account (owned) | QA-P0-24 test. The owner asks and the access manager approves (the owner cannot). Task done. The account and the grant appear at the source. Verified on the service account's own account. |
+| An AI agent, within its contract | ACCESS-P0-31 test (contract checked, out-of-contract refused), then the QA-P0-24 test: task done, the grant appears on the agent's account, verified. |
+| Removal ends revoked | ACCESS-P0-30 test: removal → revoked by reconciliation, REVOKED in the ledger. |
+| Expiry ends revoked | ACCESS-P0-32 test: one removal task, revoked by reconciliation, EXPIRED in the ledger. |
+| Approver ≠ requester | QA-P0-24 test: the requester's own decision is refused and the request stays pending. Also `approval-engine.spec.ts` and `sod.spec.ts`. |
+| Tenant isolation of new tables and columns | `tests/access/pending-grants-isolation.sql` (0121), `fulfilment-tasks-isolation.sql` (0122), and the new `request-lifecycle-isolation.sql` (0123/0124, 11/11). In the browser, the last test: another organization sees none of the requests, tasks or accounts, and cannot decide or claim any of them. |
+| A repeated reconciliation never duplicates grants or closes a task twice | QA-P0-24 test: a second access reconciliation reports added 0, verified 0, revoked 0. The grants and the tasks (status, `closed_at`, `updated_at`) are byte-for-byte the same as before it. The expiry sweep's idempotency is in the ACCESS-P0-32 test. |
+
+**New SQL checks** (`request-lifecycle-isolation.sql`, run through
+`execute_sql`, self-cleaning). All 11 passed:
+- a removal or account task naming another organization's grant or account
+  is refused (23503);
+- a second live removal task for a grant is refused (23505);
+- a task's kind must match what it names (23514);
+- an unknown request type is refused (23514);
+- a member cannot mark a grant for removal, or stamp a request's expiry
+  fields, directly (0 rows);
+- another organization reads none of the extension or removal task, and
+  cannot cancel the task.
+
+**Verified.**
+- E2E (local, dev Supabase): `f1-reconciliation` 20/20, including the new
+  test and the extra isolation checks.
+- Typecheck and ESLint clean.
+
+**The F2 exit test** ("a person, a service account they own and an agent
+within its contract; approvals; tasks; the access added by hand; the next
+reconciliation marks each verified; removal and expiry end revoked") passes
+on the seeded test organization. FOUNDATION-P0-32 (bulk invitation) is F2's
+remaining story; it does not gate the phase.

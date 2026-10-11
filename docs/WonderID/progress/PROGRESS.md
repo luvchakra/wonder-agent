@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Last updated | 2026-10-11 |
-| Current phase | F2 Access requests end to end (started 2026-10-11); F1 gating done |
-| Next story | QA-P0-24, Request-to-verified suite (#56); FOUNDATION-P0-31 (F1) waits for D11 |
+| Current phase | F2 Access requests end to end: exit test passed 2026-10-11 (seeded test organization); FOUNDATION-P0-32 remains (does not gate) |
+| Next story | FOUNDATION-P0-32, Bulk invitation and invitation API (#68); FOUNDATION-P0-31 (F1) waits for D11 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -20,7 +20,7 @@ passed. This file is hand-maintained; the generated programme rollup
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
 | F1 Import and reconciliation | 9 | 8 | 0 | Gating stories done; exit test passed (seeded staging); FOUNDATION-P0-31 waits for D11 |
-| F2 Access requests | 8 | 3 | 0 | In progress |
+| F2 Access requests | 8 | 7 | 0 | Exit test passed (seeded test organization); FOUNDATION-P0-32 remains, does not gate |
 | F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
 | F5 Roles, SoD, delegation | 5 | 0 | 0 | Not started |
@@ -84,7 +84,7 @@ Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded 
 | ACCESS-P0-31 Requests for non-human identities | Access + Identity | #53 | Done | No migration. The owner of a service account or machine identity requests for it; an agent's business owner requests only what its contract approves (refused otherwise, server-side). Non-human requests are approved by the resource's owners |
 | ACCESS-P0-32 Time-bound access | Access | #54 | Done | Migration 0124. End dates capped by policy; a reminder before the end with an Extend request (approved like any other); at the end, exactly one removal task per grant; the ledger shows EXPIRED once the source confirms the removal |
 | EXPERIENCE-P0-29 Request tracking and tasks inbox | Experience | #55 | Done | No migration. Each request line shows its real state (waiting, approved, waiting for fulfilment, not yet verified, verified, failed, ended); "Waiting for you" lists fulfilment tasks with the approvals; For lists the people you manage and what you own |
-| QA-P0-24 Request-to-verified suite | QA | #56 | Not started | |
+| QA-P0-24 Request-to-verified suite | QA | #56 | Done | A person, a service account and an agent from request to verified; removal and expiry end revoked; approver ≠ requester; isolation SQL for 0123/0124 (11/11); a repeated reconciliation changes nothing |
 | FOUNDATION-P0-32 Bulk invitation and invitation API | Foundation | #68 | Not started | Does not gate |
 
 Exit test: not run.
