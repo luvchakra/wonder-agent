@@ -12,7 +12,8 @@ function findingsTable() {
   return {
     select: () => ({
       eq: () => ({
-        eq: () => ({ maybeSingle: async () => ({ data: findingRow, error: null }) }),
+        // ACCESS-P0-25: agent findings only (.not("agent_id", "is", null)).
+        eq: () => ({ not: () => ({ maybeSingle: async () => ({ data: findingRow, error: null }) }) }),
       }),
     }),
   };

@@ -249,6 +249,16 @@ check the ownership map first.
 
 ## 3. Development Principles
 
+Owner rules (2026-10-11):
+
+- No speculative abstractions.
+- No features outside the current task.
+- Prefer boring, simple implementations.
+- Preserve working behavior.
+- Keep specs and plans short and easy for humans to understand.
+
+Also:
+
 - Prefer the simplest implementation that satisfies the story's acceptance criteria.
 - Do not add speculative functionality ahead of the current story.
 - Do not use an LLM for anything deterministic (authorization, risk scoring, policy

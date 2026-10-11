@@ -985,3 +985,38 @@ follows the same pattern and joins `lib/provenance/tables.ts`.
 `modules/risk/signals.ts`: `credentialHealth()` takes `rotationDays` and `maxActiveKeys` (defaults 90 and 3); `rules.ts` passes the organization's settings. One unit test added. Defaults equal the previous constants. Cross-module change by explicit
 owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
 Foundation log).
+
+## 2026-10-11 — Findings about access on an account (for ACCESS-P0-25)
+
+ACCESS-P0-25 (Access + Risk, approved with the IGA baseline, D1) needs a
+finding for rogue access on any identity's account, while findings were
+agent-only (`risk_findings.agent_id` NOT NULL).
+
+**What changed (additive, migration 0120).**
+- `risk_findings`:
+  - `agent_id` is optional; a check keeps every finding naming an agent or
+    an account;
+  - new subject columns `identity_id`, `account_id`, `entitlement_id`,
+    `access_grant_id` and `application_id`, with same-tenant keys;
+  - new category `rogue_access`;
+  - `subject_key`, unique among open findings, so there is one open finding
+    per account and entitlement.
+- `accessFindings.ts`, published from `service.ts`:
+  - `syncRogueAccessFindings(tenantId, rogue)` opens one high finding per
+    newly rogue access (with the grant as evidence), resolves open ones that
+    are no longer rogue (`verified_fixed`) and audits
+    `risk.access_findings_synced`;
+  - `listAccessFindings()`;
+  - shared types `AccessFinding` and `RogueAccess`.
+- Agent views are unchanged. `getFindings`, `getFinding`,
+  `remediateFinding`, `resolveFinding` and `transitionFindingStatus` read
+  and act on agent findings only (`agent_id is not null`), so an access
+  finding never reaches agent code paths. Two test mocks gained the extra
+  filter step.
+
+**Verified.** `accessFindings.test.ts` 6/6 (one per access, idempotent,
+resolve when no longer rogue, account-level key, a concurrent duplicate is
+not a failure, other organizations untouched); risk suites green in the
+full 1185/1185 run; isolation SQL in `tests/access/classification-isolation.sql`.
+
+**Left out.** Remediating rogue access is RISK-P0-13 (F3).

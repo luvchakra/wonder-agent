@@ -163,3 +163,41 @@ describe("ledgerEvents", () => {
     expect(ledgerEvents({ status: "UNPROVEN", source: "IMPORT", missingFromSourceAt: null }, after({ lastUsedAt: "2026-10-10T00:00:00Z" }))).toEqual([]);
   });
 });
+
+describe("ACCESS-P0-25: classification against the baseline", () => {
+  const BASELINE = "2026-10-05T00:00:00Z";
+
+  it("access present at the baseline with no approval is legacy, never rogue", () => {
+    const e = ledgerEntry(rel({ firstSeenAt: "2026-10-01T00:00:00Z", baselineAt: BASELINE }), none(), NOW);
+    expect(e).toMatchObject({ status: "LEGACY_EXCEPTION", source: "LEGACY_MIGRATION" });
+  });
+
+  it("access first seen after the baseline with no approval is rogue", () => {
+    const e = ledgerEntry(rel({ firstSeenAt: "2026-10-08T00:00:00Z", baselineAt: BASELINE }), none(), NOW);
+    expect(e).toMatchObject({ status: "ROGUE", source: "IMPORT", evidence: { kind: "none", id: null } });
+  });
+
+  it("an approved request makes it authorized, whatever the baseline says", () => {
+    const e = ledgerEntry(rel({ firstSeenAt: "2026-10-08T00:00:00Z", baselineAt: BASELINE }), { ...none(), requests: [request()] }, NOW);
+    expect(e).toMatchObject({ status: "VALID", source: "WONDERID_REQUEST" });
+  });
+
+  it("before any baseline, reported access without approval stays unproven", () => {
+    expect(ledgerEntry(rel({ baselineAt: null }), none(), NOW).status).toBe("UNPROVEN");
+  });
+
+  it("access nobody reported (no connection, not reconciled) is never classified rogue", () => {
+    const e = ledgerEntry(rel({ sourceIntegrationId: null, reconciled: false, firstSeenAt: "2026-10-08T00:00:00Z", baselineAt: BASELINE }), none(), NOW);
+    expect(e).toMatchObject({ status: "UNPROVEN", source: "UNKNOWN" });
+  });
+
+  it("a rogue grant revoked in WonderID's records shows as revoked", () => {
+    const e = ledgerEntry(rel({ firstSeenAt: "2026-10-08T00:00:00Z", baselineAt: BASELINE, revokedAt: "2026-10-09T00:00:00Z" }), none(), NOW);
+    expect(e.status).toBe("REVOKED");
+  });
+
+  it("becoming rogue, or approved later, is a ledger event", () => {
+    const rogue = ledgerEntry(rel({ firstSeenAt: "2026-10-08T00:00:00Z", baselineAt: BASELINE }), none(), NOW);
+    expect(ledgerEvents({ status: "UNPROVEN", source: "IMPORT", missingFromSourceAt: null }, rogue).map((e) => e.eventType)).toEqual(["changed"]);
+  });
+});

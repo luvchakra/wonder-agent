@@ -1,0 +1,164 @@
+import "server-only";
+
+import { supabaseServiceRole } from "@/lib/db/supabaseServer";
+import { writeAudit } from "@/lib/audit/writeAudit";
+import { ApiError } from "@/lib/shared/types/foundation";
+import type { AccessFinding, FindingStatus, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
+
+/**
+ * ACCESS-P0-25 — findings about access on an application account (a
+ * person's, an external person's, a service account's or an agent's): today
+ * rogue access, i.e. access that appeared on the target after the
+ * application's baseline with no WonderID approval behind it.
+ *
+ * Access decides what is rogue (its ledger) and reports the complete current
+ * set for the organization; this keeps exactly one open finding per account
+ * and entitlement for it, creates one for anything newly rogue and resolves
+ * the open ones that are no longer rogue (an approval appeared, or the
+ * access was removed or revoked). Remediation is RISK-P0-13 (F3).
+ *
+ * Findings are evidentiary: written with the service role only (no client
+ * write policy, 0034), every statement filtered on `tenantId` (§14).
+ */
+
+const PAGE = 1000;
+const OPEN: FindingStatus[] = ["open", "acknowledged", "investigating", "assigned", "remediation_in_progress", "mitigated", "exception"];
+
+/** The finding key for one account, or one entitlement of it. */
+export function accessSubjectKey(accountId: string, entitlementId: string | null): string {
+  return `${accountId}|${entitlementId ?? ""}`;
+}
+
+type Row = Record<string, unknown>;
+
+function toAccessFinding(r: Row): AccessFinding {
+  return {
+    id: r.id as string,
+    category: "rogue_access",
+    severity: r.severity as RiskSeverity,
+    status: r.status as FindingStatus,
+    title: r.title as string,
+    explanation: r.explanation as string,
+    recommendation: r.recommendation as string,
+    accountId: r.account_id as string,
+    entitlementId: (r.entitlement_id as string | null) ?? null,
+    accessGrantId: (r.access_grant_id as string | null) ?? null,
+    applicationId: (r.application_id as string | null) ?? null,
+    identityId: (r.identity_id as string | null) ?? null,
+    agentId: (r.agent_id as string | null) ?? null,
+    createdAt: r.created_at as string,
+    resolvedAt: (r.resolved_at as string | null) ?? null,
+    resolutionReason: (r.resolution_reason as string | null) ?? null,
+  };
+}
+
+/** An account's access findings, open first (for the account page). */
+export async function listAccessFindings(tenantId: string, filter: { accountId?: string; openOnly?: boolean } = {}): Promise<AccessFinding[]> {
+  let q = supabaseServiceRole().from("risk_findings").select().eq("tenant_id", tenantId).eq("category", "rogue_access");
+  if (filter.accountId) q = q.eq("account_id", filter.accountId);
+  if (filter.openOnly) q = q.in("status", OPEN);
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(200);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map(toAccessFinding);
+}
+
+/**
+ * Brings the organization's open rogue-access findings in line with
+ * `rogue`, the complete set Access found rogue just now. Returns what
+ * changed. Never throws for one bad row: a finding that cannot be written is
+ * counted as failed and the rest go on.
+ */
+export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAccess[]): Promise<{ created: number; resolved: number; failed: number }> {
+  const admin = supabaseServiceRole();
+  const open = new Map<string, string>();
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await admin
+      .from("risk_findings")
+      .select("id, tenant_id, subject_key")
+      .eq("tenant_id", tenantId)
+      .eq("category", "rogue_access")
+      .in("status", OPEN)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    for (const r of (data ?? []) as Row[]) if (r.tenant_id === tenantId && r.subject_key) open.set(r.subject_key as string, r.id as string);
+    if (!data || data.length < PAGE) break;
+  }
+
+  const wanted = new Map(rogue.map((r) => [accessSubjectKey(r.accountId, r.entitlementId), r]));
+  const result = { created: 0, resolved: 0, failed: 0 };
+  const createdIds: string[] = [];
+  const resolvedIds: string[] = [];
+
+  for (const [key, r] of wanted) {
+    if (open.has(key)) continue;
+    const { data, error } = await admin
+      .from("risk_findings")
+      .insert({
+        tenant_id: tenantId,
+        agent_id: r.agentId,
+        identity_id: r.identityId,
+        account_id: r.accountId,
+        entitlement_id: r.entitlementId,
+        access_grant_id: r.accessGrantId,
+        application_id: r.applicationId,
+        subject_key: key,
+        category: "rogue_access",
+        severity: "high",
+        risk_score: 70,
+        reasons: ["Appeared after the application's baseline", "No WonderID approval found"],
+        title: `Rogue access: ${r.label}`.slice(0, 300),
+        explanation: `This access was first seen on ${r.firstSeenAt.slice(0, 10)}, after WonderID's baseline for the application (${r.baselineAt.slice(0, 10)}), and no request, access package or administrator grant in WonderID covers it.`,
+        recommendation: "Find out who granted it. Request it through WonderID if it is needed, or have it removed on the target.",
+      })
+      .select("id")
+      .single();
+    // 23505: another refresh opened the same finding first; that one stands.
+    if (error?.code === "23505") continue;
+    if (error || !data) {
+      result.failed++;
+      continue;
+    }
+    result.created++;
+    createdIds.push(data.id as string);
+    if (r.accessGrantId) {
+      await admin.from("risk_evidence").insert({ finding_id: data.id, evidence_type: "access_grant", reference_id: r.accessGrantId, summary: `Grant ${r.label}, no WonderID approval` });
+    }
+  }
+
+  const stale = [...open.entries()].filter(([key]) => !wanted.has(key)).map(([, id]) => id);
+  for (let i = 0; i < stale.length; i += 200) {
+    const part = stale.slice(i, i + 200);
+    const { data, error } = await admin
+      .from("risk_findings")
+      .update({
+        status: "resolved",
+        resolution_type: "verified_fixed",
+        resolution_reason: "No longer rogue: an approval was found, or the access was removed or revoked.",
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("tenant_id", tenantId)
+      .eq("category", "rogue_access")
+      .in("id", part)
+      .select("id");
+    if (error) {
+      result.failed += part.length;
+      continue;
+    }
+    result.resolved += (data ?? []).length;
+    resolvedIds.push(...((data ?? []) as Row[]).map((r) => r.id as string));
+  }
+
+  if (createdIds.length || resolvedIds.length) {
+    await writeAudit({
+      tenantId,
+      actorType: "system",
+      action: "risk.access_findings_synced",
+      objectType: "tenant",
+      objectId: tenantId,
+      outcome: result.failed ? "failure" : "success",
+      metadata: { created: createdIds.slice(0, 500), resolved: resolvedIds.slice(0, 500), failed: result.failed },
+    });
+  }
+  return result;
+}

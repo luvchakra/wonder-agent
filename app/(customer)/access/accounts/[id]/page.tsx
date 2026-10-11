@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getInventoryAccount } from "@/modules/access-governance/service";
+import { getAccountAccessLedger, getInventoryAccount, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerStatus } from "@/modules/access-governance/service";
+import { listAccessFindings } from "@/modules/risk/service";
 import { listIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Badge, Button, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
@@ -33,7 +34,13 @@ export default async function AccountDetailPage({ params, searchParams }: { para
   const find = ((await searchParams).find ?? "").slice(0, 100);
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
-  const [account, provenance] = await Promise.all([getInventoryAccount(tenantId, id), getRecordProvenance(tenantId, "accounts", id)]);
+  const [account, provenance, ledger, findings] = await Promise.all([
+    getInventoryAccount(tenantId, id),
+    getRecordProvenance(tenantId, "accounts", id),
+    // ACCESS-P0-25: whether WonderID can prove each piece of this account's access was approved.
+    getAccountAccessLedger(tenantId, id).catch(() => null),
+    listAccessFindings(tenantId, { accountId: id, openOnly: true }).catch(() => []),
+  ]);
   if (!account) notFound();
   const identities =
     canManage && !account.agentId
@@ -140,6 +147,42 @@ export default async function AccountDetailPage({ params, searchParams }: { para
           </CardBody>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader title="Access" description="Whether WonderID can prove each piece of this account's access was approved." />
+        <CardBody>
+          {ledger === null ? (
+            <p role="status" className="text-sm text-warning">The access record could not be read just now.</p>
+          ) : ledger.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing recorded yet. Access appears after the application is reconciled.</p>
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {ledger.map((e) => {
+                const finding = findings.find((f) => (f.entitlementId ?? null) === (e.entitlementId ?? null));
+                return (
+                  <li key={e.id} className="flex flex-wrap items-center gap-2 py-2">
+                    <span className="min-w-0 flex-1 text-foreground">{e.entitlementName ?? "The account itself"}</span>
+                    <Badge tone={STATUS_TONE[e.status]}>{LEDGER_STATUS_LABEL[e.status]}</Badge>
+                    <span className="text-xs text-muted-foreground">{LEDGER_SOURCE_LABEL[e.source]}</span>
+                    {e.missingFromSourceAt ? <Badge tone="neutral">Gone from source</Badge> : null}
+                    {finding ? <Badge tone="danger">Finding open</Badge> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
     </div>
   );
 }
+
+const STATUS_TONE: Record<LedgerStatus, "success" | "warning" | "danger" | "neutral"> = {
+  VALID: "success",
+  EXPIRED: "warning",
+  REVOKED: "neutral",
+  UNPROVEN: "warning",
+  ROGUE: "danger",
+  LEGACY_EXCEPTION: "neutral",
+  PENDING_RECONCILIATION: "neutral",
+};

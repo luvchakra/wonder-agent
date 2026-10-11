@@ -8,6 +8,8 @@ import "server-only";
 
 export { getFindings, getFinding, getFindingAsOfDetection, assignFinding, remediateFinding, resolveFinding, transitionFindingStatus } from "./findings";
 export { evaluateAgentRisk } from "./rules";
+// ACCESS-P0-25: findings about access on an account, for any identity type.
+export { syncRogueAccessFindings, listAccessFindings, accessSubjectKey } from "./accessFindings";
 export {
   createInvestigation,
   validateCreateInvestigation,

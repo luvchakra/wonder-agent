@@ -2276,3 +2276,50 @@ takes entitlements from the connector, and stay in step with the source.
   still count a grant marked missing from the source, as they already do for
   accounts. Classifying it (unproven, removed, rogue) is ACCESS-P0-25.
 - No pre-merge E2E run; the nightly suite covers it.
+
+## 2026-10-11 — Imported access classification and drift findings (ACCESS-P0-25, F1, #45)
+
+Every imported account and grant now says whether WonderID can prove it was
+approved, and access that appeared on a target outside WonderID raises a
+finding.
+
+**What changed.**
+- Migration `0120_access_classification_rogue_findings.sql` (applied):
+  - `access_baselines`: one per application and scope (`accounts`, or
+    `access` for entitlements and grants); members read, the service writes;
+  - Risk's `risk_findings` widened for findings about an account (recorded
+    in Risk's audit log).
+- `ledgerRules.classifyUnproven()`: reported access with no evidence is
+  LEGACY_EXCEPTION if first seen at or before the application's baseline,
+  ROGUE if after, and UNPROVEN while there is no baseline. Access nobody
+  reported stays UNPROVEN. Evidence (a request, package or administrator
+  grant) still makes it VALID.
+- `ensureAccessBaseline()`: the first applied account reconciliation, and
+  the first applied entitlement and access reconciliation, record the
+  baseline for their scope.
+- `refreshAccessLedger()`: a whole-organization refresh hands the complete
+  rogue set (still present at the source) to Risk's
+  `syncRogueAccessFindings()`; a one-identity refresh leaves findings to the
+  next full one.
+- Account page: an Access card lists the account and each entitlement with
+  its classification, its source and any open finding.
+  `getAccountAccessLedger()` reuses the identity reader's query.
+- CLAUDE.md §3: the owner's rules of 2026-10-11 (no speculative
+  abstractions, no features outside the task, boring and simple, preserve
+  working behavior, short specs).
+
+**Verified.**
+- `tests/access/classification-isolation.sql`: 12/12.
+- Vitest: `ledgerRules.test.ts` +7 (legacy, rogue, authorized despite the
+  baseline, unproven before a baseline, unreported never rogue, revoked
+  wins, event); `accessFindings.test.ts` 6.
+- Full suite 1185/1185.
+- Typecheck, eslint and `next build` are clean.
+
+**Left out.**
+- No notification for a new rogue-access finding: Operations has no
+  matching type yet, and the agent-only `rogue_agent` type does not fit.
+  The finding is on the account page and in the audit trail.
+- Risk's existing findings pages stay agent-only; listing access findings
+  there belongs with RISK-P0-13 (remediation) in F3.
+- Readers of current access (CAN, runtime decisions) are unchanged.
