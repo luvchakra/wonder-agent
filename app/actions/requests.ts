@@ -39,6 +39,7 @@ export async function submitRequestAction(applicationId: string, _prev: RequestF
         subjectIdentityId: str(formData, "subjectIdentityId"),
         durationDays: str(formData, "durationDays"),
         justification: str(formData, "justification") ?? "",
+        requestType: str(formData, "requestType"),
       },
     );
     revalidatePath("/access/requests");

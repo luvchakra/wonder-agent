@@ -8,7 +8,7 @@ import type { IdentityType } from "@/lib/shared/types/agent-identity";
 import { getNormalizedObjects, getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { ensureAccountIdentities, getIdentity, getIdentityNames, listAgentIdentifiers, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
-import { replacePlaceholders } from "./pendingGrants";
+import { replacePlaceholders, verifyDisabledAccounts } from "./pendingGrants";
 import {
   dormantCutoff,
   isDormant,
@@ -436,6 +436,8 @@ async function reconcileAccounts(
         .is("missing_from_source_at", null);
       if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
     }
+    // ACCESS-P0-30: an account the source now shows disabled, or no longer lists, completes its disable task.
+    await verifyDisabledAccounts(tenantId, applicationId);
     const c = plan.counts;
     const run = await record({
       status: "succeeded",

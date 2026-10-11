@@ -113,6 +113,15 @@ describe("planGrants", () => {
     expect(plan.removed).toEqual([]);
   });
 
+  it("revokes a grant whose removal was approved once a full run no longer finds it; an incremental run never does (ACCESS-P0-30)", () => {
+    const existing = [grant({ id: "g-rm", removalStatus: "removed_unverified" }), grant({ id: "g-keep", accountId: "a2", removalStatus: "pending_removal" })];
+    const listed = [staged("x", { accountExternalId: "acc-2", entitlementExternalId: "cn=fin" })];
+    const full = planGrants({ integrationId: INT, mode: "full", staged: listed, accountByRef, entitlementByRef, existing });
+    expect(full.revoked.map((r) => r.id)).toEqual(["g-rm"]);
+    expect(full.removed).toEqual([]);
+    expect(planGrants({ integrationId: INT, mode: "incremental", staged: listed, accountByRef, entitlementByRef, existing }).revoked).toEqual([]);
+  });
+
   it("in a full run marks this connection's unlisted grants removed; relisting restores them", () => {
     const gone = planGrants({ integrationId: INT, mode: "full", staged: [], accountByRef, entitlementByRef, existing: [grant({ id: "g1" }), grant({ id: "g2", accountId: "a2", sourceIntegrationId: null })] });
     expect(gone.removed.map((r) => r.id)).toEqual(["g1"]);
@@ -156,7 +165,7 @@ describe("idempotence and the preview fingerprint", () => {
     });
     expect(countsOf(ents, grants)).toEqual({
       entitlements: { added: 0, changed: 0, removed: 0, restored: 0, unchanged: 1, invalid: 0 },
-      grants: { added: 0, removed: 0, restored: 0, verified: 0, unchanged: 1, unresolved: 0 },
+      grants: { added: 0, removed: 0, restored: 0, verified: 0, revoked: 0, unchanged: 1, unresolved: 0 },
     });
   });
 

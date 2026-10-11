@@ -41,6 +41,7 @@ let appId = "";
 let integrationId = "";
 let anaId = "";
 let fulfilmentTaskId = "";
+let caraId = "";
 let agentId = "";
 type Account = { id: string; externalAccountRef: string; identityId: string | null; agentId: string | null; correlation: string; accountType: string };
 const accounts: Record<string, Account> = {};
@@ -201,7 +202,7 @@ test.describe.serial("F1 reconciliation chain", () => {
     test.setTimeout(120_000);
     const cara = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E F2 Cara ${stamp}`, email: mail("cara") } });
     expect(cara.status(), await cara.text()).toBe(201);
-    const caraId = (await cara.json()).data.id as string;
+    caraId = (await cara.json()).data.id as string;
     const policy = await request.post("/api/v1/access/request-policies", {
       data: { applicationId: appId, name: `E2E F2 Policy ${stamp}`, autoApprove: true, riskThreshold: "high", maxDurationDays: 90, defaultDurationDays: 30, justificationRequired: true, allowForOthers: "access_managers" },
     });
@@ -256,9 +257,66 @@ test.describe.serial("F1 reconciliation chain", () => {
     fulfilmentTaskId = task.id;
     await page.goto("/access/fulfilment?view=all");
     await expect(page.getByRole("heading", { name: "Fulfilment tasks" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /^Finance in E2E F1 App/ }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /^Add Finance in E2E F1 App/ }).first()).toBeVisible();
     expect((await ledgerFor(tenantId, accounts.cara.id)).find((e) => e.entitlementId === finance)?.status).toBe("VALID");
     expect(await accessFindings(tenantId, accounts.cara.id)).toEqual([]);
+  });
+
+  test("ACCESS-P0-30: removing access, disabling an account and asking for one, each followed until the source confirms it", async ({ request }) => {
+    test.setTimeout(150_000);
+    const finance = (await entitlementIdByRef(tenantId, appId, "cn=finance"))!;
+    type View = { status: string; fulfilment: string; tasks: { id: string; kind: string; status: string }[] };
+    const submit = async (data: Record<string, unknown>) => {
+      const res = await request.post("/api/v1/access/requests", { data: { justification: "ACCESS-P0-30 request", ...data } });
+      expect(res.status(), await res.text()).toBe(201);
+      return (await res.json()).data as { id: string; status: string };
+    };
+    const view = async (id: string) => (await (await request.get(`/api/v1/access/requests/${id}`)).json()).data as View;
+    const done = async (taskId: string) => expect((await request.post(`/api/v1/access/fulfilment-tasks/${taskId}`, { data: { action: "complete" } })).status()).toBe(200);
+    const caraAccount = { externalId: "uid=cara", raw: { id: "cara", username: "cara", email: mail("cara") } };
+
+    // Remove: approved, a removal task; done → removed, not yet verified; a second removal is refused while this one runs.
+    const removal = await submit({ subjectIdentityId: caraId, applicationId: appId, entitlementId: finance, requestType: "remove" });
+    expect(removal.status).toBe("approved");
+    const r1 = await view(removal.id);
+    expect(r1).toMatchObject({ fulfilment: "pending_fulfilment" });
+    expect(r1.tasks.map((t) => t.kind)).toEqual(["remove"]);
+    await done(r1.tasks[0].id);
+    expect((await view(removal.id)).fulfilment).toBe("fulfilled_unverified");
+    const again = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: caraId, applicationId: appId, entitlementId: finance, requestType: "remove", justification: "ACCESS-P0-30 twice" } });
+    expect([200, 409]).toContain(again.status());
+    // The source no longer lists it: revoked, and the removal is verified.
+    await replaceIntegrationObjects(integrationId, tenantId, "access_grant", BASE_GRANTS);
+    const counts = await reconcileAccess(request);
+    expect(counts.grants).toMatchObject({ revoked: 1 });
+    expect((await grantsOf(tenantId, accounts.cara.id)).find((g) => g.entitlementId === finance)?.revokedAt).toBeTruthy();
+    expect((await ledgerFor(tenantId, accounts.cara.id)).find((e) => e.entitlementId === finance)?.status).toBe("REVOKED");
+    expect((await view(removal.id)).fulfilment).toBe("verified");
+
+    // Disable the account: done, then the source shows it disabled.
+    const disable = await submit({ subjectIdentityId: caraId, applicationId: appId, requestType: "disable_account" });
+    const d1 = await view(disable.id);
+    expect(d1.tasks.map((t) => t.kind)).toEqual(["disable_account"]);
+    await done(d1.tasks[0].id);
+    // A new account for Dan, who has none: a placeholder and a task to create it.
+    const dan = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E F2 Dan ${stamp}`, email: mail("dan") } });
+    const danId = (await dan.json()).data.id as string;
+    const account = await submit({ subjectIdentityId: danId, applicationId: appId });
+    const a1 = await view(account.id);
+    expect(a1.tasks.map((t) => t.kind)).toEqual(["create_account"]);
+
+    await replaceIntegrationObjects(integrationId, tenantId, "account", [
+      ...ACCOUNTS,
+      { ...caraAccount, raw: { ...caraAccount.raw, status: "disabled" } },
+      { externalId: "uid=dan", raw: { id: "dan", username: "dan", email: mail("dan") } },
+    ]);
+    const run = await request.post(`/api/v1/access/applications/${appId}/reconciliations`);
+    expect(run.status(), await run.text()).toBe(201);
+    expect((await view(disable.id)).fulfilment).toBe("verified");
+    expect((await view(account.id)).fulfilment).toBe("verified");
+    await loadAccounts(request);
+    expect(accounts.dan).toMatchObject({ identityId: danId });
+    expect(accounts[`pending:${danId}`]).toBeUndefined();
   });
 
   test("another organization sees none of it", async ({ browser }) => {

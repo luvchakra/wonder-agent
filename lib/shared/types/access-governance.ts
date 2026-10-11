@@ -189,7 +189,8 @@ export type AccessPath = {
 export type AccessRequestStatus = "pending" | "approved" | "rejected" | "fulfilled" | "cancelled" | "expired";
 
 /** COMPLIANCE-P0-01.3 — 'grant' is a request for new access; 'modify' is a reviewer-initiated request to change an entitlement already covered by an existing access_grant. */
-export type AccessRequestType = "grant" | "modify";
+/** ACCESS-P0-30: `remove` takes away access the subject holds; `disable_account` disables their account. A `grant` with no entitlement asks for an account. */
+export type AccessRequestType = "grant" | "modify" | "remove" | "disable_account";
 
 export type AccessRequest = {
   id: string;

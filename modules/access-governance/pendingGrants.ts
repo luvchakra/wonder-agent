@@ -4,7 +4,7 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { chooseAccount, placeholderRef } from "./pendingGrantRules";
-import { closeTasksForGrants, openFulfilmentTask } from "./fulfilmentTasks";
+import { closeTasksForAccounts, closeTasksForGrants, completeTasksForRequest, openFulfilmentTask } from "./fulfilmentTasks";
 
 /**
  * ACCESS-P0-28 — an approved request (or package assignment) becomes a
@@ -143,16 +143,97 @@ export async function pendRequest(tenantId: string, requestId: string): Promise<
       .eq("id", requestId)
       .maybeSingle();
     if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-    if (!req || req.tenant_id !== tenantId || req.status !== "approved" || req.request_type !== "grant" || !req.application_id) return;
-    await pendLines(
-      tenantId,
-      { identityId: (req.agent_id as string | null) ? null : ((req.subject_identity_id as string | null) ?? null), agentId: (req.agent_id as string | null) ?? null },
-      [{ applicationId: req.application_id as string, entitlementId: (req.entitlement_id as string | null) ?? null, requestId, itemId: null }],
-      { objectType: "access_request", objectId: requestId },
-    );
+    if (!req || req.tenant_id !== tenantId || req.status !== "approved" || !req.application_id) return;
+    const subject = { identityId: (req.agent_id as string | null) ? null : ((req.subject_identity_id as string | null) ?? null), agentId: (req.agent_id as string | null) ?? null };
+    const applicationId = req.application_id as string;
+    const entitlementId = (req.entitlement_id as string | null) ?? null;
+    // ACCESS-P0-30: besides access, a request may ask for an account, for access to go, or for an account to be disabled.
+    if (req.request_type === "grant" && entitlementId) {
+      await pendLines(tenantId, subject, [{ applicationId, entitlementId, requestId, itemId: null }], { objectType: "access_request", objectId: requestId });
+    } else if (req.request_type === "grant") {
+      await pendAccount(tenantId, subject, applicationId, requestId);
+    } else if (req.request_type === "remove" && entitlementId) {
+      await pendRemoval(tenantId, subject, applicationId, entitlementId, requestId);
+    } else if (req.request_type === "disable_account") {
+      await pendDisable(tenantId, subject, applicationId, requestId);
+    }
   } catch (err) {
     await writeAudit({ tenantId, actorType: "system", action: "access.grants_pending", objectType: "access_request", objectId: requestId, outcome: "failure", metadata: { error: err instanceof ApiError ? err.code : "UNEXPECTED" } });
   }
+}
+
+/** The subject's real (not placeholder) accounts on the application. */
+async function realAccounts(tenantId: string, applicationId: string, subject: Subject): Promise<{ id: string; status: string }[]> {
+  let q = supabaseServiceRole().from("accounts").select("id, tenant_id, status").eq("tenant_id", tenantId).eq("application_id", applicationId).neq("status", "pending");
+  q = subject.agentId ? q.eq("agent_id", subject.agentId) : q.eq("identity_id", subject.identityId!);
+  const { data, error } = await q.limit(10);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => ({ id: r.id as string, status: r.status as string }));
+}
+
+const lineAudit = (tenantId: string, requestId: string, action: string, ok: boolean, metadata: Record<string, unknown>) =>
+  writeAudit({ tenantId, actorType: "system", action, objectType: "access_request", objectId: requestId, outcome: ok ? "success" : "failure", metadata });
+
+/** ACCESS-P0-30: an account requested: when the subject has none, a placeholder holds the request and a task asks for the account. */
+async function pendAccount(tenantId: string, subject: Subject, applicationId: string, requestId: string): Promise<void> {
+  if ((await realAccounts(tenantId, applicationId, subject)).length) {
+    await lineAudit(tenantId, requestId, "access.account_requested", true, { applicationId, outcome: "The subject already has an account" });
+    return;
+  }
+  const accountId = await accountFor(tenantId, applicationId, subject);
+  if (!accountId) return;
+  await openFulfilmentTask(tenantId, { kind: "create_account", accountId, requestId, applicationId });
+  await lineAudit(tenantId, requestId, "access.account_requested", true, { applicationId, accountId });
+}
+
+/** ACCESS-P0-30: access to remove: the grant is marked pending removal (it is still access) and a task asks for the change. */
+async function pendRemoval(tenantId: string, subject: Subject, applicationId: string, entitlementId: string, requestId: string): Promise<void> {
+  const admin = supabaseServiceRole();
+  const accounts = await realAccounts(tenantId, applicationId, subject);
+  const { data, error } = accounts.length
+    ? await admin
+        .from("access_grants")
+        .update({ removal_status: "pending_removal", removal_request_id: requestId, updated_at: new Date().toISOString() })
+        .eq("tenant_id", tenantId)
+        .in("account_id", accounts.map((a) => a.id))
+        .eq("entitlement_id", entitlementId)
+        .is("revoked_at", null)
+        .is("removal_status", null)
+        .neq("fulfilment_status", "pending_fulfilment")
+        .select("id")
+    : { data: [], error: null };
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  const grantIds = ((data ?? []) as Row[]).map((r) => r.id as string);
+  for (const grantId of grantIds) await openFulfilmentTask(tenantId, { kind: "remove", grantId, requestId, applicationId });
+  await lineAudit(tenantId, requestId, "access.removal_pending", grantIds.length > 0, grantIds.length ? { grantIds } : { reason: "The subject holds no such access to remove" });
+}
+
+/** ACCESS-P0-30: an account to disable: its one active account gets a task; several, or none, are not guessed. */
+async function pendDisable(tenantId: string, subject: Subject, applicationId: string, requestId: string): Promise<void> {
+  const active = (await realAccounts(tenantId, applicationId, subject)).filter((a) => a.status === "active");
+  if (active.length !== 1) {
+    await lineAudit(tenantId, requestId, "access.account_disable_pending", false, { reason: active.length ? "The subject has several active accounts; none was chosen" : "The subject has no active account to disable" });
+    return;
+  }
+  await openFulfilmentTask(tenantId, { kind: "disable_account", accountId: active[0].id, requestId, applicationId });
+  await lineAudit(tenantId, requestId, "access.account_disable_pending", true, { accountId: active[0].id });
+}
+
+/**
+ * "Mark fulfilled" on a request: what it asked for was done on the target,
+ * not yet seen there. Its grants become fulfilled, not yet verified; a
+ * removal becomes removed, not yet verified; its tasks are done.
+ */
+export async function markRequestFulfilled(tenantId: string, requestId: string): Promise<void> {
+  await markGrantsFulfilled(tenantId, { requestId });
+  const { error } = await supabaseServiceRole()
+    .from("access_grants")
+    .update({ removal_status: "removed_unverified", updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .eq("removal_request_id", requestId)
+    .eq("removal_status", "pending_removal");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  await completeTasksForRequest(tenantId, requestId);
 }
 
 /** After a package assignment is created: one pending grant per item. Never throws: a failure is audited. */
@@ -256,6 +337,10 @@ export async function replacePlaceholders(tenantId: string, applicationId: strin
       (a) => a.status !== "pending" && ((p.agent_id && a.agent_id === p.agent_id) || (!p.agent_id && p.identity_id && a.identity_id === p.identity_id)),
     );
     if (real.length !== 1) continue;
+    // ACCESS-P0-30: a task asking for this account now names the real one, and the account exists: verified.
+    const { error: taskError } = await admin.from("access_fulfilment_tasks").update({ account_id: real[0].id, updated_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("account_id", p.id as string);
+    if (taskError) throw new ApiError(500, "UPDATE_FAILED", taskError.message);
+    await closeTasksForAccounts(tenantId, [real[0].id as string], "create_account", "verified");
     const { error: moveError } = await admin.from("access_grants").update({ account_id: real[0].id, updated_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("account_id", p.id as string);
     if (moveError) throw new ApiError(500, "UPDATE_FAILED", moveError.message);
     const { error: deleteError } = await admin.from("accounts").delete().eq("tenant_id", tenantId).eq("id", p.id as string).eq("status", "pending");
@@ -272,4 +357,27 @@ export async function replacePlaceholders(tenantId: string, applicationId: strin
     });
   }
   return replaced;
+}
+
+/**
+ * ACCESS-P0-30: after account reconciliation, a disable task whose account
+ * the source now shows disabled, or no longer lists, is verified.
+ */
+export async function verifyDisabledAccounts(tenantId: string, applicationId: string): Promise<number> {
+  const admin = supabaseServiceRole();
+  const { data: tasks, error } = await admin
+    .from("access_fulfilment_tasks")
+    .select("account_id")
+    .eq("tenant_id", tenantId)
+    .eq("application_id", applicationId)
+    .eq("kind", "disable_account")
+    .in("status", ["open", "claimed", "failed", "completed"])
+    .limit(500);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const ids = [...new Set(((tasks ?? []) as Row[]).map((t) => t.account_id as string))];
+  if (!ids.length) return 0;
+  const { data: accounts, error: accountError } = await admin.from("accounts").select("id, tenant_id, status, missing_from_source_at").eq("tenant_id", tenantId).in("id", ids);
+  if (accountError) throw new ApiError(500, "QUERY_FAILED", accountError.message);
+  const done = ((accounts ?? []) as Row[]).filter((a) => a.tenant_id === tenantId && (a.status === "disabled" || a.missing_from_source_at)).map((a) => a.id as string);
+  return closeTasksForAccounts(tenantId, done, "disable_account", "verified");
 }

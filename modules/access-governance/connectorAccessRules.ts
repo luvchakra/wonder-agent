@@ -18,6 +18,8 @@
  *   the same account and entitlement counts as present: no duplicate.
  * - ACCESS-P0-28: a requested grant waiting for fulfilment (or fulfilled
  *   but not yet verified) that the source now lists is verified.
+ * - ACCESS-P0-30: a grant whose removal was approved that a full run no
+ *   longer finds is revoked: the removal is confirmed.
  */
 
 export type ReconcileMode = "full" | "incremental";
@@ -44,6 +46,8 @@ export type ExistingGrant = {
   missingFromSourceAt: string | null;
   /** ACCESS-P0-28: `none` for recorded access; a requested grant's progress otherwise. */
   fulfilmentStatus?: string;
+  /** ACCESS-P0-30: an approved removal's progress, or null. */
+  removalStatus?: string | null;
 };
 
 export type FieldChange = { field: string; from: string | null; to: string | null };
@@ -65,6 +69,8 @@ export type GrantPlan = {
   restored: { id: string; accountId: string; entitlementId: string }[];
   /** ACCESS-P0-28: requested grants the source now lists. */
   verified: { id: string; accountId: string; entitlementId: string }[];
+  /** ACCESS-P0-30: grants with an approved removal that a full run no longer finds: revoked. */
+  revoked: { id: string; accountId: string; entitlementId: string }[];
   unchanged: number;
   unresolved: { ref: string; reason: string }[];
 };
@@ -193,7 +199,7 @@ export function planGrants(input: {
   /** Live (not revoked) grants of the application's accounts. */
   existing: ExistingGrant[];
 }): GrantPlan {
-  const plan: GrantPlan = { creates: [], removed: [], restored: [], verified: [], unchanged: 0, unresolved: [] };
+  const plan: GrantPlan = { creates: [], removed: [], restored: [], verified: [], revoked: [], unchanged: 0, unresolved: [] };
   const live = new Map<string, ExistingGrant[]>();
   for (const g of input.existing) {
     const k = `${g.accountId}|${g.entitlementId}`;
@@ -233,8 +239,10 @@ export function planGrants(input: {
 
   if (input.mode === "full") {
     for (const g of input.existing) {
-      if (g.sourceIntegrationId !== input.integrationId || g.missingFromSourceAt) continue;
-      if (!seen.has(`${g.accountId}|${g.entitlementId}`)) plan.removed.push({ id: g.id, accountId: g.accountId, entitlementId: g.entitlementId });
+      if (g.sourceIntegrationId !== input.integrationId) continue;
+      if (seen.has(`${g.accountId}|${g.entitlementId}`)) continue;
+      if (g.removalStatus) plan.revoked.push({ id: g.id, accountId: g.accountId, entitlementId: g.entitlementId });
+      else if (!g.missingFromSourceAt) plan.removed.push({ id: g.id, accountId: g.accountId, entitlementId: g.entitlementId });
     }
   }
   return plan;
@@ -242,7 +250,7 @@ export function planGrants(input: {
 
 export type AccessCounts = {
   entitlements: { added: number; changed: number; removed: number; restored: number; unchanged: number; invalid: number };
-  grants: { added: number; removed: number; restored: number; verified: number; unchanged: number; unresolved: number };
+  grants: { added: number; removed: number; restored: number; verified: number; revoked: number; unchanged: number; unresolved: number };
 };
 
 export function countsOf(ents: EntitlementPlan, grants: GrantPlan): AccessCounts {
@@ -253,6 +261,7 @@ export function countsOf(ents: EntitlementPlan, grants: GrantPlan): AccessCounts
       removed: grants.removed.length,
       restored: grants.restored.length,
       verified: grants.verified.length,
+      revoked: grants.revoked.length,
       unchanged: grants.unchanged,
       unresolved: grants.unresolved.length,
     },
@@ -275,5 +284,6 @@ export function planFingerprint(ents: EntitlementPlan, grants: GrantPlan): strin
     gr: sorted(grants.removed.map((r) => r.id)),
     gs: sorted(grants.restored.map((r) => r.id)),
     gv: sorted(grants.verified.map((r) => r.id)),
+    gx: sorted(grants.revoked.map((r) => r.id)),
   });
 }

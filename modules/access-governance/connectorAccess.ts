@@ -290,7 +290,7 @@ async function load(admin: Admin, tenantId: string, applicationId: string, integ
       (from, to) =>
         admin
           .from("access_grants")
-          .select("id, tenant_id, account_id, entitlement_id, grant_type, source_integration_id, missing_from_source_at, fulfilment_status")
+          .select("id, tenant_id, account_id, entitlement_id, grant_type, source_integration_id, missing_from_source_at, fulfilment_status, removal_status")
           .eq("tenant_id", tenantId)
           .in("account_id", ids)
           .is("revoked_at", null)
@@ -307,6 +307,7 @@ async function load(admin: Admin, tenantId: string, applicationId: string, integ
         sourceIntegrationId: (g.source_integration_id as string | null) ?? null,
         missingFromSourceAt: (g.missing_from_source_at as string | null) ?? null,
         fulfilmentStatus: (g.fulfilment_status as string | undefined) ?? "none",
+        removalStatus: (g.removal_status as string | null | undefined) ?? null,
       });
     }
   }
@@ -430,4 +431,16 @@ async function applyGrants(admin: Admin, tenantId: string, integrationId: string
   }
   // ACCESS-P0-29: their fulfilment tasks are done.
   await closeTasksForGrants(tenantId, plan.verified.map((v) => v.id), "verified");
+  // ACCESS-P0-30: an approved removal the source confirms: the grant is revoked, and its removal task is done.
+  for (const part of chunks(plan.revoked.map((r) => r.id), 500)) {
+    const { error } = await admin
+      .from("access_grants")
+      .update({ revoked_at: now, missing_from_source_at: now, updated_at: now })
+      .eq("tenant_id", tenantId)
+      .in("id", part)
+      .is("revoked_at", null)
+      .not("removal_status", "is", null);
+    if (error) throw new ApiError(500, "WRITE_FAILED", `access_grants: ${error.message}`);
+  }
+  await closeTasksForGrants(tenantId, plan.revoked.map((r) => r.id), "verified", "remove");
 }

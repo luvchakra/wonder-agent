@@ -6,6 +6,8 @@
 export const FULFILMENT_TASK_STATUSES = ["open", "claimed", "completed", "failed", "verified", "cancelled"] as const;
 export type FulfilmentTaskStatus = (typeof FULFILMENT_TASK_STATUSES)[number];
 export type FulfilmentTaskAction = "claim" | "complete" | "fail";
+/** ACCESS-P0-30: what the task asks for on the target. */
+export type FulfilmentTaskKind = "grant" | "remove" | "create_account" | "disable_account";
 
 /** Where each action may start, and where it ends. A failed task can be claimed again and retried. */
 const FROM: Record<FulfilmentTaskAction, { from: FulfilmentTaskStatus[]; to: FulfilmentTaskStatus }> = {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseAccount, placeholderRef, requestFulfilment } from "./pendingGrantRules";
+import { chooseAccount, placeholderRef, requestFulfilment, requestProgress } from "./pendingGrantRules";
 
 describe("chooseAccount (ACCESS-P0-28)", () => {
   it("uses the subject's one real account, ahead of a placeholder", () => {
@@ -28,5 +28,18 @@ describe("requestFulfilment", () => {
   it("is untracked with no live grant", () => {
     expect(requestFulfilment([])).toBe("untracked");
     expect(requestFulfilment([g("pending_fulfilment", "2026-10-11T00:00:00Z")])).toBe("untracked");
+  });
+});
+
+describe("requestProgress (ACCESS-P0-30)", () => {
+  const t = (status: string) => ({ status });
+  it("follows the request's tasks: to do, done but unverified, verified; cancelled ones do not count", () => {
+    expect(requestProgress([t("verified"), t("claimed")], [])).toBe("pending_fulfilment");
+    expect(requestProgress([t("completed"), t("verified")], [])).toBe("fulfilled_unverified");
+    expect(requestProgress([t("verified"), t("cancelled")], [])).toBe("verified");
+  });
+  it("falls back to the grants when the request has no task", () => {
+    expect(requestProgress([], [{ fulfilmentStatus: "none", revokedAt: null }])).toBe("verified");
+    expect(requestProgress([t("cancelled")], [])).toBe("untracked");
   });
 });

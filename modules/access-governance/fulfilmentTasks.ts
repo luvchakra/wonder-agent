@@ -6,7 +6,7 @@ import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
-import { canAct, dueAt, isOverdue, needsReminder, type FulfilmentTaskAction, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
+import { canAct, dueAt, isOverdue, needsReminder, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
 
 /**
  * ACCESS-P0-29 — fulfilment tasks. Each pending grant (ACCESS-P0-28) is
@@ -30,10 +30,13 @@ const LIVE: FulfilmentTaskStatus[] = ["open", "claimed", "failed", "completed"];
 
 export type FulfilmentTask = {
   id: string;
+  kind: FulfilmentTaskKind;
   status: FulfilmentTaskStatus;
   overdue: boolean;
   dueAt: string;
-  accessGrantId: string;
+  /** The grant to add (kind grant) or remove (kind remove); null for an account task. */
+  accessGrantId: string | null;
+  accountId: string | null;
   requestId: string | null;
   applicationId: string;
   applicationName: string | null;
@@ -50,17 +53,19 @@ export type FulfilmentTask = {
 };
 
 function toTask(r: Row, now = new Date()): FulfilmentTask {
-  const grant = (r.access_grants as Row | null) ?? null;
-  const account = (grant?.accounts as Row | null) ?? null;
+  const grant = ((r.grant as Row | null) ?? (r.removal as Row | null)) ?? null;
+  const account = ((grant?.accounts as Row | null) ?? (r.account as Row | null)) ?? null;
   const app = (r.applications as Row | null) ?? null;
   const assignee = (r.assignee as Row | null) ?? null;
   const status = r.status as FulfilmentTaskStatus;
   return {
     id: r.id as string,
+    kind: ((r.kind as FulfilmentTaskKind | undefined) ?? "grant") as FulfilmentTaskKind,
     status,
     overdue: isOverdue({ status, dueAt: r.due_at as string }, now),
     dueAt: r.due_at as string,
-    accessGrantId: r.access_grant_id as string,
+    accessGrantId: ((r.access_grant_id as string | null) ?? (r.removal_grant_id as string | null)) ?? null,
+    accountId: (r.account_id as string | null) ?? null,
     requestId: (r.request_id as string | null) ?? null,
     applicationId: r.application_id as string,
     applicationName: ((app?.display_name as string | null) ?? (app?.name as string | null)) ?? null,
@@ -77,12 +82,29 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
   };
 }
 
+const GRANT_FIELDS = "entitlements(name), accounts(account_name, external_account_ref)";
 const SELECT =
-  "id, tenant_id, status, due_at, access_grant_id, request_id, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, created_at, " +
-  "applications(name, display_name), access_grants(entitlements(name), accounts(account_name, external_account_ref)), assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name)";
+  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, created_at, " +
+  `applications(name, display_name), grant:access_grants!access_fulfilment_tasks_grant_fkey(${GRANT_FIELDS}), removal:access_grants!access_fulfilment_tasks_removal_grant_fkey(${GRANT_FIELDS}), ` +
+  "account:accounts!access_fulfilment_tasks_account_fkey(account_name, external_account_ref), assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name)";
 
-/** Opens the task for a new pending grant. Never throws: a failure is audited and the grant stays pending. */
-export async function openFulfilmentTask(tenantId: string, line: { grantId: string; requestId: string | null; applicationId: string }): Promise<void> {
+const KIND_TITLE: Record<FulfilmentTaskKind, string> = {
+  grant: "Access to fulfil",
+  remove: "Access to remove",
+  create_account: "Account to create",
+  disable_account: "Account to disable",
+};
+
+/**
+ * Opens the task for an approved line: a pending grant (kind grant), a
+ * grant to remove, or an account to create or disable. Never throws: a
+ * failure is audited and the line stays pending.
+ */
+export async function openFulfilmentTask(
+  tenantId: string,
+  line: { kind?: FulfilmentTaskKind; grantId?: string | null; accountId?: string | null; requestId: string | null; applicationId: string },
+): Promise<void> {
+  const kind = line.kind ?? "grant";
   try {
     const admin = supabaseServiceRole();
     const [{ data: app, error }, config] = await Promise.all([
@@ -96,7 +118,10 @@ export async function openFulfilmentTask(tenantId: string, line: { grantId: stri
       .from("access_fulfilment_tasks")
       .insert({
         tenant_id: tenantId,
-        access_grant_id: line.grantId,
+        kind,
+        access_grant_id: kind === "grant" ? line.grantId : null,
+        removal_grant_id: kind === "remove" ? line.grantId : null,
+        account_id: kind === "create_account" || kind === "disable_account" ? line.accountId : null,
         request_id: line.requestId,
         application_id: line.applicationId,
         assignee_identity_id: assignee,
@@ -104,15 +129,15 @@ export async function openFulfilmentTask(tenantId: string, line: { grantId: stri
       })
       .select("id")
       .single();
-    if (insertError?.code === "23505") return; // opened a moment ago for the same grant
+    if (insertError?.code === "23505") return; // a live task for the same grant or account is open already
     if (insertError || !data) throw new ApiError(500, "CREATE_FAILED", insertError?.message ?? "Could not open the task");
-    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { grantId: line.grantId, requestId: line.requestId, assigneeIdentityId: assignee } });
+    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { kind, grantId: line.grantId ?? null, accountId: line.accountId ?? null, requestId: line.requestId, assigneeIdentityId: assignee } });
     const userId = assignee ? await userOf(tenantId, assignee) : null;
     const appName = ((app.display_name as string | null) ?? (app.name as string)) as string;
     // No owner who signs in: the tenant's access managers see it in the list (a broadcast would reach everyone).
-    if (userId) await notify({ tenantId, userId, type: "fulfilment_task", title: `Access to fulfil in ${appName}`, body: "An approved request waits for the change on the target. Open Fulfilment Tasks.", referenceType: "access_fulfilment_task", referenceId: data.id as string });
+    if (userId) await notify({ tenantId, userId, type: "fulfilment_task", title: `${KIND_TITLE[kind]} in ${appName}`, body: "An approved request waits for the change on the target. Open Fulfilment Tasks.", referenceType: "access_fulfilment_task", referenceId: data.id as string });
   } catch (err) {
-    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_grant", objectId: line.grantId, outcome: "failure", metadata: { error: err instanceof ApiError ? err.code : "UNEXPECTED" } });
+    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: line.grantId ? "access_grant" : "account", objectId: (line.grantId ?? line.accountId)!, outcome: "failure", metadata: { kind, error: err instanceof ApiError ? err.code : "UNEXPECTED" } });
   }
 }
 
@@ -146,7 +171,12 @@ export async function actOnFulfilmentTask(
   const text = typeof note === "string" && note.trim() ? note.trim().slice(0, 2000) : null;
   if (action === "fail" && !text) throw new ApiError(400, "VALIDATION_FAILED", "note: say what failed");
   const admin = supabaseServiceRole();
-  const { data: task, error } = await admin.from("access_fulfilment_tasks").select("id, tenant_id, status, assignee_identity_id, claimed_by, access_grant_id").eq("tenant_id", tenantId).eq("id", taskId).maybeSingle();
+  const { data: task, error } = await admin
+    .from("access_fulfilment_tasks")
+    .select("id, tenant_id, kind, status, assignee_identity_id, claimed_by, access_grant_id, removal_grant_id")
+    .eq("tenant_id", tenantId)
+    .eq("id", taskId)
+    .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!task || task.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "No such task");
   // The task's owner is an identity; the actor is the member signed in, matched to their identity in this organization.
@@ -175,7 +205,8 @@ export async function actOnFulfilmentTask(
     .maybeSingle();
   if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
   if (!updated) throw new ApiError(409, "CONFLICT", "The task changed meanwhile; reload");
-  if (action === "complete") {
+  // Done on the target: a grant waits for verification; a removal waits for the source to drop it. Account tasks wait for the account itself.
+  if (action === "complete" && task.kind === "grant") {
     const { error: grantError } = await admin
       .from("access_grants")
       .update({ fulfilment_status: "fulfilled_unverified", updated_at: now })
@@ -184,7 +215,16 @@ export async function actOnFulfilmentTask(
       .eq("fulfilment_status", "pending_fulfilment");
     if (grantError) throw new ApiError(500, "UPDATE_FAILED", grantError.message);
   }
-  await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: `access.fulfilment_task_${action === "claim" ? "claimed" : action === "complete" ? "completed" : "failed"}`, objectType: "access_fulfilment_task", objectId: taskId, outcome: "success", metadata: { from: task.status, grantId: task.access_grant_id, note: text } });
+  if (action === "complete" && task.kind === "remove") {
+    const { error: grantError } = await admin
+      .from("access_grants")
+      .update({ removal_status: "removed_unverified", updated_at: now })
+      .eq("tenant_id", tenantId)
+      .eq("id", task.removal_grant_id as string)
+      .eq("removal_status", "pending_removal");
+    if (grantError) throw new ApiError(500, "UPDATE_FAILED", grantError.message);
+  }
+  await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: `access.fulfilment_task_${action === "claim" ? "claimed" : action === "complete" ? "completed" : "failed"}`, objectType: "access_fulfilment_task", objectId: taskId, outcome: "success", metadata: { kind: task.kind, from: task.status, grantId: task.access_grant_id ?? task.removal_grant_id ?? null, note: text } });
   const [fresh] = await listTaskById(tenantId, taskId);
   return fresh;
 }
@@ -200,8 +240,9 @@ async function listTaskById(tenantId: string, taskId: string): Promise<Fulfilmen
  * the access, `cancelled` when the grant was withdrawn, `completed` when
  * the request or item was marked fulfilled (the grant is not yet verified).
  */
-export async function closeTasksForGrants(tenantId: string, grantIds: string[], status: "verified" | "cancelled" | "completed"): Promise<number> {
+export async function closeTasksForGrants(tenantId: string, grantIds: string[], status: "verified" | "cancelled" | "completed", kind: "grant" | "remove" = "grant"): Promise<number> {
   if (!grantIds.length) return 0;
+  const column = kind === "remove" ? "removal_grant_id" : "access_grant_id";
   const now = new Date().toISOString();
   const from: FulfilmentTaskStatus[] = status === "completed" ? ["open", "claimed", "failed"] : LIVE;
   let closed = 0;
@@ -210,7 +251,8 @@ export async function closeTasksForGrants(tenantId: string, grantIds: string[], 
       .from("access_fulfilment_tasks")
       .update(status === "completed" ? { status, completed_at: now, updated_at: now } : { status, closed_at: now, updated_at: now })
       .eq("tenant_id", tenantId)
-      .in("access_grant_id", grantIds.slice(i, i + 200))
+      .eq("kind", kind)
+      .in(column, grantIds.slice(i, i + 200))
       .in("status", from)
       .select("id");
     if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
@@ -244,4 +286,34 @@ export async function remindOverdueFulfilmentTasks(tenantId: string | null, now 
     reminded++;
   }
   return { reminded };
+}
+
+/** ACCESS-P0-30: closes an account's live tasks of one kind (created or disabled at the source, or moved off a placeholder). */
+export async function closeTasksForAccounts(tenantId: string, accountIds: string[], kind: "create_account" | "disable_account", status: "verified" | "cancelled"): Promise<number> {
+  if (!accountIds.length) return 0;
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("access_fulfilment_tasks")
+    .update({ status, closed_at: now, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("kind", kind)
+    .in("account_id", accountIds)
+    .in("status", LIVE)
+    .select("id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  return (data ?? []).length;
+}
+
+/** "Mark fulfilled" on a request: every live task of it is done (what it asked for still waits for the source). */
+export async function completeTasksForRequest(tenantId: string, requestId: string): Promise<number> {
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("access_fulfilment_tasks")
+    .update({ status: "completed", completed_at: now, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("request_id", requestId)
+    .in("status", ["open", "claimed", "failed"])
+    .select("id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  return (data ?? []).length;
 }

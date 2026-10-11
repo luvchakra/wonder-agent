@@ -6,8 +6,9 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import {
   getRequestWithApprovals,
   grantsForRequest,
+  listFulfilmentTasks,
   listRequestIdsAwaiting,
-  requestFulfilment,
+  requestProgress,
   sweepApprovalTimeouts,
   type ApprovalView,
 } from "@/modules/access-governance/service";
@@ -27,11 +28,23 @@ const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   cancelled: { label: "Cancelled", tone: "neutral" },
   expired: { label: "Expired", tone: "neutral" },
 };
-// ACCESS-P0-28: once approved, the request shows how far its access has really come.
-const FULFILMENT: Record<string, { label: string; tone: BadgeTone }> = {
-  pending_fulfilment: { label: "Approved · waiting for fulfilment", tone: "warning" },
-  fulfilled_unverified: { label: "Fulfilled · not yet verified", tone: "warning" },
-  verified: { label: "Verified at the source", tone: "success" },
+// ACCESS-P0-28/30: once approved, the request shows how far it has really come, in the words of what it asked for.
+const FULFILMENT: Record<string, Record<string, { label: string; tone: BadgeTone }>> = {
+  grant: {
+    pending_fulfilment: { label: "Approved · waiting for fulfilment", tone: "warning" },
+    fulfilled_unverified: { label: "Fulfilled · not yet verified", tone: "warning" },
+    verified: { label: "Verified at the source", tone: "success" },
+  },
+  remove: {
+    pending_fulfilment: { label: "Approved · waiting for removal", tone: "warning" },
+    fulfilled_unverified: { label: "Removed · not yet verified", tone: "warning" },
+    verified: { label: "Removal verified at the source", tone: "success" },
+  },
+  disable_account: {
+    pending_fulfilment: { label: "Approved · waiting for the account to be disabled", tone: "warning" },
+    fulfilled_unverified: { label: "Disabled · not yet verified", tone: "warning" },
+    verified: { label: "Disabled at the source", tone: "success" },
+  },
 };
 const STEP: Record<string, { label: string; tone: BadgeTone }> = {
   waiting: { label: "Not yet", tone: "neutral" },
@@ -112,15 +125,16 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   const tenantId = ctx.tenantId!;
   const canApprove = ctx.permissions.includes("access.approve");
   await sweepApprovalTimeouts(tenantId);
-  const [found, awaiting, provenance, grants] = await Promise.all([
+  const [found, awaiting, provenance, grants, tasks] = await Promise.all([
     getRequestWithApprovals(tenantId, id),
     listRequestIdsAwaiting(tenantId, { userId: ctx.userId, canApproveAsAccessManager: canApprove }),
     getRecordProvenance(tenantId, "access_requests", id),
     grantsForRequest(tenantId, id).catch(() => []),
+    listFulfilmentTasks(tenantId, { requestId: id }).catch(() => []),
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
-  const fulfilment = r.status === "approved" || r.status === "fulfilled" ? FULFILMENT[requestFulfilment(grants)] : undefined;
+  const fulfilment = r.status === "approved" || r.status === "fulfilled" ? (FULFILMENT[r.requestType] ?? FULFILMENT.grant)[requestProgress(tasks, grants)] : undefined;
   const status = fulfilment ?? STATUS[r.status];
   const live = steps.filter((s) => s.status !== "invalidated");
   const invalidated = steps.filter((s) => s.status === "invalidated");
