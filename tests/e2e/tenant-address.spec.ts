@@ -1,4 +1,4 @@
-import { test, expect, type Browser, type Page } from "@playwright/test";
+import { test, expect, type Browser, type Page, type Response } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { TEST_USERS, TENANT_ONE, TENANT_TWO, type TestUserKey } from "./support/testUsers";
 
@@ -59,10 +59,16 @@ test.describe("tenant addresses", () => {
     await expect(page.getByRole("link", { name: "Sign up" })).toHaveCount(0);
     await expect(page.getByText(`Not part of ${TENANT_ONE.name}?`)).toBeVisible();
 
+    // On a failure, say where the page went: the landing page means the
+    // proxy did not see a tenant address, a redirect to sign-in means it
+    // found one (both are a 200).
+    const where = async (r: Response | null) =>
+      `${r?.url()} (from ${r?.request().redirectedFrom()?.url() ?? "no redirect"}), title "${await page.title()}"`;
     const missing = await page.goto(at("no-such-organization", "/"));
-    expect(missing?.status()).toBe(404);
+    expect(missing?.status(), await where(missing)).toBe(404);
     await expect(page.getByRole("heading", { name: "No organization at this address" })).toBeVisible();
-    expect((await page.goto(at("www", "/sign-in")))?.status()).toBe(404);
+    const reserved = await page.goto(at("www", "/sign-in"));
+    expect(reserved?.status(), await where(reserved)).toBe(404);
     // The API answers the same way, without naming any organization.
     const api = await page.evaluate(async () => {
       const r = await fetch("/api/v1/agents");
