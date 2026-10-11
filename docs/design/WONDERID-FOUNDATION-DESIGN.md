@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft for owner review. Proposes work; changes nothing on its own. |
+| Status | Draft for owner review. Proposes work; changes nothing on its own. Revised 2026-10-11: delivery reordered so reconciliation, account import and access requests come first (§10). |
 | Date | 2026-10-11 |
 | Scope | IGA for every identity type, and Agent ID (AI agents as governed non-human identities) |
 | Builds on | `CLAUDE.md` (binding contract), `docs/plan/WONDERID-ROADMAP.md`, `docs/requirements/WonderID_P0_Implementation_Spec_v3.md`, `docs/integrations/CONNECTOR-FRAMEWORK.md` |
@@ -140,12 +140,12 @@ exist and the backlog row is Done.
 | Unified identity model | `identities` with 8 types and lifecycle states, custom attributes, relationships (0077); field provenance (0080) | Detail tabs for Groups/Access/Risk/Activity (IDENTITY-P0-17 Partial) |
 | Authoritative sources | `identity_sources`, precedence, mappings, correlation rules, leaver threshold guard, reconciliation runs, pending matches (0081–0083) | Schedules stored but not run; SCIM/REST/HR are presets over files, not native pulls (INTEGRATION-P0-08 Partial) |
 | Lifecycle (JML) | Joiner/mover/leaver/rehire/conversion events → governed human tasks (0084, 0085); agent lifecycle state machine | No birthright rules, no rule engine on events, no automatic deprovisioning (IDENTITY-P0-18 Partial) |
-| Accounts | Correlation, orphan/dormant, account types (0089) | — |
-| Requests and approvals | Request policies (0092), staged approval engine with four-eyes trigger, escalation (0093), access packages for every identity type (0094), catalog | No delegation/on-behalf (ACCESS-P0-23), no recommendations, no emergency access; fulfilment is manual |
+| Accounts | Correlation, orphan/dormant, account types (0089) | Moving accounts from staging into `accounts` is started by hand per application. Staging is never pruned, so removals at the source go undetected through connectors. No incremental mode (§10, F1) |
+| Requests and approvals | Request policies (0092), staged approval engine with four-eyes trigger, escalation (0093), access packages for every identity type (0094), catalog | Approval creates no pending grant or task; fulfilment is a manual "mark fulfilled" that reconciliation never verifies; no removal or account requests; AI agents refused in the catalog; no delegation (ACCESS-P0-23), recommendations or emergency access (§10, F2) |
 | Roles and entitlements | Applications catalog, entitlements with privilege level and owner, access grants with ten grant types, access ledger (0114) | No business/IT roles, no entitlement hierarchy (ACCESS-P0-21), no role mining |
 | Certifications | Campaigns, items, decisions, snapshots, escalation, evidence export (0036, 0046) | `certification_items.agent_id` NOT NULL → agent-only (COMPLIANCE-P0-10); revoke changes only WonderID's record |
 | SoD | Action/process SoD from audit history, block or advise, exceptions (0053) | No entitlement-combination SoD (ACCESS-P0-22), no detective scans, no mitigating-control library |
-| Connectors | Declarative framework + gateway, 5 drivers (http, ldap, sql, mcp, file), 16 built-in definitions, inbound receivers, CSV, boundary test (0108–0113) | **Read-only**: no driver implements write; `executeConnectorWrite()` (0087) has no caller; no SCIM server/client; no Entra/Okta/AWS/Azure/GCP |
+| Connectors | Declarative framework + gateway, 5 drivers (http, ldap, sql, mcp, file), 16 built-in definitions, inbound receivers, CSV, boundary test (0108–0113); daily scheduled sync into staging (`integration_objects`) | Staged entitlements and access grants from connectors are read by nothing (only CSV reaches `entitlements`/`access_grants`); identity-source schedules not run. **Read-only**: no driver implements write; `executeConnectorWrite()` (0087) has no caller; no SCIM server/client; no Entra/Okta/AWS/Azure/GCP |
 | Audit | Hash-chained append-only `audit_logs`, integrity check, exports, 8 report types, 10 control frameworks (0104, 0105), record provenance (0115) | Identity graph and insights (OPERATIONS-P0-10) |
 | Admin and config | Custom roles, groups, scoped assignments, authorization policies (0097–0101); Global Configuration with versions (0116); notifications; feature flags | No workflow engine, forms, email templates, transport of configuration |
 
@@ -969,6 +969,7 @@ approves this design. No module edits another's code (NN #18).
 
 | Change | Story |
 |---|---|
+| Non-human identities from accounts: owner from source or unowned queue; agent accounts linked by declared identifiers | IDENTITY-P0-20 (F1) |
 | Finish identity detail tabs | IDENTITY-P0-17 |
 | Lifecycle rules (birthright, mover, leaver, expiry, long leave) with simulation and four-eyes publish; manager "disable all access" | IDENTITY-P0-18 (finish) + New |
 | External organizations, sponsor re-attestation, invitation/registration flow | New (P1) |
@@ -980,7 +981,9 @@ approves this design. No module edits another's code (NN #18).
 
 | Change | Story |
 |---|---|
-| Run identity-source schedules; native SCIM/REST pulls | INTEGRATION-P0-08 (finish) |
+| Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard | INTEGRATION-P0-18 (F1) |
+| Scheduled import and promotion pipeline; run identity-source schedules; run now | INTEGRATION-P0-19 (F1), INTEGRATION-P0-08 (finish) |
+| Native SCIM/REST pulls | INTEGRATION-P0-08 (finish) |
 | Write operations in drivers (http, ldap, sql, scim), binding context, provisioning pipeline, verification, manual and ITSM fulfilment | INTEGRATION-P0-13, INTEGRATION-P0-11 (finish) |
 | SCIM driver (client) and SCIM receiver (server) with RFC 9967 events | New |
 | WonderID Relay (outbound job-pull transport) | New |
@@ -996,7 +999,13 @@ approves this design. No module edits another's code (NN #18).
 | Entitlement hierarchy; SoD business functions, risks, rulesets, preventive + detective + simulation, mitigating controls, exercised flag | ACCESS-P0-22 + New (P1 library and workbench) |
 | Delegations (approval, request, admin, on-behalf); move pending items to the delegate when delegation starts | ACCESS-P0-23 |
 | Request baskets (multi-line, remove/modify), bulk, model-after, peer recommendations | New |
-| Imported access classification | ACCESS-P0-25 |
+| Entitlement and access-grant reconciliation from connectors (preview, apply, removed at source) | ACCESS-P0-27 (F1) |
+| Imported access classification (authorized, legacy baseline, unproven, rogue) and drift findings | ACCESS-P0-25 (F1) |
+| Approved requests become pending grants, verified by reconciliation | ACCESS-P0-28 (F2) |
+| Fulfilment tasks (claim, complete, SLA, auto-close on reconciliation) | ACCESS-P0-29 (F2) |
+| Remove-access and account requests | ACCESS-P0-30 (F2) |
+| Requests for non-human identities, AI agents within their contract | ACCESS-P0-31 (F2) |
+| Time-bound access with expiry tasks | ACCESS-P0-32 (F2) |
 | Emergency/JIT access sessions | New (P1) |
 | Agent delegation grants; delegation and token steps in the runtime decision pipeline; AuthZEN mapping; per-agent shadow/enforce mode | New |
 | Role and rule mining | New (P1) |
@@ -1030,7 +1039,9 @@ approves this design. No module edits another's code (NN #18).
 
 | Change | Story |
 |---|---|
-| Home, My Access, unified tasks inbox | EXPERIENCE-P0-19 + New |
+| Reconciliation console | EXPERIENCE-P0-28 (F1) |
+| Request tracking per line and tasks inbox | EXPERIENCE-P0-29 (F2) |
+| Home, My Access | EXPERIENCE-P0-19 |
 | Pages for roles, SoD workbench, lifecycle rules, delegations, emergency access, agent credentials, relay status | With each feature |
 
 ### Platform (09)
@@ -1050,6 +1061,8 @@ approves this design. No module edits another's code (NN #18).
 
 | Change | Story |
 |---|---|
+| Reconciliation suite (deletion detection, guards, baseline, isolation) | QA-P0-23 (F1) |
+| Request-to-verified suite (person, service account, agent; removal; expiry) | QA-P0-24 (F2) |
 | Gateway security suite extended to tokens, DPoP, delegation and kill switch | QA-P0-18 |
 | Provisioning safety tests (idempotency, mass-change guard, read-only enforcement) | QA-P0-21 |
 | Brownfield end-to-end: HR → lifecycle → request → provision → certify → revoke → verify | QA-P0-22 |
@@ -1058,109 +1071,256 @@ approves this design. No module edits another's code (NN #18).
 
 ## 10. Phased delivery plan
 
-The phases complete the existing roadmap first, then add what it does not cover.
-Each phase ends with a usable product increment and an exit test. Within a
-phase, stories in different modules can run in parallel; across phases the
-order matters.
+**Revised 2026-10-11 (owner direction).** Reconciliation, account import and access requests come first, for human and non-human identities alike. The earlier F1–F7 plan is renumbered F1–F10 around that order. Nothing was removed; work moved later.
 
-### Phase F1 — Close the IGA core (finish what is Partial)
+Each phase:
+- ends with a usable increment and an exit test;
+- can run stories in different modules in parallel;
+- depends on the phases before it.
 
-**Goal.** Every identity type can be sourced, requested, reviewed and checked
-for SoD inside WonderID, even if fulfilment is still manual.
+**Story IDs:**
+- Existing IDs are kept.
+- New IDs continue each module's numbering: INTEGRATION-P0-18, ACCESS-P0-27, IDENTITY-P0-20, EXPERIENCE-P0-28, QA-P0-23 and up.
+- A new story enters its module backlog (with its Progress Tracker row) when the owner approves D1. Until then this section is the plan of record.
 
-- INTEGRATION-P0-08: identity-source schedules run.
-- IDENTITY-P0-17, IDENTITY-P0-18: identity detail tabs; lifecycle rules (birthright, mover, leaver, expiry) with simulation.
-- ACCESS-P0-21: business and IT roles.
-- ACCESS-P0-22: entitlement SoD (preventive + detective) with entitlement hierarchy.
-- ACCESS-P0-23: delegations.
-- COMPLIANCE-P0-10, COMPLIANCE-P0-11: certification for every identity type, with population evidence.
-- ACCESS-P0-25: imported-access classification.
+### Where these three stand today (code check, 2026-10-11)
 
-**Exit.** A human, an external and a service account each go joiner → request →
-approve → review → revoke (as a manual task) with a complete evidence trail; an
-SoD conflict blocks a request and appears in the detective report.
+| Capability | Works end to end | Partial | Missing |
+|---|---|---|---|
+| **Account import** | Connector syncs (daily cron) refresh the staging table `integration_objects`. CSV import puts applications, entitlements, accounts and grants into the real tables. Identity sources import identities. | Accounts move from staging to `accounts` only when someone starts it by hand, per onboarded application. | Entitlements and access grants from connectors never leave staging. Nothing moves data on after a scheduled sync. Identity-source schedules are stored but never run. |
+| **Reconciliation** | Identity runs: preview, pending matches, guarded leavers from CSV. Account correlation, orphan and dormant states. Ledger marks access with no evidence as UNPROVEN. | Staging is never pruned, so an account or identity removed at the source is never detected through a connector, and leavers from integration-linked sources are missed. | No incremental mode. No reconciliation of entitlements and grants. No classification of imported access (ACCESS-P0-25), so no rogue-access findings. |
+| **Access request** | Catalog, request policies, multi-stage approval with escalation, packages, ledger evidence. Service accounts and machine identities can be requested by their manager, an access manager or the package owner. | Fulfilment is a manual "mark fulfilled". | Approval creates no pending grant and no task. No removal or account requests. No recon check that access really arrived. AI agents are refused in the catalog. No connector writes (`executeConnectorWrite` has no caller). |
 
-### Phase F2 — Close the loop: provisioning
+### Phase F1: Import and reconciliation
 
-**Goal.** Decisions change target systems, and WonderID proves it.
+**Goal.** For every connected application, WonderID holds a current, trustworthy copy of:
+- accounts, entitlements and who holds what;
+- for people, service accounts, machine identities and AI agents alike.
 
-- INTEGRATION-P0-11, INTEGRATION-P0-13: write operations, binding context, plan → pre-check → execute → verify, manual and ticketed fulfilment.
+Every run says what changed. Removals at the source are detected. Access that appeared outside WonderID is flagged.
+
+| Story | Module | What it delivers |
+|---|---|---|
+| **INTEGRATION-P0-18** Staging reflects the source | Integration | See below. |
+| **INTEGRATION-P0-19** Scheduled import and promotion | Integration | See below. Finishes the schedule part of INTEGRATION-P0-08. |
+| **ACCESS-P0-27** Entitlement and access-grant reconciliation | Access | See below. |
+| **ACCESS-P0-25** Imported access classification and drift findings *(existing)* | Access + Risk | See below. |
+| **IDENTITY-P0-20** Non-human identities from accounts | Identity | See below. |
+| **EXPERIENCE-P0-28** Reconciliation console | Experience | See below. |
+| **QA-P0-23** Reconciliation suite | QA | See below. |
+
+**INTEGRATION-P0-18, Staging reflects the source.**
+- Each sync records the run that last saw each object.
+- After a **complete full** run, objects not seen are marked missing at the source, with a time. They are never deleted.
+- Incremental and partial runs never mark anything missing.
+- A mass-missing guard (a percentage, set in Global Configuration) holds the run for approval.
+- With this, integration-linked identity sources detect leavers too.
+
+**INTEGRATION-P0-19, Scheduled import and promotion.**
+- After each sync, the changed kinds are handed to their owning module's published service:
+  - identities to the identity sources linked to the connection;
+  - accounts, entitlements and grants to application reconciliation for onboarded applications.
+- Identity-source schedules run (finishing the schedule part of INTEGRATION-P0-08).
+- There is a "run now" action.
+- Each run links import → promotion → reconciliation in one job record with counts and errors.
+- How often it runs depends on D10.
+
+**ACCESS-P0-27, Entitlement and access-grant reconciliation.**
+- Staged connector entitlements and grants move into `entitlements` and `access_grants`, as CSV already does.
+- It works through the application's onboarding mapping, including the entitlement type and the account ↔ entitlement link.
+- Full and incremental modes, with a preview (dry-run) and an apply.
+- Counts of added, changed, removed and unchanged.
+- A grant gone at the source becomes **removed at source** with a ledger event, not a deletion.
+- Accounts keep `missing_from_source_at` semantics.
+
+**ACCESS-P0-25, Imported access classification and drift findings (existing story).**
+- Every imported account and grant is classified against the ledger: **authorized** (evidence exists), **legacy** (present at the application's first baseline run), **unproven**, or **rogue** (appeared after the baseline with no evidence).
+- Rogue access raises a Risk finding, through the published Risk contract.
+- Remediating it comes in F3 (RISK-P0-13).
+
+**IDENTITY-P0-20, Non-human identities from accounts.**
+- Service and machine accounts that correlate to no person can become, or link to, SERVICE_ACCOUNT, MACHINE, WORKLOAD or APPLICATION identities.
+- The owner comes from a mapped source attribute; otherwise the identity joins an **unowned identity** queue in Onboarding.
+- AI-agent accounts link through declared identifiers: OAuth client id, service principal, agent external id.
+- Unowned non-human identities cannot be granted requested access.
+
+**EXPERIENCE-P0-28, Reconciliation console.**
+- One page per connection and per application: last import, last reconciliation, counts, missing at source, held runs, errors.
+- Preview → apply, and run now.
+- "Last seen at source" on account and grant pages.
+- One primary action per page (§19.5).
+
+**QA-P0-23, Reconciliation suite.** Tests for:
+- deletion detection, and the full vs partial run rule;
+- the mass-missing guard;
+- idempotent re-runs;
+- the baseline rule (legacy vs rogue);
+- tenant isolation of every new column and table;
+- an end-to-end path through a built-in connector (PostgreSQL or Keycloak) and through CSV.
+
+**Exit.**
+- Connect an application through a built-in connector and schedule it.
+- Accounts, entitlements and grants appear for a person, a service account and an AI agent, each correlated to the right identity.
+- An account removed at the source shows as missing after the next full run.
+- An entitlement added directly on the target shows as rogue with a finding.
+
+### Phase F2: Access requests end to end
+
+**Goal.** A request is followed until the access really exists. Approval creates a pending grant and a fulfilment task. The next reconciliation confirms the access arrived and closes the task. This works for people and for the non-human identities they own. Fulfilment stays manual until F3.
+
+| Story | Module | What it delivers |
+|---|---|---|
+| **ACCESS-P0-28** Approved requests become pending grants | Access | See below. |
+| **ACCESS-P0-29** Fulfilment tasks | Access | See below. |
+| **ACCESS-P0-30** Remove-access and account requests | Access | See below. |
+| **ACCESS-P0-31** Requests for non-human identities | Access + Identity | See below. Coordinated with IDENTITY-P0-19. |
+| **ACCESS-P0-32** Time-bound access | Access | See below. |
+| **EXPERIENCE-P0-29** Request tracking and tasks inbox | Experience | See below. |
+| **QA-P0-24** Request-to-verified suite | QA | See below. |
+
+**ACCESS-P0-28, Approved requests become pending grants.**
+- On final approval, each line becomes an `access_grants` (or account) row in status **pending fulfilment**.
+- The row links to the request, and the ledger source is REQUEST. Package assignment items behave the same way.
+- When reconciliation sees the matching grant at the source, the row becomes **active (verified)**, and the request line closes with that evidence.
+- A manual "mark fulfilled" records **fulfilled, unverified** until reconciliation confirms it.
+- The request shows its true state at each step (§17.5).
+
+**ACCESS-P0-29, Fulfilment tasks.**
+- Lines for applications without write capability create a task for the application's fulfilment owner or group.
+- The task can be claimed, completed with a note, or flagged as failed with a reason.
+- Tasks have an SLA, become overdue and send reminders.
+- Reconciliation closes the task when it confirms the access.
+
+**ACCESS-P0-30, Remove-access and account requests.**
+- A request line can remove an existing grant, ask for a new account, or ask to disable one.
+- Each line is approved on its own route; a request with several lines completes when every line is resolved.
+- Removal is confirmed by reconciliation, after which the grant becomes **revoked** in the ledger.
+
+**ACCESS-P0-31, Requests for non-human identities.**
+- Service accounts, machine identities and workloads are requested by their owner, and approval routes to the owners of the resource.
+- **AI agents:** the agent's business owner requests on the agent's behalf. The catalog shows only what the agent's contract (SHOULD) allows, and the request runs through the same approval chain. This replaces today's refusal.
+- An unowned non-human identity cannot be a subject (IDENTITY-P0-20).
+- Coordinated with IDENTITY-P0-19 (agent access packages).
+
+**ACCESS-P0-32, Time-bound access.**
+- Each line can carry an end date, capped by the request policy.
+- A reminder goes out before expiry, with a request to extend.
+- At expiry a removal task is created; F3 makes it automatic.
+
+**EXPERIENCE-P0-29, Request tracking and tasks inbox.**
+- My requests shows each line's state: requested → approved → pending fulfilment → verified, or rejected, failed or expired.
+- One inbox holds approvals and fulfilment tasks.
+- The subject picker offers myself, a person I manage, or an identity I own.
+
+**QA-P0-24, Request-to-verified suite.** End-to-end tests for:
+- a person, a service account and an AI agent (within its contract);
+- removal and expiry;
+- approver ≠ requester, and tenant isolation;
+- a repeated reconciliation, which must not duplicate grants or close a task twice.
+
+**Exit.**
+- A person requests an entitlement for themselves, for a service account they own, and for an agent within its contract.
+- Approvals run and fulfilment tasks appear.
+- The access is added on the target by hand, and the next scheduled reconciliation marks each line verified and closes its task.
+- A removal request and an expiry go the same way, ending in revoked.
+
+### Phase F3: Provisioning, closing the loop automatically
+
+Needs decision **D3**.
+
+- INTEGRATION-P0-11 (finish) and INTEGRATION-P0-13: write operations in drivers, the binding context, plan → pre-check → execute → verify, retries, failed-task view. Connections with write enabled fulfil requests and expiries directly instead of creating tasks.
+  - The first operations are reversible or low-risk: add and remove group or entitlement membership, enable and disable account.
+  - Create account follows.
 - SCIM driver (client); write support in the LDAP and http drivers.
-- Connectors: Microsoft Entra ID, one HR system (Workday or SuccessFactors), ServiceNow ticketing.
-- Closed-loop certification and finding remediation; leaver plan executes disables.
-- WonderID Relay for on-premises targets (AD, databases).
-- RISK-P0-13: rogue access management, now that drift can be remediated.
+- Connectors: Microsoft Entra ID, one HR system, ServiceNow ticketing (D9).
+- WonderID Relay for on-premises targets (§5.8.1, D7).
+- RISK-P0-13: rogue access remediation, through approval and provisioning.
 
-**Exit.** The P0 acceptance scenario (CLAUDE.md §11) runs with real removal: the
-unauthorized entitlement is removed through the connector after human approval,
-verified by re-import, and the finding resolves.
+**Exit.** The P0 acceptance scenario (CLAUDE.md §11) runs with real removal: the unauthorized entitlement is removed through the connector after human approval, verified by reconciliation, and the finding resolves.
 
-### Phase F3 — Agent ID: trusted credentials and delegation
+### Phase F4: Lifecycle and certification
 
-**Goal.** Agents stop using static keys and act for people only through explicit,
-checked delegation.
+- IDENTITY-P0-17, IDENTITY-P0-18 (finish): identity detail tabs; lifecycle rules (birthright, mover, leaver, expiry) with simulation and four-eyes publish; the manager's "disable all access".
+- COMPLIANCE-P0-10, COMPLIANCE-P0-11: certification for every identity type, with population evidence. Revoke goes through F2 tasks or F3 provisioning, and an item closes on verified removal.
+- Human identity merge over existing records (study D-6), campaign templates and preview (D-10), attribute-level audit detail (D-13).
 
-- Agent identifier and credential bindings; gateway token service (private-key
-  JWT, mTLS, SPIFFE JWT-SVID) issuing DPoP-bound, ≤ 15-minute tokens.
-- Token register, replay cache, revocation on suspend.
-- Agent delegation grants; RFC 8693 exchange with `act` chains; chain checks in
-  the decision pipeline.
-- AuthZEN 1.0 PDP interface over the existing engine.
-- Per-agent shadow → enforce rollout; approval resume for REQUIRE_APPROVAL.
-- IDENTITY-P0-19: sponsor, onboarding journey, agent access packages, lifecycle policies.
+**Exit.** A person, an external identity and a service account each go joiner → birthright → request → review → revoke → verified, with a complete evidence trail.
+
+### Phase F5: Roles, separation of duties and delegation
+
+- ACCESS-P0-21: business and IT roles.
+- ACCESS-P0-22: entitlement SoD (preventive and detective) with the entitlement hierarchy.
+- ACCESS-P0-23: delegations.
+- Approved changes to governance objects (study D-3); SoD violation workflow and import guardrail (D-8, D-9).
+
+**Exit.** An SoD conflict blocks a request and appears in the detective report; a role change is simulated, approved and published as a new version.
+
+### Phase F6: Agent ID, trusted credentials and delegation
+
+Unchanged in scope; was F3.
+
+- Agent identifier and credential bindings.
+- A gateway token service issuing DPoP-bound tokens of 15 minutes or less.
+- A token register and revocation.
+- Delegation grants and RFC 8693 `act` chains.
+- The AuthZEN interface.
+- A per-agent shadow → enforce rollout, and approval resume.
+- IDENTITY-P0-19 (agent onboarding, sponsor, lifecycle policies; agent access packages may land earlier with ACCESS-P0-31).
 - QA-P0-18 extended.
 
-**Exit.** A demo agent obtains a DPoP token with a key, acts for user X through
-a delegated token, is denied an action outside X's access, triggers a human
-approval that resumes the action, and is killed: its next call fails within
-5 seconds and its tokens are listed as revoked.
+F6 is independent of F2–F5 and may run in parallel once F1 is done.
 
-### Phase F4 — Workflow, forms and configuration
+**Exit.** As in the earlier plan: key-based DPoP token, delegated action, denied out-of-scope action, approval that resumes, and a kill switch effective within 5 seconds.
 
-- OPERATIONS-P0-09: workflow designer and runs.
-- Forms and named value lists; email templates; jobs page.
-- PLATFORM-P0-13: configuration bundles with diff and approved import.
-- Request baskets, bulk and model-after.
+### Phase F7: Workflow, forms and configuration
 
-**Exit.** A tenant builds a contractor onboarding flow (form → sponsor approval
-→ birthright → provisioning) without code, and promotes it from a test tenant
-with a reviewed diff.
+Was F4.
 
-### Phase F5 — Advanced governance
+- OPERATIONS-P0-09: workflows.
+- Forms and named value lists, e-mail templates, and the jobs page with an automation run log (D-12).
+- PLATFORM-P0-13: configuration bundles.
+- Request baskets for many identities, and model-after.
+- Saved request drafts (D-1); generated identifiers (D-2).
 
-- SoD mitigating-control library, workbench, exercised-violation flag; fine-grained SoD for one ERP connector.
-- Emergency/JIT access with post-use review; privileged and service-account governance.
-- External organizations, sponsors, invitations, sponsor re-attestation.
-- Role and rule mining; peer recommendations in requests and reviews.
-- SCIM receiver and RFC 9967 events; SSF transmitter and receiver.
-- Cloud connectors: AWS, Azure, GCP; Okta; Google Workspace; vault metadata.
+### Phase F8: Advanced governance
 
-**Exit.** An auditor walkthrough of SOX ITGC areas (§7.3) is answered entirely from
-WonderID evidence packs.
+Was F5.
 
-### Phase F6 — Intelligence and experience
+- Mitigating controls and the SoD workbench; fine-grained SoD.
+- Emergency and JIT access, with session evidence (D-4).
+- External organizations and sponsors, with external sub-types (D-15).
+- Role and rule mining; peer recommendations.
+- SCIM receiver and SSF.
+- Cloud connectors.
 
-- EXPERIENCE-P0-19: Home, My Access, unified tasks inbox.
-- OPERATIONS-P0-10: insights, identity graph, posture page, new reports, evidence packs per control.
-- Identity risk score for every identity type.
-- EXPERIENCE-P0-20: governed AI assistant (explain, search, draft, simulate — never decide).
-- FOUNDATION-P0-21: passwordless.
+### Phase F9: Intelligence and experience
 
-### Phase F7 — Release gate
+Was F6.
 
-- QA-P0-21 hardening (including the threats in §7.2), QA-P0-22 brownfield fixture,
-  full Playwright suite, tenant-isolation suite over every new table, advisor
-  checks, performance budget for the PDP (p95 ≤ 50 ms cached).
+- EXPERIENCE-P0-19 and OPERATIONS-P0-10.
+- Identity risk score for every type.
+- Control history (D-5) and owner queues (D-7).
+- EXPERIENCE-P0-20 (governed assistant).
+- FOUNDATION-P0-21 (passwordless).
+
+### Phase F10: Release gate
+
+Was F7.
+
+- QA-P0-21 hardening (including the threats in §7.2), the QA-P0-22 brownfield fixture, the full Playwright suite.
+- A tenant-isolation suite over every new table, advisor checks, and the PDP performance budget (p95 ≤ 50 ms cached).
 
 ### Dependency summary
 
 ```text
-F1 (roles, SoD, certs, lifecycle rules) ─┬─▶ F2 (provisioning closes the loop) ─┬─▶ F5 (advanced governance)
-                                         │                                       └─▶ F6 (intelligence)
-F3 (agent credentials, delegation) ──────┘   (independent of F2; may run in parallel with F1/F2)
-F4 (workflow, forms, config) ── needs F1 approval engine; feeds F5 onboarding flows
-F7 gates release after F6
+F1 import & recon ─▶ F2 requests (manual fulfilment, verified by recon) ─▶ F3 provisioning (D3) ─┬─▶ F4 lifecycle & certification ─▶ F5 roles, SoD, delegation ─▶ F8 advanced
+                                                                                                └─▶ F9 intelligence
+F1 ─▶ F6 Agent ID credentials (parallel with F2–F5)
+F2 ─▶ F7 workflow, forms, configuration (needs the request and task model) ─▶ F8
+F10 gates release after F9
 ```
+
+F4 can start once F2 is done, if F3 is delayed. Certification revokes then use F2's fulfilment tasks until provisioning exists.
 
 ---
 
@@ -1174,13 +1334,14 @@ decided.
 |---|---|---|
 | D1 | Approve this document as the design baseline and add the "New" stories (§9) to the module backlogs in the phase order of §10. | Approve. |
 | D2 | May WonderID issue OAuth access tokens to agents (gateway audience only, plus MCP servers that opt in to trust WonderID)? This makes WonderID an authorization server for agents, though not an IdP for people (CLAUDE.md §10 item 1). | Yes, scoped to agents and the gateway/opt-in MCP audiences; workforce sign-in stays with the customer IdP. |
-| D3 | Enable write/provisioning operations in connectors (still per connection, declared, tenant-enabled and approval-gated; NN #12, #15). The framework doc currently says "read only". | Yes, starting with disable/enable and remove access (reversible or low-risk), then create and add. |
+| D3 | (Gates phase F3.) Enable write/provisioning operations in connectors (still per connection, declared, tenant-enabled and approval-gated; NN #12, #15). The framework doc currently says "read only". | Yes, starting with disable/enable and remove access (reversible or low-risk), then create and add. |
 | D4 | May a critical finding automatically *suspend* an agent (reversible, audited), or only propose it? | Propose only by default; a per-tenant opt-in setting for automatic suspension of agents (never of people). |
 | D5 | Target-system password reset that shows a new password once? | No. Trigger the target's own reset flow; never handle the value. |
 | D6 | May certifications auto-close "keep" decisions for low-risk items based on a published rule? | Not in P0. Recommendations only; revisit in P1 with an explicit rule and sampling. |
 | D7 | Adopt the outbound-only WonderID Relay instead of a network tunnel for on-premises connectivity. | Adopt. |
 | D8 | Should the SCIM receiver and the AuthZEN PDP be offered on the public API surface (under `/api/connect/v1/<connection>/…`)? This widens the inbound surface of the connector boundary (NN #20; the boundary test allowlist may need a new receiver kind). | Yes, as connection receivers, with the boundary-test change approved explicitly. |
 | D9 | Priority of first non-SCIM connectors: Entra ID + Workday + AWS (recommended) or another set. | Entra ID, Workday, AWS. |
+| D10 | How often scheduled imports and reconciliation run (F1). The Vercel project is on the free plan, whose cron jobs run at most once a day, so today "hourly" means daily. Options: (a) keep daily, plus "run now" and push receivers; (b) move to a paid plan for sub-daily cron; (c) an external scheduler calling a signed endpoint. | (a) for F1; revisit when a customer needs same-day leaver detection. |
 
 ---
 
@@ -1193,7 +1354,7 @@ developed-connector list; provisioning binding variables; secure connectivity
 appliance) and (b) Saviynt's public product pages and publicly available
 training guides. `docs.saviyntcloud.com` requires a customer sign-in and was
 not used. Wording is WonderID's own. The right columns say where WonderID
-covers the capability and in which phase.
+covers the capability and in which phase (phases as revised in §10 on 2026-10-11).
 
 ### 12.1 Identity repository and lifecycle
 
@@ -1201,114 +1362,114 @@ covers the capability and in which phase.
 |---|---|---|
 | Identity warehouse from one or more authoritative sources (HR, contractor systems) | §5.1 sources as connections, attribute authority | Built + F1 |
 | Application → instance → connection model | Application + connection (one connection per target instance); definitions shared as connection types | Built |
-| Users, accounts, entitlements, roles, user groups (static/dynamic), organizations | §4, §8 identity repository | Built + F1 |
+| Users, accounts, entitlements, roles, user groups (static/dynamic), organizations | §4, §8 identity repository | Built + F1 / F5 |
 | Custom identity attributes | `identity_attribute_definitions` | Built |
-| Entitlement types, owners (ranked), requestable flag, default and maximum duration | §5.4 entitlement attributes; request policies | Built + F1 |
-| Entitlement hierarchy and implied entitlements | §5.4 `entitlement_hierarchy` | F1 |
-| Self-service / delegated registration for contingent and external users (WonderID as source of record) | §5.1 item 6, §5.10 forms | F4/F5 |
-| Duplicate identity detection at import and over existing identities | Duplicates (built), correlation queue | Built |
+| Entitlement types, owners (ranked), requestable flag, default and maximum duration | §5.4 entitlement attributes; request policies | Built + F1 / F2 |
+| Entitlement hierarchy and implied entitlements | §5.4 `entitlement_hierarchy` | F5 |
+| Self-service / delegated registration for contingent and external users (WonderID as source of record) | §5.1 item 6, §5.10 forms | F7/F8 |
+| Duplicate identity detection at import and over existing identities | Agent duplicates and import-time correlation (built); merge of existing human identities (Saviynt study D-6) | Built (import correlation; agents) + F4 (people) |
 | Account correlation; re-correlation after import | Built (0089); re-correlate from Pending Matches | Built + F1 |
-| Birthright rules on create/import | §5.2 lifecycle rules | F1 |
-| Mover rules that re-evaluate access and launch reviews | §5.2 mover + micro-certification | F1 |
-| Leaver clean-up; manager one-click "disable all accounts" | §5.2 leaver plan, manager kill action | F1 (plan) / F2 (execution) |
-| Periodic scan rules over existing population | Detective SoD, lifecycle rule re-evaluation job | F1 |
-| Identity verification before activation | §5.1 item 7 (provider result recorded) | F5 |
+| Birthright rules on create/import | §5.2 lifecycle rules | F4 |
+| Mover rules that re-evaluate access and launch reviews | §5.2 mover + micro-certification | F4 |
+| Leaver clean-up; manager one-click "disable all accounts" | §5.2 leaver plan, manager kill action | F4 (plan) / F3 (execution) |
+| Periodic scan rules over existing population | Detective SoD, lifecycle rule re-evaluation job | F4 / F5 |
+| Identity verification before activation | §5.1 item 7 (provider result recorded) | F8 |
 | Identity classification queue | §5.1 item 8 | F1 |
-| Third-party identities: vendor organizations, sponsors, invitations, consent, contract end | §5.1, §5.2 expiry, `external_organizations` | F5 |
+| Third-party identities: vendor organizations, sponsors, invitations, consent, contract end | §5.1, §5.2 expiry, `external_organizations` | F8 |
 
 ### 12.2 Access requests and approvals
 
 | Capability | WonderID design | Phase |
 |---|---|---|
-| Request access to applications, roles, entitlements; standard and service accounts | §5.3 basket lines; service accounts as identity type | Built + F4 |
-| Create / modify / remove access or accounts in one request | §5.3 basket | F4 |
-| Shopping-cart catalog with search over description, tags, metadata; job-function filtering; catalog visibility by organization | §5.3 catalog | Built + F4 |
-| Model-after request | §5.3 | F4 |
-| Bulk requests for many users | §5.3 | F4 |
-| Recommendations from peer access during request, approval and review | §5.3, §5.5 deterministic peer analysis | F5 |
-| Risk-based approval (static and dynamic risk), auto-approval of low risk, mandatory justification | §5.3 risk-based routing | F1 |
-| Preventive SoD (enterprise, application, cross-application) during request | §5.6 preventive | F1 |
-| Multi-level, serial and parallel approval; conditional branches | Built approval engine; workflows §5.10 | Built + F4 |
-| n-level escalation and SLAs, multiple notifications | §5.3 | Built + F1 |
-| Delegation of authority, out-of-office, limited-duration delegated administration | ACCESS-P0-23 | F1 |
-| Approve from e-mail or chat | §5.3 (signed link, signed-in decision) | F4 |
+| Request access to applications, roles, entitlements; standard and service accounts | §5.3 basket lines; service accounts as identity type | Built + F2 |
+| Create / modify / remove access or accounts in one request | §5.3 basket | F2 |
+| Shopping-cart catalog with search over description, tags, metadata; job-function filtering; catalog visibility by organization | §5.3 catalog | Built + F7 |
+| Model-after request | §5.3 | F7 |
+| Bulk requests for many users | §5.3 | F7 |
+| Recommendations from peer access during request, approval and review | §5.3, §5.5 deterministic peer analysis | F8 |
+| Risk-based approval (static and dynamic risk), auto-approval of low risk, mandatory justification | §5.3 risk-based routing | F2 |
+| Preventive SoD (enterprise, application, cross-application) during request | §5.6 preventive | F5 |
+| Multi-level, serial and parallel approval; conditional branches | Built approval engine; workflows §5.10 | Built + F7 |
+| n-level escalation and SLAs, multiple notifications | §5.3 | Built + F2 |
+| Delegation of authority, out-of-office, limited-duration delegated administration | ACCESS-P0-23 | F5 |
+| Approve from e-mail or chat | §5.3 (signed link, signed-in decision) | F7 |
 | Integrated manual tasks with claim and delegate | §5.3 manual fulfilment, §8 tasks inbox | F2 |
-| Ticketing for manual fulfilment with ticket status read-back | §5.8 ITSM fulfilment | F2 |
-| Time-bound access with automatic removal | §5.3 | Built + F2 |
-| Physical assets (badges) | Manual items in access packages | F4 |
-| REST APIs to extend requests; integration with HR and portals | Published API + receivers | Built + F4 |
-| Customizable landing page and labels | §8 home, labels | F6 |
+| Ticketing for manual fulfilment with ticket status read-back | §5.8 ITSM fulfilment | F3 |
+| Time-bound access with automatic removal | §5.3 | Built + F2 (task) / F3 (automatic) |
+| Physical assets (badges) | Manual items in access packages | F7 |
+| REST APIs to extend requests; integration with HR and portals | Published API + receivers | Built + F7 |
+| Customizable landing page and labels | §8 home, labels | F9 |
 
 ### 12.3 Roles
 
 | Capability | WonderID design | Phase |
 |---|---|---|
-| Hierarchical roles: enterprise/business, base, IT/technical, application; emergency roles | §5.4 role types; emergency via §5.7 | F1 / F5 |
-| Fine-grained application roles provisioned to targets | Application roles = entitlements; provisioning §5.8 | F2 |
-| Role mining (bottom-up, top-down, usage-weighted) and rule mining | §5.4 mining | F5 |
-| Role impact simulation; SoD-free role design | §5.4 simulation and inherent SoD | F1 |
-| ABAC conditions combined with roles | §5.4 ABAC with roles | F1 |
-| Role lifecycle workflow, history, versioning, comparison, rollback | §5.4 lifecycle | F1 |
-| Role membership and role content certification | §5.5 | F1 |
+| Hierarchical roles: enterprise/business, base, IT/technical, application; emergency roles | §5.4 role types; emergency via §5.7 | F5 / F8 |
+| Fine-grained application roles provisioned to targets | Application roles = entitlements; provisioning §5.8 | F3 |
+| Role mining (bottom-up, top-down, usage-weighted) and rule mining | §5.4 mining | F8 |
+| Role impact simulation; SoD-free role design | §5.4 simulation and inherent SoD | F5 |
+| ABAC conditions combined with roles | §5.4 ABAC with roles | F5 |
+| Role lifecycle workflow, history, versioning, comparison, rollback | §5.4 lifecycle | F5 |
+| Role membership and role content certification | §5.5 | F5 |
 
 ### 12.4 Certifications
 
 | Capability | WonderID design | Phase |
 |---|---|---|
-| User manager, privileged/critical access, application owner, entitlement owner, role membership, role content, service account campaigns | §5.5 campaign types | F1 |
-| Risk-based / outlier-only campaigns; direct vs inherited scope | §5.5 scoping | F1 |
-| Event-driven reviews on attribute change (transfer, long absence); micro-certifications | §5.5 event-driven | F1 |
-| Scheduling, status tracking, reporting, archiving | §5.5 | Built + F1 |
-| Closed-loop revocation with tasks | §5.5 closed loop, §5.8 | F2 |
-| Recommendations from usage (last use, last logon) and peer analysis | §5.5 recommendations | F5 |
-| Reassign and consult; second-level campaign approvers | §5.5 decisions | F1 |
-| Bulk decisions; bulk handling of leavers inside a campaign | §5.5 bulk | F1 |
+| User manager, privileged/critical access, application owner, entitlement owner, role membership, role content, service account campaigns | §5.5 campaign types | F4 |
+| Risk-based / outlier-only campaigns; direct vs inherited scope | §5.5 scoping | F4 |
+| Event-driven reviews on attribute change (transfer, long absence); micro-certifications | §5.5 event-driven | F4 |
+| Scheduling, status tracking, reporting, archiving | §5.5 | Built + F4 |
+| Closed-loop revocation with tasks | §5.5 closed loop, §5.8 | F2 (task) / F3 (automatic) / F4 |
+| Recommendations from usage (last use, last logon) and peer analysis | §5.5 recommendations | F8 |
+| Reassign and consult; second-level campaign approvers | §5.5 decisions | F4 |
+| Bulk decisions; bulk handling of leavers inside a campaign | §5.5 bulk | F4 |
 | Trust score with automatic certify decisions | Deliberately recommendations only (D6) | — |
 
 ### 12.5 Separation of duties and application access governance
 
 | Capability | WonderID design | Phase |
 |---|---|---|
-| Rulesets of risks and business functions mapped to coarse- and fine-grained entitlements, with AND/OR/NOT/exclude | §5.6 model | F1 (coarse) / F5 (fine) |
-| Business-function lifecycle: owners, control mapping, criticality, versions, history | §5.6 rulesets | F1 |
-| Prebuilt rulesets for critical applications | Original generic starter set; customer rulesets imported as data | F5 |
-| Cross-application SoD | §5.6 (functions span applications) | F1 |
-| Detective and preventive evaluation; risk simulation | §5.6 modes | F1 |
-| Investigation workbench; usage-based actual vs potential | §5.6 exercised flag, workbench | F5 |
-| Mitigating controls library | §5.6 | F5 |
-| Remediation recommendations (user → role, role → entitlement), impact analysis | §5.6 remediation advice | F5 |
-| Risk trend analysis; alerts to control owners | §5.6 alerts, §5.11 reports | F5 |
-| Critical transaction monitoring | DID from ERP connectors feeding SoD and findings | F5 |
-| SoD checks on emergency use | §5.7 | F5 |
-| License optimisation (unused access) | Unused-access report from DID | F6 |
+| Rulesets of risks and business functions mapped to coarse- and fine-grained entitlements, with AND/OR/NOT/exclude | §5.6 model | F5 (coarse) / F8 (fine) |
+| Business-function lifecycle: owners, control mapping, criticality, versions, history | §5.6 rulesets | F5 |
+| Prebuilt rulesets for critical applications | Original generic starter set; customer rulesets imported as data | F8 |
+| Cross-application SoD | §5.6 (functions span applications) | F5 |
+| Detective and preventive evaluation; risk simulation | §5.6 modes | F5 |
+| Investigation workbench; usage-based actual vs potential | §5.6 exercised flag, workbench | F8 |
+| Mitigating controls library | §5.6 | F8 |
+| Remediation recommendations (user → role, role → entitlement), impact analysis | §5.6 remediation advice | F8 |
+| Risk trend analysis; alerts to control owners | §5.6 alerts, §5.11 reports | F8 |
+| Critical transaction monitoring | DID from ERP connectors feeding SoD and findings | F8 |
+| SoD checks on emergency use | §5.7 | F8 |
+| License optimisation (unused access) | Unused-access report from DID | F9 |
 
 ### 12.6 Privileged, emergency and machine access
 
 | Capability | WonderID design | Phase |
 |---|---|---|
-| Governance of privileged, service, shared and generic accounts; ownership | §5.7 | F5 |
-| Check-out / check-in elevated access; time-bound provisioning | §5.7 emergency sessions, JIT | F5 |
-| Approval workflows for elevation | Approval engine | F5 |
-| Aggregated privileged activity; review and sign-off after check-in | §5.7 post-use review | F5 |
-| Behavioural analytics on privileged activity | Risk signals over DID | F6 |
+| Governance of privileged, service, shared and generic accounts; ownership | §5.7 | F8 |
+| Check-out / check-in elevated access; time-bound provisioning | §5.7 emergency sessions, JIT | F8 |
+| Approval workflows for elevation | Approval engine | F8 |
+| Aggregated privileged activity; review and sign-off after check-in | §5.7 post-use review | F8 |
+| Behavioural analytics on privileged activity | Risk signals over DID | F9 |
 | Vaulting, session recording | Out of scope (customer PAM via connector, §1.2) | — |
-| Service-account request, ownership succession, certification | §5.2 ownership transfer, §5.5 | F1/F5 |
-| NHI discovery (workloads, keys, certificates, tokens), owners, timeline | Built NHI inventory + cloud connectors | Built + F5 |
-| AI agent registry, owners, lifecycle, access map, runtime authorization, intent/purpose checks, delegation awareness | §6 (contracts = purpose; deterministic SHOULD/CAN/DID) | Built + F3 |
+| Service-account request, ownership succession, certification | §5.2 ownership transfer, §5.5 | F2 / F4 / F8 |
+| NHI discovery (workloads, keys, certificates, tokens), owners, timeline | Built NHI inventory + cloud connectors | Built + F8 |
+| AI agent registry, owners, lifecycle, access map, runtime authorization, intent/purpose checks, delegation awareness | §6 (contracts = purpose; deterministic SHOULD/CAN/DID) | Built + F6 |
 
 ### 12.7 Connectors, provisioning and connectivity
 
 | Capability | WonderID design | Phase |
 |---|---|---|
-| Connector families: directories, cloud platforms, security and vaults, SIEM, collaboration, enterprise apps, HR, ITSM, developer tools, mainframe, generic technologies (REST, SOAP, SCIM, LDAP, database, files over SFTP/S3, scripts) | §5.8 catalogue priority; generic drivers; scripts via relay | Built (generic) + F2/F5 |
-| Provisioning operations: create, update, enable, disable, delete account; add and remove access; update user; password reset/change; create ticket; ticket status; emergency access IDs | §5.8 operations (password reset via target's flow, §5.9) | F2 |
-| Group management: create, update, manage membership and owners | §5.8 operations | F2 |
-| Standard variables available to provisioning templates (task, user, manager, account, application, requested attributes, entitlement, parent/child entitlement, ranked owners) | §5.8 binding context — fixed, documented, secret-free | F2 |
-| Instant and batch provisioning, retries, pending task console | §5.8 pipeline, retries, failed-task view | F2 |
-| Full and incremental reconciliation | §5.8 | Built + F2 |
-| SCIM server exposed by the IGA platform | §5.8 SCIM receiver | F5 |
-| Secure connectivity to customer networks (tunnel appliance with private CA, strong ciphers, IP allowlisting, high availability, monitoring of health and certificate expiry) | §5.8.1 WonderID Relay (outbound job pull, key-bound identity, active–active, heartbeat and key-expiry alerts) | F2 |
-| Application onboarding (new and existing), questionnaires | Built onboarding state machine (0088) + forms §5.10 | Built + F4 |
+| Connector families: directories, cloud platforms, security and vaults, SIEM, collaboration, enterprise apps, HR, ITSM, developer tools, mainframe, generic technologies (REST, SOAP, SCIM, LDAP, database, files over SFTP/S3, scripts) | §5.8 catalogue priority; generic drivers; scripts via relay | Built (generic) + F3/F8 |
+| Provisioning operations: create, update, enable, disable, delete account; add and remove access; update user; password reset/change; create ticket; ticket status; emergency access IDs | §5.8 operations (password reset via target's flow, §5.9) | F3 |
+| Group management: create, update, manage membership and owners | §5.8 operations | F3 |
+| Standard variables available to provisioning templates (task, user, manager, account, application, requested attributes, entitlement, parent/child entitlement, ranked owners) | §5.8 binding context — fixed, documented, secret-free | F3 |
+| Instant and batch provisioning, retries, pending task console | §5.8 pipeline, retries, failed-task view | F3 |
+| Full and incremental reconciliation | §5.8 | Built + F1 |
+| SCIM server exposed by the IGA platform | §5.8 SCIM receiver | F8 |
+| Secure connectivity to customer networks (tunnel appliance with private CA, strong ciphers, IP allowlisting, high availability, monitoring of health and certificate expiry) | §5.8.1 WonderID Relay (outbound job pull, key-bound identity, active–active, heartbeat and key-expiry alerts) | F3 |
+| Application onboarding (new and existing), questionnaires | Built onboarding state machine (0088) + forms §5.10 | Built + F7 |
 | Discovery of applications | Built (0090) | Built |
 
 ### 12.8 Administration, security and experience
@@ -1316,28 +1477,28 @@ covers the capability and in which phase.
 | Capability | WonderID design | Phase |
 |---|---|---|
 | Admin roles controlling feature access | Built WonderID permission roles and custom roles | Built |
-| Organization hierarchy for delegated administration and request scoping | Built scoped assignments + organization scoping of catalog | Built + F4 |
-| Policies for lifecycle events | §5.2 | F1 |
-| Forms for identity and lifecycle workflows | §5.10 | F4 |
+| Organization hierarchy for delegated administration and request scoping | Built scoped assignments + organization scoping of catalog | Built + F7 |
+| Policies for lifecycle events | §5.2 | F4 |
+| Forms for identity and lifecycle workflows | §5.10 | F7 |
 | Global configuration | Built (0116) | Built |
-| Job control panel | §5.10 jobs page | F4 |
-| Orchestration of multi-system processes | §5.10 workflow engine | F4 |
-| Archival library | §5.11 archival | F6 |
-| Settings: SMTP, e-mail templates, UI customization, defaults | §8 | F4 |
-| Admin functions: search and disable a user, application logs, audit logs, certificate management, data analysis, e-mail delivery history | Audit trail (built), reports, e-mail history §8; relay key management §5.8.1 | Built + F4 |
-| Configuration transport between environments | §8 configuration promotion (diff-first) | F4 |
-| Authentication: internal, directory, SAML, OAuth for APIs | Supabase Auth, SSO, passkeys; agent tokens §6.2 | Built + F3/F6 |
+| Job control panel | §5.10 jobs page | F7 |
+| Orchestration of multi-system processes | §5.10 workflow engine | F7 |
+| Archival library | §5.11 archival | F9 |
+| Settings: SMTP, e-mail templates, UI customization, defaults | §8 | F7 |
+| Admin functions: search and disable a user, application logs, audit logs, certificate management, data analysis, e-mail delivery history | Audit trail (built), reports, e-mail history §8; relay key management §5.8.1 | Built + F7 |
+| Configuration transport between environments | §8 configuration promotion (diff-first) | F7 |
+| Authentication: internal, directory, SAML, OAuth for APIs | Supabase Auth, SSO, passkeys; agent tokens §6.2 | Built + F6/F9 |
 | Field-level encryption, encryption in transit and at rest | `encryptSecret` AES-256-GCM (built) | Built |
-| Visibility rules for requestable entitlements | §5.3 catalog visibility | F1 |
+| Visibility rules for requestable entitlements | §5.3 catalog visibility | F2 |
 | Change control and traceable operator access | Versioned config, hash-chained audit, platform admin boundary | Built |
-| Audit retention (1 year online, 7 years archive) | Plan-based retention (built), archive §5.11 | Built + F6 |
-| High availability | Hosting platform (Vercel + Supabase); relays active–active | Built + F2 |
+| Audit retention (1 year online, 7 years archive) | Plan-based retention (built), archive §5.11 | Built + F9 |
+| High availability | Hosting platform (Vercel + Supabase); relays active–active | Built + F3 |
 | Navigation: collapsible sidebar, logo, area list (Home, Intelligence, Integrations/Onboarding, Control Center, SOD, Certifications, Identities, Admin) | Built sidebar areas (CLAUDE.md §13) | Built |
-| Profile menu: recent security activity, change password, downloads (background, notify), uploads, language, notification toggle, sign out | §8 profile menu | F6 |
-| Menu search, home banner, shortcuts, personalised tiles, KPIs (pending reviews, approvals, password expiry), recent requests/assignments widgets, help links | §8 home | Built (search) + F6 |
+| Profile menu: recent security activity, change password, downloads (background, notify), uploads, language, notification toggle, sign out | §8 profile menu | F9 |
+| Menu search, home banner, shortcuts, personalised tiles, KPIs (pending reviews, approvals, password expiry), recent requests/assignments widgets, help links | §8 home | Built (search) + F9 |
 | In-app guided tour | Not planned (help guide exists) | — |
-| Identity Security Posture view across systems | §5.11 posture page | F6 |
-| Analytics controls that trigger remediation on result rows | Reports + findings → remediation via approval (no raw SQL exposed to tenants) | F6 |
+| Identity Security Posture view across systems | §5.11 posture page | F9 |
+| Analytics controls that trigger remediation on result rows | Reports + findings → remediation via approval (no raw SQL exposed to tenants) | F9 |
 
 ---
 

@@ -277,13 +277,41 @@ Open items:
   `security.txt` contact.
 - Do the §32 design review of the new signed-in screens.
 
-## 2026-10-11 — Foundation design and a live Saviynt reading (for owner review)
+## 2026-10-11 — IGA delivery order: import, reconciliation and requests first
 
-- `docs/design/WONDERID-FOUNDATION-DESIGN.md` is the owner-supplied foundation design for IGA and Agent ID.
-  - It is a draft baseline, pending decision D1.
-  - It sets phases F1–F7 and decisions D1–D9.
-- `docs/design/saviynt-reference-study.md` is a read-only reading of the owner's Saviynt training tenant (v25), covering 118 pages.
-  - It maps each observed capability to the design's section and phase.
-  - It proposes 15 additions (D-1 to D-15).
-  - It corrects one claim: duplicate detection over existing identities exists for agents only, not for people.
-- Neither document changes a backlog. Stories follow only after the owner decides D1.
+**Owner direction.** WonderID is IGA for human and non-human identities. Reconciliation, account import and access requests work first.
+
+**Plan of record:** §10 of `docs/design/WONDERID-FOUNDATION-DESIGN.md` (phases F1–F10, revised today).
+- New stories enter their module backlogs, with Progress Tracker rows, when the owner approves decision D1.
+- Until then, §10 is the plan of record.
+
+**Next up, in order:**
+
+| Phase | Stories | Exit test |
+|---|---|---|
+| **F1 Import and reconciliation** | INTEGRATION-P0-18 (staging reflects the source)<br>INTEGRATION-P0-19 (scheduled import and promotion)<br>ACCESS-P0-27 (entitlement and grant reconciliation)<br>ACCESS-P0-25 (classification, rogue findings)<br>IDENTITY-P0-20 (non-human identities from accounts)<br>EXPERIENCE-P0-28 (reconciliation console)<br>QA-P0-23 | A connected application shows accounts, entitlements and grants for a person, a service account and an agent. A removal at the source is detected. An entitlement added outside WonderID is flagged as rogue. |
+| **F2 Access requests end to end** | ACCESS-P0-28 (approval creates pending grants)<br>ACCESS-P0-29 (fulfilment tasks)<br>ACCESS-P0-30 (remove and account requests)<br>ACCESS-P0-31 (non-human subjects, agents within contract)<br>ACCESS-P0-32 (time-bound)<br>EXPERIENCE-P0-29 (request tracking, tasks inbox)<br>QA-P0-24 | Request → approval → task → access added on the target → the next reconciliation marks it verified, for a person, a service account and an agent. Removal and expiry end as revoked. |
+| **F3 Provisioning** | Needs decision D3. INTEGRATION-P0-11/13 writes; SCIM; Entra ID, HR and ServiceNow connectors; relay; RISK-P0-13 | Connector writes replace manual tasks. |
+
+**Later:** F4 lifecycle and certification; F5 roles, SoD and delegation; F6 Agent ID credentials (can run in parallel after F1); F7 workflow, forms and configuration; F8 advanced governance; F9 intelligence; F10 release gate.
+
+**Why this order.**
+- Requests can only be checked against real target data, and certification, SoD and lifecycle all need trustworthy imported access.
+- Provisioning comes third, so manual fulfilment is already verified by reconciliation before connectors start writing.
+
+**What the code does today** (code check, recorded in §10):
+- Connector syncs stage data daily, but only CSV promotes entitlements and grants.
+- Moving accounts from staging is a manual step.
+- Staging is never pruned, so removals at the source go undetected.
+- Approval creates no grant or task.
+- AI agents are refused in the catalog.
+
+**Open decisions for these phases:**
+- D3 (connector writes) gates F3.
+- D10 (how often imports run) affects F1, because the free Vercel plan allows cron at most once a day.
+
+**Supporting documents:**
+- `docs/design/WONDERID-FOUNDATION-DESIGN.md`: the owner-supplied design; draft baseline pending D1.
+- `docs/design/saviynt-reference-study.md`: a read-only reading of the owner's Saviynt v25 training tenant.
+  - It maps what was observed to the design's phases and proposes 15 additions (D-1 to D-15).
+  - It corrects one claim: duplicate detection over existing identities exists for agents only.
