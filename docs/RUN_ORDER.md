@@ -413,3 +413,11 @@ Identity, Integration, Access, Experience, QA), with `docs/PROGRESS.md`
 regenerated. F1 started with INTEGRATION-P0-18 (staging reflects the source,
 migration 0117), now Done; INTEGRATION-P0-19 is next. Live status:
 `docs/WonderID/progress/PROGRESS.md`.
+
+## 2026-10-11 — INTEGRATION-P0-19: imports carry on by themselves
+
+After every full sync, the identity sources reading the connection now
+promote its identities, then every application onboarded on it reconciles
+its accounts, with each step's counts recorded on the sync job (migration
+0118). Identity-source schedules run through the connection cron. ACCESS-P0-27
+(entitlements and grants) is next in F1.

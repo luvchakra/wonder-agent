@@ -2193,3 +2193,24 @@ shows audit records. No schema change.
 `modules/access-governance/accounts.ts` and `accountRules.ts`: the dormant threshold, when not given, is the organization's setting (`access.dormantDays`); `parseDormantDays()` takes a fallback; the Accounts page and `/api/v1/access/accounts` start from it. Defaults equal the previous constants. Cross-module change by explicit
 owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
 Foundation log).
+
+## 2026-10-11 — Account reconciliation run by the system (for INTEGRATION-P0-19)
+
+Integration's post-sync chain (INTEGRATION-P0-19) reconciles accounts after
+every full sync, in the background with no session, so Access publishes two
+additions in `modules/access-governance/accounts.ts` (exported from
+`service.ts`):
+- `reconcileApplicationAccountsAsSystem(tenantId, applicationId)`: the same
+  reconciliation as `reconcileApplicationAccounts()`, through one shared
+  core. It uses the service role; every read and write names the tenant,
+  which the caller reads from the connection's row (§14). Recorded with
+  `triggered_by` null and audited as the system (`account.reconciled`).
+- `listApplicationsReconciledFrom(tenantId, integrationId)`: the
+  applications whose promoted configuration names the connection.
+
+The user path is unchanged, except that the connector read it uses
+(`getNormalizedObjects`) now pages past 1000 rows. Before, an application
+with more than 1000 imported accounts had the rest marked "not in source".
+
+**Verified.** Typecheck; `modules/access-governance` unit tests pass in the
+484/484 run; the system path is exercised through `syncPipeline.test.ts`.

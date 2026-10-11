@@ -1927,3 +1927,71 @@ grant, a leaver from an account) are ACCESS-P0-27 and INTEGRATION-P0-19.
 Incremental runs exist as a mode but no driver issues one yet
 (INTEGRATION-P0-21). The held-run notice has no E2E spec; QA-P0-23 covers
 the reconciliation flow.
+
+## 2026-10-11 — Scheduled import and promotion (INTEGRATION-P0-19, F1, #43)
+
+After a sync, data now moves on into WonderID's tables without anyone
+starting it, and one job shows every step.
+
+**What changed.**
+- Migration `0118_integration_sync_pipeline.sql` (applied):
+  `integration_sync_jobs.pipeline` (the steps after the import) and
+  `pipeline_status` (`none`, `running`, `succeeded`, `partial`, `failed`);
+  the client insert policy pins both to their defaults.
+- `pipelineRules.ts` (pure): `planPipeline()` (only after a `full` run, only
+  for the kinds the connection read: identity sources first, then onboarded
+  applications; a failed import or a failed kind skips everything, with the
+  reason), `skipFrom()`, `pipelineStatusOf()` (failed when a step failed, the
+  import failed or nothing ran; partial when some steps were skipped, e.g. a
+  source paused since the plan, or a step or the import was partial;
+  succeeded only when every step succeeded).
+- `syncPipeline.ts`: `planAfterSync()` (a failure to find the steps is
+  itself a failed step, never "nothing to do") and `runPipeline()` (saves
+  each step as it starts and ends, so the page shows progress; a failed step
+  skips the rest).
+- `runSyncJob()` saves the planned chain with the import's result, so the
+  job never looks finished while the chain runs, then runs it; audit
+  `integration.pipeline_completed`; a failed chain notifies
+  (`integration_failure`, "Update after sync failed").
+- `identitySources.ts`: `executeReconciliation()` returns its outcome
+  (actor may be null for the system); `listSourcesReadingConnection()` and
+  `runSourceAfterSync()` (a full run from staging, queued and audited as the
+  system).
+- `objects.ts`: `getNormalizedObjects()` now reads every page, up to
+  50,000. Before, a single request stopped at PostgREST's 1000 rows, so an
+  account reconciliation over a larger application treated the rest as gone
+  from the source. Added `getNormalizedObjectsAsSystem()` for runs with no
+  session.
+- Cron: identity-source schedules run. A connection's effective schedule is
+  the most frequent of its own and its active sources'
+  (`effectiveSchedule()`); the per-window unique index still prevents a
+  second run. The source form now has a Schedule field for integration
+  sources. Before, saving the form reset any schedule to manual, because the
+  form did not send one.
+- Connection page: each job shows its chain status; the newest job lists
+  its steps with counts or the failure reason, and the card refreshes while
+  a job or chain runs. "Run sync now" runs the same chain.
+- Access (cross-module, published contract, recorded in Access's audit
+  log): `reconcileApplicationAccountsAsSystem()` and
+  `listApplicationsReconciledFrom()`.
+
+**Verified.**
+- `tests/integrations/sync-pipeline.sql` on the dev project: 7/7. A member
+  cannot create a job claiming a chain or steps, cannot rewrite a chain, and
+  can still queue a plain job; the status check refuses unknown values; a
+  member of B sees none of A's jobs.
+- Vitest: `pipelineRules.test.ts` (8), `syncPipeline.test.ts` (6),
+  `connectorScheduleRules.test.ts` (+1); `modules/integrations`,
+  `modules/access-governance`, `lib/config` and `tests/architecture`
+  484/484 (connector-boundary test green).
+- `npm run typecheck`, eslint on changed files, `next build`: clean.
+  Supabase security advisors after 0118: no new finding.
+
+**Left out.**
+- Entitlements and access grants are not chained yet; they need ACCESS-P0-27.
+- Approving a held missing-at-source run does not re-run the chain; the
+  next sync picks it up.
+- A chain cut off by the function's time limit stays `running`, as an
+  interrupted import already does; a sweep for stale runs is a follow-up.
+- Frequency follows the daily cron (decision D10, recommendation: daily plus
+  run now). `hourly` takes effect when the cron runs more often.

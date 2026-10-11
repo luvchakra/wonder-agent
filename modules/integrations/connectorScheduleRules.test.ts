@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { dueConnections, filesToPurge, isConnectionSchedule, scheduleWindow, windowStart, type ScheduledConnection } from "./connectorScheduleRules";
+import { dueConnections, effectiveSchedule, filesToPurge, isConnectionSchedule, scheduleWindow, windowStart, type ScheduledConnection } from "./connectorScheduleRules";
 
 const now = new Date("2026-10-10T20:45:00Z");
 const conn = (id: string, schedule: string, patch: Partial<ScheduledConnection> = {}): ScheduledConnection => ({ id, tenantId: "t1", schedule, status: "connected", driver: "file", ...patch });
@@ -60,5 +60,15 @@ describe("received-file retention", () => {
       { tenantId: "t1", integrationId: "A", ids: ["a1"] },
       { tenantId: "t2", integrationId: "B", ids: ["b1"] },
     ]);
+  });
+});
+
+describe("identity-source schedules (INTEGRATION-P0-19)", () => {
+  it("runs a connection as often as the most frequent of its own and its sources' schedules", () => {
+    expect(effectiveSchedule("manual", [])).toBe("manual");
+    expect(effectiveSchedule("manual", ["daily"])).toBe("daily");
+    expect(effectiveSchedule("daily", ["hourly", "manual"])).toBe("hourly");
+    expect(effectiveSchedule("hourly", ["daily"])).toBe("hourly");
+    expect(effectiveSchedule("weekly", ["sometimes"])).toBe("manual");
   });
 });

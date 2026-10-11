@@ -79,6 +79,8 @@ export {
   linkAccount,
   listReconciliationRuns,
   reconcileApplicationAccounts,
+  reconcileApplicationAccountsAsSystem,
+  listApplicationsReconciledFrom,
   ACCOUNT_VIEWS,
   RECONCILE_CAP,
   type AccountView,

@@ -32,7 +32,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-05.1 | Verified credential rotation (no overwrite until new credential proven) | Done — 2026-09-14, unit-tested |
 | INTEGRATION-P0-06 | MCP servers, tools and resources as normalized object families (master P0-10) | Done — 2026-09-25: `mcp_server`/`mcp_tool`/`mcp_resource` families (migration 0069), deterministic read/write classification, `getMcpInventory()`, `/integrations/mcp` with Discover now |
 | INTEGRATION-P0-07 | Bridge MCP runtime events into `runtime_events` (codebase-map D6, master P0-18) | Done — 2026-09-25: MCP events bridged through Runtime's `ingestRuntimeEventByReference()` (dedupe, replay, flag, exact agent resolution); truthful `runtime` outcome; constant-time secret; validated body |
-| INTEGRATION-P0-08 | Authoritative identity sources | Partial — 2026-09-26: sources, authority, precedence, mappings, correlation rules, leaver strategy and guard done (0081); schedules are stored but not executed, and SCIM/REST/HR-API are mapping presets (files or a linked integration), not native pulls |
+| INTEGRATION-P0-08 | Authoritative identity sources | Partial — 2026-09-26: sources, authority, precedence, mappings, correlation rules, leaver strategy and guard done (0081); schedules run since 2026-10-11 (INTEGRATION-P0-19) for sources reading an integration; SCIM/REST/HR-API are mapping presets (files or a linked integration), not native pulls |
 | INTEGRATION-P0-09 | Identity import and reconciliation pipeline | Done — 2026-09-26, 0081–0083 (preview = stage) |
 | INTEGRATION-P0-10 | Application discovery and unrecognized applications | Done — 2026-09-26, migration 0090 |
 | INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Partial — 2026-09-26: SSRF guard on every connector request and at configuration, capability model, idempotent write interface (0087) done; the write interface gets its end-to-end caller with INTEGRATION-P0-13 |
@@ -43,7 +43,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-16 | Connector boundary (non-negotiable #20): receivers, Runtime Gateway, MCP driver, Saviynt/Zendesk/MCP/webhook definitions; old adapters and routes removed | Done — 2026-10-10: migration 0109 applied and merged; receivers, Runtime Gateway, MCP driver and the Saviynt/Zendesk/MCP/webhook definitions live, old adapters and routes removed, `connector-boundary.test.ts` enforcing (gateway allowlist entry approved by the user). Retired types and the stale Zendesk credential removed by migration 0113 (run by the owner, 2026-10-10) |
 | INTEGRATION-P0-17 | CSV through the framework (user request 2026-10-10): `file` driver, `csv-file` connector, file receiver, connection schedules and daily cron, object-page imports (`POST /api/v1/imports`) | Done — 2026-10-10: migrations 0110/0111 applied (isolation SQL 14/14 and 8/8); object-page import now previews first and then adds/updates records additively (PR #25, `file-import.spec.ts` 16/16 on Vercel); FK indexes 0112 applied |
 | INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
-| INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Not Started |
+| INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Done — 2026-10-11: migration 0118 (isolation SQL 7/7); identities and accounts chained after every full sync; entitlements and grants follow with ACCESS-P0-27 |
 | INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Not Started |
 
 ---
@@ -76,7 +76,11 @@ Foundation's tenant/RBAC/crypto primitives.
 - `modules/integrations/connector.ts`: the connector adapter interface every
   connector implements (below). Identity/Access agents call
   `modules/integrations/service.ts`'s `getNormalizedObjects(integrationId, objectType)`
-  to read imported data — never query `integration_objects` directly.
+  to read imported data — never query `integration_objects` directly. It reads
+  every page (up to 50,000) and leaves out objects missing at the source.
+  `getNormalizedObjectsAsSystem()` is the same read for work WonderID runs after a
+  sync with no session (INTEGRATION-P0-19); the caller passes the connection's own
+  tenant.
 - `POST /api/v1/integrations/:id/sync` — triggers a sync job. Other modules never
   call a connector directly; they go through this route or the equivalent internal
   service function.
