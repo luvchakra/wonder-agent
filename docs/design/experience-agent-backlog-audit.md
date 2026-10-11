@@ -3822,3 +3822,28 @@ help guide".
   dormant threshold, the Accounts page follows it, the history shows it,
   and it is put back; saving with no change says so; a read-only member has
   no menu entry and is sent back from the page.
+
+## 2026-10-11 — Reconciliation console (EXPERIENCE-P0-28, F1, #47)
+
+Most of the console was built with the stories it depends on:
+- the connection page shows each sync job, its post-sync steps with
+  counts, the held-run Mark missing / Discard decision, and Run sync now
+  with a refreshing progress state (INTEGRATION-P0-18/19);
+- the application page has Preview access, then Apply (ACCESS-P0-27);
+- the account page shows each access with its classification and any open
+  finding (ACCESS-P0-25).
+
+This story fills the gaps:
+- Connection page: each job also says how many objects it marked gone from
+  the source (marked, or approved after a hold).
+- Application page: "Access last reconciled <when>" (or failed, with the
+  reason), from the last applied access reconciliation.
+- Account page: each access row adds "last seen at source <when>" (the
+  ledger's last verified time).
+
+Every page keeps its existing permission gate and shows only stored
+records; no new control was added (one primary action per card, §19.5). The
+new lines use token classes only, so they work in both themes and wrap on
+narrow screens.
+
+**Verified.** Typecheck, eslint and `next build` are clean.

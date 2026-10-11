@@ -448,3 +448,10 @@ the owner and otherwise listed in Onboarding › Unowned Identities. Agents'
 accounts link by the identifiers the agent declares. Access cannot be
 requested for an unowned non-human identity. EXPERIENCE-P0-28
 (reconciliation console) is next in F1.
+
+## 2026-10-11 — EXPERIENCE-P0-28: reconciliation console complete
+
+The connection, application and account pages now together show and
+control every step: imports, what went missing, held runs, the post-sync
+chain, preview and apply of access, classification and last seen at source.
+QA-P0-23 (reconciliation suite) is next in F1.

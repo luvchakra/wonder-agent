@@ -14,7 +14,7 @@ Generated 2026-10-11 from 11 module backlogs.
 
 ## Overall
 
-**206 of 268 tracked stories complete — 77%**
+**207 of 268 tracked stories complete — 77%**
 
 ```
 ███████████████████████████████░░░░░░░░░  77%
@@ -22,10 +22,10 @@ Generated 2026-10-11 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 206 |
+| Done | 207 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 33 |
+| Not Started | 32 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -45,7 +45,7 @@ and are deliberately excluded from the counts above.
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 25 | 3 | 0 | 7 | 35 | `█████████████░░░░░` 71% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 26 | 3 | 0 | 6 | 35 | `█████████████░░░░░` 74% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 13 | 2 | 1 | 1 | 17 | `██████████████░░░░` 76% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 5 | 30 | `████████░░░░░░░░░░` 43% |
@@ -293,7 +293,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 25 done · 3 partial · 0 deferred · 7 not started (35 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 26 done · 3 partial · 0 deferred · 6 not started (35 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -330,7 +330,7 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
 | EXPERIENCE-P0-26 | Install the app on phones and tablets (web app manifest, icons, install banner) | Done — 2026-10-10: manifest, icons, iOS meta and a banner shown only where the browser can install the app; see audit log |
 | EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
-| EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Not Started |
+| EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Done — 2026-10-11: built across INTEGRATION-P0-18/19 and ACCESS-P0-27/25 pages; this story adds what each run marked missing, the last access reconciliation and last seen at source per access row |
 | EXPERIENCE-P0-29 | Request tracking per line; one inbox for approvals and tasks; subject picker (F2, #55) | Not Started |
 
 ### 09 — Platform Agent

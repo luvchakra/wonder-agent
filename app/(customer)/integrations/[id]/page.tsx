@@ -48,6 +48,11 @@ function stepLine(step: SyncPipelineStep): string {
 
 const STEP_TONE: Record<string, BadgeTone> = { ...JOB_STATUS_TONE, pending: "neutral", skipped: "danger" };
 
+/** EXPERIENCE-P0-28: how many objects a run marked missing at the source (marked, or approved after a hold). */
+function markedMissing(summary: Record<string, Record<string, unknown>>): number {
+  return Object.values(summary).reduce((n, k) => n + ((k.status === "marked" || k.status === "approved") && typeof k.marked === "number" ? k.marked : 0), 0);
+}
+
 /** INTEGRATION-P0-18: the result of approving or discarding a held run. */
 const HELD_OUTCOME: Record<string, string> = {
   approved: "Approved: the records gone from the source are now marked missing.",
@@ -303,6 +308,7 @@ export default async function IntegrationDetailPage({
                         <span>
                           {j.createdAt}: processed {j.recordsProcessed}, failed {j.recordsFailed}
                           {j.errors.length > 0 ? ` (${j.errors.length} error(s))` : ""}
+                          {markedMissing(j.missingSummary) ? `, ${markedMissing(j.missingSummary)} gone from the source` : ""}
                         </span>
                         {j.pipelineStatus !== "none" ? (
                           <Badge tone={STEP_TONE[j.pipelineStatus] ?? "neutral"}>then {j.pipelineStatus}</Badge>
