@@ -60,6 +60,8 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-28 | Billing and privacy permission keys; `has_tenant_permission()` for permission-gated RLS (2026-10-01 user request) | Done — 2026-10-01 (`0101`; 6 keys, system-role grants; live isolation proof `tests/compliance/billing-privacy-tenant-isolation.sql` 28/28) |
 | FOUNDATION-P0-29 | Tamper-evident, append-only audit trail (SOX ITGC CO-01, PCI DSS 10.3.2) | Done — 2026-10-01 (`0104`; per-tenant SHA-256 chain backfilled over 8,940 rows, `verify_audit_chain()`, `purge_audit_logs()`, `/audit/integrity`; tamper test detected the altered row) |
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
+| FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; needs D11) | Not Started |
+| FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Not Started |
 
 ---
 
@@ -975,3 +977,13 @@ change takes effect on the next request. Screens: Groups list and detail
 - Changing it needs `tenant.security.manage` and is audited.
 - It stays compatible with PLATFORM-P0-13's Configuration Studio, which
   versions it.
+
+## IGA plan F1–F2 stories (2026-10-11)
+
+The owner approved the IGA baseline (decision D1) on 2026-10-11, so the
+phase F1 (import and reconciliation) and F2 (access requests) stories enter
+this backlog. Their goals, order, dependencies and exit tests are in
+[`docs/WonderID/run-order/RUN-ORDER.md`](../WonderID/run-order/RUN-ORDER.md),
+the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
+and each story's acceptance criteria in its GitHub issue (number in the
+tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).

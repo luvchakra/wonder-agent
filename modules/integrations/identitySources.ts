@@ -288,6 +288,8 @@ async function loadIntegrationRecords(tenantId: string, integrationId: string): 
       .eq("tenant_id", tenantId)
       .eq("integration_id", integrationId)
       .eq("object_type", "identity")
+      // INTEGRATION-P0-18: an identity gone from the source is not read, so a full run treats it as a leaver.
+      .is("missing_at_source_at", null)
       .order("external_id")
       .range(from, Math.min(from + 999, MAX_RECORDS_PER_RUN - 1));
     if (error) throw new Error(`reading the integration's identities: ${error.message}`);

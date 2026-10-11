@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Plan of record for the IGA and Agent ID work, pending decision D1. Stories enter their module backlogs (`docs/plan/`) when D1 is approved; until then this file is where they live. |
+| Status | Plan of record for the IGA and Agent ID work. D1 approved by the owner on 2026-10-11: the F1 and F2 stories are in their module backlogs (`docs/plan/`); later phases enter when they start. |
 | Date | 2026-10-11 |
 | Design | `../design/DESIGN.md` |
 | Live status | `../progress/PROGRESS.md` (update it in the same PR as the work) |
@@ -57,7 +57,7 @@ F10 gates release after F9
 
 | Decision | Gates | Recommendation |
 |---|---|---|
-| D1 approve the baseline | Adding any story to a backlog | Approve |
+| D1 approve the baseline | Adding any story to a backlog | Approved 2026-10-11 |
 | D10 import frequency | F1 schedule behaviour | Daily plus "run now" |
 | D11 automation credentials | FOUNDATION-P0-31 (F1) | Yes |
 | D3 connector writes | F3 | Yes, reversible operations first |

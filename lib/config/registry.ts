@@ -16,11 +16,12 @@
  * Pure (no I/O), shared by the page, the service and proxy.ts.
  */
 
-export type ConfigSection = "sessions" | "access" | "agents" | "risk" | "certifications" | "sod";
+export type ConfigSection = "sessions" | "access" | "imports" | "agents" | "risk" | "certifications" | "sod";
 
 export const SECTIONS: { key: ConfigSection; title: string; description: string }[] = [
   { key: "sessions", title: "Sessions", description: "How long a signed-in session lasts. Applies to every member, on their next page." },
   { key: "access", title: "Access", description: "How accounts are judged." },
+  { key: "imports", title: "Imports", description: "How a connection's sync treats records that are gone from the source." },
   { key: "agents", title: "AI agents and runtime", description: "Discovery and runtime alerts." },
   { key: "risk", title: "Risk", description: "When an agent's own credentials count as a risk." },
   { key: "certifications", title: "Certifications", description: "Defaults for new certification campaigns." },
@@ -154,6 +155,19 @@ export const CONFIG_SETTINGS = [
     max: 100,
     default: 50,
     unit: "points",
+  },
+  {
+    // INTEGRATION-P0-18: read by runSyncJob() (modules/integrations/syncJobs.ts).
+    key: "integration.massMissingPercent",
+    section: "imports",
+    label: "Hold a sync for review when more than this share is gone",
+    help: "A full sync that finds more than this share of a kind gone from the source (of 20 or more) waits for a person before marking them.",
+    permission: SETTINGS,
+    type: "int",
+    min: 1,
+    max: 100,
+    default: 20,
+    unit: "%",
   },
   {
     key: "sod.conflictWindowDays",

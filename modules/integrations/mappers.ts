@@ -50,6 +50,11 @@ export function toSyncJob(row: any): IntegrationSyncJob {
     retryCount: row.retry_count,
     correlationId: row.correlation_id,
     createdAt: row.created_at,
+    mode: row.mode ?? "full",
+    missingStatus: row.missing_status ?? "none",
+    missingSummary: row.missing_summary ?? {},
+    missingResolvedBy: row.missing_resolved_by ?? null,
+    missingResolvedAt: row.missing_resolved_at ?? null,
   };
 }
 

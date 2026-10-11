@@ -340,7 +340,8 @@ export async function importFileForObject(ctx: TenantContext, kind: string, scop
     rowCount: file.csvRows.length,
     createdBy: ctx.userId,
   });
-  const job = await createSyncJob(tenantId, connection.id, "manual");
+  // A partial run: this file says nothing about the records it leaves out (INTEGRATION-P0-18).
+  const job = await createSyncJob(tenantId, connection.id, "manual", "partial");
   await writeAudit({
     tenantId,
     actorId: ctx.userId,

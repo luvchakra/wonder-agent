@@ -17,6 +17,7 @@ describe("the settings", () => {
       "risk.maxActiveKeysPerAgent": 3,
       "certification.highRiskScore": 50,
       "sod.conflictWindowDays": 30,
+      "integration.massMissingPercent": 20,
     });
   });
 

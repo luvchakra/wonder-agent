@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { createSyncJob, discoverMcpTools, runSyncJob, testIntegrationConnection } from "@/modules/integrations/service";
+import { ApiError } from "@/lib/shared/types/foundation";
+import { createSyncJob, discoverMcpTools, resolveHeldMissing, runSyncJob, testIntegrationConnection } from "@/modules/integrations/service";
 
 export async function testConnectionAction(integrationId: string) {
   const ctx = await requirePermission("integration.execute");
@@ -19,6 +20,24 @@ export async function triggerSyncAction(integrationId: string) {
   // action still returns promptly.
   void runSyncJob(ctx.tenantId!, job.id);
   redirect(`/integrations/${integrationId}`);
+}
+
+/**
+ * INTEGRATION-P0-18 — approve or discard a sync the mass-missing guard
+ * held. The page shows the real outcome: the job's new status, or why the
+ * decision was refused (already decided, or a newer run has started).
+ */
+export async function resolveHeldMissingAction(integrationId: string, jobId: string, decision: "approve" | "discard") {
+  const ctx = await requirePermission("integration.update");
+  let outcome: string;
+  try {
+    await resolveHeldMissing(ctx.tenantId!, ctx.userId, integrationId, jobId, decision);
+    outcome = decision === "approve" ? "approved" : "discarded";
+  } catch (err) {
+    if (!(err instanceof ApiError)) throw err;
+    outcome = err.code === "SUPERSEDED" ? "superseded" : err.code === "NOT_HELD" ? "decided" : "failed";
+  }
+  redirect(`/integrations/${integrationId}?held=${outcome}`);
 }
 
 /**

@@ -50,6 +50,8 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
 | EXPERIENCE-P0-26 | Install the app on phones and tablets (web app manifest, icons, install banner) | Done — 2026-10-10: manifest, icons, iOS meta and a banner shown only where the browser can install the app; see audit log |
 | EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
+| EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Not Started |
+| EXPERIENCE-P0-29 | Request tracking per line; one inbox for approvals and tasks; subject picker (F2, #55) | Not Started |
 
 ---
 
@@ -754,3 +756,13 @@ menu (arrangement only; WonderID's menus, colours and type).
   effect, SoD rules in effect, SoD conflicts in the last 30 days, request
   and authorization policies (each card only for a viewer who may open its
   list), policies in effect by category, and the policies not in effect.
+
+## IGA plan F1–F2 stories (2026-10-11)
+
+The owner approved the IGA baseline (decision D1) on 2026-10-11, so the
+phase F1 (import and reconciliation) and F2 (access requests) stories enter
+this backlog. Their goals, order, dependencies and exit tests are in
+[`docs/WonderID/run-order/RUN-ORDER.md`](../WonderID/run-order/RUN-ORDER.md),
+the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
+and each story's acceptance criteria in its GitHub issue (number in the
+tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).

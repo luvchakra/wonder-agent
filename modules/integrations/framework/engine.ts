@@ -23,11 +23,21 @@ import { ConnectorRequestError, HttpSession, LIMITS, type FetchLike } from "./ht
  * so these integrations need no integration_mappings rows.
  */
 
+/**
+ * INTEGRATION-P0-18. Whether one fetch read everything the source holds.
+ * A driver sets `truncated` when it stopped at a page or record limit with
+ * more to read, and `unread` when there was nothing to read at all (a file
+ * connection with no new file). A sync marks objects missing at the source
+ * only for kinds read completely, so a cut-short read never looks like a
+ * removal.
+ */
+export type FetchReport = { truncated: boolean; unread: boolean };
+
 /** A protocol driver: how records are fetched. Mapping is the engine's job. */
 export interface ConnectorDriverSession {
   test(): Promise<void>;
   /** `kind` is the canonical kind the resource produces (the file driver reads that kind's uploads). */
-  fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number, kind: ResourceKind): Promise<unknown[]>;
+  fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number, kind: ResourceKind, report?: FetchReport): Promise<unknown[]>;
   close?(): Promise<void>;
 }
 
@@ -53,9 +63,9 @@ export function httpDriver(fetchImpl: FetchLike): DriverFactory {
         if (!def.test?.request) throw new Error("This definition has no test request");
         await session.send(def.test?.request, { settings });
       },
-      fetch(resource, scope, maxRecords) {
+      fetch(resource, scope, maxRecords, _kind, report) {
         if (!resource.request) throw new Error("This resource has no request");
-        return session.fetchAll(resource.request, resource.records, resource.pagination, scope, maxRecords, resource.recordsKeyed);
+        return session.fetchAll(resource.request, resource.records, resource.pagination, scope, maxRecords, resource.recordsKeyed, report);
       },
     };
   };
@@ -121,6 +131,8 @@ export class DefinitionConnector implements ConnectorAdapter {
   /** Raw records already fetched this run, so forEach children reuse their parents. */
   private rawCache = new Map<ResourceKind, Row[]>();
   private issues: { objectType: string; message: string }[] = [];
+  /** INTEGRATION-P0-18: per kind, whether this run read everything (see FetchReport). */
+  private reports = new Map<ResourceKind, FetchReport>();
   private context: DriverContext | undefined;
 
   constructor(private readonly drivers: DriverFactories) {}
@@ -152,6 +164,7 @@ export class DefinitionConnector implements ConnectorAdapter {
     this.session = null;
     this.rawCache.clear();
     this.issues = [];
+    this.reports.clear();
   }
 
   private async open(): Promise<ConnectorDriverSession> {
@@ -182,6 +195,16 @@ export class DefinitionConnector implements ConnectorAdapter {
     return kindsOf(this.def);
   }
 
+  /** Whether this run read every record of a kind; a kind not fetched reads as complete. */
+  readReport(kind: ResourceKind): FetchReport {
+    return { ...(this.reports.get(kind) ?? { truncated: false, unread: false }) };
+  }
+
+  private note(kind: ResourceKind, report: Partial<FetchReport>) {
+    const r = this.reports.get(kind) ?? { truncated: false, unread: false };
+    this.reports.set(kind, { truncated: r.truncated || Boolean(report.truncated), unread: r.unread || Boolean(report.unread) });
+  }
+
   /** Records that could not be mapped this run, for the sync job's error list. */
   drainIssues(): { objectType: string; message: string }[] {
     const out = this.issues;
@@ -198,10 +221,17 @@ export class DefinitionConnector implements ConnectorAdapter {
     return all;
   }
 
-  /** One driver fetch; for an `optional` request a 404 is no records rather than a failure. */
+  /**
+   * One driver fetch; for an `optional` request a 404 is no records rather
+   * than a failure. A fetch that returns `max` records may have stopped
+   * short, so it counts as truncated.
+   */
   private async fetchOptional(session: ConnectorDriverSession, spec: ResourceSpec, scope: TemplateScope, max: number, kind: ResourceKind): Promise<unknown[]> {
+    const report: FetchReport = { truncated: false, unread: false };
     try {
-      return await session.fetch(spec, scope, max, kind);
+      const records = await session.fetch(spec, scope, max, kind, report);
+      this.note(kind, { truncated: report.truncated || records.length >= max, unread: report.unread });
+      return records;
     } catch (err) {
       if (spec.optional && err instanceof ConnectorRequestError && err.status === 404) return [];
       throw err;
@@ -214,9 +244,15 @@ export class DefinitionConnector implements ConnectorAdapter {
     const rows: Row[] = [];
     if (spec.forEach) {
       const only = spec.forEachRequest === undefined ? null : specsOf(this.def, spec.forEach)[spec.forEachRequest];
-      for (const { record: parent, spec: from } of await this.rawRecords(spec.forEach)) {
+      const parents = await this.rawRecords(spec.forEach);
+      // Children of an incompletely read parent kind are incomplete too.
+      this.note(kind, this.readReport(spec.forEach));
+      for (const { record: parent, spec: from } of parents) {
         if (only && from !== only) continue;
-        if (rows.length >= max) break;
+        if (rows.length >= max) {
+          this.note(kind, { truncated: true });
+          break;
+        }
         const children = await this.fetchOptional(session, spec, { settings: this.settings, parent }, max - rows.length, kind);
         for (const record of children) rows.push({ record, parent, spec });
       }
@@ -224,7 +260,10 @@ export class DefinitionConnector implements ConnectorAdapter {
       for (const parent of await this.fetchOptional(session, spec, { settings: this.settings }, max, kind)) {
         const items = readPath(parent, spec.unwind);
         for (const item of Array.isArray(items) ? items : items === undefined || items === null ? [] : [items]) {
-          if (rows.length >= max) break;
+          if (rows.length >= max) {
+            this.note(kind, { truncated: true });
+            break;
+          }
           rows.push({ record: item && typeof item === "object" ? item : { value: item }, parent, spec });
         }
       }

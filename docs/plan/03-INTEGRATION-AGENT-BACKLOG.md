@@ -42,6 +42,9 @@ for every non-"Done" row is in
 | INTEGRATION-P0-15 | Built-in connectors: Frappe HR, ERPNext, LDAP, Keycloak, Gitea, Mattermost, Nextcloud, PostgreSQL, OpenBao, Kubernetes | Done — 2026-10-10, each certified live against the Planet Express demo company |
 | INTEGRATION-P0-16 | Connector boundary (non-negotiable #20): receivers, Runtime Gateway, MCP driver, Saviynt/Zendesk/MCP/webhook definitions; old adapters and routes removed | Done — 2026-10-10: migration 0109 applied and merged; receivers, Runtime Gateway, MCP driver and the Saviynt/Zendesk/MCP/webhook definitions live, old adapters and routes removed, `connector-boundary.test.ts` enforcing (gateway allowlist entry approved by the user). Retired types and the stale Zendesk credential removed by migration 0113 (run by the owner, 2026-10-10) |
 | INTEGRATION-P0-17 | CSV through the framework (user request 2026-10-10): `file` driver, `csv-file` connector, file receiver, connection schedules and daily cron, object-page imports (`POST /api/v1/imports`) | Done — 2026-10-10: migrations 0110/0111 applied (isolation SQL 14/14 and 8/8); object-page import now previews first and then adds/updates records additively (PR #25, `file-import.spec.ts` 16/16 on Vercel); FK indexes 0112 applied |
+| INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
+| INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Not Started |
+| INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Not Started |
 
 ---
 
@@ -534,3 +537,13 @@ From an OpenAPI document or sample payload, propose account/entitlement schema, 
 ### INTEGRATION-P0-13 — Provisioning and deprovisioning pipeline
 
 Authorization → plan → pre-checks → connector execution with idempotency key → read-back verification → access ledger → audit, as background jobs with retry. Never FULFILLED from an API call alone where verification is possible; a read-only connector can never write.
+
+## IGA plan F1–F2 stories (2026-10-11)
+
+The owner approved the IGA baseline (decision D1) on 2026-10-11, so the
+phase F1 (import and reconciliation) and F2 (access requests) stories enter
+this backlog. Their goals, order, dependencies and exit tests are in
+[`docs/WonderID/run-order/RUN-ORDER.md`](../WonderID/run-order/RUN-ORDER.md),
+the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
+and each story's acceptance criteria in its GitHub issue (number in the
+tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).

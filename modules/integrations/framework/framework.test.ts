@@ -326,6 +326,49 @@ describe("DefinitionConnector", () => {
     expect(calls.filter((x) => x.url.pathname === "/groups")).toHaveLength(1);
   });
 
+  it("reports a complete read, and a capped one as truncated for the kind and its forEach children (INTEGRATION-P0-18)", async () => {
+    const handler = (u: URL) => {
+      if (u.pathname === "/users") return json([{ id: "u1", username: "fry", enabled: true }]);
+      if (u.pathname === "/groups") return json([{ id: "g1", name: "ship_crew" }, { id: "g2", name: "admin_staff" }]);
+      if (u.pathname.startsWith("/groups/")) return json([{ id: "u1" }]);
+      return new Response("", { status: 404 });
+    };
+    const c = new DefinitionConnector({ http: httpDriver(fakeFetch(handler).fetchImpl) });
+    await c.authenticate(config, JSON.stringify({ token: "t" }));
+    await c.importAccounts();
+    await c.importAccess();
+    expect(c.readReport("account")).toEqual({ truncated: false, unread: false });
+    expect(c.readReport("entitlement")).toEqual({ truncated: false, unread: false });
+    expect(c.readReport("access_grant")).toEqual({ truncated: false, unread: false });
+
+    // The same source with the groups resource capped at one record.
+    const capped = { ...config, manifest: { ...def, resources: { ...def.resources, entitlement: { ...(def.resources.entitlement as ResourceSpec), maxRecords: 1 } } } };
+    const c2 = new DefinitionConnector({ http: httpDriver(fakeFetch(handler).fetchImpl) });
+    await c2.authenticate(capped, JSON.stringify({ token: "t" }));
+    await c2.importEntitlements();
+    await c2.importAccess();
+    expect(c2.readReport("entitlement").truncated).toBe(true);
+    // Memberships were read for the first group only, so they are incomplete too.
+    expect(c2.readReport("access_grant").truncated).toBe(true);
+    expect(c2.readReport("account")).toEqual({ truncated: false, unread: false });
+  });
+
+  it("reports a kind the driver had nothing to read as unread", async () => {
+    const fileDef: ConnectorDefinition = { ...def, driver: "file", auth: { type: "none" }, test: undefined, receive: { file: { auth: "bearer" } }, resources: { account: { file: {}, fields: { externalId: "id" } } } };
+    const c = new DefinitionConnector({
+      file: async () => ({
+        async test() {},
+        async fetch(_spec, _scope, _max, _kind, report) {
+          if (report) report.unread = true;
+          return [];
+        },
+      }),
+    });
+    await c.authenticate({ manifest: fileDef, settings: { baseUrl: "https://idp.example", realm: "pe" } }, null);
+    expect(await c.importAccounts()).toEqual([]);
+    expect(c.readReport("account")).toEqual({ truncated: false, unread: true });
+  });
+
   it("needs credentials before it runs, and refuses a tampered definition", async () => {
     const c = new DefinitionConnector({ http: httpDriver(fakeFetch(() => json({})).fetchImpl) });
     await expect(c.authenticate(config, null)).rejects.toThrow(/no credentials/);

@@ -363,6 +363,41 @@ not imported, and refreshes the page's list.
 sent or imported through the hosted app is limited to that; a file fetched
 from an address can be 10 MB.
 
+## Removed at the source (INTEGRATION-P0-18)
+
+A sync only ever adds and updates staged objects; it never deletes one. When
+an object disappears from the source, a run says so by setting the staged
+object's `missing_at_source_at`, carefully:
+
+- **Only a complete full run marks.** A run is `full` (the default: a
+  connection reads everything it holds), `incremental` or `partial`. For
+  each kind, a full run marks only when that kind was read completely: the
+  read did not fail, did not stop at a limit (`maxRecords`, the http
+  driver's page limit, the MCP page limit), every record mapped and stored,
+  and, for a file connection, a file was actually read. Each driver reports
+  that per kind (`FetchReport`: `truncated`, `unread`). A received file is
+  taken as the full extract of its kind; an object-page import is
+  `partial` and never marks anything.
+- **Never what a newer run saw.** An object last seen by a run that started
+  after this one is never marked, so overlapping syncs cannot undo each
+  other.
+- **The mass-missing guard.** When more than the organization's share
+  (Global Configuration, Imports, `integration.massMissingPercent`, default
+  20%) of a kind's present objects would be marked, and the kind has at
+  least 20, nothing is marked: the run is held, the organization is notified
+  ("Sync held for review"), and someone with `integration.update` approves
+  or discards it on the connection's page
+  (`POST /api/v1/integrations/{id}/jobs/{jobId}/missing`). Approving is
+  refused once a newer run has started.
+- **A missing object comes back** when a later run sees it again.
+
+What each run decided per kind is on the job (`missing_status`,
+`missing_summary`) and in its `integration.sync_completed` audit event. The
+published readers (`getNormalizedObjects`, `getNormalizedObjectsForTenant` and the identity-source reader)
+leave missing objects out by default; the MCP inventory includes them. The
+marking itself is `stage_mark_missing()` (migration 0117), service role
+only.
+
 ## Writing a connector
 
 Go to **Integrations → Connection Types → Write a connection type**

@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Last updated | 2026-10-11 |
-| Current phase | None started. Waiting on decision D1 (approve the baseline). |
-| Next story | INTEGRATION-P0-18, Staging reflects the source (#42) |
+| Current phase | F1 Import and reconciliation (started 2026-10-11) |
+| Next story | INTEGRATION-P0-19, Scheduled import and promotion (#43) |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -19,7 +19,7 @@ passed. This file is hand-maintained; the generated programme rollup
 
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
-| F1 Import and reconciliation | 9 | 0 | 0 | Not started |
+| F1 Import and reconciliation | 9 | 1 | 0 | In progress |
 | F2 Access requests | 8 | 0 | 0 | Not started |
 | F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
@@ -37,7 +37,7 @@ status is shown per row below.
 
 | # | Decision | Status |
 |---|---|---|
-| D1 | Approve the baseline; stories enter the backlogs | Open |
+| D1 | Approve the baseline; stories enter the backlogs | Approved 2026-10-11 (owner); F1 and F2 stories added to the module backlogs |
 | D2 | OAuth tokens to agents | Open |
 | D3 | Connector writes | Open |
 | D4 | Automatic agent suspension | Open |
@@ -61,7 +61,7 @@ status is shown per row below.
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| INTEGRATION-P0-18 Staging reflects the source | Integration | #42 | Not started | |
+| INTEGRATION-P0-18 Staging reflects the source | Integration | #42 | Done | Migration 0117; isolation SQL 19/19; held runs decided on the connection page |
 | INTEGRATION-P0-19 Scheduled import and promotion | Integration | #43 | Not started | Finishes the schedule part of INTEGRATION-P0-08 (backlog: Partial) |
 | ACCESS-P0-27 Entitlement and grant reconciliation | Access | #44 | Not started | |
 | ACCESS-P0-25 Imported access classification and drift findings | Access + Risk | #45 | Not started | Backlog: Not Started |
@@ -195,3 +195,4 @@ Exit test: not run.
 ## History
 
 - 2026-10-11: file created with the plan of record (`RUN-ORDER.md`). No story started.
+- 2026-10-11: D1 approved by the owner; F1 started. INTEGRATION-P0-18 done (migration 0117).

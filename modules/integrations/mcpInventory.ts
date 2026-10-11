@@ -86,9 +86,10 @@ export function buildMcpInventory(integrations: Integration[], objects: Integrat
 export async function getMcpInventory(tenantId: string): Promise<McpServerInventory[]> {
   const [integrations, servers, tools, resources] = await Promise.all([
     listIntegrations(tenantId),
-    getNormalizedObjectsForTenant(tenantId, "mcp_server"),
-    getNormalizedObjectsForTenant(tenantId, "mcp_tool"),
-    getNormalizedObjectsForTenant(tenantId, "mcp_resource"),
+    // The inventory shows tools a server stopped declaring (stillDeclared: false), so it reads them all.
+    getNormalizedObjectsForTenant(tenantId, "mcp_server", { includeMissing: true }),
+    getNormalizedObjectsForTenant(tenantId, "mcp_tool", { includeMissing: true }),
+    getNormalizedObjectsForTenant(tenantId, "mcp_resource", { includeMissing: true }),
   ]);
   return buildMcpInventory(integrations, [...servers, ...tools, ...resources]);
 }
