@@ -282,6 +282,11 @@ Open items:
 **Owner direction.** WonderID is IGA for human and non-human identities. Reconciliation, account import and access requests work first.
 
 **Plan of record:** §10 of `docs/design/WONDERID-FOUNDATION-DESIGN.md` (phases F1–F10, revised today).
+
+**Tracked on GitHub:**
+- Milestones F1–F10.
+- F1 is issue #41 (stories #42–#48), F2 is issue #49 (stories #50–#56).
+- F3–F10 are tracking issues #57–#64.
 - New stories enter their module backlogs, with Progress Tracker rows, when the owner approves decision D1.
 - Until then, §10 is the plan of record.
 
