@@ -19,6 +19,7 @@ import {
   type AssignmentStatus,
   type ItemStatus,
 } from "./packageRules";
+import { markGrantsFulfilled, pendAssignment, withdrawPendingGrants } from "./pendingGrants";
 
 /**
  * ACCESS-P0-20 — access packages (spec §12). Packages and their contents
@@ -477,6 +478,8 @@ async function createAssignment(
     .from("access_package_assignment_items")
     .insert(resources.map((r) => ({ tenant_id: tenantId, assignment_id: data.id, application_id: r.applicationId, entitlement_id: r.entitlementId, status: "pending" })));
   if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
+  // ACCESS-P0-28: each item's access is a pending grant until fulfilled and verified.
+  await pendAssignment(tenantId, data.id as string);
   return data.id as string;
 }
 
@@ -635,6 +638,7 @@ export async function setAssignmentItemStatus(tenantId: string, actorId: string,
     .maybeSingle();
   if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
   if (!updated) throw new ApiError(409, "CONFLICT", "The item changed meanwhile; reload");
+  if (status === "fulfilled") await markGrantsFulfilled(tenantId, { itemId });
   await refreshAssignment(tenantId, item.assignment_id as string);
   await writeAudit({ tenantId, actorId, actorType: "user", action: `access.package_item_${status}`, objectType: "access_package_assignment", objectId: item.assignment_id as string, outcome: "success", metadata: { itemId, from, detail: note } });
   return (await getAssignment(tenantId, item.assignment_id as string))!;
@@ -659,6 +663,8 @@ async function endAssignment(tenantId: string, actorId: string | null, assignmen
     const ids = (items ?? []).filter((i) => itemOnEnd(i.status as ItemStatus) === target && i.status !== target).map((i) => i.id as string);
     if (ids.length) await admin.from("access_package_assignment_items").update({ status: target, updated_by: actorId, updated_at: now }).eq("tenant_id", tenantId).in("id", ids);
   }
+  // ACCESS-P0-28: access still waiting for fulfilment never existed; its pending grants are withdrawn.
+  await withdrawPendingGrants(tenantId, (items ?? []).map((i) => i.id as string));
   return true;
 }
 

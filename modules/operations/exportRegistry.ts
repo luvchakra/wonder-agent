@@ -239,7 +239,8 @@ const ENTRIES: readonly ExportEntry[] = [
     permission: "access.read",
     auditModule: "access",
     importKind: "access_grant",
-    source: { table: "access_grants", orderBy: { column: "granted_at", ascending: false }, whereNull: ["revoked_at"] },
+    // ACCESS-P0-28: a grant waiting for fulfilment is not access yet.
+    source: { table: "access_grants", orderBy: { column: "granted_at", ascending: false }, whereNull: ["revoked_at"], where: [{ column: "fulfilment_status", in: ["none", "fulfilled_unverified", "verified"] }] },
     columns: [
       col("externalId", "id"),
       col("accountExternalId", "account_id", { lookup: { table: "accounts", label: "external_account_ref", fallbackToId: true } }),

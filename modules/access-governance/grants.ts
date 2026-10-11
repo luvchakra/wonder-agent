@@ -83,7 +83,9 @@ async function queryEffectiveAccess(tenantId: string, agentId: string, asOf: str
     .from("access_grants")
     .select("*, accounts(external_account_ref, application_id), entitlements(application_id, name, data_classification, privilege_level, applications(name), data_sources(id, name, classification))")
     .in("account_id", accountIds)
-    .eq("tenant_id", tenantId);
+    .eq("tenant_id", tenantId)
+    // ACCESS-P0-28: a grant waiting for fulfilment is not access yet.
+    .neq("fulfilment_status", "pending_fulfilment");
   query = asOf === null ? query.is("revoked_at", null) : query.lte("granted_at", asOf).or(`revoked_at.is.null,revoked_at.gt.${asOf}`);
 
   const { data, error } = await query.returns<EffectiveAccessRow[]>();
@@ -163,6 +165,7 @@ export async function explainAccessPath(
     )
     .eq("tenant_id", tenantId)
     .is("revoked_at", null)
+    .neq("fulfilment_status", "pending_fulfilment")
     .returns<EffectiveAccessRow[]>();
   if (grantsError) throw new ApiError(500, "QUERY_FAILED", grantsError.message);
 

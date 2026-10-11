@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Last updated | 2026-10-11 |
-| Current phase | F1 Import and reconciliation (started 2026-10-11) |
-| Next story | F2: ACCESS-P0-28, Approved requests become pending grants (#50); FOUNDATION-P0-31 (F1) waits for D11 |
+| Current phase | F2 Access requests end to end (started 2026-10-11); F1 gating done |
+| Next story | ACCESS-P0-29, Fulfilment tasks (#51); FOUNDATION-P0-31 (F1) waits for D11 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -20,7 +20,7 @@ passed. This file is hand-maintained; the generated programme rollup
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
 | F1 Import and reconciliation | 9 | 8 | 0 | Gating stories done; exit test passed (seeded staging); FOUNDATION-P0-31 waits for D11 |
-| F2 Access requests | 8 | 0 | 0 | Not started |
+| F2 Access requests | 8 | 1 | 0 | In progress |
 | F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
 | F5 Roles, SoD, delegation | 5 | 0 | 0 | Not started |
@@ -56,6 +56,7 @@ status is shown per row below.
 |---|---|
 | Configure the Supabase SSO provider so SAML/OIDC sign-in works (FOUNDATION-P0-03.3) | Open |
 | Rotate the Saviynt training-tenant password shared in chat on 2026-10-11 | Open |
+| Review the `wonderapps_dashboard` database role: it can sign in and reads every row of about 24 customer tables in all organizations (`using (true)` policies). No migration in the repository creates it; found 2026-10-11 by the advisors | Open |
 
 ## F1: Import and reconciliation
 
@@ -77,7 +78,7 @@ Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded 
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| ACCESS-P0-28 Approved requests become pending grants | Access | #50 | Not started | |
+| ACCESS-P0-28 Approved requests become pending grants | Access | #50 | Done | Migration 0121. Approval (chain, auto-approval, agent path, package items) adds a pending grant, on a placeholder account when the subject has none; Mark fulfilled → not yet verified; reconciliation verifies. Pending grants are not effective access |
 | ACCESS-P0-29 Fulfilment tasks | Access | #51 | Not started | |
 | ACCESS-P0-30 Remove-access and account requests | Access | #52 | Not started | |
 | ACCESS-P0-31 Requests for non-human identities | Access + Identity | #53 | Not started | |

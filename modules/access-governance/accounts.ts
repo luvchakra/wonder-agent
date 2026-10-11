@@ -8,6 +8,7 @@ import type { IdentityType } from "@/lib/shared/types/agent-identity";
 import { getNormalizedObjects, getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { ensureAccountIdentities, getIdentity, getIdentityNames, listAgentIdentifiers, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
+import { replacePlaceholders } from "./pendingGrants";
 import {
   dormantCutoff,
   isDormant,
@@ -380,7 +381,8 @@ async function reconcileAccounts(
     ]);
     if (existingRows.error) throw new ApiError(500, "QUERY_FAILED", existingRows.error.message);
     if (objects.length > RECONCILE_CAP) throw new ApiError(413, "TOO_MANY", `The connector imported ${objects.length} accounts; one run reconciles at most ${RECONCILE_CAP}`);
-    const existing: ExistingAccount[] = (existingRows.data ?? []).map((r) => ({
+    // ACCESS-P0-28: a request's placeholder is not the source's; it is replaced below, never matched or marked missing.
+    const existing: ExistingAccount[] = (existingRows.data ?? []).filter((r) => r.status !== "pending").map((r) => ({
       id: r.id,
       externalAccountRef: r.external_account_ref,
       agentId: r.agent_id,
@@ -423,6 +425,8 @@ async function reconcileAccounts(
       const { error } = await supabase.from("accounts").upsert(batch, { onConflict: "tenant_id,application_id,external_account_ref" });
       if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
     }
+    // ACCESS-P0-28: a placeholder whose real account has now arrived hands its pending grants over.
+    await replacePlaceholders(tenantId, applicationId);
     for (let i = 0; i < plan.missingIds.length; i += 500) {
       const { error } = await supabase
         .from("accounts")

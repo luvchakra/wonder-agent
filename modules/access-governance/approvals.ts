@@ -19,6 +19,7 @@ import {
   type Person,
   type StepStatus,
 } from "./approvalRules";
+import { pendRequest } from "./pendingGrants";
 
 /**
  * ACCESS-P0-19 — the approval engine for requests made through the
@@ -423,6 +424,8 @@ export async function decideApprovalStep(
         outcome: "success",
         metadata: { subjectIdentityId: row.subject_identity_id, packageId: row.access_package_id ?? null, actionFingerprint: decidedStep.actionFingerprint, stages: Math.max(...after.map((s) => s.stage)) },
       });
+      // ACCESS-P0-28: an approved request for an entitlement becomes its pending grant.
+      if (next.state === "approved" && !row.access_package_id) await pendRequest(tenantId, requestId);
       // ACCESS-P0-20: an approved package request becomes its assignment.
       // If that fails, the request stays approved and the failure is audited.
       if (next.state === "approved" && row.access_package_id) {

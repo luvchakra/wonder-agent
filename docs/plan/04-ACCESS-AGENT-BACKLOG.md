@@ -45,7 +45,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-25 | Imported access classification and drift findings | Done — 2026-10-11: migration 0120 (isolation SQL 12/12); baseline per application; legacy / authorized / unproven / rogue in the ledger and on the account page; one Risk finding per rogue access |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |
 | ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Done — 2026-10-11: migration 0119 (isolation SQL 10/10); preview then apply-exactly-that on the application page and API; runs after every full sync |
-| ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Not Started |
+| ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Done — 2026-10-11: migration 0121 (isolation SQL 10/10); pending → fulfilled, unverified → verified, on placeholder accounts when needed; readers of effective access skip pending grants |
 | ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Not Started |
 | ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Not Started |
 | ACCESS-P0-31 | Requests for non-human identities; AI agents within their contract (F2, #53) | Not Started |

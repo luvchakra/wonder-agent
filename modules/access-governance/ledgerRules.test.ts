@@ -68,6 +68,12 @@ describe("ledgerEntry", () => {
     expect(ledgerEntry(rel({ entitlementId: null, accessGrantId: null, sourceIntegrationId: null, reconciled: true }), none(), NOW).source).toBe("IMPORT");
   });
 
+  it("requested access not yet verified at the source is PENDING_RECONCILIATION, keeping its request (ACCESS-P0-28)", () => {
+    const e = ledgerEntry(rel({ sourceIntegrationId: null, awaitingVerification: true }), { ...none(), requests: [request()] }, NOW);
+    expect(e).toMatchObject({ source: "WONDERID_REQUEST", status: "PENDING_RECONCILIATION", requestId: "req-1" });
+    expect(ledgerEntry(rel({ awaitingVerification: true, revokedAt: "2026-10-02T00:00:00Z" }), { ...none(), requests: [request()] }, NOW).status).toBe("REVOKED");
+  });
+
   it("an approved request for the same person and entitlement makes it VALID, with its lineage", () => {
     const e = ledgerEntry(rel(), { ...none(), requests: [request()] }, NOW);
     expect(e).toMatchObject({

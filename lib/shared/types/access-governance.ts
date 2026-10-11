@@ -68,7 +68,8 @@ export const APPLICATION_ONBOARDING_STATUSES = [
 ] as const;
 export type ApplicationOnboardingStatus = (typeof APPLICATION_ONBOARDING_STATUSES)[number];
 
-export type AccountStatus = "active" | "disabled";
+/** `pending`: a placeholder a request created until the real account appears (ACCESS-P0-28). */
+export type AccountStatus = "active" | "disabled" | "pending";
 
 export type Account = {
   id: string;
@@ -141,6 +142,14 @@ export type GrantType =
   | "mcp_tool_permission"
   | "service_account_relationship";
 
+/**
+ * ACCESS-P0-28: a requested grant is `pending_fulfilment` on approval (not
+ * access yet), `fulfilled_unverified` once someone says it was done on the
+ * target, and `verified` when reconciliation finds it there.
+ */
+export const FULFILMENT_STATUSES = ["none", "pending_fulfilment", "fulfilled_unverified", "verified"] as const;
+export type FulfilmentStatus = (typeof FULFILMENT_STATUSES)[number];
+
 export type AccessGrant = {
   id: string;
   tenantId: string;
@@ -150,6 +159,10 @@ export type AccessGrant = {
   sourceIntegrationId: string | null;
   grantedAt: string;
   revokedAt: string | null;
+  /** ACCESS-P0-28: `none` for recorded access; otherwise how far a requested grant has come. */
+  fulfilmentStatus?: FulfilmentStatus;
+  requestId?: string | null;
+  verifiedAt?: string | null;
   // Denormalized for convenience (populated by getEffectiveAccess/explainAccessPath
   // — never persisted columns, just joined at read time):
   application?: string;

@@ -2361,3 +2361,92 @@ full suite 1191/1191.
 
 **Verified.** `tests/e2e/f1-reconciliation.spec.ts` 14/14 locally;
 `vitest run modules/access-governance` 222/222; typecheck clean.
+
+### 2026-10-11 — ACCESS-P0-28: approved requests become pending grants, verified by reconciliation (#50)
+
+**Decision (owner, asked directly).** The design's model was kept: an approved
+request becomes an `access_grants` row with a fulfilment status, and a
+placeholder account holds it when the subject has none yet. The alternative,
+tracking state on the request alone, was not chosen.
+
+**Migration 0121 (applied to dev).**
+- `access_grants` gains:
+  - `fulfilment_status`: `none` for recorded access (every existing row),
+    `pending_fulfilment`, `fulfilled_unverified` or `verified`;
+  - `request_id` and `access_package_assignment_item_id`, both same-tenant
+    keys;
+  - `verified_at`, required exactly when the status is `verified`.
+- Unique keys: one grant per request and entitlement, and one per package
+  item.
+- `accounts` accepts `status 'pending'` and `source 'request'` for
+  placeholders.
+- No client write policy was added.
+
+**Service** (`pendingGrants.ts`, rules in `pendingGrantRules.ts`).
+- **On approval:**
+  - `pendRequest()` runs at the final step of a catalog request's chain, on
+    auto-approval, and on an agent request's approval.
+  - `pendAssignment()` runs when a package assignment is created, whether
+    from a request or directly.
+  - Each line with an entitlement gets a pending grant on the subject's one
+    real account. With no account, a placeholder `pending:<identity>` is
+    created; with several real accounts, nothing is chosen and the case is
+    audited as a failure.
+  - If the access already exists, that grant is linked instead of
+    duplicated.
+  - Failures are audited (`access.grants_pending`) and never undo the
+    approval.
+- **Mark fulfilled** (a request, or a package item) makes the grant
+  `fulfilled_unverified`. Fulfilling a request no longer overwrites
+  `decided_by`/`decided_at`, which are the approval the ledger shows.
+- **Ending an assignment** withdraws (revokes) the grants still pending.
+- **Reconciliation:**
+  - Account reconciliation leaves placeholders out of its plan, so they are
+    never matched or marked missing. When the subject's one real account
+    appears, the placeholder's grants move onto it and the placeholder is
+    removed (`replacePlaceholders`, audited).
+  - Access reconciliation (`planGrants().verified`) marks a pending or
+    unverified grant the source lists as `verified`. From then on the grant
+    belongs to that connection, so a later full run can mark it missing.
+    Verified grants are part of the preview fingerprint and counts.
+- **Readers of effective access** skip `pending_fulfilment`:
+  - `getEffectiveAccess`, so SHOULD/CAN/DID and certification;
+  - the agent and application grant lookup;
+  - the runtime decision loader;
+  - data-source reach;
+  - the grants export.
+- **Ledger:** a pending or unverified grant, and a placeholder account, is
+  `PENDING_RECONCILIATION` (approved, not yet real), and becomes VALID once
+  verified.
+- **Request page and API:** the request page shows "Approved · waiting for
+  fulfilment", "Fulfilled · not yet verified" or "Verified at the source".
+  `GET /api/v1/access/requests/<id>` returns `grants` and `fulfilment`.
+
+**Verified.**
+- `tests/access/pending-grants-isolation.sql` 10/10:
+  - cross-tenant request key refused;
+  - duplicate refused;
+  - `verified` without a time refused;
+  - placeholder stored;
+  - a member can neither create, fulfil nor verify a grant;
+  - the other organization sees none.
+- Vitest `modules/access-governance` 231/231, plus operations and runtime
+  (346 across the three). New tests:
+  - `pendingGrantRules.test.ts` (6);
+  - grant verification in `planGrants`;
+  - PENDING_RECONCILIATION in the ledger;
+  - data-source reach ignores pending grants.
+- E2E (local, dev Supabase):
+  - `f1-reconciliation.spec.ts` 15/15, with a new test covering the whole
+    chain: request → placeholder + pending grant → fulfilled, unverified →
+    account arrives (grant moved) → grant arrives (verified, ledger VALID,
+    no finding);
+  - `request-catalog`, `approval-engine`, `access-packages` and `sod`
+    31/31.
+
+**Left out.**
+- Account requests, i.e. a line for an application with no entitlement
+  (ACCESS-P0-30).
+- Fulfilment tasks (ACCESS-P0-29).
+- Verification from page CSV imports (`fileImport.ts`); connector syncs,
+  file connections included, do verify.

@@ -78,6 +78,9 @@ export function toAccessGrant(row: any): AccessGrant {
     sourceIntegrationId: row.source_integration_id,
     grantedAt: row.granted_at,
     revokedAt: row.revoked_at,
+    fulfilmentStatus: row.fulfilment_status ?? "none",
+    requestId: row.request_id ?? null,
+    verifiedAt: row.verified_at ?? null,
   };
 }
 

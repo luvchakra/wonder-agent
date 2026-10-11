@@ -34,6 +34,11 @@ describe("reachByDataSource — CAN per data source", () => {
     expect(reach.get("ds1")).toEqual({ entitlementCount: 2, agentIds: ["a1", "a2"] });
     expect(reach.get("ds2")).toEqual({ entitlementCount: 1, agentIds: [] });
   });
+
+  it("ignores a grant still waiting for fulfilment (ACCESS-P0-28)", () => {
+    const reach = reachByDataSource([{ id: "e1", data_source_id: "ds1", access_grants: [{ revoked_at: null, fulfilment_status: "pending_fulfilment", accounts: { agent_id: "a1" } }, { revoked_at: null, fulfilment_status: "fulfilled_unverified", accounts: { agent_id: "a2" } }] }]);
+    expect(reach.get("ds1")?.agentIds).toEqual(["a2"]);
+  });
 });
 
 describe("dataFields — effective access carries the data source", () => {

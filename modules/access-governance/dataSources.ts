@@ -205,7 +205,7 @@ export async function linkEntitlementToDataSource(tenantId: string, actorId: str
   });
 }
 
-type ReachRow = { id: string; data_source_id: string; access_grants: Array<{ revoked_at: string | null; accounts: { agent_id: string | null } | null }> };
+type ReachRow = { id: string; data_source_id: string; access_grants: Array<{ revoked_at: string | null; fulfilment_status?: string; accounts: { agent_id: string | null } | null }> };
 
 /** Pure: per data source, how many entitlements open it and which agents currently hold one. */
 export function reachByDataSource(rows: ReachRow[]): Map<string, { entitlementCount: number; agentIds: string[] }> {
@@ -214,7 +214,8 @@ export function reachByDataSource(rows: ReachRow[]): Map<string, { entitlementCo
     const entry = out.get(e.data_source_id) ?? { entitlementCount: 0, agents: new Set<string>() };
     entry.entitlementCount += 1;
     for (const g of e.access_grants ?? []) {
-      if (g.revoked_at === null && g.accounts?.agent_id) entry.agents.add(g.accounts.agent_id);
+      // ACCESS-P0-28: a grant waiting for fulfilment is not access yet.
+      if (g.revoked_at === null && g.fulfilment_status !== "pending_fulfilment" && g.accounts?.agent_id) entry.agents.add(g.accounts.agent_id);
     }
     out.set(e.data_source_id, entry);
   }
@@ -228,7 +229,7 @@ export async function listDataSources(tenantId: string): Promise<DataSourceWithR
     supabase.from("data_sources").select("*, applications(name)").eq("tenant_id", tenantId).order("name").limit(DEFAULT_LIST_LIMIT).returns<Row[]>(),
     supabase
       .from("entitlements")
-      .select("id, data_source_id, access_grants(revoked_at, accounts(agent_id))")
+      .select("id, data_source_id, access_grants(revoked_at, fulfilment_status, accounts(agent_id))")
       .eq("tenant_id", tenantId)
       .not("data_source_id", "is", null)
       .limit(5000)

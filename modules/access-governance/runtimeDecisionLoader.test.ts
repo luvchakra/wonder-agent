@@ -15,6 +15,7 @@ function query(table: string) {
     (tables[table] ?? []).filter((r) =>
       filters.every(([c, v]) => {
         const actual = get(r, c);
+        if (v && typeof v === "object" && "not" in (v as object)) return actual !== (v as { not: unknown }).not;
         return Array.isArray(v) ? v.includes(actual) : v === null ? actual == null : actual === v;
       }),
     );
@@ -24,6 +25,7 @@ function query(table: string) {
     eq: (c: string, v: unknown) => (filters.push([c, v]), chain),
     in: (c: string, v: unknown[]) => (filters.push([c, v]), chain),
     is: (c: string, v: unknown) => (filters.push([c, v]), chain),
+    neq: (c: string, v: unknown) => (filters.push([c, { not: v }]), chain),
     returns: () => chain,
     then: (resolve: (v: unknown) => void) => resolve(result()),
   };

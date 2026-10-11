@@ -196,6 +196,57 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(findings[0].status).toBe("resolved");
   });
 
+  test("ACCESS-P0-28: an approved request becomes a pending grant on a placeholder account; marked fulfilled it is unverified; the next reconciliations verify it", async ({ request }) => {
+    test.setTimeout(120_000);
+    const cara = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E F2 Cara ${stamp}`, email: mail("cara") } });
+    expect(cara.status(), await cara.text()).toBe(201);
+    const caraId = (await cara.json()).data.id as string;
+    const policy = await request.post("/api/v1/access/request-policies", {
+      data: { applicationId: appId, name: `E2E F2 Policy ${stamp}`, autoApprove: true, riskThreshold: "high", maxDurationDays: 90, defaultDurationDays: 30, justificationRequired: true, allowForOthers: "access_managers" },
+    });
+    // Onboarding already made the application's policy; this updates it (200) to approve low-risk access automatically.
+    expect([200, 201], await policy.text()).toContain(policy.status());
+    const finance = (await entitlementIdByRef(tenantId, appId, "cn=finance"))!;
+
+    const submitted = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: caraId, applicationId: appId, entitlementId: finance, justification: "ACCESS-P0-28 pending grant" } });
+    expect(submitted.status(), await submitted.text()).toBe(201);
+    const req = (await submitted.json()).data as { id: string; status: string };
+    expect(req.status).toBe("approved");
+    const view = async () => (await (await request.get(`/api/v1/access/requests/${req.id}`)).json()).data as { fulfilment: string; grants: { accountId: string; fulfilmentStatus: string }[] };
+
+    // Approved: a pending grant on a placeholder account (Cara has no account yet); not access yet.
+    const pending = await view();
+    expect(pending.fulfilment).toBe("pending_fulfilment");
+    expect(pending.grants).toHaveLength(1);
+    const placeholder = pending.grants[0].accountId;
+    const listed = (await (await request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`)).json()).data as { id: string; status: string; externalAccountRef: string }[];
+    expect(listed.find((a) => a.id === placeholder)).toMatchObject({ status: "pending", externalAccountRef: `pending:${caraId}` });
+
+    // Marked fulfilled: someone says it was done, nobody has seen it yet.
+    const done = await request.post(`/api/v1/access/requests/${req.id}/decision`, { data: { decision: "fulfilled" } });
+    expect(done.status(), await done.text()).toBe(200);
+    expect((await view()).fulfilment).toBe("fulfilled_unverified");
+
+    // The account appears at the source: the placeholder hands its grant over and goes.
+    await replaceIntegrationObjects(integrationId, tenantId, "account", [...ACCOUNTS, { externalId: "uid=cara", raw: { id: "cara", username: "cara", email: mail("cara") } }]);
+    const accountsRun = await request.post(`/api/v1/access/applications/${appId}/reconciliations`);
+    expect(accountsRun.status(), await accountsRun.text()).toBe(201);
+    await loadAccounts(request);
+    expect(accounts.cara).toMatchObject({ identityId: caraId, correlation: "correlated" });
+    expect(accounts[`pending:${caraId}`]).toBeUndefined();
+    const moved = await view();
+    expect(moved.grants[0]).toMatchObject({ accountId: accounts.cara.id, fulfilmentStatus: "fulfilled_unverified" });
+    expect((await ledgerFor(tenantId, accounts.cara.id)).find((e) => e.entitlementId === finance)?.status).toBe("PENDING_RECONCILIATION");
+
+    // The grant appears at the source: verified, and approved in the ledger (never rogue).
+    await replaceIntegrationObjects(integrationId, tenantId, "access_grant", [...BASE_GRANTS, grant("uid=cara", "cn=finance")]);
+    const counts = await reconcileAccess(request);
+    expect(counts.grants).toMatchObject({ added: 0, verified: 1 });
+    expect((await view()).fulfilment).toBe("verified");
+    expect((await ledgerFor(tenantId, accounts.cara.id)).find((e) => e.entitlementId === finance)?.status).toBe("VALID");
+    expect(await accessFindings(tenantId, accounts.cara.id)).toEqual([]);
+  });
+
   test("another organization sees none of it", async ({ browser }) => {
     const other = await browser.newContext({ storageState: authFile("adminTwo") });
     const runs = await other.request.get(`/api/v1/access/applications/${appId}/access-reconciliations`);
