@@ -102,7 +102,8 @@ export type SyncJobMissingStatus = "none" | "applied" | "held" | "approved" | "d
 export type SyncPipelineStepStatus = "pending" | "running" | "succeeded" | "partial" | "failed" | "skipped";
 export type SyncPipelineStatus = "none" | "running" | "succeeded" | "partial" | "failed";
 export type SyncPipelineStep = {
-  kind: "identities" | "accounts";
+  /** identities: an identity source; accounts: an application's accounts; access: its entitlements and grants (ACCESS-P0-27). */
+  kind: "identities" | "accounts" | "access";
   /** The identity source or application the step works on. */
   targetId: string;
   name: string;

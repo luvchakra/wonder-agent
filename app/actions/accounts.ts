@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { linkAccount, reconcileApplicationAccounts } from "@/modules/access-governance/service";
+import { linkAccount, reconcileApplicationAccess, reconcileApplicationAccounts, type AccessReconciliationRun } from "@/modules/access-governance/service";
 
 /**
  * ACCESS-P0-17 — account inventory forms. The real result or error is
@@ -41,5 +41,32 @@ export async function reconcileAccountsAction(applicationId: string, prev: Accou
     };
   } catch (err) {
     return formError(err);
+  }
+}
+
+/**
+ * ACCESS-P0-27 — entitlements and access from the connector: a preview
+ * first (changes nothing), then an apply of exactly that preview, refused
+ * if the source or the records changed in between.
+ */
+export type AccessReconcileState =
+  | { status: "idle" }
+  | { status: "previewed"; run: AccessReconciliationRun }
+  | { status: "applied"; run: AccessReconciliationRun }
+  | { status: "error"; message: string };
+
+export async function reconcileAccessAction(applicationId: string, _prev: AccessReconcileState, formData: FormData): Promise<AccessReconcileState> {
+  const ctx = await requirePermission("access.manage");
+  const previewRunId = String(formData.get("previewRunId") ?? "") || null;
+  try {
+    if (!previewRunId) {
+      return { status: "previewed", run: await reconcileApplicationAccess(ctx.tenantId!, ctx.userId, applicationId, { dryRun: true }) };
+    }
+    const run = await reconcileApplicationAccess(ctx.tenantId!, ctx.userId, applicationId, { dryRun: false, previewRunId });
+    revalidatePath(`/access/applications/${applicationId}`);
+    return { status: "applied", run };
+  } catch (err) {
+    const e = err as { message?: string; code?: string };
+    return { status: "error", message: e?.message || e?.code || "Something went wrong" };
   }
 }

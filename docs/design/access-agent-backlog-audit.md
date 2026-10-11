@@ -2214,3 +2214,65 @@ with more than 1000 imported accounts had the rest marked "not in source".
 
 **Verified.** Typecheck; `modules/access-governance` unit tests pass in the
 484/484 run; the system path is exercised through `syncPipeline.test.ts`.
+
+## 2026-10-11 — Entitlement and access-grant reconciliation from connectors (ACCESS-P0-27, F1, #44)
+
+A connector's entitlements and who holds what now land in `entitlements`
+and `access_grants` for an onboarded application whose live configuration
+takes entitlements from the connector, and stay in step with the source.
+
+**What changed.**
+- Migration `0119_access_connector_entitlements.sql` (applied):
+  - `entitlements.source_integration_id` (same-tenant FK) and `external_ref`,
+    unique per application and connection; `missing_from_source_at` on
+    entitlements and access grants;
+  - `access_reconciliation_runs` (RLS: members read their own; only the
+    service role writes), with counts, samples and the plan hash;
+  - indexes covering every new foreign key (one follow-up migration added
+    the FK-ordered ones the advisor asked for).
+- `connectorAccessRules.ts` (pure):
+  - an entitlement is matched by the connection's id; a hand- or file-made
+    one with the same unique name is adopted; same-name ambiguity is refused;
+  - a grant maps the connector's account id through the promoted identifier
+    field (`accountRefOf`, shared with account reconciliation);
+  - access held from elsewhere for the same account and entitlement counts
+    as present (no duplicate);
+  - a full run marks what the connection brought before and no longer lists;
+    an incremental run never removes; anything listed again is restored;
+  - `planFingerprint()` for the preview check.
+- `connectorAccess.ts`:
+  - `reconcileApplicationAccess()` (a person: a preview that changes
+    nothing, or an apply that, given the preview's id, refuses with 409
+    `PLAN_CHANGED` if the plan differs) and
+    `reconcileApplicationAccessAsSystem()` (Integration's post-sync step);
+  - service role with the tenant on every query and every row checked;
+  - audited `access.reconciled` (user or system); the ledger refreshes after
+    an apply.
+- Ledger: a grant's own `missing_from_source_at` now drives its ledger row,
+  so removal at the source and return are `missing_from_source` and
+  `seen_again` events.
+- `POST/GET /api/v1/access/applications/{id}/access-reconciliations`.
+- Application page: "Preview access from the connector", then "Apply these
+  changes", with counts and folded examples.
+- The INTEGRATION-P0-19 chain gains an `access` step after the account
+  steps, for applications whose entitlements come from the connector.
+
+**Verified.**
+- `tests/access/connector-access-isolation.sql`: 10/10.
+- Vitest:
+  - `connectorAccessRules.test.ts` 12;
+  - `connectorAccess.test.ts` 8: a preview writes nothing; an apply equals
+    its preview; a stale preview is refused and writes nothing; a re-run
+    changes nothing; a removal is marked (not revoked or deleted) and
+    restored; system audit; refusals;
+  - pipeline tests +2;
+  - `modules/access-governance`, `modules/integrations`,
+    `tests/architecture` and `lib/config`: 498/498 before the service test.
+- Typecheck, eslint and `next build` are clean. Advisors: the new FKs are
+  covered and there are no new security findings.
+
+**Left out.**
+- Readers of current access (effective access, CAN, runtime decisions)
+  still count a grant marked missing from the source, as they already do for
+  accounts. Classifying it (unproven, removed, rogue) is ACCESS-P0-25.
+- No pre-merge E2E run; the nightly suite covers it.

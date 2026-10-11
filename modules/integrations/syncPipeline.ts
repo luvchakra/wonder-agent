@@ -1,7 +1,7 @@
 import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
-import { listApplicationsReconciledFrom, reconcileApplicationAccountsAsSystem } from "@/modules/access-governance/service";
+import { listApplicationsReconciledFrom, reconcileApplicationAccessAsSystem, reconcileApplicationAccountsAsSystem } from "@/modules/access-governance/service";
 import { listSourcesReadingConnection, runSourceAfterSync } from "./identitySources";
 import { pipelineStatusOf, planPipeline, skipFrom, type ImportOutcome, type PipelineStatus, type PipelineStep } from "./pipelineRules";
 
@@ -21,7 +21,7 @@ export async function planAfterSync(tenantId: string, integrationId: string, out
   try {
     const [sources, applications] = await Promise.all([
       outcome.kindsRead.includes("identity") ? listSourcesReadingConnection(tenantId, integrationId) : Promise.resolve([]),
-      outcome.kindsRead.includes("account") ? listApplicationsReconciledFrom(tenantId, integrationId) : Promise.resolve([]),
+      ["account", "entitlement", "access_grant"].some((k) => outcome.kindsRead.includes(k)) ? listApplicationsReconciledFrom(tenantId, integrationId) : Promise.resolve([]),
     ]);
     return planPipeline(outcome, sources, applications);
   } catch {
@@ -49,6 +49,30 @@ async function runStep(tenantId: string, jobId: string, integrationId: string, s
       counts: { seen: c.seen, created: c.created, updated: c.updated, unchanged: c.unchanged, pending: c.pending, leavers: c.leavers, invalid: c.invalid, errors: c.errors },
       reason: out.error ?? (out.guardTripped ? "Leavers held: too many identities missing at once" : undefined),
     };
+  }
+  if (step.kind === "access") {
+    try {
+      // Only full runs have a chain, so the access step is full too: what the connector no longer lists is marked removed.
+      const run = await reconcileApplicationAccessAsSystem(tenantId, step.targetId, { mode: "full", syncJobId: jobId });
+      const c = run.counts as { entitlements?: Record<string, number>; grants?: Record<string, number> };
+      return {
+        ...step,
+        status: run.status === "succeeded" ? "succeeded" : "failed",
+        runId: run.id,
+        counts: {
+          entitlementsAdded: c.entitlements?.added ?? 0,
+          entitlementsChanged: c.entitlements?.changed ?? 0,
+          entitlementsRemoved: c.entitlements?.removed ?? 0,
+          grantsAdded: c.grants?.added ?? 0,
+          grantsRemoved: c.grants?.removed ?? 0,
+          grantsRestored: c.grants?.restored ?? 0,
+          grantsUnresolved: c.grants?.unresolved ?? 0,
+        },
+        reason: run.error ?? undefined,
+      };
+    } catch (err) {
+      return { ...step, status: "failed", reason: err instanceof Error ? err.message.slice(0, 300) : "Access reconciliation failed" };
+    }
   }
   try {
     const run = await reconcileApplicationAccountsAsSystem(tenantId, step.targetId);

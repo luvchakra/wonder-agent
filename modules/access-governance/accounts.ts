@@ -308,7 +308,10 @@ export async function reconcileApplicationAccountsAsSystem(tenantId: string, app
  * reconciles accounts against this connection, for the post-sync chain.
  * Service role with the caller's tenant (the connection's own).
  */
-export async function listApplicationsReconciledFrom(tenantId: string, integrationId: string): Promise<{ id: string; name: string }[]> {
+export async function listApplicationsReconciledFrom(
+  tenantId: string,
+  integrationId: string,
+): Promise<{ id: string; name: string; entitlementsFromConnector: boolean }[]> {
   const admin = supabaseServiceRole();
   const { data, error } = await admin
     .from("application_onboardings")
@@ -318,11 +321,12 @@ export async function listApplicationsReconciledFrom(tenantId: string, integrati
     .eq("promoted_config->>integrationId", integrationId)
     .limit(500);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  const ids = (data ?? []).map((r) => r.application_id as string);
+  const fromConnector = new Map((data ?? []).map((r) => [r.application_id as string, (r.promoted_config as { entitlementSource?: string } | null)?.entitlementSource === "connector"]));
+  const ids = [...fromConnector.keys()];
   if (!ids.length) return [];
   const { data: apps, error: appsError } = await admin.from("applications").select("id, name").eq("tenant_id", tenantId).in("id", ids).order("name");
   if (appsError) throw new ApiError(500, "QUERY_FAILED", appsError.message);
-  return (apps ?? []).map((a) => ({ id: a.id as string, name: a.name as string }));
+  return (apps ?? []).map((a) => ({ id: a.id as string, name: a.name as string, entitlementsFromConnector: fromConnector.get(a.id as string) === true }));
 }
 
 type ReconcileClient = ReturnType<typeof supabaseServiceRole> | Awaited<ReturnType<typeof supabaseServer>>;
