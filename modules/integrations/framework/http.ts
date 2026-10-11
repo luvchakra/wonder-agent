@@ -195,6 +195,7 @@ export class HttpSession {
     scope: TemplateScope,
     maxRecords: number,
     keyed = false,
+    report?: { truncated: boolean },
   ): Promise<unknown[]> {
     const p = pagination ?? { type: "none" };
     const out: unknown[] = [];
@@ -264,6 +265,8 @@ export class HttpSession {
         if (!next || got === 0) break;
       }
       if (full()) break;
+      // INTEGRATION-P0-18: the last allowed page was read and the source still had more.
+      if (page === LIMITS.pagesPerResource - 1 && report) report.truncated = true;
     }
     return out.slice(0, maxRecords);
   }

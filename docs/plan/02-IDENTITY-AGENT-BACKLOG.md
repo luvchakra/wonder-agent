@@ -37,6 +37,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
 | IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Partial — 2026-09-26: events, governed tasks, transitions, ownership transfer done (0084/0085); automatic birthright grants and deprovisioning wait on ACCESS-P0-20 and INTEGRATION-P0-13 |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-20 | Non-human identities from accounts; owner from source or an unowned queue; agent accounts by identifier (F1, #46) | Not Started |
 
 ---
 
@@ -694,3 +695,13 @@ Lifecycle states Pre-Join → Active → Leave Pending → Disabled → Terminat
 ### IDENTITY-P0-19 — AI agent onboarding journey, sponsor, agent access packages, lifecycle policies
 
 The spec's agent journey (discover → classify → register → owner/sponsor → tools → apps/data → access model → validate → govern → activate) as a guided flow over the existing agent registration, contracts, MCP inventory and gateway; agent sponsor; agent access packages via ACCESS-P0-20; lifecycle policies and ownership transfer.
+
+## IGA plan F1–F2 stories (2026-10-11)
+
+The owner approved the IGA baseline (decision D1) on 2026-10-11, so the
+phase F1 (import and reconciliation) and F2 (access requests) stories enter
+this backlog. Their goals, order, dependencies and exit tests are in
+[`docs/WonderID/run-order/RUN-ORDER.md`](../WonderID/run-order/RUN-ORDER.md),
+the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
+and each story's acceptance criteria in its GitHub issue (number in the
+tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).

@@ -404,3 +404,12 @@ On the owner's request, every document from the IGA plan work now lives under
 study and the integrator guide (moved from `docs/design/` and
 `docs/integrations/`). Paths in earlier entries of this file were updated to
 the new locations. `docs/WonderID/README.md` is the index.
+
+## 2026-10-11 — D1 approved; F1 started
+
+The owner approved decision D1 (the IGA baseline). The phase F1 and F2
+stories now have Progress Tracker rows in their module backlogs (Foundation,
+Identity, Integration, Access, Experience, QA), with `docs/PROGRESS.md`
+regenerated. F1 started with INTEGRATION-P0-18 (staging reflects the source,
+migration 0117), now Done; INTEGRATION-P0-19 is next. Live status:
+`docs/WonderID/progress/PROGRESS.md`.

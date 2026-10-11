@@ -94,6 +94,9 @@ export type AuthType = "oauth2" | "api_key" | "basic" | "bearer" | "mtls";
 
 export type SyncJobTrigger = "manual" | "scheduled";
 export type SyncJobStatus = "queued" | "running" | "succeeded" | "failed" | "partial";
+/** INTEGRATION-P0-18: only a full run may mark staged objects missing at the source. */
+export type SyncJobMode = "full" | "incremental" | "partial";
+export type SyncJobMissingStatus = "none" | "applied" | "held" | "approved" | "discarded";
 
 export type IntegrationSyncJob = {
   id: string;
@@ -109,6 +112,12 @@ export type IntegrationSyncJob = {
   retryCount: number;
   correlationId: string;
   createdAt: string;
+  mode: SyncJobMode;
+  /** What the run decided about objects gone from the source (see modules/integrations/stagingRules.ts). */
+  missingStatus: SyncJobMissingStatus;
+  missingSummary: Record<string, Record<string, unknown>>;
+  missingResolvedBy: string | null;
+  missingResolvedAt: string | null;
 };
 
 export type IntegrationObjectType =

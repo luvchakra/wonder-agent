@@ -48,6 +48,8 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
 | QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
+| QA-P0-23 | Reconciliation suite (F1, #48) | Not Started |
+| QA-P0-24 | Request-to-verified suite (F2, #56) | Not Started |
 
 ---
 
@@ -603,3 +605,13 @@ The spec's 37A test matrix across the new surface: tenant isolation, permission 
 ### QA-P0-22 — Brownfield migration fixture
 
 End-to-end fixture from HR import to certification including legitimate access, missing request IDs, stale access, orphan accounts, conflicting sources, ambiguous identity, privileged, machine, agent and external identities.
+
+## IGA plan F1–F2 stories (2026-10-11)
+
+The owner approved the IGA baseline (decision D1) on 2026-10-11, so the
+phase F1 (import and reconciliation) and F2 (access requests) stories enter
+this backlog. Their goals, order, dependencies and exit tests are in
+[`docs/WonderID/run-order/RUN-ORDER.md`](../WonderID/run-order/RUN-ORDER.md),
+the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
+and each story's acceptance criteria in its GitHub issue (number in the
+tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).

@@ -100,7 +100,7 @@ export function fileDriver(deps: { fetch: FileFetch; store?: FileStoreFactory })
           }
         }
       },
-      async fetch(spec, _scope, maxRecords, kind) {
+      async fetch(spec, _scope, maxRecords, kind, report) {
         const address = fileAddress(spec, settings);
         if (address) {
           return parsed(kind, spec, await download(deps.fetch, address, fileAuthHeaders(def, settings, secrets)), settings, `The ${kind} file`).slice(0, maxRecords);
@@ -109,7 +109,11 @@ export function fileDriver(deps: { fetch: FileFetch; store?: FileStoreFactory })
         // preview (no stored connection) has no received files.
         if (!store) return [];
         const file = await store.newest(kind);
-        if (!file) return [];
+        // INTEGRATION-P0-18: no new file is "nothing read", not "the source is empty".
+        if (!file) {
+          if (report) report.unread = true;
+          return [];
+        }
         // Marked read even when it fails to parse: the job reports why, and
         // the next run waits for a corrected file instead of failing again.
         read.push({ kind, file });

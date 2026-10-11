@@ -4,7 +4,7 @@ import { headers } from "next/headers";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIntegration, getReceiverStatus, listSyncJobs } from "@/modules/integrations/service";
-import { testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
+import { resolveHeldMissingAction, testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
 import { parseConnectorConfig } from "@/modules/integrations/framework/engine";
@@ -23,6 +23,23 @@ const JOB_STATUS_TONE: Record<string, BadgeTone> = {
   failed: "danger",
   partial: "warning",
 };
+
+/** INTEGRATION-P0-18: the result of approving or discarding a held run. */
+const HELD_OUTCOME: Record<string, string> = {
+  approved: "Approved: the records gone from the source are now marked missing.",
+  discarded: "Discarded: nothing was marked missing.",
+  superseded: "Not approved: a newer run has started. Discard this one.",
+  decided: "This run was already decided.",
+  failed: "The decision could not be saved. Try again.",
+};
+
+/** The kinds a held run would mark, e.g. "15 of 25 identity". */
+function heldDescription(summary: Record<string, Record<string, unknown>>): string {
+  return Object.entries(summary)
+    .filter(([, k]) => k.status === "held")
+    .map(([kind, k]) => `${k.candidates} of ${k.presentBefore} ${kind}`)
+    .join(", ");
+}
 
 /** The definition a connection runs, or null when its stored definition can no longer be read. */
 function connectorDefinition(integration: { integrationTypeId: string; config: Record<string, unknown> }): ConnectorDefinition | null {
@@ -48,10 +65,10 @@ export default async function IntegrationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ credentials?: string }>;
+  searchParams: Promise<{ credentials?: string; held?: string }>;
 }) {
   const { id } = await params;
-  const { credentials } = await searchParams;
+  const { credentials, held } = await searchParams;
   let ctx;
   try {
     ctx = await requirePermission("integration.read");
@@ -223,6 +240,33 @@ export default async function IntegrationDetailPage({
               }
             />
             <CardBody>
+              {held && HELD_OUTCOME[held] ? (
+                <p role="status" className="mb-3 text-sm text-foreground">
+                  {HELD_OUTCOME[held]}
+                </p>
+              ) : null}
+              {jobs
+                .filter((j) => j.missingStatus === "held")
+                .map((j) => (
+                  <div key={j.id} role="alert" className="mb-3 rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
+                    <p>
+                      The run of {j.createdAt} found {heldDescription(j.missingSummary)} gone from the source, more than this
+                      organization allows at once. Nothing was marked missing.
+                    </p>
+                    {canEdit ? (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <form action={resolveHeldMissingAction.bind(null, id, j.id, "approve")}>
+                          <Button type="submit">Mark them missing</Button>
+                        </form>
+                        <form action={resolveHeldMissingAction.bind(null, id, j.id, "discard")}>
+                          <Button type="submit" variant="secondary">
+                            Discard
+                          </Button>
+                        </form>
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
               {jobs.length === 0 ? (
                 <EmptyState title="No sync jobs yet" />
               ) : (

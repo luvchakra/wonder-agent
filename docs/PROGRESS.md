@@ -8,25 +8,25 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-10-10 from 11 module backlogs.
+Generated 2026-10-11 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**201 of 252 tracked stories complete — 80%**
+**202 of 268 tracked stories complete — 75%**
 
 ```
-████████████████████████████████░░░░░░░░  80%
+██████████████████████████████░░░░░░░░░░  75%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 201 |
+| Done | 202 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 22 |
-| **Total tracked** | **252** |
+| Not Started | 37 |
+| **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -38,17 +38,17 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 3 | 0 | 2 | 43 | `████████████████░░` 88% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 1 | 20 | `███████████████░░░` 85% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 20 | 3 | 0 | 1 | 24 | `███████████████░░░` 83% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 23 | 0 | 0 | 4 | 27 | `███████████████░░░` 85% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 3 | 0 | 4 | 45 | `███████████████░░░` 84% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 2 | 21 | `███████████████░░░` 81% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 21 | 3 | 0 | 3 | 27 | `██████████████░░░░` 78% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 23 | 0 | 0 | 10 | 33 | `█████████████░░░░░` 70% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 25 | 3 | 0 | 5 | 33 | `██████████████░░░░` 76% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 25 | 3 | 0 | 7 | 35 | `█████████████░░░░░` 71% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 13 | 2 | 1 | 1 | 17 | `██████████████░░░░` 76% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 3 | 28 | `████████░░░░░░░░░░` 46% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 5 | 30 | `████████░░░░░░░░░░` 43% |
 
 ---
 
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 38 done · 3 partial · 0 deferred · 2 not started (43 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 38 done · 3 partial · 0 deferred · 4 not started (45 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -105,12 +105,14 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-28 | Billing and privacy permission keys; `has_tenant_permission()` for permission-gated RLS (2026-10-01 user request) | Done — 2026-10-01 (`0101`; 6 keys, system-role grants; live isolation proof `tests/compliance/billing-privacy-tenant-isolation.sql` 28/28) |
 | FOUNDATION-P0-29 | Tamper-evident, append-only audit trail (SOX ITGC CO-01, PCI DSS 10.3.2) | Done — 2026-10-01 (`0104`; per-tenant SHA-256 chain backfilled over 8,940 rows, `verify_audit_chain()`, `purge_audit_logs()`, `/audit/integrity`; tamper test detected the altered row) |
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
+| FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; needs D11) | Not Started |
+| FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Not Started |
 
 ### 02 — Identity Agent
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 17 done · 2 partial · 0 deferred · 1 not started (20 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 17 done · 2 partial · 0 deferred · 2 not started (21 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -134,12 +136,13 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
 | IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Partial — 2026-09-26: events, governed tasks, transitions, ownership transfer done (0084/0085); automatic birthright grants and deprovisioning wait on ACCESS-P0-20 and INTEGRATION-P0-13 |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
+| IDENTITY-P0-20 | Non-human identities from accounts; owner from source or an unowned queue; agent accounts by identifier (F1, #46) | Not Started |
 
 ### 03 — Integration Agent
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 20 done · 3 partial · 0 deferred · 1 not started (24 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 21 done · 3 partial · 0 deferred · 3 not started (27 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -167,12 +170,15 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-15 | Built-in connectors: Frappe HR, ERPNext, LDAP, Keycloak, Gitea, Mattermost, Nextcloud, PostgreSQL, OpenBao, Kubernetes | Done — 2026-10-10, each certified live against the Planet Express demo company |
 | INTEGRATION-P0-16 | Connector boundary (non-negotiable #20): receivers, Runtime Gateway, MCP driver, Saviynt/Zendesk/MCP/webhook definitions; old adapters and routes removed | Done — 2026-10-10: migration 0109 applied and merged; receivers, Runtime Gateway, MCP driver and the Saviynt/Zendesk/MCP/webhook definitions live, old adapters and routes removed, `connector-boundary.test.ts` enforcing (gateway allowlist entry approved by the user). Retired types and the stale Zendesk credential removed by migration 0113 (run by the owner, 2026-10-10) |
 | INTEGRATION-P0-17 | CSV through the framework (user request 2026-10-10): `file` driver, `csv-file` connector, file receiver, connection schedules and daily cron, object-page imports (`POST /api/v1/imports`) | Done — 2026-10-10: migrations 0110/0111 applied (isolation SQL 14/14 and 8/8); object-page import now previews first and then adds/updates records additively (PR #25, `file-import.spec.ts` 16/16 on Vercel); FK indexes 0112 applied |
+| INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
+| INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Not Started |
+| INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Not Started |
 
 ### 04 — Access Agent
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 23 done · 0 partial · 0 deferred · 4 not started (27 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 23 done · 0 partial · 0 deferred · 10 not started (33 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -203,6 +209,12 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |
+| ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Not Started |
+| ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Not Started |
+| ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Not Started |
+| ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Not Started |
+| ACCESS-P0-31 | Requests for non-human identities; AI agents within their contract (F2, #53) | Not Started |
+| ACCESS-P0-32 | Time-bound access: end dates, reminders, removal task at expiry (F2, #54) | Not Started |
 
 ### 05 — Runtime Agent
 
@@ -281,7 +293,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 25 done · 3 partial · 0 deferred · 5 not started (33 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 25 done · 3 partial · 0 deferred · 7 not started (35 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -318,6 +330,8 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-25 | Visual regression baselines (BRAND-012) | Partial — 2026-09-26: sign-in desktop and mobile; the remaining screens follow P0-24 |
 | EXPERIENCE-P0-26 | Install the app on phones and tablets (web app manifest, icons, install banner) | Done — 2026-10-10: manifest, icons, iOS meta and a banner shown only where the browser can install the app; see audit log |
 | EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
+| EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Not Started |
+| EXPERIENCE-P0-29 | Request tracking per line; one inbox for approvals and tasks; subject picker (F2, #55) | Not Started |
 
 ### 09 — Platform Agent
 
@@ -372,7 +386,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 13 done · 12 partial · 0 deferred · 3 not started (28 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 13 done · 12 partial · 0 deferred · 5 not started (30 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -404,4 +418,6 @@ and are deliberately excluded from the counts above.
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
 | QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
+| QA-P0-23 | Reconciliation suite (F1, #48) | Not Started |
+| QA-P0-24 | Request-to-verified suite (F2, #56) | Not Started |
 

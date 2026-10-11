@@ -55,7 +55,7 @@ export async function discoverMcpTools(tenantId: string, integrationId: string):
         const { data, error: upsertError } = await admin
           .from("integration_objects")
           .upsert(
-            { tenant_id: tenantId, integration_id: integrationId, object_type: kind, external_id: r.externalId, raw: r.raw, normalized: r.normalized ?? {}, imported_at: now },
+            { tenant_id: tenantId, integration_id: integrationId, object_type: kind, external_id: r.externalId, raw: r.raw, normalized: r.normalized ?? {}, imported_at: now, missing_at_source_at: null },
             { onConflict: "integration_id,object_type,external_id" },
           )
           .select()

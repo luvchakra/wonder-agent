@@ -119,7 +119,7 @@ export function mcpDriver(fetchImpl: FetchLike): DriverFactory {
       return initialized;
     }
 
-    async function list(method: string, max: number): Promise<unknown[]> {
+    async function list(method: string, max: number, report?: { truncated: boolean }): Promise<unknown[]> {
       await open();
       const out: unknown[] = [];
       let cursor: string | undefined;
@@ -130,6 +130,8 @@ export function mcpDriver(fetchImpl: FetchLike): DriverFactory {
         cursor = typeof result.nextCursor === "string" && result.nextCursor ? result.nextCursor : undefined;
         if (!cursor) break;
       }
+      // INTEGRATION-P0-18: stopped at the page limit with a next page still offered.
+      if (cursor && report) report.truncated = true;
       return out.slice(0, max);
     }
 
@@ -139,11 +141,11 @@ export function mcpDriver(fetchImpl: FetchLike): DriverFactory {
         const method = def.test?.rpc?.method;
         if (method && method !== "initialize") await list(method, 1);
       },
-      async fetch(resource, _scope, max) {
+      async fetch(resource, _scope, max, _kind, report) {
         const method = resource.rpc?.method;
         if (!method) throw new Error("This resource has no rpc method");
         if (method === "initialize") return [{ ...(await open()), endpoint: endpoint.toString() }];
-        const records = await list(method, max);
+        const records = await list(method, max, report);
         if (method !== "tools/list") return records;
         return records.map((t) => {
           if (typeof t !== "object" || t === null) return t;

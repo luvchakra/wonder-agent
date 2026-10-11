@@ -5,11 +5,13 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
-import type { IntegrationSyncJob, SyncJobTrigger } from "@/lib/shared/types/integrations";
+import type { IntegrationSyncJob, SyncJobMode, SyncJobTrigger } from "@/lib/shared/types/integrations";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { toSyncJob } from "./mappers";
 import { createConnector } from "./registry";
 import { getDecryptedCredential } from "./credentials";
 import { openGateway, type GatewaySession } from "./gateway/gateway";
+import { heldKinds, kindCompleteness, missingStatusOf, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -21,11 +23,13 @@ export async function createSyncJob(
   tenantId: string,
   integrationId: string,
   trigger: SyncJobTrigger,
+  // INTEGRATION-P0-18: a partial run (an object-page file) never marks anything missing.
+  mode: SyncJobMode = "full",
 ): Promise<IntegrationSyncJob> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("integration_sync_jobs")
-    .insert({ tenant_id: tenantId, integration_id: integrationId, trigger })
+    .insert({ tenant_id: tenantId, integration_id: integrationId, trigger, mode })
     .select()
     .single();
   // QA-P0-17: 0076's same-tenant foreign keys refuse a reference to another
@@ -106,6 +110,49 @@ export async function listLatestCompletedSyncStarts(tenantId: string): Promise<M
   return latest;
 }
 
+/**
+ * INTEGRATION-P0-18. For each kind this run read completely (stagingRules),
+ * marks the staged objects it did not see as missing at the source, through
+ * stage_mark_missing() (0117), which applies the organization's mass-missing
+ * guard and never marks what a newer run has seen. Service role; the job and
+ * tenant are this run's own. A failure here is recorded, never thrown: the
+ * import itself already succeeded.
+ */
+async function markMissing(tenantId: string, jobId: string, mode: SyncJobMode, kindRuns: Map<string, KindRun>): Promise<MissingSummary> {
+  const summary: MissingSummary = {};
+  let threshold: number;
+  try {
+    threshold = (await getTenantConfig(tenantId))["integration.massMissingPercent"];
+  } catch {
+    // An unreadable setting is never permission: skip marking for this run.
+    for (const kind of kindRuns.keys()) summary[kind] = { status: "skipped", reason: "the organization's settings could not be read" };
+    return summary;
+  }
+  for (const [kind, run] of kindRuns) {
+    const decision = kindCompleteness(mode, run);
+    if (!decision.complete) {
+      summary[kind] = { status: "skipped", reason: decision.reason };
+      continue;
+    }
+    const { data, error } = await supabaseServiceRole().rpc("stage_mark_missing", {
+      p_tenant: tenantId,
+      p_job: jobId,
+      p_kind: kind,
+      p_threshold_percent: threshold,
+      p_min_population: MASS_MISSING_MIN_POPULATION,
+    });
+    const row = (Array.isArray(data) ? data[0] : data) as { candidates: number; present_before: number; marked: number; held: boolean } | null;
+    if (error || !row) {
+      summary[kind] = { status: "skipped", reason: "marking failed; nothing was marked" };
+      continue;
+    }
+    summary[kind] = row.held
+      ? { status: "held", candidates: row.candidates, presentBefore: row.present_before, thresholdPercent: threshold }
+      : { status: "marked", marked: row.marked, candidates: row.candidates, presentBefore: row.present_before };
+  }
+  return summary;
+}
+
 /** integration_objects rows stored per request. */
 const UPSERT_CHUNK = 500;
 
@@ -149,6 +196,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
   const errors: { objectType?: string; message: string }[] = [];
   let recordsProcessed = 0;
   let recordsFailed = 0;
+  // INTEGRATION-P0-18: what each kind's import did, to decide whether it may mark objects missing.
+  const kindRuns = new Map<string, KindRun>();
   // The run's Connector Gateway session: every request of this sync passes it; flushed at the end.
   let gateway: GatewaySession | null = null;
 
@@ -172,6 +221,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     // Every kind the connection's definition reads, in import order (an MCP
     // server before its tools, so the inventory can tell what is still declared).
     for (const objectType of connector.kinds()) {
+      const run: KindRun = { failed: false, storeFailures: 0, unmapped: 0, truncated: false, unread: false };
+      kindRuns.set(objectType, run);
       try {
         const records = await connector.importKind(objectType);
         const rows = records.map((record) => ({
@@ -182,6 +233,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
           raw: record.raw,
           normalized: record.normalized ?? {},
           sync_job_id: jobId,
+          // Seen again: no longer missing at the source.
+          missing_at_source_at: null,
         }));
         // Stored 500 at a time; a chunk that fails is retried row by row so
         // each bad record is counted and named, never the whole chunk.
@@ -196,6 +249,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
             const { error: upsertError } = await supabase.from("integration_objects").upsert(row, { onConflict: "integration_id,object_type,external_id" });
             if (upsertError) {
               recordsFailed += 1;
+              run.storeFailures += 1;
               errors.push({ objectType, message: upsertError.message });
             } else recordsProcessed += 1;
           }
@@ -203,9 +257,12 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
         // Records the definition could not map are reported, not stored half-filled.
         for (const issue of connector.drainIssues()) {
           recordsFailed += 1;
+          run.unmapped += 1;
           errors.push(issue);
         }
+        Object.assign(run, connector.readReport(objectType));
       } catch (err) {
+        run.failed = true;
         errors.push({
           objectType,
           message: `Import failed: ${err instanceof Error ? err.message : "Unknown error"}`,
@@ -218,6 +275,10 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
 
     const finalStatus = errors.length === 0 ? "succeeded" : recordsProcessed > 0 ? "partial" : "failed";
 
+    // INTEGRATION-P0-18: objects a complete full read did not see are missing at the source.
+    const missingSummary = finalStatus === "failed" ? {} : await markMissing(tenantId, jobId, jobRow.mode ?? "full", kindRuns);
+    const missingStatus = missingStatusOf(missingSummary);
+
     await supabase
       .from("integration_sync_jobs")
       .update({
@@ -226,6 +287,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
         records_processed: recordsProcessed,
         records_failed: recordsFailed,
         errors,
+        missing_status: missingStatus,
+        missing_summary: missingSummary,
       })
       .eq("id", jobId);
 
@@ -239,8 +302,20 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       objectId: jobId,
       outcome: finalStatus === "failed" ? "failure" : "success",
       correlationId: jobRow.correlation_id,
-      metadata: { status: finalStatus, recordsProcessed, recordsFailed, integrationId: integration.id },
+      metadata: { status: finalStatus, recordsProcessed, recordsFailed, integrationId: integration.id, missingStatus, missingSummary },
     });
+
+    // A held run waits for a person (approve or discard on the connection's page).
+    if (missingStatus === "held") {
+      await notify({
+        tenantId,
+        type: "integration_failure",
+        title: `Sync held for review: ${integration.name}`,
+        body: "More records than usual are gone from the source. Nothing was marked missing; approve or discard on the connection's page.",
+        referenceType: "integration_sync_job",
+        referenceId: jobId,
+      });
+    }
 
     // OPERATIONS-P0-02.2 — wired per that story's own instruction that
     // each producing module picks this up in its own work. Only a
@@ -291,4 +366,101 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
   } finally {
     await gateway?.flush();
   }
+}
+
+/**
+ * INTEGRATION-P0-18. A person decides a run the mass-missing guard held:
+ * approve marks the held kinds' unseen objects missing (stage_mark_missing()
+ * without the guard, so still never what a newer run has seen); discard
+ * marks nothing. The decision is claimed with a conditional update, so two
+ * people deciding at once cannot both apply it. Approving is refused once a
+ * newer run of the connection has started: its result, not this one's, is
+ * the current view of the source. Service role; every query names the
+ * caller's tenant (§14).
+ */
+export async function resolveHeldMissing(
+  tenantId: string,
+  actorId: string,
+  integrationId: string,
+  jobId: string,
+  decision: "approve" | "discard",
+): Promise<IntegrationSyncJob> {
+  const supabase = supabaseServiceRole();
+  const { data: job, error } = await supabase
+    .from("integration_sync_jobs")
+    .select("id, tenant_id, integration_id, started_at, missing_status, missing_summary, correlation_id")
+    .eq("id", jobId)
+    .eq("tenant_id", tenantId)
+    .eq("integration_id", integrationId)
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", "The sync job could not be read");
+  if (!job || job.tenant_id !== tenantId) throw new ApiError(404, "JOB_NOT_FOUND", "Sync job not found");
+  if (job.missing_status !== "held") throw new ApiError(409, "NOT_HELD", "This run is not waiting for a decision");
+
+  if (decision === "approve") {
+    const { count, error: newerError } = await supabase
+      .from("integration_sync_jobs")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("integration_id", job.integration_id)
+      .gt("started_at", job.started_at);
+    if (newerError) throw new ApiError(500, "QUERY_FAILED", "Newer runs could not be checked");
+    if ((count ?? 0) > 0) throw new ApiError(409, "SUPERSEDED", "A newer run has started; discard this one");
+  }
+
+  const resolvedAt = new Date().toISOString();
+  const status = decision === "approve" ? "approved" : "discarded";
+  const { data: claimed, error: claimError } = await supabase
+    .from("integration_sync_jobs")
+    .update({ missing_status: status, missing_resolved_by: actorId, missing_resolved_at: resolvedAt })
+    .eq("id", jobId)
+    .eq("tenant_id", tenantId)
+    .eq("missing_status", "held")
+    .select("id");
+  if (claimError) throw new ApiError(500, "UPDATE_FAILED", "The decision could not be saved");
+  if (!claimed?.length) throw new ApiError(409, "NOT_HELD", "This run was already decided");
+
+  const summary = { ...(job.missing_summary as MissingSummary) };
+  for (const kind of heldKinds(summary)) {
+    const held = summary[kind] as Extract<KindMissing, { status: "held" }>;
+    if (decision === "discard") {
+      summary[kind] = { status: "discarded", candidates: held.candidates, presentBefore: held.presentBefore };
+      continue;
+    }
+    const { data, error: markError } = await supabase.rpc("stage_mark_missing", {
+      p_tenant: tenantId,
+      p_job: jobId,
+      p_kind: kind,
+      p_threshold_percent: null,
+      p_min_population: MASS_MISSING_MIN_POPULATION,
+    });
+    const row = (Array.isArray(data) ? data[0] : data) as { candidates: number; present_before: number; marked: number } | null;
+    summary[kind] =
+      markError || !row
+        ? { status: "skipped", reason: "marking failed after approval; nothing was marked" }
+        : { status: "approved", marked: row.marked, candidates: row.candidates, presentBefore: row.present_before };
+  }
+
+  const { data: updated, error: updateError } = await supabase
+    .from("integration_sync_jobs")
+    .update({ missing_summary: summary })
+    .eq("id", jobId)
+    .eq("tenant_id", tenantId)
+    .select()
+    .single();
+
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: decision === "approve" ? "integration.sync_missing_approved" : "integration.sync_missing_discarded",
+    objectType: "integration_sync_job",
+    objectId: jobId,
+    outcome: updateError ? "failure" : "success",
+    correlationId: job.correlation_id,
+    metadata: { integrationId: job.integration_id, missingSummary: summary },
+  });
+
+  if (updateError || !updated) throw new ApiError(500, "UPDATE_FAILED", "The result could not be saved");
+  return toSyncJob(updated);
 }

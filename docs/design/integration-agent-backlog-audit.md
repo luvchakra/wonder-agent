@@ -1858,3 +1858,72 @@ pages should always be paginated".
 **Verified.** `maskSecret` unit tests; typecheck and eslint clean; local
 Playwright: `integrations.spec.ts` passed in a 52/52 run with the identities
 and design-review specs.
+
+## 2026-10-11 — Staging reflects the source (INTEGRATION-P0-18, F1, #42)
+
+First story of IGA phase F1, started after the owner approved decision D1.
+Until now a sync only upserted into `integration_objects`, so an account
+removed on a target, or a leaver dropped from an HR feed, stayed in staging
+for ever. Now a complete full run marks what it did not see as missing at
+the source, guarded against the two ways that goes wrong: an incomplete read
+and a mass removal.
+
+**What changed.**
+- Migration `0117_integration_staging_missing.sql` (applied):
+  `integration_objects.missing_at_source_at` (never a delete);
+  `integration_sync_jobs.mode` (`full` default, `incremental`, `partial`),
+  `missing_status` (`none`, `applied`, `held`, `approved`, `discarded`),
+  `missing_summary`, `missing_resolved_by`, `missing_resolved_at`; the client
+  insert policy pins the new result columns to their defaults;
+  `stage_mark_missing(tenant, job, kind, threshold, min_population)`,
+  security invoker, executable by the service role only. Candidates exclude
+  objects last seen by a run that started after this one. Indexes on held
+  jobs and on `missing_resolved_by` (the advisor flagged the foreign key).
+- Engine (`framework/engine.ts`, `http.ts`, `drivers/mcp.ts`,
+  `drivers/file.ts`): a per-kind `FetchReport` (`truncated`, `unread`). The
+  silent caps (`maxRecords`, the http driver's 2000 pages, MCP's 200 pages)
+  now say when they cut a read; forEach/unwind children inherit the parent's
+  report; a file connection with no unread file for a kind reports `unread`.
+- `stagingRules.ts` (pure): `kindCompleteness()` (only a full run, and only
+  a kind read without failure, truncation, unread, store failures or
+  unmapped records), `missingStatusOf()`, `heldKinds()`, the minimum
+  population of 20.
+- `syncJobs.ts`: `runSyncJob()` collects each kind's run, clears
+  `missing_at_source_at` on every object it stores, then `markMissing()`
+  calls the function per complete kind with the organization's
+  `integration.massMissingPercent` (new Global Configuration setting,
+  section Imports, default 20, `tenant.settings`). An unreadable setting
+  skips marking (never permission). The job and its
+  `integration.sync_completed` audit event record the outcome per kind; a
+  held run notifies (`integration_failure`, "Sync held for review").
+  `resolveHeldMissing()` approves (marks the held kinds without the guard)
+  or discards, claimed with a conditional update so two people cannot both
+  apply it, refused once a newer run has started; audited
+  `integration.sync_missing_approved` / `_discarded`.
+- `POST /api/v1/integrations/{id}/jobs/{jobId}/missing` and a held-run
+  notice in the connection page's Sync jobs card (Mark them missing /
+  Discard, `integration.update`), with the real outcome shown after.
+- Object-page imports create `partial` jobs. The published readers
+  (`getNormalizedObjects*`) and the identity-source reader leave missing
+  objects out (`includeMissing` to opt in); the MCP inventory opts in, and
+  MCP discovery clears the mark on what it sees.
+- `docs/integrations/CONNECTOR-FRAMEWORK.md`: "Removed at the source".
+
+**Verified.**
+- `tests/integrations/staging-missing.sql` on the dev project: 19/19
+  (marking, nothing deleted, other kind/connection/organization untouched,
+  newer-run rule, never-tagged objects, guard hold and approval, small kinds
+  not held, foreign/unstarted job refused, no client call or claimed result,
+  member cannot clear a mark, member of B sees nothing of A).
+- Vitest: `stagingRules.test.ts` (10), `resolveHeldMissing.test.ts` (7), two
+  new engine tests in `framework.test.ts`; `modules/integrations`,
+  `lib/config` and `tests/architecture` 278/278.
+- `npm run typecheck`, eslint on changed files, `next build`: clean.
+- Supabase advisors after the migration: no new security finding; the new
+  foreign key is indexed.
+
+**Left out.** Downstream consumers acting on a missing object (revoking a
+grant, a leaver from an account) are ACCESS-P0-27 and INTEGRATION-P0-19.
+Incremental runs exist as a mode but no driver issues one yet
+(INTEGRATION-P0-21). The held-run notice has no E2E spec; QA-P0-23 covers
+the reconciliation flow.

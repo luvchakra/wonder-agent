@@ -44,6 +44,12 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |
+| ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Not Started |
+| ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Not Started |
+| ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Not Started |
+| ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Not Started |
+| ACCESS-P0-31 | Requests for non-human identities; AI agents within their contract (F2, #53) | Not Started |
+| ACCESS-P0-32 | Time-bound access: end dates, reminders, removal task at expiry (F2, #54) | Not Started |
 
 ---
 
@@ -663,3 +669,13 @@ Owner request, 2026-10-10 (the SOD area and Admin › Entitlements).
 - Entitlements (`/access/entitlements`, `access.read`): every entitlement
   across applications, paged and counted at the database, searched by an
   escaped `ilike` on the name.
+
+## IGA plan F1–F2 stories (2026-10-11)
+
+The owner approved the IGA baseline (decision D1) on 2026-10-11, so the
+phase F1 (import and reconciliation) and F2 (access requests) stories enter
+this backlog. Their goals, order, dependencies and exit tests are in
+[`docs/WonderID/run-order/RUN-ORDER.md`](../WonderID/run-order/RUN-ORDER.md),
+the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
+and each story's acceptance criteria in its GitHub issue (number in the
+tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).
