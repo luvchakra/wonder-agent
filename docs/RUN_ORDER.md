@@ -343,3 +343,39 @@ in #40, carried into #65.)
 - `docs/design/saviynt-reference-study.md`: a read-only reading of the owner's Saviynt v25 training tenant.
   - It maps what was observed to the design's phases and proposes 15 additions (D-1 to D-15).
   - It corrects one claim: duplicate detection over existing identities exists for agents only.
+
+## 2026-10-11 — Integrator configurability review
+
+The owner asked whether the design gives a system integrator enough to
+onboard users and applications, write connectors, set up technical, update
+and event-driven rules, and manage AI agents, by configuration.
+
+**Found in the code:**
+- Custom connectors are already configuration: JSON definitions written and
+  tried in the console, versioned per organization (0108).
+- Identity sources, application onboarding, request policies, packages,
+  custom roles and custom identity attributes are configurable in the console
+  and the API.
+- Not configurable yet: birthright, attribute and event-driven rules;
+  provisioning; agent discovery rules and contract templates; mapping onto
+  custom attributes; schedules on non-file connections.
+- `/api/v1/*` accepts only a browser session, so nothing can be scripted.
+- The SSO handshake waits on a Supabase SSO provider the owner has not
+  configured (FOUNDATION-P0-03.3).
+
+**Design changes** (`docs/design/WONDERID-FOUNDATION-DESIGN.md`):
+- §5.2.1 one rule model (trigger, scope, condition, effects, mode, priority,
+  version) with its catalogues; attribute rules.
+- §5.4 entitlement types per application and classification rules.
+- §5.8.2 what an integrator builds without code, and the planned extensions.
+- §5.10 event subscriptions, outbound webhooks and notification channels.
+- §6.1 discovery rules, agent classes, contract templates, tool overrides.
+- §8.1 the table of what is configurable today and what each phase adds;
+  §8.2 automation credentials; §8.3 integrator role, sandbox and guide.
+- Decisions D11 (automation credentials) and D12 (shared rule runtime).
+- Eleven stories: FOUNDATION-P0-31/32, INTEGRATION-P0-20/21,
+  IDENTITY-P0-21/22, ACCESS-P0-33/34, EXPERIENCE-P0-30, OPERATIONS-P0-11,
+  QA-P0-25, placed in F1–F7. F1 and F2 exit tests are unchanged.
+
+`docs/integrations/INTEGRATOR-GUIDE.md` is new: what an integrator can
+configure today, with paths and permissions.

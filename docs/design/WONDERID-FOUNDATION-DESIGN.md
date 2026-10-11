@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Status | Draft for owner review. Proposes work; changes nothing on its own. Revised 2026-10-11: delivery reordered so reconciliation, account import and access requests come first (§10). |
+| Status | Draft for owner review. Proposes work; changes nothing on its own. Revised 2026-10-11: delivery reordered so reconciliation, account import and access requests come first (§10). Second pass the same day: what a system integrator can configure without code (§5.2.1, §5.4, §5.8.2, §5.10, §6.1, §8.1–8.3, D11–D12). |
 | Date | 2026-10-11 |
 | Scope | IGA for every identity type, and Agent ID (AI agents as governed non-human identities) |
 | Builds on | `CLAUDE.md` (binding contract), `docs/plan/WONDERID-ROADMAP.md`, `docs/requirements/WonderID_P0_Implementation_Spec_v3.md`, `docs/integrations/CONNECTOR-FRAMEWORK.md` |
@@ -147,7 +147,7 @@ exist and the backlog row is Done.
 | SoD | Action/process SoD from audit history, block or advise, exceptions (0053) | No entitlement-combination SoD (ACCESS-P0-22), no detective scans, no mitigating-control library |
 | Connectors | Declarative framework + gateway, 5 drivers (http, ldap, sql, mcp, file), 16 built-in definitions, inbound receivers, CSV, boundary test (0108–0113); daily scheduled sync into staging (`integration_objects`) | Staged entitlements and access grants from connectors are read by nothing (only CSV reaches `entitlements`/`access_grants`); identity-source schedules not run. **Read-only**: no driver implements write; `executeConnectorWrite()` (0087) has no caller; no SCIM server/client; no Entra/Okta/AWS/Azure/GCP |
 | Audit | Hash-chained append-only `audit_logs`, integrity check, exports, 8 report types, 10 control frameworks (0104, 0105), record provenance (0115) | Identity graph and insights (OPERATIONS-P0-10) |
-| Admin and config | Custom roles, groups, scoped assignments, authorization policies (0097–0101); Global Configuration with versions (0116); notifications; feature flags | No workflow engine, forms, email templates, transport of configuration |
+| Admin and config | Custom roles, groups, scoped assignments, authorization policies (0097–0101); Global Configuration with versions (0116); notifications; feature flags; custom connector definitions written and tried in the console (0108) | No workflow engine, forms, email templates, transport of configuration. **The administration API accepts only a signed-in browser session**: there is no automation credential, so an integrator cannot script a tenant's setup (§8.2). **SSO**: the claims-to-role mapping is built; the SAML/OIDC handshake waits on a Supabase SSO provider the owner has not configured (FOUNDATION-P0-03.3 stop-and-report). Global Configuration has no API route |
 
 ### 3.2 Agent ID
 
@@ -312,6 +312,97 @@ access now" for an identity. It is one confirmed action that creates a leaver
 plan: disable every account through connectors and suspend every agent the
 person owns as sole owner.
 
+### 5.2.1 Rules: one model for lifecycle, attribute and event-driven rules
+
+An integrator configures behaviour with rules, not code (owner direction,
+2026-10-11). Every rule has the same anatomy, so one editor, one simulator and
+one run log serve lifecycle rules, attribute rules, entitlement classification
+rules (§5.4) and event subscriptions (§5.10). The technical rules, user update
+rules, organization and entitlement update rules and request rules the Saviynt
+study observed (its §2.7) all map onto it.
+
+| Part | Meaning |
+|---|---|
+| Trigger | One entry of the trigger catalogue |
+| Scope | What the rule may touch: identity types, organizations, sources, applications |
+| Condition | An expression over the subject's attributes (standard and custom), its relationships (manager, owner, organization, sponsor) and, for change triggers, the old and new values |
+| Effects | One or more entries of the effect catalogue, applied in order |
+| Mode | *Enforce*, or *report only*: the rule records what it would have done. A new rule starts in report-only mode |
+| Priority | The order when several rules fire on one event; a later rule sees the effects of earlier ones |
+| Version and status | Draft → simulated → published (four-eyes, study D-3) → retired. Every publish is a version |
+
+**Trigger catalogue.** Bold entries come first (F4); the rest follow with
+their phases.
+
+- Identity (Identity module): **created**, **activated**, **imported from a
+  named source**, **attribute changed** (any, or a named attribute),
+  **manager changed**, **moved** (department, location, title), **leaver**,
+  **end date reached**, rehire, leave started or ended, classified, owner
+  changed.
+- Access objects (Access): entitlement imported or changed, application
+  onboarded, organization changed, access expiring in N days, access found
+  outside WonderID (rogue, F1).
+- Governance (Access, Compliance, Risk): request decided, task completed or
+  overdue, certification decision, campaign closed, finding raised or
+  resolved.
+- Runtime (Runtime): agent discovered, agent decision denied, kill switch
+  used.
+- Schedule: at a time daily or weekly, or "re-evaluate every rule of this
+  kind nightly".
+
+**Effect catalogue.**
+
+- Identity: set an attribute to an expression; set type or subtype; set
+  owner, sponsor or manager; add to a group; move the lifecycle state along an
+  allowed transition.
+- Access: assign or remove an access package or business role (ledger source
+  `WONDERID_LIFECYCLE`); create a request on the identity's behalf, which then
+  goes through approval; open a micro-certification; set entitlement
+  attributes (classification rules, §5.4).
+- Work: open a task for a person or group with an SLA; notify (template and
+  recipients from an expression); run a workflow (§5.10); send an outbound
+  webhook through a connection (NN #20).
+- Agent: propose RESTRICTED or SUSPENDED (automatic only under D4); require
+  re-certification.
+
+**Condition language.** A small typed expression language evaluated by code,
+never by a model and never as SQL: comparisons (`=`, `≠`, `<`, `>`, `in`,
+`matches` a pattern, `exists`, `changed`, `was`), `and`, `or`, `not`, and
+references `identity.*`, `old.*`, `new.*`, `manager.*`, `source.*`,
+`application.*`, `entitlement.*`. Computed values reuse the connector mapping
+forms (templates and the fixed transform list in
+`docs/integrations/CONNECTOR-FRAMEWORK.md`), so an integrator learns one
+syntax. A rule that names an attribute the tenant has not defined fails
+validation.
+
+**Attribute rules** (the "user update rules" of the study). Trigger: imported
+or attribute changed. Effect: set attribute. Examples: display name from
+first and last name; region from cost centre; identity type from employment
+type; generated username and e-mail (study D-2). A value a rule writes
+carries provenance `rule` with the rule id and version (0080). A rule may set
+an attribute only where no source is authoritative for it, or where the rule
+is declared the authority for that attribute (§5.1 item 2), so a rule never
+silently overrides a system of record (NN #7).
+
+**Guard rails.**
+
+- An effect that grants consequential access creates a request; it is
+  auto-approved only under a published rule that was itself approved under
+  four-eyes (NN #15, the automation boundary above).
+- A run whose effects would touch more than the configured share of
+  identities is held for approval, like the mass-change guard of §5.1.
+- Simulation before publish lists who gains or loses what.
+- Every evaluation, effect, skip and error goes to the automation run log
+  (study D-12), with the rule version that decided.
+
+**Where rules live.** Rule *tables* stay with the module that owns their
+subject, as §4.2 lists: `lifecycle_rules` (identity triggers and attribute
+rules, Identity), entitlement classification rules (Access), event
+subscriptions (Operations), agent lifecycle policies (Identity). The rule
+*runtime* (parsing, evaluation, simulation, run log) is one shared library
+published by Operations next to the workflow engine, so every module
+evaluates rules the same way (decision D12).
+
 ### 5.3 Access requests and approvals
 
 **Built.** Request policies, staged approval chains (manager, entitlement owner,
@@ -351,6 +442,25 @@ identities; application roles stay entitlements.
   `requestable` flag and an optional *SOX-relevant* flag that drives
   certification scope and evidence retention.
 - Ownerless entitlements are not requestable and are listed as a governance gap.
+
+**Entitlement types per application.** Each application declares its
+entitlement types (from the connector, or by hand for a manual application),
+and an integrator sets per type: how it is offered in a request (single
+choice, several, free text, or shown but not requestable), whether it is
+certifiable, whether a parent is required, the default and maximum duration,
+and the approval route. These are the controls the Saviynt study observed on
+entitlement types (its §1.3), in WonderID's own form.
+
+**Entitlement classification rules** (ACCESS-P0-33, a rule kind of §5.2.1).
+An imported application brings thousands of entitlements with no owner or
+classification. A classification rule triggers on *entitlement imported or
+changed*, matches on name, type, application, source attributes or group
+membership, and sets the owner, privilege level, data classification,
+`requestable`, the SOX-relevant flag or the entitlement type. Examples: names
+ending in `-admin` are `admin` and not requestable; `AdministratorAccess` on
+AWS is SOX-relevant; a Keycloak realm role whose source attribute `composite`
+is true gets a parent. Rules run in report-only mode first and show their
+effect per entitlement before publish.
 
 **Business and IT roles** (ACCESS-P0-21):
 
@@ -622,6 +732,36 @@ least privilege:
 This is a framework transport, so it stays inside NN #20: the relay is part of
 a connection, and product modules still only read what the framework stored.
 
+#### 5.8.2 What an integrator builds without code
+
+Today (built; `docs/integrations/CONNECTOR-FRAMEWORK.md`): a connector is a
+JSON definition written in the console (`/integrations/types/new`) or sent to
+the API, validated with the server's own rules as it is typed, tried against
+a live system without saving, published as an immutable version for the
+organization, and used to create any number of connections, each with its
+own settings, encrypted credentials and sync history. The definition covers
+the `http`, `ldap`, `sql` (PostgreSQL), `mcp`, `file` and receive-only
+drivers; eight authentication types; six pagination styles; field paths,
+templates, a fixed transform list and filters; `forEach`, `unwind` and keyed
+records; and inbound channels (`receive`: webhooks, files, runtime events,
+the gateway). Secrets appear only as `{secret.<key>}` inside `auth`, requests
+stay on the organization's own addresses, and SQL is one read-only statement.
+
+Planned extensions, so that an integrator rarely needs a WonderID developer:
+
+| Extension | What it adds | Story, phase |
+|---|---|---|
+| Incremental resources | A `changes` request per kind with a `since` cursor kept per connection, so a sync is incremental where the API allows it. A definition without one runs full only (the F1 rule in INTEGRATION-P0-18) | INTEGRATION-P0-21, F3 |
+| More authentication | OAuth 2.0 authorization code (the callback is a receiver of the connection), private-key JWT assertion, client certificate held as a secret, API key in the body | INTEGRATION-P0-21, F3 |
+| Write operations | The provisioning verbs of §5.8 as templates over the binding context, in the same definition | INTEGRATION-P0-13, F3 |
+| Scripts and other engines | PowerShell, shell and other SQL engines run by the relay in the customer's network (§5.8.1). The definition names the script and its inputs; the relay holds the script | F3 |
+| Transforms | `regex` (extract), `replace`, `coalesce`, `dateAdd`; XML responses for SOAP APIs (P2) | INTEGRATION-P0-21, F3 |
+| Definition files and upgrades | Export and import a definition as a file; an "upgrade to version X" action on a connection that previews the mapping differences | INTEGRATION-P0-21, F3 |
+| Guided editor | A form over the JSON: settings, auth, one resource at a time, with a field picker over a sample response. The JSON view stays | EXPERIENCE-P0-30, F7 |
+| Certified definitions | A definition written for one customer can be submitted to the platform catalogue; after the vendor's review it becomes a built-in for every tenant (Platform module, inside the platform-admin boundary) | Platform, F7 |
+| Schedule on every connection | The schedule is settable on every connection in the console and the API, not only file connections; frequency per D10 | INTEGRATION-P0-20, F1 |
+| Custom attributes as targets | Identity source mappings may target the tenant's custom identity attributes, written with provenance | INTEGRATION-P0-20, F1 |
+
 ### 5.9 Passwords and credentials for target systems
 
 WonderID is not an IdP or a vault, and must never reveal a secret (NN #10).
@@ -664,6 +804,21 @@ onboarding questionnaires and agent onboarding.
 **Jobs.** The existing cron jobs (connector syncs, access governance,
 certifications, privacy) become visible on one *Jobs* page: schedule, last run,
 next run, outcome, run-now (permission-gated), history. No new job runner.
+
+**Event subscriptions** (`event_subscriptions`, Operations; a rule kind of
+§5.2.1). "When this happens, do that" without a full workflow: the trigger is
+any published event of the governance and runtime families, and the effects
+are *run workflow*, *notify*, *open task* or *send outbound webhook*. An
+outbound webhook is a connection of a `webhook-out` type (NN #20): a signed
+POST with retries and a delivery log, so a customer's SIEM, ITSM or chat tool
+learns about a leaver, a rogue grant or a kill switch without polling.
+
+**Notification channels.** E-mail is built. Chat and ticketing channels
+(Slack, Microsoft Teams, ServiceNow, Jira) are connections whose definitions
+declare a `notify` capability; a notification type can be routed to one or
+more channels per tenant, and templates are per channel. An inbound webhook
+that arrives at a connection's receiver can be mapped to an event (today it is
+stored only as activity), so it can trigger a subscription.
 
 ### 5.11 Audit, evidence, reporting and intelligence
 
@@ -723,6 +878,27 @@ system and an active business owner and technical owner.
 5. **Lifecycle policies.** Contract expiry, certification due, owner left,
    inactivity → state changes (CERTIFICATION_DUE, RESTRICTED, SUSPENDED) by rule,
    each audited.
+
+6. **Discovery rules** (IDENTITY-P0-22). Which imported records count as an
+   agent is tenant-configurable on top of the built-in detector: name
+   patterns, account types, OAuth client or service-principal types, tags and
+   labels from the source, MCP tool-call origins, and runtime events from
+   unregistered callers. Each connection has a *feeds agent discovery*
+   switch. The rules follow §5.2.1 (report-only first, simulation, versions).
+7. **Agent classes and contract templates.** A class (customer-support
+   assistant, coding agent, data-pipeline agent, for example) carries a
+   contract template: approved applications, data and actions, autonomy
+   level, tool allowlist, certification interval, required owners, and the
+   default runtime policy (observe, shadow or enforce). Registering an agent
+   from a class pre-fills its contract; the owner still approves it.
+8. **Tool classification overrides.** The deterministic read, write or
+   destructive classification of MCP tools can be overridden per tenant for
+   named tools, with a reason, so a misclassified tool needs no code change.
+9. **Discovery sources.** Connectors for the places agents are created: cloud
+   AI platforms (Azure AI, Amazon Bedrock agents, Google Vertex AI agents),
+   model-provider organizations (OpenAI, Anthropic), MCP registries and agent
+   frameworks' control planes. Each is a connector definition, so an
+   integrator adds one without code where the API is REST.
 
 ### 6.2 Scoped, short-lived credentials
 
@@ -949,6 +1125,66 @@ existing areas; no new area is proposed.
 
 Every page follows §19.5: one primary action; settings folded.
 
+### 8.1 What an integrator configures, and where
+
+Added 2026-10-11 on the owner's direction: a system integrator must be able to
+onboard users and applications, write connectors, set up rules and manage AI
+agents by configuration. The table says what is configurable today, how, and
+what each phase adds. "Console" means a page in the app; "API" means
+`/api/v1/*`; "bundle" means configuration promotion (§8, F7).
+
+| Area | Today (built) | Planned (story, phase) |
+|---|---|---|
+| **Onboard identities** | Identity sources with precedence, per-attribute authority, mapping rows, correlation rules, leaver strategy and safety limit (console + API); dry-run, full and partial runs; pending-match queue; custom identity attributes with type, required, sensitive, unique, enum and pattern (console + API); CSV import with a template download on every object page | Scheduled runs (INTEGRATION-P0-19, F1); custom attributes as mapping targets (INTEGRATION-P0-20, F1); attribute rules and lifecycle rules with simulation (IDENTITY-P0-21, F4); registration and sponsor forms (F7); SCIM receiver (F8); external sub-types (study D-15, F8) |
+| **Onboard WonderID members** (the people who sign in) | Invite one person, set status, assign roles (console); custom roles, groups, scoped and time-boxed assignments (console + API); an SSO connection with claims-to-role mapping (console + API) | Bulk invitation by CSV and an invitation API (FOUNDATION-P0-32, F2); the SSO handshake needs the Supabase SSO provider configured by the owner (§3.1); passkeys (FOUNDATION-P0-21, F9) |
+| **Onboard applications** | Register an application (owners, type, URL); the onboarding wizard with mode, connector, entitlement source, identifier field, correlation field, request and certification policy, validate → simulate → approve (four-eyes) → promote (console + API); mapping proposals from an OpenAPI document or a sample record; application discovery | Entitlement types per application and classification rules (ACCESS-P0-33, F4); onboarding templates per connection type with default owners, policies and entitlement types, plus a questionnaire form (ACCESS-P0-34, F7); provisioning operations (F3) |
+| **Custom connectors** | JSON definitions written and tried in the console, versioned per organization, with the full schema of `CONNECTOR-FRAMEWORK.md` (console + API) | §5.8.2: incremental resources, more authentication, write operations, scripts through the relay, more transforms, export, import and upgrades (F3); guided editor (F7); certified definitions in the platform catalogue (F7) |
+| **Technical (birthright) rules** | None. Access packages have eligibility by identity type and department; request policies decide who may ask | Lifecycle rules with the §5.2.1 catalogue, simulation, report-only mode and four-eyes publish (IDENTITY-P0-18 finish + IDENTITY-P0-21, F4) |
+| **User update rules** | None: identity attributes come from sources or by hand | Attribute rules with provenance and authority (IDENTITY-P0-21, F4) |
+| **Event-driven rules** | Lifecycle events open fixed task types; inbound webhooks are stored as activity; schedules are daily and set only on file connections | Event subscriptions with run-workflow, notify, open-task and outbound-webhook effects; notification channels as connections (OPERATIONS-P0-11, F7); a schedule on every connection (F1) |
+| **AI agent discovery and management** | A discovery inbox fed by every connection that imports identities; duplicates; shadow AI from unregistered runtime events; registration with owners, a versioned contract, lifecycle and API keys; MCP inventory; emergency controls; Global Configuration knobs for duplicate match, unregistered window, key rotation and count, alert throttle | Discovery rules, a per-connection discovery switch, agent classes with contract templates, tool classification overrides, AI-platform connectors (IDENTITY-P0-22, F6); sponsor, onboarding journey and lifecycle policies (IDENTITY-P0-19, F6); credentials and delegation (§6, F6) |
+| **Policies** | Request policies, access packages, authorization policies, agent policies (a JSON condition over fixed agent facts) (console + API) | One rules editor for every rule kind (F4); SoD rulesets (F5); runtime policies per agent class (F6) |
+| **Tenant settings** | Global Configuration, versioned with restore (console only); roles and the permission catalogue (catalogue changes by migration only); notifications on or off per person; MFA; AI provider; privacy; billing | A Global Configuration API (FOUNDATION-P0-31, F1); e-mail templates, the jobs page and configuration bundles (F7); per-tenant labels (F9) |
+| **Automation** | None: `/api/v1/*` accepts only a signed-in session | Automation credentials for the administration API (§8.2, FOUNDATION-P0-31, F1); configuration bundles with a diff and approved import (F7); an integrator setup test (QA-P0-25, F7) |
+
+### 8.2 Automation credentials for the administration API
+
+An integrator's deployment pipeline, a customer's ITSM and a configuration
+bundle importer all need to call `/api/v1/*` without a person's browser
+session. Today they cannot (§3.1). The design (FOUNDATION-P0-31, decision
+D11):
+
+- An **automation credential** belongs to a non-human identity of type
+  APPLICATION owned by the tenant, so it is governed like any other non-human
+  identity (owner, review, expiry). It has a hashed secret shown once, an
+  expiry of at most one year (default 90 days), an optional source-address
+  allowlist, and revocation. It has the same shape as agent API keys (0061)
+  and is never usable for sign-in.
+- Permissions come from a WonderID role assigned to the credential through
+  the existing scoped assignments (0100), so an integrator's credential can be
+  limited to configuration objects and never reach personal data unless its
+  role says so.
+- `Authorization: Bearer <credential>` on `/api/v1/*`. `getTenantContext()`
+  resolves the tenant from the credential's row, never from a header or body
+  (NN #2). Rate limits apply per credential.
+- Every action is audited with the credential as actor and its owner as
+  on-behalf-of (NN #11). Creating or extending a credential is four-eyes.
+- Global Configuration, invitations and connection schedules gain API routes,
+  so that everything in §8.1 is reachable this way.
+
+### 8.3 An integrator role, a sandbox and the guide
+
+- **Role.** Custom roles exist, so a tenant can create a "Configuration
+  administrator" today: integration, policy, application and tenant-settings
+  permissions, scoped by organization, time-boxed, with MFA required. A
+  built-in template of that role ships with FOUNDATION-P0-31, so every tenant
+  starts from the same least-privilege set.
+- **Sandbox.** An integrator configures a test tenant and promotes to
+  production with a reviewed diff (configuration bundles, F7).
+- **Guide.** `docs/integrations/INTEGRATOR-GUIDE.md` indexes what an
+  integrator can configure today, with paths and permissions. It points to
+  this section for what is planned and is updated with each phase.
+
 ---
 
 ## 9. Modifications required to the current implementation
@@ -964,6 +1200,8 @@ approves this design. No module edits another's code (NN #18).
 | Permission keys for new capabilities (roles, SoD, lifecycle rules, provisioning, delegation, emergency access, agent tokens, relay enrolment), added to the catalogue migration and `lib/shared/types` | New (with each feature) |
 | Published contract types for delegation context and token claims in `lib/shared/types` | New |
 | Passwordless (WebAuthn) | FOUNDATION-P0-21 |
+| Automation credentials for the administration API; API routes for Global Configuration, invitations and connection schedules; a Configuration administrator role template | FOUNDATION-P0-31 (F1) |
+| Bulk invitation by CSV and an invitation API | FOUNDATION-P0-32 (F2) |
 
 ### Identity (02)
 
@@ -976,6 +1214,8 @@ approves this design. No module edits another's code (NN #18).
 | Agent sponsor, onboarding journey, agent access packages, lifecycle policies | IDENTITY-P0-19 |
 | Agent identifier (SPIFFE-compatible), `agent_credential_bindings` | New |
 | Discovery from A2A Agent Cards and SCIM `/Agents` | New (P1) |
+| Attribute rules (user update rules) and the shared rule catalogue for lifecycle rules: triggers, effects, report-only mode, simulation (§5.2.1) | IDENTITY-P0-21 (F4) |
+| Agent discovery rules, per-connection discovery switch, agent classes with contract templates, tool classification overrides, AI-platform connectors (§6.1 items 6–9) | IDENTITY-P0-22 (F6) |
 
 ### Integration (03)
 
@@ -990,6 +1230,8 @@ approves this design. No module edits another's code (NN #18).
 | SSF transmitter/receiver connection type | New (P1) |
 | Connectors: Entra ID, Okta, Google Workspace, Workday, AWS, Azure, GCP, ServiceNow (ticketing), CyberArk/Vault metadata | New (one story each, P0 for Entra + one HR + AWS) |
 | Gateway token service and AuthZEN receivers on the runtime-gateway connection (transport); decision logic stays in Access/Runtime | New |
+| Custom identity attributes as mapping targets; a schedule on every connection (console and API) | INTEGRATION-P0-20 (F1) |
+| Definition schema extensions (§5.8.2): incremental resources, OAuth authorization code, JWT and certificate authentication, more transforms, definition export and import, connection upgrade | INTEGRATION-P0-21 (F3) |
 
 ### Access (04)
 
@@ -1009,6 +1251,8 @@ approves this design. No module edits another's code (NN #18).
 | Emergency/JIT access sessions | New (P1) |
 | Agent delegation grants; delegation and token steps in the runtime decision pipeline; AuthZEN mapping; per-agent shadow/enforce mode | New |
 | Role and rule mining | New (P1) |
+| Entitlement types per application; entitlement classification rules (§5.4) | ACCESS-P0-33 (F4) |
+| Application onboarding templates per connection type, with a questionnaire form | ACCESS-P0-34 (F7) |
 
 ### Runtime (05)
 
@@ -1042,6 +1286,7 @@ approves this design. No module edits another's code (NN #18).
 | Reconciliation console | EXPERIENCE-P0-28 (F1) |
 | Request tracking per line and tasks inbox | EXPERIENCE-P0-29 (F2) |
 | Home, My Access | EXPERIENCE-P0-19 |
+| Guided connector definition editor (§5.8.2) | EXPERIENCE-P0-30 (F7) |
 | Pages for roles, SoD workbench, lifecycle rules, delegations, emergency access, agent credentials, relay status | With each feature |
 
 ### Platform (09)
@@ -1056,6 +1301,7 @@ approves this design. No module edits another's code (NN #18).
 |---|---|
 | Workflow designer and runs; forms; email templates; jobs page; e-mail delivery history | OPERATIONS-P0-09 + New |
 | New reports (§5.11), control evidence packs, identity graph, posture page | OPERATIONS-P0-10 + New |
+| Shared rule runtime (D12, needed by F4); event subscriptions with outbound webhooks; notification channels as connections (§5.10) | OPERATIONS-P0-11 (runtime with F4; subscriptions and channels F7) |
 
 ### QA (11)
 
@@ -1066,6 +1312,7 @@ approves this design. No module edits another's code (NN #18).
 | Gateway security suite extended to tokens, DPoP, delegation and kill switch | QA-P0-18 |
 | Provisioning safety tests (idempotency, mass-change guard, read-only enforcement) | QA-P0-21 |
 | Brownfield end-to-end: HR → lifecycle → request → provision → certify → revoke → verify | QA-P0-22 |
+| Integrator setup suite: a tenant configured from scratch through the API with an automation credential and a bundle | QA-P0-25 (F7) |
 
 ---
 
@@ -1108,6 +1355,8 @@ Every run says what changed. Removals at the source are detected. Access that ap
 | **IDENTITY-P0-20** Non-human identities from accounts | Identity | See below. |
 | **EXPERIENCE-P0-28** Reconciliation console | Experience | See below. |
 | **QA-P0-23** Reconciliation suite | QA | See below. |
+| **INTEGRATION-P0-20** Custom attributes as mapping targets; schedule on every connection | Integration | See below. Does not gate the exit test. |
+| **FOUNDATION-P0-31** Automation credentials for the administration API | Foundation | See below. Runs in parallel; does not gate the exit test. |
 
 **INTEGRATION-P0-18, Staging reflects the source.**
 - Each sync records the run that last saw each object.
@@ -1158,6 +1407,17 @@ Every run says what changed. Removals at the source are detected. Access that ap
 - tenant isolation of every new column and table;
 - an end-to-end path through a built-in connector (PostgreSQL or Keycloak) and through CSV.
 
+**INTEGRATION-P0-20, Custom attributes as mapping targets; schedule on every connection.**
+- Identity source mapping targets include the tenant's custom identity attributes (`identity_attribute_definitions`), and reconciliation writes them with field provenance.
+- Validation refuses a mapping to an attribute that does not exist or whose type does not match.
+- `integrations.schedule` is editable on every connection in the console and through the API, not only on file connections.
+
+**FOUNDATION-P0-31, Automation credentials for the administration API** (§8.2; needs D11).
+- Create, rotate and revoke a credential; a role through scoped assignments; expiry; four-eyes on create and extend.
+- `requirePermission()` accepts the credential; the tenant comes from the credential's row; every action is audited with the owner as on-behalf-of.
+- API routes for Global Configuration and connection schedules.
+- A "Configuration administrator" role template.
+
 **Exit.**
 - Connect an application through a built-in connector and schedule it.
 - Accounts, entitlements and grants appear for a person, a service account and an AI agent, each correlated to the right identity.
@@ -1177,6 +1437,7 @@ Every run says what changed. Removals at the source are detected. Access that ap
 | **ACCESS-P0-32** Time-bound access | Access | See below. |
 | **EXPERIENCE-P0-29** Request tracking and tasks inbox | Experience | See below. |
 | **QA-P0-24** Request-to-verified suite | QA | See below. |
+| **FOUNDATION-P0-32** Bulk invitation and invitation API | Foundation | See below. Does not gate the exit test. |
 
 **ACCESS-P0-28, Approved requests become pending grants.**
 - On final approval, each line becomes an `access_grants` (or account) row in status **pending fulfilment**.
@@ -1218,6 +1479,10 @@ Every run says what changed. Removals at the source are detected. Access that ap
 - approver ≠ requester, and tenant isolation;
 - a repeated reconciliation, which must not duplicate grants or close a task twice.
 
+**FOUNDATION-P0-32, Bulk invitation and invitation API.**
+- Invite members from a CSV (preview, then send), with a role and an organization scope per row; `POST /api/v1/users/invitations`.
+- Invitations expire and can be re-sent or revoked; every invitation is audited.
+
 **Exit.**
 - A person requests an entitlement for themselves, for a service account they own, and for an agent within its contract.
 - Approvals run and fulfilment tasks appear.
@@ -1235,6 +1500,7 @@ Needs decision **D3**.
 - Connectors: Microsoft Entra ID, one HR system, ServiceNow ticketing (D9).
 - WonderID Relay for on-premises targets (§5.8.1, D7).
 - RISK-P0-13: rogue access remediation, through approval and provisioning.
+- INTEGRATION-P0-21: the definition extensions of §5.8.2 for integrators: incremental resources, OAuth authorization code, JWT and certificate authentication, more transforms, definition export and import, connection upgrade.
 
 **Exit.** The P0 acceptance scenario (CLAUDE.md §11) runs with real removal: the unauthorized entitlement is removed through the connector after human approval, verified by reconciliation, and the finding resolves.
 
@@ -1243,6 +1509,7 @@ Needs decision **D3**.
 - IDENTITY-P0-17, IDENTITY-P0-18 (finish): identity detail tabs; lifecycle rules (birthright, mover, leaver, expiry) with simulation and four-eyes publish; the manager's "disable all access".
 - COMPLIANCE-P0-10, COMPLIANCE-P0-11: certification for every identity type, with population evidence. Revoke goes through F2 tasks or F3 provisioning, and an item closes on verified removal.
 - Human identity merge over existing records (study D-6), campaign templates and preview (D-10), attribute-level audit detail (D-13).
+- IDENTITY-P0-21: attribute rules and the rule catalogue of §5.2.1 (triggers, effects, report-only mode), on the shared rule runtime (OPERATIONS-P0-11, D12). ACCESS-P0-33: entitlement types per application and classification rules.
 
 **Exit.** A person, an external identity and a service account each go joiner → birthright → request → review → revoke → verified, with a complete evidence trail.
 
@@ -1267,6 +1534,7 @@ Unchanged in scope; was F3.
 - A per-agent shadow → enforce rollout, and approval resume.
 - IDENTITY-P0-19 (agent onboarding, sponsor, lifecycle policies; agent access packages may land earlier with ACCESS-P0-31).
 - QA-P0-18 extended.
+- IDENTITY-P0-22: discovery rules, a per-connection discovery switch, agent classes with contract templates, tool classification overrides, AI-platform connectors.
 
 F6 is independent of F2–F5 and may run in parallel once F1 is done.
 
@@ -1281,6 +1549,7 @@ Was F4.
 - PLATFORM-P0-13: configuration bundles.
 - Request baskets for many identities, and model-after.
 - Saved request drafts (D-1); generated identifiers (D-2).
+- OPERATIONS-P0-11: event subscriptions, outbound webhooks and notification channels as connections. ACCESS-P0-34: application onboarding templates and questionnaire. EXPERIENCE-P0-30: guided connector editor. Certified definitions in the platform catalogue (Platform). QA-P0-25: integrator setup suite.
 
 ### Phase F8: Advanced governance
 
@@ -1342,6 +1611,8 @@ decided.
 | D8 | Should the SCIM receiver and the AuthZEN PDP be offered on the public API surface (under `/api/connect/v1/<connection>/…`)? This widens the inbound surface of the connector boundary (NN #20; the boundary test allowlist may need a new receiver kind). | Yes, as connection receivers, with the boundary-test change approved explicitly. |
 | D9 | Priority of first non-SCIM connectors: Entra ID + Workday + AWS (recommended) or another set. | Entra ID, Workday, AWS. |
 | D10 | How often scheduled imports and reconciliation run (F1). The Vercel project is on the free plan, whose cron jobs run at most once a day, so today "hourly" means daily. Options: (a) keep daily, plus "run now" and push receivers; (b) move to a paid plan for sub-daily cron; (c) an external scheduler calling a signed endpoint. | (a) for F1; revisit when a customer needs same-day leaver detection. |
+| D11 | Automation credentials for the administration API (§8.2): WonderID issues expiring bearer credentials (at most one year) to tenant-owned non-human identities for `/api/v1/*`, limited by a WonderID role. This is a new way into the tenant boundary beyond browser sessions and the connector receivers. | Yes, with the controls in §8.2: hashed, expiring, role-scoped, four-eyes, audited, rate-limited; never for sign-in. |
+| D12 | One shared rule runtime (parsing, evaluation, simulation, run log) published by Operations and used by every module's rule tables, or a rule engine per module. | One shared runtime; rule tables stay with their owners (§5.2.1). |
 
 ---
 
@@ -1479,6 +1750,11 @@ covers the capability and in which phase (phases as revised in §10 on 2026-10-1
 | Admin roles controlling feature access | Built WonderID permission roles and custom roles | Built |
 | Organization hierarchy for delegated administration and request scoping | Built scoped assignments + organization scoping of catalog | Built + F7 |
 | Policies for lifecycle events | §5.2 | F4 |
+| User, organization and entitlement update rules (attribute derivation, classification) | §5.2.1 attribute rules, §5.4 classification rules | F4 |
+| Event-driven actions, outbound webhooks, chat and ticketing notification channels | §5.10 event subscriptions | F7 |
+| Custom connector authoring in the console (REST, LDAP, SQL, MCP, file, receive-only) | Built (0108); extensions in §5.8.2 | Built + F3 |
+| API access for scripted setup; configuration as code | §8.2 automation credentials; bundles | F1 + F7 |
+| Agent discovery rules, agent classes, contract templates | §6.1 items 6–9 | F6 |
 | Forms for identity and lifecycle workflows | §5.10 | F7 |
 | Global configuration | Built (0116) | Built |
 | Job control panel | §5.10 jobs page | F7 |
