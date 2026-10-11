@@ -14,7 +14,7 @@ Generated 2026-10-11 from 11 module backlogs.
 
 ## Overall
 
-**216 of 268 tracked stories complete — 81%**
+**217 of 268 tracked stories complete — 81%**
 
 ```
 ████████████████████████████████░░░░░░░░  81%
@@ -22,10 +22,10 @@ Generated 2026-10-11 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 216 |
+| Done | 217 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 23 |
+| Not Started | 22 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 3 | 0 | 4 | 45 | `███████████████░░░` 84% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 39 | 3 | 0 | 3 | 45 | `████████████████░░` 87% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 23 | 3 | 0 | 1 | 27 | `███████████████░░░` 85% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 38 done · 3 partial · 0 deferred · 4 not started (45 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 39 done · 3 partial · 0 deferred · 3 not started (45 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -106,7 +106,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-29 | Tamper-evident, append-only audit trail (SOX ITGC CO-01, PCI DSS 10.3.2) | Done — 2026-10-01 (`0104`; per-tenant SHA-256 chain backfilled over 8,940 rows, `verify_audit_chain()`, `purge_audit_logs()`, `/audit/integrity`; tamper test detected the altered row) |
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
 | FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; needs D11) | Not Started |
-| FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Not Started |
+| FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Done — 2026-10-11: CSV via the framework (member kind, 0125) with preview; POST /api/v1/users/invitations (session; automation credential with P0-31); expiry, re-send, revoke; no role escalation |
 
 ### 02 — Identity Agent
 

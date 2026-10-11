@@ -64,9 +64,14 @@ export default async function OnboardingPage() {
               <form action={acceptInvitationAction} key={i.tenantId} className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
                 <input type="hidden" name="tenantId" value={i.tenantId} />
                 <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{i.tenantName}</span>
-                <Button type="submit" size="sm">
-                  Accept
-                </Button>
+                {/* FOUNDATION-P0-32: an expired invitation cannot be accepted (the server refuses it too). */}
+                {i.expired ? (
+                  <span className="text-xs text-muted-foreground">Expired: ask for it again</span>
+                ) : (
+                  <Button type="submit" size="sm">
+                    Accept
+                  </Button>
+                )}
               </form>
             ))}
           </CardBody>

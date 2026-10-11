@@ -47,7 +47,7 @@ const AUTH_BY_DRIVER: Record<string, string[]> = {
 const MCP_METHODS = ["initialize", "tools/list", "resources/list", "prompts/list"];
 
 /** The kinds a CSV can hold: rows of flat fields, not MCP declarations. */
-const FILE_KINDS = ["identity", "account", "entitlement", "access_grant", "application", "policy"];
+const FILE_KINDS = ["identity", "account", "entitlement", "access_grant", "application", "policy", "member"];
 const FILE_DELIMITERS = [",", ";", "\t", "|"];
 const SETTING_REF_RE = /^\{settings\.([a-zA-Z][a-zA-Z0-9_]*)\}$/;
 

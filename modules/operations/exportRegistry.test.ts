@@ -70,7 +70,7 @@ describe("export registry", () => {
 
   it("covers every importable kind on some page", () => {
     const kinds = new Set(EXPORT_ENTRIES.map((e) => e.importKind).filter(Boolean));
-    expect([...kinds].sort()).toEqual(["access_grant", "account", "application", "entitlement", "identity"]);
+    expect([...kinds].sort()).toEqual(["access_grant", "account", "application", "entitlement", "identity", "member"]);
   });
 });
 

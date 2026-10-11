@@ -5,8 +5,8 @@ import { FileImportInvalidError, IMPORT_KINDS, PAGE_IMPORT_MAX_ROWS, MAX_IMPORT_
 const file = (name: string, size: number) => ({ name, size, type: "text/csv", text: async () => "" });
 
 describe("importing a CSV from an object page", () => {
-  it("imports the five object kinds, nothing else", () => {
-    expect(IMPORT_KINDS).toEqual(["identity", "account", "entitlement", "access_grant", "application"]);
+  it("imports the five object kinds and members (FOUNDATION-P0-32), nothing else", () => {
+    expect(IMPORT_KINDS).toEqual(["identity", "account", "entitlement", "access_grant", "application", "member"]);
     expect(isImportKind("account")).toBe(true);
     for (const k of ["policy", "mcp_tool", "Identity", "", null]) expect(isImportKind(k)).toBe(false);
   });

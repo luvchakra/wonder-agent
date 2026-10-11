@@ -85,6 +85,7 @@ its connection (INTEGRATION-P0-19).
 | What | Where | Permission |
 |---|---|---|
 | Invite a member, set status, assign roles | Admin → Users (`/settings/users/new`) | `user.manage` (invite), `users.update`, `users.suspend`, `users.remove` |
+| Invite many members at once (FOUNDATION-P0-32): from a CSV with a preview (new, already a member, invalid), or by API (`POST /api/v1/users/invitations`, `dryRun` to preview; idempotent on e-mail). Invitations expire after Global Configuration's "Invitations expire after" (30 days by default) and can be sent again from the user's page | Admin → Users → Actions → Import CSV… | `users.invite` and `integration.execute` (CSV); `roles.assign` to give roles, and only roles within the inviter's own permissions. Scripts with an automation credential arrive with FOUNDATION-P0-31 |
 | Custom roles from the permission catalogue | Admin → Roles (`/settings/roles`); `/api/v1/roles` | `role.manage` |
 | Groups | Admin → User Groups (`/settings/groups`) | `groups.create`, `groups.update`, `groups.manage_members` |
 | Scoped, time-boxed and MFA-conditioned role assignments; authorization policies | Admin → Users; Admin → Policies → Authorization Policies | `tenant.security.manage` (view with `permissions.view`) |

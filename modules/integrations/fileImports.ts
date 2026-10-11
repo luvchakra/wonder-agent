@@ -7,6 +7,7 @@ import { MANUAL_IDENTITY_TYPES, SOURCED_IDENTITY_FIELDS, type IdentityType, type
 import type { ImportApplyRow, ImportCounts, ImportOutcomeCounts, ImportPlanRow, ImportRecord } from "@/lib/shared/types/integrations";
 import { applySourcedIdentities, listIdentitiesForCorrelation, previewSourcedIdentities, type SourcedOp } from "@/modules/agent-identity/service";
 import { applyAccessImport, previewAccessImport, type AccessImportKind } from "@/modules/access-governance/service";
+import { applyMemberInvitations, planMemberInvitations } from "@/lib/users/users";
 import { createIntegration } from "./integrations";
 import { createSyncJob, runSyncJob } from "./syncJobs";
 import { BUILTIN_DEFINITIONS } from "./framework/definitions";
@@ -133,6 +134,12 @@ async function readImport(tenantId: string, kind: string, csvText: string) {
 
 // ---------------------------------------------------------------- planning
 
+/** The importer's own e-mail, so a file that lists them is not an invitation to themselves. */
+async function actorEmail(userId: string): Promise<string | null> {
+  const { data } = await supabaseServiceRole().from("users").select("email").eq("id", userId).maybeSingle<{ email: string }>();
+  return data?.email ?? null;
+}
+
 
 function fileAuthority(connectionId: string | null): SourceAuthority {
   return { sourceId: connectionId ?? "file-imports", priority: FILE_IMPORT_PRIORITY, authoritativeFields: [...SOURCED_IDENTITY_FIELDS] };
@@ -178,6 +185,8 @@ async function planIdentities(tenantId: string, records: ImportRecord[], scope: 
 
 async function previewRecords(ctx: TenantContext, kind: ImportKind, records: ImportRecord[], scope: string | null, connectionId: string | null): Promise<ImportPlanRow[]> {
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-32: members are Foundation's: new, already a member, or invalid.
+  if (kind === "member") return planMemberInvitations(tenantId, { userId: ctx.userId, email: await actorEmail(ctx.userId), permissions: ctx.permissions }, records);
   if (kind !== "identity") return previewAccessImport(tenantId, kind as AccessImportKind, records, { integrationId: connectionId });
 
   const plan = await planIdentities(tenantId, records, scope);
@@ -224,6 +233,7 @@ const PREVIEW_COLUMNS: Record<ImportKind, string[]> = {
   entitlement: ["externalId", "name", "application", "privilegeLevel", "dataClassification"],
   account: ["externalId", "application", "username", "owner", "status", "accountType", "lastLoginAt"],
   access_grant: ["accountExternalId", "entitlementExternalId", "grantType"],
+  member: ["email", "displayName", "roles", "accountType", "authMethod"],
 };
 
 /** Rows sent with a preview; the counts always cover the whole file. */
@@ -371,7 +381,9 @@ export async function importFileForObject(ctx: TenantContext, kind: string, scop
   const applied =
     file.kind === "identity"
       ? await applyIdentities(tenantId, records, scope, connection.id, job.id)
-      : await applyAccessImport(tenantId, ctx.userId, file.kind as AccessImportKind, records, { integrationId: connection.id, jobId: job.id });
+      : file.kind === "member"
+        ? await applyMemberInvitations(tenantId, { userId: ctx.userId, email: await actorEmail(ctx.userId), permissions: ctx.permissions }, records)
+        : await applyAccessImport(tenantId, ctx.userId, file.kind as AccessImportKind, records, { integrationId: connection.id, jobId: job.id });
   // Rows the mapping refused were never stored; they are reported with the rest.
   const all: ImportApplyRow[] = [
     ...file.invalid.map((r): ImportApplyRow => ({ row: r.row, externalId: r.externalId, outcome: "skipped", targetId: null, message: r.note })),

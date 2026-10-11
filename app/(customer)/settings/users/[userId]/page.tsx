@@ -11,7 +11,9 @@ import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableC
 import { cn } from "@/lib/utils";
 import { RemoveRoleButton } from "../../roles/RemoveRoleButton";
 import { STATUS_TONE, formatDate, initials, relativeTime } from "../labels";
-import { AssignRoleForm, EditNameForm, RevokeSessionsForm, StatusActions } from "./UserActions";
+import { AssignRoleForm, EditNameForm, ResendInvitationForm, RevokeSessionsForm, StatusActions } from "./UserActions";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
+import { invitationExpired } from "@/lib/users/userRules";
 import { loadScopeOptions } from "../../roles/scopeOptions";
 import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
 
@@ -66,7 +68,7 @@ export default async function UserDetailPage({
   // Assigning roles: roles.assign, or the legacy role.manage (FOUNDATION-P0-24/25).
   const canAssign = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "roles") as TabKey;
-  const [user, identity, history, sessions, assignable, scope, provenance] = await Promise.all([
+  const [user, identity, history, sessions, assignable, scope, provenance, config] = await Promise.all([
     getUserDetail(ctx.tenantId!, userId),
     getIdentityForUser(ctx.tenantId!, userId).catch(() => null),
     tab === "history" ? getAccessHistory(ctx.tenantId!, userId) : Promise.resolve(null),
@@ -74,7 +76,9 @@ export default async function UserDetailPage({
     canAssign ? listAssignableRoles(ctx.tenantId!) : Promise.resolve([]),
     loadScopeOptions(ctx.tenantId!),
     getRecordProvenance(ctx.tenantId!, "tenant_memberships", userId, "user_id"),
+    getTenantConfig(ctx.tenantId!),
   ]);
+  const expiryDays = config["users.invitationExpiryDays"];
   // Names for application and agent scopes (FOUNDATION-P0-19).
   const scopeName = new Map([...scope.applications, ...scope.agents].map((o) => [o.id, o.label]));
   const nameOf = (id: string) => scopeName.get(id) ?? "Not found";
@@ -146,6 +150,13 @@ export default async function UserDetailPage({
               <Link href={`/identities/${identity.id}`} className="block text-sm text-primary hover:underline">
                 View their identity
               </Link>
+            ) : null}
+            {user.status === "invited" && can("users.invite") ? (
+              <ResendInvitationForm
+                userId={user.userId}
+                expired={invitationExpired(user.invitedAt, expiryDays)}
+                expiresLabel={user.invitedAt ? `on ${formatDate(new Date(Date.parse(user.invitedAt) + expiryDays * 86_400_000).toISOString())}` : "after its first sending"}
+              />
             ) : null}
             {can("users.update") && !removed ? <EditNameForm userId={user.userId} name={user.displayName ?? ""} /> : null}
             {!removed && !self && (can("users.suspend") || can("users.remove")) ? (

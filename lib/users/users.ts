@@ -7,12 +7,18 @@ import { listAssignableRoles } from "@/lib/rbac/roles";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { groupsOfUser, type UserGroup } from "./groups";
 import { describeTerms, isTenantWide, termsCurrent, type AssignmentTerms } from "@/lib/rbac/assignmentRules";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
+import { urlForTenant } from "@/lib/tenant/hostTenant";
+import type { ImportApplyRow, ImportPlanRow } from "@/lib/shared/types/integrations";
 import {
   TRANSITIONS,
   checkRoleGrant,
   checkStatusChange,
+  classifyMemberRow,
   databaseRefusal,
   effectivePermissions,
+  invitationEscalation,
+  invitationExpired,
   validateInvite,
   type AccountType,
   type AuthMethod,
@@ -289,7 +295,7 @@ export type InviteResult = { userId: string; status: MembershipStatus; emailSent
  */
 export async function inviteUser(
   tenant: { tenantId: string; name: string; url: string | null },
-  actor: { userId: string; email: string | null },
+  actor: { userId: string; email: string | null; permissions: readonly string[] },
   input: InviteInput,
 ): Promise<{ ok: true; value: InviteResult; invite: ValidInvite } | { ok: false; errors: Record<string, string> }> {
   const assignable = (await listAssignableRoles(tenant.tenantId)).map((r) => r.name);
@@ -297,6 +303,13 @@ export async function inviteUser(
   if (!parsed.ok) return parsed;
   const v = parsed.value;
   if (actor.email && v.email === actor.email.toLowerCase()) return { ok: false, errors: { email: "That's you — you are already a member." } };
+  // FOUNDATION-P0-32: inviting never escalates: the roles given carry only permissions the inviter holds.
+  const roleRows = await rolesWithPermissions(tenant.tenantId, v.roles);
+  const escalated = invitationEscalation(roleRows.flatMap((r) => r.permissions), actor.permissions);
+  if (escalated.length) {
+    await writeAudit({ tenantId: tenant.tenantId, actorId: actor.userId, actorType: "user", action: "user.invited", objectType: "tenant", objectId: tenant.tenantId, outcome: "failure", metadata: { roles: v.roles, refused: "ROLE_ESCALATION", permissions: escalated } });
+    return { ok: false, errors: { roles: `You can only give roles whose permissions you hold. Not held: ${escalated.join(", ")}` } };
+  }
 
   const db = supabaseServiceRole();
   const { data: found, error: findError } = await db
@@ -339,8 +352,8 @@ export async function inviteUser(
   }
 
   if (v.roles.length) {
-    const { data: roleRows } = await db.from("roles").select("id, name").is("tenant_id", null).in("name", v.roles);
-    const rows = ((roleRows ?? []) as { id: string; name: string }[]).map((r) => ({ tenant_id: tenant.tenantId, user_id: userId, role_id: r.id, granted_by: actor.userId }));
+    // System roles and the organization's own custom roles (FOUNDATION-P0-32: custom roles were skipped before).
+    const rows = roleRows.map((r) => ({ tenant_id: tenant.tenantId, user_id: userId, role_id: r.id, granted_by: actor.userId }));
     const { error: roleError } = await db.from("user_roles").upsert(rows, { onConflict: "tenant_id,user_id,role_id", ignoreDuplicates: true });
     if (roleError) throw new ApiError(500, "ASSIGN_FAILED", "The membership was created but its roles were not. Assign them on the user's page.");
   }
@@ -397,8 +410,11 @@ async function sendInvitationEmail(v: ValidInvite, tenant: { name: string; url: 
   }
 }
 
-/** The signed-in person's own pending invitations (read by their own user id only). */
-export async function listMyInvitations(userId: string): Promise<{ tenantId: string; tenantName: string; invitedAt: string | null }[]> {
+/**
+ * The signed-in person's own pending invitations (read by their own user id only).
+ * FOUNDATION-P0-32: one past its organization's limit is marked expired.
+ */
+export async function listMyInvitations(userId: string): Promise<{ tenantId: string; tenantName: string; invitedAt: string | null; expired: boolean }[]> {
   const { data, error } = await supabaseServiceRole()
     .from("tenant_memberships")
     .select("tenant_id, invited_at, tenants!inner(name, status)")
@@ -407,21 +423,153 @@ export async function listMyInvitations(userId: string): Promise<{ tenantId: str
     .eq("tenants.status", "active")
     .returns<{ tenant_id: string; invited_at: string | null; tenants: { name: string } }[]>();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  return (data ?? []).map((r) => ({ tenantId: r.tenant_id, tenantName: r.tenants.name, invitedAt: r.invited_at }));
+  const days = await Promise.all((data ?? []).map((r) => getTenantConfig(r.tenant_id).then((c) => c["users.invitationExpiryDays"])));
+  return (data ?? []).map((r, i) => ({ tenantId: r.tenant_id, tenantName: r.tenants.name, invitedAt: r.invited_at, expired: invitationExpired(r.invited_at, days[i]) }));
 }
 
-/** Accept your own invitation: invited → active. Only your own row, only from `invited`. */
+/** Accept your own invitation: invited → active. Only your own row, only from `invited`, only before it expires. */
 export async function acceptInvitation(userId: string, tenantId: string): Promise<void> {
-  const { data, error } = await supabaseServiceRole()
+  const db = supabaseServiceRole();
+  const { data: pending, error: readError } = await db.from("tenant_memberships").select("invited_at").eq("tenant_id", tenantId).eq("user_id", userId).eq("status", "invited").maybeSingle();
+  if (readError) throw new ApiError(500, "QUERY_FAILED", readError.message);
+  if (!pending) throw new ApiError(404, "NO_INVITATION", "There is no pending invitation to this organization.");
+  const expiryDays = (await getTenantConfig(tenantId))["users.invitationExpiryDays"];
+  if (invitationExpired(pending.invited_at as string | null, expiryDays)) {
+    await writeAudit({ tenantId, actorId: userId, actorType: "user", action: "user.invitation_accepted", objectType: "user", objectId: userId, outcome: "failure", metadata: { refused: "INVITATION_EXPIRED" } });
+    throw new ApiError(410, "INVITATION_EXPIRED", "This invitation has expired. Ask an administrator to send it again.");
+  }
+  const { data, error } = await db
     .from("tenant_memberships")
     .update({ status: "active", status_changed_by: userId, status_reason: null })
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
     .eq("status", "invited")
+    // The invitation accepted is the one just checked: a re-send in between starts a new one.
+    .eq("invited_at", pending.invited_at as string)
     .select("user_id");
   if (error) throw new ApiError(500, "ACCEPT_FAILED", error.message);
   if (!data?.length) throw new ApiError(404, "NO_INVITATION", "There is no pending invitation to this organization.");
   await writeAudit({ tenantId, actorId: userId, actorType: "user", action: "user.invitation_accepted", objectType: "user", objectId: userId, outcome: "success" });
+}
+
+/**
+ * FOUNDATION-P0-32: send a pending invitation again. It starts a new
+ * validity period and a new e-mail; the old link still works only as a
+ * set-password link (it never adds anyone). Audited.
+ */
+export async function resendInvitation(tenant: { tenantId: string; name: string; url: string | null }, actor: { userId: string; email: string | null }, userId: string): Promise<{ emailSent: boolean }> {
+  const db = supabaseServiceRole();
+  const { data: person, error: personError } = await db.from("users").select("email, display_name").eq("id", userId).maybeSingle<{ email: string; display_name: string | null }>();
+  if (personError) throw new ApiError(500, "QUERY_FAILED", personError.message);
+  const now = new Date().toISOString();
+  const { data, error } = await db
+    .from("tenant_memberships")
+    .update({ invited_at: now, invited_by: actor.userId })
+    .eq("tenant_id", tenant.tenantId)
+    .eq("user_id", userId)
+    .eq("status", "invited")
+    .select("user_id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data?.length || !person) throw new ApiError(409, "NOT_INVITED", "Only a pending invitation can be sent again.");
+  const emailSent = await sendInvitationEmail({ email: person.email } as ValidInvite, tenant, actor);
+  await writeAudit({ tenantId: tenant.tenantId, actorId: actor.userId, actorType: "user", action: "user.invitation_resent", objectType: "user", objectId: userId, outcome: "success", metadata: { emailSent } });
+  return { emailSent };
+}
+
+/** System roles and the organization's own custom roles by name, with their permissions. */
+async function rolesWithPermissions(tenantId: string, names: string[]): Promise<{ id: string; name: string; permissions: string[] }[]> {
+  if (!names.length) return [];
+  const { data, error } = await supabaseServiceRole()
+    .from("roles")
+    .select("id, name, tenant_id, role_permissions(permissions(key))")
+    .or(`tenant_id.is.null,tenant_id.eq.${tenantId}`)
+    .eq("status", "active")
+    .in("name", names)
+    .returns<{ id: string; name: string; tenant_id: string | null; role_permissions: { permissions: { key: string } | null }[] }[]>();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? [])
+    .filter((r) => r.tenant_id === null || r.tenant_id === tenantId)
+    .map((r) => ({ id: r.id, name: r.name, permissions: r.role_permissions.map((rp) => rp.permissions?.key).filter((k): k is string => Boolean(k)) }));
+}
+
+// ------------------------------------------------------------- bulk invitation (FOUNDATION-P0-32)
+
+export type MemberRecord = { row: number | null; externalId: string; values: Record<string, unknown> };
+export type BulkActor = { userId: string; email: string | null; permissions: readonly string[] };
+
+/** What a bulk invitation would do, row by row: new, already a member (left as is), or invalid with the reason. */
+export async function planMemberInvitations(tenantId: string, actor: BulkActor, records: MemberRecord[]): Promise<ImportPlanRow[]> {
+  return (await classifyMembers(tenantId, actor, records)).map(({ record, decision }) => ({
+    row: record.row,
+    externalId: record.externalId,
+    decision: decision.decision,
+    targetId: null,
+    changes: [],
+    note: decision.note,
+  }));
+}
+
+/**
+ * Sends the new rows' invitations (one by one, each audited by inviteUser);
+ * the rest are reported as they are. Sending the same file again sends
+ * nothing twice: everyone it invited is already a member.
+ */
+export async function applyMemberInvitations(tenantId: string, actor: BulkActor, records: MemberRecord[]): Promise<ImportApplyRow[]> {
+  const db = supabaseServiceRole();
+  const { data: tenantRow } = await db.from("tenants").select("name, slug").eq("id", tenantId).maybeSingle<{ name: string; slug: string | null }>();
+  const tenant = { tenantId, name: tenantRow?.name ?? "your organization", url: tenantRow?.slug ? await urlForTenant(tenantRow.slug) : null };
+  const out: ImportApplyRow[] = [];
+  for (const { record, decision } of await classifyMembers(tenantId, actor, records)) {
+    if (decision.decision !== "new" || !decision.invite) {
+      out.push({ row: record.row, externalId: record.externalId, outcome: decision.decision === "unchanged" ? "unchanged" : "skipped", targetId: null, message: decision.note });
+      continue;
+    }
+    try {
+      const result = await inviteUser(tenant, actor, decision.invite);
+      out.push(
+        result.ok
+          ? { row: record.row, externalId: record.externalId, outcome: "created", targetId: result.value.userId, message: result.value.emailSent ? null : "invited; the e-mail was not sent" }
+          : { row: record.row, externalId: record.externalId, outcome: "skipped", targetId: null, message: Object.values(result.errors).join("; ") },
+      );
+    } catch (err) {
+      out.push({ row: record.row, externalId: record.externalId, outcome: "failed", targetId: null, message: err instanceof ApiError ? err.message : "The invitation could not be sent" });
+    }
+  }
+  return out;
+}
+
+async function classifyMembers(tenantId: string, actor: BulkActor, records: MemberRecord[]) {
+  const db = supabaseServiceRole();
+  const emails = [...new Set(records.map((r) => (typeof r.values.email === "string" ? r.values.email.trim().toLowerCase() : "")).filter(Boolean))];
+  const assignable = (await listAssignableRoles(tenantId)).map((r) => r.name);
+  const memberStatus = new Map<string, MembershipStatus>();
+  for (let i = 0; i < emails.length; i += 200) {
+    const { data: people, error } = await db.from("users").select("id, email").in("email", emails.slice(i, i + 200));
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    const byId = new Map((people ?? []).map((p) => [p.id as string, (p.email as string).toLowerCase()]));
+    if (!byId.size) continue;
+    const { data: members, error: memberError } = await db.from("tenant_memberships").select("user_id, status").eq("tenant_id", tenantId).in("user_id", [...byId.keys()]);
+    if (memberError) throw new ApiError(500, "QUERY_FAILED", memberError.message);
+    for (const m of members ?? []) memberStatus.set(byId.get(m.user_id as string)!, m.status as MembershipStatus);
+  }
+  const allRoles = [...new Set(records.flatMap((r) => (Array.isArray(r.values.roles) ? r.values.roles.filter((x): x is string => typeof x === "string").map((x) => x.trim()) : [])))].filter((n) => assignable.includes(n));
+  const permsOf = new Map((await rolesWithPermissions(tenantId, allRoles)).map((r) => [r.name, r.permissions]));
+  const canAssignRoles = actor.permissions.some((p) => p === "roles.assign" || p === "role.manage");
+  const seen = new Set<string>();
+  return records.map((record) => {
+    const email = typeof record.values.email === "string" ? record.values.email.trim().toLowerCase() : "";
+    // The same e-mail twice in one file: the first row counts.
+    if (email && seen.has(email)) return { record, decision: { decision: "invalid" as const, note: "The same e-mail appears earlier in the file", invite: null } };
+    if (email) seen.add(email);
+    const decision = classifyMemberRow(record.values, {
+      assignableRoles: assignable,
+      memberStatus,
+      actorEmail: actor.email,
+      canAssignRoles,
+      escalation: (roles) => invitationEscalation(roles.flatMap((r) => permsOf.get(r) ?? []), actor.permissions),
+    });
+    return { record, decision };
+  });
 }
 
 // ------------------------------------------------------------- lifecycle

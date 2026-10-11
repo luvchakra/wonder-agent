@@ -112,5 +112,17 @@ export const csvFile: ConnectorDefinition = {
       category: text("category"),
       description: text("description"),
     }),
+    // FOUNDATION-P0-32: people to invite, from the users page only (no address: never fetched on a schedule).
+    member: {
+      file: { columns: "{settings.columns}" },
+      fields: {
+        externalId: lower("email", "mail", "emailaddress", "externalid"),
+        email: lower("email", "mail", "emailaddress", "externalid"),
+        displayName: text("displayname", "name", "fullname"),
+        roles: { path: ["roles", "role"], transform: ["split"] },
+        accountType: lower("accounttype"),
+        authMethod: lower("authmethod", "signin"),
+      },
+    },
   },
 };

@@ -16,10 +16,11 @@
  * Pure (no I/O), shared by the page, the service and proxy.ts.
  */
 
-export type ConfigSection = "sessions" | "access" | "imports" | "agents" | "risk" | "certifications" | "sod";
+export type ConfigSection = "sessions" | "members" | "access" | "imports" | "agents" | "risk" | "certifications" | "sod";
 
 export const SECTIONS: { key: ConfigSection; title: string; description: string }[] = [
   { key: "sessions", title: "Sessions", description: "How long a signed-in session lasts. Applies to every member, on their next page." },
+  { key: "members", title: "Members", description: "Invitations to join the organization." },
   { key: "access", title: "Access", description: "How accounts are judged." },
   { key: "imports", title: "Imports", description: "How a connection's sync treats records that are gone from the source." },
   { key: "agents", title: "AI agents and runtime", description: "Discovery and runtime alerts." },
@@ -82,6 +83,20 @@ export const CONFIG_SETTINGS = [
     type: "choice",
     options: [30, 60, 90, 180, 365],
     default: 90,
+    unit: "days",
+  },
+  {
+    // FOUNDATION-P0-32: read by acceptInvitation() and listMyInvitations() (lib/users/users.ts).
+    // Before, an invitation never expired; 30 days is the longest a pending invitation now stays usable by default.
+    key: "users.invitationExpiryDays",
+    section: "members",
+    label: "Invitations expire after",
+    help: "An invitation not accepted within this long can no longer be used; an administrator can send it again.",
+    permission: SECURITY,
+    type: "int",
+    min: 1,
+    max: 90,
+    default: 30,
     unit: "days",
   },
   {

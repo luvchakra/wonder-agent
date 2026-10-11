@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError, type TenantContext } from "@/lib/shared/types/foundation";
 import { buildNhiInventory } from "@/modules/agent-identity/service";
 import { getMcpInventory } from "@/modules/integrations/service";
+import { listUsers } from "@/lib/users/users";
 import { CSV_BOM, csvRow, exportFilename } from "./csvWriter";
 import {
   EXPORT_CHUNK_SIZE,
@@ -140,6 +141,16 @@ async function serviceRows(tenantId: string, source: ServiceSource): Promise<Row
   if (source.service === "nhi_inventory") {
     const entries = await buildNhiInventory(tenantId);
     return entries.map((e) => ({ ...e, agentName: e.agent?.name ?? null }));
+  }
+  if (source.service === "members") {
+    // FOUNDATION-P0-32: every member, a page at a time (Foundation's directory, user-scoped reads).
+    const rows: Row[] = [];
+    for (let page = 1; rows.length <= EXPORT_ROW_CAP; page++) {
+      const { items } = await listUsers(tenantId, { page, pageSize: 100 });
+      rows.push(...items.map((u) => ({ email: u.email, displayName: u.displayName, roles: u.roles.join(","), status: u.status })));
+      if (items.length < 100) break;
+    }
+    return rows;
   }
   const servers = await getMcpInventory(tenantId);
   return servers.map((s) => ({ ...s, toolCount: s.tools.length, resourceCount: s.resources.length }));

@@ -11,7 +11,7 @@ import type { ResourceKind } from "./framework/types";
  */
 
 /** The object pages that import CSV, by the kind of record they hold. */
-export const IMPORT_KINDS = ["identity", "account", "entitlement", "access_grant", "application"] as const satisfies readonly ResourceKind[];
+export const IMPORT_KINDS = ["identity", "account", "entitlement", "access_grant", "application", "member"] as const satisfies readonly ResourceKind[];
 export type ImportKind = (typeof IMPORT_KINDS)[number];
 
 export const MAX_IMPORT_BYTES = MAX_CSV_BYTES;
@@ -71,6 +71,8 @@ export const IMPORT_MANAGE_PERMISSION: Record<ImportKind, string> = {
   entitlement: "access.manage",
   account: "access.manage",
   access_grant: "access.manage",
+  // FOUNDATION-P0-32: each row is an invitation; giving roles needs role management too (checked per row).
+  member: "users.invite",
 };
 
 /** The identity pages an import may come from; each creates its own type by default. */

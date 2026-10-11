@@ -9,6 +9,7 @@ describe("the settings", () => {
     expect(DEFAULT_CONFIG).toEqual({
       "session.idleMinutes": 30,
       "session.maxHours": 12,
+      "users.invitationExpiryDays": 30,
       "access.dormantDays": 90,
       "access.fulfilmentSlaDays": 3,
       "access.expiryReminderDays": 7,

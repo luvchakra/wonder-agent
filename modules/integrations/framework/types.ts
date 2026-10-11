@@ -50,6 +50,8 @@ export const RESOURCE_KINDS = [
   "mcp_server",
   "mcp_tool",
   "mcp_resource",
+  // FOUNDATION-P0-32: people to invite as members of WonderID (imported from the users page).
+  "member",
 ] as const;
 export type ResourceKind = (typeof RESOURCE_KINDS)[number];
 
@@ -111,6 +113,12 @@ export const CANONICAL_FIELDS: Record<ResourceKind, { required: readonly string[
   mcp_resource: {
     required: ["externalId", "uri"],
     optional: ["name", "mimeType"],
+  },
+  // FOUNDATION-P0-32: a member is identified by e-mail; Foundation applies them as invitations.
+  member: {
+    required: ["externalId", "email"],
+    optional: ["displayName", "roles", "accountType", "authMethod"],
+    arrays: ["roles"],
   },
 };
 

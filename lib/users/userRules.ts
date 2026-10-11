@@ -201,3 +201,63 @@ export function roleLabel(role: string): string {
       .join(" ")
   );
 }
+
+// ------------------------------------------------------------- FOUNDATION-P0-32
+
+const DAY = 86_400_000;
+
+/** An invitation not accepted within the organization's limit can no longer be used. */
+export function invitationExpired(invitedAt: string | null, expiryDays: number, now = new Date()): boolean {
+  if (!invitedAt) return false;
+  return now.getTime() - Date.parse(invitedAt) > expiryDays * DAY;
+}
+
+/**
+ * Inviting never escalates: every permission of every role given must be one
+ * the inviter holds. Returns the permissions they do not hold.
+ */
+export function invitationEscalation(rolePermissions: readonly string[], inviterHolds: readonly string[]): string[] {
+  const holds = new Set(inviterHolds);
+  return [...new Set(rolePermissions.filter((p) => !holds.has(p)))].sort();
+}
+
+export type MemberRowDecision = { decision: "new" | "unchanged" | "invalid"; note: string | null; invite: InviteInput | null };
+
+/**
+ * One row of a bulk invitation (CSV or API): a new invitation, someone who
+ * is already a member (left as is: sending again is idempotent on e-mail),
+ * or a row that cannot be sent, with the reason. Pure; the service looks up
+ * memberships and role permissions.
+ */
+export function classifyMemberRow(
+  values: { email?: unknown; displayName?: unknown; roles?: unknown; accountType?: unknown; authMethod?: unknown },
+  ctx: {
+    assignableRoles: readonly string[];
+    /** Membership status in this organization, by lower-case e-mail. */
+    memberStatus: ReadonlyMap<string, MembershipStatus>;
+    actorEmail: string | null;
+    canAssignRoles: boolean;
+    /** Permissions the given roles carry that the inviter does not hold. */
+    escalation: (roles: string[]) => string[];
+  },
+): MemberRowDecision {
+  const roles = Array.isArray(values.roles) ? values.roles.filter((r): r is string => typeof r === "string" && r.trim() !== "").map((r) => r.trim()) : [];
+  const input: InviteInput = {
+    email: values.email,
+    displayName: values.displayName,
+    accountType: values.accountType ?? "internal",
+    authMethod: values.authMethod ?? "tenant_default",
+    method: "invite",
+    roles,
+  };
+  const parsed = validateInvite(input, ctx.assignableRoles);
+  if (!parsed.ok) return { decision: "invalid", note: Object.values(parsed.errors).join("; "), invite: null };
+  const email = parsed.value.email;
+  if (ctx.actorEmail && email === ctx.actorEmail.toLowerCase()) return { decision: "unchanged", note: "That's you: already a member", invite: null };
+  const status = ctx.memberStatus.get(email);
+  if (status && status !== "removed") return { decision: "unchanged", note: `Already in this organization (${STATUS_LABEL[status].toLowerCase()})`, invite: null };
+  if (roles.length && !ctx.canAssignRoles) return { decision: "invalid", note: "Giving roles needs role management; leave the roles empty", invite: null };
+  const escalated = ctx.escalation(parsed.value.roles);
+  if (escalated.length) return { decision: "invalid", note: `You can only give roles whose permissions you hold. Not held: ${escalated.join(", ")}`, invite: null };
+  return { decision: "new", note: null, invite: input };
+}
