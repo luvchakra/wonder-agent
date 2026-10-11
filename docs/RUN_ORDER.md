@@ -381,3 +381,17 @@ and event-driven rules, and manage AI agents, by configuration.
 
 `docs/integrations/INTEGRATOR-GUIDE.md` is new: what an integrator can
 configure today, with paths and permissions.
+
+## 2026-10-11 — Fresh IGA plan set in `docs/iga/`
+
+On the owner's request, a fresh, self-contained set of documents for the IGA
+and Agent ID work now lives in its own folders, separate from the historical
+documents:
+- `docs/iga/design/DESIGN.md`: the consolidated current design.
+- `docs/iga/run-order/RUN-ORDER.md`: phases F1–F10 with every story, ID,
+  module, issue and exit test. The plan of record for this work.
+- `docs/iga/progress/PROGRESS.md`: live status per story and decision,
+  updated in the same PR as the work.
+
+The older files stay as history and reference; this file keeps recording
+programme-level events as before.
