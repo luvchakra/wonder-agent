@@ -156,6 +156,8 @@ export async function pendRequest(tenantId: string, requestId: string): Promise<
       await pendRemoval(tenantId, subject, applicationId, entitlementId, requestId);
     } else if (req.request_type === "disable_account") {
       await pendDisable(tenantId, subject, applicationId, requestId);
+    } else if (req.request_type === "extend" && entitlementId) {
+      await pendExtension(tenantId, subject, applicationId, entitlementId, requestId);
     }
   } catch (err) {
     await writeAudit({ tenantId, actorType: "system", action: "access.grants_pending", objectType: "access_request", objectId: requestId, outcome: "failure", metadata: { error: err instanceof ApiError ? err.code : "UNEXPECTED" } });
@@ -217,6 +219,93 @@ async function pendDisable(tenantId: string, subject: Subject, applicationId: st
   }
   await openFulfilmentTask(tenantId, { kind: "disable_account", accountId: active[0].id, requestId, applicationId });
   await lineAudit(tenantId, requestId, "access.account_disable_pending", true, { accountId: active[0].id });
+}
+
+/**
+ * ACCESS-P0-32: an approved extension. The access the subject holds through
+ * a request now rests on this one (its approval and end date), and removal
+ * work its old end date started is called off. Nothing changes on the
+ * target, so there is no task.
+ */
+async function pendExtension(tenantId: string, subject: Subject, applicationId: string, entitlementId: string, requestId: string): Promise<void> {
+  const admin = supabaseServiceRole();
+  const accounts = await realAccounts(tenantId, applicationId, subject);
+  const { data, error } = accounts.length
+    ? await admin
+        .from("access_grants")
+        .select("id, removal_status, removal_request_id")
+        .eq("tenant_id", tenantId)
+        .in("account_id", accounts.map((a) => a.id))
+        .eq("entitlement_id", entitlementId)
+        .is("revoked_at", null)
+        .is("access_package_assignment_item_id", null)
+        .neq("fulfilment_status", "pending_fulfilment")
+    : { data: [], error: null };
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  // A removal someone asked for, or one already done on the target, is not undone by an extension.
+  const grants = ((data ?? []) as Row[]).filter((g) => g.removal_status === null || (g.removal_status === "pending_removal" && g.removal_request_id === null));
+  if (!grants.length) {
+    await lineAudit(tenantId, requestId, "access.access_extended", false, { reason: "The subject no longer holds this access to extend" });
+    return;
+  }
+  const ids = grants.map((g) => g.id as string);
+  const now = new Date().toISOString();
+  const { error: moveError } = await admin.from("access_grants").update({ request_id: requestId, updated_at: now }).eq("tenant_id", tenantId).in("id", ids);
+  if (moveError) throw new ApiError(500, "UPDATE_FAILED", moveError.message);
+  const reopened = grants.filter((g) => g.removal_status === "pending_removal").map((g) => g.id as string);
+  if (reopened.length) {
+    const { error: keepError } = await admin
+      .from("access_grants")
+      .update({ removal_status: null, updated_at: now })
+      .eq("tenant_id", tenantId)
+      .in("id", reopened)
+      .eq("removal_status", "pending_removal")
+      .is("removal_request_id", null);
+    if (keepError) throw new ApiError(500, "UPDATE_FAILED", keepError.message);
+    await closeTasksForGrants(tenantId, reopened, "cancelled", "remove");
+  }
+  await lineAudit(tenantId, requestId, "access.access_extended", true, { grantIds: ids, removalCancelled: reopened });
+}
+
+/**
+ * ACCESS-P0-32: access whose approval has ended (a request's end date, an
+ * expired or revoked package assignment) becomes removal work: each live
+ * grant is marked pending removal (it is still access) and gets one removal
+ * task. Conditional on the grant not being marked already, with one live
+ * task per grant (0123), so running it again changes nothing. Returns the
+ * grants it marked.
+ */
+export async function queueRemoval(tenantId: string, lines: { grantId: string; applicationId: string }[]): Promise<string[]> {
+  if (!lines.length) return [];
+  const { data, error } = await supabaseServiceRole()
+    .from("access_grants")
+    .update({ removal_status: "pending_removal", updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .in("id", lines.map((l) => l.grantId))
+    .is("revoked_at", null)
+    .is("removal_status", null)
+    .neq("fulfilment_status", "pending_fulfilment")
+    .select("id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  const marked = new Set(((data ?? []) as Row[]).map((r) => r.id as string));
+  for (const line of lines) if (marked.has(line.grantId)) await openFulfilmentTask(tenantId, { kind: "remove", grantId: line.grantId, requestId: null, applicationId: line.applicationId });
+  return [...marked];
+}
+
+/** ACCESS-P0-32: grants still waiting for fulfilment when their approval ends never existed: withdrawn (revoked), their tasks cancelled. */
+export async function withdrawGrants(tenantId: string, grantIds: string[]): Promise<void> {
+  if (!grantIds.length) return;
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("access_grants")
+    .update({ revoked_at: now, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .in("id", grantIds)
+    .eq("fulfilment_status", "pending_fulfilment")
+    .is("revoked_at", null)
+    .select("id");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  await closeTasksForGrants(tenantId, ((data ?? []) as Row[]).map((r) => r.id as string), "cancelled");
 }
 
 /**

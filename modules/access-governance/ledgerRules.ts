@@ -22,7 +22,7 @@
  * Status describes the authorization behind the access:
  * - VALID: current evidence;
  * - EXPIRED: the evidence's end has passed (a request's expiry, a package
- *   assignment that expired);
+ *   assignment that expired), whether or not the source has removed it yet;
  * - REVOKED: the access was revoked in WonderID's records, or the package
  *   assignment that gave it was revoked;
  * - UNPROVEN: no evidence.
@@ -185,13 +185,16 @@ function fromAdmin(a: AdminGrantEvidence): Candidate {
 
 const RANK: Record<LedgerStatus, number> = { VALID: 0, EXPIRED: 1, REVOKED: 2, UNPROVEN: 3, ROGUE: 4, LEGACY_EXCEPTION: 5, PENDING_RECONCILIATION: 6 };
 
-/** The ledger entry for one relationship. Current evidence wins over ended evidence; among equals, the latest. */
+/** The ledger entry for one relationship. Current evidence wins over ended evidence; among equals, the latest. Of requests, only the latest decision counts. */
 export function ledgerEntry(rel: LedgerRelationship, evidence: LedgerEvidence, now = new Date()): LedgerEntry {
   const candidates: Candidate[] = [];
+  // ACCESS-P0-32: among requests for the same access, the latest decision holds it: an extension replaces what it extends.
+  let latest: RequestEvidence | null = null;
   for (const r of evidence.requests) {
     const subject = (rel.identityId !== null && r.subjectIdentityId === rel.identityId) || (rel.agentId !== null && r.agentId === rel.agentId);
-    if (subject && covers(rel, r.applicationId, r.entitlementId)) candidates.push(fromRequest(r, now));
+    if (subject && covers(rel, r.applicationId, r.entitlementId) && (!latest || (r.decidedAt ?? "") > (latest.decidedAt ?? ""))) latest = r;
   }
+  if (latest) candidates.push(fromRequest(latest, now));
   for (const p of evidence.packages) {
     if (rel.identityId !== null && p.identityId === rel.identityId && covers(rel, p.applicationId, p.entitlementId)) candidates.push(fromPackage(p, now));
   }
@@ -222,9 +225,10 @@ export function ledgerEntry(rel: LedgerRelationship, evidence: LedgerEvidence, n
     identityId: rel.identityId,
     accessGrantId: rel.accessGrantId,
     ...best,
-    // Revoked in WonderID's records: whatever authorized it, the access itself has ended.
+    // Revoked in WonderID's records: whatever authorized it, the access itself has ended; when its
+    // approval had run out, it ended by expiring (ACCESS-P0-32: the source confirmed the removal).
     // Requested but not yet found at the source (ACCESS-P0-28): approved, not yet real.
-    status: rel.revokedAt !== null ? "REVOKED" : rel.awaitingVerification ? "PENDING_RECONCILIATION" : best.status,
+    status: rel.revokedAt !== null ? (best.status === "EXPIRED" ? "EXPIRED" : "REVOKED") : rel.awaitingVerification ? "PENDING_RECONCILIATION" : best.status,
     sourceIntegrationId: rel.sourceIntegrationId,
     firstSeenAt: rel.firstSeenAt,
     lastVerifiedAt: rel.lastSeenAt,

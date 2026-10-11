@@ -517,3 +517,14 @@ what its contract approves; anything else is refused by the server. These
 requests are approved by the owners of the application or entitlement, and
 follow the same pending grant and fulfilment task as a person's. ACCESS-P0-32
 (time-bound access) is next.
+
+## 2026-10-11 — ACCESS-P0-32: time-bound access
+
+Access with an end date now ends on time. The requester and the person it is
+for are reminded before the end (7 days by default, set in Global
+Configuration) and can ask to extend it from the request; an extension is
+approved like any request. At the end date each grant gets exactly one
+removal task, and once the source confirms the removal the ledger shows the
+access as expired. Expired or revoked package assignments create removal
+tasks the same way. EXPERIENCE-P0-29 (request tracking, one inbox, subject
+picker) is next.

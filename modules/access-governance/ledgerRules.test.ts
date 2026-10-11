@@ -131,6 +131,17 @@ describe("ledgerEntry", () => {
     expect(ledgerEntry(rel(), { ...none(), adminGrants }, NOW)).toMatchObject({ source: "IMPORT", status: "UNPROVEN" });
   });
 
+  it("ACCESS-P0-32: access whose approval expired is EXPIRED, before and after the source confirms its removal", () => {
+    const expired = { ...none(), requests: [request({ requestedExpiry: "2026-10-01T00:00:00Z" })] };
+    expect(ledgerEntry(rel(), expired, NOW).status).toBe("EXPIRED");
+    expect(ledgerEntry(rel({ revokedAt: "2026-10-02T00:00:00Z" }), expired, NOW).status).toBe("EXPIRED");
+    // An approved extension is current evidence again.
+    const extended = { ...none(), requests: [request({ requestedExpiry: "2026-10-01T00:00:00Z" }), request({ id: "req-2", requestedExpiry: "2099-01-01T00:00:00Z", decidedAt: "2026-09-30T00:00:00Z" })] };
+    expect(ledgerEntry(rel(), extended, NOW)).toMatchObject({ status: "VALID", requestId: "req-2" });
+    // The latest decision holds the access, even when it ends sooner than the one it replaced.
+    const shortened = { ...none(), requests: [request({ requestedExpiry: "2099-01-01T00:00:00Z" }), request({ id: "req-2", requestedExpiry: "2026-10-01T00:00:00Z", decidedAt: "2026-09-30T00:00:00Z" })] };
+    expect(ledgerEntry(rel({ revokedAt: "2026-10-02T00:00:00Z" }), shortened, NOW)).toMatchObject({ status: "EXPIRED", requestId: "req-2" });
+  });
   it("revoked access is REVOKED whatever approved it, and keeps its provenance", () => {
     const e = ledgerEntry(rel({ revokedAt: "2026-10-05T00:00:00Z" }), { ...none(), requests: [request()] }, NOW);
     expect(e).toMatchObject({ source: "WONDERID_REQUEST", status: "REVOKED", requestId: "req-1" });

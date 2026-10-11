@@ -2653,3 +2653,84 @@ people. No migration.
 - Delegated agent owners do not request; only the business owner.
 - Agent access packages and the agent onboarding journey stay with
   IDENTITY-P0-19.
+
+### 2026-10-11 — ACCESS-P0-32: time-bound access (#54)
+
+**What changed.** Access with an end date now ends on time, through the same
+fulfilment and reconciliation path as everything else. Migration 0124
+(applied to dev, additive).
+
+- **End dates.** A line's duration was already capped by its request policy
+  (`DURATION_TOO_LONG`); the end date is the request's `requested_expiry`.
+- **Extending** is a new request type, `extend`.
+  - It is evaluated like a grant: same policy, same cap, same risk, same
+    approval chain.
+  - It needs access the subject holds through a request (not a package);
+    otherwise it is refused with 409 `NOTHING_TO_CHANGE`.
+  - The new end date counts from today.
+  - On approval (`pendExtension`), the grant's evidence moves to the
+    extension (`access_grants.request_id`). Removal work that the old end
+    date had started is called off: the grant is no longer pending removal,
+    and its removal task is cancelled. A removal someone asked for is never
+    undone.
+  - The request page has a folded "Extend" form for the requester or the
+    person the access is for, offering durations up to the policy's maximum.
+- **Reminder.** Once per request, `access.expiryReminderDays` before the end
+  date (Global Configuration, default 7), the requester and the person it is
+  for get an `access_expiring` notification. It goes out only for access
+  that is held. Sent from the daily cron; claimed before sending, so two runs
+  never both remind.
+- **At the end date** (`sweepAccessExpiry`, run by the daily cron and by the
+  request page for its own organization):
+  - each live grant from the request is marked pending removal and gets
+    exactly one removal task (`queueRemoval`);
+  - grants never fulfilled are withdrawn, and their tasks cancelled;
+  - the request is stamped `expiry_processed_at`.
+
+  Idempotent three ways: the grant update is conditional, there is one live
+  task per grant (0123), and only unstamped requests are read.
+- **Package assignments** that expire or are revoked now also turn the
+  access they gave into removal tasks. Before, only the item status changed.
+- **Ledger.**
+  - Access whose approval has expired is EXPIRED, both before and after
+    the source confirms its removal (connector reconciliation revokes it).
+    Before this change, the removal made it REVOKED.
+  - Among requests for the same access, only the latest decision counts.
+    An extension replaces what it extends, even when it ends sooner.
+- **Migration 0124:**
+  - request type `extend`;
+  - `access_requests.expiry_reminded_at` and `expiry_processed_at`, with a
+    partial index for the sweeps;
+  - notification type `access_expiring`.
+
+**Verified.**
+- Typecheck, ESLint and `next build` are clean.
+- Vitest: 1222/1222. New tests:
+  - `accessExpiryRules` (end, reminder window, once only);
+  - the ledger: EXPIRED before and after removal, an extension is current,
+    a shortening extension governs;
+  - the config default.
+- E2E (local, dev Supabase):
+  - `f1-reconciliation` 18/18. The new test:
+    - 60 days is refused under a 30-day cap; 30 days is approved
+      automatically and verified at the source;
+    - an extension of 60 days is refused; 14 days is approved, and the
+      grant now rests on it;
+    - its end date passes: one removal task, and still one after the sweep
+      runs again with the request unstamped;
+    - the grant is not revoked until the source drops it, then it is
+      revoked, the task verified and the ledger EXPIRED.
+  - `access-packages`, `request-catalog`, `approval-engine` and `sod`: all
+    passed (42 with the above).
+  - `file-import` and `mcp-inventory`, which also read the ledger:
+    - run together, one `file-import` UI step timed out waiting for "1
+      added";
+    - `file-import` then passed 17/17 on its own, both on `main` and with
+      this change;
+    - this change touches no import code. Noted, not root-caused further.
+
+**Left out.**
+- No automatic removal: that is F3 (provisioning).
+- No reminder E2E: the cron route needs `CRON_SECRET`, which local runs don't
+  have. The rule is unit-tested and the sweep is shared with the cron.
+- Extending package access stays with the package (its own expiry).

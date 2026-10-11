@@ -217,8 +217,10 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
   if (!UUID_RE.test(applicationId) || (entitlementId && !UUID_RE.test(entitlementId))) throw new ApiError(400, "VALIDATION_FAILED", "applicationId (and entitlementId, if given): ids");
   // ACCESS-P0-30: access (or, with no entitlement, an account), access to remove, or an account to disable.
   const requestType = input.requestType === undefined || input.requestType === null || input.requestType === "" ? "grant" : input.requestType;
-  if (requestType !== "grant" && requestType !== "remove" && requestType !== "disable_account") throw new ApiError(400, "VALIDATION_FAILED", "requestType: grant, remove or disable_account");
+  // ACCESS-P0-32: or to keep access the subject holds for longer.
+  if (requestType !== "grant" && requestType !== "remove" && requestType !== "disable_account" && requestType !== "extend") throw new ApiError(400, "VALIDATION_FAILED", "requestType: grant, remove, disable_account or extend");
   if (requestType === "remove" && !entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: the access to remove");
+  if (requestType === "extend" && !entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: the access to extend");
   if (requestType === "disable_account" && entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: not used when disabling an account");
   const requester = await getIdentityForUser(tenantId, actor.userId);
   const subjectId = typeof input.subjectIdentityId === "string" && input.subjectIdentityId ? input.subjectIdentityId : requester?.id;
@@ -243,9 +245,10 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
 
   const now = new Date();
   const policy = resolvePolicy(policies, applicationId, entitlementId);
-  // Taking access away lowers risk, so a removal or a disable is low risk whatever it removes.
+  // Taking access away lowers risk, so a removal or a disable is low risk whatever it removes; keeping it longer is as risky as granting it.
+  const timed = requestType === "grant" || requestType === "extend";
   const risk =
-    requestType === "grant"
+    timed
       ? assessRisk({
           privilegeLevel: entRes.data?.privilege_level,
           dataClassification: entRes.data?.data_classification,
@@ -261,14 +264,14 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     : requester !== null && subject.ownerIdentityId !== null && subject.ownerIdentityId === requester.id;
   const agentContract = !agentId
     ? undefined
-    : requestType !== "grant"
+    : !timed
       ? "within" // taking access away is always within the contract
       : !contract
         ? "none"
         : withinContract(contract, [appRes.data.name, appRes.data.display_name], entRes.data?.data_classification ?? null)
           ? "within"
           : "outside";
-  const durationRaw = requestType !== "grant" || input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
+  const durationRaw = !timed || input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
   const decision = evaluateRequest({
     policy,
     appActive: appRes.data.onboarding_status === "ACTIVE",
@@ -324,8 +327,8 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
       policy_result: { checks: decision.checks },
       risk_level: risk,
       // A removal or a disable lasts: it has no duration or expiry.
-      duration_days: requestType === "grant" ? decision.durationDays : null,
-      requested_expiry: requestType === "grant" ? decision.expiresAt : null,
+      duration_days: timed ? decision.durationDays : null,
+      requested_expiry: timed ? decision.expiresAt : null,
       ...(decision.initialStatus === "approved" ? { decided_at: now.toISOString() } : {}),
     })
     .select()
@@ -444,7 +447,7 @@ export async function listRequests(
  * waiting for fulfilment, and not already being removed); a disable needs
  * an active account. Read with the service role, filtered on the tenant.
  */
-async function assertSomethingToChange(tenantId: string, subjectId: string, applicationId: string, requestType: "remove" | "disable_account", entitlementId: string | null): Promise<void> {
+async function assertSomethingToChange(tenantId: string, subjectId: string, applicationId: string, requestType: "remove" | "disable_account" | "extend", entitlementId: string | null): Promise<void> {
   const admin = supabaseServiceRole();
   const { data: accounts, error } = await admin.from("accounts").select("id, tenant_id, status").eq("tenant_id", tenantId).eq("application_id", applicationId).eq("identity_id", subjectId).neq("status", "pending").limit(10);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -453,18 +456,19 @@ async function assertSomethingToChange(tenantId: string, subjectId: string, appl
     if (!own.some((a) => a.status === "active")) throw new ApiError(409, "NOTHING_TO_CHANGE", "There is no active account on this application to disable");
     return;
   }
-  const { data: grants, error: grantError } = own.length
-    ? await admin
-        .from("access_grants")
-        .select("id")
-        .eq("tenant_id", tenantId)
-        .in("account_id", own.map((a) => a.id as string))
-        .eq("entitlement_id", entitlementId!)
-        .is("revoked_at", null)
-        .is("removal_status", null)
-        .neq("fulfilment_status", "pending_fulfilment")
-        .limit(1)
-    : { data: [], error: null };
+  let grantQuery = admin
+    .from("access_grants")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .in("account_id", own.map((a) => a.id as string))
+    .eq("entitlement_id", entitlementId!)
+    .is("revoked_at", null)
+    .neq("fulfilment_status", "pending_fulfilment");
+  // ACCESS-P0-32: access held through a request (not a package) can be extended, even once its end date has turned it into removal work.
+  grantQuery = requestType === "extend" ? grantQuery.is("access_package_assignment_item_id", null).or("removal_status.is.null,removal_status.eq.pending_removal") : grantQuery.is("removal_status", null);
+  const { data: grants, error: grantError } = own.length ? await grantQuery.limit(1) : { data: [], error: null };
   if (grantError) throw new ApiError(500, "QUERY_FAILED", grantError.message);
-  if (!grants?.length) throw new ApiError(409, "NOTHING_TO_CHANGE", "This access is not held (or its removal is already under way)");
+  if (!grants?.length) {
+    throw new ApiError(409, "NOTHING_TO_CHANGE", requestType === "extend" ? "There is no access from a request to extend" : "This access is not held (or its removal is already under way)");
+  }
 }

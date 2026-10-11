@@ -49,7 +49,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Done — 2026-10-11: migration 0122 (isolation SQL 8/8); tasks go to the application's technical (else business) owner, any access manager may work them; a group as assignee waits for applications to have a fulfilment group |
 | ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Done — 2026-10-11: migration 0123; remove access (revoked when a full run no longer finds it), new account (placeholder until it appears), disable account (until the source shows it disabled or gone); each request is one line with its own approval route |
 | ACCESS-P0-31 | Requests for non-human identities; AI agents within their contract (F2, #53) | Done — 2026-10-11: owners request for what they own; an agent's business owner only within its contract; non-human requests go to the resource's owners |
-| ACCESS-P0-32 | Time-bound access: end dates, reminders, removal task at expiry (F2, #54) | Not Started |
+| ACCESS-P0-32 | Time-bound access: end dates, reminders, removal task at expiry (F2, #54) | Done — 2026-10-11: migration 0124; extend requests through approval; one removal task per grant at the end date; ledger EXPIRED once the source confirms |
 
 ---
 

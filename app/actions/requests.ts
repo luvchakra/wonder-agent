@@ -45,9 +45,13 @@ export async function submitRequestAction(applicationId: string, _prev: RequestF
     revalidatePath("/access/requests");
     const message = duplicate
       ? `An identical request is already open (${request.status === "pending" ? "waiting for approval" : "approved"}); it was not submitted twice.`
-      : request.status === "approved"
-        ? "Approved automatically under the request policy. It is ready to be fulfilled."
-        : "Submitted. It is waiting for approval.";
+      : request.requestType === "extend"
+        ? request.status === "approved"
+          ? "Extended: approved automatically under the request policy."
+          : "Submitted. The extension is waiting for approval."
+        : request.status === "approved"
+          ? "Approved automatically under the request policy. It is ready to be fulfilled."
+          : "Submitted. It is waiting for approval.";
     return { status: "saved", message, requestId: request.id };
   } catch (err) {
     return formError(err);

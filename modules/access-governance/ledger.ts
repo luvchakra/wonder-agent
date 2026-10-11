@@ -163,7 +163,8 @@ async function loadEvidence(tenantId: string, rels: LedgerRelationship[]): Promi
             .from("access_requests")
             .select(requestCols)
             .eq("tenant_id", tenantId)
-            .eq("request_type", "grant")
+            // ACCESS-P0-32: an approved extension is evidence like the grant it extends.
+            .in("request_type", ["grant", "extend"])
             .in("status", ["approved", "fulfilled"])
             .not("application_id", "is", null)
             .in(column, part)
