@@ -1529,3 +1529,55 @@ The "share its Vercel preview URL" steps were dropped. Working branches have
 had no previews since PR #34.
 
 This change is itself waiting for "merge now".
+
+### 2026-10-11 — Nightly E2E: half 1 green, half 2 one failure (tenant addresses on Vercel)
+
+GitHub started the scheduled run late, at 00:16 UTC (run 38097869451), not
+at 21:30 UTC. It was not started by hand: at 22:45 UTC the project had 82
+deployments in 24 hours, above §19.9's limit of 70. Both halves ran on
+`3baa5cc` (#39).
+
+- **Half 1** (`e2e/nightly-1`): passed.
+- **Half 2** (`e2e/nightly-2`, `dpl_CUpcx6qs8nSeTFA6ZzVFjpXQ5xxb`): **188
+  passed, 1 failed, 1 flaky, 11 min.** It is the first half 2 to finish on
+  Vercel (the 10-10 runs timed out or were cancelled).
+- The fixes in #39 held: the sign-in provider tests and the "AI Agents"
+  heading lookups passed.
+
+**Failed: `tenant-address.spec.ts:54`, line 63.** `no-such-organization.localhost:3100/`
+answered 200, not 404, on both attempts. The rest of the file passed,
+including the tenant's own sign-in page.
+- It failed the same way in the 10-10 07:52 run, so it is not a regression
+  from #37–#39. It fails only on the Vercel builder.
+- It passes locally (1/1), and `curl` returns 404 for both unknown and
+  reserved addresses, on each of these builds:
+  - a plain build;
+  - a build without `BASE_APP_HOST`, started with it, as the Vercel script
+    does;
+  - a build with Vercel's own Next.js adapter loaded (`@vercel/next`
+    22.0.1, `NEXT_ADAPTER_PATH`, `VERCEL=1`, `CI=1`), which is what
+    "Applying modifyConfig from Vercel" in the build log refers to. The
+    adapter changes nothing that touches the proxy.
+- Ruled out:
+  - no tenant or domain named `no-such-organization` exists;
+  - `resolve_tenant_host()` returns no rows for it and is a set-returning
+    function, so the proxy cannot mistake an empty result for a match;
+  - the Vercel project defines no `BASE_APP_HOST`.
+- Both remaining explanations answer 200 and cannot be told apart from the
+  log:
+  - the proxy did not see a tenant address and served the landing page;
+  - it found one and redirected to sign-in.
+- **Change (test only):** each 404 check in that test now reports the final
+  URL, any redirect and the page title when it fails, so the next nightly
+  shows which explanation holds. The fix follows once that is known. No
+  Vercel run was started for it (00:10 instruction).
+
+**Flaky: `trust-compliance.spec.ts:144`** (members download their own data;
+the audit chain verifies intact). On the first attempt, "Intact" was not
+visible on `/audit/integrity` within 20 seconds. It passed on retry. The
+other tests in that serial group were re-run with it and passed. To watch:
+the verification walks the whole tenant chain, and the shared E2E tenant's
+chain keeps growing.
+
+The file-import spec (10 tests, in half 1) ran in the full suite for the first time and passed.
+
