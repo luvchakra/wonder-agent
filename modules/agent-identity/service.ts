@@ -44,6 +44,7 @@ export {
   getIdentityForUser,
   getIdentityNames,
   listOwnedIdentities,
+  listDirectReports,
   listAccountableHumans,
   createIdentity,
   updateIdentity,

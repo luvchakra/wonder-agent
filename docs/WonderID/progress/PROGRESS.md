@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-11 |
 | Current phase | F2 Access requests end to end (started 2026-10-11); F1 gating done |
-| Next story | EXPERIENCE-P0-29, Request tracking, one inbox, subject picker (#55); FOUNDATION-P0-31 (F1) waits for D11 |
+| Next story | QA-P0-24, Request-to-verified suite (#56); FOUNDATION-P0-31 (F1) waits for D11 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -83,7 +83,7 @@ Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded 
 | ACCESS-P0-30 Remove-access and account requests | Access | #52 | Done | Migration 0123. Remove access (revoked when the source no longer lists it), a new account (placeholder until it appears), disable an account (until the source shows it disabled). Each request is one line with its own approval; multi-line baskets remain a separate item |
 | ACCESS-P0-31 Requests for non-human identities | Access + Identity | #53 | Done | No migration. The owner of a service account or machine identity requests for it; an agent's business owner requests only what its contract approves (refused otherwise, server-side). Non-human requests are approved by the resource's owners |
 | ACCESS-P0-32 Time-bound access | Access | #54 | Done | Migration 0124. End dates capped by policy; a reminder before the end with an Extend request (approved like any other); at the end, exactly one removal task per grant; the ledger shows EXPIRED once the source confirms the removal |
-| EXPERIENCE-P0-29 Request tracking and tasks inbox | Experience | #55 | Not started | |
+| EXPERIENCE-P0-29 Request tracking and tasks inbox | Experience | #55 | Done | No migration. Each request line shows its real state (waiting, approved, waiting for fulfilment, not yet verified, verified, failed, ended); "Waiting for you" lists fulfilment tasks with the approvals; For lists the people you manage and what you own |
 | QA-P0-24 Request-to-verified suite | QA | #56 | Not started | |
 | FOUNDATION-P0-32 Bulk invitation and invitation API | Foundation | #68 | Not started | Does not gate |
 

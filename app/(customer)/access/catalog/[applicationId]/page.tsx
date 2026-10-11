@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getRequestCatalogItem, withinContract } from "@/modules/access-governance/service";
-import { getAgentContract, getIdentityForUser, listIdentities, listOwnedIdentities } from "@/modules/agent-identity/service";
+import { getAgentContract, getIdentityForUser, listDirectReports, listIdentities, listOwnedIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Button, Card, CardBody, CardHeader, EmptyState, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { RequestForm, type RequestOption } from "../RequestForm";
@@ -31,7 +31,8 @@ export default async function RequestAccessPage({ params, searchParams }: { para
   if (!item) notFound();
   // ACCESS-P0-31: what you own (service accounts, machine identities, agents) can be requested for too;
   // for an agent, only what its contract approves is offered (the server checks again).
-  const owned = await listOwnedIdentities(tenantId, ctx.userId, me?.id ?? null);
+  // EXPERIENCE-P0-29: and the people you manage, without searching.
+  const [owned, reports] = await Promise.all([listOwnedIdentities(tenantId, ctx.userId, me?.id ?? null), listDirectReports(tenantId, me?.id ?? null)]);
   const contracts = await Promise.all(owned.map((o) => (o.agentId ? getAgentContract(o.agentId, tenantId) : Promise.resolve(null))));
 
   const options: RequestOption[] = [
@@ -61,9 +62,11 @@ export default async function RequestAccessPage({ params, searchParams }: { para
       })),
   ];
   const initial = options.find((o) => o.value === sp.entitlement)?.value ?? options[0]?.value ?? "";
+  const known = new Set([me?.id, ...reports.map((r) => r.id), ...owned.map((o) => o.id)]);
   const people = [
-    ...owned.map((o) => ({ id: o.id, label: `${o.displayName} (${o.agentId ? "your agent" : "you own"})` })),
-    ...found.rows.filter((p) => p.id !== me?.id).map((p) => ({ id: p.id, label: `${p.displayName}${p.email ? ` (${p.email})` : ""}` })),
+    ...reports.map((p) => ({ id: p.id, label: `${p.displayName}${p.email ? ` (${p.email})` : ""}`, group: "People you manage" })),
+    ...owned.map((o) => ({ id: o.id, label: `${o.displayName} (${o.agentId ? "your agent" : "you own"})`, group: "What you own" })),
+    ...found.rows.filter((p) => !known.has(p.id)).map((p) => ({ id: p.id, label: `${p.displayName}${p.email ? ` (${p.email})` : ""}`, group: "Found" })),
   ];
   const dataOf = new Map(item.entitlements.map((e) => [e.id, e.dataClassification]));
   const withinAgentContract = Object.fromEntries(

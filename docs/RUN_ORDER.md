@@ -528,3 +528,12 @@ removal task, and once the source confirms the removal the ledger shows the
 access as expired. Expired or revoked package assignments create removal
 tasks the same way. EXPERIENCE-P0-29 (request tracking, one inbox, subject
 picker) is next.
+
+## 2026-10-11 — EXPERIENCE-P0-29: request tracking and one inbox
+
+Access Requests now shows where every request line really stands: waiting
+for approval, then waiting for fulfilment, not yet verified, verified,
+failed or ended. "Waiting for you" lists the fulfilment tasks waiting for
+you along with the approvals. The request form lists the people you manage
+and what you own under "For". QA-P0-24 (the request-to-verified suite) is
+next.

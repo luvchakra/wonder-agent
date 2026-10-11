@@ -146,11 +146,28 @@ async function userOf(tenantId: string, identityId: string): Promise<string | nu
   return data && data.tenant_id === tenantId ? ((data.user_id as string | null) ?? null) : null;
 }
 
-/** The organization's tasks, read as the member: the ones still to do (overdue first), or all. */
-export async function listFulfilmentTasks(tenantId: string, filter: { view?: "todo" | "all"; requestId?: string } = {}): Promise<FulfilmentTask[]> {
+/**
+ * The organization's tasks, read as the member: the ones still to do (overdue first), or all.
+ * EXPERIENCE-P0-29: `forPerson` narrows to the ones waiting for that person: assigned to them,
+ * claimed by them, or (for someone who can approve access) with no owner.
+ */
+export async function listFulfilmentTasks(
+  tenantId: string,
+  filter: { view?: "todo" | "all"; requestId?: string; forPerson?: { userId: string; identityId: string | null; canApprove: boolean } } = {},
+): Promise<FulfilmentTask[]> {
   const supabase = await supabaseServer();
   let q = supabase.from("access_fulfilment_tasks").select(SELECT).eq("tenant_id", tenantId);
   if (filter.requestId) q = q.eq("request_id", filter.requestId);
+  if (filter.forPerson) {
+    const p = filter.forPerson;
+    const mine = [
+      UUID_RE.test(p.userId) ? `claimed_by.eq.${p.userId}` : null,
+      p.identityId && UUID_RE.test(p.identityId) ? `assignee_identity_id.eq.${p.identityId}` : null,
+      p.canApprove ? "assignee_identity_id.is.null" : null,
+    ].filter(Boolean);
+    if (!mine.length) return [];
+    q = q.or(mine.join(","));
+  }
   if ((filter.view ?? "todo") === "todo" && !filter.requestId) q = q.in("status", ["open", "claimed", "failed"]);
   const { data, error } = await q.order("due_at", { ascending: true }).limit(200);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);

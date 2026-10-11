@@ -2734,3 +2734,19 @@ fulfilment and reconciliation path as everything else. Migration 0124
 - No reminder E2E: the cron route needs `CRON_SECRET`, which local runs don't
   have. The rule is unit-tested and the sweep is shared with the cron.
 - Extending package access stays with the package (its own expiry).
+
+### 2026-10-11 — Service support for EXPERIENCE-P0-29
+
+- `listFulfilmentTasks({ forPerson })`: the tasks waiting for one person.
+  These are tasks assigned to them, claimed by them, or (for someone who can
+  approve access) with no owner. Read as the member (RLS), filtered by
+  tenant.
+- `requestProgressFor(tenantId, ids)`: the progress of a page of requests in
+  two reads. It uses the service role, filtered by tenant, with each row's
+  tenant checked.
+- `requestProgress` adds the state `failed`: a task reported failed shows as
+  failed until someone takes it up again. Before, it showed as waiting. The
+  request API's `fulfilment` field can now be `failed`.
+- The fulfilment task action now also refreshes `/access/requests`.
+
+Verified with the EXPERIENCE-P0-29 entry (Experience audit log).

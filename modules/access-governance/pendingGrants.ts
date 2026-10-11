@@ -3,7 +3,7 @@ import "server-only";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { chooseAccount, placeholderRef } from "./pendingGrantRules";
+import { chooseAccount, placeholderRef, requestProgress, type FulfilmentState } from "./pendingGrantRules";
 import { closeTasksForAccounts, closeTasksForGrants, completeTasksForRequest, openFulfilmentTask } from "./fulfilmentTasks";
 
 /**
@@ -400,6 +400,29 @@ export async function grantsForRequest(tenantId: string, requestId: string): Pro
       verifiedAt: (r.verified_at as string | null) ?? null,
       revokedAt: (r.revoked_at as string | null) ?? null,
     }));
+}
+
+/** EXPERIENCE-P0-29: the progress of a page of requests, in two reads (grants and tasks by request). */
+export async function requestProgressFor(tenantId: string, requestIds: string[]): Promise<Map<string, FulfilmentState>> {
+  const out = new Map<string, FulfilmentState>();
+  if (!requestIds.length) return out;
+  const admin = supabaseServiceRole();
+  const [grants, tasks] = await Promise.all([
+    admin.from("access_grants").select("tenant_id, request_id, fulfilment_status, revoked_at").eq("tenant_id", tenantId).in("request_id", requestIds).limit(2000),
+    admin.from("access_fulfilment_tasks").select("tenant_id, request_id, status").eq("tenant_id", tenantId).in("request_id", requestIds).limit(2000),
+  ]);
+  if (grants.error || tasks.error) throw new ApiError(500, "QUERY_FAILED", (grants.error ?? tasks.error)!.message);
+  const own = (rows: Row[] | null) => (rows ?? []).filter((r) => r.tenant_id === tenantId);
+  for (const id of requestIds) {
+    out.set(
+      id,
+      requestProgress(
+        own(tasks.data as Row[]).filter((t) => t.request_id === id).map((t) => ({ status: t.status as string })),
+        own(grants.data as Row[]).filter((g) => g.request_id === id).map((g) => ({ fulfilmentStatus: g.fulfilment_status as string, revokedAt: (g.revoked_at as string | null) ?? null })),
+      ),
+    );
+  }
+  return out;
 }
 
 /**

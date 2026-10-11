@@ -1618,3 +1618,11 @@ uses it for "For". No schema change.
 
 **Verified.** Typecheck; the ACCESS-P0-31 E2E test (the owner's service
 account and agent appear under "For").
+
+### 2026-10-11 — Direct reports for requests (for EXPERIENCE-P0-29)
+
+`listDirectReports(tenantId, identityId)` (published in
+`modules/agent-identity/service.ts`) lists the active people whose manager is
+the given identity, at most 100. It reads as the user (RLS), filtered on the
+tenant. The request form lists them under "People you manage". No schema
+change.

@@ -18,45 +18,13 @@ import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { RecordProvenance, Badge, type BadgeTone, Card, CardBody, CardHeader } from "@/modules/ui";
 import { RequestActions } from "../RequestActions";
 import { ExtendForm } from "./ExtendForm";
+import { lineState } from "../labels";
 
 // ACCESS-P0-19 — one access request and its approval chain (spec §11.1
 // "see approval chain"): each stage, who it asks and why, who decided and
 // when, and what an approval was valid for. Steps invalidated by a change
 // to the request stay on record, below the live chain.
 
-const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
-  pending: { label: "Waiting for approval", tone: "warning" },
-  approved: { label: "Approved", tone: "success" },
-  rejected: { label: "Rejected", tone: "danger" },
-  fulfilled: { label: "Fulfilled", tone: "neutral" },
-  cancelled: { label: "Cancelled", tone: "neutral" },
-  expired: { label: "Expired", tone: "neutral" },
-};
-// ACCESS-P0-28/30: once approved, the request shows how far it has really come, in the words of what it asked for.
-const FULFILMENT: Record<string, Record<string, { label: string; tone: BadgeTone }>> = {
-  grant: {
-    pending_fulfilment: { label: "Approved · waiting for fulfilment", tone: "warning" },
-    fulfilled_unverified: { label: "Fulfilled · not yet verified", tone: "warning" },
-    verified: { label: "Verified at the source", tone: "success" },
-  },
-  remove: {
-    pending_fulfilment: { label: "Approved · waiting for removal", tone: "warning" },
-    fulfilled_unverified: { label: "Removed · not yet verified", tone: "warning" },
-    verified: { label: "Removal verified at the source", tone: "success" },
-  },
-  disable_account: {
-    pending_fulfilment: { label: "Approved · waiting for the account to be disabled", tone: "warning" },
-    fulfilled_unverified: { label: "Disabled · not yet verified", tone: "warning" },
-    verified: { label: "Disabled at the source", tone: "success" },
-  },
-  // ACCESS-P0-32: an extension changes nothing on the target; the access it keeps is already there.
-  extend: {
-    pending_fulfilment: { label: "Extended · the access is not yet at the source", tone: "warning" },
-    fulfilled_unverified: { label: "Extended · not yet verified", tone: "warning" },
-    verified: { label: "Extended", tone: "success" },
-    untracked: { label: "Approved · nothing left to extend", tone: "neutral" },
-  },
-};
 const STEP: Record<string, { label: string; tone: BadgeTone }> = {
   waiting: { label: "Not yet", tone: "neutral" },
   pending: { label: "Deciding now", tone: "warning" },
@@ -146,8 +114,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
-  const fulfilment = r.status === "approved" || r.status === "fulfilled" ? (FULFILMENT[r.requestType] ?? FULFILMENT.grant)[requestProgress(tasks, grants)] : undefined;
-  const status = fulfilment ?? STATUS[r.status];
+  const status = lineState(r, requestProgress(tasks, grants));
   const live = steps.filter((s) => s.status !== "invalidated");
   const invalidated = steps.filter((s) => s.status === "invalidated");
   const stages = [...new Set(live.map((s) => s.stage))].sort((a, b) => a - b);
@@ -164,7 +131,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
     r.entitlementId !== null &&
     r.subjectIdentityId !== null &&
     r.applicationId !== null &&
-    progress !== "pending_fulfilment" &&
+    (progress === "verified" || progress === "fulfilled_unverified") &&
     (mine || me?.id === r.subjectIdentityId) &&
     ctx.permissions.includes("access.request");
   const item = extendable ? await getRequestCatalogItem(tenantId, r.applicationId!) : null;

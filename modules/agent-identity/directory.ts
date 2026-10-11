@@ -321,6 +321,22 @@ export async function listOwnedIdentities(tenantId: string, userId: string, iden
   return (data ?? []).map((r) => ({ id: r.id as string, displayName: r.display_name as string, identityType: r.identity_type as IdentityType, agentId: (r.agent_id as string | null) ?? null }));
 }
 
+/** EXPERIENCE-P0-29: the active people a person manages, for requesting on their behalf. Read as the user (RLS), filtered by tenant. */
+export async function listDirectReports(tenantId: string, identityId: string | null): Promise<{ id: string; displayName: string; email: string | null }[]> {
+  if (!identityId || !UUID_RE.test(identityId)) return [];
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("identities")
+    .select("id, display_name, email")
+    .eq("tenant_id", tenantId)
+    .eq("manager_identity_id", identityId)
+    .eq("status", "active")
+    .order("display_name")
+    .limit(100);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map((r) => ({ id: r.id as string, displayName: r.display_name as string, email: (r.email as string | null) ?? null }));
+}
+
 /** People who can be named owner, sponsor or manager: the tenant's active humans. */
 export async function listAccountableHumans(tenantId: string): Promise<{ id: string; displayName: string; email: string | null }[]> {
   const supabase = await supabaseServer();

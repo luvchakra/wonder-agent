@@ -38,6 +38,10 @@ describe("requestProgress (ACCESS-P0-30)", () => {
     expect(requestProgress([t("completed"), t("verified")], [])).toBe("fulfilled_unverified");
     expect(requestProgress([t("verified"), t("cancelled")], [])).toBe("verified");
   });
+  it("EXPERIENCE-P0-29: a failed task shows as failed until it is taken up again", () => {
+    expect(requestProgress([t("failed"), t("open")], [])).toBe("failed");
+    expect(requestProgress([t("claimed"), t("verified")], [])).toBe("pending_fulfilment");
+  });
   it("falls back to the grants when the request has no task", () => {
     expect(requestProgress([], [{ fulfilmentStatus: "none", revokedAt: null }])).toBe("verified");
     expect(requestProgress([t("cancelled")], [])).toBe("untracked");
