@@ -115,7 +115,7 @@ definition (JSON) ──validate──▶ catalog ──connect──▶ integra
                                                         ▼
                                  sync job ─▶ engine ─▶ gateway ─▶ driver (http | ldap | sql | mcp | file)
                                                         ▼
-                                 integration_objects (identity, account, entitlement, access_grant, application, policy, mcp_*)
+                                 integration_objects (identity, account, entitlement, access_grant, application, policy, mcp_*, member)
                                                         ▼
                                  identity sources, account inventory, access, risk
 ```
@@ -291,6 +291,18 @@ deletes older files a sync has read. An unread file is never deleted.
 
 ### Importing from an object page
 
+**Members (FOUNDATION-P0-32, 2026-10-11).** The Users page imports
+`member` records: people to invite, identified by e-mail (columns `email`,
+`displayName`, `roles` comma-separated, optional `accountType`,
+`authMethod`). The `csv-file` definition reads them only from an upload (no
+address setting, so never on a schedule). Foundation applies them as
+invitations (`lib/users/users.ts`, `planMemberInvitations` and
+`applyMemberInvitations`). Each row is new (invited), already a member (left
+as is, so the same file again invites nobody) or invalid with the reason.
+Roles need role management, and only roles whose permissions the importer
+holds can be given. Staged `member` objects and stored files are allowed by
+migration 0125.
+
 User decision (2026-10-10): an import from an object page is **previewed
 first** and **additive**. The rows go straight into that page's list: new
 records are added and existing ones updated. A record missing from the file
@@ -299,11 +311,11 @@ is never removed, revoked or deactivated (there are no leavers here).
 Two calls, both `multipart/form-data` with the same fields, both needing a
 session with `integration.execute` (the permission that runs a sync) **and**
 the page's manage permission (`identity.manage` for identities,
-`access.manage` for the rest):
+`users.invite` for members, `access.manage` for the rest):
 
 | Field | Value |
 |---|---|
-| `kind` | `identity`, `account`, `entitlement`, `access_grant` or `application` |
+| `kind` | `identity`, `account`, `entitlement`, `access_grant`, `application` or `member` |
 | `file` | the CSV, at most 10 MB and 5,000 rows |
 | `scope` | the page (`people`, `external-identities`, `machine-identities`, `identities`): the type new identities get when the file has no `identityType` column |
 

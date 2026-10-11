@@ -548,3 +548,16 @@ end revoked. Another organization sees none of it, and a repeated
 reconciliation changes nothing. FOUNDATION-P0-32 (bulk invitation) is F2's
 last story and does not gate the phase. F3 needs D3, F4 needs D12 and F6
 needs D2.
+
+## 2026-10-11 — FOUNDATION-P0-32: bulk invitation; F2 done
+
+Administrators can invite many people at once: Users → Actions → Import
+CSV… previews which rows are new, already members or invalid, and invites
+only the new ones (the same file again invites nobody). Scripts can use
+POST /api/v1/users/invitations, with a dry run; the credential for
+unattended scripts comes with FOUNDATION-P0-31, which waits for D11.
+Invitations now expire (30 days by default, set in Global Configuration)
+and can be sent again from the person's page. Roles given by invitation
+never carry permissions the inviter lacks. With this, every F2 story is
+done. F3 needs D3, F4 needs D12 and F6 needs D2; F5 (roles, SoD,
+delegation) needs no decision.

@@ -6,7 +6,8 @@ import { listAssignableRoles } from "@/lib/rbac/roles";
 import { getUserSummary, listUsers } from "@/lib/users/users";
 import { listGroups } from "@/lib/users/groups";
 import { MEMBERSHIP_STATUSES, STATUS_LABEL, roleLabel } from "@/lib/users/userRules";
-import { Badge, Card, CardBody, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Card, CardBody, EmptyState, KpiCard, LinkButton, ObjectActionsMenu, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { STATUS_TONE, initials, relativeTime } from "./labels";
 
 // FOUNDATION-P0-23 — the organization's users (spec §6, mockup 1): who is
@@ -53,11 +54,15 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Users</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">People in your organization, their status and the roles that give them access.</p>
         </div>
-        {canAdd ? (
-          <LinkButton href="/settings/users/new" size="sm">
-            Add user
-          </LinkButton>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* FOUNDATION-P0-32: Import CSV… invites many people at once (preview first); Export CSV lists the members. */}
+          <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["members"])} />
+          {canAdd ? (
+            <LinkButton href="/settings/users/new" size="sm">
+              Add user
+            </LinkButton>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

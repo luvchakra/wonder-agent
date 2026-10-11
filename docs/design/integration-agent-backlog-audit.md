@@ -2047,3 +2047,27 @@ starting it, and one job shows every step.
 - File imports from object pages (`/api/v1/imports`) still map the standard
   fields only.
 - The identity-source preview does not list attribute changes.
+
+### 2026-10-11 — `member` records for bulk invitation (for FOUNDATION-P0-32)
+
+- **Framework.** The framework gains the resource family `member` (people to
+  invite, identified by e-mail; canonical fields `externalId`, `email`,
+  `displayName`, `roles` (array), `accountType` and `authMethod`).
+  - The built-in `csv-file` definition reads members only from an upload:
+    the resource has no address setting, so it is never fetched on a
+    schedule.
+  - File connectors may declare `member`.
+  - The object-page import accepts `kind=member` with `users.invite` (plus
+    `integration.execute`). Preview and apply go to Foundation's
+    `planMemberInvitations` / `applyMemberInvitations`.
+- **Migration 0125** (applied to dev, additive): `integration_objects`
+  `object_type` and `connector_files.kind` allow `member`.
+- **Not done.** A `member` file sent to a connection's receiver is stored
+  and staged but not applied: only the users page applies members.
+  Invitations come from a person's import, never from a feed.
+
+**Verified.**
+- Integration unit tests 286/286.
+- Connector-boundary test green.
+- `file-import` and `identity-sources` E2E unchanged and passing.
+- The FOUNDATION-P0-32 E2E (above, Foundation audit log).

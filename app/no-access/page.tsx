@@ -25,12 +25,19 @@ export default async function NoAccessPage() {
   const invitation = !suspended && host.tenant ? (await listMyInvitations(user.id)).find((i) => i.tenantId === host.tenant!.tenantId) : undefined;
   if (invitation) {
     return (
-      <AuthShell title={`Join ${name}`} subtitle={`You have been invited to ${name} on WonderID. Accept to start using it.`} footer={<>Signed in as {user.email ?? "your account"}.</>}>
+      <AuthShell
+        title={invitation.expired ? "Your invitation has expired" : `Join ${name}`}
+        subtitle={invitation.expired ? `Ask an administrator of ${name} to send it again.` : `You have been invited to ${name} on WonderID. Accept to start using it.`}
+        footer={<>Signed in as {user.email ?? "your account"}.</>}
+      >
         <div className="flex flex-wrap gap-2">
-          <form action={acceptInvitationAction}>
-            <input type="hidden" name="tenantId" value={invitation.tenantId} />
-            <Button type="submit">Accept invitation</Button>
-          </form>
+          {/* FOUNDATION-P0-32: an expired invitation cannot be accepted (the server refuses it too). */}
+          {invitation.expired ? null : (
+            <form action={acceptInvitationAction}>
+              <input type="hidden" name="tenantId" value={invitation.tenantId} />
+              <Button type="submit">Accept invitation</Button>
+            </form>
+          )}
           <form action={signOutAction}>
             <Button type="submit" variant="outline">
               Sign out

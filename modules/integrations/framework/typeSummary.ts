@@ -49,6 +49,7 @@ export const RESOURCE_LABEL: Record<ResourceKind, string> = {
   mcp_server: "MCP server",
   mcp_tool: "MCP tools",
   mcp_resource: "MCP resources",
+  member: "members to invite",
 };
 
 /** The receiving channels (ReceiveSpec keys), in words. */

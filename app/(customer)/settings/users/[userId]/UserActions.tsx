@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { assignUserRoleAction, changeUserStatusAction, revokeSessionsAction, updateUserNameAction, type ActionState } from "@/app/actions/users";
+import { assignUserRoleAction, changeUserStatusAction, resendInvitationAction, revokeSessionsAction, updateUserNameAction, type ActionState } from "@/app/actions/users";
 import { Button, PendingSubmitButton, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import type { MembershipStatus, StatusAction } from "@/lib/users/userRules";
@@ -219,5 +219,20 @@ export function RevokeSessionsForm({ userId }: { userId: string }) {
         </Button>
       )}
     </div>
+  );
+}
+
+/** FOUNDATION-P0-32 — a pending invitation: when it expires, and sending it again. */
+export function ResendInvitationForm({ userId, expiresLabel, expired }: { userId: string; expiresLabel: string; expired: boolean }) {
+  const [state, formAction] = useActionState(resendInvitationAction, initial);
+  return (
+    <form action={formAction} className="space-y-2">
+      <input type="hidden" name="userId" value={userId} />
+      <p className={cn("text-sm", expired ? "text-destructive" : "text-muted-foreground")}>{expired ? "The invitation has expired." : `The invitation expires ${expiresLabel}.`}</p>
+      <PendingSubmitButton size="sm" variant="outline" pendingLabel="Sending…">
+        Send invitation again
+      </PendingSubmitButton>
+      <Result state={state} />
+    </form>
   );
 }

@@ -61,7 +61,7 @@ for every non-"Done" row is in `docs/design/foundation-agent-backlog-audit.md`.
 | FOUNDATION-P0-29 | Tamper-evident, append-only audit trail (SOX ITGC CO-01, PCI DSS 10.3.2) | Done — 2026-10-01 (`0104`; per-tenant SHA-256 chain backfilled over 8,940 rows, `verify_audit_chain()`, `purge_audit_logs()`, `/audit/integrity`; tamper test detected the altered row) |
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
 | FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; needs D11) | Not Started |
-| FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Not Started |
+| FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Done — 2026-10-11: CSV via the framework (member kind, 0125) with preview; POST /api/v1/users/invitations (session; automation credential with P0-31); expiry, re-send, revoke; no role escalation |
 
 ---
 

@@ -34,12 +34,13 @@ export const IMPORT_MANAGE_PERMISSIONS: Record<ImportKind, string> = {
   entitlement: "access.manage",
   account: "access.manage",
   access_grant: "access.manage",
+  member: "users.invite",
 };
 export const EXPORT_CHUNK_SIZE = 1000;
 export const EXPORT_ROW_CAP = 50_000;
 export const IMPORT_MAX_BYTES = 10 * 1024 * 1024;
 
-export type ImportKind = Extract<ResourceKind, "identity" | "account" | "entitlement" | "access_grant" | "application">;
+export type ImportKind = Extract<ResourceKind, "identity" | "account" | "entitlement" | "access_grant" | "application" | "member">;
 
 /** A label resolved from another tenant table, by id, in the same tenant. */
 export type ExportLookup = { table: string; label: string; fallbackToId?: boolean };
@@ -68,7 +69,7 @@ export type TableSource = {
 };
 
 /** Pages whose list is computed by the owning module's published service (still user-scoped). */
-export type ServiceSource = { service: "nhi_inventory" | "mcp_inventory" };
+export type ServiceSource = { service: "nhi_inventory" | "mcp_inventory" | "members" };
 
 export type ExportEntry = {
   key: string;
@@ -169,6 +170,17 @@ const ENTRIES: readonly ExportEntry[] = [
       col("Owner", "owner"),
       col("Last seen", "lastSeenAt"),
     ],
+  },
+  {
+    // FOUNDATION-P0-32: the organization's members; importing invites people (columns as the import reads them).
+    key: "members",
+    label: "members",
+    permission: "users.view",
+    auditModule: "user",
+    importKind: "member",
+    source: { service: "members" },
+    // Canonical names (CANONICAL_FIELDS.member), so an exported file imports back unchanged.
+    columns: [col("externalId", "email"), col("email", "email"), col("displayName", "displayName"), col("roles", "roles")],
   },
   identityEntry("identities", "identities", []),
   identityEntry("people", "people", ["HUMAN"]),

@@ -10,7 +10,7 @@ import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantCont
 import { getSessionUser } from "@/lib/tenant/session";
 import { urlForTenant } from "@/lib/tenant/hostTenant";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { acceptInvitation, changeUserStatus, inviteUser, revokeUserSessions, updateUserName } from "@/lib/users/users";
+import { acceptInvitation, changeUserStatus, inviteUser, resendInvitation, revokeUserSessions, updateUserName } from "@/lib/users/users";
 import { STATUS_ACTIONS, invitePermission, type InviteMethod, type StatusAction } from "@/lib/users/userRules";
 import { getIdentityForUser, updateIdentity } from "@/modules/agent-identity/service";
 
@@ -51,7 +51,7 @@ export async function inviteUserAction(_prev: ActionState, formData: FormData): 
   try {
     result = await inviteUser(
       { tenantId: ctx.tenantId!, name: tenant?.name ?? "your organization", url },
-      { userId: ctx.userId, email: user?.email ?? null },
+      { userId: ctx.userId, email: user?.email ?? null, permissions: ctx.permissions },
       {
         email: formData.get("email"),
         displayName: formData.get("displayName"),
@@ -120,6 +120,22 @@ export async function revokeSessionsAction(_prev: ActionState, formData: FormDat
     const n = await revokeUserSessions(ctx.tenantId!, ctx.userId, userId);
     revalidatePath(`/settings/users/${userId}`);
     return { ok: true, message: n ? `${n} session${n === 1 ? "" : "s"} ended. They must sign in again.` : "They had no active sessions." };
+  } catch (err) {
+    return refused(err);
+  }
+}
+
+/** FOUNDATION-P0-32: send a pending invitation again (a new validity period and e-mail). */
+export async function resendInvitationAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const userId = String(formData.get("userId") ?? "");
+  try {
+    const ctx = await requirePermission("users.invite");
+    const [memberships, user] = await Promise.all([getMyMemberships(), getSessionUser()]);
+    const tenant = memberships.find((m) => m.tenantId === ctx.tenantId);
+    const url = ctx.tenantSlug ? await urlForTenant(ctx.tenantSlug) : null;
+    const { emailSent } = await resendInvitation({ tenantId: ctx.tenantId!, name: tenant?.name ?? "your organization", url }, { userId: ctx.userId, email: user?.email ?? null }, userId);
+    revalidatePath(`/settings/users/${userId}`);
+    return { ok: true, message: emailSent ? "Sent again. The invitation is valid from today." : "Renewed from today, but the e-mail could not be sent; they can use \"Forgot password\"." };
   } catch (err) {
     return refused(err);
   }

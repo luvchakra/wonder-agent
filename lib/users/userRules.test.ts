@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { checkRoleGrant, checkStatusChange, databaseRefusal, effectivePermissions, invitePermission, roleLabel, validateInvite } from "./userRules";
+import { checkRoleGrant, checkStatusChange, classifyMemberRow, databaseRefusal, effectivePermissions, invitationEscalation, invitationExpired, invitePermission, roleLabel, validateInvite, type MembershipStatus } from "./userRules";
 
 const ROLES = ["TENANT_SUPER_ADMIN", "READ_ONLY", "AUDITOR"];
 
@@ -92,5 +92,46 @@ describe("helpers", () => {
     expect(roleLabel("TENANT_SUPER_ADMIN")).toBe("Tenant Administrator");
     expect(roleLabel("IAM_ADMIN")).toBe("Identity Administrator");
     expect(roleLabel("CERTIFICATION_MANAGER")).toBe("Certification Manager");
+  });
+});
+
+describe("bulk invitation (FOUNDATION-P0-32)", () => {
+  const NOW = new Date("2026-10-11T12:00:00Z");
+  const ago = (days: number) => new Date(NOW.getTime() - days * 86_400_000).toISOString();
+  it("an invitation expires after the organization's limit, never without a date", () => {
+    expect(invitationExpired(ago(29), 30, NOW)).toBe(false);
+    expect(invitationExpired(ago(31), 30, NOW)).toBe(true);
+    expect(invitationExpired(null, 30, NOW)).toBe(false);
+  });
+  it("a role may carry only permissions the inviter holds", () => {
+    expect(invitationEscalation(["users.view", "users.invite"], ["users.view", "users.invite", "x"])).toEqual([]);
+    expect(invitationEscalation(["users.view", "tenant.security.manage", "tenant.security.manage"], ["users.view"])).toEqual(["tenant.security.manage"]);
+  });
+  const ctx = {
+    assignableRoles: ["READ_ONLY", "TENANT_SUPER_ADMIN"],
+    memberStatus: new Map<string, MembershipStatus>([
+      ["ana@example.test", "active"],
+      ["bo@example.test", "invited"],
+      ["cy@example.test", "removed"],
+    ]),
+    actorEmail: "me@example.test",
+    canAssignRoles: true,
+    escalation: (roles: string[]) => (roles.includes("TENANT_SUPER_ADMIN") ? ["tenant.security.manage"] : []),
+  };
+  it("classifies each row: new, already a member, or invalid with the reason", () => {
+    expect(classifyMemberRow({ email: "New@Example.test", displayName: "New Person" }, ctx)).toMatchObject({ decision: "new", invite: { email: "New@Example.test", method: "invite", accountType: "internal" } });
+    expect(classifyMemberRow({ email: "ana@example.test", displayName: "Ana" }, ctx)).toMatchObject({ decision: "unchanged" });
+    expect(classifyMemberRow({ email: "bo@example.test", displayName: "Bo" }, ctx).note).toMatch(/invited/);
+    // Removed people can be invited again.
+    expect(classifyMemberRow({ email: "cy@example.test", displayName: "Cy" }, ctx).decision).toBe("new");
+    expect(classifyMemberRow({ email: "me@example.test", displayName: "Me" }, ctx).decision).toBe("unchanged");
+    expect(classifyMemberRow({ email: "not-an-email", displayName: "X" }, ctx)).toMatchObject({ decision: "invalid" });
+    expect(classifyMemberRow({ email: "nameless@example.test" }, ctx)).toMatchObject({ decision: "invalid" });
+    expect(classifyMemberRow({ email: "r@example.test", displayName: "R", roles: ["NO_SUCH_ROLE"] }, ctx).note).toMatch(/Unknown role/);
+  });
+  it("roles: only with role management, and never beyond the inviter's own permissions", () => {
+    expect(classifyMemberRow({ email: "r@example.test", displayName: "R", roles: ["READ_ONLY"] }, ctx).decision).toBe("new");
+    expect(classifyMemberRow({ email: "r@example.test", displayName: "R", roles: ["READ_ONLY"] }, { ...ctx, canAssignRoles: false }).note).toMatch(/role management/);
+    expect(classifyMemberRow({ email: "r@example.test", displayName: "R", roles: ["TENANT_SUPER_ADMIN"] }, ctx).note).toMatch(/Not held: tenant.security.manage/);
   });
 });

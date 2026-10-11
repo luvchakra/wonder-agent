@@ -2799,3 +2799,78 @@ No migration in this repository creates the role or the policies.
 Non-negotiables #4 and #13 apply. Nothing was changed, because who uses it
 is unknown. It is recorded as an open owner action in
 `docs/WonderID/progress/PROGRESS.md`.
+
+### 2026-10-11 — FOUNDATION-P0-32: bulk invitation and the invitation API (#68)
+
+**What was built.**
+- **Bulk invitation from CSV, through the connector framework**
+  (non-negotiable #20). Users → Actions → Import CSV… previews a file of
+  people (`email`, `displayName`, `roles`, optional `accountType` and
+  `authMethod`). Each row is:
+  - **new**: an invitation will be sent;
+  - **already a member**: left as is, including yourself;
+  - **invalid**, with the reason: bad e-mail, no name, unknown role, role
+    management missing, a role beyond your own permissions, or the same
+    e-mail earlier in the file.
+
+  Confirm invites exactly the new rows, one by one, through `inviteUser`
+  (each audited `user.invited`). The same file again invites nobody, so
+  sending is idempotent on e-mail. The file is a `member` upload of the
+  File imports connection (Integration Agent, migration 0125). Foundation
+  decides and applies (`planMemberInvitations`, `applyMemberInvitations`
+  in `lib/users/users.ts`). Users → Actions → Export CSV lists the members
+  in the same columns.
+- **`POST /api/v1/users/invitations`**: `{ invitations: [...], dryRun? }`,
+  at most 500. It makes the same decisions as the CSV path; `dryRun`
+  returns the plan and sends nothing. It needs `users.invite` in the
+  signed-in session's organization. The automation credential for scripts
+  comes with FOUNDATION-P0-31 (§8.2 of the foundation design), which waits
+  on D11. The route is written so that credential only changes how the
+  caller is resolved.
+- **No escalation.** `inviteUser` (single and bulk) refuses roles that
+  carry a permission the inviter does not hold (`invitationEscalation`;
+  audited `user.invited` failure with the missing permissions). Giving
+  roles at all still needs `roles.assign` or `role.manage`.
+  - Found and fixed on the way: an invitation granted only *system* roles.
+    A custom role chosen in the wizard was silently not granted. It now
+    resolves the organization's own custom roles as well.
+- **Expiry, re-send, revoke.**
+  - **Expiry.** An invitation expires after Global Configuration → Members
+    → "Invitations expire after" (`users.invitationExpiryDays`, 1–90 days,
+    default 30). Before this, invitations never expired.
+  - **Accepting.** `acceptInvitation` refuses an expired invitation (410
+    `INVITATION_EXPIRED`, audited). It accepts only the invitation it
+    checked: a re-send in between starts a new one. The onboarding and
+    no-access pages show "Expired" and offer no Accept button.
+  - **Re-send.** The user's page shows when a pending invitation expires
+    and offers "Send invitation again", which renews it from today and
+    sends the e-mail (`resendInvitation`, audited
+    `user.invitation_resent`).
+  - **Revoke.** Revoking is the existing "Remove" status action on an
+    invited membership.
+
+**Verified.**
+- Typecheck, ESLint and `next build` are clean.
+- Vitest 1232/1232. New tests:
+  - expiry, escalation and row classification (new, member, self,
+    removed-then-invited, invalid e-mail, no name, unknown role, roles
+    without role management, a role beyond the inviter);
+  - the import-kind and export-registry tests now include `member`.
+- E2E (local, dev Supabase): `bulk-invitations.spec.ts` 4/4.
+  - **CSV.** A 50-row file: 42 new, 5 existing members, 3 invalid. The
+    preview shows each kind; Confirm adds exactly 42 invited memberships;
+    the same file again offers "Nothing to import".
+  - **API.** The dry run sends nothing. Sending invites 2, leaves 1, skips
+    1. Sending again invites 0.
+  - **Escalation.** An inviter holding only users.view, users.invite and
+    roles.assign cannot give TENANT_SUPER_ADMIN, but can give a role
+    within those permissions.
+  - **Expiry.** A 40-day-old invitation shows Expired with no Accept.
+    "Send invitation again" renews it, and it is then accepted.
+- Affected specs (§17.8: RBAC, file imports): `users`, `file-import`,
+  `custom-roles` and `authorization` 37/37; `identity-sources` 18/18.
+
+**Left out.**
+- An organization scope per row: invitations give organization-wide roles.
+  Scoped assignments are made on the user's page afterwards.
+- The automation credential (FOUNDATION-P0-31, D11).

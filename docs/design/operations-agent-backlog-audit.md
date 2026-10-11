@@ -930,3 +930,16 @@ Migration 0122 adds `fulfilment_task` to the `notifications` and
 and to `NotificationType`. It is sent through `notify()` when a fulfilment
 task opens, and again once a day while it is overdue. It is not mandatory,
 so members can turn it off.
+
+### 2026-10-11 — Members on the Users page's Actions menu (for FOUNDATION-P0-32)
+
+- **New export entry `members`.** It needs `users.view`; its source is the
+  service `members`, Foundation's directory through `listUsers`, page by
+  page up to the export cap.
+- **Columns.** The columns use the canonical names (`externalId`, `email`,
+  `displayName`, `roles`), so an exported file imports back unchanged.
+- **Import.** `importKind: "member"` puts "Import CSV…" on the Users page
+  for whoever has `users.invite` and `integration.execute`.
+
+**Verified.** The export-registry unit tests (canonical columns; every
+importable kind on some page) and the bulk-invitations E2E.
