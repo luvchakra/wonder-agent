@@ -280,7 +280,7 @@ Open items:
 ## 2026-10-11 — WonderID foundation design (IGA and Agent ID)
 
 On the owner's request, an original design baseline was written:
-`docs/design/WONDERID-FOUNDATION-DESIGN.md`. It was built from three sources:
+`docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md`. It was built from three sources:
 - public standards: SCIM 2.0, NIST SP 800-53 AC/IA/AU, SOX ITGC, RFC 8693,
   DPoP, SPIFFE, AuthZEN, SSF/CAEP and the IETF WIMSE AIMS draft;
 - Saviynt's public product pages and training guides, used for capabilities
@@ -304,7 +304,7 @@ in #40, carried into #65.)
 
 **Owner direction.** WonderID is IGA for human and non-human identities. Reconciliation, account import and access requests work first.
 
-**Plan of record:** §10 of `docs/design/WONDERID-FOUNDATION-DESIGN.md` (phases F1–F10, revised today).
+**Plan of record:** §10 of `docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md` (phases F1–F10, revised today).
 
 **Tracked on GitHub:**
 - Milestones F1–F10.
@@ -339,8 +339,8 @@ in #40, carried into #65.)
 - D10 (how often imports run) affects F1, because the free Vercel plan allows cron at most once a day.
 
 **Supporting documents:**
-- `docs/design/WONDERID-FOUNDATION-DESIGN.md`: the owner-supplied design; draft baseline pending D1.
-- `docs/design/saviynt-reference-study.md`: a read-only reading of the owner's Saviynt v25 training tenant.
+- `docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md`: the owner-supplied design; draft baseline pending D1.
+- `docs/WonderID/reference/saviynt-reference-study.md`: a read-only reading of the owner's Saviynt v25 training tenant.
   - It maps what was observed to the design's phases and proposes 15 additions (D-1 to D-15).
   - It corrects one claim: duplicate detection over existing identities exists for agents only.
 
@@ -363,7 +363,7 @@ and event-driven rules, and manage AI agents, by configuration.
 - The SSO handshake waits on a Supabase SSO provider the owner has not
   configured (FOUNDATION-P0-03.3).
 
-**Design changes** (`docs/design/WONDERID-FOUNDATION-DESIGN.md`):
+**Design changes** (`docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md`):
 - §5.2.1 one rule model (trigger, scope, condition, effects, mode, priority,
   version) with its catalogues; attribute rules.
 - §5.4 entitlement types per application and classification rules.
@@ -379,19 +379,28 @@ and event-driven rules, and manage AI agents, by configuration.
 - GitHub issues #66–#76, attached to their phase issues (F1 #41, F2 #49,
   F3 #57, F4 #58, F6 #60, F7 #61).
 
-`docs/integrations/INTEGRATOR-GUIDE.md` is new: what an integrator can
+`docs/WonderID/reference/INTEGRATOR-GUIDE.md` is new: what an integrator can
 configure today, with paths and permissions.
 
-## 2026-10-11 — Fresh IGA plan set in `docs/iga/`
+## 2026-10-11 — Fresh IGA plan set in `docs/WonderID/`
 
 On the owner's request, a fresh, self-contained set of documents for the IGA
 and Agent ID work now lives in its own folders, separate from the historical
 documents:
-- `docs/iga/design/DESIGN.md`: the consolidated current design.
-- `docs/iga/run-order/RUN-ORDER.md`: phases F1–F10 with every story, ID,
+- `docs/WonderID/design/DESIGN.md`: the consolidated current design.
+- `docs/WonderID/run-order/RUN-ORDER.md`: phases F1–F10 with every story, ID,
   module, issue and exit test. The plan of record for this work.
-- `docs/iga/progress/PROGRESS.md`: live status per story and decision,
+- `docs/WonderID/progress/PROGRESS.md`: live status per story and decision,
   updated in the same PR as the work.
 
 The older files stay as history and reference; this file keeps recording
 programme-level events as before.
+
+## 2026-10-11 — Plan documents moved to `docs/WonderID/`
+
+On the owner's request, every document from the IGA plan work now lives under
+`docs/WonderID/`: `design/`, `run-order/` and `progress/` (moved from
+`docs/iga/`), and `reference/` holding the foundation design, the Saviynt
+study and the integrator guide (moved from `docs/design/` and
+`docs/integrations/`). Paths in earlier entries of this file were updated to
+the new locations. `docs/WonderID/README.md` is the index.
