@@ -434,6 +434,8 @@ export type SourceAuthority = {
   priority: number;
   /** Fields this source is the system of record for; others only fill blanks. */
   authoritativeFields: SourcedIdentityField[];
+  /** INTEGRATION-P0-20: whether it is also the system of record for the custom attributes it maps (an authoritative source). */
+  ownsAttributes?: boolean;
 };
 
 // ---------------------------------------------------------------------------

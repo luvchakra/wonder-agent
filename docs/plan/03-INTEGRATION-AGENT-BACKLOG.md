@@ -44,7 +44,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-17 | CSV through the framework (user request 2026-10-10): `file` driver, `csv-file` connector, file receiver, connection schedules and daily cron, object-page imports (`POST /api/v1/imports`) | Done — 2026-10-10: migrations 0110/0111 applied (isolation SQL 14/14 and 8/8); object-page import now previews first and then adds/updates records additively (PR #25, `file-import.spec.ts` 16/16 on Vercel); FK indexes 0112 applied |
 | INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
 | INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Done — 2026-10-11: migration 0118 (isolation SQL 7/7); identities and accounts chained after every full sync; entitlements and grants follow with ACCESS-P0-27 |
-| INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Not Started |
+| INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Done — 2026-10-11: `attribute:<name>` targets validated on save, typed and written with provenance by Identity; schedule on every reading connection and `/api/v1/integrations/<id>/schedule` |
 
 ---
 

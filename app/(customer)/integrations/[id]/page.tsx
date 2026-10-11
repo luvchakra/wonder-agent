@@ -3,7 +3,7 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getIntegration, getReceiverStatus, listSyncJobs } from "@/modules/integrations/service";
+import { getConnectionSchedule, getIntegration, getReceiverStatus, listSyncJobs } from "@/modules/integrations/service";
 import { resolveHeldMissingAction, testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
@@ -15,6 +15,7 @@ import { getConnectorConfiguration, type ConnectorConfiguration } from "@/module
 import { Suspense } from "react";
 import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
 import { ConnectorFilesCard } from "./ConnectorFilesCard";
+import { ConnectionScheduleForm } from "./ConnectionScheduleForm";
 import { RunAutoRefresh } from "../sources/SourceForms";
 import type { SyncPipelineStep } from "@/lib/shared/types/integrations";
 
@@ -114,15 +115,16 @@ export default async function IntegrationDetailPage({
   const receive = connector?.receive;
   const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file);
 
-  const [jobs, receiver, origin, configuration, provenance] = await Promise.all([
+  const reads = connector ? Object.keys(connector.resources).length > 0 : false;
+  const [jobs, receiver, origin, configuration, provenance, schedule] = await Promise.all([
     listSyncJobs(ctx.tenantId!, id),
     needsSecret ? getReceiverStatus(ctx.tenantId!, id) : Promise.resolve(null),
     receive ? ownOrigin() : Promise.resolve(""),
     connector ? getConnectorConfiguration(ctx.tenantId!, id).catch(() => null as ConnectorConfiguration | null) : Promise.resolve(null),
     getRecordProvenance(ctx.tenantId!, "integrations", id),
+    reads ? getConnectionSchedule(ctx.tenantId!, id) : Promise.resolve(null),
   ]);
   const canEdit = ctx.permissions.includes("integration.update");
-  const reads = connector ? Object.keys(connector.resources).length > 0 : false;
   const type = connectionTypeOf(integration);
   const testConnectionWithId = testConnectionAction.bind(null, id);
   const triggerSyncWithId = triggerSyncAction.bind(null, id);
@@ -269,6 +271,7 @@ export default async function IntegrationDetailPage({
               }
             />
             <CardBody>
+              {schedule ? <ConnectionScheduleForm integrationId={id} schedule={schedule} canEdit={canEdit} /> : null}
               {held && HELD_OUTCOME[held] ? (
                 <p role="status" className="mb-3 text-sm text-foreground">
                   {HELD_OUTCOME[held]}

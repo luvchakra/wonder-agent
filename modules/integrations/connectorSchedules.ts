@@ -18,6 +18,7 @@ import { dueConnections, effectiveSchedule, filesToPurge, isConnectionSchedule, 
 /** Sets how often a connection syncs. The caller has checked integration.update; RLS scopes the row. */
 export async function setConnectionSchedule(tenantId: string, actorId: string, integrationId: string, schedule: unknown): Promise<ConnectionSchedule> {
   if (!isConnectionSchedule(schedule)) throw new ApiError(400, "INVALID_INPUT", "schedule: manual, hourly or daily");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(integrationId)) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("integrations")

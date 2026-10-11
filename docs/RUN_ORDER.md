@@ -467,3 +467,11 @@ onboarding validation, because its entitlements are only reconciled after
 promotion. Every F1 gating story is done and the exit test passed on seeded
 staging. INTEGRATION-P0-20 (does not gate) is next; FOUNDATION-P0-31 waits
 for D11.
+
+## 2026-10-11 — INTEGRATION-P0-20: custom attributes as targets; schedule on every connection
+
+Identity source mappings can now fill the organization's custom identity
+attributes, typed, checked for uniqueness and recorded with provenance, and
+every connection that reads has a sync schedule on its page and in the API.
+The only F1 story left is FOUNDATION-P0-31, which waits for decision D11. F2
+(access requests end to end) is next, starting with ACCESS-P0-28.

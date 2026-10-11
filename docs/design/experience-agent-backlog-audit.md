@@ -3847,3 +3847,16 @@ new lines use token classes only, so they work in both themes and wrap on
 narrow screens.
 
 **Verified.** Typecheck, eslint and `next build` are clean.
+
+### 2026-10-11 — Connection page and source form (INTEGRATION-P0-20)
+
+- The sync schedule moved from the file connection's Files card to the Sync
+  jobs card of every connection that reads (`ConnectionScheduleForm`). One
+  select and Save; a member without `integration.update` sees the value as
+  text. Visible controls per page are unchanged: the form moved, it was not
+  added twice.
+- The identity source form's target list now includes the organization's
+  active custom attributes, after the standard fields.
+
+**Verified.** `connection-schedule.spec.ts` drives the form; the
+identity-sources UI test still passes.

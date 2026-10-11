@@ -75,7 +75,9 @@ const TEMPLATE_MAPPINGS: Record<string, AttributeMapping[]> = {
   integration: IDENTITY_SOURCE_TARGETS.map((target) => ({ source: target === "externalId" ? "externalId" : `normalized.${target}`, target })),
 };
 
-function MappingEditor({ initial }: { initial: AttributeMapping[] }) {
+type CustomAttribute = { name: string; displayName: string };
+
+function MappingEditor({ initial, attributes }: { initial: AttributeMapping[]; attributes: CustomAttribute[] }) {
   const [rows, setRows] = useState<AttributeMapping[]>(initial.length ? initial : [{ source: "", target: "externalId" }]);
   const update = (i: number, patch: Partial<AttributeMapping>) => setRows((r) => r.map((row, j) => (j === i ? { ...row, ...patch } : row)));
   return (
@@ -97,6 +99,11 @@ function MappingEditor({ initial }: { initial: AttributeMapping[] }) {
               {IDENTITY_SOURCE_TARGETS.map((t) => (
                 <option key={t} value={t}>
                   {TARGET_LABEL[t]}
+                </option>
+              ))}
+              {attributes.map((a) => (
+                <option key={a.name} value={`attribute:${a.name}`}>
+                  {a.displayName}
                 </option>
               ))}
             </select>
@@ -147,7 +154,7 @@ function CorrelationEditor({ initial }: { initial: CorrelationRule[] }) {
   );
 }
 
-export function SourceForm({ source, integrations }: { source?: IdentitySource; integrations: { id: string; name: string }[] }) {
+export function SourceForm({ source, integrations, attributes }: { source?: IdentitySource; integrations: { id: string; name: string }[]; attributes: CustomAttribute[] }) {
   const [state, action, pending] = useActionState(source ? updateIdentitySourceAction.bind(null, source.id) : createIdentitySourceAction, IDLE);
   const [template, setTemplate] = useState<string>(source?.template ?? "csv");
   const [authoritative, setAuthoritative] = useState(source?.authoritative ?? false);
@@ -224,7 +231,7 @@ export function SourceForm({ source, integrations }: { source?: IdentitySource; 
         ) : null}
       </fieldset>
 
-      <MappingEditor key={mappingsKey} initial={initialMappings} />
+      <MappingEditor key={mappingsKey} initial={initialMappings} attributes={attributes} />
       <CorrelationEditor initial={source?.correlationRules ?? [{ kind: "email" }]} />
 
       <SelectField label="When a record disappears" name="leaverStrategy" defaultValue={source?.leaverStrategy ?? "disable"}>

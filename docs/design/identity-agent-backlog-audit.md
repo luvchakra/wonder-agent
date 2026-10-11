@@ -1577,3 +1577,32 @@ the agent declares.
   `accountType` decides for now.
 - Owner changes from the source after an owner is set: WonderID's owner
   wins.
+
+### 2026-10-11 — Sourced custom attributes (for INTEGRATION-P0-20)
+
+Identity's published write path for identity sources now writes custom
+attributes. The change is additive: existing callers are unchanged.
+
+- `SourcedOp` create and update take an optional `attributes` (name → text).
+  `SourcedResult` reports `attributesChanged`.
+- `SourceAuthority.ownsAttributes`: the source is the system of record for
+  the attributes it maps (an authoritative source).
+- `sourcedMerge.ts`: one merge rule for fields and attributes (the existing
+  `mergeSourcedFields()` behaviour is unchanged).
+  - `mergeSourcedAttributes()` applies the same precedence, with provenance
+    under `attributes.<name>`.
+  - `coerceSourcedAttributes()` types the values with `validateAttributes()`,
+    except that a source need not send every required attribute. It leaves
+    out retired attributes and those for other identity types, and turns a
+    blank into null, which clears an owned value.
+- `applySourcedIdentities()`:
+  - reads the definitions once per call (service role, filtered on the
+    tenant);
+  - refuses a record whose value is invalid, or whose unique value another
+    identity or another record in the same run holds. That record is
+    reported as an error; nothing of it is applied;
+  - writes `identities.attributes` and `field_provenance`. Audit metadata
+    lists attribute names, never values.
+
+**Verified.** Unit tests for typing and merge (+3); the identity-sources E2E
+test above. The unchanged precedence tests still pass.

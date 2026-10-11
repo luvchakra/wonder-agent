@@ -5,13 +5,14 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import {
   IDENTITY_STATUSES,
   type FieldProvenance,
+  type IdentityAttributeDefinition,
   type IdentityStatus,
   type IdentityType,
   type SourceAuthority,
   type SourcedFields,
   type SourcedIdentityField,
 } from "@/lib/shared/types/agent-identity";
-import { mergeSourcedFields } from "./sourcedMerge";
+import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, type AttributeValue } from "./sourcedMerge";
 import { detectLifecycleEvents, type DetectedEvent } from "./humanLifecycle";
 import { assignOpenTasksToManager, recordLifecycleEvents } from "./humanLifecycleService";
 import type { HumanLifecycleState } from "@/lib/shared/types/agent-identity";
@@ -77,9 +78,12 @@ export async function listIdentitiesForCorrelation(tenantId: string, types: Iden
 
 export type SourcedOp =
   /** `nativeId`: kept as the identity's source reference, so a later import of the same record finds it. */
-  | { op: "create"; ref: string; identityType: IdentityType; fields: SourcedFields; nativeId?: string }
-  | { op: "update"; ref: string; identityId: string; fields: SourcedFields }
+  | { op: "create"; ref: string; identityType: IdentityType; fields: SourcedFields; nativeId?: string; attributes?: SourcedAttributes }
+  | { op: "update"; ref: string; identityId: string; fields: SourcedFields; attributes?: SourcedAttributes }
   | { op: "leaver"; ref: string; identityId: string };
+
+/** INTEGRATION-P0-20: custom attribute values as the source sent them, by attribute name; typed here. */
+export type SourcedAttributes = Record<string, string | null>;
 
 export type SourcedResult = {
   ref: string;
@@ -88,6 +92,8 @@ export type SourcedResult = {
   changed: SourcedIdentityField[];
   skipped: SourcedIdentityField[];
   error?: string;
+  /** Custom attributes this change wrote. */
+  attributesChanged?: string[];
   /** Lifecycle events this change amounted to (people only), or why they could not be recorded. */
   lifecycleEvents?: string[];
   lifecycleError?: string;
@@ -148,12 +154,38 @@ export async function applySourcedIdentities(
   for (let i = 0; i < ids.length; i += 200) {
     const { data, error } = await supabase
       .from("identities")
-      .select("id, identity_type, status, lifecycle_state, user_id, field_provenance, " + Object.values(COLUMN).join(", "))
+      .select("id, identity_type, status, lifecycle_state, user_id, field_provenance, attributes, " + Object.values(COLUMN).join(", "))
       .eq("tenant_id", tenantId)
       .in("id", ids.slice(i, i + 200));
     if (error) throw new Error(`applySourcedIdentities: ${error.message}`);
     for (const r of (data ?? []) as unknown as Record<string, unknown>[]) existing.set(r.id as string, r);
   }
+
+  // INTEGRATION-P0-20: the organization's attribute definitions, when a source sends custom attributes.
+  const withAttributes = ops.some((o) => o.op !== "leaver" && o.attributes && Object.keys(o.attributes).length);
+  const definitions = withAttributes ? await loadAttributeDefinitions(tenantId) : [];
+  const unique = new Set(definitions.filter((d) => d.uniqueValue && d.active).map((d) => d.name));
+  const claimed = new Map<string, string>();
+  /** Typed values, or throws why the record cannot be used: an invalid value, or a unique value another identity holds. */
+  const typedAttributes = async (given: SourcedAttributes | undefined, identityType: IdentityType, selfKey: string, selfId: string | null, current: Record<string, unknown> = {}) => {
+    if (!given || !Object.keys(given).length) return {};
+    const coerced = coerceSourcedAttributes(given, definitions, identityType);
+    if ("invalid" in coerced) throw new Error(coerced.invalid);
+    for (const [name, value] of Object.entries(coerced.values)) {
+      if (!unique.has(name) || value === null) continue;
+      const key = `${name}\u0000${String(value)}`;
+      const holder = claimed.get(key);
+      if (holder && holder !== selfKey) throw new Error(`attributes.${name}: another record in this run has the same value`);
+      claimed.set(key, selfKey);
+      if (current[name] === value) continue;
+      let query = supabase.from("identities").select("id").eq("tenant_id", tenantId).eq(`attributes->>${name}`, String(value)).limit(1);
+      if (selfId) query = query.neq("id", selfId);
+      const { data, error } = await query;
+      if (error) throw new Error(error.message);
+      if (data?.length) throw new Error(`attributes.${name}: another identity already has this value`);
+    }
+    return coerced.values;
+  };
 
   const audit = (action: string, identityId: string, metadata: Record<string, unknown>) =>
     writeAudit({
@@ -188,8 +220,10 @@ export async function applySourcedIdentities(
         if (!SOURCED_TYPES.includes(op.identityType)) throw new Error(`a source cannot create ${op.identityType} identities`);
         if (!op.fields.displayName) throw new Error("no display name after mapping");
         const status = (op.fields.status && (IDENTITY_STATUSES as readonly string[]).includes(op.fields.status) ? op.fields.status : "active") as IdentityStatus;
+        const attributes = Object.fromEntries(Object.entries(await typedAttributes(op.attributes, op.identityType, op.ref, null)).filter(([, v]) => v !== null));
         const provenance: FieldProvenance = {};
         for (const k of Object.keys(op.fields)) provenance[k] = { sourceId: source.sourceId, priority: source.priority, at: now };
+        for (const k of Object.keys(attributes)) provenance[`attributes.${k}`] = { sourceId: source.sourceId, priority: source.priority, at: now };
         const { data, error } = await supabase
           .from("identities")
           .insert({
@@ -201,14 +235,16 @@ export async function applySourcedIdentities(
             lifecycle_state: PERSON_TYPES.has(op.identityType) ? lifecycleFor(status, op.fields.startDate ?? null, today) : null,
             source_system: source.sourceName.slice(0, 100),
             ...(op.nativeId ? { source_native_id: op.nativeId.slice(0, 300) } : {}),
+            ...(Object.keys(attributes).length ? { attributes } : {}),
             field_provenance: provenance,
           })
           .select("id")
           .single();
         if (error || !data) throw new Error(error?.message ?? "insert failed");
         const created: SourcedResult = { ref: op.ref, identityId: data.id as string, action: "created", changed: Object.keys(op.fields) as SourcedIdentityField[], skipped: [] };
+        if (Object.keys(attributes).length) created.attributesChanged = Object.keys(attributes);
         results.push(created);
-        await audit("identity.created", data.id as string, { identityType: op.identityType, fields: Object.keys(op.fields) });
+        await audit("identity.created", data.id as string, { identityType: op.identityType, fields: Object.keys(op.fields), ...(created.attributesChanged ? { attributes: created.attributesChanged } : {}) });
         if (PERSON_TYPES.has(op.identityType)) {
           const state = lifecycleFor(status, op.fields.startDate ?? null, today) as HumanLifecycleState;
           await lifecycle(
@@ -252,20 +288,39 @@ export async function applySourcedIdentities(
       const current: SourcedFields = {};
       for (const [k, col] of Object.entries(COLUMN) as [SourcedIdentityField, string][]) current[k] = (row[col] as string | null) ?? null;
       const merge = mergeSourcedFields(current, (row.field_provenance as FieldProvenance) ?? {}, op.fields, source, now);
+      const currentAttributes = (row.attributes as Record<string, AttributeValue | null>) ?? {};
+      const incomingAttributes = await typedAttributes(op.attributes, row.identity_type as IdentityType, op.ref, op.identityId, currentAttributes);
+      const attributeMerge = mergeSourcedAttributes(currentAttributes, merge.provenance, incomingAttributes, source, now);
       const changed = Object.keys(merge.changes) as SourcedIdentityField[];
-      const provenanceChanged = JSON.stringify(merge.provenance) !== JSON.stringify(row.field_provenance ?? {});
-      if (!changed.length && !provenanceChanged) {
+      const attributesChanged = Object.keys(attributeMerge.changes);
+      const provenanceChanged = JSON.stringify(attributeMerge.provenance) !== JSON.stringify(row.field_provenance ?? {});
+      if (!changed.length && !attributesChanged.length && !provenanceChanged) {
         results.push({ ref: op.ref, identityId: op.identityId, action: "unchanged", changed: [], skipped: merge.skipped.map((s) => s.field) });
         continue;
       }
-      const update: Record<string, unknown> = { ...toRow(merge.changes), field_provenance: merge.provenance };
-      if (changed.length) update.updated_at = now;
+      const update: Record<string, unknown> = { ...toRow(merge.changes), field_provenance: attributeMerge.provenance };
+      if (attributesChanged.length) {
+        const next = { ...currentAttributes };
+        for (const [name, value] of Object.entries(attributeMerge.changes)) {
+          if (value === null || value === undefined) delete next[name];
+          else next[name] = value;
+        }
+        update.attributes = next;
+      }
+      if (changed.length || attributesChanged.length) update.updated_at = now;
       if (merge.changes.status !== undefined && PERSON_TYPES.has(row.identity_type as IdentityType)) {
         update.lifecycle_state = lifecycleFor(merge.changes.status as IdentityStatus, (merge.changes.startDate ?? row.start_date ?? null) as string | null, today);
       }
       const { error } = await supabase.from("identities").update(update).eq("tenant_id", tenantId).eq("id", op.identityId);
       if (error) throw new Error(error.message);
-      const updated: SourcedResult = { ref: op.ref, identityId: op.identityId, action: changed.length ? "updated" : "unchanged", changed, skipped: merge.skipped.map((s) => s.field) };
+      const updated: SourcedResult = {
+        ref: op.ref,
+        identityId: op.identityId,
+        action: changed.length || attributesChanged.length ? "updated" : "unchanged",
+        changed,
+        skipped: merge.skipped.map((s) => s.field),
+        ...(attributesChanged.length ? { attributesChanged } : {}),
+      };
       results.push(updated);
       if (changed.length && PERSON_TYPES.has(row.identity_type as IdentityType)) {
         const beforeState = (row.lifecycle_state as HumanLifecycleState | null) ?? null;
@@ -293,9 +348,10 @@ export async function applySourcedIdentities(
           }
         }
       }
-      if (changed.length) {
+      if (changed.length || attributesChanged.length) {
         await audit(changed.includes("status") ? "identity.status_changed" : "identity.updated", op.identityId, {
           changed,
+          ...(attributesChanged.length ? { attributes: attributesChanged } : {}),
           ...(changed.includes("status") ? { from: row.status, to: merge.changes.status } : {}),
         });
       }
@@ -311,6 +367,28 @@ export async function applySourcedIdentities(
     }
   }
   return results;
+}
+
+async function loadAttributeDefinitions(tenantId: string) {
+  const { data, error } = await supabaseServiceRole()
+    .from("identity_attribute_definitions")
+    .select("tenant_id, name, display_name, identity_type, data_type, required, allowed_values, validation_regex, active, unique_value")
+    .eq("tenant_id", tenantId)
+    .limit(500);
+  if (error) throw new Error(`applySourcedIdentities: ${error.message}`);
+  return ((data ?? []) as Record<string, unknown>[])
+    .filter((r) => r.tenant_id === tenantId)
+    .map((r) => ({
+      name: r.name as string,
+      displayName: r.display_name as string,
+      identityType: (r.identity_type as IdentityType | null) ?? null,
+      dataType: r.data_type as IdentityAttributeDefinition["dataType"],
+      required: Boolean(r.required),
+      allowedValues: (r.allowed_values as string[] | null) ?? [],
+      validationRegex: (r.validation_regex as string | null) ?? null,
+      active: Boolean(r.active),
+      uniqueValue: Boolean(r.unique_value),
+    }));
 }
 
 export type SourcedPreview = {

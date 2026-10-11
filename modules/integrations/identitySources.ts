@@ -5,7 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentitySource, PendingCorrelation, ReconciliationRun } from "@/lib/shared/types/integrations";
 import type { IdentityType, SourcedFields } from "@/lib/shared/types/agent-identity";
-import { applySourcedIdentities, listIdentitiesForCorrelation, type SourcedOp, type SourcedResult } from "@/modules/agent-identity/service";
+import { applySourcedIdentities, listAttributeDefinitions, listIdentitiesForCorrelation, type SourcedOp, type SourcedResult } from "@/modules/agent-identity/service";
 import {
   MAX_RECORDS_PER_RUN,
   correlate,
@@ -143,7 +143,7 @@ function configRow(c: ReturnType<typeof validateSourceConfig>) {
 }
 
 export async function createIdentitySource(tenantId: string, actorId: string, input: SourceConfigInput): Promise<IdentitySource> {
-  const config = validateSourceConfig(input);
+  const config = validateSourceConfig(input, await listAttributeDefinitions(tenantId));
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("identity_sources")
@@ -170,7 +170,7 @@ export async function updateIdentitySource(tenantId: string, actorId: string, so
   if (!current) throw new ApiError(404, "NOT_FOUND", "No such identity source");
   // Only the keys given change; the template and its integration never do.
   const given = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
-  const config = validateSourceConfig({ ...current, ...given, template: current.template, integrationId: current.integrationId });
+  const config = validateSourceConfig({ ...current, ...given, template: current.template, integrationId: current.integrationId }, await listAttributeDefinitions(tenantId));
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("identity_sources")
@@ -379,9 +379,9 @@ export async function executeReconciliation(
           taken.add(outcome.identityId);
           matched.set(record.externalId, outcome.identityId);
         }
-        ops.push({ op: "update", ref: record.externalId, identityId: outcome.identityId, fields: record.fields });
+        ops.push({ op: "update", ref: record.externalId, identityId: outcome.identityId, fields: record.fields, attributes: record.attributes });
       } else if (outcome.kind === "new") {
-        ops.push({ op: "create", ref: record.externalId, identityType: source.identityType as IdentityType, fields: record.fields });
+        ops.push({ op: "create", ref: record.externalId, identityType: source.identityType as IdentityType, fields: record.fields, attributes: record.attributes });
       } else {
         pendings.push({ record, candidateIds: outcome.candidateIds, reason: outcome.reason });
       }
@@ -409,7 +409,14 @@ export async function executeReconciliation(
     }
 
     // 4. Compare and apply, in the Identity module.
-    const authority = { sourceId: source.id, priority: source.priority, authoritativeFields: source.authoritative ? source.authoritativeFields : [], sourceName: source.name, runId };
+    const authority = {
+      sourceId: source.id,
+      priority: source.priority,
+      authoritativeFields: source.authoritative ? source.authoritativeFields : [],
+      ownsAttributes: source.authoritative,
+      sourceName: source.name,
+      runId,
+    };
     const results: SourcedResult[] = [];
     for (let i = 0; i < ops.length; i += 500) results.push(...(await applySourcedIdentities(tenantId, authority, ops.slice(i, i + 500))));
 
@@ -443,7 +450,11 @@ export async function executeReconciliation(
     // 7. Ambiguous matches wait for a person; never merged silently. One
     // open row per record: a later run refreshes it rather than adding one.
     for (const p of pendings) {
-      const normalized = { ...p.record.fields, ...(p.record.managerExternalId ? { managerExternalId: p.record.managerExternalId } : {}) };
+      const normalized = {
+        ...p.record.fields,
+        ...(p.record.managerExternalId ? { managerExternalId: p.record.managerExternalId } : {}),
+        ...(Object.keys(p.record.attributes).length ? { attributes: p.record.attributes } : {}),
+      };
       const { data: refreshed, error: updateError } = await supabase
         .from("pending_identity_correlations")
         .update({ run_id: runId, normalized, candidate_identity_ids: p.candidateIds, reason: p.reason })
@@ -694,19 +705,22 @@ export async function resolvePendingCorrelation(tenantId: string, actorId: strin
   let identityId: string | null = null;
   if (decision.action !== "dismiss") {
     try {
-      const fields = { ...pending.normalized } as SourcedFields & { managerExternalId?: string };
+      const fields = { ...pending.normalized } as SourcedFields & { managerExternalId?: string; attributes?: Record<string, string | null> };
+      const attributes = fields.attributes;
       delete fields.managerExternalId;
+      delete fields.attributes;
       const authority = {
         sourceId: source.id,
         priority: source.priority,
         authoritativeFields: source.authoritative ? source.authoritativeFields : [],
+        ownsAttributes: source.authoritative,
         sourceName: source.name,
         runId: pending.runId ?? pendingId,
       };
       const op: SourcedOp =
         decision.action === "link"
-          ? { op: "update", ref: pending.externalId, identityId: decision.identityId, fields }
-          : { op: "create", ref: pending.externalId, identityType: source.identityType as IdentityType, fields };
+          ? { op: "update", ref: pending.externalId, identityId: decision.identityId, fields, attributes }
+          : { op: "create", ref: pending.externalId, identityType: source.identityType as IdentityType, fields, attributes };
       const [result] = await applySourcedIdentities(tenantId, authority, [op]);
       if (!result || result.action === "error" || !result.identityId) throw new ApiError(400, "APPLY_FAILED", result?.error ?? "The identity could not be updated");
       identityId = result.identityId;
