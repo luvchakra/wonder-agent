@@ -1,12 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listRequestIdsAwaiting, listRequests, repairApprovalChains, sweepApprovalTimeouts } from "@/modules/access-governance/service";
+import {
+  listFulfilmentTasks,
+  listRequestIdsAwaiting,
+  listRequests,
+  repairApprovalChains,
+  requestProgressFor,
+  sweepApprovalTimeouts,
+  type FulfilmentTask,
+} from "@/modules/access-governance/service";
+import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, type BadgeTone, Card, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { cn } from "@/lib/utils";
 import { RequestActions } from "./RequestActions";
+import { lineState } from "./labels";
+import { TaskActions } from "../fulfilment/TaskActions";
+import { TASK_STATUS, accountLabel, taskLabel } from "../fulfilment/labels";
 
 // ACCESS-P0-18 — access requests: the caller's own, those waiting for a
 // decision, or all, paged at the database (§15). Requests for people and
@@ -15,16 +27,12 @@ import { RequestActions } from "./RequestActions";
 // step of a catalog request that names them (a manager or owner needs no
 // approver role), a step open to access managers, or, for access managers,
 // a waiting agent request.
+// EXPERIENCE-P0-29 — "waiting for you" is the one inbox: the fulfilment tasks
+// waiting for the caller are listed there too, and every line shows its real
+// state (approved, then waiting for fulfilment, not yet verified, verified,
+// failed or ended), never more than the server knows.
 
 const PAGE_SIZE = 50;
-const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
-  pending: { label: "Waiting for approval", tone: "warning" },
-  approved: { label: "Approved", tone: "success" },
-  rejected: { label: "Rejected", tone: "danger" },
-  fulfilled: { label: "Fulfilled", tone: "neutral" },
-  cancelled: { label: "Cancelled", tone: "neutral" },
-  expired: { label: "Expired", tone: "neutral" },
-};
 const RISK_TONE: Record<string, BadgeTone> = { low: "neutral", medium: "info", high: "warning", critical: "danger" };
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) : null);
 
@@ -44,15 +52,20 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
   const asked: View | null = sp.view === "all" || sp.view === "mine" || sp.view === "waiting" ? sp.view : null;
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   let awaiting: string[] = [];
+  let myTasks: FulfilmentTask[] = [];
   if (asked === null || asked === "waiting") {
     // Steps past their time are escalated or expired, and waiting requests
     // without a chain get one, before anyone is shown what waits for them.
     await sweepApprovalTimeouts(ctx.tenantId!);
     await repairApprovalChains(ctx.tenantId!, ctx.userId);
-    awaiting = await listRequestIdsAwaiting(ctx.tenantId!, { userId: ctx.userId, canApproveAsAccessManager: canApprove });
+    const me = await getIdentityForUser(ctx.tenantId!, ctx.userId);
+    [awaiting, myTasks] = await Promise.all([
+      listRequestIdsAwaiting(ctx.tenantId!, { userId: ctx.userId, canApproveAsAccessManager: canApprove }),
+      listFulfilmentTasks(ctx.tenantId!, { view: "todo", forPerson: { userId: ctx.userId, identityId: me?.id ?? null, canApprove } }),
+    ]);
   }
   // Without a choice: what waits for the caller, when anything does (or always for an approver); else their own.
-  const view: View = asked ?? (awaiting.length || canApprove ? "waiting" : "mine");
+  const view: View = asked ?? (awaiting.length || myTasks.length || canApprove ? "waiting" : "mine");
   const { rows, total } = await listRequests(ctx.tenantId!, {
     mineUserId: view === "mine" ? ctx.userId : undefined,
     awaiting: view === "waiting" ? { ids: awaiting, pendingAgentRequests: canApprove } : undefined,
@@ -60,9 +73,12 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
     pageSize: PAGE_SIZE,
   });
   const awaitingMe = new Set(awaiting);
+  const progress = await requestProgressFor(ctx.tenantId!, rows.filter((r) => r.status === "approved" || r.status === "fulfilled").map((r) => r.id));
+  const tasks = view === "waiting" ? myTasks : [];
+  const waitingCount = awaiting.length + myTasks.length;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const tabs: { key: View; label: string }[] = [
-    { key: "waiting" as View, label: "Waiting for you" },
+    { key: "waiting" as View, label: waitingCount ? `Waiting for you (${waitingCount})` : "Waiting for you" },
     { key: "mine", label: "My requests" },
     { key: "all", label: "All requests" },
   ];
@@ -105,12 +121,47 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
             </Link>
           ))}
         </nav>
+        {tasks.length ? (
+          <section aria-label="Fulfilment tasks for you" className="mt-4">
+            <h2 className="text-sm font-semibold text-foreground">Fulfilment tasks</h2>
+            <ul className="mt-2 divide-y divide-border rounded-md border border-border">
+              {tasks.map((t) => {
+                const label = taskLabel(t);
+                const status = TASK_STATUS[t.status] ?? { label: t.status, tone: "neutral" as BadgeTone };
+                return (
+                  <li key={t.id} className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {t.requestId ? (
+                          <Link href={`/access/requests/${t.requestId}`} className="hover:underline">
+                            {label}
+                          </Link>
+                        ) : (
+                          label
+                        )}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                        <Badge tone={status.tone}>{status.label}</Badge>
+                        {t.overdue ? <Badge tone="danger">Overdue</Badge> : null}
+                        <span>Account {accountLabel(t.accountName)} · due {when(t.dueAt)}</span>
+                      </div>
+                    </div>
+                    <TaskActions taskId={t.id} status={t.status} mine={t.claimedBy === ctx.userId} label={label} />
+                  </li>
+                );
+              })}
+            </ul>
+            {rows.length ? <h2 className="mt-5 text-sm font-semibold text-foreground">Approvals</h2> : null}
+          </section>
+        ) : null}
         <div className="mt-4">
           {rows.length === 0 ? (
-            <EmptyState
-              title={view === "waiting" ? "Nothing is waiting for you" : view === "mine" ? "You have no requests" : "No access requests yet"}
-              description={view === "mine" && canRequest ? "Find what you need in the request catalog." : undefined}
-            />
+            tasks.length ? null : (
+              <EmptyState
+                title={view === "waiting" ? "Nothing is waiting for you" : view === "mine" ? "You have no requests" : "No access requests yet"}
+                description={view === "mine" && canRequest ? "Find what you need in the request catalog." : undefined}
+              />
+            )
           ) : (
             <TableContainer label="Access requests" bare>
               <Thead>
@@ -149,7 +200,9 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
                         {mine ? <span className="block text-xs text-muted-foreground">Requested by you</span> : null}
                       </Td>
                       <Td>
-                        <Badge tone={STATUS[r.status]?.tone ?? "neutral"} className="whitespace-nowrap">{STATUS[r.status]?.label ?? r.status}</Badge>
+                        <Badge tone={lineState(r, progress.get(r.id)).tone} className="whitespace-nowrap">
+                          {lineState(r, progress.get(r.id)).label}
+                        </Badge>
                         {r.status === "pending" && r.approvalStage ? <span className="mt-0.5 block text-xs text-muted-foreground">Stage {r.approvalStage}</span> : null}
                         {r.requestedExpiry && ["pending", "approved", "fulfilled"].includes(r.status) ? <span className="mt-0.5 block text-xs text-muted-foreground">Until {when(r.requestedExpiry)}</span> : null}
                       </Td>

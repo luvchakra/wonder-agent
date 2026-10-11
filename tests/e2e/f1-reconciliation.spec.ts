@@ -470,6 +470,40 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect((await ledgerFor(tenantId, accounts.eve.id)).find((e) => e.entitlementId === finance)?.status).toBe("EXPIRED");
   });
 
+  test("EXPERIENCE-P0-29: one inbox for tasks, each line's real state, and the people you manage under For", async ({ request, page }) => {
+    test.setTimeout(120_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data: admin } = await db.from("identities").select("id").eq("tenant_id", tenantId).eq("identity_type", "HUMAN").eq("email", TEST_USERS.adminOne.email).limit(1).single();
+    // The signed-in admin becomes the application's technical owner, so its new tasks wait for them; and Fay's manager.
+    expect((await request.patch(`/api/v1/access/applications/${appId}`, { data: { technicalOwnerIdentityId: admin!.id } })).status()).toBe(200);
+    const fayName = `E2E F2 Fay ${stamp}`;
+    const fay = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: fayName, email: mail("fay"), managerIdentityId: admin!.id } });
+    expect(fay.status(), await fay.text()).toBe(201);
+    const fayId = (await fay.json()).data.id as string;
+    const finance = (await entitlementIdByRef(tenantId, appId, "cn=finance"))!;
+    const asked = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: fayId, applicationId: appId, entitlementId: finance, durationDays: 7, justification: "EXPERIENCE-P0-29 inbox" } });
+    expect(asked.status(), await asked.text()).toBe(201);
+    expect((await asked.json()).data.status).toBe("approved");
+
+    // Waiting for you: the task, with its one action.
+    await page.goto("/access/requests?view=waiting");
+    await expect(page.getByRole("link", { name: /^Waiting for you \(\d+\)$/ })).toBeVisible();
+    const tasks = page.getByRole("region", { name: "Fulfilment tasks for you" });
+    const label = `Add Finance in E2E F1 App ${stamp}`;
+    await expect(tasks.getByRole("link", { name: label }).first()).toBeVisible();
+    await tasks.getByRole("button", { name: `Claim: ${label}` }).first().click();
+    await expect(tasks.getByRole("button", { name: `Done: ${label}` }).first()).toBeVisible();
+
+    // My requests: the line's real state, not just "approved".
+    await page.goto("/access/requests?view=mine");
+    await expect(page.getByRole("row", { name: new RegExp(fayName) }).first()).toContainText("Approved · waiting for fulfilment");
+
+    // For: the people you manage are listed without searching.
+    await page.goto(`/access/catalog/${appId}`);
+    const forSelect = page.getByRole("combobox", { name: "For", exact: true });
+    await expect(forSelect.locator('optgroup[label="People you manage"] option', { hasText: fayName })).toHaveCount(1);
+  });
+
   test("another organization sees none of it", async ({ browser }) => {
     const other = await browser.newContext({ storageState: authFile("adminTwo") });
     const runs = await other.request.get(`/api/v1/access/applications/${appId}/access-reconciliations`);

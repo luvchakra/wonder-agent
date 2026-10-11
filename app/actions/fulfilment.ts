@@ -14,6 +14,7 @@ export async function fulfilmentTaskAction(taskId: string, _prev: TaskFormState,
   try {
     await actOnFulfilmentTask(ctx.tenantId!, { userId: ctx.userId, canApprove: ctx.permissions.includes("access.approve") }, taskId, action, note);
     revalidatePath("/access/fulfilment");
+    revalidatePath("/access/requests");
     return { status: "saved", message: action === "claim" ? "Claimed: it is yours to do." : action === "complete" ? "Done. It is verified when the next sync finds it on the target." : "Recorded as failed." };
   } catch (err) {
     const e = err as { message?: string; code?: string };

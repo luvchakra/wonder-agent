@@ -21,7 +21,7 @@ export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createMa
 export { refreshAccessLedger, refreshAccessLedgerForAllTenants, getIdentityAccessLedger, getAccountAccessLedger, type IdentityAccessEntry } from "./ledger";
 export { LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerSource, type LedgerStatus } from "./ledgerRules";
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
-export { grantsForRequest } from "./pendingGrants";
+export { grantsForRequest, requestProgressFor } from "./pendingGrants";
 export { listFulfilmentTasks, actOnFulfilmentTask, remindOverdueFulfilmentTasks, type FulfilmentTask } from "./fulfilmentTasks";
 export { sweepAccessExpiry, remindExpiringAccess } from "./accessExpiry";
 export { requestFulfilment, requestProgress, type FulfilmentState } from "./pendingGrantRules";

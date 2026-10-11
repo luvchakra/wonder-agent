@@ -24,7 +24,7 @@ export function placeholderRef(subject: { identityId: string | null; agentId: st
   return `pending:${subject.identityId ?? `agent:${subject.agentId}`}`;
 }
 
-export type FulfilmentState = "pending_fulfilment" | "fulfilled_unverified" | "verified" | "untracked";
+export type FulfilmentState = "pending_fulfilment" | "failed" | "fulfilled_unverified" | "verified" | "untracked";
 
 /**
  * A request's fulfilment, from its grants: verified only when every grant
@@ -41,8 +41,8 @@ export function requestFulfilment(grants: { fulfilmentStatus: string; revokedAt:
 
 /**
  * ACCESS-P0-30: a request's progress from its fulfilment tasks (every kind
- * of request has them): still to do, done but not yet seen at the source,
- * or verified. With no task (a request older than tasks, or access that
+ * of request has them): still to do (or failed), done but not yet seen at
+ * the source, or verified. With no task (a request older than tasks, or access that
  * already existed), its grants decide.
  */
 export function requestProgress(
@@ -51,7 +51,9 @@ export function requestProgress(
 ): FulfilmentState {
   const live = tasks.filter((t) => t.status !== "cancelled");
   if (!live.length) return requestFulfilment(grants);
-  if (live.some((t) => t.status === "open" || t.status === "claimed" || t.status === "failed")) return "pending_fulfilment";
+  // EXPERIENCE-P0-29: a task reported failed is shown as such until someone takes it up again.
+  if (live.some((t) => t.status === "failed")) return "failed";
+  if (live.some((t) => t.status === "open" || t.status === "claimed")) return "pending_fulfilment";
   if (live.some((t) => t.status === "completed")) return "fulfilled_unverified";
   return "verified";
 }

@@ -35,7 +35,8 @@ export function RequestForm({
   applicationId: string;
   options: RequestOption[];
   initialOption: string;
-  people: { id: string; label: string }[];
+  /** EXPERIENCE-P0-29: grouped as people you manage, what you own, and search results. */
+  people: { id: string; label: string; group?: string }[];
   /** ACCESS-P0-31: for each of your agents, the options its contract approves. */
   withinAgentContract?: Record<string, string[]>;
   selfLabel: string;
@@ -58,11 +59,22 @@ export function RequestForm({
     <form action={action} className="space-y-4">
       <SelectField label="For" name="subjectIdentityId" value={subject} onChange={(e) => setSubject(e.target.value)}>
         <option value="">{selfLabel}</option>
-        {people.map((p) => (
-          <option key={p.id} value={p.id}>
-            {p.label}
-          </option>
-        ))}
+        {[...new Set(people.map((p) => p.group ?? ""))].map((group) => {
+          const options = people
+            .filter((p) => (p.group ?? "") === group)
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.label}
+              </option>
+            ));
+          return group ? (
+            <optgroup key={group} label={group}>
+              {options}
+            </optgroup>
+          ) : (
+            options
+          );
+        })}
       </SelectField>
       <input type="hidden" name="requestType" value={kind} />
       {kind !== "disable_account" ? (

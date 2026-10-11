@@ -3905,3 +3905,58 @@ RLS.
   name is now unique per run, because an earlier run's account in the
   shared tenant made the name check ambiguous.
 - Typecheck and eslint clean.
+
+### 2026-10-11 — EXPERIENCE-P0-29: request tracking, one inbox, subject picker (#55)
+
+**What changed.** No migration and no new page or menu entry: the existing
+Access Requests screen does the work.
+
+- **Each line's real state.** My requests (and every view) shows where a line
+  stands, from the server's own records (`lineState` in
+  `app/(customer)/access/requests/labels.ts`, shared with the request page):
+  - before approval, its status: waiting, rejected, cancelled, expired;
+  - once approved, its progress from its fulfilment tasks and grants
+    (`requestProgressFor`, two reads per page): waiting for fulfilment,
+    fulfilled but not yet verified, verified at the source, or
+    **failed** (a task reported failed; new in `requestProgress`);
+  - time-bound access past its end date reads "Ended".
+
+  Wording follows what was asked: add, remove, disable, extend. Nothing is
+  shown as done before the server records it (§17.5).
+- **One inbox.** "Waiting for you" now lists the fulfilment tasks waiting for
+  you, above the approvals waiting for you, with a count on the tab. A task
+  is yours when it is assigned to you or claimed by you. Someone who can
+  approve access also sees tasks with no owner. Each task has its one action
+  (Claim, then Done or Report a problem), the same as on Fulfilment Tasks.
+- **Subject picker.** "For" on the request form groups:
+  - you;
+  - the people you manage (`listDirectReports`, no search needed);
+  - what you own (service accounts, machine identities, agents);
+  - people found by search.
+- **Placeholder accounts** (ACCESS-P0-28) read "none yet" instead of their
+  internal `pending:` reference, on both task lists.
+- Task wording moved to `app/(customer)/access/fulfilment/labels.ts`, so
+  Fulfilment Tasks and the inbox say the same thing.
+
+**Design review (§32).**
+- Screens checked: the inbox at 390 px and 1280 px, light and dark, with a
+  task and an approval waiting.
+- Design tokens and the existing components only; one action per row.
+- Not changed here: the Approve/Reject buttons in the approvals table wrap
+  at 1280 px. That is unchanged from before this story.
+
+**Verified.**
+- Typecheck, ESLint and `next build` are clean.
+- Vitest: 1226/1226. New tests:
+  - `lineState`: each state; ended; never more than the server knows;
+  - `requestProgress`: failed;
+  - task wording and placeholder accounts.
+- E2E (local): `f1-reconciliation` 19/19. The new test makes the signed-in
+  admin the application's technical owner and the manager of a new person,
+  then submits a request for that person and checks:
+  - "Waiting for you (n)" lists the task, and Claim gives "Done";
+  - My requests shows "Approved · waiting for fulfilment";
+  - "For" lists the person under "People you manage".
+
+  `request-catalog` and `approval-engine` passed, 34 in all with the
+  above.

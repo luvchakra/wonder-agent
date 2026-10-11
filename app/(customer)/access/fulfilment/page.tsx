@@ -5,22 +5,11 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { listFulfilmentTasks } from "@/modules/access-governance/service";
 import { Badge, type BadgeTone, Card, CardBody, EmptyState } from "@/modules/ui";
 import { TaskActions } from "./TaskActions";
+import { TASK_STATUS, accountLabel, taskLabel } from "./labels";
 
 // ACCESS-P0-29 — approved access waiting for a person to make the change on
 // the target (until provisioning exists, F3). Soonest due first; a task
 // closes itself when reconciliation finds the access.
-
-const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
-  open: { label: "To do", tone: "warning" },
-  claimed: { label: "Claimed", tone: "info" },
-  failed: { label: "Failed", tone: "danger" },
-  completed: { label: "Done · waiting for verification", tone: "neutral" },
-  verified: { label: "Verified at the source", tone: "success" },
-  cancelled: { label: "Cancelled", tone: "neutral" },
-};
-
-// ACCESS-P0-30: what each task asks for on the target.
-const KIND: Record<string, string> = { grant: "Add", remove: "Remove", create_account: "Create account", disable_account: "Disable account" };
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
@@ -56,9 +45,8 @@ export default async function FulfilmentTasksPage({ searchParams }: { searchPara
           ) : (
             <ul className="divide-y divide-border">
               {tasks.map((t) => {
-                const what = t.kind === "create_account" || t.kind === "disable_account" ? KIND[t.kind] : `${KIND[t.kind] ?? "Add"} ${t.entitlementName ?? "access"}`;
-                const label = `${what} in ${t.applicationName ?? "an application"}`;
-                const status = STATUS[t.status] ?? { label: t.status, tone: "neutral" as BadgeTone };
+                const label = taskLabel(t);
+                const status = TASK_STATUS[t.status] ?? { label: t.status, tone: "neutral" as BadgeTone };
                 return (
                   <li key={t.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 space-y-1">
@@ -72,7 +60,7 @@ export default async function FulfilmentTasksPage({ searchParams }: { searchPara
                         )}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        Account {t.accountName ?? "—"} · {t.assigneeName ? `owner ${t.assigneeName}` : "no owner: access managers"} · due {day(t.dueAt)}
+                        Account {accountLabel(t.accountName)} · {t.assigneeName ? `owner ${t.assigneeName}` : "no owner: access managers"} · due {day(t.dueAt)}
                         {t.failureReason && t.status === "failed" ? ` · ${t.failureReason}` : ""}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
