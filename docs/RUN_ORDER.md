@@ -489,3 +489,13 @@ fulfilment. It sits on a placeholder account when the person has none yet,
 and it is not counted as access. "Mark fulfilled" makes it unverified; the
 next reconciliation that sees it at the source verifies it. ACCESS-P0-29
 (fulfilment tasks) is next.
+
+## 2026-10-11 — ACCESS-P0-29: fulfilment tasks
+
+Each grant waiting for fulfilment now has a task for the application's
+owner. The task can be claimed, completed (the access is then waiting for
+verification) or reported failed with a reason. It is due after the
+organization's SLA and reminds its owner daily once overdue, and
+reconciliation closes it when the access is found at the source. The tasks
+are under Home › Access Governance › Fulfilment Tasks. ACCESS-P0-30
+(remove-access and account requests) is next.

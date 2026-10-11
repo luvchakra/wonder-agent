@@ -23,7 +23,7 @@ describe("the area list (owner decision, 2026-10-10)", () => {
   });
 
   it("keeps a member's day-to-day work in Home", () => {
-    expect(sectionPages(SHELL_NAV[0]).map((p) => p.href)).toEqual(["/", "/access/catalog", "/my-privacy", "/settings/security", "/access/requests", "/access/packages"]);
+    expect(sectionPages(SHELL_NAV[0]).map((p) => p.href)).toEqual(["/", "/access/catalog", "/my-privacy", "/settings/security", "/access/requests", "/access/fulfilment", "/access/packages"]);
   });
 
   it("lists every route once", () => {
@@ -64,7 +64,7 @@ describe("navFor", () => {
   it("shows a member only the pages they may open, and drops empty areas", () => {
     const nav = navFor(SHELL_NAV, ["access.read"]);
     expect(nav.map((s) => s.label)).toEqual(["Home", "Admin"]);
-    expect(sectionPages(nav[0]).map((p) => p.label)).toEqual(["Home", "Request Access", "My Privacy", "Sign-in Security", "Access Requests", "Access Packages"]);
+    expect(sectionPages(nav[0]).map((p) => p.label)).toEqual(["Home", "Request Access", "My Privacy", "Sign-in Security", "Access Requests", "Fulfilment Tasks", "Access Packages"]);
     expect(sectionPages(nav[1]).map((p) => p.label)).toEqual(["Accounts", "Entitlements", "Application Inventory", "Data Sources"]);
     expect(nav[1].href).toBe("/access/accounts");
   });

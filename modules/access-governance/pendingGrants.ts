@@ -4,6 +4,7 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { chooseAccount, placeholderRef } from "./pendingGrantRules";
+import { closeTasksForGrants, openFulfilmentTask } from "./fulfilmentTasks";
 
 /**
  * ACCESS-P0-28 — an approved request (or package assignment) becomes a
@@ -101,6 +102,8 @@ async function pendGrant(tenantId: string, accountId: string, line: Line & { ent
     if (again) return { grantId: again.id as string, existing: false };
   }
   if (insertError || !data) throw new ApiError(500, "CREATE_FAILED", insertError?.message ?? "Could not record the pending grant");
+  // ACCESS-P0-29: until provisioning exists, a person makes the change: their task opens with the grant.
+  await openFulfilmentTask(tenantId, { grantId: data.id as string, requestId: line.requestId, applicationId: line.applicationId });
   return { grantId: data.id as string, existing: false };
 }
 
@@ -186,21 +189,26 @@ export async function markGrantsFulfilled(tenantId: string, by: { requestId: str
   q = "requestId" in by ? q.eq("request_id", by.requestId).is("access_package_assignment_item_id", null) : q.eq("access_package_assignment_item_id", by.itemId);
   const { data, error } = await q.select("id");
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
-  return (data ?? []).length;
+  const ids = ((data ?? []) as Row[]).map((r) => r.id as string);
+  // Marked fulfilled on the request or item: its tasks are done too (the grant still waits for verification).
+  await closeTasksForGrants(tenantId, ids, "completed");
+  return ids.length;
 }
 
 /** An assignment ended before its items were fulfilled: their pending grants never existed, so they are withdrawn (revoked). */
 export async function withdrawPendingGrants(tenantId: string, itemIds: string[]): Promise<void> {
   if (!itemIds.length) return;
   const now = new Date().toISOString();
-  const { error } = await supabaseServiceRole()
+  const { data, error } = await supabaseServiceRole()
     .from("access_grants")
     .update({ revoked_at: now, updated_at: now })
     .eq("tenant_id", tenantId)
     .eq("fulfilment_status", "pending_fulfilment")
     .is("revoked_at", null)
-    .in("access_package_assignment_item_id", itemIds);
+    .in("access_package_assignment_item_id", itemIds)
+    .select("id");
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  await closeTasksForGrants(tenantId, ((data ?? []) as Row[]).map((r) => r.id as string), "cancelled");
 }
 
 /** The grants a request asked for (its own and its package items'), for the request page. */
