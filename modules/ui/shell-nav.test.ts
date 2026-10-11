@@ -13,8 +13,13 @@ describe("the area list (owner decision, 2026-10-10)", () => {
     }
   });
 
-  it("opens Admin with its four object lists, then identities and applications as groups", () => {
-    expect(ADMIN_AREA.children?.slice(0, 8).map((e) => e.label)).toEqual(["Accounts", "Entitlements", "Roles", "User Groups", "Global Configuration", "Identities", "Applications", "Policies"]);
+  it("arranges Admin in the groups of the foundation design's §8 (owner decision, 2026-10-11)", () => {
+    expect(ADMIN_AREA.children?.map((e) => e.label)).toEqual(["Identity Repository", "Applications", "Policies", "Integrations", "Users & Permissions", "Settings", "Compliance"]);
+    expect(ADMIN_AREA.children?.every((e) => e.kind === "group")).toBe(true);
+    const repository = ADMIN_AREA.children![0];
+    expect(repository.kind === "group" && repository.children.map((p) => p.href)).toEqual(
+      expect.arrayContaining(["/identities", "/access/accounts", "/access/entitlements", "/settings/groups"]),
+    );
   });
 
   it("keeps a member's day-to-day work in Home", () => {
@@ -61,6 +66,7 @@ describe("navFor", () => {
     expect(nav.map((s) => s.label)).toEqual(["Home", "Admin"]);
     expect(sectionPages(nav[0]).map((p) => p.label)).toEqual(["Home", "Request Access", "My Privacy", "Sign-in Security", "Access Requests", "Access Packages"]);
     expect(sectionPages(nav[1]).map((p) => p.label)).toEqual(["Accounts", "Entitlements", "Application Inventory", "Data Sources"]);
+    expect(nav[1].href).toBe("/access/accounts");
   });
 
   it("gives a member with no admin permission no Admin area", () => {
@@ -84,7 +90,7 @@ describe("navFor", () => {
 describe("searchNav (the sidebar's menu search)", () => {
   it("finds pages by name, group or area, with where they live", () => {
     expect(searchNav(SHELL_NAV, "sync")).toEqual([{ label: "Sync Jobs", href: "/integrations/jobs", trail: ["Admin", "Integrations"] }]);
-    expect(searchNav(SHELL_NAV, "people")).toEqual([{ label: "People", href: "/identities/humans", trail: ["Admin", "Identities"] }]);
+    expect(searchNav(SHELL_NAV, "people")).toEqual([{ label: "People", href: "/identities/humans", trail: ["Admin", "Identity Repository"] }]);
     expect(searchNav(SHELL_NAV, "admin roles").map((m) => m.label)).toEqual(["Roles"]);
     expect(searchNav(SHELL_NAV, "conflicts")).toEqual([{ label: "SoD Conflicts", href: "/sod/conflicts", trail: ["SOD"] }]);
   });

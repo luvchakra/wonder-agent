@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supabaseServiceRole } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessFinding, FindingStatus, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
@@ -60,6 +60,22 @@ export async function listAccessFindings(tenantId: string, filter: { accountId?:
   const { data, error } = await q.order("created_at", { ascending: false }).limit(200);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map(toAccessFinding);
+}
+
+/**
+ * How many rogue-access findings are open, for the Intelligence badge: a
+ * count only, read as the member under RLS and filtered on the tenant.
+ * Unreadable counts as 0 so the shell never fails on it.
+ */
+export async function countOpenAccessFindings(tenantId: string): Promise<number> {
+  const supabase = await supabaseServer();
+  const { count, error } = await supabase
+    .from("risk_findings")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("category", "rogue_access")
+    .eq("status", "open");
+  return error ? 0 : (count ?? 0);
 }
 
 /**

@@ -8,7 +8,7 @@ import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContex
 import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
-import { getFindings } from "@/modules/risk/service";
+import { countOpenAccessFindings, getFindings } from "@/modules/risk/service";
 import { AppSidebar, MobileNavDrawer, MobileNavTrigger } from "@/modules/ui/AppSidebar";
 import { MobileTabBar } from "@/modules/ui/MobileTabBar";
 import { AccountPanel } from "@/modules/ui/AccountPanel";
@@ -66,7 +66,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     redirect(host.target.kind === "subdomain" || host.target.kind === "invalid" ? "/no-access" : "/onboarding/start");
   }
 
-  const [profile, memberships, isAdmin, announcements, openFindings, cookieStore] = await Promise.all([
+  const [profile, memberships, isAdmin, announcements, openFindings, cookieStore, openAccessFindings] = await Promise.all([
     getProfile(),
     // Already resolved by getTenantContext() above — the cache hands back
     // the same promise, so this costs nothing.
@@ -87,6 +87,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // EXPERIENCE-P0-18: the sidebar's collapsed/expanded choice, so the
     // server renders the width the user left it at.
     cookies(),
+    // ACCESS-P0-25: rogue access is listed in Risk Overview too, so the badge counts it (one count query).
+    countOpenAccessFindings(ctx.tenantId),
   ]);
 
   // FOUNDATION-P0-22 — each organization's own address, so the rail always shows where you are.
@@ -99,7 +101,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     url: tenantUrls[i],
   }));
 
-  const badges: ShellBadgeCounts = { risk: openFindings.length };
+  const badges: ShellBadgeCounts = { risk: openFindings.length + openAccessFindings };
   const sidebarUser = {
     email: user.email ?? "",
     displayName: profile?.displayName ?? null,

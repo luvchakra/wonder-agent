@@ -1020,3 +1020,14 @@ not a failure, other organizations untouched); risk suites green in the
 full 1185/1185 run; isolation SQL in `tests/access/classification-isolation.sql`.
 
 **Left out.** Remediating rogue access is RISK-P0-13 (F3).
+
+### 2026-10-11 — Rogue-access findings in Risk Overview
+
+`countOpenAccessFindings(tenantId)` (`modules/risk/accessFindings.ts`,
+exported from the service) counts open `rogue_access` findings. It reads
+under RLS with an explicit tenant filter, and returns 0 when the count
+cannot be read. The shell's Intelligence badge uses it. Risk Overview
+(`/risk`) also lists these findings through `listAccessFindings()`.
+
+**Verified.** The F1 E2E suite checks the listing and its link to the
+account.

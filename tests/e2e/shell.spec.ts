@@ -83,9 +83,10 @@ test.describe("customer shell", () => {
     await page.goto("/settings/users");
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("heading", { name: "Admin" })).toBeVisible();
-    // Admin opens with its four object lists, then its groups.
-    for (const name of ["Accounts", "Entitlements", "Roles", "User Groups"]) await expect(nav.getByRole("link", { name, exact: true })).toBeVisible();
+    // Admin is groups (foundation design §8); the page's own group is open.
+    for (const name of ["Identity Repository", "Applications", "Policies", "Integrations", "Settings", "Compliance"]) await expect(nav.getByRole("button", { name, exact: true })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Users & Permissions" })).toHaveAttribute("aria-expanded", "true");
+    await expect(nav.getByRole("link", { name: "Roles", exact: true })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Users", exact: true })).toHaveAttribute("aria-current", "page");
     // Another group's pages stay folded.
     await expect(nav.getByRole("link", { name: "Sync Jobs" })).toHaveCount(0);
@@ -104,7 +105,7 @@ test.describe("customer shell", () => {
     await page.goto("/identities/humans");
     const nav = page.getByRole("navigation", { name: "Main" });
     await expect(nav.getByRole("heading", { name: "Admin" })).toBeVisible();
-    await expect(nav.getByRole("button", { name: "Identities" })).toHaveAttribute("aria-expanded", "true");
+    await expect(nav.getByRole("button", { name: "Identity Repository" })).toHaveAttribute("aria-expanded", "true");
     await expect(nav.getByRole("link", { name: "People" })).toHaveAttribute("aria-current", "page");
     // The Applications group stays closed; its pages are not current.
     await expect(nav.getByRole("button", { name: "Applications" })).toHaveAttribute("aria-expanded", "false");
@@ -117,7 +118,7 @@ test.describe("customer shell", () => {
     await page.getByRole("button", { name: "Collapse navigation" }).click();
     const nav = page.getByRole("navigation", { name: "Main" });
     await nav.getByRole("button", { name: "Admin" }).click();
-    await page.getByRole("menuitem", { name: "Identities" }).hover();
+    await page.getByRole("menuitem", { name: "Identity Repository" }).hover();
     await page.getByRole("menuitem", { name: "People" }).click();
     await expect(page).toHaveURL("/identities/humans");
 

@@ -8,8 +8,10 @@ import { cn } from "@/lib/utils";
 
 export type FindingRow = {
   id: string;
-  agentId: string;
-  agentName: string;
+  /** Where the row leads: the agent's risk page, or the account a rogue-access finding is about. */
+  href: string;
+  /** What the finding is about: the agent's name, or "Application account". */
+  subject: string;
   title: string;
   severity: string;
   category: string;
@@ -34,8 +36,8 @@ function relative(iso: string, now: number): string {
 
 /**
  * The design's "Risks & Alerts" list: severity count pills over a list
- * whose rows carry a severity icon, the finding, its agent and how long it
- * has been open. Severity is never carried by colour alone — every row has
+ * whose rows carry a severity icon, the finding, what it is about (an agent,
+ * or an application account for rogue access) and how long it has been open. Severity is never carried by colour alone — every row has
  * an icon and the severity word (UI-UX-DESIGN-RULES.md §19).
  *
  * `now` is passed in from the server render so the relative timestamps are
@@ -71,7 +73,7 @@ export function FindingsList({ findings, now }: { findings: FindingRow[]; now: n
             return (
               <li key={f.id}>
                 <Link
-                  href={`/risk/agents/${f.agentId}`}
+                  href={f.href}
                   className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
                 >
                   <Icon className={cn("mt-0.5 size-4 shrink-0", meta.className)} aria-hidden="true" />
@@ -79,7 +81,7 @@ export function FindingsList({ findings, now }: { findings: FindingRow[]; now: n
                     <span className="block truncate text-sm font-medium text-foreground">{f.title}</span>
                     <span className="block truncate text-xs text-muted-foreground">
                       <span className="sr-only">{meta.label} severity. </span>
-                      {meta.label} · {f.agentName} · {f.category.replace(/_/g, " ")}
+                      {meta.label} · {f.subject} · {f.category.replace(/_/g, " ")}
                     </span>
                   </span>
                   <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">

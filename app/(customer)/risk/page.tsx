@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents } from "@/modules/agent-identity/service";
-import { getFindings } from "@/modules/risk/service";
+import { getFindings, listAccessFindings } from "@/modules/risk/service";
 import { listUnregisteredAgentActivity } from "@/modules/runtime-assurance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardHeader, CardBody, LinkButton, ObjectActionsMenu } from "@/modules/ui";
@@ -26,10 +26,14 @@ export default async function RiskIndexPage() {
   // RISK-P0-12: Shadow AI is a tenant-level signal (an unregistered agent
   // has no agent record for a finding to hang on), so it is shown here and
   // resolved through discovery, not as a per-agent finding.
-  const [agents, findings, shadowAi] = await Promise.all([
+  // ACCESS-P0-25: rogue access on application accounts (people's, service
+  // accounts', agents') is listed with the agent findings, each leading to
+  // its account.
+  const [agents, findings, shadowAi, accessFindings] = await Promise.all([
     listAgents(ctx.tenantId!),
     getFindings(ctx.tenantId!, { status: "open" }),
     listUnregisteredAgentActivity(ctx.tenantId!),
+    listAccessFindings(ctx.tenantId!, { openOnly: true }),
   ]);
   const findingCountByAgent = new Map<string, number>();
   const worstSeverityByAgent = new Map<string, string>();
@@ -49,19 +53,28 @@ export default async function RiskIndexPage() {
 
   const nameById = new Map(agents.map((a) => [a.id, a.displayName?.trim() || a.agentName]));
   const severityRank: Record<string, number> = rank;
-  const findingRows: FindingRow[] = [...findings]
-    .sort((a, b) =>
-      severityRank[b.severity] - severityRank[a.severity] || b.createdAt.localeCompare(a.createdAt),
-    )
-    .map((f) => ({
+  const findingRows: FindingRow[] = [
+    ...findings.map((f) => ({
       id: f.id,
-      agentId: f.agentId,
-      agentName: nameById.get(f.agentId) ?? "Unknown agent",
+      href: `/risk/agents/${f.agentId}`,
+      subject: nameById.get(f.agentId) ?? "Unknown agent",
       title: f.title,
       severity: f.severity,
       category: f.category,
       createdAt: f.createdAt,
-    }));
+    })),
+    ...accessFindings
+      .filter((f) => f.status === "open")
+      .map((f) => ({
+        id: f.id,
+        href: `/access/accounts/${f.accountId}`,
+        subject: "Application account",
+        title: f.title,
+        severity: f.severity,
+        category: f.category,
+        createdAt: f.createdAt,
+      })),
+  ].sort((a, b) => severityRank[b.severity] - severityRank[a.severity] || b.createdAt.localeCompare(a.createdAt));
   const renderedAt = new Date().getTime();
 
   return (
