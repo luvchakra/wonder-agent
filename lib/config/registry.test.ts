@@ -11,6 +11,7 @@ describe("the settings", () => {
       "session.maxHours": 12,
       "access.dormantDays": 90,
       "access.fulfilmentSlaDays": 3,
+      "access.expiryReminderDays": 7,
       "agents.duplicateMatchPercent": 60,
       "runtime.unregisteredWindowDays": 90,
       "runtime.alertThrottleMinutes": 15,

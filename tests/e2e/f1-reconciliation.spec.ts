@@ -407,6 +407,69 @@ test.describe.serial("F1 reconciliation chain", () => {
     }
   });
 
+  test("ACCESS-P0-32: an end date within the policy's cap, an approved extension, and at the end exactly one removal task; the ledger shows it expired", async ({ request }) => {
+    test.setTimeout(180_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+    const policy = await request.post("/api/v1/access/request-policies", { data: { applicationId: appId, autoApprove: true, maxDurationDays: 30, defaultDurationDays: null } });
+    expect(policy.status(), await policy.text()).toBe(200);
+    const finance = (await entitlementIdByRef(tenantId, appId, "cn=finance"))!;
+    const eve = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E F2 Eve ${stamp}`, email: mail("eve") } });
+    const eveId = (await eve.json()).data.id as string;
+    const ask = (data: Record<string, unknown>) => request.post("/api/v1/access/requests", { data: { subjectIdentityId: eveId, applicationId: appId, entitlementId: finance, justification: "ACCESS-P0-32 time-bound", ...data } });
+
+    // Beyond the policy's cap: refused.
+    const tooLong = await ask({ durationDays: 60 });
+    expect(tooLong.status()).toBe(400);
+    expect((await tooLong.json()).error.code).toBe("DURATION_TOO_LONG");
+    const granted = await ask({ durationDays: 30 });
+    expect(granted.status(), await granted.text()).toBe(201);
+    const grantRequest = (await granted.json()).data as { id: string; status: string; requestedExpiry: string };
+    expect(grantRequest.status).toBe("approved");
+
+    // The access appears at the source and is verified.
+    await replaceIntegrationObjects(integrationId, tenantId, "account", [
+      ...ACCOUNTS,
+      { externalId: "uid=cara", raw: { id: "cara", username: "cara", email: mail("cara"), status: "disabled" } },
+      { externalId: "uid=dan", raw: { id: "dan", username: "dan", email: mail("dan") } },
+      { externalId: "uid=eve", raw: { id: "eve", username: "eve", email: mail("eve") } },
+    ]);
+    expect((await request.post(`/api/v1/access/applications/${appId}/reconciliations`)).status()).toBe(201);
+    await loadAccounts(request);
+    await replaceIntegrationObjects(integrationId, tenantId, "access_grant", [...BASE_GRANTS, grant("uid=eve", "cn=finance")]);
+    expect((await reconcileAccess(request)).grants).toMatchObject({ verified: 1 });
+    const view = async (id: string) => (await (await request.get(`/api/v1/access/requests/${id}`)).json()).data as { request: { status: string; requestedExpiry: string }; fulfilment: string; grants: { id: string }[] };
+    const [eveGrant] = (await view(grantRequest.id)).grants;
+
+    // Extending goes through the policy again (its cap included); approved, the access rests on the extension.
+    const extendTooLong = await ask({ requestType: "extend", durationDays: 60 });
+    expect(extendTooLong.status()).toBe(400);
+    const extended = await ask({ requestType: "extend", durationDays: 14 });
+    expect(extended.status(), await extended.text()).toBe(201);
+    const extension = (await extended.json()).data as { id: string; status: string; requestType: string };
+    expect(extension).toMatchObject({ status: "approved", requestType: "extend" });
+    const ext = await view(extension.id);
+    expect(ext.fulfilment).toBe("verified");
+    expect(ext.grants.map((g) => g.id)).toEqual([eveGrant.id]);
+
+    // The end date comes: one removal task, however often the sweep runs.
+    const removalTasks = async () => (await db.from("access_fulfilment_tasks").select("id, status").eq("tenant_id", tenantId).eq("removal_grant_id", eveGrant.id)).data ?? [];
+    await db.from("access_requests").update({ requested_expiry: new Date(Date.now() - 60_000).toISOString() }).eq("tenant_id", tenantId).eq("id", extension.id);
+    expect((await request.get(`/access/requests/${extension.id}`)).status()).toBe(200); // the page sweeps its organization
+    expect(await removalTasks()).toHaveLength(1);
+    await db.from("access_requests").update({ expiry_processed_at: null }).eq("tenant_id", tenantId).eq("id", extension.id);
+    expect((await request.get(`/access/requests/${extension.id}`)).status()).toBe(200);
+    const tasks = await removalTasks();
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0].status).toBe("open");
+    expect((await grantsOf(tenantId, accounts.eve.id)).find((g) => g.entitlementId === finance)?.revokedAt).toBeNull();
+
+    // Removed at the source: revoked by reconciliation, the task verified, and the ledger says it expired.
+    await replaceIntegrationObjects(integrationId, tenantId, "access_grant", BASE_GRANTS);
+    expect((await reconcileAccess(request)).grants).toMatchObject({ revoked: 1 });
+    expect((await removalTasks())[0].status).toBe("verified");
+    expect((await ledgerFor(tenantId, accounts.eve.id)).find((e) => e.entitlementId === finance)?.status).toBe("EXPIRED");
+  });
+
   test("another organization sees none of it", async ({ browser }) => {
     const other = await browser.newContext({ storageState: authFile("adminTwo") });
     const runs = await other.request.get(`/api/v1/access/applications/${appId}/access-reconciliations`);

@@ -19,7 +19,7 @@ import {
   type AssignmentStatus,
   type ItemStatus,
 } from "./packageRules";
-import { markGrantsFulfilled, pendAssignment, withdrawPendingGrants } from "./pendingGrants";
+import { markGrantsFulfilled, pendAssignment, queueRemoval, withdrawPendingGrants } from "./pendingGrants";
 
 /**
  * ACCESS-P0-20 — access packages (spec §12). Packages and their contents
@@ -657,7 +657,7 @@ async function endAssignment(tenantId: string, actorId: string | null, assignmen
     .maybeSingle();
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
   if (!data) return false;
-  const { data: items, error: itemsError } = await admin.from("access_package_assignment_items").select("id, status").eq("tenant_id", tenantId).eq("assignment_id", assignmentId);
+  const { data: items, error: itemsError } = await admin.from("access_package_assignment_items").select("id, status, application_id").eq("tenant_id", tenantId).eq("assignment_id", assignmentId);
   if (itemsError) throw new ApiError(500, "QUERY_FAILED", itemsError.message);
   for (const target of ["revoke_pending", "revoked"] as const) {
     const ids = (items ?? []).filter((i) => itemOnEnd(i.status as ItemStatus) === target && i.status !== target).map((i) => i.id as string);
@@ -665,6 +665,13 @@ async function endAssignment(tenantId: string, actorId: string | null, assignmen
   }
   // ACCESS-P0-28: access still waiting for fulfilment never existed; its pending grants are withdrawn.
   await withdrawPendingGrants(tenantId, (items ?? []).map((i) => i.id as string));
+  // ACCESS-P0-32: access that exists becomes removal work, confirmed when the source no longer lists it.
+  const appOf = new Map((items ?? []).map((i) => [i.id as string, i.application_id as string]));
+  const { data: held, error: heldError } = appOf.size
+    ? await admin.from("access_grants").select("id, access_package_assignment_item_id").eq("tenant_id", tenantId).in("access_package_assignment_item_id", [...appOf.keys()]).is("revoked_at", null)
+    : { data: [], error: null };
+  if (heldError) throw new ApiError(500, "QUERY_FAILED", heldError.message);
+  await queueRemoval(tenantId, (held ?? []).map((g) => ({ grantId: g.id as string, applicationId: appOf.get(g.access_package_assignment_item_id as string)! })));
   return true;
 }
 

@@ -98,6 +98,19 @@ export const CONFIG_SETTINGS = [
     unit: "days",
   },
   {
+    // ACCESS-P0-32: read by remindExpiringAccess() (modules/access-governance/accessExpiry.ts).
+    key: "access.expiryReminderDays",
+    section: "access",
+    label: "Remind before access ends",
+    help: "Time-bound access reminds the requester and the person it is for this long before its end date, once, with the way to extend it.",
+    permission: SETTINGS,
+    type: "int",
+    min: 1,
+    max: 30,
+    default: 7,
+    unit: "days",
+  },
+  {
     key: "agents.duplicateMatchPercent",
     section: "agents",
     label: "Possible duplicate at",

@@ -4,16 +4,20 @@ import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
+  getRequestCatalogItem,
   getRequestWithApprovals,
   grantsForRequest,
   listFulfilmentTasks,
   listRequestIdsAwaiting,
   requestProgress,
+  sweepAccessExpiry,
   sweepApprovalTimeouts,
   type ApprovalView,
 } from "@/modules/access-governance/service";
+import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { RecordProvenance, Badge, type BadgeTone, Card, CardBody, CardHeader } from "@/modules/ui";
 import { RequestActions } from "../RequestActions";
+import { ExtendForm } from "./ExtendForm";
 
 // ACCESS-P0-19 — one access request and its approval chain (spec §11.1
 // "see approval chain"): each stage, who it asks and why, who decided and
@@ -44,6 +48,13 @@ const FULFILMENT: Record<string, Record<string, { label: string; tone: BadgeTone
     pending_fulfilment: { label: "Approved · waiting for the account to be disabled", tone: "warning" },
     fulfilled_unverified: { label: "Disabled · not yet verified", tone: "warning" },
     verified: { label: "Disabled at the source", tone: "success" },
+  },
+  // ACCESS-P0-32: an extension changes nothing on the target; the access it keeps is already there.
+  extend: {
+    pending_fulfilment: { label: "Extended · the access is not yet at the source", tone: "warning" },
+    fulfilled_unverified: { label: "Extended · not yet verified", tone: "warning" },
+    verified: { label: "Extended", tone: "success" },
+    untracked: { label: "Approved · nothing left to extend", tone: "neutral" },
   },
 };
 const STEP: Record<string, { label: string; tone: BadgeTone }> = {
@@ -124,13 +135,14 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   const { id } = await params;
   const tenantId = ctx.tenantId!;
   const canApprove = ctx.permissions.includes("access.approve");
-  await sweepApprovalTimeouts(tenantId);
-  const [found, awaiting, provenance, grants, tasks] = await Promise.all([
+  await Promise.all([sweepApprovalTimeouts(tenantId), sweepAccessExpiry(tenantId)]);
+  const [found, awaiting, provenance, grants, tasks, me] = await Promise.all([
     getRequestWithApprovals(tenantId, id),
     listRequestIdsAwaiting(tenantId, { userId: ctx.userId, canApproveAsAccessManager: canApprove }),
     getRecordProvenance(tenantId, "access_requests", id),
     grantsForRequest(tenantId, id).catch(() => []),
     listFulfilmentTasks(tenantId, { requestId: id }).catch(() => []),
+    getIdentityForUser(tenantId, ctx.userId),
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
@@ -143,6 +155,20 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   const catalog = Boolean(r.subjectIdentityId);
   const canDecide = r.status === "pending" && (catalog ? awaiting.includes(r.id) : canApprove && !mine);
   const checks = r.policyResult?.checks ?? [];
+  // ACCESS-P0-32: time-bound access held through this request can be extended by whoever asked for it or holds it.
+  const progress = requestProgress(tasks, grants);
+  const extendable =
+    (r.requestType === "grant" || r.requestType === "extend") &&
+    (r.status === "approved" || r.status === "fulfilled") &&
+    r.requestedExpiry !== null &&
+    r.entitlementId !== null &&
+    r.subjectIdentityId !== null &&
+    r.applicationId !== null &&
+    progress !== "pending_fulfilment" &&
+    (mine || me?.id === r.subjectIdentityId) &&
+    ctx.permissions.includes("access.request");
+  const item = extendable ? await getRequestCatalogItem(tenantId, r.applicationId!) : null;
+  const maxDays = item?.entitlements.find((e) => e.id === r.entitlementId)?.policy?.maxDurationDays ?? null;
 
   return (
     <div className="space-y-5">
@@ -268,6 +294,11 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
                   {r.durationDays ? `${r.durationDays} days` : "No end date"}
                   {r.requestedExpiry ? ` · until ${when(r.requestedExpiry)}` : ""}
                 </dd>
+                {extendable ? (
+                  <div className="mt-2">
+                    <ExtendForm applicationId={r.applicationId!} entitlementId={r.entitlementId!} subjectIdentityId={r.subjectIdentityId!} maxDays={maxDays} />
+                  </div>
+                ) : null}
               </div>
               {checks.length ? (
                 <div>

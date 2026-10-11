@@ -1,6 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { refreshAccessLedgerForAllTenants, remindOverdueFulfilmentTasks, sweepApprovalTimeouts, sweepPackageExpiry } from "@/modules/access-governance/service";
+import {
+  refreshAccessLedgerForAllTenants,
+  remindExpiringAccess,
+  remindOverdueFulfilmentTasks,
+  sweepAccessExpiry,
+  sweepApprovalTimeouts,
+  sweepPackageExpiry,
+} from "@/modules/access-governance/service";
 
 /**
  * Access governance's daily sweep, wired to Vercel Cron via `vercel.json`;
@@ -12,7 +19,9 @@ import { refreshAccessLedgerForAllTenants, remindOverdueFulfilmentTasks, sweepAp
  *   granted becomes revocation work;
  * - ACCESS-P0-24: every organization's access ledger is recomputed, so an
  *   approval that expired overnight no longer shows as current;
- * - ACCESS-P0-29: overdue fulfilment tasks remind their owner, once a day.
+ * - ACCESS-P0-29: overdue fulfilment tasks remind their owner, once a day;
+ * - ACCESS-P0-32: access ending soon is reminded once; access whose end
+ *   date has come becomes one removal task per grant.
  * Each sweep filters every write by the row's own tenant. Signed-in views
  * also sweep their own tenant, so nothing shows as current past its time.
  */
@@ -29,8 +38,10 @@ export async function GET(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
   }
-  const [approvals, packages, fulfilment] = await Promise.all([sweepApprovalTimeouts(null), sweepPackageExpiry(null), remindOverdueFulfilmentTasks(null)]);
+  const [approvals, packages, expiry, expiring] = await Promise.all([sweepApprovalTimeouts(null), sweepPackageExpiry(null), sweepAccessExpiry(null), remindExpiringAccess(null)]);
+  // After the expiry sweeps, so the removal tasks they opened are counted as they stand.
+  const fulfilment = await remindOverdueFulfilmentTasks(null);
   // After the sweeps, so expiries they recorded are reflected.
   const ledger = await refreshAccessLedgerForAllTenants();
-  return NextResponse.json({ ok: true, data: { approvals, packages, fulfilment, ledger } });
+  return NextResponse.json({ ok: true, data: { approvals, packages, expiry, expiring, fulfilment, ledger } });
 }

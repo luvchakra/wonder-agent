@@ -56,7 +56,10 @@ export type NotificationType =
   | "privacy_deadline"
   // ACCESS-P0-29 (0122): approved access to fulfil on a target, sent to the
   // application's owner; again daily once overdue. Not mandatory (a preference).
-  | "fulfilment_task";
+  | "fulfilment_task"
+  // ACCESS-P0-32 (0124): access ends soon; sent to the requester and the
+  // person it is for, once, with a way to extend. Not mandatory (a preference).
+  | "access_expiring";
 
 /**
  * Every P0 notification type is mandatory — never suppressible via
