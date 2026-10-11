@@ -48,7 +48,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
 | QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
-| QA-P0-23 | Reconciliation suite (F1, #48) | Not Started |
+| QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Not Started |
 
 ---

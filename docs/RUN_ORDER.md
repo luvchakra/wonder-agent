@@ -455,3 +455,15 @@ The connection, application and account pages now together show and
 control every step: imports, what went missing, held runs, the post-sync
 chain, preview and apply of access, classification and last seen at source.
 QA-P0-23 (reconciliation suite) is next in F1.
+
+## 2026-10-11 — QA-P0-23: F1 reconciliation suite; F1 exit test passed
+
+`tests/e2e/f1-reconciliation.spec.ts` drives the F1 chain through the app's
+routes for a person, an owned and an unowned service account and an agent,
+on connector records seeded into staging. It passed locally (7 tests, plus
+sign-in setup). It found one defect, fixed in the same change: an
+application whose entitlements come from the connector could never pass
+onboarding validation, because its entitlements are only reconciled after
+promotion. Every F1 gating story is done and the exit test passed on seeded
+staging. INTEGRATION-P0-20 (does not gate) is next; FOUNDATION-P0-31 waits
+for D11.

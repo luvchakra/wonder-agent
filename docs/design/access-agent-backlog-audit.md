@@ -2344,3 +2344,20 @@ finding.
 service/shared types; a person match wins; agent linked by declared
 identifier and never made a service identity); `requestRules.test.ts` +1;
 full suite 1191/1191.
+
+### 2026-10-11 — Two fixes found by QA-P0-23
+
+- **Onboarding validation with connector entitlements.** "Entitlement model
+  discovered" counted only the application's WonderID entitlements. With
+  `entitlementSource: connector` those arrive only after promotion
+  (ACCESS-P0-27 reconciles a promoted application), so validation could
+  never pass. `onboarding.ts` now counts the larger of the application's
+  entitlements and the connector's staged entitlements for it
+  (`belongsToApplication`), read as the user under RLS. Simulation uses the
+  same count.
+- **Request refusal order.** `evaluateRequest` checks for an unowned
+  non-human subject first, before the policy, so the refusal names the real
+  reason.
+
+**Verified.** `tests/e2e/f1-reconciliation.spec.ts` 14/14 locally;
+`vitest run modules/access-governance` 222/222; typecheck clean.

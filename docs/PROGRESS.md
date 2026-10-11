@@ -14,18 +14,18 @@ Generated 2026-10-11 from 11 module backlogs.
 
 ## Overall
 
-**207 of 268 tracked stories complete — 77%**
+**208 of 268 tracked stories complete — 78%**
 
 ```
-███████████████████████████████░░░░░░░░░  77%
+███████████████████████████████░░░░░░░░░  78%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 207 |
+| Done | 208 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 32 |
+| Not Started | 31 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 26 | 3 | 0 | 6 | 35 | `█████████████░░░░░` 74% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 13 | 2 | 1 | 1 | 17 | `██████████████░░░░` 76% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 13 | 12 | 0 | 5 | 30 | `████████░░░░░░░░░░` 43% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 14 | 12 | 0 | 4 | 30 | `████████░░░░░░░░░░` 47% |
 
 ---
 
@@ -386,7 +386,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 13 done · 12 partial · 0 deferred · 5 not started (30 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 14 done · 12 partial · 0 deferred · 4 not started (30 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -418,6 +418,6 @@ and are deliberately excluded from the counts above.
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
 | QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
-| QA-P0-23 | Reconciliation suite (F1, #48) | Not Started |
+| QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Not Started |
 

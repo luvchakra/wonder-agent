@@ -114,12 +114,13 @@ export function isUnownedNonHuman(subject: { identityType: string; ownerIdentity
 
 export function evaluateRequest(c: RequestContext): RequestDecision {
   const checks: { check: string; result: string }[] = [];
+  // IDENTITY-P0-20: about the subject, whatever the policy says.
+  if (isUnownedNonHuman(c.subject)) return refuse(409, "SUBJECT_UNOWNED", UNOWNED_MESSAGE);
   if (!c.appActive) return refuse(409, "NOT_REQUESTABLE", "This application is not live yet; it is requestable once onboarding is promoted");
   if (!c.policy || !c.policy.requestable) return refuse(403, "NOT_REQUESTABLE", "No request policy makes this requestable");
   checks.push({ check: "policy", result: c.policy.name });
   if (c.subject.identityType === "AI_AGENT") return refuse(400, "VALIDATION_FAILED", "An AI agent's access is requested from the agent");
   if (c.subject.status !== "active") return refuse(409, "SUBJECT_INACTIVE", "Access can only be requested for an active identity");
-  if (isUnownedNonHuman(c.subject)) return refuse(409, "SUBJECT_UNOWNED", UNOWNED_MESSAGE);
 
   const self = c.requesterIdentityId !== null && c.requesterIdentityId === c.subject.id;
   if (self) {
