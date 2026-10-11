@@ -275,7 +275,7 @@ export async function startReconciliation(
     correlationId: run.id,
     metadata: { runId: run.id, trigger: run.trigger, mode: run.mode, dryRun: run.dryRun, records: records?.length ?? null },
   });
-  return { run, execute: () => executeReconciliation(tenantId, actorId, source, run.id, run.mode, records, run.dryRun) };
+  return { run, execute: async () => void (await executeReconciliation(tenantId, actorId, source, run.id, run.mode, records, run.dryRun)) };
 }
 
 async function loadIntegrationRecords(tenantId: string, integrationId: string): Promise<Record<string, unknown>[]> {
@@ -310,13 +310,13 @@ async function loadIntegrationRecords(tenantId: string, integrationId: string): 
  */
 export async function executeReconciliation(
   tenantId: string,
-  actorId: string,
+  actorId: string | null,
   source: IdentitySource,
   runId: string,
   mode: "full" | "partial",
   given: Record<string, unknown>[] | null,
   dryRun = false,
-): Promise<void> {
+): Promise<ReconciliationOutcome> {
   const supabase = supabaseServiceRole();
   const startedAt = new Date().toISOString();
   await supabase.from("identity_reconciliation_runs").update({ status: "running", started_at: startedAt }).eq("tenant_id", tenantId).eq("id", runId);
@@ -565,6 +565,63 @@ export async function executeReconciliation(
     correlationId: runId,
     metadata: { runId, status, dryRun, ...counts, guardTripped },
   });
+  return { runId, status, counts, guardTripped, error: status === "failed" ? (errors[errors.length - 1]?.message ?? "The run failed") : null };
+}
+
+/** What a reconciliation run ended with (INTEGRATION-P0-19 shows it on the sync job). */
+export type ReconciliationOutcome = {
+  runId: string;
+  status: ReconciliationRun["status"];
+  counts: { seen: number; invalid: number; created: number; updated: number; unchanged: number; pending: number; leavers: number; errors: number };
+  guardTripped: boolean;
+  error: string | null;
+};
+
+/**
+ * INTEGRATION-P0-19: the active identity sources that read this
+ * connection's staged identities, for the post-sync chain. Service role;
+ * `tenantId` is the connection's own (from the job row).
+ */
+export async function listSourcesReadingConnection(tenantId: string, integrationId: string): Promise<IdentitySource[]> {
+  const { data, error } = await supabaseServiceRole()
+    .from("identity_sources")
+    .select()
+    .eq("tenant_id", tenantId)
+    .eq("integration_id", integrationId)
+    .eq("template", "integration")
+    .eq("status", "active")
+    .order("priority")
+    .limit(50);
+  if (error) throw new Error(`reading the connection's identity sources: ${error.message}`);
+  return (data ?? []).filter((r) => r.tenant_id === tenantId).map(toSource);
+}
+
+/**
+ * INTEGRATION-P0-19: a full reconciliation of a source from its
+ * connection's staging, started by WonderID after a sync (no person).
+ * Queued and audited as the system, then run to the end; the outcome is
+ * returned, never thrown, so the chain can record it.
+ */
+export async function runSourceAfterSync(tenantId: string, source: IdentitySource, syncJobId: string): Promise<ReconciliationOutcome> {
+  const { data, error } = await supabaseServiceRole()
+    .from("identity_reconciliation_runs")
+    .insert({ tenant_id: tenantId, source_id: source.id, trigger: "integration", mode: "full", dry_run: false, created_by: null })
+    .select("id")
+    .single();
+  if (error || !data) {
+    return { runId: "", status: "failed", counts: { seen: 0, invalid: 0, created: 0, updated: 0, unchanged: 0, pending: 0, leavers: 0, errors: 0 }, guardTripped: false, error: "The run could not be queued" };
+  }
+  await writeAudit({
+    tenantId,
+    actorType: "system",
+    action: "identity_source.run_started",
+    objectType: "identity_source",
+    objectId: source.id,
+    outcome: "success",
+    correlationId: data.id,
+    metadata: { runId: data.id, trigger: "integration", mode: "full", dryRun: false, syncJobId },
+  });
+  return executeReconciliation(tenantId, null, source, data.id, "full", null, false);
 }
 
 // ---------------------------------------------------------------- pending correlations

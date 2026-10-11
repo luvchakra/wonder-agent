@@ -243,6 +243,13 @@ export function SourceForm({ source, integrations }: { source?: IdentitySource; 
         defaultValue={source?.leaverThresholdPercent ?? 20}
         hint="If more linked identities than this are missing, the run applies no leavers and asks for review"
       />
+      {(source?.template ?? template) === "integration" ? (
+        <SelectField label="Schedule" name="schedule" defaultValue={source?.schedule ?? "manual"} hint="Syncs the integration on this schedule, then runs this source">
+          <option value="manual">Manual</option>
+          <option value="daily">Daily</option>
+          <option value="hourly">Hourly</option>
+        </SelectField>
+      ) : null}
       {source ? (
         <SelectField label="Status" name="status" defaultValue={source.status}>
           <option value="active">Active</option>

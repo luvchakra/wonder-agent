@@ -5,7 +5,7 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentityType } from "@/lib/shared/types/agent-identity";
-import { getNormalizedObjects } from "@/modules/integrations/service";
+import { getNormalizedObjects, getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { getIdentity, getIdentityNames, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
 import { refreshAccessLedger } from "./ledger";
 import {
@@ -289,8 +289,53 @@ type LiveConfig = { integrationId: string | null; accountIdentifierField: string
  * the connected system changes.
  */
 export async function reconcileApplicationAccounts(tenantId: string, actorId: string, applicationId: string): Promise<ReconciliationRun> {
+  return reconcileAccounts(tenantId, actorId, applicationId, await supabaseServer(), getNormalizedObjects);
+}
+
+/**
+ * INTEGRATION-P0-19: the same reconciliation, run by WonderID itself after
+ * a connection's sync (scheduled or "run now", in the background, with no
+ * session). Service role, so `tenantId` must be the connection's own
+ * tenant, read from its row by the caller; every query below names it
+ * (§14). Recorded and audited as the system.
+ */
+export async function reconcileApplicationAccountsAsSystem(tenantId: string, applicationId: string): Promise<ReconciliationRun> {
+  return reconcileAccounts(tenantId, null, applicationId, supabaseServiceRole(), getNormalizedObjectsAsSystem);
+}
+
+/**
+ * INTEGRATION-P0-19: the applications whose live (promoted) configuration
+ * reconciles accounts against this connection, for the post-sync chain.
+ * Service role with the caller's tenant (the connection's own).
+ */
+export async function listApplicationsReconciledFrom(tenantId: string, integrationId: string): Promise<{ id: string; name: string }[]> {
+  const admin = supabaseServiceRole();
+  const { data, error } = await admin
+    .from("application_onboardings")
+    .select("application_id, promoted_config")
+    .eq("tenant_id", tenantId)
+    .not("promoted_config", "is", null)
+    .eq("promoted_config->>integrationId", integrationId)
+    .limit(500);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const ids = (data ?? []).map((r) => r.application_id as string);
+  if (!ids.length) return [];
+  const { data: apps, error: appsError } = await admin.from("applications").select("id, name").eq("tenant_id", tenantId).in("id", ids).order("name");
+  if (appsError) throw new ApiError(500, "QUERY_FAILED", appsError.message);
+  return (apps ?? []).map((a) => ({ id: a.id as string, name: a.name as string }));
+}
+
+type ReconcileClient = ReturnType<typeof supabaseServiceRole> | Awaited<ReturnType<typeof supabaseServer>>;
+
+async function reconcileAccounts(
+  tenantId: string,
+  actorId: string | null,
+  applicationId: string,
+  supabase: ReconcileClient,
+  readObjects: typeof getNormalizedObjects,
+): Promise<ReconciliationRun> {
   if (!UUID_RE.test(applicationId)) throw new ApiError(404, "NOT_FOUND", "No such application");
-  const supabase = await supabaseServer();
+  const actorType = actorId ? "user" : "system";
   const { data: onboarding, error: onbError } = await supabase
     .from("application_onboardings")
     .select("promoted_config, promoted_hash")
@@ -319,7 +364,7 @@ export async function reconcileApplicationAccounts(tenantId: string, actorId: st
 
   try {
     const [objects, identities, existingRows] = await Promise.all([
-      getNormalizedObjects(tenantId, config.integrationId, "account"),
+      readObjects(tenantId, config.integrationId, "account"),
       listIdentitiesForCorrelation(tenantId, NON_AGENT_TYPES),
       supabase
         .from("accounts")
@@ -383,7 +428,7 @@ export async function reconcileApplicationAccounts(tenantId: string, actorId: st
       missing_identifier: c.missingIdentifier,
       not_in_source: c.notInSource,
     });
-    await writeAudit({ tenantId, actorId, actorType: "user", action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c } });
+    await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c } });
     // The ledger looks for the approval behind each account (ACCESS-P0-24); the daily sweep catches up if this fails.
     await refreshAccessLedger(tenantId).catch(() => undefined);
     return run;
@@ -391,7 +436,7 @@ export async function reconcileApplicationAccounts(tenantId: string, actorId: st
     // Record the failure truthfully (§17.5), then report it.
     const message = err instanceof Error ? err.message : "Reconciliation failed";
     const run = await record({ status: "failed", error: message.slice(0, 1000) }).catch(() => null);
-    await writeAudit({ tenantId, actorId, actorType: "user", action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "failure", metadata: { runId: run?.id ?? null, error: message.slice(0, 300) } });
+    await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "failure", metadata: { runId: run?.id ?? null, error: message.slice(0, 300) } });
     throw err;
   }
 }

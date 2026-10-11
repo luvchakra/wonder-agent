@@ -55,6 +55,8 @@ export function toSyncJob(row: any): IntegrationSyncJob {
     missingSummary: row.missing_summary ?? {},
     missingResolvedBy: row.missing_resolved_by ?? null,
     missingResolvedAt: row.missing_resolved_at ?? null,
+    pipeline: Array.isArray(row.pipeline) ? row.pipeline : [],
+    pipelineStatus: row.pipeline_status ?? "none",
   };
 }
 

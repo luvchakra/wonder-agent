@@ -11,6 +11,8 @@ import { toSyncJob } from "./mappers";
 import { createConnector } from "./registry";
 import { getDecryptedCredential } from "./credentials";
 import { openGateway, type GatewaySession } from "./gateway/gateway";
+import { planAfterSync, runPipeline } from "./syncPipeline";
+import { pipelineStatusOf, type ImportOutcome } from "./pipelineRules";
 import { heldKinds, kindCompleteness, missingStatusOf, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
 
 /**
@@ -279,6 +281,17 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     const missingSummary = finalStatus === "failed" ? {} : await markMissing(tenantId, jobId, jobRow.mode ?? "full", kindRuns);
     const missingStatus = missingStatusOf(missingSummary);
 
+    // INTEGRATION-P0-19: what follows the import (identity sources, then account reconciliation),
+    // saved with the import's result so the job never looks finished while it runs.
+    const importOutcome: ImportOutcome = {
+      mode: jobRow.mode ?? "full",
+      status: finalStatus,
+      kindsRead: [...kindRuns.keys()],
+      kindsFailed: [...kindRuns].filter(([, r]) => r.failed).map(([kind]) => kind),
+    };
+    const pipeline = await planAfterSync(tenantId, integration.id, importOutcome);
+    const pipelineStatus = pipelineStatusOf(pipeline, finalStatus);
+
     await supabase
       .from("integration_sync_jobs")
       .update({
@@ -289,6 +302,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
         errors,
         missing_status: missingStatus,
         missing_summary: missingSummary,
+        pipeline,
+        pipeline_status: pipelineStatus,
       })
       .eq("id", jobId);
 
@@ -315,6 +330,31 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
         referenceType: "integration_sync_job",
         referenceId: jobId,
       });
+    }
+
+    if (pipelineStatus === "running") {
+      const result = await runPipeline(tenantId, jobId, integration.id, pipeline, finalStatus);
+      await writeAudit({
+        tenantId,
+        actorType: "system",
+        action: "integration.pipeline_completed",
+        objectType: "integration_sync_job",
+        objectId: jobId,
+        outcome: result.status === "failed" ? "failure" : "success",
+        correlationId: jobRow.correlation_id,
+        metadata: { integrationId: integration.id, status: result.status, steps: result.steps },
+      });
+      if (result.status === "failed") {
+        const failed = result.steps.find((st) => st.status === "failed");
+        await notify({
+          tenantId,
+          type: "integration_failure",
+          title: `Update after sync failed: ${integration.name}`,
+          body: failed ? `${failed.name}: ${failed.reason ?? "failed"}. Later steps did not run.` : "A step after the import did not run.",
+          referenceType: "integration_sync_job",
+          referenceId: jobId,
+        });
+      }
     }
 
     // OPERATIONS-P0-02.2 — wired per that story's own instruction that

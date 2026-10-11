@@ -32,6 +32,19 @@ export function windowStart(schedule: ConnectionSchedule, now: Date): Date | nul
   return null;
 }
 
+/**
+ * INTEGRATION-P0-19: a connection runs as often as the most frequent of its
+ * own schedule and the schedules of the active identity sources reading it,
+ * since a source's run is the step after its connection's sync. Anything
+ * unrecognised counts as manual.
+ */
+export function effectiveSchedule(own: unknown, sourceSchedules: unknown[]): ConnectionSchedule {
+  const all = [own, ...sourceSchedules];
+  if (all.includes("hourly")) return "hourly";
+  if (all.includes("daily")) return "daily";
+  return "manual";
+}
+
 export type ScheduledConnection = { id: string; tenantId: string; schedule: string; status: string; driver: string | null };
 
 /**

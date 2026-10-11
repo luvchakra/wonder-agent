@@ -15,6 +15,8 @@ import { getConnectorConfiguration, type ConnectorConfiguration } from "@/module
 import { Suspense } from "react";
 import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
 import { ConnectorFilesCard } from "./ConnectorFilesCard";
+import { RunAutoRefresh } from "../sources/SourceForms";
+import type { SyncPipelineStep } from "@/lib/shared/types/integrations";
 
 const JOB_STATUS_TONE: Record<string, BadgeTone> = {
   queued: "neutral",
@@ -23,6 +25,20 @@ const JOB_STATUS_TONE: Record<string, BadgeTone> = {
   failed: "danger",
   partial: "warning",
 };
+
+/** INTEGRATION-P0-19: how a step after the import ended, in a line. */
+function stepLine(step: SyncPipelineStep): string {
+  const what = step.kind === "identities" ? `Identities from ${step.name}` : `Accounts of ${step.name}`;
+  const c = step.counts ?? {};
+  const counts =
+    step.kind === "identities"
+      ? [`${c.created ?? 0} created`, `${c.updated ?? 0} updated`, c.leavers ? `${c.leavers} leavers` : "", c.pending ? `${c.pending} to review` : ""]
+      : [`${c.created ?? 0} new`, `${c.updated ?? 0} updated`, c.orphan ? `${c.orphan} orphan` : "", c.notInSource ? `${c.notInSource} gone from source` : ""];
+  const detail = step.status === "succeeded" || step.status === "partial" ? counts.filter(Boolean).join(", ") : (step.reason ?? "");
+  return detail ? `${what}: ${detail}` : what;
+}
+
+const STEP_TONE: Record<string, BadgeTone> = { ...JOB_STATUS_TONE, pending: "neutral", skipped: "danger" };
 
 /** INTEGRATION-P0-18: the result of approving or discarding a held run. */
 const HELD_OUTCOME: Record<string, string> = {
@@ -271,13 +287,29 @@ export default async function IntegrationDetailPage({
                 <EmptyState title="No sync jobs yet" />
               ) : (
                 <ul className="space-y-1 text-sm text-muted-foreground">
-                  {jobs.map((j) => (
-                    <li key={j.id} className="flex items-center gap-2">
-                      <Badge tone={JOB_STATUS_TONE[j.status] ?? "neutral"}>{j.status}</Badge>
-                      <span>
-                        {j.createdAt}: processed {j.recordsProcessed}, failed {j.recordsFailed}
-                        {j.errors.length > 0 ? ` (${j.errors.length} error(s))` : ""}
-                      </span>
+                  <RunAutoRefresh active={jobs.some((j) => j.status === "queued" || j.status === "running" || j.pipelineStatus === "running")} />
+                  {jobs.map((j, index) => (
+                    <li key={j.id}>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge tone={JOB_STATUS_TONE[j.status] ?? "neutral"}>{j.status}</Badge>
+                        <span>
+                          {j.createdAt}: processed {j.recordsProcessed}, failed {j.recordsFailed}
+                          {j.errors.length > 0 ? ` (${j.errors.length} error(s))` : ""}
+                        </span>
+                        {j.pipelineStatus !== "none" ? (
+                          <Badge tone={STEP_TONE[j.pipelineStatus] ?? "neutral"}>then {j.pipelineStatus}</Badge>
+                        ) : null}
+                      </div>
+                      {index === 0 && j.pipeline.length > 0 ? (
+                        <ol className="mt-1 space-y-0.5 pl-4">
+                          {j.pipeline.map((step, i) => (
+                            <li key={`${step.kind}-${step.targetId}-${i}`} className="flex flex-wrap items-center gap-2">
+                              <Badge tone={STEP_TONE[step.status] ?? "neutral"}>{step.status}</Badge>
+                              <span>{stepLine(step)}</span>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : null}
                     </li>
                   ))}
                 </ul>

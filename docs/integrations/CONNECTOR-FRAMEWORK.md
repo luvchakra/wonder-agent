@@ -363,6 +363,35 @@ not imported, and refreshes the page's list.
 sent or imported through the hosted app is limited to that; a file fetched
 from an address can be 10 MB.
 
+## After a sync (INTEGRATION-P0-19)
+
+A full sync does not stop at staging. When its import ends, the same job
+carries the data on, in order:
+
+1. **Identities.** Each active identity source that reads the connection
+   (template "integration") runs a full reconciliation from the
+   connection's staged identities: create, update, link, leavers under the
+   source's own guard.
+2. **Accounts.** Each application whose live onboarding configuration names
+   the connection reconciles its accounts (Access,
+   `reconcileApplicationAccountsAsSystem`).
+
+Entitlements and access grants join this chain with ACCESS-P0-27.
+
+The job records each step in `pipeline` (status, its run record, counts,
+and the reason it failed or was skipped) and the chain in
+`pipeline_status` (`none`, `running`, `succeeded`, `partial`, `failed`). A
+failed step skips the steps after it, and the chain is then failed and the
+organization notified ("Update after sync failed"). A failed import skips
+the whole chain. A partial run, such as an object-page import, has no
+chain. The connection page shows the newest job's steps and refreshes while
+one runs. "Run sync now" runs the same chain in the background. Audit:
+`integration.pipeline_completed`.
+
+A connection runs as often as the most frequent of its own schedule and the
+schedules of the active identity sources reading it, so setting a source to
+daily syncs its connection daily, and the source runs after it.
+
 ## Removed at the source (INTEGRATION-P0-18)
 
 A sync only ever adds and updates staged objects; it never deletes one. When

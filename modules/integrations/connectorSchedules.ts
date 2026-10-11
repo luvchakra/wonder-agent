@@ -6,7 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { connectionDriver } from "./framework/engine";
 import { deleteConnectorFiles, listFilesForRetention } from "./framework/files";
 import { createSystemSyncJob, runSyncJob } from "./syncJobs";
-import { dueConnections, filesToPurge, isConnectionSchedule, type ConnectionSchedule, type ScheduledConnection } from "./connectorScheduleRules";
+import { dueConnections, effectiveSchedule, filesToPurge, isConnectionSchedule, type ConnectionSchedule, type ScheduledConnection } from "./connectorScheduleRules";
 
 /**
  * Connection schedules (integrations.schedule, migration 0111) and the
@@ -64,19 +64,37 @@ export async function runScheduledSyncs(now = new Date(), opts: { budgetMs?: num
   const budgetMs = opts.budgetMs ?? 240_000;
   const supabase = supabaseServiceRole();
 
-  const { data: rows, error } = await supabase
-    .from("integrations")
-    .select("id, tenant_id, schedule, status, config")
-    .eq("integration_type_id", "connector")
+  // INTEGRATION-P0-19: active identity sources with a schedule make the connection they read due too.
+  const { data: sourceRows, error: sourcesError } = await supabase
+    .from("identity_sources")
+    .select("tenant_id, integration_id, schedule")
+    .eq("template", "integration")
+    .eq("status", "active")
     .neq("schedule", "manual")
-    .neq("status", "disabled")
-    .order("id")
+    .not("integration_id", "is", null)
     .limit(2000);
-  if (error) throw new Error("scheduled connections could not be listed");
-  const connections: ScheduledConnection[] = (rows ?? []).map((r: { id: string; tenant_id: string; schedule: string; status: string; config: Record<string, unknown> | null }) => ({
+  if (sourcesError) throw new Error("scheduled identity sources could not be listed");
+  const sourceSchedules = new Map<string, { tenantId: string; schedule: string }[]>();
+  for (const r of (sourceRows ?? []) as { tenant_id: string; integration_id: string; schedule: string }[]) {
+    sourceSchedules.set(r.integration_id, [...(sourceSchedules.get(r.integration_id) ?? []), { tenantId: r.tenant_id, schedule: r.schedule }]);
+  }
+
+  type ConnectionRow = { id: string; tenant_id: string; schedule: string; status: string; config: Record<string, unknown> | null };
+  const select = "id, tenant_id, schedule, status, config";
+  const [own, viaSources] = await Promise.all([
+    supabase.from("integrations").select(select).eq("integration_type_id", "connector").neq("schedule", "manual").neq("status", "disabled").order("id").limit(2000),
+    sourceSchedules.size
+      ? supabase.from("integrations").select(select).eq("integration_type_id", "connector").neq("status", "disabled").in("id", [...sourceSchedules.keys()].slice(0, 500))
+      : Promise.resolve({ data: [] as ConnectionRow[], error: null }),
+  ]);
+  if (own.error || viaSources.error) throw new Error("scheduled connections could not be listed");
+  const byId = new Map<string, ConnectionRow>();
+  for (const r of [...((own.data ?? []) as ConnectionRow[]), ...((viaSources.data ?? []) as ConnectionRow[])]) byId.set(r.id, r);
+  const connections: ScheduledConnection[] = [...byId.values()].map((r) => ({
     id: r.id,
     tenantId: r.tenant_id,
-    schedule: r.schedule,
+    // A source counts only for a connection of its own tenant.
+    schedule: effectiveSchedule(r.schedule, (sourceSchedules.get(r.id) ?? []).filter((x) => x.tenantId === r.tenant_id).map((x) => x.schedule)),
     status: r.status,
     driver: connectionDriver(r.config ?? {}),
   }));

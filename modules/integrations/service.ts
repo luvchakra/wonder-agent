@@ -23,7 +23,7 @@ export {
 } from "./integrations";
 export { setCredential } from "./credentials";
 export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs, listLatestCompletedSyncStarts, resolveHeldMissing } from "./syncJobs";
-export { getNormalizedObjects, getNormalizedObjectsForTenant } from "./objects";
+export { getNormalizedObjects, getNormalizedObjectsAsSystem, getNormalizedObjectsForTenant } from "./objects";
 export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";
 export { rotateReceiverSecret, getReceiverStatus } from "./framework/receive";

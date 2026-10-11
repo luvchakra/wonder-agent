@@ -98,6 +98,22 @@ export type SyncJobStatus = "queued" | "running" | "succeeded" | "failed" | "par
 export type SyncJobMode = "full" | "incremental" | "partial";
 export type SyncJobMissingStatus = "none" | "applied" | "held" | "approved" | "discarded";
 
+/** INTEGRATION-P0-19: one step after a sync's import (identity promotion or account reconciliation). */
+export type SyncPipelineStepStatus = "pending" | "running" | "succeeded" | "partial" | "failed" | "skipped";
+export type SyncPipelineStatus = "none" | "running" | "succeeded" | "partial" | "failed";
+export type SyncPipelineStep = {
+  kind: "identities" | "accounts";
+  /** The identity source or application the step works on. */
+  targetId: string;
+  name: string;
+  status: SyncPipelineStepStatus;
+  /** The step's own run record (identity_reconciliation_runs / account_reconciliation_runs). */
+  runId?: string;
+  counts?: Record<string, number>;
+  /** Why the step failed or was skipped. */
+  reason?: string;
+};
+
 export type IntegrationSyncJob = {
   id: string;
   tenantId: string;
@@ -118,6 +134,8 @@ export type IntegrationSyncJob = {
   missingSummary: Record<string, Record<string, unknown>>;
   missingResolvedBy: string | null;
   missingResolvedAt: string | null;
+  pipeline: SyncPipelineStep[];
+  pipelineStatus: SyncPipelineStatus;
 };
 
 export type IntegrationObjectType =

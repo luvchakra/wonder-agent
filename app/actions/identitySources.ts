@@ -38,6 +38,7 @@ function sourceFields(formData: FormData) {
     correlationRules: String(formData.get("correlationRules") ?? "[]"),
     leaverStrategy: formData.get("leaverStrategy") ?? undefined,
     leaverThresholdPercent: formData.get("leaverThresholdPercent") ?? undefined,
+    schedule: formData.get("schedule") ?? undefined,
     status: formData.get("status") ?? undefined,
   };
 }
