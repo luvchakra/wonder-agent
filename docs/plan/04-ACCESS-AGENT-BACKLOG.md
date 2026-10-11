@@ -44,7 +44,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |
-| ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Not Started |
+| ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Done — 2026-10-11: migration 0119 (isolation SQL 10/10); preview then apply-exactly-that on the application page and API; runs after every full sync |
 | ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Not Started |
 | ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Not Started |
 | ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Not Started |

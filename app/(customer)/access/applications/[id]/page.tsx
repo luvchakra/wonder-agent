@@ -10,7 +10,7 @@ import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, KpiCar
 import { ApplicationForm } from "../ApplicationForm";
 import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../labels";
 import { LifecycleForm } from "./onboarding/OnboardingForms";
-import { ReconcileAccountsForm } from "../../accounts/AccountForms";
+import { ReconcileAccessForm, ReconcileAccountsForm } from "../../accounts/AccountForms";
 
 // ACCESS-P0-15 — one application: catalog details, owners, classification,
 // connector, and the access it holds. ACCESS-P0-16 adds its onboarding and
@@ -216,6 +216,9 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                 applicationId={id}
                 disabledReason={onboarding?.promotedAt ? null : "Promote an onboarding configuration first"}
               />
+            ) : null}
+            {canManage && onboarding?.promotedAt && onboarding.config.entitlementSource === "connector" ? (
+              <ReconcileAccessForm applicationId={id} disabledReason={null} />
             ) : null}
           </CardBody>
         </Card>

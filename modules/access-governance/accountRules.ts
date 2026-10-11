@@ -34,6 +34,15 @@ function read(raw: Record<string, unknown>, path: string): unknown {
 
 const text = (v: unknown) => (v === undefined || v === null ? "" : String(v).trim());
 
+/**
+ * The account a source record is, as reconciliation keys it: the value of
+ * the promoted configuration's identifier field (ACCESS-P0-27 maps a
+ * connector's grants to accounts with the same rule). Empty when missing.
+ */
+export function accountRefOf(raw: Record<string, unknown>, identifierField: string): string {
+  return text(read(raw, identifierField));
+}
+
 function firstDate(raw: Record<string, unknown>, keys: string[]): string | null {
   for (const k of keys) {
     const v = read(raw, k);
@@ -126,7 +135,7 @@ export function planReconciliation(input: {
   const nowIso = input.now.toISOString();
 
   for (const raw of input.sourceAccounts) {
-    const ref = text(read(raw, input.identifierField));
+    const ref = accountRefOf(raw, input.identifierField);
     if (!ref) {
       counts.missingIdentifier++;
       continue;

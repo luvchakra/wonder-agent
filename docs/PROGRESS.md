@@ -14,7 +14,7 @@ Generated 2026-10-11 from 11 module backlogs.
 
 ## Overall
 
-**203 of 268 tracked stories complete — 76%**
+**204 of 268 tracked stories complete — 76%**
 
 ```
 ██████████████████████████████░░░░░░░░░░  76%
@@ -22,10 +22,10 @@ Generated 2026-10-11 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 203 |
+| Done | 204 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 36 |
+| Not Started | 35 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -41,7 +41,7 @@ and are deliberately excluded from the counts above.
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 3 | 0 | 4 | 45 | `███████████████░░░` 84% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 17 | 2 | 0 | 2 | 21 | `███████████████░░░` 81% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 22 | 3 | 0 | 2 | 27 | `███████████████░░░` 81% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 23 | 0 | 0 | 10 | 33 | `█████████████░░░░░` 70% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 24 | 0 | 0 | 9 | 33 | `█████████████░░░░░` 73% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
@@ -178,7 +178,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 23 done · 0 partial · 0 deferred · 10 not started (33 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 24 done · 0 partial · 0 deferred · 9 not started (33 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -209,7 +209,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |
-| ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Not Started |
+| ACCESS-P0-27 | Entitlement and access-grant reconciliation from connectors: preview, apply, removed at source (F1, #44) | Done — 2026-10-11: migration 0119 (isolation SQL 10/10); preview then apply-exactly-that on the application page and API; runs after every full sync |
 | ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Not Started |
 | ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Not Started |
 | ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Not Started |

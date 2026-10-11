@@ -77,7 +77,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
       (from, to) =>
         admin
           .from("access_grants")
-          .select("id, tenant_id, account_id, entitlement_id, source_integration_id, granted_at, revoked_at")
+          .select("id, tenant_id, account_id, entitlement_id, source_integration_id, granted_at, revoked_at, missing_from_source_at")
           .eq("tenant_id", tenantId)
           .in("account_id", ids)
           .order("id")
@@ -127,7 +127,8 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
       revokedAt: (g.revoked_at as string | null) ?? null,
       lastSeenAt: (a.last_seen_at as string | null) ?? null,
       lastUsedAt: (a.last_used_at as string | null) ?? null,
-      missingFromSourceAt: (a.missing_from_source_at as string | null) ?? null,
+      // ACCESS-P0-27: the grant gone from the source, or its whole account.
+      missingFromSourceAt: (g.missing_from_source_at as string | null) ?? (a.missing_from_source_at as string | null) ?? null,
     });
   }
   return rels;

@@ -35,8 +35,13 @@ vi.mock("./identitySources", () => ({
     error: sourceOutcome.error,
   })),
 }));
+const accessCalls: { appId: string; opts: unknown }[] = [];
 vi.mock("@/modules/access-governance/service", () => ({
-  listApplicationsReconciledFrom: vi.fn(async () => [{ id: "a1", name: "SAP" }]),
+  reconcileApplicationAccessAsSystem: vi.fn(async (_t: string, appId: string, opts: unknown) => {
+    accessCalls.push({ appId, opts });
+    return { id: "acr1", status: "succeeded", error: null, counts: { entitlements: { added: 2, changed: 0, removed: 1 }, grants: { added: 5, removed: 1, restored: 0, unresolved: 0 } } };
+  }),
+  listApplicationsReconciledFrom: vi.fn(async () => [{ id: "a1", name: "SAP", entitlementsFromConnector: true }]),
   reconcileApplicationAccountsAsSystem: vi.fn(async (_t: string, appId: string) => {
     accountCalls.push(appId);
     if (accountsThrow) throw new Error("connector unreachable");
@@ -93,10 +98,19 @@ describe("runPipeline", () => {
   });
 });
 
+describe("the access step (ACCESS-P0-27)", () => {
+  it("runs a full access reconciliation for the application as part of this sync job", async () => {
+    accessCalls.length = 0;
+    const result = await runPipeline("t1", "j1", "c1", [{ kind: "access", targetId: "a1", name: "SAP", status: "pending" }], "succeeded");
+    expect(accessCalls).toEqual([{ appId: "a1", opts: { mode: "full", syncJobId: "j1" } }]);
+    expect(result.steps[0]).toMatchObject({ status: "succeeded", runId: "acr1", counts: { entitlementsAdded: 2, grantsAdded: 5, grantsRemoved: 1 } });
+  });
+});
+
 describe("planAfterSync", () => {
   it("plans from the connection's sources and onboarded applications", async () => {
-    const steps = await planAfterSync("t1", "c1", { mode: "full", status: "succeeded", kindsRead: ["identity", "account"], kindsFailed: [] });
-    expect(steps.map((s) => `${s.kind}:${s.targetId}`)).toEqual(["identities:s1", "accounts:a1"]);
+    const steps = await planAfterSync("t1", "c1", { mode: "full", status: "succeeded", kindsRead: ["identity", "account", "access_grant"], kindsFailed: [] });
+    expect(steps.map((s) => `${s.kind}:${s.targetId}`)).toEqual(["identities:s1", "accounts:a1", "access:a1"]);
   });
 
   it("reports a failure to find the steps instead of planning nothing", async () => {

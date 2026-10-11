@@ -2,7 +2,8 @@
  * INTEGRATION-P0-19 — pure rules (no I/O) for the chain that follows a
  * sync: import → promotion of identities (the identity sources reading the
  * connection) → reconciliation of accounts (the applications onboarded on
- * it). syncPipeline.ts runs it and records every step on the sync job.
+ * it) → their entitlements and grants, for applications whose entitlements
+ * come from the connector (ACCESS-P0-27). syncPipeline.ts runs it and records every step on the sync job.
  *
  * Steps run in order. A step that fails stops the chain: every later step
  * is recorded as skipped with the reason, and the chain is failed, never
@@ -29,7 +30,7 @@ export type ImportOutcome = {
 export function planPipeline(
   outcome: ImportOutcome,
   sources: { id: string; name: string }[],
-  applications: { id: string; name: string }[],
+  applications: { id: string; name: string; entitlementsFromConnector?: boolean }[],
 ): PipelineStep[] {
   // An object-page import already applied its rows; nothing is promoted from a partial run.
   if (outcome.mode !== "full") return [];
@@ -39,6 +40,10 @@ export function planPipeline(
   }
   if (outcome.kindsRead.includes("account")) {
     for (const a of applications) steps.push({ kind: "accounts", targetId: a.id, name: a.name, status: "pending" });
+  }
+  // ACCESS-P0-27: entitlements and grants last, since grants name accounts.
+  if (outcome.kindsRead.includes("entitlement") || outcome.kindsRead.includes("access_grant")) {
+    for (const a of applications) if (a.entitlementsFromConnector) steps.push({ kind: "access", targetId: a.id, name: a.name, status: "pending" });
   }
   if (outcome.status === "failed" || outcome.kindsFailed.length > 0) {
     const reason = outcome.status === "failed" ? "the import failed" : `the import of ${outcome.kindsFailed.join(", ")} failed`;

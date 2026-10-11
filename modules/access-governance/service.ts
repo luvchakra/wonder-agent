@@ -142,3 +142,11 @@ export { checkEligibility as checkPackageEligibility, PACKAGE_IDENTITY_TYPES, CE
 // 2026-10-10 — CSV imports from the object pages (preview, then additive apply).
 export { previewAccessImport, applyAccessImport } from "./fileImport";
 export { ACCESS_IMPORT_KINDS, type AccessImportKind } from "./fileImportRules";
+export {
+  listAccessReconciliationRuns,
+  reconcileApplicationAccess,
+  reconcileApplicationAccessAsSystem,
+  type AccessReconciliationRun,
+  type AccessSamples,
+} from "./connectorAccess";
+export type { AccessCounts } from "./connectorAccessRules";

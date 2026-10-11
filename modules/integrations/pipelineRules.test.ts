@@ -14,6 +14,12 @@ describe("planPipeline", () => {
     ]);
   });
 
+  it("reconciles entitlements and grants last, only for applications that take them from the connector", () => {
+    const apps = [{ id: "a1", name: "SAP", entitlementsFromConnector: true }, { id: "a2", name: "Snowflake", entitlementsFromConnector: false }];
+    const steps = planPipeline({ ...ok, kindsRead: ["identity", "account", "entitlement", "access_grant"] }, SOURCES, apps);
+    expect(steps.map((s) => `${s.kind}:${s.targetId}`)).toEqual(["identities:s1", "accounts:a1", "accounts:a2", "access:a1"]);
+  });
+
   it("plans only for the kinds the connection read", () => {
     expect(planPipeline({ ...ok, kindsRead: ["account"] }, SOURCES, APPS).map((s) => s.kind)).toEqual(["accounts", "accounts"]);
     expect(planPipeline({ ...ok, kindsRead: ["entitlement"] }, SOURCES, APPS)).toEqual([]);

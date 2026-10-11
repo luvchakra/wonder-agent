@@ -375,8 +375,13 @@ carries the data on, in order:
 2. **Accounts.** Each application whose live onboarding configuration names
    the connection reconciles its accounts (Access,
    `reconcileApplicationAccountsAsSystem`).
-
-Entitlements and access grants join this chain with ACCESS-P0-27.
+3. **Entitlements and access** (ACCESS-P0-27). For each of those applications
+   whose entitlements come from the connector, its entitlements (matched by
+   the connection's id for them) and who holds which (account by the
+   identifier field, entitlement by the connection's id). What the
+   connection no longer lists is marked missing from the source, never
+   revoked; listed again, it is restored. The same reconciliation can be
+   previewed and applied on the application's page.
 
 The job records each step in `pipeline` (status, its run record, counts,
 and the reason it failed or was skipped) and the chain in

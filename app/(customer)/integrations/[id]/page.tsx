@@ -28,12 +28,20 @@ const JOB_STATUS_TONE: Record<string, BadgeTone> = {
 
 /** INTEGRATION-P0-19: how a step after the import ended, in a line. */
 function stepLine(step: SyncPipelineStep): string {
-  const what = step.kind === "identities" ? `Identities from ${step.name}` : `Accounts of ${step.name}`;
+  const what = step.kind === "identities" ? `Identities from ${step.name}` : step.kind === "access" ? `Access in ${step.name}` : `Accounts of ${step.name}`;
   const c = step.counts ?? {};
   const counts =
     step.kind === "identities"
       ? [`${c.created ?? 0} created`, `${c.updated ?? 0} updated`, c.leavers ? `${c.leavers} leavers` : "", c.pending ? `${c.pending} to review` : ""]
-      : [`${c.created ?? 0} new`, `${c.updated ?? 0} updated`, c.orphan ? `${c.orphan} orphan` : "", c.notInSource ? `${c.notInSource} gone from source` : ""];
+      : step.kind === "access"
+        ? [
+            `${c.entitlementsAdded ?? 0} entitlements added`,
+            `${c.grantsAdded ?? 0} grants added`,
+            c.grantsRemoved ? `${c.grantsRemoved} grants gone from source` : "",
+            c.grantsRestored ? `${c.grantsRestored} restored` : "",
+            c.grantsUnresolved ? `${c.grantsUnresolved} unmatched` : "",
+          ]
+        : [`${c.created ?? 0} new`, `${c.updated ?? 0} updated`, c.orphan ? `${c.orphan} orphan` : "", c.notInSource ? `${c.notInSource} gone from source` : ""];
   const detail = step.status === "succeeded" || step.status === "partial" ? counts.filter(Boolean).join(", ") : (step.reason ?? "");
   return detail ? `${what}: ${detail}` : what;
 }
