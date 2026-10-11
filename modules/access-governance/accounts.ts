@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentityType } from "@/lib/shared/types/agent-identity";
 import { getNormalizedObjects, getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { getIdentity, getIdentityNames, listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
-import { refreshAccessLedger } from "./ledger";
+import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
 import {
   dormantCutoff,
   isDormant,
@@ -433,6 +433,8 @@ async function reconcileAccounts(
       not_in_source: c.notInSource,
     });
     await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c } });
+    // ACCESS-P0-25: the first reconciliation is the baseline; what it found is legacy, anything later without approval is rogue.
+    await ensureAccessBaseline(tenantId, applicationId, "accounts", run.id);
     // The ledger looks for the approval behind each account (ACCESS-P0-24); the daily sweep catches up if this fails.
     await refreshAccessLedger(tenantId).catch(() => undefined);
     return run;

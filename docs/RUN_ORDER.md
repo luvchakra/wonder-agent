@@ -430,3 +430,12 @@ apply on the application page or after every full sync. A grant gone from
 the source is marked, never revoked, and returns if it reappears, with
 ledger events either way. ACCESS-P0-25 (classification and drift findings)
 is next in F1.
+
+## 2026-10-11 — ACCESS-P0-25: legacy, authorized, unproven, rogue
+
+Each application now has a baseline from its first reconciliation (migration
+0120). Imported access present then is legacy; later access with no WonderID
+approval is rogue and gets one Risk finding, resolved when an approval
+appears or the access goes. The classification is shown in the ledger and
+on the account page. CLAUDE.md §3 also gained the owner's simplicity rules.
+IDENTITY-P0-20 is next in F1.

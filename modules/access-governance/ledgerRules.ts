@@ -8,8 +8,16 @@
  * application itself) or one entitlement of an account. Evidence is a
  * WonderID record only: an approved request, a fulfilled access-package
  * item, or an administrator's grant recorded in the audit trail. Without
- * one the access is UNPROVEN, never filled in (spec §18, H5). ROGUE and
- * LEGACY_EXCEPTION wait for ACCESS-P0-25 and the owner's go-live cut-off.
+ * one the access is UNPROVEN, never filled in (spec §18, H5).
+ *
+ * ACCESS-P0-25: access a connection or file reported, with no evidence, is
+ * classified against the application's baseline (the first reconciliation
+ * of its accounts, or of its entitlements and access):
+ * - LEGACY_EXCEPTION: present at the baseline. Granted before WonderID
+ *   governed the application, so never called malicious.
+ * - ROGUE: first seen after the baseline. It appeared on the target outside
+ *   WonderID; Risk raises a finding for it.
+ * - UNPROVEN: no baseline yet, or not reported by a connection or file.
  *
  * Status describes the authorization behind the access:
  * - VALID: current evidence;
@@ -53,6 +61,8 @@ export type LedgerRelationship = {
   lastSeenAt: string | null;
   lastUsedAt: string | null;
   missingFromSourceAt: string | null;
+  /** ACCESS-P0-25: the application's baseline for this kind of relationship (accounts, or entitlements and access); null before one exists. */
+  baselineAt?: string | null;
 };
 
 export type RequestEvidence = {
@@ -189,9 +199,10 @@ export function ledgerEntry(rel: LedgerRelationship, evidence: LedgerEvidence, n
 
   candidates.sort((a, b) => RANK[a.status] - RANK[b.status] || (b.approvedAt ?? "").localeCompare(a.approvedAt ?? ""));
   const reported = rel.sourceIntegrationId !== null || rel.reconciled;
+  const unproven = classifyUnproven(rel, reported);
   const best: Candidate = candidates[0] ?? {
-    source: reported ? "IMPORT" : "UNKNOWN",
-    status: "UNPROVEN",
+    source: unproven.source,
+    status: unproven.status,
     requestId: null,
     accessPackageAssignmentId: null,
     approvedBy: null,
@@ -217,6 +228,18 @@ export function ledgerEntry(rel: LedgerRelationship, evidence: LedgerEvidence, n
     lastUsedAt: rel.lastUsedAt,
     missingFromSourceAt: rel.missingFromSourceAt,
   };
+}
+
+/** ACCESS-P0-25: reported access with no evidence, against the application's baseline. */
+export function classifyUnproven(
+  rel: Pick<LedgerRelationship, "firstSeenAt" | "baselineAt">,
+  reported: boolean,
+): { status: LedgerStatus; source: LedgerSource } {
+  if (!reported) return { status: "UNPROVEN", source: "UNKNOWN" };
+  if (!rel.baselineAt) return { status: "UNPROVEN", source: "IMPORT" };
+  return Date.parse(rel.firstSeenAt) <= Date.parse(rel.baselineAt)
+    ? { status: "LEGACY_EXCEPTION", source: "LEGACY_MIGRATION" }
+    : { status: "ROGUE", source: "IMPORT" };
 }
 
 export type LedgerEventType = "recorded" | "changed" | "missing_from_source" | "seen_again";

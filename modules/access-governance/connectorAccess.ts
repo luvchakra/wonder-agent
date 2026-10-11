@@ -6,7 +6,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { accountRefOf } from "./accountRules";
-import { refreshAccessLedger } from "./ledger";
+import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
 import {
   belongsToApplication,
   countsOf,
@@ -224,6 +224,8 @@ async function reconcileAccess(
       correlationId: opts.syncJobId ?? run.id,
       metadata: { runId: run.id, integrationId, mode: opts.mode, previewRunId: opts.previewRunId, syncJobId: opts.syncJobId, counts },
     });
+    // ACCESS-P0-25: the first apply is the baseline for this application's entitlements and access.
+    await ensureAccessBaseline(tenantId, applicationId, "access", run.id);
     // Removals and returns become ledger events; the daily sweep catches up if this fails.
     await refreshAccessLedger(tenantId).catch(() => undefined);
     return run;

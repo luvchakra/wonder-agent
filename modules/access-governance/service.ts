@@ -18,7 +18,7 @@ export {
   type EntitlementWithContext,
 } from "./entitlements";
 export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createManualAccessGrant, revokeAccessGrant, getAccessGrant } from "./grants";
-export { refreshAccessLedger, refreshAccessLedgerForAllTenants, getIdentityAccessLedger, type IdentityAccessEntry } from "./ledger";
+export { refreshAccessLedger, refreshAccessLedgerForAllTenants, getIdentityAccessLedger, getAccountAccessLedger, type IdentityAccessEntry } from "./ledger";
 export { LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerSource, type LedgerStatus } from "./ledgerRules";
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
 export {

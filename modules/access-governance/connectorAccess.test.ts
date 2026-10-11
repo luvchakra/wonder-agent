@@ -50,7 +50,7 @@ vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ from: 
 const audits: Row[] = [];
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: vi.fn(async (e: Row) => void audits.push(e)) }));
 const ledger = vi.fn(async () => ({ recorded: 0, changed: 0 }));
-vi.mock("./ledger", () => ({ refreshAccessLedger: () => ledger() }));
+vi.mock("./ledger", () => ({ refreshAccessLedger: () => ledger(), ensureAccessBaseline: vi.fn(async () => undefined) }));
 const staged: Record<string, { externalId: string; raw: Row; normalized: Row }[]> = {};
 vi.mock("@/modules/integrations/service", () => ({
   getNormalizedObjectsAsSystem: vi.fn(async (_t: string, _i: string, kind: string) => staged[kind] ?? []),

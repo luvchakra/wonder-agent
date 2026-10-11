@@ -70,7 +70,8 @@ export async function notifyForFinding(tenantId: string, findingId: string, cate
  */
 export async function getFindings(tenantId: string, filter: FindingFilter = {}): Promise<RiskFinding[]> {
   const supabase = await supabaseServer();
-  let query = supabase.from("risk_findings").select().eq("tenant_id", tenantId).order("created_at", { ascending: false });
+  // ACCESS-P0-25: access findings (no agent) have their own reader, accessFindings.ts.
+  let query = supabase.from("risk_findings").select().eq("tenant_id", tenantId).not("agent_id", "is", null).order("created_at", { ascending: false });
   if (filter.agentId) query = query.eq("agent_id", filter.agentId);
   if (filter.status) query = query.eq("status", filter.status);
   if (filter.category) query = query.eq("category", filter.category);
@@ -82,7 +83,7 @@ export async function getFindings(tenantId: string, filter: FindingFilter = {}):
 
 export async function getFinding(tenantId: string, findingId: string): Promise<RiskFinding | null> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("risk_findings").select().eq("tenant_id", tenantId).eq("id", findingId).maybeSingle();
+  const { data, error } = await supabase.from("risk_findings").select().eq("tenant_id", tenantId).eq("id", findingId).not("agent_id", "is", null).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!data) return null;
 
@@ -323,7 +324,7 @@ export async function remediateFinding(
   // PLATFORM-P0-12: remediation is a flag-gated capability (on by default).
   await requireFeature(tenantId, "remediation");
   const supabase = supabaseServiceRole();
-  const { data: findingRow, error } = await supabase.from("risk_findings").select().eq("id", findingId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: findingRow, error } = await supabase.from("risk_findings").select().eq("id", findingId).eq("tenant_id", tenantId).not("agent_id", "is", null).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!findingRow) throw new ApiError(404, "FINDING_NOT_FOUND");
 
@@ -423,6 +424,7 @@ export async function resolveFinding(
     })
     .eq("id", findingId)
     .eq("tenant_id", tenantId)
+    .not("agent_id", "is", null)
     .select()
     .maybeSingle();
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
@@ -469,6 +471,7 @@ export async function transitionFindingStatus(
     .select("status")
     .eq("id", findingId)
     .eq("tenant_id", tenantId)
+    .not("agent_id", "is", null)
     .maybeSingle();
   if (existingError) throw new ApiError(500, "QUERY_FAILED", existingError.message);
   if (!existing) throw new ApiError(404, "FINDING_NOT_FOUND");

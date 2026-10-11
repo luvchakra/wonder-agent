@@ -2,6 +2,8 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
+import type { RogueAccess } from "@/lib/shared/types/risk";
+import { syncRogueAccessFindings } from "@/modules/risk/service";
 import {
   ledgerEntry,
   ledgerEvents,
@@ -87,6 +89,13 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
     grants.push(...rows.filter(own(tenantId)));
   }
 
+  // ACCESS-P0-25: each application's baselines, for legacy and rogue.
+  const baselineRows = (
+    await readPaged((from, to) => admin.from("access_baselines").select("tenant_id, application_id, scope, taken_at").eq("tenant_id", tenantId).order("id").range(from, to), "access_baselines")
+  ).filter(own(tenantId));
+  const baseline = (applicationId: unknown, scope: "accounts" | "access") =>
+    (baselineRows.find((b) => b.application_id === applicationId && b.scope === scope)?.taken_at as string | undefined) ?? null;
+
   const byId = new Map(accounts.map((a) => [a.id as string, a]));
   const rels: LedgerRelationship[] = accounts.map((a) => ({
     accountId: a.id as string,
@@ -102,6 +111,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
     lastSeenAt: (a.last_seen_at as string | null) ?? null,
     lastUsedAt: (a.last_used_at as string | null) ?? null,
     missingFromSourceAt: (a.missing_from_source_at as string | null) ?? null,
+    baselineAt: baseline(a.application_id, "accounts"),
   }));
   // One relationship per account and entitlement: the latest grant row stands for it (a revoked one is kept only if none is live).
   const latest = new Map<string, Row>();
@@ -129,6 +139,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
       lastUsedAt: (a.last_used_at as string | null) ?? null,
       // ACCESS-P0-27: the grant gone from the source, or its whole account.
       missingFromSourceAt: (g.missing_from_source_at as string | null) ?? (a.missing_from_source_at as string | null) ?? null,
+      baselineAt: baseline(a.application_id, "access"),
     });
   }
   return rels;
@@ -279,7 +290,10 @@ function same(a: unknown, b: unknown): boolean {
 export async function refreshAccessLedger(tenantId: string, scope: { identityId?: string } = {}): Promise<{ recorded: number; changed: number }> {
   if (!tenantId) throw new ApiError(400, "VALIDATION_FAILED", "tenant required");
   const rels = await loadRelationships(tenantId, scope);
-  if (rels.length === 0) return { recorded: 0, changed: 0 };
+  if (rels.length === 0) {
+    if (!scope.identityId) await syncRogueAccessFindings(tenantId, []);
+    return { recorded: 0, changed: 0 };
+  }
   const evidence = await loadEvidence(tenantId, rels);
   const now = new Date();
   const nowIso = now.toISOString();
@@ -349,7 +363,60 @@ export async function refreshAccessLedger(tenantId: string, scope: { identityId?
     const { error } = await admin.from("access_ledger_events").insert(part);
     if (error) throw new ApiError(500, "WRITE_FAILED", `access_ledger_events: ${error.message}`);
   }
+  // ACCESS-P0-25: Risk keeps one open finding per rogue relationship. Only a whole-organization
+  // refresh knows the complete set, so a one-identity refresh leaves findings to the next full one.
+  if (!scope.identityId) await syncRogueAccessFindings(tenantId, await rogueAccess(tenantId, entries, rels));
   return { recorded: events.filter((e) => !e.before && ids.has(e.key)).length, changed: updates.length };
+}
+
+/** The rogue relationships still present at the source, labelled for their findings. */
+async function rogueAccess(tenantId: string, entries: LedgerEntry[], rels: LedgerRelationship[]): Promise<RogueAccess[]> {
+  const rogue = entries.filter((e) => e.status === "ROGUE" && e.missingFromSourceAt === null);
+  if (!rogue.length) return [];
+  const admin = supabaseServiceRole();
+  const names = async (table: string, column: string, ids: string[]) => {
+    const out = new Map<string, string>();
+    for (const part of chunks([...new Set(ids)])) {
+      const { data, error } = await admin.from(table).select(`id, tenant_id, ${column}`).eq("tenant_id", tenantId).in("id", part);
+      if (error) throw new ApiError(500, "QUERY_FAILED", `${table}: ${error.message}`);
+      for (const r of ((data ?? []) as unknown as Row[]).filter(own(tenantId))) out.set(r.id as string, (r[column] as string | null) ?? (r.id as string));
+    }
+    return out;
+  };
+  const [accountNames, appNames, entNames] = await Promise.all([
+    names("accounts", "account_name", rogue.map((e) => e.accountId)),
+    names("applications", "name", rogue.map((e) => e.applicationId)),
+    names("entitlements", "name", rogue.map((e) => e.entitlementId).filter((x): x is string => x !== null)),
+  ]);
+  const relOf = new Map(rels.map((r) => [`${r.accountId}|${r.entitlementId ?? ""}`, r]));
+  return rogue.map((e) => {
+    const rel = relOf.get(`${e.accountId}|${e.entitlementId ?? ""}`);
+    const who = `${accountNames.get(e.accountId) ?? e.accountId} in ${appNames.get(e.applicationId) ?? "the application"}`;
+    return {
+      accountId: e.accountId,
+      entitlementId: e.entitlementId,
+      accessGrantId: e.accessGrantId,
+      applicationId: e.applicationId,
+      identityId: e.identityId,
+      agentId: rel?.agentId ?? null,
+      label: e.entitlementId ? `${who} → ${entNames.get(e.entitlementId) ?? "an entitlement"}` : who,
+      firstSeenAt: e.firstSeenAt,
+      baselineAt: rel?.baselineAt ?? e.firstSeenAt,
+    };
+  });
+}
+
+/**
+ * ACCESS-P0-25: records an application's baseline for its accounts, or its
+ * entitlements and access, the first time a reconciliation of that kind is
+ * applied. Later calls change nothing (one baseline per application and
+ * scope). Service role, with the caller's tenant (§14).
+ */
+export async function ensureAccessBaseline(tenantId: string, applicationId: string, scope: "accounts" | "access", runId: string | null): Promise<void> {
+  const { error } = await supabaseServiceRole()
+    .from("access_baselines")
+    .upsert({ tenant_id: tenantId, application_id: applicationId, scope, run_id: runId, taken_at: new Date().toISOString() }, { onConflict: "tenant_id,application_id,scope", ignoreDuplicates: true });
+  if (error) throw new ApiError(500, "WRITE_FAILED", `access_baselines: ${error.message}`);
 }
 
 /** The daily sweep: every active organization's ledger. One organization's failure is reported, not allowed to stop the rest. */
@@ -402,6 +469,19 @@ export async function getIdentityAccessLedger(tenantId: string, identityId: stri
     () => true,
     () => false,
   );
+  return { entries: await readLedgerEntries(tenantId, "identity_id", identityId), refreshed };
+}
+
+/**
+ * ACCESS-P0-25: one account's access as the ledger last recorded it (the
+ * account itself and each entitlement), for the account's page. Read as the
+ * user under RLS with the tenant filtered too (§14).
+ */
+export async function getAccountAccessLedger(tenantId: string, accountId: string): Promise<IdentityAccessEntry[]> {
+  return readLedgerEntries(tenantId, "account_id", accountId);
+}
+
+async function readLedgerEntries(tenantId: string, column: "identity_id" | "account_id", value: string): Promise<IdentityAccessEntry[]> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("access_ledger")
@@ -409,7 +489,7 @@ export async function getIdentityAccessLedger(tenantId: string, identityId: stri
       "id, application_id, entitlement_id, source, status, request_id, access_package_assignment_id, approved_at, business_justification, expiry_at, first_seen_at, last_verified_at, last_used_at, missing_from_source_at, applications(name), entitlements(name), accounts(account_name, external_account_ref)",
     )
     .eq("tenant_id", tenantId)
-    .eq("identity_id", identityId)
+    .eq(column, value)
     .order("first_seen_at", { ascending: false })
     .limit(500);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -437,5 +517,5 @@ export async function getIdentityAccessLedger(tenantId: string, identityId: stri
       missingFromSourceAt: (r.missing_from_source_at as string | null) ?? null,
     };
   });
-  return { entries, refreshed };
+  return entries;
 }

@@ -17,7 +17,9 @@ export type RogueCategory =
   | "governance_drift"
   // RISK-P0-12: delegation or credential sharing with an ungoverned agent; tools used outside the contract.
   | "suspicious_delegation"
-  | "unapproved_tool_use";
+  | "unapproved_tool_use"
+  // ACCESS-P0-25: access that appeared on a target after its baseline with no WonderID approval.
+  | "rogue_access";
 
 export type RiskSeverity = "info" | "low" | "medium" | "high" | "critical";
 
@@ -53,6 +55,7 @@ export type ResolutionType = "verified_fixed" | "accepted_risk" | "false_positiv
 export type RiskFinding = {
   id: string;
   tenantId: string;
+  /** Agent findings only; an access finding about an account is an AccessFinding (ACCESS-P0-25). */
   agentId: string;
   category: RogueCategory;
   severity: RiskSeverity;
@@ -135,4 +138,43 @@ export type InvestigationEvent = {
 export type InvestigationDetail = Investigation & {
   findings: RiskFinding[];
   events: InvestigationEvent[];
+};
+
+/**
+ * ACCESS-P0-25: a finding about access on an application account, which may
+ * belong to a person, an external person, a service account or an agent.
+ * Stored with the agent findings (risk_findings, category rogue_access) but
+ * read through its own contract, so agent views keep their agent.
+ */
+export type AccessFinding = {
+  id: string;
+  category: "rogue_access";
+  severity: RiskSeverity;
+  status: FindingStatus;
+  title: string;
+  explanation: string;
+  recommendation: string;
+  accountId: string;
+  entitlementId: string | null;
+  accessGrantId: string | null;
+  applicationId: string | null;
+  identityId: string | null;
+  agentId: string | null;
+  createdAt: string;
+  resolvedAt: string | null;
+  resolutionReason: string | null;
+};
+
+/** What Access reports as rogue now: one entry per account (entitlementId null) or account and entitlement. */
+export type RogueAccess = {
+  accountId: string;
+  entitlementId: string | null;
+  accessGrantId: string | null;
+  applicationId: string;
+  identityId: string | null;
+  agentId: string | null;
+  /** For the finding's title, e.g. "alice in SAP → Finance". */
+  label: string;
+  firstSeenAt: string;
+  baselineAt: string;
 };
