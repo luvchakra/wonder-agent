@@ -276,3 +276,14 @@ Open items:
 - The owner enables Supabase leaked-password protection and sets the real
   `security.txt` contact.
 - Do the §32 design review of the new signed-in screens.
+
+## 2026-10-11 — Foundation design and a live Saviynt reading (for owner review)
+
+- `docs/design/WONDERID-FOUNDATION-DESIGN.md` is the owner-supplied foundation design for IGA and Agent ID.
+  - It is a draft baseline, pending decision D1.
+  - It sets phases F1–F7 and decisions D1–D9.
+- `docs/design/saviynt-reference-study.md` is a read-only reading of the owner's Saviynt training tenant (v25), covering 118 pages.
+  - It maps each observed capability to the design's section and phase.
+  - It proposes 15 additions (D-1 to D-15).
+  - It corrects one claim: duplicate detection over existing identities exists for agents only, not for people.
+- Neither document changes a backlog. Stories follow only after the owner decides D1.
