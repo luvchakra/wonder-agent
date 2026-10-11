@@ -16,8 +16,8 @@
  * - **Home** holds a member's day-to-day work: the dashboard, their own
  *   access (requests, privacy, sign-in security) and access governance.
  * - **Admin** holds everything that administers the organization, as
- *   groups: organization settings, users and permissions, authentication,
- *   integrations, identity configuration, and policies.
+ *   groups (foundation design §8): identity repository, applications,
+ *   policies, integrations, users and permissions, settings, compliance.
  *
  * Every entry names the permission its page requires (any of a list), and
  * the layout shows only what the viewer may open; an area appears only when
@@ -74,27 +74,28 @@ const group = (label: string, children: ShellNavLink[], icon?: string): ShellNav
 
 /**
  * The Admin area: administering the organization, always the last area.
- * Its four object lists come first as its own pages (owner request,
- * 2026-10-10); identities, applications and policies are groups inside it.
+ * Its groups follow §8 of the WonderID foundation design (owner decision,
+ * 2026-10-11, replacing the 10-10 arrangement with four object lists on
+ * top): the identity repository, applications, policies, integrations,
+ * users and permissions (WonderID's own roles and sign-in), settings and
+ * compliance.
  */
 export const ADMIN_AREA: ShellNavItem = {
   label: "Admin",
-  href: "/access/accounts",
+  href: "/identities",
   icon: "Settings",
   children: [
-    link("Accounts", "/access/accounts", "IdCard", "access.read"),
-    link("Entitlements", "/access/entitlements", "KeyRound", "access.read"),
-    link("Roles", "/settings/roles", "UserCog", "roles.view", "role.manage"),
-    link("User Groups", "/settings/groups", "Users", "groups.view"),
-    link("Global Configuration", "/settings/configuration", "SlidersHorizontal", "tenant.settings", "tenant.security.manage"),
     group(
-      "Identities",
+      "Identity Repository",
       [
         page("Overview", "/identities", "identity.read"),
         page("All Identities", "/identities/all", "identity.read"),
         page("People", "/identities/humans", "identity.read"),
         page("External Identities", "/identities/external", "identity.read"),
         page("Machine Identities", "/identities/machines", "identity.read"),
+        page("Accounts", "/access/accounts", "access.read"),
+        page("Entitlements", "/access/entitlements", "access.read"),
+        page("User Groups", "/settings/groups", "groups.view"),
         page("Lifecycle Work", "/identities/lifecycle", "identity.read"),
         page("Identity Attributes", "/identities/attributes", "identity.manage"),
       ],
@@ -111,28 +112,37 @@ export const ADMIN_AREA: ShellNavItem = {
       "Scale",
     ),
     group(
-      "Organization",
-      [
-        page("Organization", "/settings", "tenant.settings"),
-        page("Notifications", "/settings/notifications", "notification.manage"),
-        page("AI Assistance", "/settings/ai", "ai.manage"),
-        page("Billing", "/settings/billing", "billing.view"),
-      ],
-      "Building2",
-    ),
-    group("Users & Permissions", [page("Users", "/settings/users", "users.view"), page("Permission Catalog", "/settings/permissions", "permissions.view")], "UserCog"),
-    group("Authentication", [page("Single Sign-On", "/settings/sso", "sso.manage")], "Fingerprint"),
-    group(
       "Integrations",
       [
         page("Connections", "/integrations", "integration.read"),
         page("Connection Types", "/integrations/types", "integration.read"),
-        page("Gateway", "/integrations/gateway", "integration.read"),
         page("Identity Sources", "/integrations/sources", "integration.read"),
-        page("MCP Servers", "/integrations/mcp", "integration.read"),
         page("Sync Jobs", "/integrations/jobs", "integration.read"),
+        page("Gateway", "/integrations/gateway", "integration.read"),
+        page("MCP Servers", "/integrations/mcp", "integration.read"),
       ],
       "Link2",
+    ),
+    group(
+      "Users & Permissions",
+      [
+        page("Users", "/settings/users", "users.view"),
+        page("Roles", "/settings/roles", "roles.view", "role.manage"),
+        page("Permission Catalog", "/settings/permissions", "permissions.view"),
+        page("Single Sign-On", "/settings/sso", "sso.manage"),
+      ],
+      "UserCog",
+    ),
+    group(
+      "Settings",
+      [
+        page("Organization", "/settings", "tenant.settings"),
+        page("Global Configuration", "/settings/configuration", "tenant.settings", "tenant.security.manage"),
+        page("Notifications", "/settings/notifications", "notification.manage"),
+        page("AI Assistance", "/settings/ai", "ai.manage"),
+        page("Billing", "/settings/billing", "billing.view"),
+      ],
+      "SlidersHorizontal",
     ),
     group(
       "Compliance",

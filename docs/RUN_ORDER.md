@@ -475,3 +475,9 @@ attributes, typed, checked for uniqueness and recorded with provenance, and
 every connection that reads has a sync schedule on its page and in the API.
 The only F1 story left is FOUNDATION-P0-31, which waits for decision D11. F2
 (access requests end to end) is next, starting with ACCESS-P0-28.
+
+## 2026-10-11 — Admin menu by the foundation design's §8; rogue access in Risk Overview
+
+Admin is now seven groups: Identity Repository, Applications, Policies,
+Integrations, Users & Permissions, Settings and Compliance (owner decision).
+Risk Overview and its badge now include rogue-access findings.

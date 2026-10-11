@@ -3860,3 +3860,48 @@ narrow screens.
 
 **Verified.** `connection-schedule.spec.ts` drives the form; the
 identity-sources UI test still passes.
+
+### 2026-10-11 — Admin menu regrouped by the foundation design's §8 (owner decision)
+
+**Why.** The owner asked to rearrange the menus to match the new design.
+Asked directly, they chose to follow §8 of
+`docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md` exactly. This
+replaces the 10-10 arrangement, in which Accounts, Entitlements, Roles and
+User Groups were top-level Admin pages. The area list is unchanged.
+
+**What changed** (`modules/ui/shell-nav.ts`).
+- Admin is now seven groups:
+  - **Identity Repository:** Overview, All Identities, People, External,
+    Machine, Accounts, Entitlements, User Groups, Lifecycle Work, Identity
+    Attributes;
+  - **Applications;**
+  - **Policies;**
+  - **Integrations:** Connections, Connection Types, Identity Sources, Sync
+    Jobs, Gateway, MCP Servers;
+  - **Users & Permissions:** Users, Roles (WonderID's own roles), Permission
+    Catalog, Single Sign-On;
+  - **Settings:** Organization, Global Configuration, Notifications, AI
+    Assistance, Billing;
+  - **Compliance.**
+- The Authentication group is folded into Users & Permissions.
+- Admin's landing page is the identity Overview. A viewer without
+  `identity.read` lands on their first permitted page, as before.
+- Every route still appears once, with the same permissions.
+
+**Also: rogue access in Risk Overview** (owner request). `/risk` lists open
+rogue-access findings alongside agent findings, most severe first. Each one
+leads to its account page and is labelled "Application account".
+`FindingRow` now carries `href` and `subject` instead of an agent id. The
+Intelligence badge adds `countOpenAccessFindings()`, one count query under
+RLS.
+
+**Verified.**
+- `shell-nav` unit tests 14/14, rewritten for the groups.
+- Local Playwright: `shell`, `global-configuration` and `design-review`
+  44/44.
+- Local Playwright: `f1-reconciliation`, `risk` and `shadow-ai` all pass
+  (the F1 suite 14/14 on its re-run). The F1 suite now checks that the rogue
+  finding is listed on `/risk` and links to its account. Its unowned account
+  name is now unique per run, because an earlier run's account in the
+  shared tenant made the name check ambiguous.
+- Typecheck and eslint clean.

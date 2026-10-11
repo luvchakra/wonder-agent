@@ -20,12 +20,14 @@ import { accessFindings, entitlementIdByRef, grantsOf, ledgerEvents, ledgerFor }
 const stamp = Date.now();
 const mail = (who: string) => `e2e-f1-${who}-${stamp}@example.test`;
 const CLIENT_ID = `e2e-f1-client-${stamp}`;
+// Unique per run: the unowned queue lists every earlier run's account too.
+const LONELY = `svc-lonely-${stamp}`;
 
 const ACCOUNTS: SeedAccount[] = [
   { externalId: "uid=ana", raw: { id: "ana", username: "ana", email: mail("ana") } },
   { externalId: "uid=svc", raw: { id: "svc-backup", username: "svc-backup", accountType: "service", owner: mail("ana") } },
   { externalId: "uid=bot", raw: { id: "finbot", username: "finbot", accountType: "service", clientId: CLIENT_ID } },
-  { externalId: "uid=lonely", raw: { id: "svc-lonely", username: "svc-lonely", accountType: "service" } },
+  { externalId: "uid=lonely", raw: { id: LONELY, username: LONELY, accountType: "service" } },
 ];
 const ENTITLEMENTS: SeedAccount[] = [
   { externalId: "cn=finance", raw: {}, normalized: { name: "Finance" } },
@@ -121,11 +123,11 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(accounts.ana).toMatchObject({ identityId: anaId, correlation: "correlated" });
     expect(accounts.finbot).toMatchObject({ agentId, correlation: "correlated" });
     expect(accounts["svc-backup"]).toMatchObject({ correlation: "correlated", accountType: "service" });
-    expect(accounts["svc-lonely"]).toMatchObject({ correlation: "correlated", accountType: "service" });
+    expect(accounts[LONELY]).toMatchObject({ correlation: "correlated", accountType: "service" });
 
     const svc = (await (await request.get(`/api/v1/identities/${accounts["svc-backup"].identityId}`)).json()).data;
     expect(svc).toMatchObject({ identityType: "SERVICE_ACCOUNT", ownerIdentityId: anaId });
-    const lonely = (await (await request.get(`/api/v1/identities/${accounts["svc-lonely"].identityId}`)).json()).data;
+    const lonely = (await (await request.get(`/api/v1/identities/${accounts[LONELY].identityId}`)).json()).data;
     expect(lonely).toMatchObject({ identityType: "SERVICE_ACCOUNT", ownerIdentityId: null });
 
     // Running it again changes nothing and creates no second identity.
@@ -137,11 +139,11 @@ test.describe.serial("F1 reconciliation chain", () => {
   });
 
   test("an unowned service account waits in the queue and cannot be a request subject", async ({ request, page }) => {
-    const refused = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: accounts["svc-lonely"].identityId, applicationId: appId, justification: "QA-P0-23 unowned subject" } });
+    const refused = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: accounts[LONELY].identityId, applicationId: appId, justification: "QA-P0-23 unowned subject" } });
     expect(refused.status(), await refused.text()).toBe(409);
     expect((await refused.json()).error.code).toBe("SUBJECT_UNOWNED");
     await page.goto("/identities/unowned");
-    await expect(page.getByRole("link", { name: "svc-lonely" })).toBeVisible();
+    await expect(page.getByRole("link", { name: LONELY })).toBeVisible();
   });
 
   test("entitlements and access: the first apply is the baseline, so what it found is legacy; a re-run changes nothing", async ({ request }) => {
@@ -159,7 +161,7 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(again.grants).toMatchObject({ added: 0, removed: 0, restored: 0, unchanged: 3 });
   });
 
-  test("a grant added on the target after the baseline with no approval is rogue, with exactly one finding", async ({ request }) => {
+  test("a grant added on the target after the baseline with no approval is rogue, with exactly one finding", async ({ request, page }) => {
     await replaceIntegrationObjects(integrationId, tenantId, "access_grant", [...BASE_GRANTS, grant("uid=ana", "cn=ops")]);
     const counts = await reconcileAccess(request);
     expect(counts.grants).toMatchObject({ added: 1 });
@@ -172,6 +174,12 @@ test.describe.serial("F1 reconciliation chain", () => {
     // Applying again opens no second finding.
     await reconcileAccess(request);
     expect(await accessFindings(tenantId, accounts.ana.id)).toHaveLength(1);
+
+    // Risk Overview lists it with the agent findings, leading to the account.
+    await page.goto("/risk");
+    const row = page.getByRole("link", { name: new RegExp(`^${findings[0].title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`) });
+    await expect(row).toBeVisible();
+    await expect(row).toHaveAttribute("href", `/access/accounts/${accounts.ana.id}`);
   });
 
   test("removed at the source: the grant is marked (not revoked), the ledger records it, the finding resolves", async ({ request }) => {
