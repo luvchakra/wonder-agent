@@ -14,6 +14,7 @@ import {
   chainOutcome,
   dueAt,
   planApprovalChain,
+  routeForSubject,
   timeoutAction,
   type ApproverKind,
   type Person,
@@ -186,8 +187,8 @@ async function buildChain(tenantId: string, req: RequestRow, now: Date): Promise
     getIdentity(tenantId, req.subject_identity_id as string),
   ]);
   if (!subject) throw new ApiError(409, "SUBJECT_GONE", "The person this request is for no longer exists");
-  // A non-human identity has no manager; its accountable owner stands in.
-  const managerId = subject.managerIdentityId ?? (subject.identityType !== "HUMAN" ? subject.ownerIdentityId : null);
+  // ACCESS-P0-31: a non-human subject's request goes to the resource's owners (routeForSubject).
+  const managerId = subject.managerIdentityId;
   const [manager, entitlementOwner, applicationOwner, packageOwner] = await Promise.all([
     person(tenantId, managerId),
     person(tenantId, matter.entitlementOwnerId),
@@ -195,7 +196,7 @@ async function buildChain(tenantId: string, req: RequestRow, now: Date): Promise
     person(tenantId, matter.packageOwnerId),
   ]);
   const plan = planApprovalChain({
-    route: terms.approval,
+    route: routeForSubject(terms.approval, subject.identityType),
     mode: terms.approvalMode,
     risk: matter.risk,
     manager,

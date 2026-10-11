@@ -109,7 +109,8 @@ export async function decideAccessRequest(
   if (!allowed.includes(decision)) {
     throw new ApiError(409, "INVALID_TRANSITION", `Cannot move from ${existing.status} to ${decision}`);
   }
-  if (existing.agent_id) {
+  // ACCESS-P0-31: an agent request from the catalog names its identity too and runs its approval chain like any other.
+  if (existing.agent_id && !existing.subject_identity_id) {
     // ACCESS-P0-14: e.g. the person who requested access may not also approve it.
     await enforceSoD(tenantId, actorId, `access.request_${decision}`, existing.agent_id);
   } else if (decision !== "fulfilled") {

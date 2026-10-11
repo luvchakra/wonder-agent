@@ -29,26 +29,34 @@ export function RequestForm({
   options,
   initialOption,
   people,
+  withinAgentContract = {},
   selfLabel,
 }: {
   applicationId: string;
   options: RequestOption[];
   initialOption: string;
   people: { id: string; label: string }[];
+  /** ACCESS-P0-31: for each of your agents, the options its contract approves. */
+  withinAgentContract?: Record<string, string[]>;
   selfLabel: string;
 }) {
   const [state, action, pending] = useActionState(submitRequestAction.bind(null, applicationId), IDLE);
+  const [subject, setSubject] = useState("");
   const [choice, setChoice] = useState(initialOption);
   // ACCESS-P0-30: a request can also take access away or disable the account; folded, as the rarer case.
   const [kind, setKind] = useState<"grant" | "remove" | "disable_account">("grant");
-  const opt = options.find((o) => o.value === choice) ?? options[0];
+  // ACCESS-P0-31: an agent is offered only what its contract approves (removing access is always allowed).
+  const allowed = withinAgentContract[subject];
+  const offered = allowed && kind === "grant" ? options.filter((o) => allowed.includes(o.value)) : options;
+  const outOfContract = offered.length === 0;
+  const opt = offered.find((o) => o.value === choice) ?? offered[0] ?? options[0];
   const durations = DURATIONS.filter((d) => opt.maxDurationDays === null || d <= opt.maxDurationDays);
   if (opt.maxDurationDays && !durations.includes(opt.maxDurationDays)) durations.push(opt.maxDurationDays);
   const defaultDuration = String(opt.defaultDurationDays ?? opt.maxDurationDays ?? "");
 
   return (
     <form action={action} className="space-y-4">
-      <SelectField label="For" name="subjectIdentityId" defaultValue="">
+      <SelectField label="For" name="subjectIdentityId" value={subject} onChange={(e) => setSubject(e.target.value)}>
         <option value="">{selfLabel}</option>
         {people.map((p) => (
           <option key={p.id} value={p.id}>
@@ -58,8 +66,8 @@ export function RequestForm({
       </SelectField>
       <input type="hidden" name="requestType" value={kind} />
       {kind !== "disable_account" ? (
-        <SelectField label={kind === "remove" ? "Access to remove" : "Access"} name="entitlementId" value={choice} onChange={(e) => setChoice(e.target.value)}>
-          {options
+        <SelectField label={kind === "remove" ? "Access to remove" : "Access"} name="entitlementId" value={opt.value} onChange={(e) => setChoice(e.target.value)}>
+          {offered
             .filter((o) => kind === "grant" || o.value)
             .map((o) => (
               <option key={o.value || "app"} value={o.value}>
@@ -105,12 +113,13 @@ export function RequestForm({
         required={opt.justificationRequired}
         hint={opt.justificationRequired ? "At least 10 characters. The approver reads this." : undefined}
       />
+      {outOfContract ? <p className="text-sm text-muted-foreground">Nothing here is within this agent&apos;s contract.</p> : null}
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
         <Badge tone={RISK_TONE[kind === "grant" ? opt.risk : "low"]}>{kind === "grant" ? opt.risk : "low"} risk</Badge>
         <span className="text-foreground">{approvalPreview(opt.approval, kind === "grant" ? opt.risk : "low")}</span>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={pending || !opt.approval}>
+        <Button type="submit" disabled={pending || !opt.approval || outOfContract}>
           {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
           {pending ? "Submitting…" : "Submit request"}
         </Button>

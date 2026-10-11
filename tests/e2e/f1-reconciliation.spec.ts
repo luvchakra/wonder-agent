@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { authFile, TENANT_ONE } from "./support/testUsers";
+import { createClient } from "@supabase/supabase-js";
+import { authFile, TEST_USERS, TENANT_ONE } from "./support/testUsers";
 import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
 import { replaceIntegrationObjects, seedIntegrationWithAccounts, type SeedAccount } from "./support/seedIntegrationAccounts";
 import { accessFindings, entitlementIdByRef, grantsOf, ledgerEvents, ledgerFor } from "./support/readAccessGovernance";
@@ -317,6 +318,93 @@ test.describe.serial("F1 reconciliation chain", () => {
     await loadAccounts(request);
     expect(accounts.dan).toMatchObject({ identityId: danId });
     expect(accounts[`pending:${danId}`]).toBeUndefined();
+  });
+
+  test("ACCESS-P0-31: an owner requests for their service account and, within its contract, for their agent; anyone else is refused", async ({ request, browser }) => {
+    test.setTimeout(150_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+    const { data: me } = await db.from("identities").select("id, user_id").eq("tenant_id", tenantId).eq("identity_type", "HUMAN").eq("email", TEST_USERS.requester.email).limit(1).single();
+    expect(me?.user_id).toBeTruthy();
+    // Requests now wait for approval, and a manager (or an owner) may request for others.
+    const policy = await request.post("/api/v1/access/request-policies", { data: { applicationId: appId, allowForOthers: "managers", autoApprove: false } });
+    expect(policy.status(), await policy.text()).toBe(200);
+    // A third entitlement; the agent's contract approves financial data only.
+    await replaceIntegrationObjects(integrationId, tenantId, "entitlement", [...ENTITLEMENTS, { externalId: "cn=reports", raw: {}, normalized: { name: "Reports" } }]);
+    await reconcileAccess(request);
+    const ops = (await entitlementIdByRef(tenantId, appId, "cn=ops"))!;
+    const reports = (await entitlementIdByRef(tenantId, appId, "cn=reports"))!;
+    await db.from("entitlements").update({ data_classification: "financial" }).eq("tenant_id", tenantId).eq("id", reports);
+    await db.from("entitlements").update({ data_classification: "customer" }).eq("tenant_id", tenantId).eq("id", ops);
+
+    const svc = await request.post("/api/v1/identities", { data: { identityType: "SERVICE_ACCOUNT", displayName: `E2E F2 svc-report ${stamp}`, ownerIdentityId: me!.id } });
+    expect(svc.status(), await svc.text()).toBe(201);
+    const svcId = (await svc.json()).data.id as string;
+    expect((await request.post(`/api/v1/agents/${agentId}/owners`, { data: { ownerType: "business_owner", userId: me!.user_id } })).status()).toBe(201);
+    const contract = await request.post(`/api/v1/agents/${agentId}/contracts`, { data: { purpose: "Financial reporting", approvedApplications: [`E2E F1 App ${stamp}`], approvedData: ["financial"], approvedActions: ["READ"] } });
+    expect(contract.status(), await contract.text()).toBe(201);
+    // The agent goes live (a technical owner too; approval needs both owners).
+    const { data: admin } = await db.from("identities").select("user_id").eq("tenant_id", tenantId).eq("identity_type", "HUMAN").eq("email", TEST_USERS.adminOne.email).limit(1).single();
+    expect((await request.post(`/api/v1/agents/${agentId}/owners`, { data: { ownerType: "technical_owner", userId: admin!.user_id } })).status()).toBe(201);
+    for (const toState of ["REGISTERED", "APPROVED", "PROVISIONED", "ACTIVE"]) {
+      const moved = await request.post(`/api/v1/agents/${agentId}/lifecycle`, { data: { toState, reason: "ACCESS-P0-31" } });
+      expect(moved.status(), `${toState}: ${await moved.text()}`).toBe(200);
+    }
+    const { data: agentIdentity } = await db.from("identities").select("id, status").eq("tenant_id", tenantId).eq("agent_id", agentId).single();
+    expect(agentIdentity?.status).toBe("active");
+
+    const owner = await browser.newContext({ storageState: authFile("requester") });
+    const ask = (ctx: APIRequestContext, subjectIdentityId: string, entitlementId: string) =>
+      ctx.post("/api/v1/access/requests", { data: { subjectIdentityId, applicationId: appId, entitlementId, justification: "ACCESS-P0-31 owner request" } });
+    try {
+      // The service account's owner may; someone who does not own it (svc-backup is Ana's) may not.
+      const forSvc = await ask(owner.request, svcId, ops);
+      expect(forSvc.status(), await forSvc.text()).toBe(201);
+      const svcRequest = (await forSvc.json()).data as { id: string; status: string; policyResult: { checks: { check: string; result: string }[] } };
+      expect(svcRequest.status).toBe("pending");
+      expect(svcRequest.policyResult.checks).toContainEqual({ check: "for", result: "an identity you own" });
+      const notOwned = await ask(owner.request, accounts["svc-backup"].identityId!, ops);
+      expect(notOwned.status()).toBe(403);
+      expect((await notOwned.json()).error.code).toBe("REQUEST_SCOPE");
+      // Approval goes to the resource's owners (Ana, who cannot sign in, so access managers), never to the requester.
+      const steps = (await (await request.get(`/api/v1/access/requests/${svcRequest.id}`)).json()).data.steps as { approverKind: string; reason: string | null }[];
+      expect(steps[0]).toMatchObject({ approverKind: "access_managers" });
+      expect(steps[0].reason).toMatch(/application owner/);
+
+      // The agent: only its business owner, and only what its contract approves.
+      const inContract = await ask(owner.request, agentIdentity!.id, reports);
+      expect(inContract.status(), await inContract.text()).toBe(201);
+      const agentRequest = (await inContract.json()).data as { id: string; agentId: string; subjectIdentityId: string };
+      expect(agentRequest).toMatchObject({ agentId, subjectIdentityId: agentIdentity!.id });
+      const outOfContract = await ask(owner.request, agentIdentity!.id, ops);
+      expect(outOfContract.status()).toBe(403);
+      expect((await outOfContract.json()).error.code).toBe("OUT_OF_CONTRACT");
+      const notTheOwner = await ask(request, agentIdentity!.id, reports);
+      expect(notTheOwner.status()).toBe(403);
+      expect((await notTheOwner.json()).error.code).toBe("REQUEST_SCOPE");
+
+      // Approved like anyone's: the pending grant lands on the agent's own account, with a fulfilment task.
+      const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+      const decided = await iam.request.post(`/api/v1/access/requests/${agentRequest.id}/decision`, { data: { decision: "approved", comment: "Within the contract" } });
+      expect(decided.status(), await decided.text()).toBe(200);
+      await iam.close();
+      const view = (await (await request.get(`/api/v1/access/requests/${agentRequest.id}`)).json()).data as { request: { status: string }; fulfilment: string; grants: { accountId: string }[]; tasks: { kind: string }[] };
+      expect(view.request.status).toBe("approved");
+      expect(view.fulfilment).toBe("pending_fulfilment");
+      expect(view.grants.map((g) => g.accountId)).toEqual([accounts.finbot.id]);
+      expect(view.tasks.map((t) => t.kind)).toEqual(["grant"]);
+
+      // The request screen offers the owner what they own, and for the agent only what its contract approves.
+      const page = await owner.newPage();
+      await page.goto(`/access/catalog/${appId}`);
+      const forSelect = page.getByRole("combobox", { name: "For", exact: true });
+      await expect(forSelect.locator("option", { hasText: `E2E F2 svc-report ${stamp} (you own)` })).toHaveCount(1);
+      await forSelect.selectOption(agentIdentity!.id);
+      const offered = await page.getByRole("combobox", { name: "Access", exact: true }).locator("option").allTextContents();
+      expect(offered).toContain("Reports");
+      expect(offered).not.toContain("Ops");
+    } finally {
+      await owner.close();
+    }
   });
 
   test("another organization sees none of it", async ({ browser }) => {

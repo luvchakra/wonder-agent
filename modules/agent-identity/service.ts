@@ -43,6 +43,7 @@ export {
   getIdentity,
   getIdentityForUser,
   getIdentityNames,
+  listOwnedIdentities,
   listAccountableHumans,
   createIdentity,
   updateIdentity,

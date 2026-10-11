@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getRequestCatalogItem } from "@/modules/access-governance/service";
-import { getIdentityForUser, listIdentities } from "@/modules/agent-identity/service";
+import { getRequestCatalogItem, withinContract } from "@/modules/access-governance/service";
+import { getAgentContract, getIdentityForUser, listIdentities, listOwnedIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Button, Card, CardBody, CardHeader, EmptyState, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { RequestForm, type RequestOption } from "../RequestForm";
@@ -29,6 +29,10 @@ export default async function RequestAccessPage({ params, searchParams }: { para
     find ? listIdentities(tenantId, { types: ["HUMAN", "EXTERNAL"], status: "active", q: find, pageSize: 20 }) : Promise.resolve({ rows: [], total: 0 }),
   ]);
   if (!item) notFound();
+  // ACCESS-P0-31: what you own (service accounts, machine identities, agents) can be requested for too;
+  // for an agent, only what its contract approves is offered (the server checks again).
+  const owned = await listOwnedIdentities(tenantId, ctx.userId, me?.id ?? null);
+  const contracts = await Promise.all(owned.map((o) => (o.agentId ? getAgentContract(o.agentId, tenantId) : Promise.resolve(null))));
 
   const options: RequestOption[] = [
     ...(item.appRequestable
@@ -57,7 +61,18 @@ export default async function RequestAccessPage({ params, searchParams }: { para
       })),
   ];
   const initial = options.find((o) => o.value === sp.entitlement)?.value ?? options[0]?.value ?? "";
-  const people = found.rows.filter((p) => p.id !== me?.id).map((p) => ({ id: p.id, label: `${p.displayName}${p.email ? ` (${p.email})` : ""}` }));
+  const people = [
+    ...owned.map((o) => ({ id: o.id, label: `${o.displayName} (${o.agentId ? "your agent" : "you own"})` })),
+    ...found.rows.filter((p) => p.id !== me?.id).map((p) => ({ id: p.id, label: `${p.displayName}${p.email ? ` (${p.email})` : ""}` })),
+  ];
+  const dataOf = new Map(item.entitlements.map((e) => [e.id, e.dataClassification]));
+  const withinAgentContract = Object.fromEntries(
+    owned.flatMap((o, i) => {
+      if (!o.agentId) return [];
+      const contract = contracts[i];
+      return [[o.id, contract ? options.filter((opt) => withinContract(contract, item.names, opt.value ? (dataOf.get(opt.value) ?? null) : null)).map((opt) => opt.value) : []]];
+    }),
+  );
 
   return (
     <div className="space-y-5">
@@ -77,14 +92,21 @@ export default async function RequestAccessPage({ params, searchParams }: { para
           <CardHeader title="Your request" />
           <CardBody>
             {options.length ? (
-              <RequestForm applicationId={item.applicationId} options={options} initialOption={initial} people={people} selfLabel={me ? `Me (${me.displayName})` : "Me"} />
+              <RequestForm
+                applicationId={item.applicationId}
+                options={options}
+                initialOption={initial}
+                people={people}
+                withinAgentContract={withinAgentContract}
+                selfLabel={me ? `Me (${me.displayName})` : "Me"}
+              />
             ) : (
               <EmptyState title="Nothing here is requestable" description="A request policy decides what can be requested; ask an access manager." />
             )}
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Requesting for someone else" description="Their manager can request for them; so can an access manager. Anyone else is refused." />
+          <CardHeader title="Requesting for someone else" description="Their manager can request for them, as an owner can for a service account or agent; so can an access manager. Anyone else is refused." />
           <CardBody>
             <form method="get" className="space-y-2">
               {sp.entitlement ? <input type="hidden" name="entitlement" value={sp.entitlement} /> : null}

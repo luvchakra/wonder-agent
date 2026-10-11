@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { actionFingerprint, actionableStep, chainOutcome, planApprovalChain, timeoutAction, type ChainInput } from "./approvalRules";
+import { actionFingerprint, actionableStep, chainOutcome, planApprovalChain, routeForSubject, timeoutAction, type ChainInput } from "./approvalRules";
 
 const person = (id: string, userId: string | null = `u-${id}`, active = true) => ({ identityId: id, userId, active });
 const input = (over: Partial<ChainInput> = {}): ChainInput => ({
@@ -118,5 +118,13 @@ describe("timeoutAction", () => {
     expect(timeoutAction({ approverKind: "access_managers", escalatedAt: "2026-09-26T00:00:00Z" }, "escalate")).toBe("expire");
     expect(timeoutAction({ approverKind: "access_managers", escalatedAt: null }, "escalate")).toBe("expire");
     expect(timeoutAction({ approverKind: "manager", escalatedAt: null }, "expire")).toBe("expire");
+  });
+});
+
+describe("routeForSubject (ACCESS-P0-31)", () => {
+  it("keeps the policy's route for people and sends a non-human identity's or an agent's request to the resource's owners", () => {
+    expect(routeForSubject("manager_and_owner", "HUMAN")).toBe("manager_and_owner");
+    expect(routeForSubject("manager_approval", "EXTERNAL")).toBe("manager_approval");
+    for (const t of ["SERVICE_ACCOUNT", "MACHINE", "WORKLOAD", "APPLICATION", "API", "AI_AGENT"]) expect(routeForSubject("manager_approval", t)).toBe("owner_approval");
   });
 });

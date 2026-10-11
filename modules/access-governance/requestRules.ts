@@ -82,6 +82,10 @@ export type RequestContext = {
   requesterIdentityId: string | null;
   subject: { id: string; status: string; managerIdentityId: string | null; identityType: string; ownerIdentityId?: string | null };
   requesterCanManageAccess: boolean;
+  /** ACCESS-P0-31: the requester owns the subject (a non-human identity's owner, an agent's business owner). */
+  requesterOwnsSubject?: boolean;
+  /** ACCESS-P0-31: for an AI agent, whether this line is within its active contract (SHOULD). */
+  agentContract?: "within" | "outside" | "none";
   durationDays: number | null;
   justification: string;
   now: Date;
@@ -119,7 +123,13 @@ export function evaluateRequest(c: RequestContext): RequestDecision {
   if (!c.appActive) return refuse(409, "NOT_REQUESTABLE", "This application is not live yet; it is requestable once onboarding is promoted");
   if (!c.policy || !c.policy.requestable) return refuse(403, "NOT_REQUESTABLE", "No request policy makes this requestable");
   checks.push({ check: "policy", result: c.policy.name });
-  if (c.subject.identityType === "AI_AGENT") return refuse(400, "VALIDATION_FAILED", "An AI agent's access is requested from the agent");
+  // ACCESS-P0-31: the agent's business owner requests for it, and only what its contract approves.
+  if (c.subject.identityType === "AI_AGENT") {
+    if (!c.requesterOwnsSubject) return refuse(403, "REQUEST_SCOPE", "Only the agent's business owner may request access for it");
+    if (c.agentContract === "none") return refuse(409, "NO_ACTIVE_CONTRACT", "This agent has no active contract; approve one before requesting access for it");
+    if (c.agentContract !== "within") return refuse(403, "OUT_OF_CONTRACT", "This is outside the agent's contract (its approved applications and data)");
+    checks.push({ check: "contract", result: "within the agent's contract" });
+  }
   if (c.subject.status !== "active") return refuse(409, "SUBJECT_INACTIVE", "Access can only be requested for an active identity");
 
   const self = c.requesterIdentityId !== null && c.requesterIdentityId === c.subject.id;
@@ -128,8 +138,10 @@ export function evaluateRequest(c: RequestContext): RequestDecision {
     checks.push({ check: "for", result: "self" });
   } else {
     const isManager = c.requesterIdentityId !== null && c.subject.managerIdentityId === c.requesterIdentityId;
+    // ACCESS-P0-31: the owner of a non-human identity or an agent requests for it as a manager does for a report.
+    const isOwner = c.requesterOwnsSubject === true && c.subject.identityType !== "HUMAN" && c.subject.identityType !== "EXTERNAL";
     const mayForOthers =
-      c.policy.allowForOthers === "access_managers" ? c.requesterCanManageAccess : c.policy.allowForOthers === "managers" ? isManager || c.requesterCanManageAccess : false;
+      c.policy.allowForOthers === "access_managers" ? c.requesterCanManageAccess : c.policy.allowForOthers === "managers" ? isManager || isOwner || c.requesterCanManageAccess : false;
     if (!mayForOthers) {
       return refuse(
         403,
@@ -137,11 +149,11 @@ export function evaluateRequest(c: RequestContext): RequestDecision {
         c.policy.allowForOthers === "none"
           ? "This policy allows requests only for yourself"
           : c.policy.allowForOthers === "managers"
-            ? "Only the person's manager or an access manager may request this for them"
+            ? "Only the person's manager, the identity's owner or an access manager may request this for them"
             : "Only an access manager may request this for someone else",
       );
     }
-    checks.push({ check: "for", result: isManager ? "a direct report" : "someone else (access manager)" });
+    checks.push({ check: "for", result: isOwner ? "an identity you own" : isManager ? "a direct report" : "someone else (access manager)" });
   }
 
   let duration = c.durationDays;

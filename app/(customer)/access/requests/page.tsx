@@ -163,7 +163,7 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
                           requestId={r.id}
                           catalog={Boolean(r.subjectIdentityId)}
                           canCancel={mine && r.status === "pending" && canRequest}
-                          canDecide={r.status === "pending" && (r.agentId ? canApprove : awaitingMe.has(r.id))}
+                          canDecide={r.status === "pending" && (r.subjectIdentityId ? awaitingMe.has(r.id) : canApprove)}
                           canFulfil={canApprove && r.status === "approved"}
                         />
                       </Td>

@@ -508,3 +508,12 @@ fulfilment task. It is confirmed by reconciliation: removed access is revoked
 once the source no longer lists it; a new account once it appears; a
 disabled account once the source shows it disabled. ACCESS-P0-31 (requests
 for non-human identities) is next.
+
+## 2026-10-11 — ACCESS-P0-31: requests for non-human identities
+
+The owner of a service account or machine identity can now request access
+for it, and an AI agent's business owner can request for the agent, but only
+what its contract approves; anything else is refused by the server. These
+requests are approved by the owners of the application or entitlement, and
+follow the same pending grant and fulfilment task as a person's. ACCESS-P0-32
+(time-bound access) is next.

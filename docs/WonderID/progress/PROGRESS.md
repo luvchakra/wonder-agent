@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-11 |
 | Current phase | F2 Access requests end to end (started 2026-10-11); F1 gating done |
-| Next story | ACCESS-P0-31, Requests for non-human identities (#53); FOUNDATION-P0-31 (F1) waits for D11 |
+| Next story | ACCESS-P0-32, Time-bound access (#54); FOUNDATION-P0-31 (F1) waits for D11 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -81,7 +81,7 @@ Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded 
 | ACCESS-P0-28 Approved requests become pending grants | Access | #50 | Done | Migration 0121. Approval (chain, auto-approval, agent path, package items) adds a pending grant, on a placeholder account when the subject has none; Mark fulfilled → not yet verified; reconciliation verifies. Pending grants are not effective access |
 | ACCESS-P0-29 Fulfilment tasks | Access | #51 | Done | Migration 0122. One task per pending grant for the application's owner; claim, done (grant unverified), fail with a reason; SLA in Global Configuration (3 days), daily reminder when overdue; closed as verified by reconciliation. Home › Access Governance › Fulfilment Tasks |
 | ACCESS-P0-30 Remove-access and account requests | Access | #52 | Done | Migration 0123. Remove access (revoked when the source no longer lists it), a new account (placeholder until it appears), disable an account (until the source shows it disabled). Each request is one line with its own approval; multi-line baskets remain a separate item |
-| ACCESS-P0-31 Requests for non-human identities | Access + Identity | #53 | Not started | |
+| ACCESS-P0-31 Requests for non-human identities | Access + Identity | #53 | Done | No migration. The owner of a service account or machine identity requests for it; an agent's business owner requests only what its contract approves (refused otherwise, server-side). Non-human requests are approved by the resource's owners |
 | ACCESS-P0-32 Time-bound access | Access | #54 | Not started | |
 | EXPERIENCE-P0-29 Request tracking and tasks inbox | Experience | #55 | Not started | |
 | QA-P0-24 Request-to-verified suite | QA | #56 | Not started | |

@@ -100,10 +100,33 @@ describe("evaluateRequest (spec §11.5)", () => {
     // People never need an owner.
     expect(evaluateRequest(ctx({ subject: { id: "me", status: "active", managerIdentityId: null, identityType: "HUMAN" } })).ok).toBe(true);
   });
+  it("ACCESS-P0-31: the owner of a service account requests for it; someone who does not own it is refused", () => {
+    const svc = { id: "svc", status: "active", managerIdentityId: null, identityType: "SERVICE_ACCOUNT", ownerIdentityId: "me" };
+    const owner = evaluateRequest(ctx({ subject: svc, requesterOwnsSubject: true }));
+    expect(owner).toMatchObject({ ok: true });
+    expect(owner.ok && owner.checks).toContainEqual({ check: "for", result: "an identity you own" });
+    expect(evaluateRequest(ctx({ subject: { ...svc, ownerIdentityId: "someone" }, requesterOwnsSubject: false }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
+    // A policy that allows requests only for yourself, or only by access managers, still applies to owners.
+    expect(evaluateRequest(ctx({ subject: svc, requesterOwnsSubject: true, policy: policy({ allowForOthers: "none" }) }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
+    expect(evaluateRequest(ctx({ subject: svc, requesterOwnsSubject: true, policy: policy({ allowForOthers: "access_managers" }) }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
+    // Owning a person is not a thing: the flag never makes someone else's request "for a person you own".
+    expect(evaluateRequest(ctx({ subject: { id: "p", status: "active", managerIdentityId: null, identityType: "HUMAN" }, requesterOwnsSubject: true }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
+  });
+  it("ACCESS-P0-31: an agent's business owner requests only what the agent's contract approves", () => {
+    const agent = { id: "ag", status: "active", managerIdentityId: null, identityType: "AI_AGENT" };
+    const within = evaluateRequest(ctx({ subject: agent, requesterOwnsSubject: true, agentContract: "within" }));
+    expect(within).toMatchObject({ ok: true });
+    expect(within.ok && within.checks).toContainEqual({ check: "contract", result: "within the agent's contract" });
+    expect(evaluateRequest(ctx({ subject: agent, requesterOwnsSubject: true, agentContract: "outside" }))).toMatchObject({ ok: false, status: 403, code: "OUT_OF_CONTRACT" });
+    expect(evaluateRequest(ctx({ subject: agent, requesterOwnsSubject: true, agentContract: "none" }))).toMatchObject({ ok: false, status: 409, code: "NO_ACTIVE_CONTRACT" });
+    expect(evaluateRequest(ctx({ subject: agent, requesterOwnsSubject: true }))).toMatchObject({ ok: false, code: "OUT_OF_CONTRACT" });
+    // An access manager who is not the business owner is refused, whatever the contract says.
+    expect(evaluateRequest(ctx({ subject: agent, requesterCanManageAccess: true, agentContract: "within" }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
+  });
   it("self-requests can be turned off; inactive people, agents and applications not yet live are refused", () => {
     expect(evaluateRequest(ctx({ policy: policy({ allowSelf: false }) }))).toMatchObject({ ok: false, code: "NOT_ALLOWED" });
     expect(evaluateRequest(ctx({ subject: { id: "me", status: "disabled", managerIdentityId: null, identityType: "HUMAN" } }))).toMatchObject({ ok: false, code: "SUBJECT_INACTIVE" });
-    expect(evaluateRequest(ctx({ subject: { id: "x", status: "active", managerIdentityId: null, identityType: "AI_AGENT" } }))).toMatchObject({ ok: false, status: 400 });
+    expect(evaluateRequest(ctx({ subject: { id: "x", status: "active", managerIdentityId: null, identityType: "AI_AGENT" } }))).toMatchObject({ ok: false, code: "REQUEST_SCOPE" });
     expect(evaluateRequest(ctx({ appActive: false }))).toMatchObject({ ok: false, code: "NOT_REQUESTABLE" });
     expect(evaluateRequest(ctx({ policy: policy({ requestable: false }) }))).toMatchObject({ ok: false, code: "NOT_REQUESTABLE" });
   });

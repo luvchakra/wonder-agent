@@ -101,6 +101,7 @@ export {
   submitAccessRequest,
   cancelAccessRequest,
   listRequests,
+  withinContract,
   type CatalogItem,
   type CatalogEntitlement,
   type PolicyRow,
