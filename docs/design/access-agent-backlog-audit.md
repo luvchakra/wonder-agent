@@ -2583,3 +2583,73 @@ a separate item in the design (§10, Access), not built here.
 - An approved grant request with no end date still answers as "open" when
   the same access is requested again. This was true before; noted for
   ACCESS-P0-32 (time-bound access).
+
+### 2026-10-11 — ACCESS-P0-31: requests for non-human identities; AI agents within their contract (#53)
+
+**What changed.** Owners can now request access for what they own, through
+the same catalog, approval chain, pending grant and fulfilment task as
+people. No migration.
+
+- **Service accounts and machine identities** (SERVICE_ACCOUNT, MACHINE,
+  WORKLOAD, APPLICATION, API). The identity's owner may request for it as a
+  manager may for a report: the policy must allow requests for others
+  ("managers"). Someone who does not own it, and is not an access manager,
+  is refused (`REQUEST_SCOPE`). Unowned identities are still refused first
+  (IDENTITY-P0-20).
+- **AI agents.** This replaces the earlier refusal ("an AI agent's access is
+  requested from the agent").
+  - Only the agent's business owner may request for it (`REQUEST_SCOPE`
+    otherwise, even for an access manager).
+  - A grant line must be within the agent's active contract, decided by
+    `classifyAccessGrant()` (the same SHOULD vs CAN check Risk uses):
+    - the application, by name or display name, is an approved application;
+    - the entitlement's data classification is in the approved data, and
+      not in the prohibited data.
+  - No active contract → `NO_ACTIVE_CONTRACT` (409); outside it →
+    `OUT_OF_CONTRACT` (403). A removal or a disable is always allowed.
+  - The agent's separation-of-duties rules run before anything is written
+    (`enforceSoD`, as on the legacy agent path).
+  - The request names the agent identity and the agent, so the pending
+    grant lands on the agent's own account (or its placeholder).
+- **Approval routes to the resource's owners** for any non-human subject
+  (`routeForSubject()`): a manager route becomes owner approval, because
+  the subject has no manager and its owner is usually the requester. Before,
+  the identity's owner stood in as manager. Critical risk still adds access
+  managers; an owner who cannot sign in falls back to access managers, as
+  before.
+- **The legacy agent path** (`decideAccessRequest`, the access managers'
+  "waiting agent requests") now applies only to requests without a subject
+  identity. An agent request from the catalog is decided by its chain, like
+  anyone's.
+- **Duplicates after the rules.** An identical open request is now returned
+  only once the rules allow the requester to ask. Before, anyone re-submitting
+  someone else's waiting request got that request back.
+- **Request form.** "For" lists what you own, marked "(you own)" or "(your
+  agent)". With an agent chosen, only the contract's lines are offered; with
+  none, the form says so and cannot be submitted. The server checks again.
+
+**Verified.**
+- Typecheck and ESLint clean.
+- Vitest: 1219/1219. New tests:
+  - owner / non-owner of a service account, and policy scope still
+    applying to owners;
+  - an agent's owner within, outside and without a contract; an access
+    manager who is not the owner;
+  - `routeForSubject`.
+- E2E (local, dev Supabase):
+  - `f1-reconciliation` 17/17. The new test: the owner of a service account
+    requests for it (pending; the chain names the application owner, not the
+    requester); a non-owner is refused; the agent's business owner gets a
+    contract line (201) and is refused an out-of-contract one; an access
+    manager who is not the owner is refused; approval puts the pending grant
+    on the agent's account with a grant task; the form offers only the
+    contract's lines.
+  - `request-catalog`, `approval-engine`, `access-packages` and `sod`:
+    all passed.
+
+**Left out.**
+- The catalog list itself is not narrowed per agent; only the request form
+  is. A subject picker across the catalog is EXPERIENCE-P0-29.
+- Delegated agent owners do not request; only the business owner.
+- Agent access packages and the agent onboarding journey stay with
+  IDENTITY-P0-19.

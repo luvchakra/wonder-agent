@@ -14,7 +14,7 @@ Generated 2026-10-11 from 11 module backlogs.
 
 ## Overall
 
-**212 of 268 tracked stories complete — 79%**
+**213 of 268 tracked stories complete — 79%**
 
 ```
 ████████████████████████████████░░░░░░░░  79%
@@ -22,10 +22,10 @@ Generated 2026-10-11 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 212 |
+| Done | 213 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 27 |
+| Not Started | 26 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -41,7 +41,7 @@ and are deliberately excluded from the counts above.
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 38 | 3 | 0 | 4 | 45 | `███████████████░░░` 84% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 23 | 3 | 0 | 1 | 27 | `███████████████░░░` 85% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 28 | 0 | 0 | 5 | 33 | `███████████████░░░` 85% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 29 | 0 | 0 | 4 | 33 | `████████████████░░` 88% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
@@ -178,7 +178,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 28 done · 0 partial · 0 deferred · 5 not started (33 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 29 done · 0 partial · 0 deferred · 4 not started (33 tracked) · 3 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -213,7 +213,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-28 | Approved requests become pending grants, verified by reconciliation (F2, #50) | Done — 2026-10-11: migration 0121 (isolation SQL 10/10); pending → fulfilled, unverified → verified, on placeholder accounts when needed; readers of effective access skip pending grants |
 | ACCESS-P0-29 | Fulfilment tasks: owner or group, claim, complete, fail, SLA, auto-close on reconciliation (F2, #51) | Done — 2026-10-11: migration 0122 (isolation SQL 8/8); tasks go to the application's technical (else business) owner, any access manager may work them; a group as assignee waits for applications to have a fulfilment group |
 | ACCESS-P0-30 | Remove-access and account requests; per-line approval (F2, #52) | Done — 2026-10-11: migration 0123; remove access (revoked when a full run no longer finds it), new account (placeholder until it appears), disable account (until the source shows it disabled or gone); each request is one line with its own approval route |
-| ACCESS-P0-31 | Requests for non-human identities; AI agents within their contract (F2, #53) | Not Started |
+| ACCESS-P0-31 | Requests for non-human identities; AI agents within their contract (F2, #53) | Done — 2026-10-11: owners request for what they own; an agent's business owner only within its contract; non-human requests go to the resource's owners |
 | ACCESS-P0-32 | Time-bound access: end dates, reminders, removal task at expiry (F2, #54) | Not Started |
 
 ### 05 — Runtime Agent

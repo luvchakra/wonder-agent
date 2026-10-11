@@ -65,6 +65,15 @@ function resolve(kind: Exclude<ApproverKind, "access_managers">, person: Person,
   return { approverKind: kind, approverIdentityId: person.identityId, approverUserId: person.userId, reason: null };
 }
 
+/**
+ * ACCESS-P0-31: a non-human identity or an AI agent has no manager, and its
+ * owner is usually the requester; its access is approved by the owners of
+ * the resource instead.
+ */
+export function routeForSubject(route: RequestPolicy["approval"], identityType: string): RequestPolicy["approval"] {
+  return identityType === "HUMAN" || identityType === "EXTERNAL" ? route : "owner_approval";
+}
+
 export function planApprovalChain(c: ChainInput): PlannedStep[] {
   const manager = () => resolve("manager", c.manager, c);
   const owner = () =>

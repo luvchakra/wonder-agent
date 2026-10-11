@@ -4,11 +4,13 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessRequest } from "@/lib/shared/types/access-governance";
-import { getIdentity, getIdentityForUser, getIdentityNames } from "@/modules/agent-identity/service";
+import { getAgentContract, getIdentity, getIdentityForUser, getIdentityNames, listOwners } from "@/modules/agent-identity/service";
+import { classifyAccessGrant } from "./comparison";
 import { toAccessRequest } from "./mappers";
 import { startApprovalChain } from "./approvals";
 import { approvalOutcome, assessRisk, evaluateRequest, resolvePolicy, validatePolicyInput, type RequestPolicy, type RiskLevel } from "./requestRules";
 import { pendRequest } from "./pendingGrants";
+import { enforceSoD } from "./sod";
 
 /**
  * ACCESS-P0-18 — the self-service request catalog (spec §11): request
@@ -109,6 +111,8 @@ export type CatalogEntitlement = { id: string; name: string; privilegeLevel: str
 export type CatalogItem = {
   applicationId: string;
   name: string;
+  /** ACCESS-P0-31: its name and display name, which an agent contract may name. */
+  names: string[];
   description: string | null;
   vendor: string | null;
   risk: RiskLevel;
@@ -175,6 +179,7 @@ export async function listRequestCatalog(tenantId: string, filter: { q?: string;
     return {
       applicationId: a.id as string,
       name: (a.display_name as string | null) ?? (a.name as string),
+      names: [a.name as string, a.display_name as string | null].filter((n): n is string => Boolean(n)),
       description: (a.description as string | null) ?? null,
       vendor: (a.vendor as string | null) ?? null,
       risk: appRisk,
@@ -222,7 +227,7 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
   const supabase = await supabaseServer();
   const [subject, appRes, entRes, policies] = await Promise.all([
     getIdentity(tenantId, subjectId),
-    supabase.from("applications").select("id, onboarding_status, risk_level, data_classification").eq("tenant_id", tenantId).eq("id", applicationId).maybeSingle(),
+    supabase.from("applications").select("id, name, display_name, onboarding_status, risk_level, data_classification").eq("tenant_id", tenantId).eq("id", applicationId).maybeSingle(),
     entitlementId
       ? supabase.from("entitlements").select("id, application_id, privilege_level, data_classification").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -236,22 +241,7 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
   // ACCESS-P0-30: there must be something to remove or to disable (what the target last reported).
   if (requestType !== "grant") await assertSomethingToChange(tenantId, subject.id, applicationId, requestType, entitlementId);
 
-  // An identical open request is returned, not duplicated (spec §11.5).
-  let dupQuery = supabase
-    .from("access_requests")
-    .select()
-    .eq("tenant_id", tenantId)
-    .eq("subject_identity_id", subject.id)
-    .eq("application_id", applicationId)
-    .eq("request_type", requestType)
-    .in("status", ["pending", "approved"]);
-  dupQuery = entitlementId ? dupQuery.eq("entitlement_id", entitlementId) : dupQuery.is("entitlement_id", null);
-  const { data: open, error: dupError } = await dupQuery.order("created_at", { ascending: false }).limit(5);
-  if (dupError) throw new ApiError(500, "QUERY_FAILED", dupError.message);
   const now = new Date();
-  const stillOpen = (open ?? []).find((r) => !r.requested_expiry || new Date(r.requested_expiry) > now);
-  if (stillOpen) return { request: toAccessRequest(stillOpen), duplicate: true };
-
   const policy = resolvePolicy(policies, applicationId, entitlementId);
   // Taking access away lowers risk, so a removal or a disable is low risk whatever it removes.
   const risk =
@@ -263,6 +253,21 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
           appDataClassification: appRes.data.data_classification,
         })
       : "low";
+  // ACCESS-P0-31: who owns the subject, and for an agent whether this is within its contract.
+  const agentId = subject.identityType === "AI_AGENT" ? subject.agentId : null;
+  const [owners, contract] = agentId ? await Promise.all([listOwners(tenantId, agentId), getAgentContract(agentId, tenantId)]) : [[], null];
+  const requesterOwnsSubject = agentId
+    ? owners.some((o) => o.ownerType === "business_owner" && o.userId === actor.userId)
+    : requester !== null && subject.ownerIdentityId !== null && subject.ownerIdentityId === requester.id;
+  const agentContract = !agentId
+    ? undefined
+    : requestType !== "grant"
+      ? "within" // taking access away is always within the contract
+      : !contract
+        ? "none"
+        : withinContract(contract, [appRes.data.name, appRes.data.display_name], entRes.data?.data_classification ?? null)
+          ? "within"
+          : "outside";
   const durationRaw = requestType !== "grant" || input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
   const decision = evaluateRequest({
     policy,
@@ -271,21 +276,42 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     requesterIdentityId: requester?.id ?? null,
     subject: { id: subject.id, status: subject.status, managerIdentityId: subject.managerIdentityId, identityType: subject.identityType, ownerIdentityId: subject.ownerIdentityId },
     requesterCanManageAccess: actor.canManageAccess,
+    requesterOwnsSubject,
+    agentContract,
     durationDays: durationRaw,
     justification: typeof input.justification === "string" ? input.justification : "",
     now,
   });
   if (!decision.ok) {
-    await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: "access.request_refused", objectType: "application", objectId: applicationId, outcome: "failure", metadata: { subjectIdentityId: subject.id, entitlementId, code: decision.code } });
+    await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: "access.request_refused", objectType: "application", objectId: applicationId, outcome: "failure", metadata: { subjectIdentityId: subject.id, agentId, entitlementId, code: decision.code } });
     throw new ApiError(decision.status, decision.code, decision.message);
   }
+  // ACCESS-P0-14 / P0-31: an agent's separation-of-duties rules apply to its requests, before anything is written.
+  if (agentId) await enforceSoD(tenantId, actor.userId, "access.request_submitted", agentId);
+
+  // An identical open request is returned, not duplicated (spec §11.5), once the
+  // rules allow this requester to ask (ACCESS-P0-31: never someone else's request to a refused one).
+  let dupQuery = supabase
+    .from("access_requests")
+    .select()
+    .eq("tenant_id", tenantId)
+    .eq("subject_identity_id", subject.id)
+    .eq("application_id", applicationId)
+    .eq("request_type", requestType)
+    .in("status", ["pending", "approved"]);
+  dupQuery = entitlementId ? dupQuery.eq("entitlement_id", entitlementId) : dupQuery.is("entitlement_id", null);
+  const { data: open, error: dupError } = await dupQuery.order("created_at", { ascending: false }).limit(5);
+  if (dupError) throw new ApiError(500, "QUERY_FAILED", dupError.message);
+  const stillOpen = (open ?? []).find((r) => !r.requested_expiry || new Date(r.requested_expiry) > now);
+  if (stillOpen) return { request: toAccessRequest(stillOpen), duplicate: true };
 
   const justification = typeof input.justification === "string" ? input.justification.trim().slice(0, 2000) : "";
   const { data, error } = await supabaseServiceRole()
     .from("access_requests")
     .insert({
       tenant_id: tenantId,
-      agent_id: null,
+      // ACCESS-P0-31: an agent's request names the agent too, so its grant lands on the agent's account.
+      agent_id: agentId,
       subject_identity_id: subject.id,
       requester_identity_id: requester?.id ?? null,
       requested_by: actor.userId,
@@ -321,7 +347,7 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     objectType: "access_request",
     objectId: request.id,
     outcome: "success",
-    metadata: { subjectIdentityId: subject.id, applicationId, entitlementId, risk, policyId: policy!.id, durationDays: decision.durationDays, checks: decision.checks },
+    metadata: { subjectIdentityId: subject.id, agentId, applicationId, entitlementId, risk, policyId: policy!.id, durationDays: decision.durationDays, checks: decision.checks },
   });
   // ACCESS-P0-28: approved by its policy alone, it becomes its pending grant at once.
   if (request.status === "approved") await pendRequest(tenantId, request.id);
@@ -338,6 +364,11 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     }
   }
   return { request, duplicate: false };
+}
+
+/** ACCESS-P0-31: an application (by name or display name) and data classification the agent's contract approves. */
+export function withinContract(contract: Parameters<typeof classifyAccessGrant>[0], appNames: (string | null | undefined)[], dataClassification: string | null): boolean {
+  return appNames.some((name) => Boolean(name) && classifyAccessGrant(contract, { application: name, dataClassification }) === "approved");
 }
 
 /** The requester withdraws a request that is still waiting. */
@@ -386,7 +417,7 @@ export async function listRequests(
   if (filter.awaiting) {
     const ids = filter.awaiting.ids.filter((id) => UUID_RE.test(id));
     const byId = ids.length ? `id.in.(${ids.join(",")})` : null;
-    const agents = filter.awaiting.pendingAgentRequests ? "and(agent_id.not.is.null,status.eq.pending)" : null;
+    const agents = filter.awaiting.pendingAgentRequests ? "and(agent_id.not.is.null,subject_identity_id.is.null,status.eq.pending)" : null;
     const either = [byId, agents].filter(Boolean).join(",");
     if (!either) return { rows: [], total: 0 };
     query = query.or(either);

@@ -289,6 +289,38 @@ export async function getIdentityNames(tenantId: string, ids: string[]): Promise
   return out;
 }
 
+/**
+ * ACCESS-P0-31: the active identities a person may request access for as
+ * their owner: the non-human identities they own, and the AI agents they
+ * are business owner of. Read as the user (RLS), filtered by tenant.
+ */
+export async function listOwnedIdentities(tenantId: string, userId: string, identityId: string | null): Promise<{ id: string; displayName: string; identityType: IdentityType; agentId: string | null }[]> {
+  const supabase = await supabaseServer();
+  const { data: owned, error: ownError } = await supabase
+    .from("agent_owners")
+    .select("agent_id")
+    .eq("tenant_id", tenantId)
+    .eq("user_id", userId)
+    .eq("owner_type", "business_owner")
+    .is("removed_at", null)
+    .limit(200);
+  if (ownError) throw new ApiError(500, "QUERY_FAILED", ownError.message);
+  const agentIds = [...new Set((owned ?? []).map((o) => o.agent_id as string).filter((id) => UUID_RE.test(id)))];
+  const either = [identityId && UUID_RE.test(identityId) ? `owner_identity_id.eq.${identityId}` : null, agentIds.length ? `agent_id.in.(${agentIds.join(",")})` : null].filter(Boolean);
+  if (!either.length) return [];
+  const { data, error } = await supabase
+    .from("identities")
+    .select("id, display_name, identity_type, agent_id")
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .in("identity_type", ["MACHINE", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API", "AI_AGENT"])
+    .or(either.join(","))
+    .order("display_name")
+    .limit(100);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map((r) => ({ id: r.id as string, displayName: r.display_name as string, identityType: r.identity_type as IdentityType, agentId: (r.agent_id as string | null) ?? null }));
+}
+
 /** People who can be named owner, sponsor or manager: the tenant's active humans. */
 export async function listAccountableHumans(tenantId: string): Promise<{ id: string; displayName: string; email: string | null }[]> {
   const supabase = await supabaseServer();

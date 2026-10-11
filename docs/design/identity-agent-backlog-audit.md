@@ -1606,3 +1606,15 @@ attributes. The change is additive: existing callers are unchanged.
 
 **Verified.** Unit tests for typing and merge (+3); the identity-sources E2E
 test above. The unchanged precedence tests still pass.
+
+### 2026-10-11 — Owned identities for requests (for ACCESS-P0-31)
+
+`listOwnedIdentities(tenantId, userId, identityId)` (published in
+`modules/agent-identity/service.ts`) lists the active identities a person
+may request access for as their owner: non-human identities whose owner is
+their identity, and the AI agents they are business owner of. It reads as
+the user (RLS), filtered on the tenant, at most 100 rows. The request form
+uses it for "For". No schema change.
+
+**Verified.** Typecheck; the ACCESS-P0-31 E2E test (the owner's service
+account and agent appear under "For").
