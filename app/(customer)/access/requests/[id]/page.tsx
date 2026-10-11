@@ -3,7 +3,14 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { getRequestWithApprovals, listRequestIdsAwaiting, sweepApprovalTimeouts, type ApprovalView } from "@/modules/access-governance/service";
+import {
+  getRequestWithApprovals,
+  grantsForRequest,
+  listRequestIdsAwaiting,
+  requestFulfilment,
+  sweepApprovalTimeouts,
+  type ApprovalView,
+} from "@/modules/access-governance/service";
 import { RecordProvenance, Badge, type BadgeTone, Card, CardBody, CardHeader } from "@/modules/ui";
 import { RequestActions } from "../RequestActions";
 
@@ -19,6 +26,12 @@ const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   fulfilled: { label: "Fulfilled", tone: "neutral" },
   cancelled: { label: "Cancelled", tone: "neutral" },
   expired: { label: "Expired", tone: "neutral" },
+};
+// ACCESS-P0-28: once approved, the request shows how far its access has really come.
+const FULFILMENT: Record<string, { label: string; tone: BadgeTone }> = {
+  pending_fulfilment: { label: "Approved · waiting for fulfilment", tone: "warning" },
+  fulfilled_unverified: { label: "Fulfilled · not yet verified", tone: "warning" },
+  verified: { label: "Verified at the source", tone: "success" },
 };
 const STEP: Record<string, { label: string; tone: BadgeTone }> = {
   waiting: { label: "Not yet", tone: "neutral" },
@@ -99,13 +112,16 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   const tenantId = ctx.tenantId!;
   const canApprove = ctx.permissions.includes("access.approve");
   await sweepApprovalTimeouts(tenantId);
-  const [found, awaiting, provenance] = await Promise.all([
+  const [found, awaiting, provenance, grants] = await Promise.all([
     getRequestWithApprovals(tenantId, id),
     listRequestIdsAwaiting(tenantId, { userId: ctx.userId, canApproveAsAccessManager: canApprove }),
     getRecordProvenance(tenantId, "access_requests", id),
+    grantsForRequest(tenantId, id).catch(() => []),
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
+  const fulfilment = r.status === "approved" || r.status === "fulfilled" ? FULFILMENT[requestFulfilment(grants)] : undefined;
+  const status = fulfilment ?? STATUS[r.status];
   const live = steps.filter((s) => s.status !== "invalidated");
   const invalidated = steps.filter((s) => s.status === "invalidated");
   const stages = [...new Set(live.map((s) => s.stage))].sort((a, b) => a - b);
@@ -147,8 +163,8 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Badge tone={STATUS[r.status]?.tone ?? "neutral"} className="whitespace-nowrap">
-            {STATUS[r.status]?.label ?? r.status}
+          <Badge tone={status?.tone ?? "neutral"} className="whitespace-nowrap">
+            {status?.label ?? r.status}
           </Badge>
           {r.riskLevel ? (
             <Badge tone={RISK_TONE[r.riskLevel]} className="whitespace-nowrap">

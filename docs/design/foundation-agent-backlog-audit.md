@@ -2784,3 +2784,18 @@ this change and are fixed in it:
 One later local setup sign-in stalled on the sign-in page (auth
 rate-limiting after many local runs this hour); the tests that need no
 signed-in user were run without it.
+
+### 2026-10-11 — Security note: `wonderapps_dashboard` role (found, not changed)
+
+While checking advisors after migration 0121, the performance advisor listed
+`wonderapps_dashboard_read` policies. On inspection:
+- `wonderapps_dashboard` is a role that can sign in;
+- it has `SELECT ... USING (true)` on about 24 customer tables
+  (access_requests, accounts, identities, audit_logs, risk_findings,
+  tenants and others);
+- it can therefore read every organization's rows in them.
+
+No migration in this repository creates the role or the policies.
+Non-negotiables #4 and #13 apply. Nothing was changed, because who uses it
+is unknown. It is recorded as an open owner action in
+`docs/WonderID/progress/PROGRESS.md`.

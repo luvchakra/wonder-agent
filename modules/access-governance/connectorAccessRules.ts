@@ -16,6 +16,8 @@
  *   updates and restores.
  * - Access WonderID holds from elsewhere (a request, an administrator) for
  *   the same account and entitlement counts as present: no duplicate.
+ * - ACCESS-P0-28: a requested grant waiting for fulfilment (or fulfilled
+ *   but not yet verified) that the source now lists is verified.
  */
 
 export type ReconcileMode = "full" | "incremental";
@@ -40,6 +42,8 @@ export type ExistingGrant = {
   grantType: string;
   sourceIntegrationId: string | null;
   missingFromSourceAt: string | null;
+  /** ACCESS-P0-28: `none` for recorded access; a requested grant's progress otherwise. */
+  fulfilmentStatus?: string;
 };
 
 export type FieldChange = { field: string; from: string | null; to: string | null };
@@ -59,6 +63,8 @@ export type GrantPlan = {
   creates: { ref: string; accountId: string; entitlementId: string; grantType: string }[];
   removed: { id: string; accountId: string; entitlementId: string }[];
   restored: { id: string; accountId: string; entitlementId: string }[];
+  /** ACCESS-P0-28: requested grants the source now lists. */
+  verified: { id: string; accountId: string; entitlementId: string }[];
   unchanged: number;
   unresolved: { ref: string; reason: string }[];
 };
@@ -187,7 +193,7 @@ export function planGrants(input: {
   /** Live (not revoked) grants of the application's accounts. */
   existing: ExistingGrant[];
 }): GrantPlan {
-  const plan: GrantPlan = { creates: [], removed: [], restored: [], unchanged: 0, unresolved: [] };
+  const plan: GrantPlan = { creates: [], removed: [], restored: [], verified: [], unchanged: 0, unresolved: [] };
   const live = new Map<string, ExistingGrant[]>();
   for (const g of input.existing) {
     const k = `${g.accountId}|${g.entitlementId}`;
@@ -220,7 +226,9 @@ export function planGrants(input: {
     }
     const missing = current.filter((g) => g.missingFromSourceAt);
     for (const g of missing) plan.restored.push({ id: g.id, accountId, entitlementId });
-    if (!missing.length) plan.unchanged++;
+    const unverified = current.filter((g) => g.fulfilmentStatus === "pending_fulfilment" || g.fulfilmentStatus === "fulfilled_unverified");
+    for (const g of unverified) plan.verified.push({ id: g.id, accountId, entitlementId });
+    if (!missing.length && !unverified.length) plan.unchanged++;
   }
 
   if (input.mode === "full") {
@@ -234,13 +242,20 @@ export function planGrants(input: {
 
 export type AccessCounts = {
   entitlements: { added: number; changed: number; removed: number; restored: number; unchanged: number; invalid: number };
-  grants: { added: number; removed: number; restored: number; unchanged: number; unresolved: number };
+  grants: { added: number; removed: number; restored: number; verified: number; unchanged: number; unresolved: number };
 };
 
 export function countsOf(ents: EntitlementPlan, grants: GrantPlan): AccessCounts {
   return {
     entitlements: { added: ents.creates.length, changed: ents.updates.length, removed: ents.removed.length, restored: ents.restored.length, unchanged: ents.unchanged, invalid: ents.invalid.length },
-    grants: { added: grants.creates.length, removed: grants.removed.length, restored: grants.restored.length, unchanged: grants.unchanged, unresolved: grants.unresolved.length },
+    grants: {
+      added: grants.creates.length,
+      removed: grants.removed.length,
+      restored: grants.restored.length,
+      verified: grants.verified.length,
+      unchanged: grants.unchanged,
+      unresolved: grants.unresolved.length,
+    },
   };
 }
 
@@ -259,5 +274,6 @@ export function planFingerprint(ents: EntitlementPlan, grants: GrantPlan): strin
     gc: sorted(grants.creates.map((c) => `${c.accountId}|${c.entitlementId}|${c.grantType}`)),
     gr: sorted(grants.removed.map((r) => r.id)),
     gs: sorted(grants.restored.map((r) => r.id)),
+    gv: sorted(grants.verified.map((r) => r.id)),
   });
 }

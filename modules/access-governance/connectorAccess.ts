@@ -289,7 +289,7 @@ async function load(admin: Admin, tenantId: string, applicationId: string, integ
       (from, to) =>
         admin
           .from("access_grants")
-          .select("id, tenant_id, account_id, entitlement_id, grant_type, source_integration_id, missing_from_source_at")
+          .select("id, tenant_id, account_id, entitlement_id, grant_type, source_integration_id, missing_from_source_at, fulfilment_status")
           .eq("tenant_id", tenantId)
           .in("account_id", ids)
           .is("revoked_at", null)
@@ -305,6 +305,7 @@ async function load(admin: Admin, tenantId: string, applicationId: string, integ
         grantType: g.grant_type as string,
         sourceIntegrationId: (g.source_integration_id as string | null) ?? null,
         missingFromSourceAt: (g.missing_from_source_at as string | null) ?? null,
+        fulfilmentStatus: (g.fulfilment_status as string | undefined) ?? "none",
       });
     }
   }
@@ -414,5 +415,16 @@ async function applyGrants(admin: Admin, tenantId: string, integrationId: string
       const { error } = await admin.from("access_grants").update({ missing_from_source_at: value, updated_at: now }).eq("tenant_id", tenantId).in("id", part);
       if (error) throw new ApiError(500, "WRITE_FAILED", `access_grants: ${error.message}`);
     }
+  }
+  // ACCESS-P0-28: requested grants the source lists are verified, and from now on are this connection's
+  // (so a later full run marks them missing if the source drops them).
+  for (const part of chunks(plan.verified.map((v) => v.id), 500)) {
+    const { error } = await admin
+      .from("access_grants")
+      .update({ fulfilment_status: "verified", verified_at: now, source_integration_id: integrationId, missing_from_source_at: null, updated_at: now })
+      .eq("tenant_id", tenantId)
+      .in("id", part)
+      .in("fulfilment_status", ["pending_fulfilment", "fulfilled_unverified"]);
+    if (error) throw new ApiError(500, "WRITE_FAILED", `access_grants: ${error.message}`);
   }
 }

@@ -481,3 +481,11 @@ The only F1 story left is FOUNDATION-P0-31, which waits for decision D11. F2
 Admin is now seven groups: Identity Repository, Applications, Policies,
 Integrations, Users & Permissions, Settings and Compliance (owner decision).
 Risk Overview and its badge now include rogue-access findings.
+
+## 2026-10-11 — ACCESS-P0-28: approved requests become pending grants (F2 starts)
+
+An approved request (or package item) is now a grant waiting for
+fulfilment. It sits on a placeholder account when the person has none yet,
+and it is not counted as access. "Mark fulfilled" makes it unverified; the
+next reconciliation that sees it at the source verifies it. ACCESS-P0-29
+(fulfilment tasks) is next.

@@ -7,6 +7,7 @@ import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { AccessRequest, AccessRequestStatus, AccessRequestType } from "@/lib/shared/types/access-governance";
 import { toAccessRequest } from "./mappers";
 import { enforceSoD } from "./sod";
+import { markGrantsFulfilled, pendRequest } from "./pendingGrants";
 
 /**
  * ACCESS-P0-01.3. `access_requests` grants a client-facing INSERT, but its
@@ -120,7 +121,8 @@ export async function decideAccessRequest(
   // Conditional on the status read above, so two deciders cannot both win.
   const { data, error } = await supabase
     .from("access_requests")
-    .update({ status: decision, decided_by: actorId, decided_at: new Date().toISOString() })
+    // Fulfilling keeps the approver: decided_by/decided_at are the approval the ledger shows (the fulfiller is in the audit).
+    .update(decision === "fulfilled" ? { status: decision } : { status: decision, decided_by: actorId, decided_at: new Date().toISOString() })
     .eq("id", requestId)
     .eq("tenant_id", tenantId)
     .eq("status", existing.status)
@@ -140,6 +142,10 @@ export async function decideAccessRequest(
     // agentId lets a later separation-of-duties check see this decision.
     metadata: { previousStatus: existing.status, agentId: existing.agent_id, subjectIdentityId: existing.subject_identity_id ?? null },
   });
+
+  // ACCESS-P0-28: approval adds the pending grant; fulfilment says it was done on the target, not yet verified.
+  if (decision === "approved") await pendRequest(tenantId, requestId);
+  if (decision === "fulfilled") await markGrantsFulfilled(tenantId, { requestId });
 
   return toAccessRequest(data);
 }

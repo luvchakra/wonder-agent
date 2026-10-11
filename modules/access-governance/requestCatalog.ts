@@ -8,6 +8,7 @@ import { getIdentity, getIdentityForUser, getIdentityNames } from "@/modules/age
 import { toAccessRequest } from "./mappers";
 import { startApprovalChain } from "./approvals";
 import { approvalOutcome, assessRisk, evaluateRequest, resolvePolicy, validatePolicyInput, type RequestPolicy, type RiskLevel } from "./requestRules";
+import { pendRequest } from "./pendingGrants";
 
 /**
  * ACCESS-P0-18 — the self-service request catalog (spec §11): request
@@ -306,6 +307,8 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     outcome: "success",
     metadata: { subjectIdentityId: subject.id, applicationId, entitlementId, risk, policyId: policy!.id, durationDays: decision.durationDays, checks: decision.checks },
   });
+  // ACCESS-P0-28: approved by its policy alone, it becomes its pending grant at once.
+  if (request.status === "approved") await pendRequest(tenantId, request.id);
   if (request.status === "pending") {
     // ACCESS-P0-19: route it to its approvers. The request is stored either
     // way; a chain that cannot start now is built on the next waiting view

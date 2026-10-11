@@ -58,6 +58,8 @@ async function loadEffectiveApplications(tenantId: string, agentId: string): Pro
     .eq("accounts.agent_id", agentId)
     .eq("accounts.tenant_id", tenantId)
     .is("revoked_at", null)
+    // ACCESS-P0-28: a grant waiting for fulfilment is not access yet.
+    .neq("fulfilment_status", "pending_fulfilment")
     .returns<
       Array<{
         tenant_id: string;

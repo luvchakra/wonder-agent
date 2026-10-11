@@ -66,7 +66,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
     await readPaged((from, to) => {
       let q = admin
         .from("accounts")
-        .select("id, tenant_id, application_id, identity_id, agent_id, source, source_integration_id, created_at, last_seen_at, last_used_at, missing_from_source_at")
+        .select("id, tenant_id, application_id, identity_id, agent_id, status, source, source_integration_id, created_at, last_seen_at, last_used_at, missing_from_source_at")
         .eq("tenant_id", tenantId);
       if (scope.identityId) q = q.eq("identity_id", scope.identityId);
       return q.order("id").range(from, to);
@@ -79,7 +79,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
       (from, to) =>
         admin
           .from("access_grants")
-          .select("id, tenant_id, account_id, entitlement_id, source_integration_id, granted_at, revoked_at, missing_from_source_at")
+          .select("id, tenant_id, account_id, entitlement_id, source_integration_id, granted_at, revoked_at, missing_from_source_at, fulfilment_status")
           .eq("tenant_id", tenantId)
           .in("account_id", ids)
           .order("id")
@@ -112,6 +112,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
     lastUsedAt: (a.last_used_at as string | null) ?? null,
     missingFromSourceAt: (a.missing_from_source_at as string | null) ?? null,
     baselineAt: baseline(a.application_id, "accounts"),
+    awaitingVerification: a.status === "pending",
   }));
   // One relationship per account and entitlement: the latest grant row stands for it (a revoked one is kept only if none is live).
   const latest = new Map<string, Row>();
@@ -140,6 +141,7 @@ async function loadRelationships(tenantId: string, scope: { identityId?: string 
       // ACCESS-P0-27: the grant gone from the source, or its whole account.
       missingFromSourceAt: (g.missing_from_source_at as string | null) ?? (a.missing_from_source_at as string | null) ?? null,
       baselineAt: baseline(a.application_id, "access"),
+      awaitingVerification: g.fulfilment_status === "pending_fulfilment" || g.fulfilment_status === "fulfilled_unverified",
     });
   }
   return rels;

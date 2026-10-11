@@ -1,0 +1,32 @@
+import { describe, expect, it } from "vitest";
+import { chooseAccount, placeholderRef, requestFulfilment } from "./pendingGrantRules";
+
+describe("chooseAccount (ACCESS-P0-28)", () => {
+  it("uses the subject's one real account, ahead of a placeholder", () => {
+    expect(chooseAccount([{ id: "p", status: "pending" }, { id: "r", status: "active" }])).toEqual({ kind: "existing", accountId: "r" });
+  });
+  it("reuses the placeholder a request already made, else creates one", () => {
+    expect(chooseAccount([{ id: "p", status: "pending" }])).toEqual({ kind: "existing", accountId: "p" });
+    expect(chooseAccount([])).toEqual({ kind: "create" });
+  });
+  it("never picks between several real accounts", () => {
+    expect(chooseAccount([{ id: "a", status: "active" }, { id: "b", status: "active" }])).toEqual({ kind: "ambiguous", count: 2 });
+  });
+  it("names the placeholder after the subject", () => {
+    expect(placeholderRef({ identityId: "i1", agentId: null })).toBe("pending:i1");
+    expect(placeholderRef({ identityId: null, agentId: "a1" })).toBe("pending:agent:a1");
+  });
+});
+
+describe("requestFulfilment", () => {
+  const g = (fulfilmentStatus: string, revokedAt: string | null = null) => ({ fulfilmentStatus, revokedAt });
+  it("is the least advanced live grant, and verified only when all are", () => {
+    expect(requestFulfilment([g("verified"), g("pending_fulfilment")])).toBe("pending_fulfilment");
+    expect(requestFulfilment([g("verified"), g("fulfilled_unverified")])).toBe("fulfilled_unverified");
+    expect(requestFulfilment([g("verified"), g("none")])).toBe("verified");
+  });
+  it("is untracked with no live grant", () => {
+    expect(requestFulfilment([])).toBe("untracked");
+    expect(requestFulfilment([g("pending_fulfilment", "2026-10-11T00:00:00Z")])).toBe("untracked");
+  });
+});

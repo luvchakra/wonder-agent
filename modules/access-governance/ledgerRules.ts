@@ -63,6 +63,8 @@ export type LedgerRelationship = {
   missingFromSourceAt: string | null;
   /** ACCESS-P0-25: the application's baseline for this kind of relationship (accounts, or entitlements and access); null before one exists. */
   baselineAt?: string | null;
+  /** ACCESS-P0-28: requested and not yet verified at the source (a pending or unverified grant, or a placeholder account). */
+  awaitingVerification?: boolean;
 };
 
 export type RequestEvidence = {
@@ -221,7 +223,8 @@ export function ledgerEntry(rel: LedgerRelationship, evidence: LedgerEvidence, n
     accessGrantId: rel.accessGrantId,
     ...best,
     // Revoked in WonderID's records: whatever authorized it, the access itself has ended.
-    status: rel.revokedAt !== null ? "REVOKED" : best.status,
+    // Requested but not yet found at the source (ACCESS-P0-28): approved, not yet real.
+    status: rel.revokedAt !== null ? "REVOKED" : rel.awaitingVerification ? "PENDING_RECONCILIATION" : best.status,
     sourceIntegrationId: rel.sourceIntegrationId,
     firstSeenAt: rel.firstSeenAt,
     lastVerifiedAt: rel.lastSeenAt,
