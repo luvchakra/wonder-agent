@@ -19,6 +19,9 @@ const STATUS: Record<string, { label: string; tone: BadgeTone }> = {
   cancelled: { label: "Cancelled", tone: "neutral" },
 };
 
+// ACCESS-P0-30: what each task asks for on the target.
+const KIND: Record<string, string> = { grant: "Add", remove: "Remove", create_account: "Create account", disable_account: "Disable account" };
+
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 
 export default async function FulfilmentTasksPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
@@ -53,7 +56,8 @@ export default async function FulfilmentTasksPage({ searchParams }: { searchPara
           ) : (
             <ul className="divide-y divide-border">
               {tasks.map((t) => {
-                const label = `${t.entitlementName ?? "Access"} in ${t.applicationName ?? "an application"}`;
+                const what = t.kind === "create_account" || t.kind === "disable_account" ? KIND[t.kind] : `${KIND[t.kind] ?? "Add"} ${t.entitlementName ?? "access"}`;
+                const label = `${what} in ${t.applicationName ?? "an application"}`;
                 const status = STATUS[t.status] ?? { label: t.status, tone: "neutral" as BadgeTone };
                 return (
                   <li key={t.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">

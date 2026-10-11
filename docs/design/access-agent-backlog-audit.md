@@ -2514,3 +2514,72 @@ tracking state on the request alone, was not chosen.
 - Tasks for applications with write capability go to provisioning in F3.
   Until then every pending grant gets a task.
 - The single inbox for approvals and tasks is EXPERIENCE-P0-29.
+
+### 2026-10-11 — ACCESS-P0-30: remove-access and account requests (#52)
+
+**Built.**
+- **Migration 0123 (applied to dev; additive, nothing dropped):**
+  - `request_type` gains `remove` and `disable_account`;
+  - `access_grants.removal_status` (`pending_removal` → `removed_unverified`)
+    and `removal_request_id`;
+  - `access_fulfilment_tasks.kind` (grant, remove, create_account,
+    disable_account), with `removal_grant_id` and `account_id`, a check that
+    each kind names its subject, and one live task per grant or account and
+    kind.
+  - The first draft dropped and recreated two unique indexes; the database
+    tool cancels `drop index`. So the waiting-request key stays as it was, a
+    second waiting request of another type gets 409
+    `ANOTHER_REQUEST_WAITING`, and removal tasks reference their grant
+    through their own column.
+- **Submitting** (`submitAccessRequest`, `requestType`):
+  - A removal must name access the subject holds: live, not still pending,
+    and not already being removed. A disable needs an active account.
+    Otherwise the answer is 409 `NOTHING_TO_CHANGE`.
+  - Both are low risk and have no duration.
+  - A grant request with no entitlement asks for an account.
+- **On approval** (`pendRequest`):
+  - **Account request:** with no real account, a placeholder and a
+    create-account task.
+  - **Removal:** the grant becomes pending removal (it is still access) and a
+    removal task opens.
+  - **Disable:** a task for the one active account. Several accounts are
+    not guessed between; the case is audited instead.
+- **Done** on a task, or "Mark fulfilled" on the request
+  (`markRequestFulfilled`), records the change as made but not yet seen.
+- **Verification:**
+  - A full access reconciliation that no longer finds a grant with an
+    approved removal revokes it. The plan counts it as `revoked`, and the
+    ledger shows REVOKED.
+  - Account reconciliation closes create-account tasks when the placeholder
+    is replaced, and disable tasks when the account shows disabled or is no
+    longer listed (`verifyDisabledAccounts`).
+- **Request form:** a folded "Remove access or disable the account instead".
+  The default request is unchanged.
+- **Request page and API:** progress comes from the request's tasks, worded
+  for what was asked: "waiting for removal", "Removed · not yet verified",
+  "Removal verified at the source", and so on.
+- **Fulfilment Tasks:** each row says Add, Remove, Create account or Disable
+  account.
+
+**Per-line approval.** Every request is one line with its own approval route,
+so a line is approved on its own. Multi-line baskets ("request baskets") are
+a separate item in the design (§10, Access), not built here.
+
+**Verified.**
+- Vitest: access, UI and config suites 350/350. New tests:
+  - removal confirmed only by a full run;
+  - `requestProgress` (2 cases).
+- E2E (local):
+  - `f1-reconciliation` 16/16. The new test runs: remove → done →
+    unverified → the source drops it → revoked, REVOKED in the ledger,
+    verified; disable → done → the source shows it disabled → verified; a
+    new account → placeholder and task → the account arrives → verified,
+    placeholder gone.
+  - `request-catalog`, `approval-engine`, `access-packages` and `sod`
+    31/31.
+
+**Left out.**
+- Request baskets.
+- An approved grant request with no end date still answers as "open" when
+  the same access is requested again. This was true before; noted for
+  ACCESS-P0-32 (time-bound access).

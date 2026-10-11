@@ -38,3 +38,20 @@ export function requestFulfilment(grants: { fulfilmentStatus: string; revokedAt:
   if (live.some((g) => g.fulfilmentStatus === "fulfilled_unverified")) return "fulfilled_unverified";
   return "verified";
 }
+
+/**
+ * ACCESS-P0-30: a request's progress from its fulfilment tasks (every kind
+ * of request has them): still to do, done but not yet seen at the source,
+ * or verified. With no task (a request older than tasks, or access that
+ * already existed), its grants decide.
+ */
+export function requestProgress(
+  tasks: { status: string }[],
+  grants: { fulfilmentStatus: string; revokedAt: string | null }[],
+): FulfilmentState {
+  const live = tasks.filter((t) => t.status !== "cancelled");
+  if (!live.length) return requestFulfilment(grants);
+  if (live.some((t) => t.status === "open" || t.status === "claimed" || t.status === "failed")) return "pending_fulfilment";
+  if (live.some((t) => t.status === "completed")) return "fulfilled_unverified";
+  return "verified";
+}

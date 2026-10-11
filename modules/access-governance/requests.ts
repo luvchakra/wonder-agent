@@ -7,7 +7,7 @@ import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { AccessRequest, AccessRequestStatus, AccessRequestType } from "@/lib/shared/types/access-governance";
 import { toAccessRequest } from "./mappers";
 import { enforceSoD } from "./sod";
-import { markGrantsFulfilled, pendRequest } from "./pendingGrants";
+import { markRequestFulfilled, pendRequest } from "./pendingGrants";
 
 /**
  * ACCESS-P0-01.3. `access_requests` grants a client-facing INSERT, but its
@@ -145,7 +145,7 @@ export async function decideAccessRequest(
 
   // ACCESS-P0-28: approval adds the pending grant; fulfilment says it was done on the target, not yet verified.
   if (decision === "approved") await pendRequest(tenantId, requestId);
-  if (decision === "fulfilled") await markGrantsFulfilled(tenantId, { requestId });
+  if (decision === "fulfilled") await markRequestFulfilled(tenantId, requestId);
 
   return toAccessRequest(data);
 }

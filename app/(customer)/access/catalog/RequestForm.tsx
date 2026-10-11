@@ -39,6 +39,8 @@ export function RequestForm({
 }) {
   const [state, action, pending] = useActionState(submitRequestAction.bind(null, applicationId), IDLE);
   const [choice, setChoice] = useState(initialOption);
+  // ACCESS-P0-30: a request can also take access away or disable the account; folded, as the rarer case.
+  const [kind, setKind] = useState<"grant" | "remove" | "disable_account">("grant");
   const opt = options.find((o) => o.value === choice) ?? options[0];
   const durations = DURATIONS.filter((d) => opt.maxDurationDays === null || d <= opt.maxDurationDays);
   if (opt.maxDurationDays && !durations.includes(opt.maxDurationDays)) durations.push(opt.maxDurationDays);
@@ -54,21 +56,47 @@ export function RequestForm({
           </option>
         ))}
       </SelectField>
-      <SelectField label="Access" name="entitlementId" value={choice} onChange={(e) => setChoice(e.target.value)}>
-        {options.map((o) => (
-          <option key={o.value || "app"} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </SelectField>
-      <SelectField key={`${choice}-duration`} label="For how long" name="durationDays" defaultValue={defaultDuration}>
-        {opt.maxDurationDays === null ? <option value="">Until it is removed</option> : null}
-        {durations.map((d) => (
-          <option key={d} value={d}>
-            {d} days
-          </option>
-        ))}
-      </SelectField>
+      <input type="hidden" name="requestType" value={kind} />
+      {kind !== "disable_account" ? (
+        <SelectField label={kind === "remove" ? "Access to remove" : "Access"} name="entitlementId" value={choice} onChange={(e) => setChoice(e.target.value)}>
+          {options
+            .filter((o) => kind === "grant" || o.value)
+            .map((o) => (
+              <option key={o.value || "app"} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+        </SelectField>
+      ) : null}
+      {kind === "grant" ? (
+        <SelectField key={`${choice}-duration`} label="For how long" name="durationDays" defaultValue={defaultDuration}>
+          {opt.maxDurationDays === null ? <option value="">Until it is removed</option> : null}
+          {durations.map((d) => (
+            <option key={d} value={d}>
+              {d} days
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      <details className="text-sm" open={kind !== "grant"}>
+        <summary className="cursor-pointer text-muted-foreground">Remove access or disable the account instead</summary>
+        <div className="mt-2">
+          <SelectField
+            label="Request"
+            name="kind"
+            value={kind}
+            onChange={(e) => {
+              const next = e.target.value as typeof kind;
+              setKind(next);
+              if (next === "remove" && !choice) setChoice(options.find((o) => o.value)?.value ?? "");
+            }}
+          >
+            <option value="grant">Add access</option>
+            <option value="remove">Remove access</option>
+            <option value="disable_account">Disable the account</option>
+          </SelectField>
+        </div>
+      </details>
       <TextareaField
         label={opt.justificationRequired ? "Why you need it" : "Why you need it (optional)"}
         name="justification"
@@ -78,8 +106,8 @@ export function RequestForm({
         hint={opt.justificationRequired ? "At least 10 characters. The approver reads this." : undefined}
       />
       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/40 p-3 text-sm">
-        <Badge tone={RISK_TONE[opt.risk]}>{opt.risk} risk</Badge>
-        <span className="text-foreground">{approvalPreview(opt.approval, opt.risk)}</span>
+        <Badge tone={RISK_TONE[kind === "grant" ? opt.risk : "low"]}>{kind === "grant" ? opt.risk : "low"} risk</Badge>
+        <span className="text-foreground">{approvalPreview(opt.approval, kind === "grant" ? opt.risk : "low")}</span>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending || !opt.approval}>

@@ -499,3 +499,12 @@ organization's SLA and reminds its owner daily once overdue, and
 reconciliation closes it when the access is found at the source. The tasks
 are under Home › Access Governance › Fulfilment Tasks. ACCESS-P0-30
 (remove-access and account requests) is next.
+
+## 2026-10-11 — ACCESS-P0-30: remove-access and account requests
+
+A request can now remove access someone holds, ask for a new account, or
+disable an account. Each is approved on its own route and becomes a
+fulfilment task. It is confirmed by reconciliation: removed access is revoked
+once the source no longer lists it; a new account once it appears; a
+disabled account once the source shows it disabled. ACCESS-P0-31 (requests
+for non-human identities) is next.

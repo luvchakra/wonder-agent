@@ -196,7 +196,7 @@ export async function getRequestCatalogItem(tenantId: string, applicationId: str
 
 // ---------------------------------------------------------------- requests
 
-export type RequestInput = { subjectIdentityId?: unknown; applicationId?: unknown; entitlementId?: unknown; durationDays?: unknown; justification?: unknown };
+export type RequestInput = { subjectIdentityId?: unknown; applicationId?: unknown; entitlementId?: unknown; durationDays?: unknown; justification?: unknown; requestType?: unknown };
 export type RequestActor = { userId: string; canManageAccess: boolean };
 
 /**
@@ -210,6 +210,11 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
   const applicationId = typeof input.applicationId === "string" ? input.applicationId : "";
   const entitlementId = typeof input.entitlementId === "string" && input.entitlementId ? input.entitlementId : null;
   if (!UUID_RE.test(applicationId) || (entitlementId && !UUID_RE.test(entitlementId))) throw new ApiError(400, "VALIDATION_FAILED", "applicationId (and entitlementId, if given): ids");
+  // ACCESS-P0-30: access (or, with no entitlement, an account), access to remove, or an account to disable.
+  const requestType = input.requestType === undefined || input.requestType === null || input.requestType === "" ? "grant" : input.requestType;
+  if (requestType !== "grant" && requestType !== "remove" && requestType !== "disable_account") throw new ApiError(400, "VALIDATION_FAILED", "requestType: grant, remove or disable_account");
+  if (requestType === "remove" && !entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: the access to remove");
+  if (requestType === "disable_account" && entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: not used when disabling an account");
   const requester = await getIdentityForUser(tenantId, actor.userId);
   const subjectId = typeof input.subjectIdentityId === "string" && input.subjectIdentityId ? input.subjectIdentityId : requester?.id;
   if (!subjectId || !UUID_RE.test(subjectId)) throw new ApiError(400, "VALIDATION_FAILED", "subjectIdentityId: who the access is for");
@@ -228,6 +233,9 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
   if (!appRes.data) throw new ApiError(404, "NOT_FOUND", "applicationId: that application is not in this organization");
   if (entitlementId && (!entRes.data || entRes.data.application_id !== applicationId)) throw new ApiError(404, "NOT_FOUND", "entitlementId: not an entitlement of that application");
 
+  // ACCESS-P0-30: there must be something to remove or to disable (what the target last reported).
+  if (requestType !== "grant") await assertSomethingToChange(tenantId, subject.id, applicationId, requestType, entitlementId);
+
   // An identical open request is returned, not duplicated (spec §11.5).
   let dupQuery = supabase
     .from("access_requests")
@@ -235,6 +243,7 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     .eq("tenant_id", tenantId)
     .eq("subject_identity_id", subject.id)
     .eq("application_id", applicationId)
+    .eq("request_type", requestType)
     .in("status", ["pending", "approved"]);
   dupQuery = entitlementId ? dupQuery.eq("entitlement_id", entitlementId) : dupQuery.is("entitlement_id", null);
   const { data: open, error: dupError } = await dupQuery.order("created_at", { ascending: false }).limit(5);
@@ -244,13 +253,17 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
   if (stillOpen) return { request: toAccessRequest(stillOpen), duplicate: true };
 
   const policy = resolvePolicy(policies, applicationId, entitlementId);
-  const risk = assessRisk({
-    privilegeLevel: entRes.data?.privilege_level,
-    dataClassification: entRes.data?.data_classification,
-    appRiskLevel: appRes.data.risk_level,
-    appDataClassification: appRes.data.data_classification,
-  });
-  const durationRaw = input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
+  // Taking access away lowers risk, so a removal or a disable is low risk whatever it removes.
+  const risk =
+    requestType === "grant"
+      ? assessRisk({
+          privilegeLevel: entRes.data?.privilege_level,
+          dataClassification: entRes.data?.data_classification,
+          appRiskLevel: appRes.data.risk_level,
+          appDataClassification: appRes.data.data_classification,
+        })
+      : "low";
+  const durationRaw = requestType !== "grant" || input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
   const decision = evaluateRequest({
     policy,
     appActive: appRes.data.onboarding_status === "ACTIVE",
@@ -278,14 +291,15 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
       requested_by: actor.userId,
       application_id: applicationId,
       entitlement_id: entitlementId,
-      request_type: "grant",
+      request_type: requestType,
       justification,
       status: decision.initialStatus,
       request_policy_id: policy!.id,
       policy_result: { checks: decision.checks },
       risk_level: risk,
-      duration_days: decision.durationDays,
-      requested_expiry: decision.expiresAt,
+      // A removal or a disable lasts: it has no duration or expiry.
+      duration_days: requestType === "grant" ? decision.durationDays : null,
+      requested_expiry: requestType === "grant" ? decision.expiresAt : null,
       ...(decision.initialStatus === "approved" ? { decided_at: now.toISOString() } : {}),
     })
     .select()
@@ -294,6 +308,8 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     // Someone submitted the identical request a moment ago: return theirs.
     const { data: again } = await dupQuery.eq("status", "pending").limit(1).maybeSingle();
     if (again) return { request: toAccessRequest(again), duplicate: true };
+    // A waiting request of another kind for the same access holds the key until it is decided.
+    throw new ApiError(409, "ANOTHER_REQUEST_WAITING", "Another request for this access is waiting for approval; decide or cancel it first");
   }
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Could not submit the request");
   let request = toAccessRequest(data);
@@ -391,3 +407,33 @@ export async function listRequests(
 }
 
 
+
+/**
+ * ACCESS-P0-30: a removal names access the subject holds (live, not still
+ * waiting for fulfilment, and not already being removed); a disable needs
+ * an active account. Read with the service role, filtered on the tenant.
+ */
+async function assertSomethingToChange(tenantId: string, subjectId: string, applicationId: string, requestType: "remove" | "disable_account", entitlementId: string | null): Promise<void> {
+  const admin = supabaseServiceRole();
+  const { data: accounts, error } = await admin.from("accounts").select("id, tenant_id, status").eq("tenant_id", tenantId).eq("application_id", applicationId).eq("identity_id", subjectId).neq("status", "pending").limit(10);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const own = (accounts ?? []).filter((a) => a.tenant_id === tenantId);
+  if (requestType === "disable_account") {
+    if (!own.some((a) => a.status === "active")) throw new ApiError(409, "NOTHING_TO_CHANGE", "There is no active account on this application to disable");
+    return;
+  }
+  const { data: grants, error: grantError } = own.length
+    ? await admin
+        .from("access_grants")
+        .select("id")
+        .eq("tenant_id", tenantId)
+        .in("account_id", own.map((a) => a.id as string))
+        .eq("entitlement_id", entitlementId!)
+        .is("revoked_at", null)
+        .is("removal_status", null)
+        .neq("fulfilment_status", "pending_fulfilment")
+        .limit(1)
+    : { data: [], error: null };
+  if (grantError) throw new ApiError(500, "QUERY_FAILED", grantError.message);
+  if (!grants?.length) throw new ApiError(409, "NOTHING_TO_CHANGE", "This access is not held (or its removal is already under way)");
+}
