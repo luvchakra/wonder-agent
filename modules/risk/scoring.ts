@@ -77,6 +77,15 @@ export function computeSeverity(factors: RiskFactor[]): { severity: RiskSeverity
  * implemented as an explicit, auditable override rather than tuned
  * weights, per the backlog's own instruction.
  */
+/**
+ * WID-C03 (owner decision 2026-10-12): an agent set to "gateway only" that
+ * acted around the gateway is critical, whatever its score.
+ */
+export function applyGatewayOnlyOverride(severity: RiskSeverity, reasons: string[], gatewayOnlyBypass: boolean): { severity: RiskSeverity; reasons: string[] } {
+  if (!gatewayOnlyBypass) return { severity, reasons };
+  return { severity: "critical", reasons: [...reasons, "Acted around the Runtime Gateway although set to gateway only"] };
+}
+
 export function applyProhibitedDataOverride(
   severity: RiskSeverity,
   reasons: string[],

@@ -49,6 +49,8 @@ export type Agent = {
   lastSeenAt: string | null;
   nextReviewAt: string | null;
   retirementDate: string | null;
+  /** WID-C03: an action around the Runtime Gateway is critical and suspends the agent at the gateway. */
+  gatewayOnly?: boolean;
 };
 
 export type AgentIdentityType =

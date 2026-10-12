@@ -19,6 +19,7 @@ const LABEL: Record<EmergencyControl["controlType"], string> = {
   tool_suspension: "Tool suspended",
   mcp_server_suspension: "MCP server suspended",
   session_termination: "Session terminated",
+  agent_suspension: "Agent suspended",
 };
 
 const TARGET_LABEL: Record<string, string> = {

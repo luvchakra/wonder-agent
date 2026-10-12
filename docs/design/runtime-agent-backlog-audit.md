@@ -930,3 +930,27 @@ Verified:
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`. Next: bypass
 detection.
+
+### 2026-10-12 — Agent suspension at the gateway, for "gateway only" (WID-C03, owner decision)
+
+- New emergency control `agent_suspension` (target: the agent's id), in
+  `EMERGENCY_CONTROL_TYPES` and the check constraint (migration 0144,
+  applied). `toEmergencyState` folds it into `suspendedAgents`.
+- `suspendAgentAtGateway` (`emergency.ts`, published in `service.ts`):
+  - engaged by the system (`engaged_by` null) and audited as
+    `runtime.emergency_control_engaged` with `automatic: true`;
+  - an agent already suspended is left as it is.
+
+  Risk calls it for a "gateway only" bypass. Administrators can also engage
+  one through the existing engage path (the target must be an agent id).
+- The decision engine (Access's `runtimeDecision.ts`) denies every call for
+  a suspended agent (`AGENT_SUSPENDED`) and hides its tools.
+  `AGENT_SUSPENDED` is in `ALWAYS_BLOCKING_CODES`, so it blocks in Observe
+  mode too.
+- The Runtime page lists it as "Agent suspended", liftable like the other
+  controls.
+
+Verified:
+- `emergency.test.ts` and `runtimeDecision.test.ts`: new cases.
+- `npm run typecheck`, eslint and `npm run build`: clean.
+- E2E `runtime-gateway`: see the Risk entry of the same date.

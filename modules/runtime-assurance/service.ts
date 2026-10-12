@@ -21,6 +21,7 @@ export {
   engageEmergencyControl,
   liftEmergencyControl,
   listEmergencyControls,
+  suspendAgentAtGateway,
   loadActiveEmergencyState,
   toEmergencyState,
   EMERGENCY_CONTROL_TYPES,

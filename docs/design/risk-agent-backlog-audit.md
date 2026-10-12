@@ -1253,3 +1253,23 @@ Verified:
 
 Left out: accepted-exception and false-positive closure for rogue findings
 on human accounts.
+
+### 2026-10-12 — "Gateway only" bypass is critical and suspends the agent (WID-C03, owner decision)
+
+- For an agent with `gatewayOnly`, the `gateway_bypass` trigger carries
+  `gatewayOnlyBypass`. `applyGatewayOnlyOverride` (`scoring.ts`) makes it
+  critical, with the reason "Acted around the Runtime Gateway although set
+  to gateway only".
+- `evaluateAgentRisk` then calls Runtime's `suspendAgentAtGateway`. This is
+  the automatic remediation the owner approved under #15. The existing
+  auto-restrict on a critical finding still applies to ACTIVE agents.
+
+Verified:
+- `rules.test.ts`, "WID-C03, gateway only": critical and suspended with the
+  setting; scored as usual and nothing suspended without it.
+- `npx vitest run modules/risk modules/runtime-assurance
+  modules/access-governance modules/agent-identity`: 514 passed.
+- E2E, local against the production build: `runtime-gateway` and
+  `emergency-controls`, 26 passed (1.9 min). The new case: allowed in
+  Observe mode before; after the setting and a direct call, the finding is
+  critical and the next call is refused with `AGENT_SUSPENDED`.

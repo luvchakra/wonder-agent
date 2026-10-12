@@ -69,6 +69,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A sync that reads fewer records than the system says it holds counts as partial and marks nothing missing. |
 | 12 Oct 2026 | Audit records are kept at least a year on every plan: 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. |
 | 12 Oct 2026 | When someone leaves, a connection that can disable accounts (with changes turned on) disables their account at once; people still remove each access. |
+| 12 Oct 2026 | A "gateway only" setting per agent: acting around the gateway is critical and suspends the agent at the gateway. |
 
 ---
 
@@ -179,6 +180,7 @@ A gap between them, such as access the agent shouldn't have or something it did 
 **The Runtime Gateway**
 - **What it is:** agents can ask the gateway before taking an action. Only actions sent to the gateway are checked; an agent that calls a system directly is not checked or stopped.
 - **Bypass detection:** once an agent uses the gateway, any action WonderID sees from another source (MCP, a runtime or a webhook) without a gateway decision for it shortly before becomes a "gateway bypass" finding. So does an action that went ahead although the gateway said no. This finds a bypass after the fact; it does not stop it. Agents that never use the gateway are not judged.
+- **Gateway only:** on an agent's page (API keys → "Gateway only"), someone with emergency-control permission can turn this on. Then a bypass by that agent is a critical finding, and the agent is suspended at the gateway at once: every call is refused, in every mode, until an administrator lifts the suspension on the Runtime page.
 - **Two modes:**
   - *Observe* (the default): the decision is recorded and the agent is told to go ahead, except when an emergency control applies or no decision can be worked out: then it is told no.
   - *Enforce:* the agent is told to allow or block the action, against its contract and access. A platform administrator switches it on for an organization. If no decision can be worked out, the answer is block.

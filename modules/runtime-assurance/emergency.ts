@@ -25,6 +25,7 @@ export const EMERGENCY_CONTROL_TYPES: readonly EmergencyControlType[] = [
   "tool_suspension",
   "mcp_server_suspension",
   "session_termination",
+  "agent_suspension",
 ];
 
 type ControlRow = {
@@ -58,12 +59,13 @@ function toControl(row: ControlRow): EmergencyControl {
 
 /** Folds active control rows into the state the decision engine reads. Pure. */
 export function toEmergencyState(rows: Array<Pick<ControlRow, "control_type" | "target">>): RuntimeEmergencyState {
-  const state: RuntimeEmergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [] };
+  const state: RuntimeEmergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [], suspendedAgents: [] };
   for (const r of rows) {
     if (r.control_type === "kill_switch") state.killSwitch = true;
     else if (r.control_type === "tool_suspension" && r.target) state.suspendedTools.push(r.target);
     else if (r.control_type === "mcp_server_suspension" && r.target) state.suspendedMcpServers.push(r.target);
     else if (r.control_type === "session_termination" && r.target) state.terminatedSessions.push(r.target);
+    else if (r.control_type === "agent_suspension" && r.target) state.suspendedAgents.push(r.target);
   }
   return state;
 }
@@ -112,7 +114,10 @@ export async function engageEmergencyControl(
   if (!reason || reason.length > 500) throw new ApiError(400, "VALIDATION_FAILED", "A reason (up to 500 characters) is required");
   const target = controlType === "kill_switch" ? null : input.target?.trim() ?? "";
   if (controlType !== "kill_switch" && (!target || target.length > 200)) {
-    throw new ApiError(400, "VALIDATION_FAILED", "A target (tool, MCP server or session id, up to 200 characters) is required");
+    throw new ApiError(400, "VALIDATION_FAILED", "A target (tool, MCP server, session or agent id, up to 200 characters) is required");
+  }
+  if (controlType === "agent_suspension" && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(target ?? "")) {
+    throw new ApiError(400, "VALIDATION_FAILED", "An agent suspension names the agent's id");
   }
 
   const { data, error } = await supabaseServiceRole()
@@ -136,6 +141,33 @@ export async function engageEmergencyControl(
     metadata: { controlType, target, reason },
   });
   return toControl(data);
+}
+
+/**
+ * WID-C03 (owner decision 2026-10-12): an agent set to "gateway only" that
+ * acted around the gateway is suspended there at once. This is automatic
+ * remediation the owner approved under #15. Engaged by the system
+ * (engaged_by null), audited, and lifted by an administrator like any other
+ * control. Already suspended: nothing changes. Never throws: a failure is
+ * audited, and the critical finding still stands.
+ */
+export async function suspendAgentAtGateway(tenantId: string, agentId: string, reason: string): Promise<"suspended" | "already" | "failed"> {
+  const { data, error } = await supabaseServiceRole()
+    .from("runtime_emergency_controls")
+    .insert({ tenant_id: tenantId, control_type: "agent_suspension", target: agentId, reason: reason.slice(0, 500), engaged_by: null })
+    .select("id")
+    .single<{ id: string }>();
+  if (error?.code === "23505") return "already";
+  await writeAudit({
+    tenantId,
+    actorType: "system",
+    action: "runtime.emergency_control_engaged",
+    objectType: data ? "runtime_emergency_control" : "agent",
+    objectId: data?.id ?? agentId,
+    outcome: data ? "success" : "failure",
+    metadata: { controlType: "agent_suspension", target: agentId, reason, automatic: true, ...(error ? { error: error.message } : {}) },
+  });
+  return data ? "suspended" : "failed";
 }
 
 export async function liftEmergencyControl(tenantId: string, actorId: string, controlId: string, reason: string): Promise<EmergencyControl> {

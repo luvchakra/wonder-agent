@@ -78,6 +78,8 @@ export type RuntimeDecisionFacts = {
     suspendedMcpServers?: string[];
     /** RUNTIME-P0-18: agent sessions terminated by an administrator. */
     terminatedSessions?: string[];
+    /** WID-C03: agents suspended at the gateway. */
+    suspendedAgents?: string[];
   };
   runtimePolicies: RuntimePolicyFacts[];
 };
@@ -175,6 +177,8 @@ export function decideRuntimeRequest(facts: RuntimeDecisionFacts): RuntimeDecisi
   // 4. Emergency controls.
   if (facts.emergency.killSwitch) {
     step({ step: "emergency", outcome: "DENY", code: "KILL_SWITCH", reason: "The emergency kill switch is engaged." });
+  } else if (agent && (facts.emergency.suspendedAgents ?? []).includes(agent.id)) {
+    step({ step: "emergency", outcome: "DENY", code: "AGENT_SUSPENDED", reason: "This agent is suspended at the gateway." });
   } else if (request.tool && inList(facts.emergency.suspendedTools, request.tool)) {
     step({ step: "emergency", outcome: "DENY", code: "TOOL_SUSPENDED", reason: `Tool ${request.tool} is suspended.` });
   } else if (request.mcpServer && inList(facts.emergency.suspendedMcpServers ?? [], request.mcpServer)) {
@@ -406,6 +410,7 @@ export function filterToolsForAgent(
     if (!facts.tenantActive) return { code: "TENANT_INACTIVE", reason: "The organization is not active." };
     if (!facts.agent) return { code: "UNKNOWN_AGENT", reason: "The agent is not known in this organization." };
     if (facts.emergency.killSwitch) return { code: "KILL_SWITCH", reason: "The emergency kill switch is engaged." };
+    if ((facts.emergency.suspendedAgents ?? []).includes(facts.agent.id)) return { code: "AGENT_SUSPENDED", reason: "This agent is suspended at the gateway." };
     if (mcpServer && inList(facts.emergency.suspendedMcpServers ?? [], mcpServer)) {
       return { code: "MCP_SERVER_SUSPENDED", reason: `MCP server ${mcpServer} is suspended.` };
     }

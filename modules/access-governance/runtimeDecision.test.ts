@@ -91,6 +91,14 @@ describe("decideRuntimeRequest — master §21 fail-safe defaults", () => {
     ).toBe("TOOL_SUSPENDED");
   });
 
+  it("WID-C03: an agent suspended at the gateway → DENY, and its tools are hidden", () => {
+    const f = facts({ emergency: { killSwitch: false, suspendedTools: [], suspendedAgents: [facts().agent!.id] } });
+    expect(decideRuntimeRequest(f).code).toBe("AGENT_SUSPENDED");
+    expect(filterToolsForAgent(f, ["a", "b"]).every((t) => !t.visible && t.code === "AGENT_SUSPENDED")).toBe(true);
+    // Another agent's suspension does not touch this one.
+    expect(decideRuntimeRequest(facts({ emergency: { killSwitch: false, suspendedTools: [], suspendedAgents: ["other-agent"] } })).code).not.toBe("AGENT_SUSPENDED");
+  });
+
   it("explicit deny (prohibited action or data) → DENY", () => {
     expect(decideRuntimeRequest(facts({}, { action: "delete" })).code).toBe("ACTION_PROHIBITED");
     expect(decideRuntimeRequest(facts({}, { dataClassification: "PII" })).code).toBe("DATA_PROHIBITED");
