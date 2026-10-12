@@ -22,7 +22,7 @@ import {
   overRateLimit,
   parseCidrs,
   roleEscalation,
-  useRefusal,
+  refusalFor,
   type CredentialState,
   type CredentialStatus,
 } from "./automationCredentialRules";
@@ -516,7 +516,7 @@ async function automationAccessNow(): Promise<{ accessToken: string; userId: str
   const [method, path] = request.split(" ");
   const now = new Date();
 
-  const refusal = useRefusal({ ...row, tenant_status: found.tenantStatus }, ip, now);
+  const refusal = refusalFor({ ...row, tenant_status: found.tenantStatus }, ip, now);
   if (refusal) {
     if (refusal.status === 403) {
       await writeAudit({

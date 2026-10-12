@@ -10,7 +10,7 @@ import {
   overRateLimit,
   parseCidrs,
   roleEscalation,
-  useRefusal,
+  refusalFor,
 } from "./automationCredentialRules";
 
 const now = new Date("2026-10-12T10:00:00Z");
@@ -83,18 +83,18 @@ describe("address allowlist", () => {
 
 describe("use decision", () => {
   it("allows an approved, current credential", () => {
-    expect(useRefusal(ok, "1.2.3.4", now)).toBeNull();
+    expect(refusalFor(ok, "1.2.3.4", now)).toBeNull();
   });
 
   it("refuses pending, revoked and expired with 401", () => {
-    expect(useRefusal({ ...ok, status: "pending" }, null, now)).toMatchObject({ status: 401, code: "CREDENTIAL_PENDING" });
-    expect(useRefusal({ ...ok, status: "revoked" }, null, now)).toMatchObject({ status: 401, code: "CREDENTIAL_REVOKED" });
-    expect(useRefusal({ ...ok, expires_at: past }, null, now)).toMatchObject({ status: 401, code: "CREDENTIAL_EXPIRED" });
+    expect(refusalFor({ ...ok, status: "pending" }, null, now)).toMatchObject({ status: 401, code: "CREDENTIAL_PENDING" });
+    expect(refusalFor({ ...ok, status: "revoked" }, null, now)).toMatchObject({ status: 401, code: "CREDENTIAL_REVOKED" });
+    expect(refusalFor({ ...ok, expires_at: past }, null, now)).toMatchObject({ status: 401, code: "CREDENTIAL_EXPIRED" });
   });
 
   it("refuses a suspended organization and a disallowed address", () => {
-    expect(useRefusal({ ...ok, tenant_status: "suspended" }, null, now)).toMatchObject({ status: 401 });
-    expect(useRefusal({ ...ok, allowed_cidrs: ["10.0.0.0/8"] }, "1.2.3.4", now)).toMatchObject({ status: 403, code: "ADDRESS_NOT_ALLOWED" });
+    expect(refusalFor({ ...ok, tenant_status: "suspended" }, null, now)).toMatchObject({ status: 401 });
+    expect(refusalFor({ ...ok, allowed_cidrs: ["10.0.0.0/8"] }, "1.2.3.4", now)).toMatchObject({ status: 403, code: "ADDRESS_NOT_ALLOWED" });
   });
 
   it("limits calls per minute", () => {

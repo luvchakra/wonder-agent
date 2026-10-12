@@ -101,7 +101,7 @@ export type UseRefusal = { status: 401 | 403 | 429; code: string; message: strin
  * organization, are 401 (the caller is not authenticated); an address
  * outside the allowlist is 403; over the per-minute limit is 429.
  */
-export function useRefusal(
+export function refusalFor(
   row: { status: CredentialStatus; expires_at: string; allowed_cidrs: readonly string[]; tenant_status: string | null },
   ip: string | null,
   now: Date,
