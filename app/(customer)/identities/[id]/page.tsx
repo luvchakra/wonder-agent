@@ -18,7 +18,8 @@ import {
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getIdentityAccessLedger, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type IdentityAccessEntry, type LedgerStatus } from "@/modules/access-governance/service";
 import { RecordProvenance, Badge, Card, EmptyState, LinkButton, TabPanel, Tabs } from "@/modules/ui";
-import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm } from "../IdentityForms";
+import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm, UnlinkSourceRecordButton } from "../IdentityForms";
+import { listSourceLinksForIdentity } from "@/modules/integrations/service";
 import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
 
 // IDENTITY-P0-15/16/17 — one identity: its details, accountable people,
@@ -110,7 +111,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   if (!identity) notFound();
 
   const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
-  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance] = await Promise.all([
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
@@ -120,6 +121,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     personIdentity ? listLifecycleTasks(tenantId, { identityId: id }) : Promise.resolve([]),
     canReadAccess ? getIdentityAccessLedger(tenantId, id) : Promise.resolve(null),
     getRecordProvenance(tenantId, "identities", id),
+    identity.identityType === "AI_AGENT" ? Promise.resolve([]) : listSourceLinksForIdentity(tenantId, id),
   ]);
   const openTasks = lifecycleTasks.filter((t) => t.status === "open");
   const footprint = openTasks.some((t) => t.taskType === "transfer_ownership") ? await getOwnershipFootprint(tenantId, id) : null;
@@ -217,6 +219,24 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
               {isAgent && identity.riskScore !== null ? <Detail label="Risk score">{identity.riskScore}</Detail> : null}
               <Detail label="Added">{new Date(identity.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</Detail>
             </dl>
+            {sourceLinks.length ? (
+              <details className="mt-5 rounded-md border border-border" data-testid="source-records">
+                <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">
+                  Source records <span className="text-muted-foreground">({sourceLinks.length})</span>
+                </summary>
+                <ul className="divide-y divide-border border-t border-border text-sm">
+                  {sourceLinks.map((l) => (
+                    <li key={`${l.sourceId}:${l.externalId}`} className="flex flex-col gap-2 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+                      <span className="min-w-0">
+                        {l.sourceName} <span className="break-all font-mono text-xs text-muted-foreground">{l.externalId}</span>
+                        {l.present ? null : <span className="text-xs text-muted-foreground"> · not in the latest full import</span>}
+                      </span>
+                      {canManage ? <UnlinkSourceRecordButton identityId={identity.id} sourceId={l.sourceId} externalId={l.externalId} label={`${l.sourceName} record ${l.externalId}`} /> : null}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
             <p className="mt-5 text-xs text-muted-foreground">
               Changes to identities are recorded in the{" "}
               <Link href="/audit?objectType=identity" className="text-primary hover:underline">

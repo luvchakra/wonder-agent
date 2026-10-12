@@ -2813,3 +2813,26 @@ sources (see that audit log). On this side:
   value and source, and the other value and source.
 
 Verified with the Identity entry's checks (E2E `identity-sources` 18 passed).
+
+### 2026-10-12 — unlink a source record, with undo (WID-H01, owner decision)
+
+- `unlinkSourceRecord` (`identity.manage`, through
+  `POST /api/v1/integrations/identity-sources/{id}/unlink` and the identity
+  page) runs in this order:
+  1. Identity's `revertSourceRecord`; on failure nothing is unlinked;
+  2. records the rejection;
+  3. removes the link;
+  4. audits `identity_source.record_unlinked`.
+- `executeReconciliation` reads the source's rejections, and `correlate`
+  takes them: a match only to an identity the record was unlinked from
+  goes to Pending Matches with that identity as the candidate. Linking it
+  there removes the rejection.
+- `listSourceLinksForIdentity` (RLS, tenant filter) feeds the identity
+  page.
+
+Verified with the Identity entry's checks, plus E2E `identity-sources.spec.ts`, run locally: 20 passed. Its unlink case covers:
+- restored and kept fields;
+- a second unlink returns 404;
+- the next run holds the record in Pending Matches;
+- linking it back works;
+- another organization and a read-only member are refused.

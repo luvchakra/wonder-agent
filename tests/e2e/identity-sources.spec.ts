@@ -311,3 +311,53 @@ test.describe.serial("identity sources — custom attributes (INTEGRATION-P0-20)
     await ctx.close();
   });
 });
+
+test.describe.serial("identity sources — unlink with undo (WID-H01)", () => {
+  test.use({ storageState: authFile("adminOne") });
+  let personId = "";
+  let srcId = "";
+
+  test("unlinking a wrong match restores what it changed, keeps what changed since, and is never re-matched by itself", async ({ request }) => {
+    test.setTimeout(150_000);
+    personId = await createPerson(request, `E2E Unlink ${stamp}`, mail("unlink"));
+    expect((await request.patch(`/api/v1/identities/${personId}`, { data: { location: "Pune" } })).status()).toBe(200);
+    srcId = await createSource(request, { name: `E2E Unlink HR ${stamp}`, authoritative: true, priority: 10, authoritativeFields: ["department", "title"] });
+
+    // A record matched by email, but it is not this person.
+    const record = csv([["U1", `E2E Unlink ${stamp}`, mail("unlink"), "Finance", "Analyst", "", "active"]]);
+    expect(await runCsv(request, srcId, record, "partial")).toMatchObject({ updatedCount: 1, pendingCount: 0 });
+    expect(await identity(request, personId)).toMatchObject({ department: "Finance", title: "Analyst", location: "Pune" });
+
+    // A person corrects the title by hand afterwards.
+    expect((await request.patch(`/api/v1/identities/${personId}`, { data: { title: "Lead" } })).status()).toBe(200);
+
+    const res = await request.post(`/api/v1/integrations/identity-sources/${srcId}/unlink`, { data: { externalId: "U1" } });
+    expect(res.status(), await res.text()).toBe(200);
+    expect((await res.json()).data).toMatchObject({ identityId: personId, restored: ["department"], kept: ["title"] });
+    expect(await identity(request, personId)).toMatchObject({ department: null, title: "Lead", location: "Pune" });
+    const again = await request.post(`/api/v1/integrations/identity-sources/${srcId}/unlink`, { data: { externalId: "U1" } });
+    expect(again.status()).toBe(404);
+
+    // The next run does not link it back by itself: it waits for a person.
+    expect(await runCsv(request, srcId, record, "partial")).toMatchObject({ updatedCount: 0, createdCount: 0, pendingCount: 1 });
+    expect(await identity(request, personId)).toMatchObject({ department: null });
+    const pending = (await (await request.get(`/api/v1/integrations/correlations?sourceId=${srcId}`)).json()).data as { id: string; externalId: string; candidateIdentityIds: string[]; reason: string }[];
+    const held = pending.find((p) => p.externalId === "U1");
+    expect(held).toMatchObject({ candidateIdentityIds: [personId], reason: expect.stringMatching(/unlinked from/) });
+
+    // A person may link it back: the undo of the unlink.
+    const link = await request.post(`/api/v1/integrations/correlations/${held!.id}`, { data: { action: "link", identityId: personId } });
+    expect(link.status(), await link.text()).toBe(200);
+    expect(await identity(request, personId)).toMatchObject({ department: "Finance" });
+    expect(await runCsv(request, srcId, record, "partial")).toMatchObject({ pendingCount: 0 });
+  });
+
+  test("another organization cannot unlink it, and a read-only member may not unlink", async ({ browser }) => {
+    for (const who of ["adminTwo", "readOnly"] as const) {
+      const ctx = await browser.newContext({ storageState: authFile(who) });
+      const res = await ctx.request.post(`/api/v1/integrations/identity-sources/${srcId}/unlink`, { data: { externalId: "U1" } });
+      expect([403, 404]).toContain(res.status());
+      await ctx.close();
+    }
+  });
+});

@@ -46,6 +46,8 @@ export {
   listPendingCorrelations,
   countPendingCorrelations,
   resolvePendingCorrelation,
+  unlinkSourceRecord,
+  listSourceLinksForIdentity,
   type ReconciliationInput,
   type CorrelationDecision,
 } from "./identitySources";

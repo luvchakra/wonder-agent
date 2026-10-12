@@ -338,6 +338,8 @@ export function correlate(
   index: CorrelationIndexEntry[],
   linkedIdentityId: string | null,
   takenIdentityIds: Set<string>,
+  /** WID-H01: identities this record was unlinked from; never matched to again by itself. */
+  rejectedIdentityIds: ReadonlySet<string> = new Set(),
 ): CorrelationOutcome {
   if (linkedIdentityId) return { kind: "linked", identityId: linkedIdentityId };
   const pool = index.filter((e) => !takenIdentityIds.has(e.id));
@@ -359,6 +361,11 @@ export function correlate(
       matches = pool.filter((e) => fields.every((f, i) => norm(e[f]) === values[i]));
       label = `composite(${fields.join("+")})`;
     }
+    const rejected = matches.filter((m) => rejectedIdentityIds.has(m.id));
+    if (rejected.length && rejected.length === matches.length) {
+      return { kind: "ambiguous", candidateIds: rejected.slice(0, 10).map((m) => m.id), reason: `The only match on ${label} is an identity this record was unlinked from` };
+    }
+    matches = matches.filter((m) => !rejectedIdentityIds.has(m.id));
     if (matches.length === 1 && FORMER_STATUSES.has(String(matches[0].status ?? ""))) {
       return { kind: "ambiguous", candidateIds: [matches[0].id], reason: `The only match on ${label} is an identity that has left (${matches[0].status}): a rehire or a reused value` };
     }

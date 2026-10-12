@@ -1702,3 +1702,35 @@ Verified:
   `fixture-tenant-b81-test`) remain until the cleanup lines are run.
 
 Not done here: unlink with undo (the next WID-H01 item).
+
+### 2026-10-12 — unlink a source record, with undo (WID-H01, owner decision)
+
+- Migration 0148 (applied): `identity_source_changes` (this module) and
+  `identity_source_rejections` (Integration). Both have RLS select under
+  the tenant rule, no client write policy, and same-tenant composite
+  foreign keys.
+- `applySourcedIdentities` records each value it changes on an existing
+  identity (update and leaver paths) before it applies the change. If the
+  history insert fails, the record fails and nothing is changed.
+- `revertSourceRecord` (service role, explicit tenant filters): the pure
+  `planRevert` restores each field the record changed to its value before
+  the record's first change, with that value's provenance. A field changed
+  since is kept and named. A restored status recomputes the person's
+  lifecycle state, with no lifecycle event. The identity is written only if
+  `updated_at` is unchanged since it was read. Audited as
+  `identity.source_changes_undone` (field names only).
+- The identity page shows "Source records (n)", folded, with Unlink for
+  `identity.manage` (it asks first). The server action is
+  `unlinkSourceRecordAction`.
+
+Verified:
+- typecheck, eslint on the changed files, `npm run build`: clean;
+- `identitySourceRules.test.ts` 43 with the architecture tests (planRevert
+  3, correlate with rejections 1);
+- E2E: see the Integration entry.
+
+Not run: the 0148 checks added to
+`tests/integration/identity-sources-isolation.sql`. Database writes
+through the SQL tool were cancelled this session, so they wait for a
+session that can write (with the fixture cleanup noted in the previous
+entry).
