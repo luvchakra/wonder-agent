@@ -35,7 +35,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C03 Gateway bypass | P2 | Partly fixed | Done: a per-agent "gateway only" setting; a direct call is critical and suspends the agent at the gateway (owner decision 12 Oct). For the register to assess |
 | WID-H01 Identity correlation | P2 | Fixed (owner decisions 12 Oct) | Conflict list; unlink with undo for source records and accounts |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
-| WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
+| WID-H03 Incomplete syncs | P2 | Partly fixed | Nothing open on our side (checksums wait for a system that offers one); for the register to assess |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
@@ -474,9 +474,19 @@ Tests:
 - E2E `sync-failed-page.spec.ts`, 4th case: a page that answers 200 with
   nothing while `X-Total-Count` says more.
 
-**Next:**
-- Checksums, where a system offers one (none of the built-in types does
-  today).
+**Checked (12 Oct), nothing to build now:**
+- **Checksums:** no built-in connection type offers one, so there is
+  nothing to check against. They are added when a connected system offers
+  one (no speculative build, CLAUDE.md §3); `total` is the proof used
+  until then.
+- **Expired cursors and replay:** an incremental read asks for changes
+  since the last succeeded run's start time. That is a timestamp WonderID
+  keeps, not a token the system can expire. A cut-short run does not move
+  it, and replaying a window only re-applies the same upserts. The daily
+  full read is the reset.
+
+Nothing is open on our side; the register's closure criteria are for its
+audit to judge.
 
 ### WID-H04: rogue access provenance (P2, partly fixed)
 
