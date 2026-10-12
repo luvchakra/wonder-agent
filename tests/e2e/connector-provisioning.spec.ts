@@ -22,6 +22,8 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  *   is rogue with a finding; a reviewer asks to remove it; the request is
  *   approved under the application's policy, the connector removes it,
  *   reconciliation verifies it, and the finding resolves.
+ * - WID-H04: rogue access accepted as an exception (at most 90 days), then
+ *   closed as a false positive, is not flagged again.
  * - Adding access (slice 2): an approved grant is added by the connector
  *   and verified. For a person with no account yet, the connector creates
  *   the account first; the next read brings it in and replaces the
@@ -410,6 +412,48 @@ test.describe.serial("connector provisioning", () => {
     // A second ask is refused: the finding is closed.
     const again = await request.post(`/api/v1/findings/${raised!.id}/request-removal`);
     expect(again.status()).toBe(409);
+  });
+
+  test("WID-H04: rogue access accepted as an exception (90 days at most), then closed as a false positive, is not flagged again", async ({ request, page }) => {
+    test.setTimeout(180_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    // Ana is put back in Finance directly on the system: rogue again.
+    system.members["g-fin"].push("u-ana");
+    await syncAndWait(request);
+    const { data: ana } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-ana").single();
+    const findings = async () => (await db.from("risk_findings").select("id, status, exception_until, decision_reason, decided_by, resolution_type").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", ana!.id).order("created_at", { ascending: false })).data ?? [];
+    await expect.poll(async () => (await findings())[0]?.status, { timeout: 60_000 }).toBe("open");
+    const [finding] = await findings();
+
+    // Too long an exception is refused.
+    const tooLong = new Date(Date.now() + 120 * 86_400_000).toISOString().slice(0, 10);
+    const refused = await request.post(`/api/v1/findings/${finding.id}/decision`, { data: { outcome: "exception", reason: "Audit season", until: tooLong } });
+    expect(refused.status()).toBe(400);
+
+    // Accepted as an exception from the account page, for 30 days.
+    const until = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    await page.goto(`/access/accounts/${ana!.id}`);
+    const row = page.getByRole("listitem").filter({ hasText: "Finance" });
+    await row.getByText("Other outcomes").click();
+    await row.getByLabel("Until (90 days at most)").fill(until);
+    await row.getByLabel("Reason").fill("Covering month-end close");
+    await row.getByRole("button", { name: "Save" }).click();
+    await expect(row).toContainText(`Exception until ${until}`, { timeout: 30_000 });
+    expect((await findings())[0]).toMatchObject({ status: "exception", decision_reason: "Covering month-end close", decided_by: expect.any(String) });
+
+    // A later read keeps the one finding: no duplicate while excepted.
+    await syncAndWait(request);
+    expect((await findings()).length).toBe(1);
+
+    // Closed as a false positive: the same grant is not flagged again on the next read.
+    const fp = await request.post(`/api/v1/findings/${finding.id}/decision`, { data: { outcome: "false_positive", reason: "Granted by the payroll process, approved outside WonderID" } });
+    expect(fp.status(), await fp.text()).toBe(200);
+    expect((await findings())[0]).toMatchObject({ status: "false_positive", resolution_type: "false_positive", exception_until: null });
+    await syncAndWait(request);
+    expect((await findings()).map((f) => f.status)).toEqual(["false_positive"]);
+
+    const { data: audit } = await db.from("audit_logs").select("metadata").eq("tenant_id", tenantId).eq("object_id", finding.id).eq("action", "risk.access_finding_decided");
+    expect((audit ?? []).map((a) => (a.metadata as { outcome: string }).outcome).sort()).toEqual(["exception", "false_positive"]);
   });
 
   test("slice 2: approved access is added by the connector and verified", async ({ request }) => {

@@ -36,7 +36,7 @@ met, with evidence), or Waiting on the owner.
 | WID-H01 Identity correlation | P2 | Partly fixed | Build: unlink with undo, and a conflict list beside the current source-priority rule (owner decisions 12 Oct) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
-| WID-H04 Rogue access provenance | P2 | Partly fixed | Build: accepted exception (90 days at most, decided by someone else) and false positive for findings on people's accounts (owner decision 12 Oct) |
+| WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P2 | Partly fixed | Retention defaults done (0143). Build: typed text out of audit records, then identifiers only (owner decisions 12 Oct) |
@@ -57,7 +57,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Done: when on, a detected direct call is a critical finding and the agent is suspended at the gateway automatically (`agent_suspension` control). The owner approved that automatic suspension under #15. |
 | 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Build: an administrator unlinks a source record or account; the attribute values the link changed are restored from history; accounts go back for matching; audited. |
 | 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Build: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources. |
-| 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Build: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
+| 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Done: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
 | 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
 | 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Build: audit rows keep the record's id and a fingerprint (hash) of the text; the words stay on the request or task, where erasure can reach them. |
 | 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Build, after the item above: audit records hold ids, never personal data; erasure pseudonymizes the records the ids point to. |
@@ -447,12 +447,32 @@ Tests:
 **Owner decision (12 Oct):** accepted exception and false positive, both
 governed.
 
-**Next (P2):** build them for rogue-access findings on people's accounts:
-- an accepted exception needs a reason, an end date at most 90 days away,
-  and a decider other than the account's owner; the finding reopens when it
-  ends;
-- a false positive needs a reason;
-- both are audited and kept in the finding's history.
+**Done:** both, for rogue-access findings on any account (people's,
+service accounts' and agents' accounts alike):
+- an **accepted exception** needs a reason and an end date at most 90 days
+  away. The finding moves to `exception`; the next sync after the date
+  reopens it (`reopenEndedExceptions`). The account's ticket stays open
+  meanwhile;
+- a **false positive** needs a reason. It closes the finding; a later sync
+  does not flag the same grant again, and the ticket closes with the
+  account's last finding;
+- someone other than the account's owner decides: the decider's identity
+  must not be the account's (`decidesOwnAccess`), `risk.manage` is required,
+  and the result is audited (`risk.access_finding_decided`). The finding
+  keeps `decided_by`, `decided_at` and `decision_reason` (migration 0145,
+  applied, which also caps an exception at 90 days in the database).
+
+UI: "Other outcomes", folded under each rogue row on the account page. API:
+`POST /api/v1/findings/{id}/decision`.
+
+Tests:
+- `accessFindingRules.test.ts` ("rogue-access decisions");
+- E2E `connector-provisioning`, "WID-H04": an exception over 90 days is
+  refused; a 30-day exception is set from the account page; the next read
+  keeps one finding; a false positive closes it and the next read does not
+  flag it again; both decisions are in the audit trail.
+
+**Next:** none of ours.
 
 ### WID-H05: connector security (P3, partly fixed)
 

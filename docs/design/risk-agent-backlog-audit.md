@@ -1273,3 +1273,36 @@ Verified:
   `emergency-controls`, 26 passed (1.9 min). The new case: allowed in
   Observe mode before; after the setting and a direct call, the finding is
   critical and the next call is refused with `AGENT_SUSPENDED`.
+
+### 2026-10-12 — Accepted exception and false positive for rogue access (WID-H04, owner decision)
+
+- Rules (`accessFindingRules.ts`):
+  - `validateRogueDecision`: exception needs a reason and an end at most
+    90 days away (a date means the end of that day, UTC); false positive
+    needs a reason;
+  - `decidesOwnAccess`;
+  - `exceptionEnded`.
+- `decideRogueFinding` (`accessFindings.ts`):
+  - service role, tenant-filtered, open rogue findings only;
+  - refuses the account's owner (`SELF_DECISION`, 403);
+  - an exception sets `status = exception` and `exception_until`; a false
+    positive sets `status = false_positive` and
+    `resolution_type = false_positive`;
+  - both record `decided_by`, `decided_at` and `decision_reason`, and are
+    audited as `risk.access_finding_decided`.
+- `syncRogueAccessFindings`:
+  - first reopens ended exceptions (`reopenEndedExceptions`, audited as
+    `risk.access_finding_exception_ended`);
+  - never re-creates a finding for a grant closed as a false positive.
+- Migration 0145 (applied): the decision columns, plus a check that a rogue
+  exception ends within 90 days of its decision.
+- Route `POST /api/v1/findings/{id}/decision` (`risk.manage`).
+- Account page: `CloseRogueFinding`, folded under each rogue row ("Other
+  outcomes"); an excepted row shows "Exception until …".
+
+Verified:
+- `npx vitest run modules/risk`: 80 passed (including the new rule cases).
+- `npm run typecheck`, eslint on the changed files and `npm run build`:
+  clean.
+- E2E, local against the production build: `connector-provisioning` and
+  `f1-reconciliation`, 36 passed (9.7 min), including "WID-H04".

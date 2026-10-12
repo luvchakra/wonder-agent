@@ -70,6 +70,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Audit records are kept at least a year on every plan: 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. |
 | 12 Oct 2026 | When someone leaves, a connection that can disable accounts (with changes turned on) disables their account at once; people still remove each access. |
 | 12 Oct 2026 | A "gateway only" setting per agent: acting around the gateway is critical and suspends the agent at the gateway. |
+| 12 Oct 2026 | Rogue access on an account can be accepted as an exception (up to 90 days) or closed as a false positive, with a reason, by someone other than the account's owner. |
 
 ---
 
@@ -412,6 +413,10 @@ Findings are raised for:
 - **Raising:** access that appeared in a system with no approval raises a finding.
 - **One ticket per account:** a rogue account gets one ticket, such as **RA-000012**, numbered in order within your organization. Everything rogue found on that account belongs to the same ticket. You can quote the number in conversations and other tools; it shows on the account page and in Risk Overview.
 - **Fixing:** for each piece of rogue access, a reviewer clicks **Remove access**, which raises an ordinary request under the application's rules. The request quotes the account's ticket number.
+- **Other outcomes:** under **Other outcomes** on the account page, someone with risk-management permission, and never the account's owner, can instead:
+  - accept it as an **exception** until a date at most 90 days away, with a reason. The finding reopens on that date, and the ticket stays open meanwhile;
+  - close it as a **false positive**, with a reason. The same access is not flagged again.
+  Both are kept on the finding and in the audit trail.
 - **Closing:** the ticket stays open until all of the account's rogue access is dealt with. Each finding records how: **removed** (confirmed by a later sync), or **approved afterwards**, with the request that approved it attached. The access history keeps the earlier Rogue status either way. If rogue access turns up on the same account later, a new ticket opens.
 
 **Investigations**

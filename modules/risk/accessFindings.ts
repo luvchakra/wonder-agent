@@ -4,7 +4,8 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessFinding, FindingStatus, ResolutionType, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
-import { rogueResolution, type RogueResolution } from "./accessFindingRules";
+import { decidesOwnAccess, exceptionEnded, rogueResolution, validateRogueDecision, type RogueDecisionInput, type RogueResolution } from "./accessFindingRules";
+import { getIdentityForUser } from "@/modules/agent-identity/service";
 
 /**
  * ACCESS-P0-25 — findings about access on an application account (a
@@ -62,6 +63,8 @@ function toAccessFinding(r: Row): AccessFinding {
     resolutionReason: (r.resolution_reason as string | null) ?? null,
     remediationRequestId: (r.remediation_request_id as string | null) ?? null,
     remediationRequestStatus: null,
+    exceptionUntil: (r.exception_until as string | null) ?? null,
+    decisionReason: (r.decision_reason as string | null) ?? null,
   };
 }
 
@@ -147,6 +150,22 @@ async function resolutionsFor(tenantId: string, findingIds: string[]): Promise<M
  */
 export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAccess[]): Promise<{ created: number; resolved: number; failed: number }> {
   const admin = supabaseServiceRole();
+  // WID-H04: an accepted exception that has ended is open again.
+  await reopenEndedExceptions(tenantId);
+  // WID-H04: a grant a person closed as a false positive is not flagged again.
+  const falsePositive = new Set<string>();
+  {
+    const { data, error } = await admin
+      .from("risk_findings")
+      .select("tenant_id, subject_key, access_grant_id")
+      .eq("tenant_id", tenantId)
+      .eq("category", "rogue_access")
+      .eq("status", "false_positive")
+      .not("access_grant_id", "is", null)
+      .limit(5000);
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    for (const r of (data ?? []) as Row[]) if (r.tenant_id === tenantId) falsePositive.add(`${r.subject_key}|${r.access_grant_id}`);
+  }
   const open = new Map<string, string>();
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin
@@ -171,6 +190,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
 
   for (const [key, r] of wanted) {
     if (open.has(key)) continue;
+    if (r.accessGrantId && falsePositive.has(`${key}|${r.accessGrantId}`)) continue;
     const { data, error } = await admin
       .from("risk_findings")
       .insert({
@@ -256,4 +276,88 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
     });
   }
   return result;
+}
+
+/**
+ * WID-H04 (owner decision 2026-10-12): a person closes a rogue-access
+ * finding without removing the access: an accepted exception (a reason and
+ * an end at most 90 days away; it reopens then) or a false positive (a
+ * reason; the same grant is not flagged again). Someone other than the
+ * account's owner decides. Service role (findings have no client write
+ * policy); every statement is filtered on `tenantId`; audited.
+ */
+export async function decideRogueFinding(tenantId: string, actorId: string, findingId: string, input: RogueDecisionInput, now = new Date()): Promise<AccessFinding> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(findingId)) throw new ApiError(404, "FINDING_NOT_FOUND");
+  const decision = validateRogueDecision(input, now);
+  if ("error" in decision) throw new ApiError(400, "VALIDATION_FAILED", decision.error);
+  const admin = supabaseServiceRole();
+  const { data: finding, error } = await admin
+    .from("risk_findings")
+    .select("id, tenant_id, status, identity_id")
+    .eq("tenant_id", tenantId)
+    .eq("id", findingId)
+    .eq("category", "rogue_access")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!finding || finding.tenant_id !== tenantId) throw new ApiError(404, "FINDING_NOT_FOUND");
+  if (!OPEN.includes(finding.status as FindingStatus)) throw new ApiError(409, "FINDING_CLOSED", "This finding is already closed");
+  const decider = await getIdentityForUser(tenantId, actorId);
+  if (decidesOwnAccess(decider?.id ?? null, (finding.identity_id as string | null) ?? null)) {
+    throw new ApiError(403, "SELF_DECISION", "Someone other than the account's owner decides on its access");
+  }
+  const decidedAt = now.toISOString();
+  const set =
+    decision.outcome === "exception"
+      ? { status: "exception", exception_until: decision.until, decision_reason: decision.reason, decided_by: actorId, decided_at: decidedAt }
+      : { status: "false_positive", resolution_type: "false_positive", resolution_reason: decision.reason, resolved_at: decidedAt, exception_until: null, decision_reason: decision.reason, decided_by: actorId, decided_at: decidedAt };
+  const { data: updated, error: updateError } = await admin
+    .from("risk_findings")
+    .update(set)
+    .eq("tenant_id", tenantId)
+    .eq("id", findingId)
+    .eq("status", finding.status as string)
+    .select(`*, ${TICKET}`)
+    .maybeSingle();
+  if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  if (!updated) throw new ApiError(409, "CONFLICT", "The finding changed meanwhile; reload");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "risk.access_finding_decided",
+    objectType: "risk_finding",
+    objectId: findingId,
+    outcome: "success",
+    metadata: { outcome: decision.outcome, reason: decision.reason, until: decision.until, fromStatus: finding.status },
+  });
+  return toAccessFinding(updated as Row);
+}
+
+/** WID-H04: accepted exceptions whose end has passed are open again. Returns how many. */
+export async function reopenEndedExceptions(tenantId: string, now = new Date()): Promise<number> {
+  const admin = supabaseServiceRole();
+  const { data, error } = await admin
+    .from("risk_findings")
+    .select("id, tenant_id, exception_until")
+    .eq("tenant_id", tenantId)
+    .eq("category", "rogue_access")
+    .eq("status", "exception")
+    .lte("exception_until", now.toISOString())
+    .limit(500);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const ended = ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId && exceptionEnded((r.exception_until as string | null) ?? null, now)).map((r) => r.id as string);
+  if (!ended.length) return 0;
+  const { data: reopened, error: updateError } = await admin
+    .from("risk_findings")
+    .update({ status: "open", exception_until: null })
+    .eq("tenant_id", tenantId)
+    .eq("status", "exception")
+    .in("id", ended)
+    .select("id");
+  if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  const ids = ((reopened ?? []) as Row[]).map((r) => r.id as string);
+  if (ids.length) {
+    await writeAudit({ tenantId, actorType: "system", action: "risk.access_finding_exception_ended", objectType: "tenant", objectId: tenantId, outcome: "success", metadata: { reopened: ids.slice(0, 500) } });
+  }
+  return ids.length;
 }
