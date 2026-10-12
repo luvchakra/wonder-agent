@@ -2676,3 +2676,28 @@ base says so.
 
 Left out (next slices): SCIM Groups, bulk operations, RFC 9967 security
 events, and a mapping preset for SCIM in the identity source form.
+
+### 2026-10-12 — A sync cut short at a limit counts as partial (WID-H03)
+
+- `runStatus` (new, pure, `stagingRules.ts`) decides a run's status:
+  - errors give partial, or failed when nothing was stored, as before;
+  - with no errors, a kind whose read was `truncated` (stopped at a page
+    or record limit) gives partial;
+  - otherwise the run succeeded.
+- `runSyncJob` uses it, and adds one line per truncated kind to the run's
+  errors saying why it is partial.
+- Only succeeded runs feed `lastGoodRuns`. So a cut-short run no longer
+  moves the incremental cursor (`lastSucceededStart`), and no longer
+  resets the daily full-read clock (`lastFullSucceededStart`). The
+  pipeline after a sync still runs for partial imports.
+
+Verified:
+- `npx vitest run modules/integrations`: 358 passed, including 3 new
+  `runStatus` cases.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local: `connector-provisioning`, `identity-sources` and
+  `connection-upgrade` passed 26/26 (with `--timeout 120000`).
+
+Left out: mass-missing thresholds per kind, and an E2E test for a page
+that fails in the middle of a read. Both are tracked in
+`docs/WonderID/FINDINGS-REMEDIATION.md`.

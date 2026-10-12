@@ -13,7 +13,7 @@ import { getDecryptedCredential, keepObtainedTokens } from "./credentials";
 import { openGateway, type GatewaySession } from "./gateway/gateway";
 import { planAfterSync, runPipeline } from "./syncPipeline";
 import { pipelineStatusOf, type ImportOutcome } from "./pipelineRules";
-import { chooseRunMode, heldKinds, kindCompleteness, missingStatusOf, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
+import { chooseRunMode, heldKinds, kindCompleteness, missingStatusOf, runStatus, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -327,7 +327,9 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     // LDAP and SQL drivers hold a connection open for the run.
     await connector.close();
 
-    const finalStatus = errors.length === 0 ? "succeeded" : recordsProcessed > 0 ? "partial" : "failed";
+    const finalStatus = runStatus(errors.length, recordsProcessed, kindRuns.values());
+    // WID-H03: say why a run with no errors is partial.
+    for (const [kind, run] of kindRuns) if (run.truncated) errors.push({ objectType: kind, message: "The read stopped at a limit, so this run counts as partial: the next incremental read starts from the last complete run." });
 
     // INTEGRATION-P0-18: objects a complete full read did not see are missing at the source.
     const missingSummary = finalStatus === "failed" ? {} : await markMissing(tenantId, jobId, mode, kindRuns);

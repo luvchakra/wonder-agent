@@ -35,7 +35,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
-| WID-H03 Incomplete syncs | P2 | Not started | A cut-short incremental run counts as partial and does not move the cursor |
+| WID-H03 Incomplete syncs | P2 | Partly fixed | Thresholds per kind; tests for a failed page in the middle of a read |
 | WID-H04 Rogue access provenance | P2 | Not started | A separate "approved afterwards" resolution; closure for findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
 | WID-H06 Automation credentials | P2 | Fixed | Nothing left from the register's closure criteria; refusals with an unknown key have no organization to audit to |
@@ -175,12 +175,30 @@ claims "never applied twice".
 - Read the system before a retry after an unclear failure.
 - Declare which connection types honour the key.
 
-### WID-H03: incomplete syncs (P2, not started)
+### WID-H03: incomplete syncs (P2, partly fixed)
+
+**Already true:**
+- Records are marked missing only for a kind read completely in a full run
+  with no failures.
+- The mass-missing hold.
+
+**Done:** a run in which any kind's read stopped at a limit is partial,
+not succeeded, and says why on the run (`runStatus` in `stagingRules.ts`).
+Only succeeded runs are a base for the next incremental read and for the
+daily full read (`lastGoodRuns`). So:
+- a cut-short incremental run no longer moves the cursor;
+- a cut-short full run no longer resets the daily full-read clock.
+
+The steps after a sync still run for a partial run.
+
+Tests:
+- `stagingRules.test.ts`, "runStatus";
+- E2E `connector-provisioning`, `identity-sources` and
+  `connection-upgrade`: 26/26.
 
 **Next:**
-- A cut-short incremental run counts as partial and does not move the
-  cursor.
-- Thresholds per kind.
+- Mass-missing thresholds per kind.
+- An E2E test for a page that fails in the middle of a read.
 
 ### WID-H04: rogue access provenance (P2, not started)
 
