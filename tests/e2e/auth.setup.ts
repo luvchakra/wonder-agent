@@ -1,5 +1,5 @@
 import { test as setup, expect } from "@playwright/test";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { clearAuthRateLimits, pruneThrowawayAgents, pruneThrowawayIntegrationsAndQuarantine, seedTestData } from "./support/seedTestData";
 import { TEST_USERS, authFile, type TestUserKey } from "./support/testUsers";
 
@@ -57,7 +57,17 @@ function signInAndSaveState(key: TestUserKey) {
       await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
     }
 
-    await page.context().storageState({ path: authFile(key) });
+    // The saved state is shared by every spec, in contexts opened at any
+    // time during the run. It keeps the Supabase session but not the app's
+    // own session-timing cookies (wa_session_started_at, wa_session_last_seen):
+    // carried in a context opened more than the organization's idle limit
+    // (30 minutes) after setup, a setup-time "last seen" made the proxy treat
+    // the session as idle and sign the user out globally, ending it for every
+    // other spec too (nightly of 12 October). Without them, each context's
+    // clock starts at its first request, as for a fresh sign-in.
+    const state = await page.context().storageState();
+    state.cookies = state.cookies.filter((c) => !c.name.startsWith("wa_session_"));
+    writeFileSync(authFile(key), JSON.stringify(state, null, 2));
   });
 }
 

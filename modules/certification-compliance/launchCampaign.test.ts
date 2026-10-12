@@ -59,8 +59,9 @@ function campaignsTable() {
 
 function itemsTable() {
   return {
-    insert: (row: Record<string, unknown>) => {
-      insertedItems.push(row);
+    // Items are written in bulk (an array), like the real client accepts.
+    insert: (rows: Record<string, unknown> | Record<string, unknown>[]) => {
+      insertedItems.push(...(Array.isArray(rows) ? rows : [rows]));
       return Promise.resolve({ error: null });
     },
   };

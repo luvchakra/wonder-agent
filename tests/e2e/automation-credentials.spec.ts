@@ -1,6 +1,6 @@
 import { test, expect, request as playwrightRequest, type Browser, type APIRequestContext } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { authFile, E2E_PASSWORD, TEST_USERS, TENANT_ONE, TENANT_TWO } from "./support/testUsers";
+import { authFile, TEST_USERS, TENANT_ONE, TENANT_TWO } from "./support/testUsers";
 import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
 
 /**
@@ -36,17 +36,14 @@ async function bearer(baseURL: string | undefined): Promise<APIRequestContext> {
   return playwrightRequest.newContext({ baseURL, extraHTTPHeaders: { Authorization: `Bearer ${secret}` } });
 }
 
-async function signInAs(browser: Browser, email: string) {
-  const { data } = await db().from("users").select("id").eq("email", email).single();
-  expect((await db().auth.admin.updateUserById(data!.id as string, { password: E2E_PASSWORD })).error).toBeNull();
-  const ctx = await browser.newContext();
-  const page = await ctx.newPage();
-  await page.goto("/sign-in");
-  await page.getByRole("textbox", { name: "Email" }).fill(email);
-  await page.locator("#password").fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.waitForURL((url) => !url.pathname.startsWith("/sign-in"));
-  return page;
+/**
+ * The second administrator, from the saved session. Never by resetting the
+ * shared user's password: that ends every session the user holds, including
+ * the saved one every other spec uses (nightly of 12 October).
+ */
+async function asIamAdmin(browser: Browser) {
+  const ctx = await browser.newContext({ storageState: authFile("iamAdminOne") });
+  return ctx.newPage();
 }
 
 test.describe.serial("automation credentials", () => {
@@ -107,7 +104,7 @@ test.describe.serial("automation credentials", () => {
   });
 
   test("a second administrator approves; the credential acts with its role only, in its own organization", async ({ browser, baseURL }) => {
-    const approver = await signInAs(browser, TEST_USERS.iamAdminOne.email);
+    const approver = await asIamAdmin(browser);
     await approver.goto("/settings/automation");
     const row = approver.getByRole("row", { name: new RegExp(credentialName) });
     await row.getByRole("button", { name: "Approve" }).click();
@@ -175,7 +172,7 @@ test.describe.serial("automation credentials", () => {
     expect(self.status()).toBe(403);
     expect((await self.json()).error.code).toBe("FOUR_EYES");
     // Someone else can; then it works again.
-    const approver = await signInAs(browser, TEST_USERS.iamAdminOne.email);
+    const approver = await asIamAdmin(browser);
     const ok = await approver.request.post(`/api/v1/automation-credentials/${credentialId}`, { data: { action: "approve" } });
     expect(ok.status(), await ok.text()).toBeLessThan(300);
     await approver.context().close();

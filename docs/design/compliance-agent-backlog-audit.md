@@ -1133,3 +1133,15 @@ follows the same pattern and joins `lib/provenance/tables.ts`.
 `modules/certification-compliance/campaigns.ts`: a high-risk campaign without its own threshold uses the organization's `certification.highRiskScore` (default 50). The evidence cadence was not exposed: `recomputeStaleControlMappings()` is never called, so a setting would do nothing. Defaults equal the previous constants. Cross-module change by explicit
 owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
 Foundation log).
+
+### 2026-10-12 — campaign launch no longer waits on one agent at a time
+
+`populateCertificationItems` read each agent's contract, effective access,
+policy evaluations, findings and DID one agent after another, then inserted
+one item at a time. A launch over the 56 agents of the E2E organization
+took about 28 s (measured), past the form's wait and §15.
+- Agents are now read 16 at a time (`AGENT_BATCH`), and items are inserted
+  in bulk (500 per insert).
+- What each item snapshots is unchanged.
+- The `launchCampaign.test.ts` stub accepts a bulk insert: 57 passed. E2E
+  `compliance.spec.ts` passed.
