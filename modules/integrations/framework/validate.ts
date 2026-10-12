@@ -39,7 +39,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const MAX_BYTES = 256 * 1024;
 
 const AUTH_BY_DRIVER: Record<string, string[]> = {
-  http: ["none", "basic", "bearer", "header", "query", "body", "oauth2_client_credentials", "client_certificate"],
+  http: ["none", "basic", "bearer", "header", "query", "body", "oauth2_client_credentials", "oauth2_authorization_code", "client_certificate"],
   ldap: ["ldap_simple"],
   sql: ["sql_password"],
   mcp: ["none", "bearer", "header"],
@@ -441,6 +441,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
       query: ["name", "value"],
       body: ["name", "value"],
       oauth2_client_credentials: ["clientId"],
+      oauth2_authorization_code: ["clientId", "clientSecret"],
       client_certificate: ["certificate", "privateKey"],
       ldap_simple: ["bindDn", "password"],
       sql_password: ["username", "password"],
@@ -475,17 +476,25 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
       if (!signed && (auth.privateKey !== undefined || auth.algorithm !== undefined || auth.keyId !== undefined || auth.subject !== undefined)) {
         issue(ctx, "auth", "privateKey, algorithm, keyId and subject need clientAuth private_key_jwt or the jwt_bearer grant");
       }
-      const t = auth.tokenUrl;
-      if (!str(t, 1000)) issue(ctx, "auth.tokenUrl", "is required");
-      else {
-        const fromSetting = /^\{settings\.([a-zA-Z0-9_]+)\}/.exec(t);
-        if (!t.startsWith("/") && !(fromSetting && ctx.settings.get(fromSetting[1]) === "url")) {
-          issue(ctx, "auth.tokenUrl", "must be a path (/…) or start with a url setting ({settings.<url>}/…)");
-        }
-        checkTemplate(ctx, "auth.tokenUrl", t, ["settings"]);
-      }
+      checkAuthAddress(ctx, "auth.tokenUrl", auth.tokenUrl);
       if (auth.scope !== undefined && typeof auth.scope !== "string") issue(ctx, "auth.scope", "must be text");
       if (auth.clientAuth !== undefined && !["body", "basic", "private_key_jwt"].includes(String(auth.clientAuth))) issue(ctx, "auth.clientAuth", "must be body, basic or private_key_jwt");
+    }
+    if (auth.type === "oauth2_authorization_code") {
+      // INTEGRATION-P0-21: an administrator signs in once on the system's own page.
+      checkAuthAddress(ctx, "auth.authorizeUrl", auth.authorizeUrl);
+      checkAuthAddress(ctx, "auth.tokenUrl", auth.tokenUrl);
+      if (typeof auth.clientSecret === "string" && !/\{secret\./.test(auth.clientSecret)) issue(ctx, "auth.clientSecret", "must come from a secret field ({secret.…})");
+      if (auth.scope !== undefined && (typeof auth.scope !== "string" || auth.scope.length > 1000)) issue(ctx, "auth.scope", "must be text");
+      if (auth.authorizeParams !== undefined) {
+        if (!isObj(auth.authorizeParams)) issue(ctx, "auth.authorizeParams", "must be an object of text values");
+        else
+          for (const [k, v] of Object.entries(auth.authorizeParams)) {
+            if (!/^[a-zA-Z0-9_.-]{1,60}$/.test(k) || typeof v !== "string" || v.length > 200) issue(ctx, `auth.authorizeParams.${k}`, "must be a short name with a text value");
+            else if (RESERVED_AUTHORIZE_PARAMS.has(k)) issue(ctx, `auth.authorizeParams.${k}`, "is set by WonderID");
+            else if (/\{secret\./.test(v)) issue(ctx, `auth.authorizeParams.${k}`, "cannot hold a secret: the sign-in address is seen by the browser");
+          }
+      }
     }
   }
 
@@ -622,6 +631,19 @@ export function validateSettings(def: ConnectorDefinition, input: unknown): { se
 }
 
 /** The secret values an organization entered, as the JSON stored (encrypted) in integration_credentials. */
+/** Parameters of the sign-in address that WonderID sets itself (INTEGRATION-P0-21). */
+const RESERVED_AUTHORIZE_PARAMS = new Set(["response_type", "client_id", "redirect_uri", "state", "code_challenge", "code_challenge_method", "scope", "client_secret"]);
+
+/** A token or sign-in address: a path on the base address, or a url setting followed by a path. */
+function checkAuthAddress(ctx: Ctx, path: string, t: unknown) {
+  if (!str(t, 1000)) return issue(ctx, path, "is required");
+  const fromSetting = /^\{settings\.([a-zA-Z0-9_]+)\}/.exec(t);
+  if (!t.startsWith("/") && !(fromSetting && ctx.settings.get(fromSetting[1]) === "url")) {
+    issue(ctx, path, "must be a path (/…) or start with a url setting ({settings.<url>}/…)");
+  }
+  checkTemplate(ctx, path, t, ["settings"]);
+}
+
 export function validateSecrets(def: ConnectorDefinition, input: unknown): { secret: string | null; issues: DefinitionIssue[] } {
   if (def.auth.type === "none") return { secret: null, issues: [] };
   const values = isObj(input) ? input : {};

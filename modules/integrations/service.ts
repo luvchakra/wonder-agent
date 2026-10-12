@@ -27,6 +27,8 @@ export { getNormalizedObjects, getNormalizedObjectsAsSystem, getNormalizedObject
 export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";
 export { rotateReceiverSecret, getReceiverStatus } from "./framework/receive";
+export { startConnectorSignIn, completeConnectorSignIn } from "./oauthCode";
+export { OAUTH_OUTCOMES, redirectUriFor, type OAuthOutcome } from "./oauthCodeRules";
 export { listConnectorTraffic, purgeConnectorTraffic, TRAFFIC_PAGE_SIZE, type ConnectionTraffic } from "./gateway/traffic";
 export { importFileForObject, previewFileForObject, type FileImportResult, type FileImportPreview, type ImportPreviewRow } from "./fileImports";
 export { IMPORT_KINDS, PAGE_IMPORT_MAX_ROWS, MAX_IMPORT_BYTES, FileImportInvalidError, checkImportForm, tooLargeForImport, importScope, IMPORT_MANAGE_PERMISSION, type ImportKind } from "./fileImportRules";

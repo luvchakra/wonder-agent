@@ -52,6 +52,7 @@ What a definition can do: drivers `http`, `ldap`, `sql` (PostgreSQL, one
 read-only statement), `mcp`, `file`, `none` (receive only); authentication
 `none`, `basic`, `bearer`, `header`, `query`, `body`, `oauth2_client_credentials`
 (with a secret, or a private key: `private_key_jwt` and the `jwt_bearer` grant),
+`oauth2_authorization_code` (an administrator connects on the provider's own sign-in page),
 `client_certificate` (mutual TLS),
 `ldap_simple`, `sql_password`; pagination `none`, `page`, `offset`, `cursor`,
 `link_header`, `scim`; field paths, templates, a fixed transform list and
@@ -60,7 +61,7 @@ requests for scheduled syncs; inbound channels
 (`receive`) for webhooks, files, runtime events and the gateway. The full
 reference is `CONNECTOR-FRAMEWORK.md`, "Definition reference".
 
-Needs a WonderID change today: OAuth authorization code; other SQL engines; SOAP; transforms outside the fixed list
+Needs a WonderID change today: other SQL engines; SOAP; transforms outside the fixed list
 (which now includes `regex`, `replace`, `coalesce` and `dateAdd`); a
 connection upgrading to a newer definition version. Write operations are
 declared in a definition's `write` (see "Changes in the system"). These

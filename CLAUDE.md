@@ -953,13 +953,17 @@ tool governance or autonomy, executors and connectors, webhooks, file processing
 or notifications, the **full** Playwright suite must pass, not just the module's
 specs. Since 2026-10-09 (user decision) the full suite runs nightly in CI
 (`e2e.yml`), not on every pull request.
-- Before merging, run the affected spec files (locally, or with a hand-started
-  `e2e.yml` run given those specs) only for a security-sensitive change:
-  sign-in, sessions or `proxy.ts`; tenant resolution; RBAC and permissions;
-  RLS and migrations; connectors, including their webhooks and file imports.
-  Any other change, including UI work and ordinary features, waits for the
-  nightly run. This narrower list was set by the owner on 2026-10-10 to cut
-  the number of E2E runs.
+- End-to-end tests are nightly. Before merging, run the affected spec files
+  (locally, or with a hand-started `e2e.yml` run given those specs) only for:
+  - a security-related change: sign-in, sessions or `proxy.ts`; tenant
+    resolution; RBAC and permissions; RLS and migrations; credentials and
+    secrets; how a connection signs in or changes an organization's systems;
+  - a major change: a new end-to-end flow, or one that crosses modules.
+
+  Any other change, including UI work, ordinary features and connector
+  definition extensions, waits for the nightly run. The owner set this on
+  2026-10-10 and confirmed it on 2026-10-12 to save build and deployment
+  time.
 - Check the next nightly run.
 - A red nightly run is fixed before anything else merges.
 An apparently isolated change can alter security behaviour: on 2026-09-18 a
@@ -1389,8 +1393,8 @@ budget, with production first.
    - A docs-only change that cannot wait is still one deployment.
 3. **E2E on Vercel costs one deployment per run.**
    - The nightly suite is two (one per half).
-   - Pre-merge spec runs follow §17.8: only for security-sensitive changes,
-     and locally (`E2E_CHROMIUM_PATH`, see `playwright.config.ts`) when that
+   - Pre-merge spec runs follow §17.8: only for security-related or major
+     changes, and locally (`E2E_CHROMIUM_PATH`, see `playwright.config.ts`) when that
      is possible, before using a Vercel run.
    - Never re-run a Vercel E2E run to "see if it passes": find the cause
      first.

@@ -14,7 +14,7 @@ import { createDefinitionConnector } from "./connector";
 import { openGateway } from "../gateway/gateway";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { protocolLabel } from "./typeSummary";
-import { RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type DefinitionIssue, type ResourceKind, type ResourceSpec } from "./types";
+import { OAUTH_TOKEN_KEYS, RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type DefinitionIssue, type ResourceKind, type ResourceSpec } from "./types";
 
 /**
  * The connector catalog: WonderID's built-in definitions plus an
@@ -175,6 +175,7 @@ const AUTH_TYPE_FOR: Record<ConnectorDefinition["auth"]["type"], AuthType> = {
   body: "api_key",
   client_certificate: "mtls",
   oauth2_client_credentials: "oauth2",
+  oauth2_authorization_code: "oauth2",
   ldap_simple: "basic",
   sql_password: "basic",
 };
@@ -261,6 +262,8 @@ export type ConnectorConfiguration = {
   settings: Record<string, string | number | boolean | undefined>;
   /** Every secret field the definition declares, masked (maskSecret); "" when none is stored. */
   secrets: Record<string, string>;
+  /** INTEGRATION-P0-21: for a sign-in-with-the-provider connection, whether an administrator has connected it. */
+  signedIn: boolean | null;
 };
 
 /**
@@ -277,7 +280,8 @@ export async function getConnectorConfiguration(tenantId: string, integrationId:
   if (def.auth.type !== "none") for (const f of def.auth.fields) secrets[f.key] = maskSecret(stored?.[f.key]);
   const shown: ConnectorConfiguration["settings"] = {};
   for (const s of def.settings) shown[s.key] = settings[s.key];
-  return { def, name: row.name, settings: shown, secrets };
+  const signedIn = def.auth.type === "oauth2_authorization_code" ? Boolean(stored?.[OAUTH_TOKEN_KEYS.refresh]) : null;
+  return { def, name: row.name, settings: shown, secrets, signedIn };
 }
 
 /**

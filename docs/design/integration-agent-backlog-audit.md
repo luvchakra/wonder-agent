@@ -2347,3 +2347,92 @@ certificate auth; export/import and connection upgrade.
 **Left out.** OAuth authorization code (a "Connect" consent flow with a
 callback receiver; next); export and import of definitions and connection
 upgrade.
+
+### 2026-10-12 — Definition extensions, part 3b: sign in with the provider (INTEGRATION-P0-21, #69)
+
+**Built (no migration).**
+- **`auth.type: oauth2_authorization_code`** (http): OAuth 2.0
+  authorization code with PKCE (S256).
+  - `authorizeUrl` and `tokenUrl` follow the token-address rule: a path, or
+    a url setting followed by a path.
+  - `clientSecret` must be a `{secret.…}` field. `authorizeParams` take
+    text only: never a secret (the browser sees the address), and never a
+    parameter WonderID sets itself.
+  - Tokens live inside the connection's encrypted credential under
+    `OAUTH_TOKEN_KEYS` (`_oauth_*`). Definition secret fields cannot use
+    these names, since a field key must start with a letter.
+- **Connect** (`connectSignInAction`, integration.update): the
+  connection's page sends the browser to the provider's own sign-in page.
+  - The state is HMAC-signed (key derived from `SECRET_ENCRYPTION_KEY`) and
+    names the connection, its tenant and the administrator. It lasts 10
+    minutes.
+  - The httpOnly, SameSite=Lax cookie is scoped to
+    `/api/connect/v1/<id>/oauth`. It holds, encrypted, the nonce, the PKCE
+    verifier and the exact redirect address.
+  - A server-action redirect is a script navigation, so the CSP
+    `form-action` allow-list stays limited to the named payment pages
+    (§18.5).
+- **Callback** (`GET /api/connect/v1/<id>/oauth/callback`, the connection's
+  receiver, non-negotiable #20; `completeConnectorSignIn`):
+  - The state must verify, be unexpired, name this connection and match
+    the cookie's nonce. Otherwise nothing happens (`?oauth=expired`).
+  - The tenant then comes only from the signed state, and the connection
+    is re-read with it (§14).
+  - The code is traded for tokens through the connection's Connector
+    Gateway session. The provider must return a refresh token.
+  - The tokens are stored (`storeObtainedTokens`, audited
+    `integration.oauth_connected`), then the connection is tested with the
+    new sign-in and its status set from that result.
+  - The browser always lands on the connection's page with the outcome.
+    The cookie is cleared.
+- **Runs**: the http driver uses the stored access token while it is
+  valid and otherwise refreshes it with the refresh token.
+  - Syncs, writes and tests store what the run obtained
+    (`keepObtainedTokens`, in each `finally`).
+  - A rotated refresh token is audited (`integration.oauth_refresh_rotated`,
+    system actor).
+  - Not connected: "Not connected yet". A refused refresh (400/401): "The
+    sign-in has expired or was revoked: connect the connection again".
+    Neither message quotes a token.
+- **Credentials**: saved untested while the connection awaits sign-in
+  (`awaitsAuthorization()`). Saving new credentials drops the tokens
+  (`validateSecrets` keeps only declared fields), so changing the client
+  means connecting again.
+- **Page**: in the Credentials card, a "Connected / Not connected" badge,
+  Connect (or Reconnect), and the address to register, folded. One
+  outcome line after the callback.
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `npx vitest run modules/integrations tests/architecture lib/security`:
+  399 passed, including the connector-boundary test.
+  - `oauthCodeRules.test.ts`: forged, re-keyed, re-signed and expired
+    states are refused; the PKCE challenge; the callback address.
+  - framework tests: validator rules; the sign-in address (PKCE, no
+    secret, no request made); the code exchange; no refresh token is
+    refused; refresh and rotation; the stored access token is reused while
+    valid; not connected and revoked messages; `awaitsAuthorization()` and
+    `obtainedTokens()`.
+  - `credentials.test.ts`: saved untested while awaiting sign-in.
+- E2E, local: the new `oauth-connect.spec.ts` against a stub provider,
+  5/5.
+  - Not connected, and a sync fails with what to do.
+  - Connect goes through the provider and back, with the PKCE verifier,
+    client secret and redirect address checked by the provider.
+  - Two syncs each refresh with the refresh token the previous run stored.
+  - A forged state, or a callback without the cookie, sends nothing to the
+    provider.
+  - Audit rows exist, and none holds a token.
+- Affected specs (§17.8, connectors): `integrations`,
+  `connector-provisioning` and `outbound-guard`, 22/22.
+
+**Left out / known limits.**
+- The driver is http only; MCP servers that use OAuth sign-in come later.
+- Two runs refreshing at the same moment against a provider that rotates
+  refresh tokens can retire each other's token. The connection then asks
+  to be connected again.
+- A sync cannot be previewed before the connection is connected.
+
+**Also recorded.** The owner confirmed that end-to-end tests are nightly.
+Before a merge they run only for security-related or major changes
+(CLAUDE.md §17.8 updated).

@@ -12,7 +12,7 @@ import { toIntegration, toIntegrationType } from "./mappers";
 import { createConnector } from "./registry";
 import { capabilitiesOf, parseConnectorConfig } from "./framework/engine";
 import { openGateway } from "./gateway/gateway";
-import { getDecryptedCredential } from "./credentials";
+import { getDecryptedCredential, keepObtainedTokens } from "./credentials";
 import { requireFeature } from "@/modules/platform-admin/service";
 
 export type CreateIntegrationInput = {
@@ -182,12 +182,15 @@ export async function testIntegrationConnection(
   // The test's requests pass the connection's Connector Gateway session (a disabled connection is refused there).
   const gateway = openGateway({ tenantId, integrationId, status: integration.status });
   let result: { ok: boolean; message?: string };
+  let connector: object | null = null;
   try {
-    const connector = createConnector(integration.integrationTypeId, gateway);
-    await connector.authenticate(integration.config, secret);
-    result = await connector.testConnection();
-    await connector.close();
+    const c = createConnector(integration.integrationTypeId, gateway);
+    connector = c;
+    await c.authenticate(integration.config, secret);
+    result = await c.testConnection();
+    await c.close();
   } finally {
+    await keepObtainedTokens(tenantId, integrationId, connector);
     await gateway.flush();
   }
   // A disabled connection stays disabled: its refused test does not mark it as failing.

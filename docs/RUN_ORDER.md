@@ -665,3 +665,15 @@ organization's private key (`private_key_jwt`, or the `jwt_bearer` grant for
 service accounts), and the new `client_certificate` auth presents a client
 certificate (mutual TLS) to the connection's own address only
 (INTEGRATION-P0-21 part 3a). Next: OAuth authorization code.
+
+## 2026-10-12 — Connections sign in with the provider
+
+`oauth2_authorization_code`: an administrator presses Connect on the
+connection's page, approves on the provider's own sign-in page, and comes
+back through the connection's receiver (non-negotiable #20). Tokens are kept
+encrypted with the connection's credentials and refreshed during runs
+(INTEGRATION-P0-21 part 3b). Next: export/import of definitions and
+connection upgrade.
+
+The owner confirmed that end-to-end tests are nightly; before a merge they
+run only for security-related or major changes (CLAUDE.md §17.8).

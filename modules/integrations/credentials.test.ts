@@ -4,7 +4,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const authenticate = vi.fn();
 const testConnection = vi.fn();
 const close = vi.fn();
-const createConnectorMock = vi.fn(() => ({ authenticate, testConnection, close }));
+const awaitsAuthorization = vi.fn(() => false);
+const createConnectorMock = vi.fn(() => ({ authenticate, testConnection, close, awaitsAuthorization }));
 vi.mock("./registry", () => ({ createConnector: () => createConnectorMock() }));
 
 vi.mock("@/lib/security/encryptSecret", () => ({
@@ -48,7 +49,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 
 beforeEach(() => {
   vi.clearAllMocks();
-  createConnectorMock.mockReturnValue({ authenticate, testConnection, close });
+  createConnectorMock.mockReturnValue({ authenticate, testConnection, close, awaitsAuthorization });
+  awaitsAuthorization.mockReturnValue(false);
   existingCredentialRow = { integration_id: "int-1" };
 });
 
@@ -98,5 +100,12 @@ describe("setCredential — INTEGRATION-P0-05.1 verified rotation", () => {
     expect(insertFn).toHaveBeenCalled();
     expect(updateFn).not.toHaveBeenCalled();
     expect(writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "integration.credential_set" }));
+  });
+
+  it("INTEGRATION-P0-21: saves a sign-in-with-the-provider connection's credentials untested until an administrator connects it", async () => {
+    awaitsAuthorization.mockReturnValue(true);
+    await setCredential("tenant-1", "user-1", "int-1", "oauth2", '{"clientId":"c","clientSecret":"s"}');
+    expect(testConnection).not.toHaveBeenCalled();
+    expect(updateFn).toHaveBeenCalled();
   });
 });

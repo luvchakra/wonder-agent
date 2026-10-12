@@ -8,7 +8,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { ConnectorCapabilities, ConnectorWriteResult } from "@/lib/shared/types/integrations";
 import { createConnector } from "./registry";
 import { openGateway } from "./gateway/gateway";
-import { getDecryptedCredential } from "./credentials";
+import { getDecryptedCredential, keepObtainedTokens } from "./credentials";
 import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, WRITE_WINDOW_MS, retryableWriteFailure, validateWriteRequest, writesEnabled, type WriteRequestInput } from "./connectorWriteRules";
 import { ConnectorRequestError } from "./framework/http";
@@ -156,6 +156,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
     const status = err instanceof ConnectorRequestError ? err.status : undefined;
     return finish("failed", null, err instanceof Error ? err.message.slice(0, 1000) : "The write failed", retryableWriteFailure(status, kind));
   } finally {
+    await keepObtainedTokens(tenantId, integrationId, connector);
     await gateway.flush();
   }
 }
