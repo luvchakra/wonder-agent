@@ -2800,3 +2800,16 @@ Verified:
 - E2E, local: `sync-failed-page` 4/4 (its 4th case is a page answering
   200 with nothing while `X-Total-Count` says more), `connection-upgrade`
   and `identity-sources`; 25 passed in all.
+
+### 2026-10-12 — disagreements between identity sources on Pending Matches (WID-H01)
+
+The Identity Agent's import now keeps a list of disagreements between
+sources (see that audit log). On this side:
+- `executeReconciliation` reports a result's `conflictsError` in the run's
+  errors as `disagreements: …`, without counting it as an error, so it
+  never holds back leavers;
+- Pending Matches (`/integrations/correlations`) shows a folded
+  "Disagreements between sources (n)" section: person, field, the kept
+  value and source, and the other value and source.
+
+Verified with the Identity entry's checks (E2E `identity-sources` 18 passed).

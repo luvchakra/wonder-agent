@@ -12,7 +12,7 @@ import {
   type SourcedFields,
   type SourcedIdentityField,
 } from "@/lib/shared/types/agent-identity";
-import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, type AttributeValue } from "./sourcedMerge";
+import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, planDisagreements, type AttributeValue, type OpenDisagreement } from "./sourcedMerge";
 import { detectLifecycleEvents, type DetectedEvent } from "./humanLifecycle";
 import { assignOpenTasksToManager, recordLifecycleEvents } from "./humanLifecycleService";
 import type { HumanLifecycleState } from "@/lib/shared/types/agent-identity";
@@ -97,6 +97,8 @@ export type SourcedResult = {
   /** Lifecycle events this change amounted to (people only), or why they could not be recorded. */
   lifecycleEvents?: string[];
   lifecycleError?: string;
+  /** WID-H01: why this person's source disagreements could not be updated (the change itself applied). */
+  conflictsError?: string;
 };
 
 const COLUMN: Record<SourcedIdentityField, string> = {
@@ -161,6 +163,31 @@ export async function applySourcedIdentities(
     for (const r of (data ?? []) as unknown as Record<string, unknown>[]) existing.set(r.id as string, r);
   }
 
+  // WID-H01: the open disagreements on these people, from any source, read once.
+  const openDisagreements = new Map<string, OpenDisagreement[]>();
+  const updateIds = [...new Set(ops.filter((o) => o.op === "update").map((o) => (o as { identityId: string }).identityId))];
+  for (let i = 0; i < updateIds.length; i += 200) {
+    const { data, error } = await supabase
+      .from("identity_source_conflicts")
+      .select("id, identity_id, field, kept_value, kept_source_id, other_value, other_source_id")
+      .eq("tenant_id", tenantId)
+      .in("identity_id", updateIds.slice(i, i + 200))
+      .is("resolved_at", null);
+    if (error) throw new Error(`applySourcedIdentities: ${error.message}`);
+    for (const r of (data ?? []) as Record<string, unknown>[]) {
+      const list = openDisagreements.get(r.identity_id as string) ?? [];
+      list.push({
+        id: r.id as string,
+        field: r.field as string,
+        keptValue: (r.kept_value as string | null) ?? null,
+        keptSourceId: (r.kept_source_id as string | null) ?? null,
+        otherValue: (r.other_value as string | null) ?? null,
+        otherSourceId: r.other_source_id as string,
+      });
+      openDisagreements.set(r.identity_id as string, list);
+    }
+  }
+
   // INTEGRATION-P0-20: the organization's attribute definitions, when a source sends custom attributes.
   const withAttributes = ops.some((o) => o.op !== "leaver" && o.attributes && Object.keys(o.attributes).length);
   const definitions = withAttributes ? await loadAttributeDefinitions(tenantId) : [];
@@ -211,6 +238,58 @@ export async function applySourcedIdentities(
       result.lifecycleEvents = detected.map((d) => d.eventType);
     } catch (err) {
       result.lifecycleError = err instanceof Error ? err.message.slice(0, 300) : "lifecycle events not recorded";
+    }
+  };
+
+  // WID-H01 (owner decision): the higher-priority source still wins; each
+  // disagreement is kept for review with both values and both sources. A
+  // failure here is reported on the result, never undoing the change.
+  const disagreementsFor = async (identityId: string, plan: ReturnType<typeof planDisagreements>, fieldsById: Map<string, string>): Promise<string | undefined> => {
+    if (!plan.insert.length && !plan.update.length && !plan.resolve.length) return undefined;
+    try {
+      if (plan.insert.length) {
+        const { error } = await supabase.from("identity_source_conflicts").insert(
+          plan.insert.map((c) => ({
+            tenant_id: tenantId,
+            identity_id: identityId,
+            field: c.field,
+            kept_value: c.keptValue,
+            kept_source_id: c.keptSourceId,
+            other_value: c.otherValue,
+            other_source_id: source.sourceId,
+            first_seen_at: now,
+            last_seen_at: now,
+          })),
+        );
+        if (error) throw new Error(error.message);
+      }
+      for (const c of plan.update) {
+        const { error } = await supabase
+          .from("identity_source_conflicts")
+          .update({ kept_value: c.keptValue, kept_source_id: c.keptSourceId, other_value: c.otherValue, last_seen_at: now })
+          .eq("tenant_id", tenantId)
+          .eq("identity_id", identityId)
+          .eq("id", c.id);
+        if (error) throw new Error(error.message);
+      }
+      if (plan.resolve.length) {
+        const { error } = await supabase
+          .from("identity_source_conflicts")
+          .update({ resolved_at: now })
+          .eq("tenant_id", tenantId)
+          .eq("identity_id", identityId)
+          .in("id", plan.resolve);
+        if (error) throw new Error(error.message);
+      }
+      if (plan.insert.length || plan.resolve.length) {
+        await audit("identity.source_disagreements_changed", identityId, {
+          opened: plan.insert.map((c) => c.field),
+          resolved: plan.resolve.map((id) => fieldsById.get(id) ?? id),
+        });
+      }
+      return undefined;
+    } catch (err) {
+      return err instanceof Error ? err.message.slice(0, 300) : "disagreements not recorded";
     }
   };
 
@@ -294,8 +373,19 @@ export async function applySourcedIdentities(
       const changed = Object.keys(merge.changes) as SourcedIdentityField[];
       const attributesChanged = Object.keys(attributeMerge.changes);
       const provenanceChanged = JSON.stringify(attributeMerge.provenance) !== JSON.stringify(row.field_provenance ?? {});
+      const open = openDisagreements.get(op.identityId) ?? [];
+      const written: Record<string, unknown> = { ...merge.changes };
+      for (const [name, value] of Object.entries(attributeMerge.changes)) written[`attributes.${name}`] = value;
+      const disagreementPlan = planDisagreements(
+        open,
+        source.sourceId,
+        [...Object.keys(op.fields).filter((k) => op.fields[k as SourcedIdentityField] !== undefined), ...Object.keys(incomingAttributes).map((n) => `attributes.${n}`)],
+        [...merge.disagreements, ...attributeMerge.disagreements.map((d) => ({ ...d, field: `attributes.${d.field}` }))],
+        written,
+      );
+      const conflictsError = await disagreementsFor(op.identityId, disagreementPlan, new Map(open.map((o) => [o.id, o.field])));
       if (!changed.length && !attributesChanged.length && !provenanceChanged) {
-        results.push({ ref: op.ref, identityId: op.identityId, action: "unchanged", changed: [], skipped: merge.skipped.map((s) => s.field) });
+        results.push({ ref: op.ref, identityId: op.identityId, action: "unchanged", changed: [], skipped: merge.skipped.map((s) => s.field), ...(conflictsError ? { conflictsError } : {}) });
         continue;
       }
       const update: Record<string, unknown> = { ...toRow(merge.changes), field_provenance: attributeMerge.provenance };
@@ -320,6 +410,7 @@ export async function applySourcedIdentities(
         changed,
         skipped: merge.skipped.map((s) => s.field),
         ...(attributesChanged.length ? { attributesChanged } : {}),
+        ...(conflictsError ? { conflictsError } : {}),
       };
       results.push(updated);
       if (changed.length && PERSON_TYPES.has(row.identity_type as IdentityType)) {
@@ -432,6 +523,6 @@ export async function previewSourcedIdentities(tenantId: string, source: SourceA
     for (const [k, col] of Object.entries(COLUMN) as [SourcedIdentityField, string][]) current[k] = (row[col] as string | null) ?? null;
     const merge = mergeSourcedFields(current, (row.field_provenance as FieldProvenance) ?? {}, op.fields, source, now);
     const changes = (Object.entries(merge.changes) as [SourcedIdentityField, string | null][]).map(([field, to]) => ({ field, from: current[field] ?? null, to }));
-    return { ref: op.ref, identityId: op.identityId, action: changes.length ? "update" : "unchanged", changes, skipped: merge.skipped };
+    return { ref: op.ref, identityId: op.identityId, action: changes.length ? "update" : "unchanged", changes, skipped: merge.skipped.map(({ field, reason }) => ({ field, reason })) };
   });
 }

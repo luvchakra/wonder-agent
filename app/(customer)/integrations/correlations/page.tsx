@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listIdentitySources, listPendingCorrelations } from "@/modules/integrations/service";
-import { getIdentityNames } from "@/modules/agent-identity/service";
+import { getIdentityNames, listSourceDisagreements } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, EmptyState } from "@/modules/ui";
 import { CorrelationDecision } from "../sources/SourceForms";
@@ -10,6 +10,8 @@ import { TARGET_LABEL } from "../sources/labels";
 
 // INTEGRATION-P0-09 — source records that matched more than one identity.
 // Nothing happens to them until a person decides (§17.6).
+// WID-H01 (owner decision): below them, folded, the fields two sources
+// disagree on. The higher-priority source's value stays; this is for review.
 
 export default async function PendingCorrelationsPage() {
   let ctx;
@@ -20,10 +22,11 @@ export default async function PendingCorrelationsPage() {
     throw err;
   }
   const tenantId = ctx.tenantId!;
-  const [pending, sources] = await Promise.all([listPendingCorrelations(tenantId), listIdentitySources(tenantId)]);
+  const [pending, sources, disagreements] = await Promise.all([listPendingCorrelations(tenantId), listIdentitySources(tenantId), listSourceDisagreements(tenantId)]);
   const names = await getIdentityNames(tenantId, pending.flatMap((p) => p.candidateIdentityIds));
   const sourceName = new Map(sources.map((s) => [s.id, s.name]));
   const canResolve = ctx.permissions.includes("identity.manage");
+  const fieldLabel = (f: string) => (f.startsWith("attributes.") ? f.slice("attributes.".length) : (TARGET_LABEL[f as keyof typeof TARGET_LABEL] ?? f));
 
   return (
     <div className="space-y-5">
@@ -89,6 +92,32 @@ export default async function PendingCorrelationsPage() {
           })}
         </ul>
       )}
+      <details className="group rounded-lg border border-border bg-card" data-testid="source-disagreements">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+          Disagreements between sources <span className="text-muted-foreground">({disagreements.length})</span>
+        </summary>
+        <div className="border-t border-border px-4 py-3">
+          {disagreements.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Every source agrees on the fields it owns.</p>
+          ) : (
+            <ul className="divide-y divide-border text-sm">
+              {disagreements.map((d) => (
+                <li key={d.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-baseline sm:gap-3">
+                  <Link href={`/identities/${d.identityId}`} className="shrink-0 font-medium text-primary hover:underline">
+                    {d.displayName}
+                  </Link>
+                  <span className="shrink-0 text-muted-foreground">{fieldLabel(d.field)}</span>
+                  <span className="min-w-0 break-words text-foreground">
+                    {d.keptValue ?? "(blank)"} <span className="text-muted-foreground">from {(d.keptSourceId && sourceName.get(d.keptSourceId)) ?? "a source"}, kept</span>
+                    <span className="text-muted-foreground"> · </span>
+                    {d.otherValue ?? "(blank)"} <span className="text-muted-foreground">from {sourceName.get(d.otherSourceId) ?? "a source"}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

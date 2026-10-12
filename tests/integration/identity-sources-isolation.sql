@@ -1,6 +1,7 @@
 -- Integration Agent — INTEGRATION-P0-08/09 live verification of migrations
 -- 0080/0081 (identity_sources, identity_reconciliation_runs,
--- identity_source_links, pending_identity_correlations). Run via the
+-- identity_source_links, pending_identity_correlations), plus 0146/0147
+-- (identity_source_conflicts, WID-H01). Run via the
 -- Supabase MCP execute_sql tool: fixtures + checks + results in one call,
 -- cleanup in a second.
 --
@@ -37,11 +38,21 @@ insert into identity_source_links (tenant_id, source_id, external_id, identity_i
   ('bbbbbbbb-8100-0000-0000-000000000002', 'b8100000-0000-0000-0000-0000000000b5', 'B-1', 'b8100000-0000-0000-0000-0000000000b1');
 insert into pending_identity_correlations (tenant_id, source_id, external_id, reason) values
   ('bbbbbbbb-8100-0000-0000-000000000002', 'b8100000-0000-0000-0000-0000000000b5', 'B-2', 'fixture');
+-- WID-H01 (0146/0147): a disagreement between B's sources.
+insert into identity_source_conflicts (tenant_id, identity_id, field, kept_value, other_value, other_source_id) values
+  ('bbbbbbbb-8100-0000-0000-000000000002', 'b8100000-0000-0000-0000-0000000000b1', 'department', 'Finance', 'Marketing', 'b8100000-0000-0000-0000-0000000000b5');
 
 create temporary table check_results (check_name text, result text);
 grant insert, select on check_results to authenticated;
 set role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-8100-0000-0000-000000000001","role":"authenticated"}', true);
+insert into check_results select 'X: B disagreements visible (expect 0)', (select count(*) from identity_source_conflicts where tenant_id = 'bbbbbbbb-8100-0000-0000-000000000002')::text;
+do $$ begin
+  insert into identity_source_conflicts (tenant_id, identity_id, field, other_source_id) values ('aaaaaaaa-8100-0000-0000-000000000001', 'b8100000-0000-0000-0000-0000000000b1', 'forged', 'a8100000-0000-0000-0000-0000000000a5');
+  insert into check_results values ('X: write a disagreement, no client policy (expect denied)', 'ALLOWED');
+exception when others then insert into check_results values ('X: write a disagreement, no client policy (expect denied)', 'denied: ' || sqlstate); end $$;
+with u as (update identity_source_conflicts set resolved_at = now() where tenant_id = 'bbbbbbbb-8100-0000-0000-000000000002' returning 1)
+insert into check_results select 'X: resolve B disagreement (expect 0)', count(*)::text from u;
 insert into check_results select 'X: B sources/runs/links/pending visible (expect 0)', (
   (select count(*) from identity_sources where tenant_id = 'bbbbbbbb-8100-0000-0000-000000000002')
  + (select count(*) from identity_reconciliation_runs where tenant_id = 'bbbbbbbb-8100-0000-0000-000000000002')
@@ -89,7 +100,20 @@ do $$ begin
   update identities set field_provenance = '[]'::jsonb where id = 'b8100000-0000-0000-0000-0000000000b1';
   insert into check_results values ('provenance must be an object (expect denied)', 'ALLOWED');
 exception when others then insert into check_results values ('provenance must be an object (expect denied)', 'denied: ' || sqlstate); end $$;
+do $$ begin
+  insert into identity_source_conflicts (tenant_id, identity_id, field, other_source_id) values ('aaaaaaaa-8100-0000-0000-000000000001', 'b8100000-0000-0000-0000-0000000000b1', 'forged', 'a8100000-0000-0000-0000-0000000000a5');
+  insert into check_results values ('service role: A disagreement on B person (expect denied)', 'ALLOWED');
+exception when others then insert into check_results values ('service role: A disagreement on B person (expect denied)', 'denied: ' || sqlstate); end $$;
+do $$ begin
+  insert into identity_source_conflicts (tenant_id, identity_id, field, other_source_id) values ('bbbbbbbb-8100-0000-0000-000000000002', 'b8100000-0000-0000-0000-0000000000b1', 'forged', 'a8100000-0000-0000-0000-0000000000a5');
+  insert into check_results values ('service role: B disagreement from A source (expect denied)', 'ALLOWED');
+exception when others then insert into check_results values ('service role: B disagreement from A source (expect denied)', 'denied: ' || sqlstate); end $$;
+do $$ begin
+  insert into identity_source_conflicts (tenant_id, identity_id, field, other_source_id) values ('bbbbbbbb-8100-0000-0000-000000000002', 'b8100000-0000-0000-0000-0000000000b1', 'department', 'b8100000-0000-0000-0000-0000000000b5');
+  insert into check_results values ('second open disagreement, same person/field/source (expect denied)', 'ALLOWED');
+exception when others then insert into check_results values ('second open disagreement, same person/field/source (expect denied)', 'denied: ' || sqlstate); end $$;
 insert into check_results select 'forged rows that exist (expect 0)', (
+  (select count(*) from identity_source_conflicts where field = 'forged') +
   (select count(*) from identity_sources where name = 'forged')
  + (select count(*) from pending_identity_correlations where reason in ('forged', 'second open row')))::text;
 select * from check_results;

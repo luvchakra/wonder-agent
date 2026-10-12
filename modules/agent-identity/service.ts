@@ -43,6 +43,7 @@ export {
   getIdentity,
   getIdentityForUser,
   getIdentityNames,
+  listSourceDisagreements,
   listOwnedIdentities,
   listDirectReports,
   listAccountableHumans,
@@ -57,6 +58,7 @@ export {
   type IdentityListFilter,
   type IdentityListRow,
   type RelationshipView,
+  type SourceDisagreementRow,
 } from "./directory";
 export {
   listIdentitiesForCorrelation,

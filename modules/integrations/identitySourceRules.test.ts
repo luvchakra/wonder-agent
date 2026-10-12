@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { correlate, normalizeRecord, parseCsv, planLeavers, validateMappings, validateSourceConfig, type NormalizedSourceRecord } from "./identitySourceRules";
-import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields } from "@/modules/agent-identity/sourcedMerge";
+import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, planDisagreements } from "@/modules/agent-identity/sourcedMerge";
 
 const err = (fn: () => unknown) => {
   try {
@@ -204,6 +204,15 @@ describe("mergeSourcedFields (Identity precedence)", () => {
     const r = mergeSourcedFields({ department: "Finance" }, { department: { sourceId: "hr", priority: 10, at } }, { department: "Sales" }, dir, at);
     expect(r.changes).toEqual({});
     expect(r.skipped).toEqual([{ field: "department", reason: "higher_precedence" }]);
+    // WID-H01: the disagreement is kept, with both values and the source that won.
+    expect(r.disagreements).toEqual([{ field: "department", kept: "Finance", keptSourceId: "hr", incoming: "Sales" }]);
+  });
+
+  it("WID-H01: agreeing, owning the field, or only filling a blank is not a disagreement", () => {
+    const owner = { department: { sourceId: "hr", priority: 10, at } };
+    expect(mergeSourcedFields({ department: "Finance" }, owner, { department: "Finance" }, dir, at).disagreements).toEqual([]);
+    expect(mergeSourcedFields({ department: "Finance" }, owner, { department: "Ops" }, hr, at).disagreements).toEqual([]);
+    expect(mergeSourcedFields({ location: "Bergen" }, {}, { location: "Oslo" }, dir, at).disagreements).toEqual([]);
   });
 
   it("lets a non-authoritative field only fill a blank", () => {
@@ -256,8 +265,38 @@ describe("custom attributes from a source (Identity, INTEGRATION-P0-20)", () => 
     const blocked = mergeSourcedAttributes({ cost_center: "4100" }, { "attributes.cost_center": { sourceId: "hr", priority: 10, at } }, { cost_center: "9" }, dir, at);
     expect(blocked.changes).toEqual({});
     expect(blocked.skipped).toEqual([{ field: "cost_center", reason: "higher_precedence" }]);
+    expect(blocked.disagreements).toEqual([{ field: "cost_center", kept: "4100", keptSourceId: "hr", incoming: "9" }]);
 
     expect(mergeSourcedAttributes({}, {}, { grade: 7 }, sheet, at).changes).toEqual({ grade: 7 });
     expect(mergeSourcedAttributes({ grade: 5 }, {}, { grade: 7 }, sheet, at).changes).toEqual({});
+  });
+});
+
+describe("planDisagreements (WID-H01, owner decision)", () => {
+  const open = (id: string, field: string, otherSourceId: string, otherValue: string | null, keptValue = "Finance") => ({ id, field, keptValue, keptSourceId: "hr", otherValue, otherSourceId });
+  const lost = (field: string, kept: unknown, incoming: unknown) => ({ field, kept, keptSourceId: "hr", incoming });
+
+  it("opens a new disagreement and refreshes one already open from the same source", () => {
+    const r = planDisagreements([open("c1", "title", "dir", "Analyst")], "dir", ["department", "title"], [lost("department", "Finance", "Marketing"), lost("title", "CFO", "Lead")], {});
+    expect(r.insert).toEqual([{ field: "department", keptValue: "Finance", keptSourceId: "hr", otherValue: "Marketing" }]);
+    expect(r.update).toEqual([{ id: "c1", keptValue: "CFO", keptSourceId: "hr", otherValue: "Lead" }]);
+    expect(r.resolve).toEqual([]);
+  });
+
+  it("resolves one from this source when it sends the field and no longer loses it; leaves one it did not send", () => {
+    const r = planDisagreements([open("c1", "department", "dir", "Marketing"), open("c2", "title", "dir", "Lead")], "dir", ["department"], [], {});
+    expect(r).toEqual({ insert: [], update: [], resolve: ["c1"] });
+  });
+
+  it("when the owning source writes the field, the other source's disagreement takes the new value, or resolves when they now agree", () => {
+    const rows = [open("c1", "department", "dir", "Marketing"), open("c2", "title", "dir", "Lead"), open("c3", "location", "dir", "Oslo")];
+    const r = planDisagreements(rows, "hr", ["department", "title"], [], { department: "Marketing", title: "CEO" });
+    expect(r.resolve).toEqual(["c1"]);
+    expect(r.update).toEqual([{ id: "c2", keptValue: "CEO", keptSourceId: "hr", otherValue: "Lead" }]);
+  });
+
+  it("keeps custom attribute values as text, under attributes.<name>", () => {
+    const r = planDisagreements([], "dir", ["attributes.grade"], [lost("attributes.grade", 7, 9)], {});
+    expect(r.insert).toEqual([{ field: "attributes.grade", keptValue: "7", keptSourceId: "hr", otherValue: "9" }]);
   });
 });
