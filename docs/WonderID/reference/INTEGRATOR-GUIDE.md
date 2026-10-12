@@ -4,16 +4,16 @@ For a system integrator setting WonderID up for a customer. It lists what is
 configurable now, where, and with which permission, and says what is still
 planned. The planned items and their phases are in
 `docs/WonderID/reference/WONDERID-FOUNDATION-DESIGN.md` §8.1 (the plan of record) and
-§10. Checked against the code on 2026-10-11; keep this file in step with each
+§10. Checked against the code on 2026-10-12; keep this file in step with each
 phase.
 
 Two things to know first:
 
 - **Everything is tenant-scoped.** You configure one organization at a time,
   signed in as a member of it with the permissions named below.
-- **There is no API credential yet.** `/api/v1/*` answers only to a signed-in
-  browser session, so a setup script has to use a session. Automation
-  credentials are FOUNDATION-P0-31 (phase F1).
+- **Scripts use an automation credential.** `/api/v1/*` accepts a signed-in
+  session or `Authorization: Bearer wa_ac_…` from an approved automation
+  credential (Admin → Users & Permissions → Automation Credentials, §10).
 
 ## 1. Connect systems
 
@@ -22,7 +22,7 @@ Two things to know first:
 | Browse connection types (built-in and your organization's) | Integrations → Connection Types (`/integrations/types`) | `integration.read` |
 | Create a connection from a type: name, settings, credentials (tested before they are stored, then encrypted) | the type's page → Create connection | `integration.create` |
 | Run a sync now; see sync history | the connection's page (`/integrations/{id}`) | `integration.update` |
-| Schedule (daily; "hourly" also runs daily today) | file connections only, on the connection's page | `integration.update` |
+| Schedule (daily; "hourly" also runs daily today) | every connection's page; `PUT /api/v1/integrations/{id}/schedule` | `integration.update` |
 | Replace credentials | the connection's page; `POST /api/v1/integrations/{id}/connector-credentials` | `integration.update` |
 
 Built-in types: Frappe HR, ERPNext, LDAP directory, Keycloak, Gitea,
@@ -85,7 +85,7 @@ its connection (INTEGRATION-P0-19).
 | What | Where | Permission |
 |---|---|---|
 | Invite a member, set status, assign roles | Admin → Users (`/settings/users/new`) | `user.manage` (invite), `users.update`, `users.suspend`, `users.remove` |
-| Invite many members at once (FOUNDATION-P0-32): from a CSV with a preview (new, already a member, invalid), or by API (`POST /api/v1/users/invitations`, `dryRun` to preview; idempotent on e-mail). Invitations expire after Global Configuration's "Invitations expire after" (30 days by default) and can be sent again from the user's page | Admin → Users → Actions → Import CSV… | `users.invite` and `integration.execute` (CSV); `roles.assign` to give roles, and only roles within the inviter's own permissions. Scripts with an automation credential arrive with FOUNDATION-P0-31 |
+| Invite many members at once (FOUNDATION-P0-32): from a CSV with a preview (new, already a member, invalid), or by API (`POST /api/v1/users/invitations`, `dryRun` to preview; idempotent on e-mail). Invitations expire after Global Configuration's "Invitations expire after" (30 days by default) and can be sent again from the user's page | Admin → Users → Actions → Import CSV… | `users.invite` and `integration.execute` (CSV); `roles.assign` to give roles, and only roles within the inviter's own permissions. A script can call it with an automation credential (§10) |
 | Custom roles from the permission catalogue | Admin → Roles (`/settings/roles`); `/api/v1/roles` | `role.manage` |
 | Groups | Admin → User Groups (`/settings/groups`) | `groups.create`, `groups.update`, `groups.manage_members` |
 | Scoped, time-boxed and MFA-conditioned role assignments; authorization policies | Admin → Users; Admin → Policies → Authorization Policies | `tenant.security.manage` (view with `permissions.view`) |
@@ -151,7 +151,7 @@ classification overrides are IDENTITY-P0-22 (F6).
 
 | What | Where | Permission |
 |---|---|---|
-| Global Configuration (ten settings, versioned, restorable) | `/settings/configuration` (console only) | `tenant.settings`; session limits need `tenant.security.manage` |
+| Global Configuration (versioned, restorable) | `/settings/configuration`; `GET` / `PATCH /api/v1/tenant/configuration` (an object of setting keys and values; any invalid value refuses the whole save) | `tenant.settings`; session limits need `tenant.security.manage` |
 | Organization name and details | `/settings` | `tenant.settings` |
 | Notifications (each member turns optional e-mails on or off) | `/settings/notifications` | member |
 | MFA, AI provider, privacy, billing | `/settings/security`, `/settings/ai`, `/settings/privacy`, `/settings/billing` | as labelled |
@@ -164,7 +164,26 @@ entitlements, grants, packages, request-policies, requests), `agents`, `audit`,
 `identities`, `imports`, `integrations/*` (connectors, correlations,
 discoveries, identity-sources, types, `{id}`), `jobs`, `notifications`,
 `policies`, `reports`, `risk`, `roles`, `runtime`, `search`, `sso`, `tenant`,
-`users`. Session authentication; every route checks a permission server-side.
+`users`, `automation-credentials`. Every route checks a permission
+server-side.
+
+**Authentication.** A signed-in session, or an automation credential
+(FOUNDATION-P0-31): `Authorization: Bearer wa_ac_…`, on `/api/v1/*` only.
+
+| What | Where | Permission |
+|---|---|---|
+| Create a credential for an application identity: a role, expiry (1–365 days, 90 by default), optional allowed addresses (CIDR), calls a minute (120 by default). The secret is shown once | Admin → Users & Permissions → Automation Credentials (`/settings/automation`); `POST /api/v1/automation-credentials` | `automation.manage` |
+| Approve it. It works only after a second administrator approves (the creator cannot) | same page; `POST /api/v1/automation-credentials/{id}` `{ "action": "approve" }` | `automation.manage` |
+| Extend (another administrator approves), rotate the secret, revoke, give or remove a role | same page → Manage; actions `request_extension`, `approve_extension`, `rotate`, `revoke`, `assign_role`, `remove_role` | `automation.manage` |
+
+- A credential acts with its roles only, in its own organization. A role
+  can carry only permissions its giver holds, and never `automation.manage`.
+  The built-in **Configuration Administrator** role (integrations, policies,
+  organization settings, notifications; no personal data) is the default.
+- Every call is audited (`automation.api_call`) with the application identity
+  as on-behalf-of. Refused calls: 401 (unknown, pending, expired, revoked),
+  403 (role, or an address outside the allowlist), 429 (over the limit).
+- Connection schedules: `GET` / `PUT /api/v1/integrations/{id}/schedule`.
 
 Inbound, for the customer's systems: `/api/connect/v1/{connection}/…`
 (webhooks, files, runtime events, the gateway), authenticated with the
@@ -172,9 +191,10 @@ connection's secret (`CONNECTOR-FRAMEWORK.md`, "Receiving").
 
 ## 11. Suggested setup order
 
-1. Create a "Configuration administrator" custom role (integration, policy,
-   application and tenant-settings permissions; scoped and time-boxed) and
-   assign it to the integrator's account with MFA.
+1. Give the integrator's account the built-in Configuration Administrator
+   role (scoped and time-boxed, with MFA). For scripts, create an
+   application identity and an automation credential with the same role,
+   and have another administrator approve it.
 2. Connect the HR system and the directory; run syncs by hand until schedules
    run (F1).
 3. Create identity sources for them; dry-run, fix mappings, run full.

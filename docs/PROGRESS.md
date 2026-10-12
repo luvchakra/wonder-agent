@@ -8,24 +8,24 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-10-11 from 11 module backlogs.
+Generated 2026-10-12 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**217 of 268 tracked stories complete — 81%**
+**218 of 268 tracked stories complete — 81%**
 
 ```
-████████████████████████████████░░░░░░░░  81%
+█████████████████████████████████░░░░░░░  81%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 217 |
+| Done | 218 |
 | Partial | 28 |
 | Deferred | 1 |
-| Not Started | 22 |
+| Not Started | 21 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 39 | 3 | 0 | 3 | 45 | `████████████████░░` 87% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 2 | 45 | `████████████████░░` 89% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 23 | 3 | 0 | 1 | 27 | `███████████████░░░` 85% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 39 done · 3 partial · 0 deferred · 3 not started (45 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 40 done · 3 partial · 0 deferred · 2 not started (45 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -105,7 +105,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-28 | Billing and privacy permission keys; `has_tenant_permission()` for permission-gated RLS (2026-10-01 user request) | Done — 2026-10-01 (`0101`; 6 keys, system-role grants; live isolation proof `tests/compliance/billing-privacy-tenant-isolation.sql` 28/28) |
 | FOUNDATION-P0-29 | Tamper-evident, append-only audit trail (SOX ITGC CO-01, PCI DSS 10.3.2) | Done — 2026-10-01 (`0104`; per-tenant SHA-256 chain backfilled over 8,940 rows, `verify_audit_chain()`, `purge_audit_logs()`, `/audit/integrity`; tamper test detected the altered row) |
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
-| FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; needs D11) | Not Started |
+| FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; D11 approved 2026-10-12) | Done — 2026-10-12: migrations 0126–0127; `wa_ac_` bearer on /api/v1/* through a backing automation member (RLS and the engine unchanged); four-eyes create/extend; expiry, CIDR, rate limit, rotate, revoke; per-call audit with on-behalf-of; /api/v1/tenant/configuration; CONFIGURATION_ADMIN template |
 | FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Done — 2026-10-11: CSV via the framework (member kind, 0125) with preview; POST /api/v1/users/invitations (session; automation credential with P0-31); expiry, re-send, revoke; no role escalation |
 
 ### 02 — Identity Agent

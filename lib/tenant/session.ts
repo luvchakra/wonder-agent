@@ -35,7 +35,12 @@ export type SessionUser = {
  */
 export const getSessionUser = cache(async (): Promise<SessionUser | null> => {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.auth.getClaims();
+  // FOUNDATION-P0-31 — an automation credential's call carries its
+  // backing member's token, just issued by the resolver; the client holds
+  // no session to read it from.
+  const { getAutomationAccess } = await import("@/lib/security/automationCredentials");
+  const automation = await getAutomationAccess();
+  const { data, error } = automation ? await supabase.auth.getClaims(automation.accessToken) : await supabase.auth.getClaims();
   if (error || !data?.claims?.sub) return null;
   const email = typeof data.claims.email === "string" ? data.claims.email : null;
   const aal = data.claims.aal === "aal2" ? "aal2" : data.claims.aal === "aal1" ? "aal1" : null;

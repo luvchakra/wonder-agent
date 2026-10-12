@@ -83,15 +83,22 @@ async function findRole(tenantId: string, roleName: string): Promise<{ id: strin
 // active membership makes them effective); never for a removed one. Read
 // with the service role, since members who are not active are outside the
 // caller's RLS view, and filtered by the verified tenant.
-async function assertTenantMember(tenantId: string, userId: string) {
+// FOUNDATION-P0-31: an automation credential's backing member gets its
+// roles only through the credential (lib/security/automationCredentials.ts),
+// which checks escalation and refuses automation.manage; never through the
+// people pages or /api/v1/users/{id}/roles.
+async function assertTenantMember(tenantId: string, userId: string, opts: { automation?: boolean }) {
   const { data } = await supabaseServiceRole()
     .from("tenant_memberships")
-    .select("user_id")
+    .select("user_id, account_type")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
     .neq("status", "removed")
-    .maybeSingle();
+    .maybeSingle<{ user_id: string; account_type: string }>();
   if (!data) throw new ApiError(404, "NOT_FOUND", "User is not a member of this tenant");
+  if ((data.account_type === "automation") !== !!opts.automation) {
+    throw new ApiError(409, "AUTOMATION_MEMBER", data.account_type === "automation" ? "Change an automation credential's roles on its own page." : "Not an automation credential.");
+  }
 }
 
 // Migration 0096's guards (last administrator, self-grant), as answers.
@@ -121,13 +128,14 @@ export async function assignRole(
   targetUserId: string,
   roleName: string,
   terms: AssignmentTerms = TENANT_WIDE,
+  opts: { automation?: boolean } = {},
 ): Promise<void> {
   // Nobody grants themselves a role (spec §30); the database refuses it too.
   if (actorId === targetUserId) {
     await writeAudit({ tenantId, actorId, actorType: "user", action: "role.assigned", objectType: "user_role", objectId: targetUserId, outcome: "failure", metadata: { role: roleName, refused: "SELF_ESCALATION" } });
     throw new ApiError(403, "SELF_ESCALATION", "You can't assign a role to yourself. Another administrator must do it.");
   }
-  await assertTenantMember(tenantId, targetUserId);
+  await assertTenantMember(tenantId, targetUserId, opts);
 
   const supabase = supabaseServiceRole();
   const role = await findRole(tenantId, roleName);
@@ -171,8 +179,9 @@ export async function removeRole(
   actorId: string,
   targetUserId: string,
   roleName: string,
+  opts: { automation?: boolean } = {},
 ): Promise<void> {
-  await assertTenantMember(tenantId, targetUserId);
+  await assertTenantMember(tenantId, targetUserId, opts);
 
   const supabase = supabaseServiceRole();
   const role = await findRole(tenantId, roleName);

@@ -111,6 +111,23 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ ok: false, error: { code: "CROSS_SITE_REQUEST", message: "Cross-site requests are not allowed" } }, { status: 403 });
   }
 
+  // FOUNDATION-P0-31 — an automation credential (`Bearer wa_ac_…`) is
+  // accepted only by the administration API, /api/v1/*, and is verified in
+  // the route (lib/security/automationCredentials.ts), never here: no
+  // cookie session is read or refreshed for it. The proxy only stamps the
+  // method and path for the call's audit entry and a fresh request id (the
+  // route checks the credential once per id), overwriting anything the
+  // caller sent under those names.
+  if (/^Bearer\s+wa_ac_/i.test(request.headers.get("authorization")?.trim() ?? "")) {
+    if (!pathname.startsWith("/api/v1/")) {
+      return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Automation credentials are accepted only on /api/v1/*" } }, { status: 401 });
+    }
+    const forwarded = new Headers(request.headers);
+    forwarded.set("x-wonderid-request", `${request.method} ${pathname}`);
+    forwarded.set("x-wonderid-request-id", crypto.randomUUID());
+    return NextResponse.next({ request: { headers: forwarded } });
+  }
+
   const response = NextResponse.next({ request });
 
   // The proxy runs ahead of EVERY route, so anything it throws becomes a
@@ -174,6 +191,17 @@ export async function proxy(request: NextRequest) {
     },
     hostLookup,
   ] = await Promise.all([supabase.auth.getUser(), hostTarget.kind === "subdomain" ? lookUpTenantHost(supabase, hostTarget.label) : Promise.resolve(null)]);
+
+  // FOUNDATION-P0-31 — an automation credential's backing member never
+  // holds a browser session: its password is never shown, and should a
+  // session exist anyway it is ended and refused here.
+  if (user?.app_metadata?.automation === true) {
+    await supabase.auth.signOut({ scope: "local" });
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ ok: false, error: { code: "UNAUTHENTICATED", message: "Automation accounts cannot sign in" } }, { status: 401 });
+    }
+    return NextResponse.redirect(new URL("/sign-in", request.url));
+  }
 
   if (hostTarget.kind === "invalid" || (hostTarget.kind === "subdomain" && hostLookup !== "found")) {
     const unavailable = hostLookup === "error";

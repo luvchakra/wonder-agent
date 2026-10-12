@@ -13,6 +13,11 @@ export const ACTOR_HEADER = "x-wonderid-actor";
 
 export async function currentActorId(): Promise<string | null> {
   try {
+    // An automation credential's call: its backing member, from the
+    // credential lookup (which itself sends no actor header).
+    const { automationActorId } = await import("@/lib/security/automationCredentials");
+    const automation = await automationActorId();
+    if (automation !== undefined) return automation;
     const { getSessionUser } = await import("@/lib/tenant/session");
     const user = await getSessionUser();
     return user?.id ?? null;

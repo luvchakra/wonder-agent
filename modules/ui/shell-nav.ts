@@ -130,6 +130,7 @@ export const ADMIN_AREA: ShellNavItem = {
         page("Roles", "/settings/roles", "roles.view", "role.manage"),
         page("Permission Catalog", "/settings/permissions", "permissions.view"),
         page("Single Sign-On", "/settings/sso", "sso.manage"),
+        page("Automation Credentials", "/settings/automation", "automation.manage"),
       ],
       "UserCog",
     ),

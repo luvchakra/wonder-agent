@@ -332,6 +332,16 @@ through `modules/privacy/service.ts`, since no other module consumes them yet);
 `/audit/integrity` composes FA's `lib/audit/integrity.ts`; `/platform-admin/billing`
 is PA's.
 
+2026-10-12 (FOUNDATION-P0-31): `automation_credentials`,
+`automation_credential_usage` and `automation_credential_hit()` (0126) are FA's,
+with `lib/security/automationCredentials.ts` / `automationCredentialRules.ts`,
+`/api/v1/automation-credentials/*`, `/api/v1/tenant/configuration` and the
+`/settings/automation` page (FA's functional page, composed of EA's shared
+primitives). The `'automation'` membership account type and the
+`CONFIGURATION_ADMIN` system role are FA's. 0127 changes IA's
+`identity_sync_membership()` additively (an automation membership creates no
+HUMAN identity), recorded in both audit logs.
+
 2026-10-10 (Global Configuration): `tenant_config_versions`, `save_tenant_config()`,
 `my_session_policy()` (0116) and `lib/config/*` are FA's (shared primitives every
 module reads through `getTenantConfig()`); `/settings/configuration` is EA's page

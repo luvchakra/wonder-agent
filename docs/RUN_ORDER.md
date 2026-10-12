@@ -561,3 +561,35 @@ and can be sent again from the person's page. Roles given by invitation
 never carry permissions the inviter lacks. With this, every F2 story is
 done. F3 needs D3, F4 needs D12 and F6 needs D2; F5 (roles, SoD,
 delegation) needs no decision.
+
+## 2026-10-12 — Decisions D2, D3, D11 and D12 approved (owner)
+
+The owner approved the recommendations for four open decisions:
+
+- **D3 (connector writes, gates F3):** yes. Writes are per connection,
+  declared, tenant-enabled and approval-gated. Disable/enable and remove
+  access come first, then create and add.
+- **D11 (automation credentials, FOUNDATION-P0-31):** yes, with the §8.2
+  controls: hashed, expiring at most a year, role-scoped, four-eyes,
+  audited, rate-limited, never for sign-in.
+- **D12 (shared rule runtime, F4):** one runtime published by Operations;
+  rule tables stay with their owners.
+- **D2 (OAuth tokens to agents, F6):** yes, scoped to agents and the
+  gateway and opt-in MCP audiences; people's sign-in stays with the
+  customer's IdP.
+
+The owner also rotated the Saviynt training password and disconnected the
+paused Vercel project. Next: FOUNDATION-P0-31 (F1's last story), then F3.
+D7 (relay) and D9 (first connectors) remain open for their F3 stories.
+
+## 2026-10-12 — FOUNDATION-P0-31 done: F1 complete
+
+Automation credentials for the administration API (migrations 0126–0127).
+A pipeline or ITSM calls `/api/v1/*` with `Authorization: Bearer wa_ac_…`;
+each credential belongs to an application identity, acts through its own
+backing automation member (so RLS and the authorization engine apply
+unchanged), needs a second administrator to approve it or extend it, expires
+within a year, and is audited on every call. Global Configuration has an API
+route, and the built-in Configuration Administrator role ships. All nine F1
+stories are done. Next: F3 Provisioning (D3 approved).
+

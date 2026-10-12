@@ -89,7 +89,7 @@ WonderID is flagged.
 | EXPERIENCE-P0-28 | Reconciliation console | Experience | #47 | Needs the three above |
 | QA-P0-23 | Reconciliation suite | QA | #48 | |
 | INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection | Integration | #66 | Does not gate |
-| FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template | Foundation | #67 | Needs D11; does not gate |
+| FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template | Foundation | #67 | Done 2026-10-12 (D11 approved) |
 
 **Exit test.** Connect an application through a built-in connector and
 schedule it. Accounts, entitlements and grants appear for a person, a service
