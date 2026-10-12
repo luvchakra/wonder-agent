@@ -83,7 +83,22 @@ export function runIsLost(startedAt: string | null, now: Date): boolean {
   return !!startedAt && now.getTime() - Date.parse(startedAt) > LOST_RUN_MS;
 }
 
-/** The idempotency key of one attempt: per task and attempt, so a retry is a new request and a replay of one attempt is not. */
+/** The idempotency key of one attempt in WonderID's record: per task and attempt, so a retry is a new record and a replay of one attempt is not. */
 export function attemptKey(taskId: string, attempt: number): string {
   return `fulfil:${taskId}:${attempt}`;
+}
+
+/** WID-H02: the task every attempt belongs to; the system sees one key per task and change. */
+export function taskKey(taskId: string): string {
+  return `fulfil:${taskId}`;
+}
+
+/** WID-H02: the owner's note when the system may have made the change and it is not sent again. */
+export function uncertainReason(error: string | null): string {
+  return `The system may have made this change before the connection failed (${(error ?? "no answer").slice(0, 300)}). WonderID is reading the system again: if the change is there, this task closes by itself. Otherwise, try again once that read has finished.`;
+}
+
+/** WID-H02: whether the connector may be tried again: not while an unclear outcome waits for a read of the system started after it. */
+export function retryWaitsForRead(uncertainAt: string | null, readFinished: boolean): boolean {
+  return uncertainAt !== null && !readFinished;
 }

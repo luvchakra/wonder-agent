@@ -29,8 +29,13 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  * - QA-P0-26 provisioning safety: a connection type without writes cannot
  *   be turned on; the mass-change guard refuses the change past the hourly
  *   limit (nothing sent, the owner's task with the reason) and "Try again"
- *   works once the limit allows; no attempt key ever reaches the system
- *   twice, and every change the system received is recorded once.
+ *   works once the limit allows; every change the system received is
+ *   recorded once.
+ * - WID-H02: the system sees one key per task and change, the same on
+ *   every try. A change declared repeatable is tried three times; one that
+ *   is not is sent once when its outcome is unclear. Then WonderID reads
+ *   the system: the task closes by itself if the change is there, and
+ *   "try again" waits for that read.
  * - INTEGRATION-P0-21: an incremental sync asks the system only for what
  *   changed since the last good run, stores it, and marks nothing missing.
  * - Writes turned off: the next change is a person's task again.
@@ -38,6 +43,8 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
 
 const stamp = Date.now();
 const KEY = `e2e-writer-${stamp}`;
+// WID-H02: the key the system sees, one per task and change.
+const SYSTEM_KEY = /^fulfil:[0-9a-f-]{36}:[0-9a-f]{16}$/;
 const mail = (who: string) => `e2e-prov-${who}-${stamp}@example.test`;
 
 type Call = { method: string; path: string; key: string | null };
@@ -50,7 +57,10 @@ const system = {
     { id: "u-dee", username: "dee", email: mail("dee"), enabled: true },
   ] as { id: string; username: string; email: string; enabled: boolean; changedAt?: string }[],
   members: { "g-fin": ["u-ana", "u-bob", "u-cy"], "g-ops": [] } as Record<string, string[]>,
-  failWrites: false,
+  // WID-H02: "before" answers 503 without the change; "after" makes it, then answers 503.
+  failWrites: false as false | "before" | "after",
+  // While set, reads of /users wait for it (to hold a verification read).
+  holdReads: null as Promise<void> | null,
   reads: [] as string[],
   writes: [] as Call[],
 };
@@ -89,7 +99,7 @@ function definition() {
     },
     write: {
       revoke_access: { request: { method: "DELETE", path: "/groups/{target.entitlement}/members/{target.account}" } },
-      disable_account: { request: { method: "PATCH", path: "/users/{target.account}", body: { enabled: false } } },
+      disable_account: { repeatable: true, request: { method: "PATCH", path: "/users/{target.account}", body: { enabled: false } } },
       grant_access: { request: { method: "PUT", path: "/groups/{target.entitlement}/members/{target.account}" } },
       create_account: { request: { method: "POST", path: "/users", body: { email: "{target.email}", name: "{target.displayName}" } } },
     },
@@ -120,6 +130,7 @@ test.beforeAll(async () => {
     if (req.headers.authorization !== "Bearer e2e-token") return send(401, { error: "unauthorized" });
     if (req.method === "GET" && url.pathname === "/api/ping") return send(200, { ok: true });
     if (req.method === "GET" && url.pathname === "/users") {
+      if (system.holdReads) await system.holdReads;
       system.reads.push(url.search);
       const since = url.searchParams.get("since");
       return send(200, since ? system.users.filter((u) => u.changedAt && u.changedAt > since) : system.users);
@@ -132,7 +143,7 @@ test.beforeAll(async () => {
     const user = /^\/users\/([^/]+)$/.exec(url.pathname);
     if ((req.method === "POST" && url.pathname === "/users") || ((req.method === "DELETE" || req.method === "PUT") && membership) || (req.method === "PATCH" && user)) {
       system.writes.push({ method: req.method, path: url.pathname, key });
-      if (system.failWrites) return send(503, { error: "maintenance" });
+      if (system.failWrites === "before") return send(503, { error: "maintenance" });
       if (req.method === "POST") {
         const created = JSON.parse((await body(req)) || "{}") as { email?: string };
         const username = (created.email ?? "").split("@")[0].replace(/^e2e-prov-|-\d+$/g, "");
@@ -147,6 +158,7 @@ test.beforeAll(async () => {
         const u = system.users.find((x) => x.id === user[1]);
         if (u && patch.enabled === false) u.enabled = false;
       }
+      if (system.failWrites === "after") return send(503, { error: "gateway timeout" });
       return send(204);
     }
     return send(404, { error: "not found" });
@@ -238,7 +250,7 @@ test.describe.serial("connector provisioning", () => {
 
     // The connector made the change once, with an idempotency key.
     await expect.poll(() => system.members["g-fin"].includes("u-ana"), { timeout: 30_000 }).toBe(false);
-    expect(system.writes).toEqual([{ method: "DELETE", path: "/groups/g-fin/members/u-ana", key: expect.stringMatching(/^fulfil:[0-9a-f-]+:1$/) }]);
+    expect(system.writes).toEqual([{ method: "DELETE", path: "/groups/g-fin/members/u-ana", key: expect.stringMatching(SYSTEM_KEY) }]);
     // Then the system was read again and reconciliation verified it.
     await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 60_000 }).toBe("verified");
     const [task] = await tasksOf(request, req.id);
@@ -254,9 +266,9 @@ test.describe.serial("connector provisioning", () => {
     await expect(page.getByRole("button", { name: "Turn off" })).toBeVisible();
   });
 
-  test("a system error: three tries, then the owner's task with the reason; try again once it recovers, and it is verified", async ({ request, page }) => {
+  test("a system error on a repeatable change: three tries with one key, then the owner's task with the reason; try again once it recovers, and it is verified", async ({ request, page }) => {
     test.setTimeout(150_000);
-    system.failWrites = true;
+    system.failWrites = "before";
     const before = system.writes.length;
     const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.bob, applicationId: appId, requestType: "disable_account", justification: "INTEGRATION-P0-13 failure" } });
     expect(res.status(), await res.text()).toBe(201);
@@ -267,7 +279,10 @@ test.describe.serial("connector provisioning", () => {
     const [failed] = await tasksOf(request, req.id);
     expect(failed).toMatchObject({ kind: "disable_account", status: "open", connectorError: expect.stringMatching(/HTTP 503/) });
     const attempts = system.writes.slice(before);
-    expect(attempts.map((w) => w.key)).toEqual([expect.stringMatching(/:1$/), expect.stringMatching(/:2$/), expect.stringMatching(/:3$/)]);
+    // WID-H02: the same key on every try, so a system that honours it applies the change once.
+    expect(attempts).toHaveLength(3);
+    expect(new Set(attempts.map((w) => w.key)).size).toBe(1);
+    expect(attempts[0].key).toMatch(SYSTEM_KEY);
     expect(system.users.find((u) => u.id === "u-bob")?.enabled).toBe(true);
 
     await page.goto("/access/fulfilment");
@@ -281,6 +296,67 @@ test.describe.serial("connector provisioning", () => {
     await expect(row).toHaveCount(0, { timeout: 30_000 });
     expect(system.users.find((u) => u.id === "u-bob")?.enabled).toBe(false);
     await expect.poll(async () => (await tasksOf(request, req.id))[0]?.status, { timeout: 60_000 }).toBe("verified");
+  });
+
+  test("WID-H02: a change that is not repeatable and may have been made is sent once; reading the system closes the task", async ({ request }) => {
+    test.setTimeout(150_000);
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    const before = system.writes.length;
+    system.failWrites = "after";
+    try {
+      const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.cy, applicationId: appId, entitlementId: ops, requestType: "grant", justification: "WID-H02 unclear outcome" } });
+      expect(res.status(), await res.text()).toBe(201);
+      const req = (await res.json()).data as { id: string; status: string };
+      expect(req.status).toBe("approved");
+      await expect.poll(async () => (await tasksOf(request, req.id))[0]?.connectorStatus, { timeout: 60_000 }).toMatch(/failed|succeeded/);
+      // The system made the change but answered 503: never sent a second time.
+      expect(system.members["g-ops"]).toContain("u-cy");
+      expect(system.writes.slice(before)).toEqual([{ method: "PUT", path: "/groups/g-ops/members/u-cy", key: expect.stringMatching(SYSTEM_KEY) }]);
+      // WonderID read the system, found the change, and closed the task.
+      await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 90_000 }).toBe("verified");
+      expect(system.writes.length).toBe(before + 1);
+    } finally {
+      system.failWrites = false;
+    }
+  });
+
+  test("WID-H02: when the change is not there, try again waits for the read of the system, then works", async ({ request }) => {
+    test.setTimeout(150_000);
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    const before = system.writes.length;
+    let release = () => {};
+    system.failWrites = "before";
+    system.holdReads = new Promise<void>((resolve) => (release = resolve));
+    try {
+      const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.dee, applicationId: appId, entitlementId: ops, requestType: "grant", justification: "WID-H02 read before retry" } });
+      expect(res.status(), await res.text()).toBe(201);
+      const req = (await res.json()).data as { id: string };
+      await expect.poll(async () => (await tasksOf(request, req.id))[0]?.connectorStatus, { timeout: 60_000 }).toBe("failed");
+      const [held] = await tasksOf(request, req.id);
+      expect(held.connectorError).toMatch(/may have made this change/);
+      expect(system.writes.length).toBe(before + 1);
+
+      // The read has not finished: trying again is refused, and nothing is sent.
+      system.failWrites = false;
+      const early = await request.post(`/api/v1/access/fulfilment-tasks/${held.id}`, { data: { action: "retry_connector" } });
+      expect(early.status()).toBe(409);
+      expect((await early.json()).error.code).toBe("READ_PENDING");
+      expect(system.writes.length).toBe(before + 1);
+
+      // Once the read has finished (the change is not there), trying again makes it.
+      release();
+      system.holdReads = null;
+      await expect.poll(async () => (await request.post(`/api/v1/access/fulfilment-tasks/${held.id}`, { data: { action: "retry_connector" } })).status(), { timeout: 90_000, intervals: [3_000] }).toBe(200);
+      expect(system.members["g-ops"]).toContain("u-dee");
+      const sent = system.writes.slice(before);
+      expect(sent).toHaveLength(2);
+      expect(sent[1].key).toBe(sent[0].key);
+      await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 90_000 }).toBe("verified");
+    } finally {
+      release();
+      system.holdReads = null;
+      system.failWrites = false;
+    }
   });
 
   test("F3 exit: rogue access is removed through the connector after a reviewer asks, verified, and its finding resolves", async ({ request, page }) => {
@@ -338,7 +414,7 @@ test.describe.serial("connector provisioning", () => {
     expect(req.status).toBe("approved");
 
     await expect.poll(() => system.members["g-ops"].includes("u-ana"), { timeout: 30_000 }).toBe(true);
-    expect(system.writes.slice(before)).toEqual([{ method: "PUT", path: "/groups/g-ops/members/u-ana", key: expect.stringMatching(/^fulfil:[0-9a-f-]+:1$/) }]);
+    expect(system.writes.slice(before)).toEqual([{ method: "PUT", path: "/groups/g-ops/members/u-ana", key: expect.stringMatching(SYSTEM_KEY) }]);
     await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 60_000 }).toBe("verified");
     const [task] = await tasksOf(request, req.id);
     expect(task).toMatchObject({ kind: "grant", status: "verified", connectorStatus: "succeeded" });
@@ -425,16 +501,18 @@ test.describe.serial("connector provisioning", () => {
     }
   });
 
-  test("QA-P0-26 idempotency: no attempt key reached the system twice, and each change it received is recorded once", async () => {
+  test("QA-P0-26 / WID-H02 idempotency: a key always meant one change, retries reused it, and each request the system received is recorded once", async () => {
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
     const keys = system.writes.map((w) => w.key);
-    expect(keys.every((k) => k !== null)).toBe(true);
-    expect(new Set(keys).size).toBe(keys.length);
-    const { data: rows } = await db.from("connector_write_operations").select("idempotency_key, status").eq("tenant_id", tenantId).eq("integration_id", integrationId);
+    expect(keys.every((k) => k !== null && SYSTEM_KEY.test(k))).toBe(true);
+    const changes = new Map<string, Set<string>>();
+    for (const w of system.writes) changes.set(w.key!, (changes.get(w.key!) ?? new Set()).add(`${w.method} ${w.path}`));
+    expect([...changes.values()].every((c) => c.size === 1)).toBe(true);
+    expect(changes.size).toBeLessThan(keys.length);
+    const { data: rows } = await db.from("connector_write_operations").select("system_key, status").eq("tenant_id", tenantId).eq("integration_id", integrationId);
     const sent = (rows ?? []).filter((r) => r.status === "succeeded" || r.status === "failed");
-    // Every request the system saw has its one record; blocked ones never reached it.
-    expect(sent.map((r) => r.idempotency_key).sort()).toEqual([...keys].sort());
-    expect((rows ?? []).filter((r) => r.status === "blocked").every((r) => !keys.includes(r.idempotency_key))).toBe(true);
+    // One record per request the system saw, with the key it saw; blocked ones never reached it.
+    expect(sent.map((r) => r.system_key).sort()).toEqual([...keys].sort());
   });
 
   test("INTEGRATION-P0-21: an incremental sync reads only what changed and marks nothing missing", async ({ request }) => {

@@ -3,7 +3,8 @@ import { generateKeyPairSync, verify } from "node:crypto";
 import { applyTransform, fillTemplate, mapField, mapRecord, matchesFilters, readPath, TemplateError } from "./mapping";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { HttpSession, parseLinkNext, type FetchLike } from "./http";
-import { DefinitionConnector, capabilitiesOf, httpDriver, writeCapabilitiesOf } from "./engine";
+import { DefinitionConnector, capabilitiesOf, httpDriver, writeCapabilitiesOf, writeIsRepeatable } from "./engine";
+import { scim } from "./definitions/scim";
 import type { ConnectorDefinition, ResourceSpec } from "./types";
 
 const base: ConnectorDefinition = {
@@ -521,6 +522,20 @@ describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
     expect(capabilitiesOf(writer).revokeAccess).toBeUndefined();
     expect(writeCapabilitiesOf(writer)).toEqual({ revokeAccess: true, disableAccount: true, grantAccess: true, createAccount: true, deprovision: true, provision: true });
     expect(writeCapabilitiesOf(base)).toEqual({ revokeAccess: false, disableAccount: false, grantAccess: false, createAccount: false, deprovision: false, provision: false });
+  });
+
+  it("WID-H02: a change is repeatable only when declared (LDAP always), and the flag is checked", () => {
+    expect(writeIsRepeatable(writer, "revoke_access")).toBe(false);
+    const declared = { ...writer, write: { ...writer.write, disable_account: { ...writer.write!.disable_account!, repeatable: true } } } as ConnectorDefinition;
+    expect(validateDefinition(declared).issues).toEqual([]);
+    expect(writeIsRepeatable(declared, "disable_account")).toBe(true);
+    expect(writeIsRepeatable(declared, "create_account")).toBe(false);
+    expect(writeIsRepeatable(base, "disable_account")).toBe(false);
+    expect(writeIsRepeatable({ ...writer, driver: "ldap", write: { revoke_access: { ldap: { dn: "{target.entitlement}" } } } } as unknown as ConnectorDefinition, "revoke_access")).toBe(true);
+    const issues = validateDefinition({ ...writer, write: { disable_account: { repeatable: "yes", request: { method: "PATCH", path: "/users/{target.account}" } } } } as unknown as ConnectorDefinition).issues;
+    expect(issues.map((i) => `${i.path}: ${i.message}`).join()).toMatch(/write.disable_account.repeatable: must be true or false/);
+    // The built-in SCIM type: membership and disabling are repeatable, creating a user is not.
+    expect((["grant_access", "revoke_access", "disable_account", "create_account"] as const).map((op) => writeIsRepeatable(scim, op))).toEqual([true, true, true, false]);
   });
 
   it("sends the declared request with the target filled in and the idempotency key", async () => {

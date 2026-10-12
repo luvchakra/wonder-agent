@@ -72,8 +72,10 @@ export type ConnectorWriteResult = {
   replayed: boolean;
   externalId: string | null;
   error: string | null;
-  /** INTEGRATION-P0-13: a failed write that may succeed if tried again (network, 429, 5xx). */
+  /** INTEGRATION-P0-13: a failed write that may succeed if tried again now (WID-H02: never one the system may already have applied, unless the change is repeatable). */
   retryable?: boolean;
+  /** WID-H02: the system may have applied this change and it is not repeatable: read the system before trying again. */
+  uncertain?: boolean;
 };
 
 export type IntegrationStatus = "configured" | "connected" | "error" | "disabled";

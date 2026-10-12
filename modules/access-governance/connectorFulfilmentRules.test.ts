@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attemptKey, connectorOperation, connectorTarget, newAccountTarget, retryDelayMs, runIsLost, shouldRetry, MAX_ATTEMPTS_PER_RUN, MAX_ATTEMPTS_TOTAL } from "./connectorFulfilmentRules";
+import { attemptKey, connectorOperation, connectorTarget, newAccountTarget, retryDelayMs, retryWaitsForRead, runIsLost, shouldRetry, taskKey, uncertainReason, MAX_ATTEMPTS_PER_RUN, MAX_ATTEMPTS_TOTAL } from "./connectorFulfilmentRules";
 
 describe("connector fulfilment rules (INTEGRATION-P0-13)", () => {
   it("maps each task kind to its write (D3)", () => {
@@ -55,5 +55,27 @@ describe("connector fulfilment rules (INTEGRATION-P0-13)", () => {
     expect(runIsLost(null, now)).toBe(false);
     expect(attemptKey("t1", 2)).toBe("fulfil:t1:2");
     expect(attemptKey("8a3b1f2c-0000-4000-8000-000000000001", 20)).toMatch(/^[A-Za-z0-9._:-]{8,200}$/);
+  });
+});
+
+describe("WID-H02: one task, unclear outcomes", () => {
+  it("names the task once for the system, and each attempt for WonderID's record", () => {
+    expect(taskKey("t-0001")).toBe("fulfil:t-0001");
+    expect(attemptKey("t-0001", 1).startsWith(taskKey("t-0001") + ":")).toBe(true);
+    expect(taskKey("8a3b1f2c-0000-4000-8000-000000000001")).toMatch(/^[A-Za-z0-9._:-]{8,180}$/);
+  });
+
+  it("a retry waits for a read of the system only after an unclear outcome", () => {
+    expect(retryWaitsForRead(null, false)).toBe(false);
+    expect(retryWaitsForRead("2026-10-12T10:00:00Z", false)).toBe(true);
+    expect(retryWaitsForRead("2026-10-12T10:00:00Z", true)).toBe(false);
+  });
+
+  it("tells the owner the change may be there and that the task may close by itself", () => {
+    const reason = uncertainReason("Write failed: HTTP 503");
+    expect(reason).toMatch(/may have made this change/);
+    expect(reason).toContain("HTTP 503");
+    expect(reason).toMatch(/closes by itself/);
+    expect(uncertainReason(null)).toContain("no answer");
   });
 });

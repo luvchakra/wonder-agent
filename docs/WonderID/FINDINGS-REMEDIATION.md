@@ -34,7 +34,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Integration tests for a connector outage and a failed deprovisioning; owner decision on connectors carrying out a leaver's removals |
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
-| WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
+| WID-H02 Idempotency and retries | P2 | Partly fixed | Process-crash tests; compensation for a partly created account |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | A test for a failed page in the middle of a read |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
@@ -197,10 +197,47 @@ Priority lowered to P3: what remains needs owner input.
 (PR #107; `ldapWrite.ts`, `alreadyApplied`). The knowledge base no longer
 claims "never applied twice".
 
+**Done (2026-10-12):** the three items below, decided under the owner's
+standing instruction to prioritise and fix findings without asking.
+- **One key per task.** The system receives one `Idempotency-Key` per task
+  and change (`systemKey` in `connectorWriteRules.ts`: the task plus a
+  fingerprint of the request), the same on every try. A corrected request
+  gets a new key. WonderID's own record stays one row per attempt and now
+  stores the key the system saw (`system_key`, migration 0141).
+- **Failures are classified** (`writeFailureKind`):
+  - not applied: 429, or a connection that never reached the system;
+  - unclear: a timeout, a dropped connection, 408, 5xx, or an unreadable
+    success answer;
+  - refused: other 4xx, or blocked by WonderID.
+- **Declared per connection type.** A definition marks an http change
+  `repeatable` when sending it twice cannot make it twice. LDAP changes
+  always are; in `scim-2`, adding, removing and disabling are, creating a
+  user is not.
+- **Read before a retry.** An unclear outcome is retried automatically
+  only for a repeatable change. Otherwise:
+  - the change is not sent again;
+  - a verification sync reads the system, and reconciliation closes the
+    task if the change is there;
+  - "Try again" is refused (`READ_PENDING`) until a complete read of the
+    connection that started after the failure has finished
+    (`connector_uncertain_at`, migration 0142; `readFinishedSince`).
+
+  A connector run that never reported back is treated the same way.
+
+Tests:
+- `connectorWriteRules.test.ts`, `connectorFulfilmentRules.test.ts` and
+  `framework.test.ts` ("WID-H02");
+- E2E `connector-provisioning`:
+  - a repeatable change: three tries with one key;
+  - a non-repeatable change the system made, then answered 503: sent
+    once, and closed by the read;
+  - a non-repeatable change that failed: the retry is refused until the
+    read finishes, then works with the same key.
+
 **Next:**
-- One key per task instead of per attempt.
-- Read the system before a retry after an unclear failure.
-- Declare which connection types honour the key.
+- Crash and timeout tests at the process level (a run killed mid-write).
+- Compensation for a partly created account (an account created, its
+  access not).
 
 ### WID-H03: incomplete syncs (P2, partly fixed)
 

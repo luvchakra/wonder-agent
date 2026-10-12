@@ -60,13 +60,19 @@ export const scim: ConnectorDefinition = {
   },
   write: {
     // RFC 7644 §3.5.2: group membership changes by PATCH on the group.
+    // Repeatable (WID-H02): adding a member already there, removing one
+    // already gone or deactivating twice changes nothing. Creating a user
+    // is not: a second POST could make a second account.
     grant_access: {
+      repeatable: true,
       request: { method: "PATCH", path: "/Groups/{target.entitlement}", body: { schemas: [PATCH], Operations: [{ op: "add", path: "members", value: [{ value: "{target.account}" }] }] } },
     },
     revoke_access: {
+      repeatable: true,
       request: { method: "PATCH", path: "/Groups/{target.entitlement}", body: { schemas: [PATCH], Operations: [{ op: "remove", path: 'members[value eq "{target.account}"]' }] } },
     },
     disable_account: {
+      repeatable: true,
       request: { method: "PATCH", path: "/Users/{target.account}", body: { schemas: [PATCH], Operations: [{ op: "replace", path: "active", value: false }] } },
     },
     create_account: {

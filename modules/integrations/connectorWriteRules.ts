@@ -39,13 +39,23 @@ export function validateDeclaredCapabilities(requested: unknown, supported: Conn
   return out;
 }
 
-export type WriteRequestInput = { operation?: unknown; idempotencyKey?: unknown; target?: unknown };
+/**
+ * `idempotencyKey` names one attempt in WonderID's own record. `taskKey`
+ * (WID-H02), when given, names the piece of work the attempt belongs to:
+ * the key the system sees is derived from it and the request, so every
+ * attempt at the same change sends the system the same key.
+ */
+export type WriteRequestInput = { operation?: unknown; idempotencyKey?: unknown; taskKey?: unknown; target?: unknown };
 
-export function validateWriteRequest(input: WriteRequestInput): { operation: ConnectorWriteOperation; idempotencyKey: string; target: Record<string, string> } {
+const KEY_RE = /^[A-Za-z0-9._:-]{8,200}$/;
+
+export function validateWriteRequest(input: WriteRequestInput): { operation: ConnectorWriteOperation; idempotencyKey: string; taskKey: string | null; target: Record<string, string> } {
   const operation = input.operation;
   if (typeof operation !== "string" || !(operation in CONNECTOR_WRITE_OPERATIONS)) fail(`operation: one of ${Object.keys(CONNECTOR_WRITE_OPERATIONS).join(", ")}`);
   const key = input.idempotencyKey;
-  if (typeof key !== "string" || !/^[A-Za-z0-9._:-]{8,200}$/.test(key)) fail("idempotencyKey: 8 to 200 letters, digits or . _ : -");
+  if (typeof key !== "string" || !KEY_RE.test(key)) fail("idempotencyKey: 8 to 200 letters, digits or . _ : -");
+  const taskKey = input.taskKey ?? null;
+  if (taskKey !== null && (typeof taskKey !== "string" || !KEY_RE.test(taskKey) || taskKey.length > 180)) fail("taskKey: 8 to 180 letters, digits or . _ : -");
   const target = input.target;
   if (!target || typeof target !== "object" || Array.isArray(target)) fail("target: an object naming the account, entitlement or identity");
   const out: Record<string, string> = {};
@@ -56,7 +66,18 @@ export function validateWriteRequest(input: WriteRequestInput): { operation: Con
     out[k] = v as string;
   }
   if (!Object.keys(out).length) fail("target: name at least one field");
-  return { operation: operation as ConnectorWriteOperation, idempotencyKey: key as string, target: out };
+  return { operation: operation as ConnectorWriteOperation, idempotencyKey: key as string, taskKey: taskKey as string | null, target: out };
+}
+
+/**
+ * WID-H02: the `Idempotency-Key` the system receives. One per task and
+ * request content: a retry of the same change sends the same key, so a
+ * system that honours the key applies it once; a changed request (a
+ * corrected mapping) is a different change with a different key. Without
+ * a task, the attempt's own key.
+ */
+export function systemKey(request: { idempotencyKey: string; taskKey: string | null }, fingerprint: string): string {
+  return request.taskKey ? `${request.taskKey}:${fingerprint.slice(0, 16)}` : request.idempotencyKey;
 }
 
 /** A stable fingerprint of what was asked, to spot a key reused for something else. */
@@ -115,12 +136,34 @@ export function writesEnabled(declared: ConnectorCapabilities): boolean {
 }
 
 /**
- * Whether a failed write is worth trying again: a network failure, a rate
- * limit (429) or a server error (5xx). A refusal (4xx) or a definition
- * that cannot fill its request will fail the same way again.
+ * WID-H02: what a failed write says about the system.
+ * - `not_applied`: the system did not take the change (429, or the
+ *   connection never reached it). Trying again is safe.
+ * - `unclear`: the request may have reached the system and been applied
+ *   (a timeout, a dropped connection, 408 or 5xx, or a success answer
+ *   WonderID could not read). Sending it again is safe only when the
+ *   change is declared repeatable; otherwise the system must be read first.
+ * - `refused`: the system said no (4xx), or WonderID refused to send it.
+ *   It will fail the same way again.
  */
-export function retryableWriteFailure(status: number | undefined, kind: "http" | "network" | "other"): boolean {
-  if (kind === "network") return true;
-  if (kind !== "http" || status === undefined) return false;
-  return status === 429 || status >= 500;
+export type WriteFailure = "not_applied" | "unclear" | "refused";
+
+const NOT_SENT = /^(ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EHOSTUNREACH|ENETUNREACH)$/;
+const CUT_OFF = /^(ECONNRESET|EPIPE|ETIMEDOUT|ECONNABORTED|UND_ERR_SOCKET)$/;
+
+export function writeFailureKind(f: { status?: number; code?: string; message?: string; network?: boolean; blocked?: boolean }): WriteFailure {
+  if (f.blocked) return "refused";
+  if (f.status !== undefined) return f.status === 429 ? "not_applied" : f.status === 408 || f.status >= 500 ? "unclear" : "refused";
+  if (f.code && NOT_SENT.test(f.code)) return "not_applied";
+  if (f.code && CUT_OFF.test(f.code)) return "unclear";
+  const message = f.message ?? "";
+  if (/timed? ?out|socket hang up|did not return JSON/i.test(message)) return "unclear";
+  // fetch's own "fetch failed": it may have failed before or after sending.
+  if (f.network) return "unclear";
+  return "refused";
+}
+
+/** Whether to send a failed write again now: never refused; an unclear one only when repeating it cannot make the change twice. */
+export function retryableWrite(kind: WriteFailure, repeatable: boolean): boolean {
+  return kind === "not_applied" || (kind === "unclear" && repeatable);
 }

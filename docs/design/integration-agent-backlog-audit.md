@@ -2740,3 +2740,36 @@ Verified:
 
 Left out: an E2E test for a page that fails in the middle of a read
 (tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`).
+
+### 2026-10-12 — One key per change; unclear write outcomes read first (WID-H02)
+
+Decided under the owner's standing instruction to fix findings by priority
+without asking; recorded in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+- **The key the system sees.** One per task and change (`systemKey` in
+  `connectorWriteRules.ts`: the caller's `taskKey` plus the first 16 hex of
+  the request fingerprint), the same on every try. `connector_write_operations`
+  keeps one row per attempt and now stores the sent key (`system_key`,
+  migration 0141, applied). Calls without a task send the attempt's own key,
+  as before.
+- **Failures classified** (`writeFailureKind`):
+  - not applied: 429; `ECONNREFUSED`, `ENOTFOUND` and similar;
+  - unclear: 408, 5xx, a timeout, `ECONNRESET`, fetch's "fetch failed",
+    or a success answer that was not JSON;
+  - refused: other 4xx, or blocked by the gateway or the egress policy.
+
+  A failure while authenticating, before anything is sent, is never
+  unclear.
+- **Repeatable changes.** An http write may declare `repeatable: true`
+  (`WriteSpec`; validated in `checkWrite`; `writeIsRepeatable` in
+  `engine.ts`). LDAP writes are always repeatable. Built-in `scim-2`:
+  grant, revoke and disable are repeatable, create is not.
+  `retryableWrite`: an unclear failure is retryable only when repeatable.
+  Otherwise the result is `uncertain: true` (`ConnectorWriteResult`).
+- **`readFinishedSince`** (`syncJobs.ts`, published in `service.ts`): a
+  succeeded read of the connection, started at or after a time, with its
+  post-sync steps finished. Access uses it to gate retries.
+- `docs/integrations/CONNECTOR-FRAMEWORK.md` documents `repeatable` and the
+  key.
+
+Verified: see the Access Agent entry of the same date (shared E2E run).

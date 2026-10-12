@@ -14,6 +14,8 @@ import {
   retryDelayMs,
   runIsLost,
   shouldRetry,
+  taskKey,
+  uncertainReason,
   MAX_ATTEMPTS_TOTAL,
   type ConnectorOperation,
 } from "./connectorFulfilmentRules";
@@ -26,14 +28,19 @@ import type { FulfilmentTaskKind } from "./fulfilmentTaskRules";
  * approval (the request, already decided by people) → plan (the task's
  * operation and target, through the connection the account came from) →
  * pre-check (writes turned on for that connection, operation supported,
- * connection not disabled) → execute (connectorWrites, one idempotency key
- * per attempt; retried twice on a network, 429 or 5xx failure) → record
+ * connection not disabled) → execute (connectorWrites: one record per
+ * attempt, one key per task for the system; retried twice when the system
+ * did not take it, or when its outcome is unclear and the change is
+ * repeatable, WID-H02) → record
  * (the task completes, not yet verified, as when a person completes it) →
  * verify (a sync reads the system again; reconciliation closes the task
  * only when the change is really there) → audit at each step.
  *
  * A failure leaves the task open for its owner, with the reason, and tells
- * them. Access for an account that does not exist yet waits for it: the
+ * them. When the system may have made a change that is not repeatable, it
+ * is not sent again: a verification sync reads the system, reconciliation
+ * closes the task if the change is there, and the owner may try again only
+ * after that read (connector_uncertain_at, WID-H02). Access for an account that does not exist yet waits for it: the
  * connector creates the account, the next read brings it in and replaces
  * the placeholder, and then the access is added (resumeConnectorGrants).
  *
@@ -205,7 +212,7 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
   // Claim: only an open task the connector is not already working on.
   const { data: claimed, error: claimError } = await admin
     .from("access_fulfilment_tasks")
-    .update({ connector_status: "running", connector_integration_id: plan.integrationId, connector_started_at: now, connector_error: null, updated_at: now })
+    .update({ connector_status: "running", connector_integration_id: plan.integrationId, connector_started_at: now, connector_error: null, connector_uncertain_at: null, updated_at: now })
     .eq("tenant_id", tenantId)
     .eq("id", plan.taskId)
     .eq("status", "open")
@@ -217,12 +224,12 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
 
   let attempts = claimed.connector_attempts as number;
   let thisRun = 0;
-  let outcome: { status: string; error: string | null; id?: string; retryable?: boolean } = { status: "failed", error: "Not attempted" };
+  let outcome: { status: string; error: string | null; id?: string; retryable?: boolean; uncertain?: boolean } = { status: "failed", error: "Not attempted" };
   while (attempts < MAX_ATTEMPTS_TOTAL) {
     attempts++;
     thisRun++;
     try {
-      outcome = await executeConnectorWrite(tenantId, actorId, plan.integrationId, { operation: plan.operation, idempotencyKey: attemptKey(plan.taskId, attempts), target: plan.target });
+      outcome = await executeConnectorWrite(tenantId, actorId, plan.integrationId, { operation: plan.operation, idempotencyKey: attemptKey(plan.taskId, attempts), taskKey: taskKey(plan.taskId), target: plan.target });
     } catch (err) {
       outcome = { status: "failed", error: err instanceof ApiError ? err.message : "The write could not be started", retryable: false };
     }
@@ -279,10 +286,11 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
     return "succeeded";
   }
 
-  const reason = (outcome.error ?? "The connector could not make the change").slice(0, 1000);
+  const uncertain = outcome.uncertain === true;
+  const reason = uncertain ? uncertainReason(outcome.error) : (outcome.error ?? "The connector could not make the change").slice(0, 1000);
   const { error } = await admin
     .from("access_fulfilment_tasks")
-    .update({ connector_status: "failed", connector_error: reason, connector_attempts: attempts, updated_at: done })
+    .update({ connector_status: "failed", connector_error: reason, connector_attempts: attempts, connector_uncertain_at: uncertain ? done : null, updated_at: done })
     .eq("tenant_id", tenantId)
     .eq("id", plan.taskId)
     .eq("connector_status", "running");
@@ -296,8 +304,10 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
     objectId: plan.taskId,
     outcome: "failure",
     correlationId: outcome.id,
-    metadata: { integrationId: plan.integrationId, operation: plan.operation, attempts, status: outcome.status, error: reason },
+    metadata: { integrationId: plan.integrationId, operation: plan.operation, attempts, status: outcome.status, error: reason, ...(uncertain ? { uncertain } : {}) },
   });
+  // WID-H02: read the system rather than send it again; reconciliation closes the task if the change is there.
+  if (uncertain) await startVerificationSync(tenantId, plan.integrationId);
   await tellOwner(tenantId, plan.taskId, (claimed.assignee_identity_id as string | null) ?? null, reason);
   return "failed";
 }
@@ -327,7 +337,7 @@ async function tellOwner(tenantId: string, taskId: string, assigneeIdentityId: s
  */
 export async function releaseLostConnectorRuns(tenantId: string | null, now = new Date()): Promise<number> {
   const admin = supabaseServiceRole();
-  let q = admin.from("access_fulfilment_tasks").select("id, tenant_id, assignee_identity_id, connector_started_at").eq("connector_status", "running").limit(500);
+  let q = admin.from("access_fulfilment_tasks").select("id, tenant_id, assignee_identity_id, connector_started_at, connector_integration_id").eq("connector_status", "running").limit(500);
   if (tenantId) q = q.eq("tenant_id", tenantId);
   const { data, error } = await q;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -336,10 +346,11 @@ export async function releaseLostConnectorRuns(tenantId: string | null, now = ne
     if (tenantId && row.tenant_id !== tenantId) continue;
     if (!runIsLost((row.connector_started_at as string | null) ?? null, now)) continue;
     const t = row.tenant_id as string;
-    const reason = "The connector run did not report back. Check the system, then finish the task by hand or try the connector again.";
+    const reason = "The connector run did not report back. WonderID is reading the system again: if the change is there, this task closes by itself. Otherwise, finish it by hand or try the connector again once that read has finished.";
     const { data: updated } = await admin
       .from("access_fulfilment_tasks")
-      .update({ connector_status: "failed", connector_error: reason, updated_at: now.toISOString() })
+      // WID-H02: the outcome is unknown, so a retry waits for a read of the system.
+      .update({ connector_status: "failed", connector_error: reason, connector_uncertain_at: now.toISOString(), updated_at: now.toISOString() })
       .eq("tenant_id", t)
       .eq("id", row.id as string)
       .eq("connector_status", "running")
@@ -347,7 +358,8 @@ export async function releaseLostConnectorRuns(tenantId: string | null, now = ne
       .maybeSingle();
     if (!updated) continue;
     released++;
-    await writeAudit({ tenantId: t, actorType: "system", action: "access.fulfilment_task_connector_failed", objectType: "access_fulfilment_task", objectId: row.id as string, outcome: "failure", metadata: { error: "LOST_RUN" } });
+    await writeAudit({ tenantId: t, actorType: "system", action: "access.fulfilment_task_connector_failed", objectType: "access_fulfilment_task", objectId: row.id as string, outcome: "failure", metadata: { error: "LOST_RUN", uncertain: true } });
+    if (row.connector_integration_id) await startVerificationSync(t, row.connector_integration_id as string);
     await tellOwner(t, row.id as string, (row.assignee_identity_id as string | null) ?? null, reason);
   }
   return released;

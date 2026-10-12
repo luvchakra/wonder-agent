@@ -65,6 +65,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Rogue access that was approved later is recorded as "approved afterwards", with its request, never as fixed. |
 | 12 Oct 2026 | An account matched to a person stays with them when an email address or username is reused; the sync results say so. |
 | 12 Oct 2026 | A sync is held when every record of a kind would go missing at once, at any size; people are held at a lower share than other records. |
+| 12 Oct 2026 | A connection's change sends the system one key however often it is tried; a change that may already have been made is checked by reading the system before it is sent again. |
 
 ---
 
@@ -358,8 +359,12 @@ An approved request is not access yet. It becomes access once the change is made
   - create accounts.
 - **Off until switched on:** this is off until an administrator turns it on for that connection (the connection's page → "Changes in the system"), and only for the changes its type supports.
 - **No account yet:** for someone with no account, the connection creates the account first, then adds the access once the account appears.
-- **Attempt keys:** each attempt carries its own key; systems that support these keys ignore a repeated attempt. A retry is a new attempt, so after an unclear failure, check the system before pressing "Try again".
-- **Temporary errors:** rate limits and server errors are retried twice.
+- **One key per change:** every try at the same change sends the system the same key, so a system that supports these keys makes the change once.
+- **Temporary errors:** a rate limit, or a system that could not be reached, is retried twice.
+- **Unclear outcome:** after a timeout, a dropped connection or a server error, the system may have made the change anyway.
+  - If the connection type marks the change as repeatable (sending it twice can't make it twice), it is retried twice.
+  - Otherwise it is not sent again. WonderID reads the system: if the change is there, the task closes by itself. "Try again" works only once that read has finished.
+  - Directory (LDAP) changes are always repeatable. For SCIM, adding, removing and disabling are repeatable; creating a user is not.
 - **Verified:** after the change, WonderID reads the system again and marks it verified only if the change is really there.
 - **If it fails:** the task goes back to its owner with the reason. They can do it by hand or press "Try again".
 - **Not confirmed:** if a removal was marked done but the system still has not confirmed it 2 days later, its owner is reminded daily to check.

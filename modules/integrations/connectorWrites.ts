@@ -10,9 +10,10 @@ import { createConnector } from "./registry";
 import { openGateway } from "./gateway/gateway";
 import { getDecryptedCredential, keepObtainedTokens } from "./credentials";
 import { getTenantConfig } from "@/lib/config/tenantConfig";
-import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, WRITE_WINDOW_MS, retryableWriteFailure, validateWriteRequest, writesEnabled, type WriteRequestInput } from "./connectorWriteRules";
+import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, retryableWrite, systemKey, WRITE_WINDOW_MS, validateWriteRequest, writeFailureKind, writesEnabled, type WriteRequestInput } from "./connectorWriteRules";
 import { ConnectorRequestError } from "./framework/http";
-import { parseConnectorConfig, writeCapabilitiesOf } from "./framework/engine";
+import { parseConnectorConfig, writeCapabilitiesOf, writeIsRepeatable } from "./framework/engine";
+import { classifyOutboundError } from "./gateway/gatewayRules";
 import { DEFINITION_WRITE_OPERATIONS, type DefinitionWriteOperation } from "./framework/types";
 import { createSystemSyncJob, runSyncJob } from "./syncJobs";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
@@ -32,6 +33,12 @@ import { CONNECTOR_WRITE_OPERATIONS, type ConnectorWriteOperation } from "@/lib/
  * recorded outcome (or "requested" while the first call is still running);
  * a key reused for a different request is refused. Service role, with an
  * explicit tenant filter on every statement (§14).
+ *
+ * WID-H02: the key the system receives is one per task and change
+ * (`systemKey`), recorded as `system_key`. A failure is classified
+ * (`writeFailureKind`): one the system may have applied is retryable only
+ * when the definition declares the change repeatable; otherwise the result
+ * is `uncertain` and the caller must read the system before trying again.
  */
 
 type Row = Record<string, unknown>;
@@ -49,9 +56,32 @@ function toResult(r: Row, replayed: boolean): ConnectorWriteResult {
   };
 }
 
+/** What a thrown error says about a write, for writeFailureKind. */
+function failureFacts(err: unknown) {
+  const code = (err as { code?: unknown })?.code ?? (err as { cause?: { code?: unknown } })?.cause?.code;
+  return {
+    blocked: classifyOutboundError(err).outcome === "blocked",
+    status: err instanceof ConnectorRequestError ? err.status : undefined,
+    code: typeof code === "string" ? code : undefined,
+    message: err instanceof Error ? err.message : undefined,
+    network: err instanceof TypeError,
+  };
+}
+
+/** WID-H02: whether the connection's definition declares this change repeatable. */
+function repeatableWrite(integration: { integration_type_id: unknown; config: unknown }, operation: ConnectorWriteOperation): boolean {
+  if (integration.integration_type_id !== "connector") return false;
+  try {
+    return writeIsRepeatable(parseConnectorConfig((integration.config ?? {}) as Record<string, unknown>).def, operation as DefinitionWriteOperation);
+  } catch {
+    return false;
+  }
+}
+
 export async function executeConnectorWrite(tenantId: string, actorId: string | null, integrationId: string, input: WriteRequestInput): Promise<ConnectorWriteResult> {
   const request = validateWriteRequest(input);
   const fingerprint = requestFingerprint(request.operation, request.target);
+  const sentKey = systemKey(request, fingerprint);
   const supabase = supabaseServiceRole();
 
   const { data: integration, error: integrationError } = await supabase
@@ -71,6 +101,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
       tenant_id: tenantId,
       integration_id: integrationId,
       idempotency_key: request.idempotencyKey,
+      system_key: sentKey,
       operation: request.operation,
       request_fingerprint: fingerprint,
       target: request.target,
@@ -94,7 +125,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
   }
   if (claimError || !claimed) throw new ApiError(500, "WRITE_FAILED", claimError?.message ?? "Could not record the write");
 
-  const finish = async (status: "succeeded" | "failed" | "blocked", externalId: string | null, error: string | null, retryable = false) => {
+  const finish = async (status: "succeeded" | "failed" | "blocked", externalId: string | null, error: string | null, retryable = false, uncertain = false) => {
     const { data, error: updateError } = await supabase
       .from("connector_write_operations")
       .update({ status, external_id: externalId, error, completed_at: new Date().toISOString() })
@@ -113,9 +144,9 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
       outcome: status === "succeeded" ? "success" : "failure",
       correlationId: claimed.id as string,
       // Identifiers only: target fields were validated to carry no secrets.
-      metadata: { operation: request.operation, idempotencyKey: request.idempotencyKey, target: request.target, error },
+      metadata: { operation: request.operation, idempotencyKey: request.idempotencyKey, systemKey: sentKey, target: request.target, error, ...(uncertain ? { uncertain } : {}) },
     });
-    return { ...toResult(data, false), retryable };
+    return { ...toResult(data, false), retryable, uncertain };
   };
 
   const decision = decideWrite(request.operation, (integration.capabilities ?? {}) as ConnectorCapabilities, integration.status as string);
@@ -146,15 +177,19 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
     return finish("failed", null, "This integration type has no connector");
   }
   if (!connector.write) return finish("failed", null, "The connector does not implement writes");
+  let sending = false;
   try {
     const secret = await getDecryptedCredential(tenantId, integrationId);
     await connector.authenticate((integration.config ?? {}) as Record<string, unknown>, secret);
-    const out = await connector.write(request.operation, request.target, request.idempotencyKey);
+    sending = true;
+    const out = await connector.write(request.operation, request.target, sentKey);
     return finish("succeeded", out.externalId ?? null, null);
   } catch (err) {
-    const kind = err instanceof ConnectorRequestError ? "http" : err instanceof TypeError ? "network" : "other";
-    const status = err instanceof ConnectorRequestError ? err.status : undefined;
-    return finish("failed", null, err instanceof Error ? err.message.slice(0, 1000) : "The write failed", retryableWriteFailure(status, kind));
+    const kind = writeFailureKind(failureFacts(err));
+    // Before sending, whatever went wrong, the change never reached the system.
+    const failure = !sending && kind === "unclear" ? "not_applied" : kind;
+    const repeatable = repeatableWrite(integration, request.operation);
+    return finish("failed", null, err instanceof Error ? err.message.slice(0, 1000) : "The write failed", retryableWrite(failure, repeatable), failure === "unclear" && !repeatable);
   } finally {
     await keepObtainedTokens(tenantId, integrationId, connector);
     await gateway.flush();

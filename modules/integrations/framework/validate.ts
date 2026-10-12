@@ -627,6 +627,7 @@ function checkWrite(ctx: Ctx, write: unknown, driver: unknown) {
     }
     if (driver === "ldap") {
       if (!isObj(spec) || spec.request !== undefined) issue(ctx, p, "an ldap connector writes with { ldap }, not { request }");
+      else if (spec.repeatable !== undefined) issue(ctx, `${p}.repeatable`, "LDAP changes are always repeatable; leave it out");
       else checkLdapWrite(ctx, p, op, spec.ldap);
       continue;
     }
@@ -634,6 +635,7 @@ function checkWrite(ctx: Ctx, write: unknown, driver: unknown) {
       issue(ctx, p, "must be { request }");
       continue;
     }
+    if (spec.repeatable !== undefined && typeof spec.repeatable !== "boolean") issue(ctx, `${p}.repeatable`, "must be true or false");
     const allowed: Scope[] = ["settings", "target"];
     checkRequest(ctx, `${p}.request`, spec.request, allowed, ["POST", "PUT", "PATCH", "DELETE"]);
     if (spec.request.method === undefined) issue(ctx, `${p}.request.method`, "is required (POST, PUT, PATCH or DELETE)");

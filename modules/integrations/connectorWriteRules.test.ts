@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, retryableWriteFailure, validateDeclaredCapabilities, validateWriteRequest, writesEnabled } from "./connectorWriteRules";
+import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, retryableWrite, systemKey, validateDeclaredCapabilities, validateWriteRequest, writeFailureKind, writesEnabled } from "./connectorWriteRules";
 
 const err = (fn: () => unknown) => {
   try {
@@ -33,7 +33,7 @@ describe("validateWriteRequest", () => {
   const ok = { operation: "revoke_access", idempotencyKey: "req-2026-09-26:abc123", target: { accountId: "acc-1", entitlement: "CustomerDB" } };
 
   it("accepts a well-formed request", () => {
-    expect(validateWriteRequest(ok)).toEqual(ok);
+    expect(validateWriteRequest(ok)).toEqual({ ...ok, taskKey: null });
   });
 
   it("refuses unknown operations, weak or odd keys, empty targets and secrets in targets", () => {
@@ -88,13 +88,44 @@ describe("writes per connection (INTEGRATION-P0-13)", () => {
     expect(decideWrite("revoke_access", capabilitiesWithWrites(reads, supported, true), "disabled").run).toBe(false);
   });
 
-  it("retries only network failures, rate limits and server errors", () => {
-    expect(retryableWriteFailure(undefined, "network")).toBe(true);
-    expect(retryableWriteFailure(429, "http")).toBe(true);
-    expect(retryableWriteFailure(503, "http")).toBe(true);
-    expect(retryableWriteFailure(404, "http")).toBe(false);
-    expect(retryableWriteFailure(403, "http")).toBe(false);
-    expect(retryableWriteFailure(undefined, "other")).toBe(false);
+  it("WID-H02: tells a refused write from one the system may have applied", () => {
+    expect(writeFailureKind({ status: 429 })).toBe("not_applied");
+    expect(writeFailureKind({ status: 503 })).toBe("unclear");
+    expect(writeFailureKind({ status: 500 })).toBe("unclear");
+    expect(writeFailureKind({ status: 408 })).toBe("unclear");
+    expect(writeFailureKind({ status: 404 })).toBe("refused");
+    expect(writeFailureKind({ status: 403 })).toBe("refused");
+    expect(writeFailureKind({ code: "ECONNREFUSED" })).toBe("not_applied");
+    expect(writeFailureKind({ code: "ENOTFOUND" })).toBe("not_applied");
+    expect(writeFailureKind({ code: "ECONNRESET" })).toBe("unclear");
+    expect(writeFailureKind({ message: "The request to x timed out after 20 s" })).toBe("unclear");
+    expect(writeFailureKind({ message: "Write did not return JSON" })).toBe("unclear");
+    expect(writeFailureKind({ network: true, message: "fetch failed" })).toBe("unclear");
+    expect(writeFailureKind({ blocked: true, status: 503 })).toBe("refused");
+    expect(writeFailureKind({ message: "This connector cannot create account" })).toBe("refused");
+  });
+
+  it("WID-H02: sends an unclear write again only when it is repeatable", () => {
+    expect(retryableWrite("not_applied", false)).toBe(true);
+    expect(retryableWrite("unclear", true)).toBe(true);
+    expect(retryableWrite("unclear", false)).toBe(false);
+    expect(retryableWrite("refused", true)).toBe(false);
+  });
+
+  it("WID-H02: one system key per task and change, the attempt key without a task", () => {
+    const fp = requestFingerprint("disable_account", { account: "u1" });
+    const first = systemKey({ idempotencyKey: "fulfil:t1:1", taskKey: "fulfil:t1" }, fp);
+    expect(systemKey({ idempotencyKey: "fulfil:t1:2", taskKey: "fulfil:t1" }, fp)).toBe(first);
+    expect(systemKey({ idempotencyKey: "fulfil:t1:2", taskKey: "fulfil:t1" }, requestFingerprint("disable_account", { account: "u2" }))).not.toBe(first);
+    expect(systemKey({ idempotencyKey: "attempt-key-1", taskKey: null }, fp)).toBe("attempt-key-1");
+    expect(first).toMatch(/^[A-Za-z0-9._:-]{8,200}$/);
+  });
+
+  it("WID-H02: validates the task key", () => {
+    const base = { operation: "disable_account", idempotencyKey: "fulfil:t1:1", target: { account: "u1" } };
+    expect(validateWriteRequest(base).taskKey).toBeNull();
+    expect(validateWriteRequest({ ...base, taskKey: "fulfil:t1" }).taskKey).toBe("fulfil:t1");
+    expect(() => validateWriteRequest({ ...base, taskKey: "bad key!" })).toThrow(/taskKey/);
   });
 });
 
