@@ -2701,3 +2701,21 @@ Verified:
 Left out: mass-missing thresholds per kind, and an E2E test for a page
 that fails in the middle of a read. Both are tracked in
 `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — More hidden private addresses refused; DNS rebinding tests (WID-H05)
+
+- `isPrivateAddress` (`outboundPolicy.ts`) now:
+  - judges 6to4 (`2002::/16`) and IPv4-compatible (`::a.b.c.d`) addresses
+    by their embedded IPv4;
+  - always refuses Teredo (`2001:0::/32`) and local-use NAT64
+    (`64:ff9b:1::/48`);
+  - refuses the 6to4 relay range `192.88.99.0/24`.
+- New tests:
+  - `outboundPolicy.test.ts`, "WID-H05";
+  - `outboundFetch.test.ts`: a name that rebinds from public to loopback
+    between lookups is refused at the second connect, and a name with
+    both a public and a private address is refused.
+
+Verified:
+- `npx vitest run modules/integrations`: passed, including the new cases.
+- `npm run typecheck` and eslint on the changed files: clean.

@@ -3074,3 +3074,17 @@ Verified:
   - rotation: the old secret gets 401 at once, and the new one works.
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — A SQL test for the audit trail's integrity (WID-H07)
+
+New `tests/foundation/audit-trail-integrity.sql`. It is one block that
+rolls back, run through the Supabase MCP `execute_sql`. It checks, against
+migration 0104:
+- an `audit_logs` row cannot be updated or deleted (42501);
+- `purge_audit_logs` refuses a cut inside 365 days (22023);
+- an active legal hold on audit logs makes the purge remove nothing;
+- once released, the purge removes only the 400-day-old row, records it
+  in `audit_log_purges`, and `verify_audit_chain` reports no break.
+
+Run against the live project on 12 October: "AUDIT TRAIL CHECKS PASSED".
+The block rolls back, so it leaves no fixtures. No code changed.

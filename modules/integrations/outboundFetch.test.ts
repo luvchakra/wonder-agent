@@ -1,5 +1,6 @@
 // @vitest-environment node
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import dns from "node:dns";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
 import { guardedFetch, guardedLookup } from "./outboundFetch";
@@ -110,5 +111,34 @@ describe("guardedFetch", () => {
       );
     await expect(run(strict)).rejects.toThrow(/not allowed/);
     await expect(run(dev)).resolves.toMatch(/^(127\.|::1)/);
+  });
+
+  it("WID-H05: a name that turns private between lookups is refused at the connect that would reach it", async () => {
+    // A rebinding name: public on the first lookup, loopback on the next.
+    const answers = [[{ address: "93.184.216.34", family: 4 }], [{ address: "127.0.0.1", family: 4 }]];
+    const spy = vi.spyOn(dns, "lookup").mockImplementation(((_h: string, _o: unknown, cb: (e: null, a: dns.LookupAddress[]) => void) => cb(null, answers.shift() ?? [])) as never);
+    const resolve = () =>
+      new Promise<string>((ok, fail) => guardedLookup(strict)("rebind.example", { family: 0 } as never, (err: Error | null, address: string | { address: string }[]) => (err ? fail(err) : ok(String(address)))));
+    try {
+      await expect(resolve()).resolves.toBe("93.184.216.34");
+      await expect(resolve()).rejects.toThrow(/not allowed/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("WID-H05: a name resolving to a public and a private address is refused, whichever comes first", async () => {
+    const spy = vi.spyOn(dns, "lookup").mockImplementation(((_h: string, _o: unknown, cb: (e: null, a: dns.LookupAddress[]) => void) =>
+      cb(null, [
+        { address: "93.184.216.34", family: 4 },
+        { address: "2002:a00:1::1", family: 6 },
+      ])) as never);
+    try {
+      await expect(
+        new Promise<string>((ok, fail) => guardedLookup(strict)("mixed.example", { family: 0 } as never, (err: Error | null, address: string | { address: string }[]) => (err ? fail(err) : ok(String(address))))),
+      ).rejects.toThrow(/not allowed/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
