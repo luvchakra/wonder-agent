@@ -2874,3 +2874,111 @@ is unknown. It is recorded as an open owner action in
 - An organization scope per row: invitations give organization-wide roles.
   Scoped assignments are made on the user's page afterwards.
 - The automation credential (FOUNDATION-P0-31, D11).
+
+### 2026-10-12 — FOUNDATION-P0-31: automation credentials for the administration API (#67)
+
+Decision D11 approved by the owner on 2026-10-12 (design §8.2). F1's last
+story; F1 is complete.
+
+**Built.**
+- **Model (migrations 0126, 0127).**
+  - `automation_credentials`: one per application identity of the
+    organization (same-tenant FK). Hashed secret (`wa_ac_` + 32 random
+    bytes, shown once), status pending/active/revoked, expiry (1–365 days,
+    90 by default), optional CIDR allowlist (≤ 20), calls a minute (120 by
+    default). Four-eyes in the database: `approved_by <> created_by`, and
+    active needs an approver. RLS: read only with `automation.manage` in the
+    credential's own organization; no client write policy.
+  - `automation_credential_usage` + `automation_credential_hit()`: the
+    per-minute counter, service role only.
+  - Membership account type `'automation'`; permission `automation.manage`
+    (Tenant Administrator); system role `CONFIGURATION_ADMIN`
+    (integrations, policies, organization settings, notifications, roles and
+    permissions view; no personal data).
+  - 0127: an automation membership creates no HUMAN identity (Identity's
+    `identity_sync_membership()`, additive), and the users directory and its
+    summary leave automation members out.
+- **How a call is authenticated.** Each credential has a backing member of
+  its own (an auth user with `app_metadata.automation`, a random password
+  held with `encryptSecret`, never shown). Its roles are the credential's
+  roles, so RLS, `getTenantContext()`, scoped assignments and the
+  authorization engine apply unchanged, and the tenant comes from the
+  credential's row (non-negotiable #2).
+  - `proxy.ts`: a `wa_ac_` bearer is accepted only on `/api/v1/*` (401
+    elsewhere); no cookie session is read for it; the proxy stamps the
+    method, path and a fresh request id. A cookie session of an automation
+    account is ended and refused.
+  - `lib/security/automationCredentials.ts`: hash lookup, then the use
+    decision (pending, revoked, expired or suspended organization: 401;
+    address outside the allowlist: 403, audited), the rate limit (429), the
+    backing member's token (signed in server-side, held in memory until a
+    minute before expiry, bounded), and an `automation.api_call` audit entry
+    per call (actor type `integration`, `onBehalfOf` = the application
+    identity, its owner, method, path).
+  - `supabaseServer()` and `getSessionUser()` use that token when the
+    request carries a credential; the actor header (0115) names the backing
+    member. React's `cache()` does not memoize in route handlers, so the
+    check is held per request id: found in E2E, where every helper call
+    re-ran it (11 s per call; one call refused).
+- **Console and API.** Admin → Users & Permissions → Automation
+  Credentials (`/settings/automation`): create (name, application identity,
+  role; expiry and limits folded), approve (not the creator), and under
+  Manage: give or remove a role, request an extension (another person
+  approves), rotate, revoke (ends the backing member's sessions).
+  `GET/POST /api/v1/automation-credentials`,
+  `POST /api/v1/automation-credentials/{id}` (actions),
+  `GET/PATCH /api/v1/tenant/configuration`. Schedules already had
+  `/api/v1/integrations/{id}/schedule` (INTEGRATION-P0-20).
+- **Escalation.** A credential's role carries only permissions its giver
+  holds, never `automation.manage` (so never Tenant Administrator, which
+  also keeps it out of the last-administrator count). `assignRole()` /
+  `removeRole()` refuse an automation member unless called from the
+  credential service, so `/api/v1/users/{id}/roles` cannot bypass that.
+
+**Verified.**
+- Typecheck and ESLint clean; Vitest 1244/1244 (new: secret shape, bearer
+  parsing, expiry, CIDR parsing and matching for IPv4/IPv6/mapped, the use
+  decision, rate limit, role escalation).
+- `tests/foundation/automation-credentials-isolation.sql` 16/16 on dev:
+  read only with `automation.manage` in the same organization; no direct
+  insert or update; creator cannot approve; active needs an approver; no
+  credential for another organization's identity; counter not callable by
+  members; no person identity; not in the users directory; the template
+  has no personal-data permission.
+- E2E (local, dev Supabase): `automation-credentials.spec.ts` 4/4.
+  Secret shown once; pending is 401; the creator cannot approve (console
+  and API: FOUR_EYES); a second administrator approves; the credential
+  lists exactly its own organization's connections (a `wa_tenant` cookie
+  naming the other organization changes nothing; the other's connection is
+  404); Global Configuration 200; users 403; credentials 403; a page 401;
+  each call audited with the identity as on-behalf-of; TENANT_SUPER_ADMIN
+  refused as ROLE_ESCALATION; rate limit 429; expired 401; revoked 401; the
+  backing account is not in the users directory.
+- Supabase advisors: only the expected "RLS enabled, no policy" note on the
+  service-only usage table.
+- Affected specs (§17.8: sessions, `proxy.ts`, RBAC), local against dev:
+  `auth`, `csrf`, `authorization`, `multi-org-isolation`, `users`,
+  `custom-roles`, `groups`, `global-configuration`, `agent-api-keys`,
+  `tenant-address`, `runtime-gateway` and `bulk-invitations` 96/96. The
+  first run had one failure: the 42-row import in `bulk-invitations` did not
+  finish within 120 s while dev Supabase was slow (password sign-in 7 s,
+  auth health 0.6–2.2 s). The same spec on `main` passed after the
+  recovery, and on this branch it then passed in the same 2.1 min. With
+  temporary counters on both branches, an invitation API call made the same
+  number of session lookups, clients and service-role calls (31 / 48 / 16
+  for two invitations), at the same speed. That import wait was already at
+  its limit: 42 sequential invitations take about 3 s each from a remote
+  runner. It is now 240 s, within a 360 s test budget.
+
+**Left out.**
+- Four-eyes on an extension is enforced in the service (the requester
+  cannot approve); the database enforces it for approval, and keeps the
+  request and its requester as a pair.
+- Pruning old `automation_credential_usage` rows (one per credential per
+  minute used): a retention follow-up.
+- Each server instance signs the backing member in once per token lifetime,
+  so auth sessions accumulate slowly; they end when the credential is
+  revoked.
+- Other modules' member pickers (owners, investigations) may list an
+  automation member by its "Automation: …" name; excluding them there is
+  for those modules.

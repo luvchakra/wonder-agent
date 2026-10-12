@@ -477,7 +477,7 @@ export async function resendInvitation(tenant: { tenantId: string; name: string;
 }
 
 /** System roles and the organization's own custom roles by name, with their permissions. */
-async function rolesWithPermissions(tenantId: string, names: string[]): Promise<{ id: string; name: string; permissions: string[] }[]> {
+export async function rolesWithPermissions(tenantId: string, names: string[]): Promise<{ id: string; name: string; permissions: string[] }[]> {
   if (!names.length) return [];
   const { data, error } = await supabaseServiceRole()
     .from("roles")

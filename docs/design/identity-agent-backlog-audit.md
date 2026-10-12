@@ -1626,3 +1626,14 @@ account and agent appear under "For").
 the given identity, at most 100. It reads as the user (RLS), filtered on the
 tenant. The request form lists them under "People you manage". No schema
 change.
+
+### 2026-10-12 — Automation members create no person identity (for FOUNDATION-P0-31)
+
+Migration 0127 (Foundation) replaces `identity_sync_membership()` with the
+same body plus one guard: a membership with `account_type = 'automation'`
+creates no HUMAN identity. Such a membership is the backing member of an
+automation credential, which is governed through the APPLICATION identity
+it belongs to. Every other membership behaves as before; the status trigger
+is unchanged (it finds no identity to update for an automation member).
+Verified by `tests/foundation/automation-credentials-isolation.sql`
+("automation membership creates a person identity", 0).

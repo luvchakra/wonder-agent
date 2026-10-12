@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Last updated | 2026-10-11 |
-| Current phase | F2 done 2026-10-11 (exit test passed on the seeded test organization). F3 needs D3, F4 needs D12, F6 needs D2 |
-| Next story | F5 Roles, SoD, delegation (no decision pending), unless the owner settles D3 first; FOUNDATION-P0-31 (F1) waits for D11 |
+| Last updated | 2026-10-12 |
+| Current phase | F1 and F2 done (FOUNDATION-P0-31 2026-10-12). D2, D3, D11 and D12 approved 2026-10-12: F3 next |
+| Next story | F3 Provisioning (D3 approved): INTEGRATION-P0-11 finish, then INTEGRATION-P0-13 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -19,12 +19,12 @@ passed. This file is hand-maintained; the generated programme rollup
 
 | Phase | Stories | Done | In progress | Status |
 |---|---|---|---|---|
-| F1 Import and reconciliation | 9 | 8 | 0 | Gating stories done; exit test passed (seeded staging); FOUNDATION-P0-31 waits for D11 |
+| F1 Import and reconciliation | 9 | 9 | 0 | Done; exit test passed (seeded staging) |
 | F2 Access requests | 8 | 8 | 0 | Done; exit test passed (seeded test organization) |
-| F3 Provisioning | 10 | 0 | 0 | Not started; needs D3 |
-| F4 Lifecycle and certification | 10 | 0 | 0 | Not started; needs D12 |
+| F3 Provisioning | 10 | 0 | 0 | Not started; D3 approved |
+| F4 Lifecycle and certification | 10 | 0 | 0 | Not started; D12 approved |
 | F5 Roles, SoD, delegation | 5 | 0 | 0 | Not started |
-| F6 Agent ID | 11 | 0 | 0 | Not started; needs D2 |
+| F6 Agent ID | 11 | 0 | 0 | Not started; D2 approved |
 | F7 Workflow, forms, configuration | 10 | 0 | 0 | Not started |
 | F8 Advanced governance | 8 | 0 | 0 | Not started |
 | F9 Intelligence and experience | 8 | 0 | 0 | Not started |
@@ -38,8 +38,8 @@ status is shown per row below.
 | # | Decision | Status |
 |---|---|---|
 | D1 | Approve the baseline; stories enter the backlogs | Approved 2026-10-11 (owner); F1 and F2 stories added to the module backlogs |
-| D2 | OAuth tokens to agents | Open |
-| D3 | Connector writes | Open |
+| D2 | OAuth tokens to agents | Approved 2026-10-12 (owner): yes, scoped to agents and the gateway and opt-in MCP audiences; workforce sign-in stays with the customer's IdP |
+| D3 | Connector writes | Approved 2026-10-12 (owner): yes, per connection, declared, tenant-enabled and approval-gated; disable/enable and remove access first, then create and add |
 | D4 | Automatic agent suspension | Open |
 | D5 | Password reset showing a value | Open (recommendation: no) |
 | D6 | Auto-close certification decisions | Open (recommendation: not in P0) |
@@ -47,15 +47,16 @@ status is shown per row below.
 | D8 | SCIM receiver and AuthZEN as public receivers | Open |
 | D9 | First connectors | Open (recommendation: Entra ID, Workday, AWS) |
 | D10 | Import frequency on the free plan | Open (recommendation: daily plus run now) |
-| D11 | Automation credentials | Open |
-| D12 | Shared rule runtime | Open |
+| D11 | Automation credentials | Approved 2026-10-12 (owner): yes, with the §8.2 controls (hashed, expiring at most a year, role-scoped, four-eyes, audited, rate-limited, never for sign-in) |
+| D12 | Shared rule runtime | Approved 2026-10-12 (owner): one shared runtime published by Operations; rule tables stay with their owners |
 
 ## Owner actions outside the plan
 
 | Action | Status |
 |---|---|
 | Configure the Supabase SSO provider so SAML/OIDC sign-in works (FOUNDATION-P0-03.3) | Open |
-| Rotate the Saviynt training-tenant password shared in chat on 2026-10-11 | Open |
+| Rotate the Saviynt training-tenant password shared in chat on 2026-10-11 | Done 2026-10-12 (owner) |
+| Disconnect the paused Vercel project `kunals-projects-9f64757f/wonder-id` from the repository | Done 2026-10-12 (owner) |
 | Review the `wonderapps_dashboard` database role: it can sign in and reads every row of about 24 customer tables in all organizations (`using (true)` policies). No migration in the repository creates it; found 2026-10-11 by the advisors | Open |
 
 ## F1: Import and reconciliation
@@ -70,7 +71,7 @@ status is shown per row below.
 | EXPERIENCE-P0-28 Reconciliation console | Experience | #47 | Done | Held runs, run now with progress, chain steps, preview and apply, classification and last seen at source, on the connection, application and account pages |
 | QA-P0-23 Reconciliation suite | QA | #48 | Done | `tests/e2e/f1-reconciliation.spec.ts`, 7 tests (14 with sign-in setup) passed locally. Found and fixed: connector-sourced onboarding could never validate |
 | INTEGRATION-P0-20 Custom attributes as targets; schedule on every connection | Integration | #66 | Done | Mappings to custom attributes, typed and unique-checked by Identity, with provenance; schedule on every reading connection and its API. Does not gate |
-| FOUNDATION-P0-31 Automation credentials | Foundation | #67 | Not started | Needs D11; does not gate |
+| FOUNDATION-P0-31 Automation credentials | Foundation | #67 | Done | Migrations 0126–0127. Admin → Automation Credentials: one per application identity, secret shown once, four-eyes create and extend, expiry ≤ 1 year, CIDR allowlist, rate limit, rotate, revoke; `Bearer wa_ac_…` on /api/v1/* acts with its role only, every call audited; Global Configuration API; Configuration Administrator role |
 
 Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded into staging (a live target is not reachable from the test). A person, an owned service account and an agent show accounts, entitlements and grants; a grant removed at the source is marked missing and its finding resolves; a grant added after the baseline is rogue with one finding.
 
@@ -85,7 +86,7 @@ Exit test: passed 2026-10-11 by the QA-P0-23 suite, on connector records seeded 
 | ACCESS-P0-32 Time-bound access | Access | #54 | Done | Migration 0124. End dates capped by policy; a reminder before the end with an Extend request (approved like any other); at the end, exactly one removal task per grant; the ledger shows EXPIRED once the source confirms the removal |
 | EXPERIENCE-P0-29 Request tracking and tasks inbox | Experience | #55 | Done | No migration. Each request line shows its real state (waiting, approved, waiting for fulfilment, not yet verified, verified, failed, ended); "Waiting for you" lists fulfilment tasks with the approvals; For lists the people you manage and what you own |
 | QA-P0-24 Request-to-verified suite | QA | #56 | Done | A person, a service account and an agent from request to verified; removal and expiry end revoked; approver ≠ requester; isolation SQL for 0123/0124 (11/11); a repeated reconciliation changes nothing |
-| FOUNDATION-P0-32 Bulk invitation and invitation API | Foundation | #68 | Done | Migration 0125. Users → Import CSV… previews new, already-member and invalid rows and invites only the new; POST /api/v1/users/invitations (dry run; idempotent on e-mail); invitations expire (30 days by default) and can be sent again; roles never beyond the inviter's own permissions. The script credential comes with FOUNDATION-P0-31 (D11) |
+| FOUNDATION-P0-32 Bulk invitation and invitation API | Foundation | #68 | Done | Migration 0125. Users → Import CSV… previews new, already-member and invalid rows and invites only the new; POST /api/v1/users/invitations (dry run; idempotent on e-mail); invitations expire (30 days by default) and can be sent again; roles never beyond the inviter's own permissions. Scripts use an automation credential (FOUNDATION-P0-31) |
 
 Exit test: not run.
 
