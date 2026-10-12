@@ -9,7 +9,13 @@ import type { ConnectorCapabilities, ConnectorWriteResult } from "@/lib/shared/t
 import { createConnector } from "./registry";
 import { openGateway } from "./gateway/gateway";
 import { getDecryptedCredential } from "./credentials";
-import { decideWrite, requestFingerprint, validateWriteRequest, type WriteRequestInput } from "./connectorWriteRules";
+import { capabilitiesWithWrites, decideWrite, requestFingerprint, retryableWriteFailure, validateWriteRequest, writesEnabled, type WriteRequestInput } from "./connectorWriteRules";
+import { ConnectorRequestError } from "./framework/http";
+import { parseConnectorConfig, writeCapabilitiesOf } from "./framework/engine";
+import { DEFINITION_WRITE_OPERATIONS, type DefinitionWriteOperation } from "./framework/types";
+import { createSystemSyncJob, runSyncJob } from "./syncJobs";
+import { runAfterResponse } from "@/lib/shared/afterResponse";
+import { CONNECTOR_WRITE_OPERATIONS, type ConnectorWriteOperation } from "@/lib/shared/types/integrations";
 
 /**
  * INTEGRATION-P0-11 — the connector write interface. Not exposed as a
@@ -84,7 +90,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
   }
   if (claimError || !claimed) throw new ApiError(500, "WRITE_FAILED", claimError?.message ?? "Could not record the write");
 
-  const finish = async (status: "succeeded" | "failed" | "blocked", externalId: string | null, error: string | null) => {
+  const finish = async (status: "succeeded" | "failed" | "blocked", externalId: string | null, error: string | null, retryable = false) => {
     const { data, error: updateError } = await supabase
       .from("connector_write_operations")
       .update({ status, external_id: externalId, error, completed_at: new Date().toISOString() })
@@ -105,7 +111,7 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
       // Identifiers only: target fields were validated to carry no secrets.
       metadata: { operation: request.operation, idempotencyKey: request.idempotencyKey, target: request.target, error },
     });
-    return toResult(data, false);
+    return { ...toResult(data, false), retryable };
   };
 
   const decision = decideWrite(request.operation, (integration.capabilities ?? {}) as ConnectorCapabilities, integration.status as string);
@@ -126,8 +132,106 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
     const out = await connector.write(request.operation, request.target, request.idempotencyKey);
     return finish("succeeded", out.externalId ?? null, null);
   } catch (err) {
-    return finish("failed", null, err instanceof Error ? err.message.slice(0, 1000) : "The write failed");
+    const kind = err instanceof ConnectorRequestError ? "http" : err instanceof TypeError ? "network" : "other";
+    const status = err instanceof ConnectorRequestError ? err.status : undefined;
+    return finish("failed", null, err instanceof Error ? err.message.slice(0, 1000) : "The write failed", retryableWriteFailure(status, kind));
   } finally {
     await gateway.flush();
   }
 }
+
+// ------------------------------------------------- INTEGRATION-P0-13 (D3)
+
+type ConnectionRow = { id: string; tenant_id: string; integration_type_id: string; config: Record<string, unknown> | null; capabilities: ConnectorCapabilities | null; status: string };
+
+async function loadConnection(tenantId: string, integrationId: string): Promise<ConnectionRow> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(integrationId)) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
+  const { data, error } = await supabaseServiceRole()
+    .from("integrations")
+    .select("id, tenant_id, integration_type_id, config, capabilities, status")
+    .eq("tenant_id", tenantId)
+    .eq("id", integrationId)
+    .maybeSingle<ConnectionRow>();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!data || data.tenant_id !== tenantId) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
+  return data;
+}
+
+/** The writes a connection's definition supports (none for a non-connector or an unreadable definition). */
+function supportedWrites(row: ConnectionRow): ConnectorCapabilities {
+  if (row.integration_type_id !== "connector") return {};
+  try {
+    return writeCapabilitiesOf(parseConnectorConfig(row.config ?? {}).def);
+  } catch {
+    return {};
+  }
+}
+
+export type ConnectionWrites = { supported: DefinitionWriteOperation[]; enabled: boolean };
+
+/** What a connection could change in the system, and whether an administrator has turned that on. */
+export async function getConnectionWrites(tenantId: string, integrationId: string): Promise<ConnectionWrites> {
+  const row = await loadConnection(tenantId, integrationId);
+  const supported = supportedWrites(row);
+  return {
+    supported: DEFINITION_WRITE_OPERATIONS.filter((op) => supported[CONNECTOR_WRITE_OPERATIONS[op]] === true),
+    enabled: writesEnabled(row.capabilities ?? {}),
+  };
+}
+
+/**
+ * Turns writes on or off for one connection (decision D3: per connection,
+ * declared, enabled by the organization). On declares every write its
+ * definition supports; off declares none, and connectorWrites refuses any
+ * write at once. The caller has checked integration.update. Audited.
+ */
+export async function setConnectionWrites(tenantId: string, actorId: string, integrationId: string, enabled: unknown): Promise<ConnectionWrites> {
+  if (typeof enabled !== "boolean") throw new ApiError(400, "INVALID_INPUT", "enabled: true or false");
+  const row = await loadConnection(tenantId, integrationId);
+  const supported = supportedWrites(row);
+  if (enabled && !Object.values(supported).some(Boolean)) throw new ApiError(409, "NOT_SUPPORTED", "This connection's definition makes no changes in the system");
+  const capabilities = capabilitiesWithWrites(row.capabilities ?? {}, supported, enabled);
+  const { data, error } = await supabaseServiceRole()
+    .from("integrations")
+    .update({ capabilities })
+    .eq("tenant_id", tenantId)
+    .eq("id", integrationId)
+    .select("id")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "SAVE_FAILED", "The setting could not be saved");
+  if (!data) throw new ApiError(404, "INTEGRATION_NOT_FOUND");
+  const operations = DEFINITION_WRITE_OPERATIONS.filter((op) => capabilities[CONNECTOR_WRITE_OPERATIONS[op]] === true);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: enabled ? "integration.writes_enabled" : "integration.writes_disabled",
+    objectType: "integration",
+    objectId: integrationId,
+    outcome: "success",
+    metadata: { operations },
+  });
+  return { supported: DEFINITION_WRITE_OPERATIONS.filter((op) => supported[CONNECTOR_WRITE_OPERATIONS[op]] === true), enabled };
+}
+
+/** Whether this connection may make this change now: declared (writes on), supported, and not disabled. */
+export async function connectionCanWrite(tenantId: string, integrationId: string, operation: ConnectorWriteOperation): Promise<boolean> {
+  const row = await loadConnection(tenantId, integrationId).catch(() => null);
+  if (!row) return false;
+  return decideWrite(operation, row.capabilities ?? {}, row.status).run && supportedWrites(row)[CONNECTOR_WRITE_OPERATIONS[operation]] === true;
+}
+
+/**
+ * Reads the system again after a write, so reconciliation (not the write's
+ * own answer) decides whether the change is there. Runs after the
+ * response; never throws.
+ */
+export async function startVerificationSync(tenantId: string, integrationId: string): Promise<void> {
+  try {
+    const job = await createSystemSyncJob(tenantId, integrationId, "verification");
+    if (job) runAfterResponse(() => runSyncJob(tenantId, job.id));
+  } catch (err) {
+    console.error("verification sync not started", { tenantId, integrationId, error: err instanceof Error ? err.message : "unknown" });
+  }
+}
+

@@ -118,7 +118,8 @@ test.describe.serial("object-page CSV import and export", () => {
     await expect(dialog.getByRole("table")).toContainText("E2E Dialog Person");
     await expect(dialog.getByRole("table")).toContainText("New");
     await dialog.getByRole("button", { name: /Confirm import \(1\)/ }).click();
-    await expect(dialog.getByRole("status")).toContainText("1 added");
+    // The import runs the connection's whole sync: about 10 s from a remote runner (2026-10-12).
+    await expect(dialog.getByRole("status")).toContainText("1 added", { timeout: 30_000 });
     await dialog.getByRole("button", { name: "Close" }).click();
     await page.goto(`/identities/humans?q=${encodeURIComponent(id)}`);
     await expect(page.getByRole("link", { name: "E2E Dialog Person" })).toBeVisible();

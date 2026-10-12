@@ -2071,3 +2071,86 @@ starting it, and one job shows every step.
 - Connector-boundary test green.
 - `file-import` and `identity-sources` E2E unchanged and passing.
 - The FOUNDATION-P0-32 E2E (above, Foundation audit log).
+
+### 2026-10-12 — INTEGRATION-P0-11 done and INTEGRATION-P0-13 slice 1: connectors remove access and disable accounts (F3, decision D3)
+
+D3 (approved by the owner 2026-10-12): writes are per connection, declared,
+turned on by the organization and gated by approval; reversible operations
+first. This slice does removals and disabling; grants and account creation
+follow.
+
+**Built.**
+- **Definitions declare writes** (`framework/types.ts`, `validate.ts`):
+  - `write.revoke_access` and `write.disable_account`, http driver only.
+    Each is one POST/PUT/PATCH/DELETE request whose strings may use
+    `{settings.…}`, `{target.account}` and `{target.entitlement}`.
+  - The validator refuses:
+    - a write that does not name its target;
+    - unknown operations;
+    - GET, or a missing method;
+    - other drivers;
+    - `{record.…}` and `{secret.…}` outside auth;
+    - write methods on reads.
+- **Engine**:
+  - `DefinitionConnector.write()` fills the request (body strings included)
+    and sends `Idempotency-Key`; the http driver gains `send()`.
+  - `writeCapabilitiesOf()` reports what a definition supports.
+    `capabilitiesOf()` still never declares a write, so a new connection is
+    read-only.
+- **Per connection** (`connectorWrites.ts`):
+  - `setConnectionWrites()` declares exactly the supported writes (on) or
+    none (off), audited `integration.writes_enabled` / `_disabled`.
+    `getConnectionWrites()` and `connectionCanWrite()` read that state.
+  - Routes: `GET`/`PUT /api/v1/integrations/{id}/writes`, `integration.update`.
+  - Connection page card "Changes in the system": one sentence and one
+    button.
+- **Write results**:
+  - `executeConnectorWrite()` now says whether a failure is worth retrying:
+    a network failure, 429 or 5xx (`retryableWriteFailure()`).
+  - `startVerificationSync()` reads the system again after a write, with
+    sync trigger `verification` (migration 0128).
+- The fulfilment side is the Access Agent's (`connectorFulfilment.ts`; see
+  its audit log), calling these through `modules/integrations/service.ts`.
+- **Connector boundary unchanged.** Writes go through
+  `createConnector(openGateway(...))`, as reads do, and no allowlist was
+  widened.
+
+**Verified.**
+- Typecheck and ESLint clean. Vitest 1256/1256. New tests cover:
+  - write validation, write capabilities and request filling (path
+    encoding, body, `Idempotency-Key`);
+  - undeclared operations, missing targets, error responses;
+  - the on/off capability rules and retry classification.
+- `tests/access/connector-fulfilment-isolation.sql` 7/7 on dev, including
+  that a verification sync job is allowed.
+- E2E `connector-provisioning.spec.ts` 5/5 (local, dev Supabase, a stub
+  system over HTTP). It covers:
+  - the connection is supported but off;
+  - with writes off, a removal is a person's task and nothing is written;
+  - with writes on, one DELETE with `fulfil:<task>:1`, then the
+    verification sync and reconciliation mark the request verified;
+  - a 503 is tried three times (keys `:1`, `:2`, `:3`), the task goes back
+    with "HTTP 503", and Try again succeeds and is verified;
+  - with writes off again, the next change is a person's task.
+- Affected specs (§17.8: connectors), local, one worker: `f1-reconciliation`,
+  `file-import`, `integrations`, `connection-schedule`, `outbound-guard`,
+  `identity-sources` and `connector-provisioning`. 50 passed and 1 failed:
+  - The failure was the object-page import's "1 added" wait in
+    `file-import`. That import runs the connection's whole sync, about 10 s
+    from this runner, and the wait was 10 s. It also failed once on
+    2026-10-11.
+  - The 5 tests after it in that serial spec did not run.
+  - `file-import` alone: 10/10.
+  - That wait is now 30 s; this change does not touch the file-import path.
+- Supabase advisors: the new foreign key is covered by a composite index.
+  - On dev an extra single-column index from the first apply remains: the
+    MCP tool refuses `drop index`, and the migration file creates only the
+    composite one.
+
+**Left out.**
+- Granting access and creating accounts (D3's second step), and built-in
+  definitions declaring writes. Which systems come first is D9's
+  connector stories.
+- SCIM and LDAP writes (INTEGRATION-P0-22) and ticketed fulfilment
+  (INTEGRATION-P0-26).
+- A mass-change guard on writes (QA-P0-26).

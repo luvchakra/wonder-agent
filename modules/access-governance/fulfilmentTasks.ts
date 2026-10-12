@@ -7,6 +7,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { canAct, dueAt, isOverdue, needsReminder, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
+import { planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
+import { runAfterResponse } from "@/lib/shared/afterResponse";
 
 /**
  * ACCESS-P0-29 — fulfilment tasks. Each pending grant (ACCESS-P0-28) is
@@ -49,6 +51,9 @@ export type FulfilmentTask = {
   completedAt: string | null;
   note: string | null;
   failureReason: string | null;
+  /** INTEGRATION-P0-13: the connector's attempt at this task, if it made one. */
+  connectorStatus: "running" | "succeeded" | "failed" | null;
+  connectorError: string | null;
   createdAt: string;
 };
 
@@ -78,13 +83,15 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
     completedAt: (r.completed_at as string | null) ?? null,
     note: (r.note as string | null) ?? null,
     failureReason: (r.failure_reason as string | null) ?? null,
+    connectorStatus: (r.connector_status as FulfilmentTask["connectorStatus"]) ?? null,
+    connectorError: (r.connector_error as string | null) ?? null,
     createdAt: r.created_at as string,
   };
 }
 
 const GRANT_FIELDS = "entitlements(name), accounts(account_name, external_account_ref)";
 const SELECT =
-  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, created_at, " +
+  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, connector_status, connector_error, created_at, " +
   `applications(name, display_name), grant:access_grants!access_fulfilment_tasks_grant_fkey(${GRANT_FIELDS}), removal:access_grants!access_fulfilment_tasks_removal_grant_fkey(${GRANT_FIELDS}), ` +
   "account:accounts!access_fulfilment_tasks_account_fkey(account_name, external_account_ref), assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name)";
 
@@ -132,6 +139,12 @@ export async function openFulfilmentTask(
     if (insertError?.code === "23505") return; // a live task for the same grant or account is open already
     if (insertError || !data) throw new ApiError(500, "CREATE_FAILED", insertError?.message ?? "Could not open the task");
     await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { kind, grantId: line.grantId ?? null, accountId: line.accountId ?? null, requestId: line.requestId, assigneeIdentityId: assignee } });
+    // INTEGRATION-P0-13: a connector with writes turned on makes the change; its owner hears only if it cannot.
+    const plan = await planConnectorFulfilment(tenantId, data.id as string).catch(() => null);
+    if (plan) {
+      runAfterResponse(() => runConnectorFulfilment(tenantId, plan));
+      return;
+    }
     const userId = assignee ? await userOf(tenantId, assignee) : null;
     const appName = ((app.display_name as string | null) ?? (app.name as string)) as string;
     // No owner who signs in: the tenant's access managers see it in the list (a broadcast would reach everyone).
@@ -184,26 +197,39 @@ export async function actOnFulfilmentTask(
   note?: unknown,
 ): Promise<FulfilmentTask> {
   if (!UUID_RE.test(taskId)) throw new ApiError(404, "NOT_FOUND", "No such task");
-  if (action !== "claim" && action !== "complete" && action !== "fail") throw new ApiError(400, "VALIDATION_FAILED", "action: claim, complete or fail");
+  if (action !== "claim" && action !== "complete" && action !== "fail" && action !== "retry_connector") throw new ApiError(400, "VALIDATION_FAILED", "action: claim, complete, fail or retry_connector");
   const text = typeof note === "string" && note.trim() ? note.trim().slice(0, 2000) : null;
   if (action === "fail" && !text) throw new ApiError(400, "VALIDATION_FAILED", "note: say what failed");
   const admin = supabaseServiceRole();
   const { data: task, error } = await admin
     .from("access_fulfilment_tasks")
-    .select("id, tenant_id, kind, status, assignee_identity_id, claimed_by, access_grant_id, removal_grant_id")
+    .select("id, tenant_id, kind, status, assignee_identity_id, claimed_by, access_grant_id, removal_grant_id, connector_status")
     .eq("tenant_id", tenantId)
     .eq("id", taskId)
     .maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!task || task.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "No such task");
+  // INTEGRATION-P0-13: never two hands on the target at once.
+  if (task.connector_status === "running") throw new ApiError(409, "CONNECTOR_RUNNING", "The connector is making this change now; wait for its result");
   // The task's owner is an identity; the actor is the member signed in, matched to their identity in this organization.
   const identity = await getIdentityForUser(tenantId, actor.userId);
   const decision = canAct(
     { status: task.status as FulfilmentTaskStatus, assigneeIdentityId: (task.assignee_identity_id as string | null) ?? null, claimedBy: (task.claimed_by as string | null) ?? null },
     { ...actor, identityId: identity?.id ?? null },
-    action as FulfilmentTaskAction,
+    action === "retry_connector" ? "claim" : (action as FulfilmentTaskAction),
   );
   if (!decision.ok) throw new ApiError(decision.code === "FORBIDDEN" ? 403 : 409, decision.code, decision.message);
+
+  // INTEGRATION-P0-13: whoever may work on the task may ask the connector to try again.
+  if (action === "retry_connector") {
+    if (task.connector_status !== "failed" || task.status !== "open") throw new ApiError(409, "INVALID_TRANSITION", "Only an open task the connector failed can be tried again");
+    const plan = await planConnectorFulfilment(tenantId, taskId);
+    if (!plan) throw new ApiError(409, "CONNECTOR_UNAVAILABLE", "No connector can make this change now (writes are off, or the system does not support it)");
+    const result = await runConnectorFulfilment(tenantId, plan, actor.userId);
+    if (result === "busy") throw new ApiError(409, "CONFLICT", "The task changed meanwhile; reload");
+    const [fresh] = await listTaskById(tenantId, taskId);
+    return fresh;
+  }
 
   const now = new Date().toISOString();
   const set: Row =

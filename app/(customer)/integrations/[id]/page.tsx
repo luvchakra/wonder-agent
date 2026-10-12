@@ -3,7 +3,7 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getConnectionSchedule, getIntegration, getReceiverStatus, listSyncJobs } from "@/modules/integrations/service";
+import { getConnectionSchedule, getConnectionWrites, getIntegration, getReceiverStatus, listSyncJobs, type ConnectionWrites } from "@/modules/integrations/service";
 import { resolveHeldMissingAction, testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
@@ -16,6 +16,7 @@ import { Suspense } from "react";
 import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
 import { ConnectorFilesCard } from "./ConnectorFilesCard";
 import { ConnectionScheduleForm } from "./ConnectionScheduleForm";
+import { ConnectionWritesForm } from "./ConnectionWritesForm";
 import { RunAutoRefresh } from "../sources/SourceForms";
 import type { SyncPipelineStep } from "@/lib/shared/types/integrations";
 
@@ -116,13 +117,15 @@ export default async function IntegrationDetailPage({
   const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file);
 
   const reads = connector ? Object.keys(connector.resources).length > 0 : false;
-  const [jobs, receiver, origin, configuration, provenance, schedule] = await Promise.all([
+  const writable = connector?.write ? Object.keys(connector.write).length > 0 : false;
+  const [jobs, receiver, origin, configuration, provenance, schedule, writes] = await Promise.all([
     listSyncJobs(ctx.tenantId!, id),
     needsSecret ? getReceiverStatus(ctx.tenantId!, id) : Promise.resolve(null),
     receive ? ownOrigin() : Promise.resolve(""),
     connector ? getConnectorConfiguration(ctx.tenantId!, id).catch(() => null as ConnectorConfiguration | null) : Promise.resolve(null),
     getRecordProvenance(ctx.tenantId!, "integrations", id),
     reads ? getConnectionSchedule(ctx.tenantId!, id) : Promise.resolve(null),
+    writable ? getConnectionWrites(ctx.tenantId!, id).catch(() => null as ConnectionWrites | null) : Promise.resolve(null),
   ]);
   const canEdit = ctx.permissions.includes("integration.update");
   const type = connectionTypeOf(integration);
@@ -171,6 +174,15 @@ export default async function IntegrationDetailPage({
           <CardHeader title="Settings" description={`What this connection was set up with, as ${connector.name} declares it.`} />
           <CardBody>
             <ConnectorSettingsForm integrationId={id} name={configuration.name} settings={connector.settings} values={configuration.settings} canEdit={canEdit} />
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {writes && writes.supported.length ? (
+        <Card>
+          <CardHeader title="Changes in the system" />
+          <CardBody>
+            <ConnectionWritesForm integrationId={id} writes={writes} canEdit={canEdit} />
           </CardBody>
         </Card>
       ) : null}

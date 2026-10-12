@@ -47,7 +47,7 @@ export {
   type ReconciliationInput,
   type CorrelationDecision,
 } from "./identitySources";
-export { executeConnectorWrite } from "./connectorWrites";
+export { executeConnectorWrite, getConnectionWrites, setConnectionWrites, connectionCanWrite, startVerificationSync, type ConnectionWrites } from "./connectorWrites";
 export {
   listDiscoveries,
   getDiscoveryCounts,

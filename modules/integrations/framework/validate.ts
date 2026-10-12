@@ -3,6 +3,7 @@ import {
   CONNECTOR_CATEGORIES,
   CONNECTOR_DRIVERS,
   DEFINITION_SCHEMA_VERSION,
+  DEFINITION_WRITE_OPERATIONS,
   RESOURCE_KINDS,
   RUNTIME_EVENT_FIELDS,
   TRANSFORMS,
@@ -86,7 +87,9 @@ function issue(ctx: Ctx, path: string, message: string) {
 }
 
 /** Every `{…}` in a template must name something the scope will have. */
-function checkTemplate(ctx: Ctx, path: string, template: string, allowed: ("settings" | "record" | "parent" | "secret" | "auth")[]) {
+type Scope = "settings" | "record" | "parent" | "secret" | "auth" | "target";
+
+function checkTemplate(ctx: Ctx, path: string, template: string, allowed: Scope[]) {
   for (const name of templateVariables(template)) {
     const [scope, ...rest] = name.split(".");
     if (!allowed.includes(scope as never)) {
@@ -95,6 +98,7 @@ function checkTemplate(ctx: Ctx, path: string, template: string, allowed: ("sett
     }
     if (scope === "settings" && !ctx.settings.has(rest[0])) issue(ctx, path, `"{${name}}" names no setting`);
     if (scope === "secret" && !ctx.secrets.has(rest[0])) issue(ctx, path, `"{${name}}" names no secret field`);
+    if (scope === "target" && !(rest.length === 1 && (rest[0] === "account" || rest[0] === "entitlement"))) issue(ctx, path, `"{${name}}" must be {target.account} or {target.entitlement}`);
   }
 }
 
@@ -106,7 +110,7 @@ function findSecretRefs(value: unknown, path: string, out: string[]) {
   else if (isObj(value)) for (const [k, v] of Object.entries(value)) findSecretRefs(v, `${path}.${k}`, out);
 }
 
-function checkRelativePath(ctx: Ctx, path: string, value: unknown, allowed: ("settings" | "record" | "parent")[]) {
+function checkRelativePath(ctx: Ctx, path: string, value: unknown, allowed: Scope[]) {
   if (!str(value, 2000)) return issue(ctx, path, "is required");
   if (!value.startsWith("/") || value.startsWith("//") || /^[a-z]+:/i.test(value)) {
     return issue(ctx, path, "must be a path relative to the base address, starting with /");
@@ -114,9 +118,9 @@ function checkRelativePath(ctx: Ctx, path: string, value: unknown, allowed: ("se
   checkTemplate(ctx, path, value, allowed);
 }
 
-function checkRequest(ctx: Ctx, path: string, req: unknown, allowed: ("settings" | "record" | "parent")[]) {
+function checkRequest(ctx: Ctx, path: string, req: unknown, allowed: Scope[], methods: string[] = ["GET", "POST"]) {
   if (!isObj(req)) return issue(ctx, path, "must be an object");
-  if (req.method !== undefined && req.method !== "GET" && req.method !== "POST") issue(ctx, `${path}.method`, "must be GET or POST");
+  if (req.method !== undefined && !methods.includes(String(req.method))) issue(ctx, `${path}.method`, `must be ${methods.join(", ")}`);
   checkRelativePath(ctx, `${path}.path`, req.path, allowed);
   for (const key of ["query", "headers"] as const) {
     const v = req[key];
@@ -466,7 +470,43 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
     }
   }
 
-  return { definition: ctx.issues.length ? null : (d as unknown as ConnectorDefinition), issues: ctx.issues };
+  // Writes (INTEGRATION-P0-11 / P0-13)
+  if (d.write !== undefined) checkWrite(ctx, d.write, d.driver);
+
+    return { definition: ctx.issues.length ? null : (d as unknown as ConnectorDefinition), issues: ctx.issues };
+}
+
+/** Every string in a value, with its path (a write body's templates). */
+function eachString(value: unknown, path: string, out: [string, string][]) {
+  if (typeof value === "string") out.push([path, value]);
+  else if (Array.isArray(value)) value.forEach((v, i) => eachString(v, `${path}[${i}]`, out));
+  else if (isObj(value)) for (const [k, v] of Object.entries(value)) eachString(v, `${path}.${k}`, out);
+}
+
+function checkWrite(ctx: Ctx, write: unknown, driver: unknown) {
+  if (!isObj(write)) return issue(ctx, "write", "must be an object");
+  if (driver !== "http") return issue(ctx, "write", "only an http connector can write");
+  for (const [op, spec] of Object.entries(write)) {
+    const p = `write.${op}`;
+    if (!(DEFINITION_WRITE_OPERATIONS as readonly string[]).includes(op)) {
+      issue(ctx, p, `must be one of ${DEFINITION_WRITE_OPERATIONS.join(", ")}`);
+      continue;
+    }
+    if (!isObj(spec) || !isObj(spec.request)) {
+      issue(ctx, p, "must be { request }");
+      continue;
+    }
+    const allowed: Scope[] = ["settings", "target"];
+    checkRequest(ctx, `${p}.request`, spec.request, allowed, ["POST", "PUT", "PATCH", "DELETE"]);
+    if (spec.request.method === undefined) issue(ctx, `${p}.request.method`, "is required (POST, PUT, PATCH or DELETE)");
+    const strings: [string, string][] = [];
+    eachString(spec.request.body, `${p}.request.body`, strings);
+    for (const [where, text] of strings) checkTemplate(ctx, where, text, allowed);
+    // A write must name what it changes, or it would hit the same address for everyone.
+    const used = new Set([String(spec.request.path ?? ""), ...strings.map(([, t]) => t)].flatMap((t) => templateVariables(t)));
+    if (!used.has("target.account")) issue(ctx, `${p}.request`, "must use {target.account} in its path or body");
+    if (op === "revoke_access" && !used.has("target.entitlement")) issue(ctx, `${p}.request`, "must use {target.entitlement} in its path or body");
+  }
 }
 
 /** The setting values an organization entered, checked against the definition. */

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { applyTransform, fillTemplate, mapRecord, matchesFilters, readPath, TemplateError } from "./mapping";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { HttpSession, parseLinkNext, type FetchLike } from "./http";
-import { DefinitionConnector, httpDriver } from "./engine";
+import { DefinitionConnector, capabilitiesOf, httpDriver, writeCapabilitiesOf } from "./engine";
 import type { ConnectorDefinition, ResourceSpec } from "./types";
 
 const base: ConnectorDefinition = {
@@ -477,5 +477,64 @@ describe("DefinitionConnector", () => {
   it("validates each request of a combined kind", () => {
     const bad = { ...def, resources: { entitlement: [{ request: { path: "/groups" }, fields: { externalId: "id", name: "name" } }, { request: { path: "https://evil.example/roles" }, fields: { externalId: "id", name: "name" } }] } };
     expect(validateDefinition(bad).issues.some((i) => i.path.startsWith("resources.entitlement[1]"))).toBe(true);
+  });
+});
+
+describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
+  const writer: ConnectorDefinition = {
+    ...fast,
+    key: "acme-writer",
+    settings: [{ key: "baseUrl", label: "Address", type: "url", required: true }],
+    resources: { account: { request: { path: "/users" }, records: "", fields: { externalId: "id" } } },
+    write: {
+      revoke_access: { request: { method: "DELETE", path: "/groups/{target.entitlement}/members/{target.account}" } },
+      disable_account: { request: { method: "PATCH", path: "/users/{target.account}", body: { enabled: false, note: "by {settings.baseUrl}" } } },
+    },
+  };
+  const config = { definition: { key: writer.key, version: writer.version, origin: "custom" }, manifest: writer, settings: { baseUrl: "https://acme.example" } };
+
+  it("accepts a write section on an http connector", () => {
+    expect(validateDefinition(writer).issues).toEqual([]);
+  });
+
+  it("refuses writes that name no target, unknown operations, a GET, other drivers and stray variables", () => {
+    const bad = (write: unknown, extra: Partial<ConnectorDefinition> = {}) => validateDefinition({ ...writer, ...extra, write }).issues.map((i) => `${i.path}: ${i.message}`).join("\n");
+    expect(bad({ revoke_access: { request: { method: "DELETE", path: "/groups/{target.entitlement}" } } })).toMatch(/must use \{target.account\}/);
+    expect(bad({ revoke_access: { request: { method: "DELETE", path: "/users/{target.account}" } } })).toMatch(/must use \{target.entitlement\}/);
+    expect(bad({ grant_access: { request: { method: "POST", path: "/users/{target.account}" } } })).toMatch(/write.grant_access: must be one of revoke_access, disable_account/);
+    expect(bad({ disable_account: { request: { method: "GET", path: "/users/{target.account}" } } })).toMatch(/method: must be POST, PUT, PATCH, DELETE/);
+    expect(bad({ disable_account: { request: { path: "/users/{target.account}" } } })).toMatch(/method: is required/);
+    expect(bad({ disable_account: { request: { method: "PUT", path: "/users/{target.account}", body: { by: "{record.id}" } } } })).toMatch(/\{record.id\}" is not allowed here/);
+    expect(bad({ disable_account: { request: { method: "PUT", path: "/users/{target.who}" } } })).toMatch(/must be \{target.account\} or \{target.entitlement\}/);
+    expect(bad({ disable_account: { request: { method: "PUT", path: "/u/{target.account}", body: { k: "{secret.token}" } } } })).toMatch(/secrets may only be used in the auth block/);
+    // Reads still may not delete.
+    expect(validateDefinition({ ...writer, resources: { account: { request: { method: "DELETE", path: "/users" }, records: "", fields: { externalId: "id" } } } }).issues.map((i) => i.message).join()).toMatch(/must be GET, POST/);
+  });
+
+  it("supports writes, but never declares them on its own", () => {
+    expect(capabilitiesOf(writer)).toMatchObject({ provision: false, deprovision: false });
+    expect(capabilitiesOf(writer).revokeAccess).toBeUndefined();
+    expect(writeCapabilitiesOf(writer)).toEqual({ revokeAccess: true, disableAccount: true, deprovision: true });
+    expect(writeCapabilitiesOf(base)).toEqual({ revokeAccess: false, disableAccount: false, deprovision: false });
+  });
+
+  it("sends the declared request with the target filled in and the idempotency key", async () => {
+    const { fetchImpl, calls } = fakeFetch(() => new Response(null, { status: 204 }));
+    const c = new DefinitionConnector({ http: httpDriver(fetchImpl) });
+    await c.authenticate(config, JSON.stringify({ token: "t" }));
+    await c.write("revoke_access", { account: "u 1", entitlement: "g/1" }, "fulfil:task:1");
+    await c.write("disable_account", { account: "u1" }, "fulfil:task:2");
+    expect(calls.map((x) => `${x.method} ${x.url.pathname}`)).toEqual(["DELETE /groups/g%2F1/members/u%201", "PATCH /users/u1"]);
+    expect(calls[0].headers["Idempotency-Key"]).toBe("fulfil:task:1");
+    expect(JSON.parse(calls[1].body!)).toEqual({ enabled: false, note: "by https://acme.example" });
+  });
+
+  it("fails truthfully: an undeclared operation, a missing target, an error response", async () => {
+    const { fetchImpl } = fakeFetch(() => new Response("{}", { status: 500 }));
+    const c = new DefinitionConnector({ http: httpDriver(fetchImpl) });
+    await c.authenticate(config, JSON.stringify({ token: "t" }));
+    await expect(c.write("grant_access", { account: "u1" }, "k-00000001")).rejects.toThrow(/cannot grant access/);
+    await expect(c.write("revoke_access", { account: "u1" }, "k-00000002")).rejects.toThrow(/has no value/);
+    await expect(c.write("disable_account", { account: "u1" }, "k-00000003")).rejects.toThrow(/HTTP 500/);
   });
 });

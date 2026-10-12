@@ -4,7 +4,8 @@ import { actOnFulfilmentTask } from "@/modules/access-governance/service";
 import { errorResponse } from "@/modules/access-governance/http";
 
 /**
- * ACCESS-P0-29 — body `{ "action": "claim" | "complete" | "fail", "note"?: string }`.
+ * ACCESS-P0-29 — body `{ "action": "claim" | "complete" | "fail" | "retry_connector", "note"?: string }`.
+ * INTEGRATION-P0-13: `retry_connector` asks the connector to try an open task it failed again.
  * The task's owner or an access manager (access.approve) may act; a failure needs a note. Audited.
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

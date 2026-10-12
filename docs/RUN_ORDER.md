@@ -593,3 +593,17 @@ within a year, and is audited on every call. Global Configuration has an API
 route, and the built-in Configuration Administrator role ships. All nine F1
 stories are done. Next: F3 Provisioning (D3 approved).
 
+## 2026-10-12 — F3 started: connectors remove access and disable accounts
+
+INTEGRATION-P0-11 is done and INTEGRATION-P0-13 has its first slice
+(migrations 0128–0129):
+- Connector definitions may declare writes. A connection makes them only
+  after an administrator turns writes on (Connection → Changes in the
+  system).
+- An approved removal or disable is then made by the connector, retried
+  on transient errors, and verified by reading the system again.
+- Failures go back to the task's owner with the reason.
+
+Next in F3: grants and account creation (D3's second step), then RISK-P0-13
+remediation through the connector for the exit test.
+

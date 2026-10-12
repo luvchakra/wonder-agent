@@ -74,3 +74,31 @@ export function decideWrite(operation: ConnectorWriteOperation, declared: Connec
   if (declared[capability] !== true) return { run: false, status: "blocked", reason: `The integration is not declared to ${operation.replace(/_/g, " ")} (read-only for this operation)` };
   return { run: true };
 }
+
+/**
+ * INTEGRATION-P0-13: the capabilities a connection declares once an
+ * administrator turns writes on (everything its definition supports) or
+ * off (no write at all). Reads are left as they are.
+ */
+export function capabilitiesWithWrites(current: ConnectorCapabilities, supported: ConnectorCapabilities, enabled: boolean): ConnectorCapabilities {
+  const next: ConnectorCapabilities = { ...current, provision: false, deprovision: false };
+  for (const key of WRITE_CAPABILITY_KEYS) next[key] = enabled && supported[key] === true;
+  if (enabled) next.deprovision = supported.deprovision === true;
+  return next;
+}
+
+/** Whether a connection's declared capabilities let it write anything. */
+export function writesEnabled(declared: ConnectorCapabilities): boolean {
+  return WRITE_CAPABILITY_KEYS.some((k) => declared[k] === true);
+}
+
+/**
+ * Whether a failed write is worth trying again: a network failure, a rate
+ * limit (429) or a server error (5xx). A refusal (4xx) or a definition
+ * that cannot fill its request will fail the same way again.
+ */
+export function retryableWriteFailure(status: number | undefined, kind: "http" | "network" | "other"): boolean {
+  if (kind === "network") return true;
+  if (kind !== "http" || status === undefined) return false;
+  return status === 429 || status >= 500;
+}

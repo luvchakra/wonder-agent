@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import {
   refreshAccessLedgerForAllTenants,
+  releaseLostConnectorRuns,
   remindExpiringAccess,
   remindOverdueFulfilmentTasks,
   sweepAccessExpiry,
@@ -21,7 +22,9 @@ import {
  *   approval that expired overnight no longer shows as current;
  * - ACCESS-P0-29: overdue fulfilment tasks remind their owner, once a day;
  * - ACCESS-P0-32: access ending soon is reminded once; access whose end
- *   date has come becomes one removal task per grant.
+ *   date has come becomes one removal task per grant;
+ * - INTEGRATION-P0-13: a connector run that never reported back goes back
+ *   to its task's owner, saying its outcome is unknown.
  * Each sweep filters every write by the row's own tenant. Signed-in views
  * also sweep their own tenant, so nothing shows as current past its time.
  */
@@ -40,8 +43,8 @@ export async function GET(request: NextRequest) {
   }
   const [approvals, packages, expiry, expiring] = await Promise.all([sweepApprovalTimeouts(null), sweepPackageExpiry(null), sweepAccessExpiry(null), remindExpiringAccess(null)]);
   // After the expiry sweeps, so the removal tasks they opened are counted as they stand.
-  const fulfilment = await remindOverdueFulfilmentTasks(null);
+  const [fulfilment, lostConnectorRuns] = await Promise.all([remindOverdueFulfilmentTasks(null), releaseLostConnectorRuns(null)]);
   // After the sweeps, so expiries they recorded are reflected.
   const ledger = await refreshAccessLedgerForAllTenants();
-  return NextResponse.json({ ok: true, data: { approvals, packages, expiry, expiring, fulfilment, ledger } });
+  return NextResponse.json({ ok: true, data: { approvals, packages, expiry, expiring, fulfilment, lostConnectorRuns, ledger } });
 }

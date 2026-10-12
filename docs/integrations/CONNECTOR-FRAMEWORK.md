@@ -103,8 +103,10 @@ product takes a definition, not new code.
 - **One connector per system.** HR, the identity provider, the directory and
   each application each get their own connection, so each keeps its own
   credentials, schedule and sync history.
-- **Read only.** The framework imports. It has no write or remediation path
-  (non-negotiable #12).
+- **Read only unless turned on.** The framework imports. A definition may
+  declare writes (`write`, see "Changes in the system"), but a connection
+  makes them only after an administrator turns writes on for it, and only
+  for approved requests (non-negotiable #12, decision D3).
 - **Not code.** Mappings use field paths, string templates and a fixed list
   of transforms. Anything that would need code belongs in a driver, which
   WonderID owns and reviews.
@@ -446,6 +448,64 @@ leave missing objects out by default; the MCP inventory includes them. The
 marking itself is `stage_mark_missing()` (migration 0117), service role
 only.
 
+## Changes in the system (INTEGRATION-P0-11 / P0-13)
+
+Decision D3 (approved 2026-10-12): writes are per connection, declared,
+turned on by the organization and gated by approval. Reversible changes
+come first.
+
+**Declaring writes.** An http definition may list, under `write`:
+
+| Operation | What it does | Must use |
+|---|---|---|
+| `revoke_access` | Removes one entitlement from one account (a group membership, a role) | `{target.account}` and `{target.entitlement}` |
+| `disable_account` | Disables one account | `{target.account}` |
+
+Each is one request (`method` POST, PUT, PATCH or DELETE; `path`, `query`,
+`headers` and `body` strings may use `{settings.…}` and the target). The
+target values are the ids the system itself gave the account and the
+entitlement, as imported. The request carries `Idempotency-Key`, one per
+attempt. For example:
+
+```json
+"write": {
+  "revoke_access": { "request": { "method": "DELETE", "path": "/groups/{target.entitlement}/members/{target.account}" } },
+  "disable_account": { "request": { "method": "PATCH", "path": "/users/{target.account}", "body": { "enabled": false } } }
+}
+```
+
+Reads still may only GET or POST. Granting access and creating accounts
+come later in F3.
+
+**Turning writes on.** A connection whose definition declares writes shows
+"Changes in the system" on its page: Off by default. Turning it on (or
+`PUT /api/v1/integrations/{id}/writes {"enabled": true}`, `integration.update`)
+declares the connection's write capabilities, exactly what its definition
+supports; turning it off declares none, and any write is refused at once.
+Both are audited (`integration.writes_enabled` / `_disabled`).
+
+**What happens to an approved change.** When a remove-access or
+disable-account fulfilment task opens, and the account came from a
+connection with writes on that supports the operation (for a removal, the
+entitlement must come from that same connection):
+
+1. The task is claimed for the connector; nobody else can act on it while
+   it runs.
+2. The connector makes the change (`connectorWrites.ts`: idempotency
+   record, capability check, the Connector Gateway, audit
+   `integration.write_*`). A network failure, 429 or 5xx is retried twice,
+   after 2 and 8 seconds.
+3. On success the task completes (not yet verified) and a sync with trigger
+   `verification` reads the system again. Reconciliation closes the task as
+   verified only when the change is really there.
+4. On failure the task stays open for its owner with the reason, and the
+   owner is told. Whoever may work on the task can do it by hand or "Try
+   again" (`retry_connector`). A run that never reports back is handed back
+   by the daily sweep after 15 minutes, saying its outcome is unknown.
+
+Tasks the connector cannot do (writes off, an operation not supported, an
+account or entitlement without a system id) stay a person's task, as before.
+
 ## Writing a connector
 
 Go to **Integrations → Connection Types → Write a connection type**
@@ -521,6 +581,7 @@ The same operations are available over the API (session authentication):
 | `application` | The application name recorded on accounts and entitlements. It may use `{settings.…}`. |
 | `resources` | One request per canonical kind, or a list of up to 10 whose records are combined. Empty for a `none` connector. |
 | `rateLimitPerSecond` | Request rate. The default is 10. |
+| `write` | Optional, http driver only: the changes this connector can make in the system, `revoke_access` and `disable_account` (see "Changes in the system"). |
 
 ### Authentication (`auth.type`)
 

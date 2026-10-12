@@ -2750,3 +2750,48 @@ fulfilment and reconciliation path as everything else. Migration 0124
 - The fulfilment task action now also refreshes `/access/requests`.
 
 Verified with the EXPERIENCE-P0-29 entry (Experience audit log).
+
+### 2026-10-12 — Fulfilment tasks done by a connector (INTEGRATION-P0-13 slice 1, with ACCESS-P0-29; decision D3)
+
+**Built (migration 0129, `connectorFulfilment.ts`, `connectorFulfilmentRules.ts`).**
+- **When the connector acts.** A remove-access or disable-account task is
+  carried out by the connector when all of these hold:
+  - the account came from a connection with writes turned on that supports
+    the operation;
+  - for a removal, the entitlement comes from that same connection.
+
+  `openFulfilmentTask()` plans it and runs it after the response. The owner
+  is notified only if the connector cannot do it.
+- **Steps.**
+  1. The task is claimed for the connector (`connector_status` running), so
+     never twice at once, and person actions are refused while it runs.
+  2. Each attempt has its own idempotency key (`fulfil:<task>:<n>`). A
+     network failure, 429 or 5xx is retried twice, after 2 s and 8 s; total
+     attempts are capped at 20.
+  3. On success the task completes and a removal's grant becomes
+     `removed_unverified`, exactly as when a person completes it. A
+     verification sync follows; reconciliation closes the task as verified.
+  4. On failure the task stays open with `connector_error`, and the owner is
+     notified.
+- **Try again.** `retry_connector` (API and a folded "Connector → Try again"
+  on the task) is open to whoever may claim the task.
+- **Lost runs.** The daily access-governance cron hands a run still marked
+  running after 15 minutes back to its owner, saying the outcome is
+  unknown.
+- **Audit.** `access.fulfilment_task_completed` carries `byConnector`,
+  `access.fulfilment_task_connector_failed` records failures, and the
+  write's own `integration.write_*` entry is correlated.
+- **Fulfilment Tasks page.** A badge shows "Connector working", "Done by
+  connector" or "Connector failed", and the reason appears on the task's
+  line.
+
+**Verified.**
+- Rules tests cover: which kinds a connector does, the target through the
+  account's own connection (a cross-connection entitlement is refused),
+  retry limits and delays, lost runs and keys.
+- E2E `connector-provisioning.spec.ts` 5/5 and
+  `tests/access/connector-fulfilment-isolation.sql` 7/7 (Integration audit
+  log).
+
+**Left out.** Grant and create-account tasks stay a person's work until D3's
+second step.
