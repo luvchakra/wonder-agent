@@ -3007,3 +3007,23 @@ Verified:
 
 Left out (tracked): process-level crash tests, and compensation for an
 account created whose access was not added.
+
+### 2026-10-12 — Crash and timeout tests for connector tasks (WID-H02)
+
+- New `modules/access-governance/connectorFulfilment.test.ts`: the service
+  against an in-memory stand-in for the service-role client, with
+  integrations mocked. Five cases:
+  - a run lost mid-write (started 20 minutes ago) goes back to its owner
+    as unclear (`connector_uncertain_at`), with a verification sync; a
+    recent run and another organization's run are untouched;
+  - an unclear result is attempted once, never retried, and read;
+  - a 429 is retried with the same `taskKey` and a new attempt key, then
+    completes;
+  - a task already running returns `busy` without a write;
+  - another organization's task is never claimed.
+- Decided and recorded in the tracker: no automatic compensation for an
+  account created whose access was not added. The access task stays with
+  its owner (non-negotiable #15).
+
+Verified: `npx vitest run modules/access-governance/connectorFulfilment.test.ts`
+5/5; eslint and `tsc --noEmit` clean. No product code changed.

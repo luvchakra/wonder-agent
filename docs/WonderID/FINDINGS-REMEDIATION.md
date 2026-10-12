@@ -34,7 +34,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Owner decision on connectors carrying out a leaver's removals |
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
-| WID-H02 Idempotency and retries | P2 | Partly fixed | Process-crash tests; compensation for a partly created account |
+| WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
@@ -244,10 +244,21 @@ Tests:
   - a non-repeatable change that failed: the retry is refused until the
     read finishes, then works with the same key.
 
-**Next:**
-- Crash and timeout tests at the process level (a run killed mid-write).
-- Compensation for a partly created account (an account created, its
-  access not).
+**Done:** crash and timeout tests (`connectorFulfilment.test.ts`, 5 cases):
+- a run killed mid-write is swept back to its owner as unclear, and the
+  system is read again;
+- an unclear outcome is sent once and never again;
+- a change the system did not take is retried with the same task key;
+- a task already running, or another organization's, is never run.
+
+**Decided: no automatic compensation for a partly created account.**
+Creating the account and adding its access are separate tasks. If the
+account is created and the access is not, the access task stays open with
+its owner and the reason. Undoing the account automatically would be a
+destructive change without a person (non-negotiable #15), so it is left
+to the owner.
+
+**Next:** nothing that needs no owner decision.
 
 ### WID-H03: incomplete syncs (P2, partly fixed)
 
