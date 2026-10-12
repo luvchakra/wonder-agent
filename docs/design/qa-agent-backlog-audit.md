@@ -1741,3 +1741,101 @@ d58957b):
 - `tsc --noEmit` and eslint on both specs: clean.
 
 No product code changed.
+
+### 2026-10-12 — Nightly E2E of 12 October red: shared sessions logged out mid-run
+
+The scheduled run at 00:39 UTC (run 38188817822) failed on both halves.
+- Half 1 (`dpl_oWxa2xqt34kZaHrhnxci1CozUdis`): 122 passed, 13 failed, 5
+  flaky, 66 did not run. It hit the 35-minute cap.
+- Half 2 failed too; its log tail shows only stream-closed noise.
+
+It was not investigated at the time, and #96 to #128 merged on top of it.
+That broke §17.8 ("a red nightly run is fixed before anything else
+merges"). This entry records the investigation and the fix.
+
+Reproduced locally on `main` (9157a18), full suite with 2 workers: 240
+passed, 101 failed, 109 did not run, 56.5 minutes. Supabase Auth logs and
+the failure times show three causes.
+
+1. **A spec reset a shared user's password.**
+   - `automation-credentials.spec.ts` signed in as `iamAdminOne` by
+     setting its password through the Admin API (PUTs at 17:55:21 and
+     17:55:50). That ends every session the user holds.
+   - From then on every spec using the saved `iamAdminOne` session got 401
+     "Session is no longer valid" (Auth `/user` 403 "Session not found").
+   - These were the onboarding, approval and connector-provisioning setup
+     failures, the same as in the nightly.
+   - Fix: the spec uses the saved session (`asIamAdmin`). It never
+     changes the shared user's password.
+2. **Saved sessions carried a setup-time "last seen".**
+   - The saved storage state included `wa_session_last_seen` and
+     `wa_session_started_at`.
+   - A context opened more than the organization's idle limit (30
+     minutes) after setup looked idle. The proxy then signed adminOne out
+     globally (Auth `/logout` at 18:16, exactly 30 minutes after setup),
+     and every later adminOne context failed.
+   - The suite has outgrown 30 minutes per half, which is why this is
+     new.
+   - Fix: `auth.setup.ts` saves the state without the `wa_session_*`
+     cookies, so each context's clock starts at its first request.
+   - The product's idle and global-sign-out behaviour is unchanged.
+3. **Real defects the suite caught.**
+   - Launching an agent-scope certification campaign took about 28 s for
+     56 agents: one agent after another, five reads each, then one insert
+     per item. Fixed: agents are read 16 at a time and items inserted in
+     bulk (Compliance).
+   - File imports could not update existing people. #127 records value
+     history (and #126 disagreements) for every change, and a file
+     import's connection is not an identity source, so the history row
+     broke its foreign key and failed the record. Fixed: history and
+     disagreements are recorded only for real identity sources
+     (Identity).
+   - `groups.spec.ts` now removes its own leftover groups from runs cut
+     short before it starts. An aborted run had left a group still giving
+     the requester report access.
+
+Verified, locally:
+- the earlier-failing specs (automation-credentials, compliance,
+  emergency-controls, connector-provisioning, file-import, groups) after
+  the session fixes, then compliance, file-import, groups and
+  identity-sources after the code fixes: 43 passed;
+- the full suite: see the next entry.
+
+`branding.spec.ts:47` (a screenshot baseline) fails locally as before. It
+is environment-specific and known since 10-10.
+
+### 2026-10-12 — full suite after the fixes (local)
+
+Full suite, 2 workers, on the fix branch: **407 passed, 19 failed, 24 did
+not run, 51.6 minutes**, against 240 passed and 101 failed before. No
+session was lost in this run: adminOne and iamAdminOne stayed valid past
+the 30-minute idle limit.
+
+Each remaining failure was looked at; they are not session losses.
+- **Layout, real:** `/agents/identities` scrolls sideways at 1024px (a
+  722px table in 670px; `design-review.spec.ts:149`). Not fixed here; for
+  the Experience Agent.
+- **Slowness under load:**
+  - campaign launches, once more agents had been added during the run.
+    A launch now takes 5.5 s at 80 agents, against 28 s at 56. A large
+    organization still needs the campaign filled in the background
+    (§15); that is a follow-up;
+  - design-review timeouts;
+  - bulk invitation (42 invites in 240 s);
+  - agent creation (`gateway-enforcement`);
+  - `connection-schedule`, `f1-reconciliation:208`, the FinanceBot
+    scenario, the connector verification (`connector-provisioning:333`)
+    and the automation-credential revocation row.
+
+  The local server is one Next.js process against the remote database,
+  and the shared E2E organization grows with every run: 284 campaigns,
+  and 80 agents locally, where seeding (skipped here) prunes them.
+- **Data left by runs cut short:** `mcp-inventory.spec.ts:57` found two
+  `ledger://fy2026` resources.
+- **Sign-up:** `first-organization.spec.ts:30` was sent back to sign-in.
+  It sits on Auth's sign-up rate limit, already documented in
+  `auth.spec.ts`.
+- **Known:** `branding.spec.ts:47` (local baseline).
+
+The scheduled nightly on Vercel (21:30 UTC) is the check of record. It
+seeds and prunes first; its result is recorded in the next entry.

@@ -30,6 +30,13 @@ test.describe.serial("groups", () => {
   test("an administrator creates a group, gives it a role and adds a person", async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: authFile("adminOne") });
     const page = await ctx.newPage();
+    // A run cut short leaves its group behind, still giving the requester
+    // report access, so this run could never see it taken away. Remove those
+    // first (this file's own groups only, by name).
+    const existing = (await (await page.request.get("/api/v1/groups")).json()).data as { id: string; name: string }[];
+    for (const g of existing.filter((x) => x.name.startsWith("E2E Reporting Team ") && x.name !== groupName)) {
+      expect((await page.request.delete(`/api/v1/groups/${g.id}`)).status()).toBe(200);
+    }
     const created = await page.request.post("/api/v1/roles", {
       data: { name: roleName, description: "Report access for a group", permissions: ["report.read", "agent.read"] },
     });

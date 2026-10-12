@@ -60,6 +60,8 @@ const HIGH_RISK_SCORE_THRESHOLD = 50;
  * `high_risk_agent`-scoped campaign has no grant-level filter, since the
  * scope already narrowed which *agents* are in it).
  */
+const AGENT_BATCH = 16;
+
 async function populateCertificationItems(
   tenantId: string,
   campaignId: string,
@@ -68,42 +70,51 @@ async function populateCertificationItems(
   grantFilter?: (grant: Awaited<ReturnType<typeof getEffectiveAccess>>[number]) => boolean,
 ): Promise<void> {
   const svc = supabaseServiceRole();
-  for (const agent of agents) {
-    const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
-      getAgentContract(agent.id, tenantId),
-      getEffectiveAccess(tenantId, agent.id),
-      listPolicyEvaluations(tenantId, agent.id),
-      getFindings(tenantId, { agentId: agent.id, status: "open" }),
-      getDid(tenantId, agent.id),
-    ]);
-
-    const worstFinding = computeWorstSeverity(findings);
-    const grants = grantFilter ? effectiveAccess.filter(grantFilter) : effectiveAccess;
-
-    for (const grant of grants) {
-      const usageAtReview = computeUsageForApplication(did.tuples, findings.length > 0, grant.application);
-      const recommendation = computeRecommendation(worstFinding, usageAtReview);
-      // COMPLIANCE-P0-03 — snapshot everything the reviewer will see at
-      // the moment this item is populated (contract/policy versions,
-      // this specific grant, risk/usage) so a decision made later can be
-      // reproduced exactly, even if the live contract/policy has since
-      // changed.
-      const snapshot = shapeCertificationSnapshot({ contract, grant, policyEvaluations, riskAtReview: worstFinding, usageAtReview });
-
-      const { error: itemError } = await svc.from("certification_items").insert({
-        tenant_id: tenantId,
-        campaign_id: campaignId,
-        agent_id: agent.id,
-        access_grant_id: grant.id,
-        reviewer_id: input.reviewerId,
-        risk_at_review: worstFinding,
-        usage_at_review: usageAtReview,
-        recommendation,
-        due_date: input.dueDate ?? null,
-        snapshot,
-      });
-      if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
-    }
+  // Agents are read AGENT_BATCH at a time and the items written in bulk:
+  // one agent after another made a launch take about half a second per
+  // agent (28 s for 56), past what a person waits for (§15).
+  const rows: Record<string, unknown>[] = [];
+  for (let i = 0; i < agents.length; i += AGENT_BATCH) {
+    const batch = await Promise.all(
+      agents.slice(i, i + AGENT_BATCH).map(async (agent) => {
+        const [contract, effectiveAccess, policyEvaluations, findings, did] = await Promise.all([
+          getAgentContract(agent.id, tenantId),
+          getEffectiveAccess(tenantId, agent.id),
+          listPolicyEvaluations(tenantId, agent.id),
+          getFindings(tenantId, { agentId: agent.id, status: "open" }),
+          getDid(tenantId, agent.id),
+        ]);
+        const worstFinding = computeWorstSeverity(findings);
+        const grants = grantFilter ? effectiveAccess.filter(grantFilter) : effectiveAccess;
+        return grants.map((grant) => {
+          const usageAtReview = computeUsageForApplication(did.tuples, findings.length > 0, grant.application);
+          const recommendation = computeRecommendation(worstFinding, usageAtReview);
+          // COMPLIANCE-P0-03 — snapshot everything the reviewer will see at
+          // the moment this item is populated (contract/policy versions,
+          // this specific grant, risk/usage) so a decision made later can be
+          // reproduced exactly, even if the live contract/policy has since
+          // changed.
+          const snapshot = shapeCertificationSnapshot({ contract, grant, policyEvaluations, riskAtReview: worstFinding, usageAtReview });
+          return {
+            tenant_id: tenantId,
+            campaign_id: campaignId,
+            agent_id: agent.id,
+            access_grant_id: grant.id,
+            reviewer_id: input.reviewerId,
+            risk_at_review: worstFinding,
+            usage_at_review: usageAtReview,
+            recommendation,
+            due_date: input.dueDate ?? null,
+            snapshot,
+          };
+        });
+      }),
+    );
+    for (const items of batch) rows.push(...items);
+  }
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error: itemError } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
+    if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
   }
 }
 

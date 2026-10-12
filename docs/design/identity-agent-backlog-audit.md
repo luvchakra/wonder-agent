@@ -1734,3 +1734,21 @@ Not run: the 0148 checks added to
 through the SQL tool were cancelled this session, so they wait for a
 session that can write (with the fixture cleanup noted in the previous
 entry).
+
+### 2026-10-12 — fix: file imports could not update people (regression from #126/#127)
+
+`applySourcedIdentities` now records value history and source
+disagreements only when the authority is one of the organization's
+identity sources (`identitySourceExists`).
+
+A file import passes its connection's id as the source. Since #127 the
+history insert broke its foreign key for every change it made, so each
+updated person failed ("updated 0"). The #126 disagreement writes failed
+the same way, though only as a reported error. File imports have no
+source record to unlink, so they record neither.
+
+Found by E2E `file-import.spec.ts` in the investigation of the 12 October
+nightly. Verified:
+- `npx vitest run modules/agent-identity modules/integrations
+  modules/certification-compliance`: 519 passed;
+- E2E `file-import` and `identity-sources`: passed.

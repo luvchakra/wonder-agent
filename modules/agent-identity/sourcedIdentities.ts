@@ -163,9 +163,15 @@ export async function applySourcedIdentities(
     for (const r of (data ?? []) as unknown as Record<string, unknown>[]) existing.set(r.id as string, r);
   }
 
+  // WID-H01: history and disagreements belong to identity sources. A file
+  // import (its connection stands in as the source) has no source record to
+  // unlink, so it records neither; its rows would also break their foreign
+  // keys, failing every change it makes.
+  const isIdentitySource = await identitySourceExists(supabase, tenantId, source.sourceId);
+
   // WID-H01: the open disagreements on these people, from any source, read once.
   const openDisagreements = new Map<string, OpenDisagreement[]>();
-  const updateIds = [...new Set(ops.filter((o) => o.op === "update").map((o) => (o as { identityId: string }).identityId))];
+  const updateIds = isIdentitySource ? [...new Set(ops.filter((o) => o.op === "update").map((o) => (o as { identityId: string }).identityId))] : [];
   for (let i = 0; i < updateIds.length; i += 200) {
     const { data, error } = await supabase
       .from("identity_source_conflicts")
@@ -245,7 +251,7 @@ export async function applySourcedIdentities(
   // disagreement is kept for review with both values and both sources. A
   // failure here is reported on the result, never undoing the change.
   const disagreementsFor = async (identityId: string, plan: ReturnType<typeof planDisagreements>, fieldsById: Map<string, string>): Promise<string | undefined> => {
-    if (!plan.insert.length && !plan.update.length && !plan.resolve.length) return undefined;
+    if (!isIdentitySource || (!plan.insert.length && !plan.update.length && !plan.resolve.length)) return undefined;
     try {
       if (plan.insert.length) {
         const { error } = await supabase.from("identity_source_conflicts").insert(
@@ -297,7 +303,7 @@ export async function applySourcedIdentities(
   // written before the change itself, so no change is applied without the
   // history to undo it (a failure here fails the record, not the run).
   const recordHistory = async (identityId: string, ref: string, entries: { field: string; oldValue: unknown; newValue: unknown; oldProvenance: unknown }[]) => {
-    if (!entries.length) return;
+    if (!isIdentitySource || !entries.length) return;
     const { error } = await supabase.from("identity_source_changes").insert(
       entries.map((e) => ({
         tenant_id: tenantId,
@@ -602,6 +608,14 @@ export async function revertSourceRecord(
     metadata: { sourceId: record.sourceId, externalId: record.externalId, restored, kept: plan.kept },
   });
   return { restored, kept: plan.kept };
+}
+
+/** Whether `sourceId` is one of this organization's identity sources (a file import's connection is not). */
+async function identitySourceExists(supabase: ReturnType<typeof supabaseServiceRole>, tenantId: string, sourceId: string): Promise<boolean> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(sourceId)) return false;
+  const { data, error } = await supabase.from("identity_sources").select("id").eq("tenant_id", tenantId).eq("id", sourceId).maybeSingle();
+  if (error) throw new Error(`applySourcedIdentities: ${error.message}`);
+  return Boolean(data);
 }
 
 async function loadAttributeDefinitions(tenantId: string) {
