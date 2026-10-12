@@ -12,7 +12,7 @@ import {
   type SourcedFields,
   type SourcedIdentityField,
 } from "@/lib/shared/types/agent-identity";
-import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, planDisagreements, type AttributeValue, type OpenDisagreement } from "./sourcedMerge";
+import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, planDisagreements, planRevert, type AttributeValue, type OpenDisagreement, type RecordedChange } from "./sourcedMerge";
 import { detectLifecycleEvents, type DetectedEvent } from "./humanLifecycle";
 import { assignOpenTasksToManager, recordLifecycleEvents } from "./humanLifecycleService";
 import type { HumanLifecycleState } from "@/lib/shared/types/agent-identity";
@@ -293,6 +293,28 @@ export async function applySourcedIdentities(
     }
   };
 
+  // WID-H01 (owner decision): the value history behind "unlink with undo",
+  // written before the change itself, so no change is applied without the
+  // history to undo it (a failure here fails the record, not the run).
+  const recordHistory = async (identityId: string, ref: string, entries: { field: string; oldValue: unknown; newValue: unknown; oldProvenance: unknown }[]) => {
+    if (!entries.length) return;
+    const { error } = await supabase.from("identity_source_changes").insert(
+      entries.map((e) => ({
+        tenant_id: tenantId,
+        identity_id: identityId,
+        source_id: source.sourceId,
+        external_id: ref.slice(0, 300),
+        field: e.field,
+        old_value: e.oldValue ?? null,
+        new_value: e.newValue ?? null,
+        old_provenance: e.oldProvenance ?? null,
+        run_id: source.runId,
+        changed_at: now,
+      })),
+    );
+    if (error) throw new Error(`recording the change history: ${error.message}`);
+  };
+
   for (const op of ops) {
     try {
       if (op.op === "create") {
@@ -344,6 +366,7 @@ export async function applySourcedIdentities(
           continue;
         }
         const person = PERSON_TYPES.has(row.identity_type as IdentityType);
+        await recordHistory(op.identityId, op.ref, [{ field: "status", oldValue: row.status, newValue: "inactive", oldProvenance: ((row.field_provenance as FieldProvenance) ?? {}).status }]);
         const { error } = await supabase
           .from("identities")
           .update({ status: "inactive", ...(person ? { lifecycle_state: "LEAVE_PENDING" } : {}), updated_at: now })
@@ -401,6 +424,16 @@ export async function applySourcedIdentities(
       if (merge.changes.status !== undefined && PERSON_TYPES.has(row.identity_type as IdentityType)) {
         update.lifecycle_state = lifecycleFor(merge.changes.status as IdentityStatus, (merge.changes.startDate ?? row.start_date ?? null) as string | null, today);
       }
+      const before = (row.field_provenance as FieldProvenance) ?? {};
+      await recordHistory(op.identityId, op.ref, [
+        ...changed.map((field) => ({ field, oldValue: current[field] ?? null, newValue: merge.changes[field] ?? null, oldProvenance: before[field] })),
+        ...attributesChanged.map((name) => ({
+          field: `attributes.${name}`,
+          oldValue: currentAttributes[name] ?? null,
+          newValue: attributeMerge.changes[name] ?? null,
+          oldProvenance: before[`attributes.${name}`],
+        })),
+      ]);
       const { error } = await supabase.from("identities").update(update).eq("tenant_id", tenantId).eq("id", op.identityId);
       if (error) throw new Error(error.message);
       const updated: SourcedResult = {
@@ -458,6 +491,117 @@ export async function applySourcedIdentities(
     }
   }
   return results;
+}
+
+/**
+ * WID-H01 (owner decision): undoes what one source record changed on an
+ * identity, when the record is unlinked from it. Each field the record
+ * changed goes back to its value before the first change, with that
+ * value's provenance, unless it has changed since (then it is kept and
+ * reported). A restored status also restores the person's lifecycle
+ * state; it starts no lifecycle event (an undo is not a joiner or mover).
+ *
+ * Service role, called by the Integration module's unlink after its own
+ * authorization; every statement is filtered on `tenantId`, and the
+ * identity is written only if it has not changed since it was read.
+ */
+export async function revertSourceRecord(
+  tenantId: string,
+  actorId: string,
+  record: { identityId: string; sourceId: string; externalId: string },
+): Promise<{ restored: string[]; kept: string[] }> {
+  const supabase = supabaseServiceRole();
+  const now = new Date().toISOString();
+  const [{ data: changeRows, error: changeError }, { data: row, error: rowError }] = await Promise.all([
+    supabase
+      .from("identity_source_changes")
+      .select("id, field, old_value, new_value, old_provenance, changed_at")
+      .eq("tenant_id", tenantId)
+      .eq("identity_id", record.identityId)
+      .eq("source_id", record.sourceId)
+      .eq("external_id", record.externalId)
+      .is("undone_at", null)
+      .order("changed_at")
+      .limit(2000),
+    supabase
+      .from("identities")
+      .select("id, identity_type, attributes, field_provenance, updated_at, " + Object.values(COLUMN).join(", "))
+      .eq("tenant_id", tenantId)
+      .eq("id", record.identityId)
+      .maybeSingle(),
+  ]);
+  if (changeError) throw new Error(`revertSourceRecord: ${changeError.message}`);
+  if (rowError) throw new Error(`revertSourceRecord: ${rowError.message}`);
+  const identity = row as unknown as Record<string, unknown> | null;
+  if (!identity) throw new Error("identity not found in this organization");
+
+  const changes: RecordedChange[] = ((changeRows ?? []) as Record<string, unknown>[]).map((c) => ({
+    id: c.id as string,
+    field: c.field as string,
+    oldValue: c.old_value,
+    newValue: c.new_value,
+    oldProvenance: (c.old_provenance as FieldProvenance[string] | null) ?? null,
+    changedAt: c.changed_at as string,
+  }));
+  const attributes = { ...((identity.attributes as Record<string, AttributeValue | null>) ?? {}) };
+  const current: Record<string, unknown> = {};
+  for (const [k, col] of Object.entries(COLUMN) as [SourcedIdentityField, string][]) current[k] = identity[col] ?? null;
+  for (const [name, value] of Object.entries(attributes)) current[`attributes.${name}`] = value;
+  const plan = planRevert(changes, current);
+
+  if (plan.restore.length) {
+    const provenance: FieldProvenance = { ...((identity.field_provenance as FieldProvenance) ?? {}) };
+    const update: Record<string, unknown> = {};
+    let attributesChanged = false;
+    for (const r of plan.restore) {
+      if (r.field.startsWith("attributes.")) {
+        const name = r.field.slice("attributes.".length);
+        if (r.value === null || r.value === undefined) delete attributes[name];
+        else attributes[name] = r.value as AttributeValue;
+        attributesChanged = true;
+      } else if (r.field in COLUMN) {
+        update[COLUMN[r.field as SourcedIdentityField]] = r.value ?? null;
+      } else continue;
+      if (r.provenance) provenance[r.field] = r.provenance;
+      else delete provenance[r.field];
+    }
+    if (attributesChanged) update.attributes = attributes;
+    const status = update.status as IdentityStatus | undefined;
+    if (status && PERSON_TYPES.has(identity.identity_type as IdentityType)) {
+      update.lifecycle_state = lifecycleFor(status, ((update.start_date ?? identity.start_date) as string | null) ?? null, now.slice(0, 10));
+    }
+    const { data: written, error } = await supabase
+      .from("identities")
+      .update({ ...update, field_provenance: provenance, updated_at: now })
+      .eq("tenant_id", tenantId)
+      .eq("id", record.identityId)
+      .eq("updated_at", identity.updated_at as string)
+      .select("id");
+    if (error) throw new Error(`revertSourceRecord: ${error.message}`);
+    if (!written?.length) throw new Error("the identity changed meanwhile; try again");
+  }
+  for (let i = 0; i < plan.undone.length; i += 200) {
+    const { error } = await supabase
+      .from("identity_source_changes")
+      .update({ undone_at: now })
+      .eq("tenant_id", tenantId)
+      .eq("identity_id", record.identityId)
+      .in("id", plan.undone.slice(i, i + 200));
+    if (error) throw new Error(`revertSourceRecord: ${error.message}`);
+  }
+  const restored = plan.restore.map((r) => r.field);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "identity.source_changes_undone",
+    objectType: "identity",
+    objectId: record.identityId,
+    outcome: "success",
+    // Field names only, never values (#10, §17.7).
+    metadata: { sourceId: record.sourceId, externalId: record.externalId, restored, kept: plan.kept },
+  });
+  return { restored, kept: plan.kept };
 }
 
 async function loadAttributeDefinitions(tenantId: string) {

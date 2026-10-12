@@ -15,6 +15,7 @@ import {
   transferOwnership,
 } from "@/modules/agent-identity/service";
 import { HUMAN_LIFECYCLE_STATES, type HumanLifecycleState } from "@/lib/shared/types/agent-identity";
+import { unlinkSourceRecord } from "@/modules/integrations/service";
 
 /**
  * IDENTITY-P0-15/16/17 — the identity directory's forms. Each returns the
@@ -119,6 +120,19 @@ export async function endRelationshipAction(identityId: string, relationshipId: 
   }
   revalidatePath(`/identities/${identityId}`);
   return { status: "saved", message: "Relationship ended." };
+}
+
+/** WID-H01: unlink a source record from this identity, restoring what it changed. */
+export async function unlinkSourceRecordAction(identityId: string, sourceId: string, externalId: string): Promise<IdentityFormState> {
+  const ctx = await requirePermission("identity.manage");
+  let kept: string[];
+  try {
+    ({ kept } = await unlinkSourceRecord(ctx.tenantId!, ctx.userId, sourceId, externalId));
+  } catch (err) {
+    return formError(err);
+  }
+  revalidatePath(`/identities/${identityId}`);
+  return { status: "saved", message: kept.length ? `Unlinked. Kept, as they changed since: ${kept.join(", ")}.` : "Unlinked; its values were restored." };
 }
 
 export async function createAttributeDefinitionAction(_prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {

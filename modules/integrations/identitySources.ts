@@ -5,7 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentitySource, PendingCorrelation, ReconciliationRun } from "@/lib/shared/types/integrations";
 import type { IdentityType, SourcedFields } from "@/lib/shared/types/agent-identity";
-import { applySourcedIdentities, listAttributeDefinitions, listIdentitiesForCorrelation, type SourcedOp, type SourcedResult } from "@/modules/agent-identity/service";
+import { applySourcedIdentities, listAttributeDefinitions, listIdentitiesForCorrelation, revertSourceRecord, type SourcedOp, type SourcedResult } from "@/modules/agent-identity/service";
 import {
   MAX_RECORDS_PER_RUN,
   correlate,
@@ -364,6 +364,25 @@ export async function executeReconciliation(
       for (const l of data ?? []) links.set(l.external_id as string, { identityId: l.identity_id as string, present: Boolean(l.present) });
       if (!data || data.length < 1000) break;
     }
+    // WID-H01: the identities each record was unlinked from.
+    const rejections = new Map<string, Set<string>>();
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("identity_source_rejections")
+        .select("external_id, identity_id")
+        .eq("tenant_id", tenantId)
+        .eq("source_id", source.id)
+        .order("external_id")
+        .order("identity_id")
+        .range(from, from + 999);
+      if (error) throw new Error(`reading unlinked records: ${error.message}`);
+      for (const r of data ?? []) {
+        const set = rejections.get(r.external_id as string) ?? new Set<string>();
+        set.add(r.identity_id as string);
+        rejections.set(r.external_id as string, set);
+      }
+      if (!data || data.length < 1000) break;
+    }
     const types = PERSON_TYPES.includes(source.identityType as IdentityType) ? PERSON_TYPES : MACHINE_TYPES;
     const index = await listIdentitiesForCorrelation(tenantId, types);
     const taken = new Set([...links.values()].map((l) => l.identityId));
@@ -373,7 +392,7 @@ export async function executeReconciliation(
     const matched = new Map<string, string>();
     const pendings: { record: NormalizedSourceRecord; candidateIds: string[]; reason: string }[] = [];
     for (const record of valid) {
-      const outcome = correlate(record, source.correlationRules, index, links.get(record.externalId)?.identityId ?? null, taken);
+      const outcome = correlate(record, source.correlationRules, index, links.get(record.externalId)?.identityId ?? null, taken, rejections.get(record.externalId));
       if (outcome.kind === "linked" || outcome.kind === "matched") {
         if (outcome.kind === "matched") {
           taken.add(outcome.identityId);
@@ -797,6 +816,16 @@ export async function resolvePendingCorrelation(tenantId: string, actorId: strin
       });
       if (linkError?.code === "23505") throw new ApiError(409, "ALREADY_LINKED", "That identity or record is already linked to this source");
       if (linkError) throw new ApiError(500, "WRITE_FAILED", linkError.message);
+      // WID-H01: a person linking it back overrides an earlier unlink.
+      if (decision.action === "link") {
+        await supabase
+          .from("identity_source_rejections")
+          .delete()
+          .eq("tenant_id", tenantId)
+          .eq("source_id", source.id)
+          .eq("external_id", pending.externalId)
+          .eq("identity_id", identityId);
+      }
     } catch (err) {
       await release();
       throw err;
@@ -815,4 +844,86 @@ export async function resolvePendingCorrelation(tenantId: string, actorId: strin
     metadata: { pendingId, externalId: pending.externalId, decision: decision.action, identityId },
   });
   return { ...pending, status: claimedStatus, resolvedIdentityId: identityId };
+}
+
+// ---------------------------------------------------------------- unlink (WID-H01)
+
+/** The records sources have linked to one identity, for its page. Read as the user (RLS), filtered by tenant. */
+export async function listSourceLinksForIdentity(tenantId: string, identityId: string): Promise<{ sourceId: string; sourceName: string; externalId: string; present: boolean; lastSeenAt: string }[]> {
+  if (!UUID_RE.test(identityId)) return [];
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("identity_source_links")
+    .select("source_id, external_id, present, last_seen_at")
+    .eq("tenant_id", tenantId)
+    .eq("identity_id", identityId)
+    .limit(50);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const sources = new Map((await listIdentitySources(tenantId)).map((s) => [s.id, s.name]));
+  return (data ?? []).map((l) => ({
+    sourceId: l.source_id as string,
+    sourceName: sources.get(l.source_id as string) ?? "A source",
+    externalId: l.external_id as string,
+    present: Boolean(l.present),
+    lastSeenAt: l.last_seen_at as string,
+  }));
+}
+
+/**
+ * WID-H01 (owner decision): unlinks a source record from the identity it
+ * was matched to, with undo. In order:
+ * 1. the values the record changed on the identity are restored (Identity's
+ *    revertSourceRecord), unless they changed since;
+ * 2. the identity is recorded as one the record was unlinked from, so
+ *    matching never links them again by itself;
+ * 3. the link is removed: the next run matches the record afresh, and a
+ *    match only to this identity waits in Pending Matches for a person.
+ * The record's identity is not deleted, and its own accounts stay as they
+ * are. Audited.
+ */
+export async function unlinkSourceRecord(tenantId: string, actorId: string, sourceId: string, externalId: unknown): Promise<{ identityId: string; restored: string[]; kept: string[] }> {
+  if (!UUID_RE.test(sourceId)) throw new ApiError(404, "NOT_FOUND", "No such identity source");
+  if (typeof externalId !== "string" || !externalId.trim() || externalId.length > 300) throw new ApiError(400, "VALIDATION_FAILED", "externalId: the source record's id");
+  const supabase = supabaseServiceRole();
+  const { data: link, error } = await supabase
+    .from("identity_source_links")
+    .select("identity_id")
+    .eq("tenant_id", tenantId)
+    .eq("source_id", sourceId)
+    .eq("external_id", externalId)
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!link) throw new ApiError(404, "NOT_FOUND", "That record is not linked to anyone");
+  const identityId = link.identity_id as string;
+
+  let undo: { restored: string[]; kept: string[] };
+  try {
+    undo = await revertSourceRecord(tenantId, actorId, { identityId, sourceId, externalId });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "the values could not be restored";
+    throw new ApiError(/changed meanwhile/.test(message) ? 409 : 500, "UNDO_FAILED", `Nothing was unlinked: ${message.slice(0, 200)}`);
+  }
+  const { error: rejectError } = await supabase
+    .from("identity_source_rejections")
+    .upsert({ tenant_id: tenantId, source_id: sourceId, external_id: externalId, identity_id: identityId, rejected_by: actorId }, { onConflict: "source_id,external_id,identity_id" });
+  if (rejectError) throw new ApiError(500, "WRITE_FAILED", `The values were restored, but the record is still linked: ${rejectError.message}`);
+  const { error: deleteError } = await supabase
+    .from("identity_source_links")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("source_id", sourceId)
+    .eq("external_id", externalId)
+    .eq("identity_id", identityId);
+  if (deleteError) throw new ApiError(500, "WRITE_FAILED", `The values were restored, but the record is still linked: ${deleteError.message}`);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "identity_source.record_unlinked",
+    objectType: "identity",
+    objectId: identityId,
+    outcome: "success",
+    metadata: { sourceId, externalId, restored: undo.restored, kept: undo.kept },
+  });
+  return { identityId, ...undo };
 }

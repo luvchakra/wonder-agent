@@ -64,6 +64,7 @@ export {
   listIdentitiesForCorrelation,
   applySourcedIdentities,
   previewSourcedIdentities,
+  revertSourceRecord,
   type CorrelationCandidate,
   type SourcedOp,
   type SourcedPreview,

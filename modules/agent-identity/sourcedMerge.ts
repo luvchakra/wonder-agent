@@ -184,3 +184,43 @@ export function planDisagreements(
   }
   return { insert, update, resolve };
 }
+
+/** One value a source record changed on an identity (identity_source_changes). */
+export type RecordedChange = {
+  id: string;
+  field: string;
+  oldValue: unknown;
+  newValue: unknown;
+  oldProvenance: FieldProvenance[string] | null;
+  changedAt: string;
+};
+
+const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+/**
+ * WID-H01 (owner decision): what unlinking a source record restores. Pure.
+ * For each field the record changed, the value before its first change
+ * comes back, with that value's provenance, unless the field has changed
+ * since its last change (another source or a person set it): then it is
+ * kept and reported. Every change is marked undone either way.
+ */
+export function planRevert(
+  changes: RecordedChange[],
+  current: Record<string, unknown>,
+): { restore: { field: string; value: unknown; provenance: FieldProvenance[string] | null }[]; kept: string[]; undone: string[] } {
+  const byField = new Map<string, RecordedChange[]>();
+  for (const c of [...changes].sort((a, b) => a.changedAt.localeCompare(b.changedAt))) {
+    const list = byField.get(c.field) ?? [];
+    list.push(c);
+    byField.set(c.field, list);
+  }
+  const restore: { field: string; value: unknown; provenance: FieldProvenance[string] | null }[] = [];
+  const kept: string[] = [];
+  for (const [field, list] of byField) {
+    const first = list[0];
+    const last = list[list.length - 1];
+    if (same(current[field], last.newValue)) restore.push({ field, value: first.oldValue ?? null, provenance: first.oldProvenance });
+    else kept.push(field);
+  }
+  return { restore, kept, undone: changes.map((c) => c.id) };
+}

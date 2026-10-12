@@ -9,6 +9,7 @@ import {
   transitionLifecycleAction,
   createIdentityAction,
   endRelationshipAction,
+  unlinkSourceRecordAction,
   setAttributeActiveAction,
   updateIdentityAction,
   type IdentityFormState,
@@ -332,6 +333,26 @@ export function EndRelationshipButton({ identityId, relationshipId, label }: { i
         End
       </Button>
       {state.status === "error" ? <span className="text-xs text-destructive">{state.message}</span> : null}
+    </form>
+  );
+}
+
+/** WID-H01: unlink a source record, restoring the values it changed. Asks first. */
+export function UnlinkSourceRecordButton({ identityId, sourceId, externalId, label }: { identityId: string; sourceId: string; externalId: string; label: string }) {
+  const [state, action, pending] = useActionState(unlinkSourceRecordAction.bind(null, identityId, sourceId, externalId), IDLE);
+  return (
+    <form
+      action={action}
+      className="flex flex-wrap items-center gap-2"
+      onSubmit={(e) => {
+        if (!window.confirm(`Unlink ${label}? The values it changed here are restored, and it will not be matched to this identity again by itself.`)) e.preventDefault();
+      }}
+    >
+      <Button type="submit" size="sm" variant="outline" disabled={pending} aria-label={`Unlink ${label}`}>
+        {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+        Unlink
+      </Button>
+      {state.status !== "idle" ? <span className={state.status === "error" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>{state.message}</span> : null}
     </form>
   );
 }

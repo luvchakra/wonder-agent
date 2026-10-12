@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { correlate, normalizeRecord, parseCsv, planLeavers, validateMappings, validateSourceConfig, type NormalizedSourceRecord } from "./identitySourceRules";
-import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, planDisagreements } from "@/modules/agent-identity/sourcedMerge";
+import { coerceSourcedAttributes, mergeSourcedAttributes, mergeSourcedFields, planDisagreements, planRevert } from "@/modules/agent-identity/sourcedMerge";
 
 const err = (fn: () => unknown) => {
   try {
@@ -147,6 +147,19 @@ describe("correlate", () => {
     expect(correlate(rec({ email: "on@example.test" }), [{ kind: "email" }], withLeaver, null, new Set())).toMatchObject({ kind: "matched", identityId: "i5" });
     // A record the source already links keeps its link, whatever the identity's status.
     expect(correlate(rec({ email: "back@example.test" }), [{ kind: "email" }], withLeaver, "i4", new Set())).toEqual({ kind: "linked", identityId: "i4" });
+  });
+
+  it("WID-H01: a record is never matched again by itself to an identity it was unlinked from; a person decides", () => {
+    const rejected = new Set(["i1"]);
+    expect(correlate(rec({ email: "ada@example.test" }), [{ kind: "email" }], index, null, new Set(), rejected)).toEqual({
+      kind: "ambiguous",
+      candidateIds: ["i1"],
+      reason: expect.stringMatching(/unlinked from/),
+    });
+    // Another identity matching alongside the rejected one is the match.
+    expect(correlate(rec({ email: "twin@example.test" }), [{ kind: "email" }], index, null, new Set(), new Set(["i2"]))).toMatchObject({ kind: "matched", identityId: "i3" });
+    // Without a rejection, nothing changes.
+    expect(correlate(rec({ email: "ada@example.test" }), [{ kind: "email" }], index, null, new Set())).toMatchObject({ kind: "matched", identityId: "i1" });
   });
 
   it("keeps an existing link above every rule", () => {
@@ -298,5 +311,35 @@ describe("planDisagreements (WID-H01, owner decision)", () => {
   it("keeps custom attribute values as text, under attributes.<name>", () => {
     const r = planDisagreements([], "dir", ["attributes.grade"], [lost("attributes.grade", 7, 9)], {});
     expect(r.insert).toEqual([{ field: "attributes.grade", keptValue: "7", keptSourceId: "hr", otherValue: "9" }]);
+  });
+});
+
+describe("planRevert (WID-H01, unlink with undo)", () => {
+  const at = (m: number) => `2026-10-12T10:${String(m).padStart(2, "0")}:00Z`;
+  const hr = { sourceId: "hr", priority: 10, at: at(0) };
+  const change = (id: string, field: string, oldValue: unknown, newValue: unknown, m: number, oldProvenance: typeof hr | null = null) => ({ id, field, oldValue, newValue, oldProvenance, changedAt: at(m) });
+
+  it("restores each field to its value before the record's first change, with that value's provenance", () => {
+    const r = planRevert(
+      [change("c2", "department", "Sales", "Marketing", 2), change("c1", "department", "Ops", "Sales", 1, hr), change("c3", "attributes.grade", null, 7, 1)],
+      { department: "Marketing", "attributes.grade": 7 },
+    );
+    expect(r.restore).toEqual([
+      { field: "department", value: "Ops", provenance: hr },
+      { field: "attributes.grade", value: null, provenance: null },
+    ]);
+    expect(r.kept).toEqual([]);
+    expect(r.undone.sort()).toEqual(["c1", "c2", "c3"]);
+  });
+
+  it("keeps a field that changed since (another source or a person), and still marks it undone", () => {
+    const r = planRevert([change("c1", "title", null, "Analyst", 1), change("c2", "status", "active", "inactive", 1)], { title: "Lead", status: "inactive" });
+    expect(r.restore).toEqual([{ field: "status", value: "active", provenance: null }]);
+    expect(r.kept).toEqual(["title"]);
+    expect(r.undone.sort()).toEqual(["c1", "c2"]);
+  });
+
+  it("restores nothing when the record changed nothing (it created the identity)", () => {
+    expect(planRevert([], { department: "Finance" })).toEqual({ restore: [], kept: [], undone: [] });
   });
 });
