@@ -3,8 +3,8 @@
 > **Purpose:** Living register for Critical and High-risk gaps found by the hourly audit of [WonderID Knowledge Base](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md), with follow-up verification against the repository where feasible. It is **not** a list of confirmed exploitable vulnerabilities.
 >
 > **Initial review:** 2026-10-12 (Asia/Kolkata)  
-> **Last check:** 2026-10-12 11:34 IST (GitHub write-permission diagnostic; findings not fully revalidated this run)  
-> **Source knowledge-base blob SHA:** `3c370bad21093fe4900560ed939fffbd182edc18`  
+> **Last check:** 2026-10-12 12:40 IST (manual authorized retry; findings reconciled with latest remediation evidence)  
+> **Source knowledge-base blob SHA:** `5734cded248edddf2594b7773b3627da203ddc80`  
 > **Owner:** WonderID project team (triage/assignee TBD)  
 > **Audit scope:** Source document reviewed in full. **Code and tests:** first post-merge review 2026-10-12 (CLAUDE.md §19.12); each finding's evidence names the files and tests checked. Runtime behavior and deployed controls not verified.
 >
@@ -15,7 +15,7 @@
 | Severity | Open | Changed | Verified fixed |
 |---|---:|---:|---:|
 | Critical (P0) | 0 | 3 | 0 |
-| High (P1) | 1 | 7 | 0 |
+| High (P1) | 0 | 7 | 1 |
 
 Priority reflects the potential harm *if the ambiguity or missing control translates into real behavior*, not an established production incident.
 
@@ -35,6 +35,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - The older agent-request path (`requests.ts:111-113`) has no built-in requester ≠ approver check: a flag-only SoD policy lets the requester approve, by design (`tests/e2e/sod.spec.ts`).
   - Knowledge base §1, §7 and §17 corrected to say this.
   - **Owner decisions open:** a hard self-approval block on the agent path (it changes D5's tested flag behaviour); capping auto-approval below high risk; maker/checker on request-policy changes; a distinct record for rogue access approved afterwards (see WID-H04).
+- **Follow-up (2026-10-12 12:40 IST):** The latest [knowledge base §1](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md#1-what-wonderid-is) distinguishes automatic low/medium-risk decisions from human-only high-risk approvals. [Remediation evidence](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-c01-approval-policy-p2-partly-fixed) identifies self-approval and risk-threshold safeguards. **Still unresolved:** maker/checker for request-policy edits and retrospective approval provenance (WID-H04).
 
 ### WID-C02 — Urgent revocation and time-bound-access verification
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -52,6 +53,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
     - leaver `revoke_access` tasks have no assignee or deadline and open no per-grant removals (`humanLifecycle.ts:104-105`).
   - Knowledge base §3 and §7 corrected.
   - **Owner decisions open:** an urgent revocation path for leavers and emergencies (per-grant removals, priority SLA, escalation); a request status for "expired, removal pending" vs "removal verified".
+- **Follow-up (2026-10-12 12:40 IST):** [Remediation tracker](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-c02-urgent-revocation-and-time-bound-access-p1-in-progress) and the updated knowledge base document per-grant leaver removal tasks, one-day removal/disable SLA, escalation and distinct `removal pending / removed unverified / verified` states. **Still unresolved:** connector outage, delayed-sync and failed-deprovisioning integration tests, plus the policy decision on automated leaver removals. Earlier gap details above are retained as historical baseline.
 
 ### WID-C03 — Gateway enforcement can be bypassed
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -68,6 +70,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - **Owner decisions open:** whether the kill switch and lookup failures block even in Observe mode; flagging runtime events with no matching gateway decision; making the gateway the only path.
 
 ## High (P1)
+- **Follow-up (2026-10-12 12:40 IST):** [Remediation tracker](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-c03-gateway-coverage-p2-partly-fixed) cites gateway emergency block behavior in Observe mode and after-the-fact bypass detection from reported runtime events. **Still unresolved:** direct target-system calls without gateway interception, unreported actions and enforcing a mandatory gateway boundary. Not verified fixed.
 
 ### WID-H01 — Identity correlation and reassignment controls
 - **Status:** CHANGED (code verified, knowledge base corrected, partial fix shipped; closure criteria not yet met)
@@ -82,6 +85,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - **Fixed in this PR:** a single match on a terminated or archived identity now goes to Pending Matches instead of linking automatically (`identitySourceRules.ts`, `correlate`; test "WID-H01").
   - Knowledge base §3 corrected (matching; duplicate merge applies only to AI agents).
   - **Open:** accounts that are not linked by hand are re-correlated each run, so a reassigned email moves the account; there is no merge reversal and no source-priority policy.
+- **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
 
 ### WID-H02 — Provisioning idempotency and partial-failure recovery
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -97,6 +101,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - The knowledge base claim "a system never applies the same change twice" was wrong. §8 and §17 are corrected.
   - **Owner decisions open:** one key per task instead of per attempt; reading the system before a retry after an unclear failure; declaring which connection types support idempotency.
   - Since INTEGRATION-P0-22 slice 2 (LDAP changes): a directory answer that the change is already there (results 20, 16 and 68) counts as done (`framework/ldapWrite.ts`, `alreadyApplied`; tests in `ldapWrite.test.ts`), so an LDAP retry cannot apply a change twice. http connections are unchanged.
+- **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
 
 ### WID-H03 — Incomplete sync and false deletion detection
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -114,6 +119,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Knowledge base §5 corrected.
   - This PR also makes the first sync after a connection upgrade a full read (`syncJobs.ts`, `lastGoodRuns`).
   - **Open:** treat a cut-short incremental run as partial (it changes run status and full-read frequency); per-kind thresholds; proof of completeness.
+- **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
 
 ### WID-H04 — False positives and provenance gaps for rogue access
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -128,6 +134,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Manual accept / false-positive closure is limited to agent findings (`findings.ts:427,474`).
   - Knowledge base §6 (Unproven) and §9 (closing) corrected.
   - **Owner decisions open:** a separate "approved afterwards" resolution, or the request id on the finding; exception and false-positive closure for rogue findings on human accounts.
+- **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
 
 ### WID-H05 — Connector security and tenant boundary for user-defined endpoints
 - **Status:** CHANGED (code verified, knowledge base corrected, partial fix shipped; closure criteria not yet met)
@@ -143,9 +150,10 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
     - a 307/308 redirect to another origin that would resend the request body (which may hold an API key) is refused (`outboundFetch.ts`, `credentialHeaders`; tests "WID-H05").
   - Knowledge base §5 corrected.
   - **Open:** tests for an actual DNS rebind and for a strict-policy redirect to a private address; 6to4/Teredo ranges; sandboxing and egress allow-lists (owner).
+- **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
 
 ### WID-H06 — Automation credential privilege scoping
-- **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
+- **Status:** FIXED (repository implementation and committed test evidence verified 2026-10-12 12:40 IST; production not independently exercised)
 - **First seen / last checked:** 2026-10-12 / 2026-10-12 (code)
 - **Evidence:** [§8](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md#8-making-the-change-by-a-person-or-automatically) mentions credential ownership, second-admin approval, expiry, network restrictions and rate limits but not allowed scopes or permitted API actions.
 - **Risk:** A compromised automation key may gain broader read/write or approval powers than its workflow needs.
@@ -160,6 +168,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Nothing prevents a credential from holding `access.approve`, so a credential can approve access.
   - Knowledge base §8 corrected.
   - **Owner decisions open:** forbid automation credentials from approving access; four-eyes on role changes to an active credential; audit 401/429 refusals; a database cap on expiry.
+- **Closure verification (2026-10-12 12:40 IST):** Reviewed current [`automationCredentialRules.ts`](https://github.com/luvchakra/wonder-agent/blob/main/lib/security/automationCredentialRules.ts#L164-L179), [its unit tests](https://github.com/luvchakra/wonder-agent/blob/main/lib/security/automationCredentialRules.test.ts#L118-L160), [automation-credentials E2E test cases](https://github.com/luvchakra/wonder-agent/blob/main/tests/e2e/automation-credentials.spec.ts#L165-L235), and [remediation evidence](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-h06-automation-credential-scope-p2-fixed). Human-only permissions are disallowed, role upgrades require different-approver reapproval, credential refusals are audited in a bounded way, and the E2E cases cover expiry, rotation/revocation and cross-tenant behavior. Earlier 'open' claims above are historical observations superseded by this evidence. **FIXED at committed implementation/test-evidence level; production runtime not independently tested in this audit.**
 
 ### WID-H07 — Immutable audit vs. personal-data erasure and retention
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -175,15 +184,17 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - There is no test for `purge_audit_logs` or the append-only trigger.
   - Knowledge base §12 and §17 corrected.
   - **Open:** a SQL test for the append-only and purge rules; owner/legal: default retention, minimising free-text metadata, crypto-erasure.
+- **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
 
 ### WID-H08 — Automation credential network allowlist trusts forwarding headers
-- **Status:** OPEN (code-supported potential bypass; deployment trust model not verified)
+- **Status:** CHANGED (trusted-edge header logic and tests added; deployment verification still required)
 - **First seen / last checked:** 2026-10-12 / 2026-10-12 10:45 IST
 - **Evidence:** [`lib/security/automationCredentials.ts`](https://github.com/luvchakra/wonder-agent/blob/main/lib/security/automationCredentials.ts) in `automationAccessNow()` selects the first client-supplied `x-forwarded-for` entry, falling back to `x-real-ip`, to enforce `allowed_cidrs`. [`proxy.ts`](https://github.com/luvchakra/wonder-agent/blob/main/proxy.ts) copies request headers for automation credentials and overwrites only `x-wonderid-request` and `x-wonderid-request-id`. The deployed ingress's overwrite/trusted-proxy configuration has **not** been verified.
 - **Risk:** If the public edge forwards untrusted client-provided address headers without sanitizing them, an attacker holding a compromised automation credential could spoof an allowed source address and bypass its network allowlist. This is **conditional**; do not report as a confirmed exploitable vulnerability without validating ingress behavior.
 - **Required action:** Resolve the client IP through a trusted edge/platform mechanism rather than a caller-controlled header, or require the edge to overwrite the headers and restrict direct origin access. Define trusted proxy hops. Add tests for spoofed and multi-hop forwarding headers, direct-to-origin access and the deployed ingress configuration. Fail closed if the source address cannot be trusted.
 - **Closure criteria:** An end-to-end test at the actual ingress shows client-supplied forwarding headers cannot influence the validated IP; source address canonicalization and deny behavior are tested for each supported deployment configuration; changes are documented.
 - **Verification evidence:** Code paths inspected 2026-10-12; deployment and end-to-end spoofing checks outstanding.
+- **Follow-up (2026-10-12 12:40 IST):** [`trustedClientIp`](https://github.com/luvchakra/wonder-agent/blob/main/lib/security/automationCredentialRules.ts#L79-L96) now selects configured trusted ingress headers, Vercel-controlled headers or unknown/fail-closed, and [unit tests](https://github.com/luvchakra/wonder-agent/blob/main/lib/security/automationCredentialRules.test.ts#L125-L143) exercise selection/denial. **Still unresolved:** end-to-end production ingress spoofing test and verification of self-hosted proxy configuration. Treat potential exploitability as unconfirmed.
 
 ## Hourly review protocol
 
@@ -201,3 +212,4 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 | 2026-10-12 (baseline) | `4fc40ff98ed36a619d1073414b182a7ab4e2a36f` | Established 3 P0 and 7 P1 candidates from full document; implementation unverified | Register created |
 | 2026-10-12 10:45 IST (manual) | `8218bec727a2f89a5b632154db888dfaa4bed2d7` | Rechecked 3 P0 and 7 previously tracked P1; none verified fixed. Added WID-H08 after reviewing forwarding-header handling in automation credential middleware; ingress security not verified. | 1 P1 OPEN added; 3 P0 and 7 P1 remain CHANGED |
 | 2026-10-12 11:34 IST | `3c370bad21093fe4900560ed939fffbd182edc18` | Verified current document and repository write access; carried forward existing risk statuses without asserting a fix. No full code/security re-audit in this diagnostic. | Diagnostic history entry committed; 3 P0 CHANGED, 7 P1 CHANGED, 1 P1 OPEN |
+| 2026-10-12 12:40 IST (manual retry) | `5734cded248edddf2594b7773b3627da203ddc80` | Reassessed all 11 P0/P1 findings and current remediation; WID-H06 verified FIXED at implementation/test-evidence level. WID-H08 improved but deployment not verified. Remaining: 3 P0 + 7 P1. | 0 new, 1 fixed, 1 status advanced OPEN→CHANGED, 0 reopened; update committed on main |
