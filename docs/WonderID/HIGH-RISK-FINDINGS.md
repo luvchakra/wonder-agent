@@ -3,8 +3,8 @@
 > **Purpose:** Living register for Critical and High-risk gaps found by the hourly audit of [WonderID Knowledge Base](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md), with follow-up verification against the repository where feasible. It is **not** a list of confirmed exploitable vulnerabilities.
 >
 > **Initial review:** 2026-10-12 (Asia/Kolkata)  
-> **Last hourly check:** 2026-10-12 (initial baseline; next scheduled check 10:14 IST)  
-> **Source knowledge-base blob SHA:** `4fc40ff98ed36a619d1073414b182a7ab4e2a36f`  
+> **Last check:** 2026-10-12 10:45 IST (manual review requested by user; next hourly run remains scheduled)  
+> **Source knowledge-base blob SHA:** `8218bec727a2f89a5b632154db888dfaa4bed2d7`  
 > **Owner:** WonderID project team (triage/assignee TBD)  
 > **Audit scope:** Source document reviewed in full. **Code and tests:** first post-merge review 2026-10-12 (CLAUDE.md §19.12); each finding's evidence names the files and tests checked. Runtime behavior and deployed controls not verified.
 >
@@ -15,7 +15,7 @@
 | Severity | Open | Changed | Verified fixed |
 |---|---:|---:|---:|
 | Critical (P0) | 0 | 3 | 0 |
-| High (P1) | 0 | 7 | 0 |
+| High (P1) | 1 | 7 | 0 |
 
 Priority reflects the potential harm *if the ambiguity or missing control translates into real behavior*, not an established production incident.
 
@@ -176,6 +176,15 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Knowledge base §12 and §17 corrected.
   - **Open:** a SQL test for the append-only and purge rules; owner/legal: default retention, minimising free-text metadata, crypto-erasure.
 
+### WID-H08 — Automation credential network allowlist trusts forwarding headers
+- **Status:** OPEN (code-supported potential bypass; deployment trust model not verified)
+- **First seen / last checked:** 2026-10-12 / 2026-10-12 10:45 IST
+- **Evidence:** [`lib/security/automationCredentials.ts`](https://github.com/luvchakra/wonder-agent/blob/main/lib/security/automationCredentials.ts) in `automationAccessNow()` selects the first client-supplied `x-forwarded-for` entry, falling back to `x-real-ip`, to enforce `allowed_cidrs`. [`proxy.ts`](https://github.com/luvchakra/wonder-agent/blob/main/proxy.ts) copies request headers for automation credentials and overwrites only `x-wonderid-request` and `x-wonderid-request-id`. The deployed ingress's overwrite/trusted-proxy configuration has **not** been verified.
+- **Risk:** If the public edge forwards untrusted client-provided address headers without sanitizing them, an attacker holding a compromised automation credential could spoof an allowed source address and bypass its network allowlist. This is **conditional**; do not report as a confirmed exploitable vulnerability without validating ingress behavior.
+- **Required action:** Resolve the client IP through a trusted edge/platform mechanism rather than a caller-controlled header, or require the edge to overwrite the headers and restrict direct origin access. Define trusted proxy hops. Add tests for spoofed and multi-hop forwarding headers, direct-to-origin access and the deployed ingress configuration. Fail closed if the source address cannot be trusted.
+- **Closure criteria:** An end-to-end test at the actual ingress shows client-supplied forwarding headers cannot influence the validated IP; source address canonicalization and deny behavior are tested for each supported deployment configuration; changes are documented.
+- **Verification evidence:** Code paths inspected 2026-10-12; deployment and end-to-end spoofing checks outstanding.
+
 ## Hourly review protocol
 
 1. Fetch the latest `docs/WonderID/KNOWLEDGE-BASE.md`, this register and relevant implementation/tests/commit changes from `main`.
@@ -190,4 +199,4 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 | Checked (IST) | Knowledge-base SHA | Outcome | Register action |
 |---|---|---|---|
 | 2026-10-12 (baseline) | `4fc40ff98ed36a619d1073414b182a7ab4e2a36f` | Established 3 P0 and 7 P1 candidates from full document; implementation unverified | Register created |
-
+| 2026-10-12 10:45 IST (manual) | `8218bec727a2f89a5b632154db888dfaa4bed2d7` | Rechecked 3 P0 and 7 previously tracked P1; none verified fixed. Added WID-H08 after reviewing forwarding-header handling in automation credential middleware; ingress security not verified. | 1 P1 OPEN added; 3 P0 and 7 P1 remain CHANGED |
