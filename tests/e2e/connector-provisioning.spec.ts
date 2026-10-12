@@ -18,6 +18,10 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  * - A system error: the connector tries three times, then hands the task
  *   back to its owner with the reason; nobody else acts while it runs;
  *   "try again" succeeds once the system recovers, and is verified.
+ * - F3 exit test (RISK-P0-13): access added on the system with no approval
+ *   is rogue with a finding; a reviewer asks to remove it; the request is
+ *   approved under the application's policy, the connector removes it,
+ *   reconciliation verifies it, and the finding resolves.
  * - Writes turned off: the next change is a person's task again.
  */
 
@@ -31,6 +35,7 @@ const system = {
     { id: "u-ana", username: "ana", email: mail("ana"), enabled: true },
     { id: "u-bob", username: "bob", email: mail("bob"), enabled: true },
     { id: "u-cy", username: "cy", email: mail("cy"), enabled: true },
+    { id: "u-dee", username: "dee", email: mail("dee"), enabled: true },
   ],
   members: { "g-fin": ["u-ana", "u-bob", "u-cy"] } as Record<string, string[]>,
   failWrites: false,
@@ -133,7 +138,7 @@ test.describe.serial("connector provisioning", () => {
   test("setup: a writing connection, synced, its application onboarded and reconciled; writes start off", async ({ request, browser }) => {
     test.setTimeout(180_000);
     tenantId = await getTenantIdBySlug(TENANT_ONE.slug);
-    for (const who of ["ana", "bob", "cy"]) {
+    for (const who of ["ana", "bob", "cy", "dee"]) {
       const res = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E Prov ${who} ${stamp}`, email: mail(who) } });
       expect(res.status(), await res.text()).toBe(201);
       people[who] = (await res.json()).data.id;
@@ -170,7 +175,7 @@ test.describe.serial("connector provisioning", () => {
     expect((await onb({ action: "promote" })).status()).toBe(200);
 
     const accounts = await request.post(`/api/v1/access/applications/${appId}/reconciliations`);
-    expect((await accounts.json()).data).toMatchObject({ status: "succeeded", sourceAccounts: 3, created: 3 });
+    expect((await accounts.json()).data).toMatchObject({ status: "succeeded", sourceAccounts: 4, created: 4 });
     const preview = await request.post(`/api/v1/access/applications/${appId}/access-reconciliations`, { data: { dryRun: true } });
     const previewRun = (await preview.json()).data;
     const applied = await request.post(`/api/v1/access/applications/${appId}/access-reconciliations`, { data: { previewRunId: previewRun.id } });
@@ -249,6 +254,39 @@ test.describe.serial("connector provisioning", () => {
     await expect(row).toHaveCount(0, { timeout: 30_000 });
     expect(system.users.find((u) => u.id === "u-bob")?.enabled).toBe(false);
     await expect.poll(async () => (await tasksOf(request, req.id))[0]?.status, { timeout: 60_000 }).toBe("verified");
+  });
+
+  test("F3 exit: rogue access is removed through the connector after a reviewer asks, verified, and its finding resolves", async ({ request, page }) => {
+    test.setTimeout(180_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    // Someone adds Dee to Finance directly on the system: nothing in WonderID approved it.
+    system.members["g-fin"].push("u-dee");
+    await syncAndWait(request);
+    const { data: dee } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-dee").single();
+    const findingOf = async () =>
+      (await db.from("risk_findings").select("id, status, resolution_type, remediation_request_id").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).order("created_at", { ascending: false }).limit(1)).data?.[0];
+    await expect.poll(async () => (await findingOf())?.status, { timeout: 60_000 }).toBe("open");
+
+    // A reviewer asks for it to be removed, from the account page.
+    await page.goto(`/access/accounts/${dee!.id}`);
+    const row = page.getByRole("listitem").filter({ hasText: "Finance" });
+    await expect(row).toContainText("Finding open");
+    await row.getByRole("button", { name: "Remove access" }).click();
+    await page.getByRole("button", { name: "Request it" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Done." })).toBeVisible({ timeout: 30_000 });
+    const raised = await findingOf();
+    expect(raised).toMatchObject({ status: "remediation_in_progress", remediation_request_id: expect.any(String) });
+
+    // The connector removes it; the system is read again; the finding resolves as verified fixed.
+    await expect.poll(() => system.members["g-fin"].includes("u-dee"), { timeout: 60_000 }).toBe(false);
+    expect(system.writes.at(-1)).toMatchObject({ method: "DELETE", path: "/groups/g-fin/members/u-dee" });
+    await expect.poll(async () => (await findingOf())?.status, { timeout: 90_000 }).toBe("resolved");
+    expect((await findingOf())?.resolution_type).toBe("verified_fixed");
+    expect((await viewOf(request, raised!.remediation_request_id as string)).fulfilment).toBe("verified");
+
+    // A second ask is refused: the finding is closed.
+    const again = await request.post(`/api/v1/findings/${raised!.id}/request-removal`);
+    expect(again.status()).toBe(409);
   });
 
   test("writes off again: the next change is a person's task", async ({ request }) => {

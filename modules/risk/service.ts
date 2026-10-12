@@ -10,6 +10,8 @@ export { getFindings, getFinding, getFindingAsOfDetection, assignFinding, remedi
 export { evaluateAgentRisk } from "./rules";
 // ACCESS-P0-25: findings about access on an account, for any identity type.
 export { syncRogueAccessFindings, listAccessFindings, countOpenAccessFindings, accessSubjectKey } from "./accessFindings";
+export { requestAccessFindingRemoval } from "./accessRemediation";
+export { remediationLabel } from "./accessRemediationRules";
 export {
   createInvestigation,
   validateCreateInvestigation,

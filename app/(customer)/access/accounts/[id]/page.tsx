@@ -3,11 +3,12 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getAccountAccessLedger, getInventoryAccount, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerStatus } from "@/modules/access-governance/service";
-import { listAccessFindings } from "@/modules/risk/service";
+import { listAccessFindings, remediationLabel } from "@/modules/risk/service";
 import { listIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Badge, Button, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { LinkAccountForm } from "../AccountForms";
+import { RemoveRogueAccessButton } from "./RemoveRogueAccessButton";
 import { ACCOUNT_TYPE_LABEL, CORRELATION_LABEL, IDENTITY_TYPE_LABEL, when } from "../labels";
 
 // ACCESS-P0-17 — one account: who it belongs to and how that was decided,
@@ -34,6 +35,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
   const find = ((await searchParams).find ?? "").slice(0, 100);
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
+  const canRemediate = ctx.permissions.includes("risk.manage");
   const [account, provenance, ledger, findings] = await Promise.all([
     getInventoryAccount(tenantId, id),
     getRecordProvenance(tenantId, "accounts", id),
@@ -169,6 +171,10 @@ export default async function AccountDetailPage({ params, searchParams }: { para
                     </span>
                     {e.missingFromSourceAt ? <Badge tone="neutral">Gone from source</Badge> : null}
                     {finding ? <Badge tone="danger">Finding open</Badge> : null}
+                    {finding && remediationLabel(finding.remediationRequestStatus) ? <Badge tone="info">{remediationLabel(finding.remediationRequestStatus)}</Badge> : null}
+                    {finding && canRemediate && (!finding.remediationRequestStatus || ["rejected", "cancelled", "expired"].includes(finding.remediationRequestStatus)) ? (
+                      <RemoveRogueAccessButton findingId={finding.id} what={e.entitlementName ?? "this account"} disable={!e.entitlementId} />
+                    ) : null}
                   </li>
                 );
               })}

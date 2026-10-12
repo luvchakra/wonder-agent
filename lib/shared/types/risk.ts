@@ -163,6 +163,9 @@ export type AccessFinding = {
   createdAt: string;
   resolvedAt: string | null;
   resolutionReason: string | null;
+  /** RISK-P0-13: the removal request raised for it, and that request's status. */
+  remediationRequestId: string | null;
+  remediationRequestStatus: string | null;
 };
 
 /** What Access reports as rogue now: one entry per account (entitlementId null) or account and entitlement. */

@@ -23,9 +23,9 @@ Generated 2026-10-12 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 219 |
-| Partial | 28 |
+| Partial | 29 |
 | Deferred | 1 |
-| Not Started | 20 |
+| Not Started | 19 |
 | **Total tracked** | **268** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
@@ -43,7 +43,7 @@ and are deliberately excluded from the counts above.
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 24 | 3 | 0 | 0 | 27 | `████████████████░░` 89% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
-| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 2 | 0 | 1 | 16 | `███████████████░░░` 81% |
+| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 27 | 3 | 0 | 5 | 35 | `██████████████░░░░` 77% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 13 | 2 | 1 | 1 | 17 | `██████████████░░░░` 76% |
@@ -242,7 +242,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Risk Engine & Rogue Agent Detection  
 **Backlog status:** DORMANT — do not start until the user says "Run Risk Agent"  
-**Stories:** 13 done · 2 partial · 0 deferred · 1 not started (16 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 13 done · 3 partial · 0 deferred · 0 not started (16 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -261,7 +261,7 @@ and are deliberately excluded from the counts above.
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
 | RISK-P0-11 | Investigations as a first-class record (master P0-37) | Done — 2026-09-25: migration 0071 (investigations, investigation_findings, investigation_events; select-only RLS; composite same-tenant FKs), audited service + API, `/risk/investigations` list/detail with timeline; cannot resolve while a finding is open |
 | RISK-P0-12 | New risk signals (master P0-20/P0-21) | Partial — 2026-09-25: suspicious delegation + unapproved tool use findings (migration 0072), certification overdue / destructive capability / credential health factors sourced, Shadow AI signal on /risk; attack-path factor still has no source (needs an Access graph-traversal contract) |
-| RISK-P0-13 | Rogue Access management | Not Started — 2026-09-26, WonderID |
+| RISK-P0-13 | Rogue Access management | Partial — 2026-10-12 (F3 core, migration 0130): "Remove access" / "Disable account" on a rogue-access finding raises a request under the application's policy; the connector removes it, reconciliation verifies it and the finding resolves as verified fixed. Other remediation actions, severity factors and trend remain |
 
 ### 07 — Compliance Agent
 
