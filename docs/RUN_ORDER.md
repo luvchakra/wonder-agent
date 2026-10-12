@@ -607,3 +607,11 @@ INTEGRATION-P0-11 is done and INTEGRATION-P0-13 has its first slice
 Next in F3: grants and account creation (D3's second step), then RISK-P0-13
 remediation through the connector for the exit test.
 
+
+## 2026-10-12 — F3 exit scenario runs against a stub system (RISK-P0-13 core)
+
+A rogue-access finding can now be remediated with "Remove access". This
+raises a request under the application's policy. The connector removes the
+access, reconciliation verifies it, and the finding resolves as verified
+fixed. `connector-provisioning.spec.ts` runs that scenario end to end against
+a stub system over HTTP (migration 0130). The real target systems wait on D9.

@@ -332,6 +332,11 @@ through `modules/privacy/service.ts`, since no other module consumes them yet);
 `/audit/integrity` composes FA's `lib/audit/integrity.ts`; `/platform-admin/billing`
 is PA's.
 
+2026-10-12 (RISK-P0-13 core): `risk_findings.remediation_request_id` (0130), `accessRemediation.ts` and
+`/api/v1/findings/{id}/request-removal` are RA's; they raise requests through AA's published
+`submitAccessRequest`. The "Remove access" button on `/access/accounts/[id]` is a functional control on
+EA's page.
+
 2026-10-12 (INTEGRATION-P0-11 / P0-13): definition `write` sections, `writeCapabilitiesOf()`,
 `setConnectionWrites()` / `getConnectionWrites()` / `connectionCanWrite()` / `startVerificationSync()`,
 `/api/v1/integrations/{id}/writes` and the `verification` sync trigger (0128) are IA's;

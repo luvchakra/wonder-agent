@@ -1031,3 +1031,59 @@ cannot be read. The shell's Intelligence badge uses it. Risk Overview
 
 **Verified.** The F1 E2E suite checks the listing and its link to the
 account.
+
+### 2026-10-12 — RISK-P0-13 core: remediating rogue access through a request and the connector (F3 exit scenario)
+
+**Built (migration 0130, `accessRemediation.ts`, `accessRemediationRules.ts`).**
+- **The action.** "Remove access" (or "Disable account", for an account
+  nothing approved) appears on an account page row with an open
+  rogue-access finding, for `risk.manage`. The API is
+  `POST /api/v1/findings/{id}/request-removal`.
+- **What it raises.** An ordinary request through Access's published
+  `submitAccessRequest`:
+  - It is submitted as the reviewer, with the finding as its
+    justification.
+  - The application's request policy decides the approval
+    (non-negotiable #15).
+- **What happens next.** Nothing is revoked directly:
+  - Approval opens the removal task.
+  - A connector with writes on makes the change (INTEGRATION-P0-13).
+  - The verification sync and reconciliation confirm it.
+  - The existing `syncRogueAccessFindings` resolves the finding as
+    `verified_fixed` once the access is gone.
+- **Tracking.**
+  - The finding links its request (`remediation_request_id`, same-tenant
+    key) and moves to `remediation_in_progress`.
+  - The account page shows where the request stands: awaiting approval,
+    approved, done awaiting verification, or rejected.
+  - A rejected, cancelled or expired request lets the reviewer ask again.
+  - Audited `risk.remediation_requested`.
+- **Refusals** (409 with the reason):
+  - a closed finding;
+  - an account linked to no identity (link it first);
+  - a second live request.
+- **Unchanged.** The older agent-finding `remediateFinding` path, which
+  revokes in WonderID directly.
+
+**Verified.**
+- Typecheck clean. Vitest 1260/1260, including the new rules tests.
+- `tests/risk/rogue-remediation-isolation.sql` 3/3 on dev.
+- E2E `connector-provisioning.spec.ts` 6/6, including the F3 exit
+  scenario against a stub system:
+  1. A membership is added on the system after the baseline, so it is
+     rogue with an open finding.
+  2. The reviewer chooses "Remove access", and a request is raised under
+     the application's policy (auto-approval for low-risk removals here).
+  3. The connector deletes the membership.
+  4. The verification sync and reconciliation mark the request verified.
+  5. The finding resolves as `verified_fixed`, and a second ask is refused
+     with 409.
+
+**Left out.**
+- Remediation actions other than removal: authorize, package, legacy,
+  owner, exception, time-bound, escalate and quarantine.
+- Severity from privilege, sensitivity and blast radius, and the trend.
+- A finding detail page.
+- **Exit-test wording.** "After human approval" is the reviewer's explicit
+  request plus whatever approval the application's policy requires. With an
+  auto-approval policy the request needs no second person.

@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Last updated | 2026-10-12 |
-| Current phase | F3 started 2026-10-12: connectors remove access and disable accounts (INTEGRATION-P0-11, P0-13 first slice) |
-| Next story | F3: INTEGRATION-P0-13 grants and account creation; RISK-P0-13 remediation through the connector (exit test) |
+| Current phase | F3 in progress. The exit scenario runs end to end against a stub system (2026-10-12): rogue access removed through the connector after a reviewer asks, verified, finding resolved |
+| Next story | F3: INTEGRATION-P0-13 grants and account creation (D3's second step); the remaining F3 stories wait on D7 (relay) and D9 (connectors) |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -21,7 +21,7 @@ passed. This file is hand-maintained; the generated programme rollup
 |---|---|---|---|---|
 | F1 Import and reconciliation | 9 | 9 | 0 | Done; exit test passed (seeded staging) |
 | F2 Access requests | 8 | 8 | 0 | Done; exit test passed (seeded test organization) |
-| F3 Provisioning | 10 | 1 | 1 | Started: removal and disabling through connectors, verified by reconciliation |
+| F3 Provisioning | 10 | 1 | 2 | Removal and disabling through connectors; rogue access remediated through them; exit scenario passes against a stub system |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; D12 approved |
 | F5 Roles, SoD, delegation | 5 | 0 | 0 | Not started |
 | F6 Agent ID | 11 | 0 | 0 | Not started; D2 approved |
@@ -102,7 +102,7 @@ Exit test: not run.
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | |
-| RISK-P0-13 Rogue access management | Risk | | Not started | Backlog: Not Started |
+| RISK-P0-13 Rogue access remediation | Risk | | In progress | Core (2026-10-12, migration 0130): "Remove access" on a rogue-access finding raises an ordinary request under the application's policy; connector, verification, finding resolves verified fixed. `connector-provisioning.spec.ts` runs the F3 exit scenario. Other remediation actions, severity factors and trend remain |
 | QA-P0-26 † Provisioning safety suite | QA | | Not started | |
 
 ## F4: Lifecycle and certification

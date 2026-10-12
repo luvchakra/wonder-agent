@@ -49,6 +49,8 @@ function toAccessFinding(r: Row): AccessFinding {
     createdAt: r.created_at as string,
     resolvedAt: (r.resolved_at as string | null) ?? null,
     resolutionReason: (r.resolution_reason as string | null) ?? null,
+    remediationRequestId: (r.remediation_request_id as string | null) ?? null,
+    remediationRequestStatus: null,
   };
 }
 
@@ -59,7 +61,15 @@ export async function listAccessFindings(tenantId: string, filter: { accountId?:
   if (filter.openOnly) q = q.in("status", OPEN);
   const { data, error } = await q.order("created_at", { ascending: false }).limit(200);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  return ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map(toAccessFinding);
+  const findings = ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map(toAccessFinding);
+  // RISK-P0-13: where each removal request stands.
+  const requestIds = [...new Set(findings.map((f) => f.remediationRequestId).filter((x): x is string => !!x))];
+  if (requestIds.length) {
+    const { data: requests } = await supabaseServiceRole().from("access_requests").select("id, tenant_id, status").eq("tenant_id", tenantId).in("id", requestIds);
+    const status = new Map(((requests ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => [r.id as string, r.status as string]));
+    for (const f of findings) f.remediationRequestStatus = f.remediationRequestId ? (status.get(f.remediationRequestId) ?? null) : null;
+  }
+  return findings;
 }
 
 /**
