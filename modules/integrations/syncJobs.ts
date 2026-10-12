@@ -351,6 +351,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     const finalStatus = runStatus(errors.length, recordsProcessed, kindRuns.values());
     // WID-H03: say why a run with no errors is partial.
     for (const [kind, run] of kindRuns) if (run.truncated) errors.push({ objectType: kind, message: "The read stopped at a limit, so this run counts as partial: the next incremental read starts from the last complete run." });
+    for (const [kind, run] of kindRuns) if (run.short && !run.truncated) errors.push({ objectType: kind, message: "Fewer records were read than the system reported, so nothing was marked missing and this run counts as partial." });
 
     // INTEGRATION-P0-18: objects a complete full read did not see are missing at the source.
     const missingSummary = finalStatus === "failed" ? {} : await markMissing(tenantId, jobId, mode, kindRuns);

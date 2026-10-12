@@ -24,6 +24,8 @@ export type KindRun = {
   /** The engine's read report (FetchReport). */
   truncated: boolean;
   unread: boolean;
+  /** WID-H03: fewer records than the system said it holds. */
+  short?: boolean;
 };
 
 export type KindDecision = { complete: true } | { complete: false; reason: string };
@@ -34,6 +36,7 @@ export function kindCompleteness(mode: SyncMode, run: KindRun): KindDecision {
   if (run.failed) return { complete: false, reason: "the import of this kind failed" };
   if (run.unread) return { complete: false, reason: "nothing was read (no new file)" };
   if (run.truncated) return { complete: false, reason: "the read stopped at a limit" };
+  if (run.short) return { complete: false, reason: "fewer records were read than the system reported" };
   if (run.storeFailures > 0) return { complete: false, reason: `${run.storeFailures} records could not be stored` };
   if (run.unmapped > 0) return { complete: false, reason: "some records could not be mapped" };
   return { complete: true };
@@ -48,7 +51,7 @@ export function kindCompleteness(mode: SyncMode, run: KindRun): KindDecision {
  */
 export function runStatus(errorCount: number, recordsProcessed: number, kindRuns: Iterable<KindRun>): "succeeded" | "partial" | "failed" {
   if (errorCount > 0) return recordsProcessed > 0 ? "partial" : "failed";
-  for (const run of kindRuns) if (run.truncated) return "partial";
+  for (const run of kindRuns) if (run.truncated || run.short) return "partial";
   return "succeeded";
 }
 

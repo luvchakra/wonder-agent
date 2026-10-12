@@ -35,7 +35,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Process-crash tests; compensation for a partly created account |
-| WID-H03 Incomplete syncs | P2 | Partly fixed | Proof of completeness (page counts or checksums where a system offers them) |
+| WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
@@ -288,9 +288,28 @@ accounts two at a time:
   succeed, and nothing is marked missing;
 - once the system recovers, only the deleted account is marked missing.
 
+**Done:** proof of completeness where a system offers it. A resource may
+declare `total`: a dot path in the first response, or
+`header:<Name>`. SCIM pagination always uses `totalResults`.
+- A read that ends with fewer records than that count, or whose declared
+  count is missing, is `short`.
+- A short kind is incomplete: nothing is marked missing, and the run is
+  partial with the reason ("fewer records were read than the system
+  reported").
+
+See `reportedTotal` in `http.ts`; `kindCompleteness` and `runStatus` in
+`stagingRules.ts`.
+
+Tests:
+- `framework.test.ts`, "WID-H03": body count, header count, a missing
+  count, SCIM, and our own record limit;
+- `stagingRules.test.ts`;
+- E2E `sync-failed-page.spec.ts`, 4th case: a page that answers 200 with
+  nothing while `X-Total-Count` says more.
+
 **Next:**
-- Proof of completeness where a system offers it (a total count or a
-  checksum to compare with what was read).
+- Checksums, where a system offers one (none of the built-in types does
+  today).
 
 ### WID-H04: rogue access provenance (P2, partly fixed)
 

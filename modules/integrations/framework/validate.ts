@@ -261,6 +261,7 @@ function checkResource(ctx: Ctx, def: Record<string, unknown>, kind: ResourceKin
     checkRequest(ctx, `${path}.request`, r.request, parentAllowed);
     checkRecordsPath(ctx, `${path}.records`, r.records);
     if (r.recordsKeyed !== undefined && typeof r.recordsKeyed !== "boolean") issue(ctx, `${path}.recordsKeyed`, "must be true or false");
+    if (r.total !== undefined && (typeof r.total !== "string" || !/^(header:[A-Za-z0-9-]{1,64}|[A-Za-z0-9_$.-]{1,200})$/.test(r.total))) issue(ctx, `${path}.total`, "must be a dot path in the response or header:<Name>");
     checkPagination(ctx, `${path}.pagination`, r.pagination);
     if (r.changes !== undefined) checkChanges(ctx, `${path}.changes`, r);
   } else if (driver === "file") {

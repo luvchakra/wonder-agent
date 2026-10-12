@@ -340,10 +340,23 @@ export class HttpSession {
     scope: TemplateScope,
     maxRecords: number,
     keyed = false,
-    report?: { truncated: boolean },
+    report?: { truncated: boolean; short?: boolean },
+    totalPath?: string,
   ): Promise<unknown[]> {
     const p = pagination ?? { type: "none" };
     const out: unknown[] = [];
+    // WID-H03: the record count the system reports, from the first response (SCIM: totalResults).
+    const countPath = totalPath ?? (p.type === "scim" ? "totalResults" : undefined);
+    let declared: number | null | undefined = undefined;
+    const counted = <T extends { json: unknown; headers: Headers }>(res: T): T => {
+      if (countPath && declared === undefined) declared = reportedTotal(res, countPath);
+      return res;
+    };
+    const finish = () => {
+      // Fewer than the system holds (and not cut at our own limit), or a declared count that could not be read.
+      if (countPath && report && out.length < maxRecords && (declared === null || (declared !== undefined && out.length < declared))) report.short = true;
+      return out.slice(0, maxRecords);
+    };
     const paths = recordsPath === undefined ? [p.type === "scim" ? "Resources" : ""] : Array.isArray(recordsPath) ? recordsPath : [recordsPath];
     const take = (json: unknown) => {
       // The first records path that holds a list (or, when none does, the first that holds anything).
@@ -371,24 +384,24 @@ export class HttpSession {
     const full = () => out.length >= maxRecords;
 
     if (p.type === "none") {
-      take((await this.send(spec, scope)).json);
-      return out.slice(0, maxRecords);
+      take(counted(await this.send(spec, scope)).json);
+      return finish();
     }
     for (let page = 0, cursor: string | null = null, next: string | null = null; page < LIMITS.pagesPerResource; page++) {
       let got = 0;
       if (p.type === "page") {
         const q: Record<string, string> = { [p.param]: String((p.start ?? 1) + page) };
         if (p.sizeParam) q[p.sizeParam] = String(p.size);
-        got = take((await this.send(spec, scope, q)).json);
+        got = take(counted(await this.send(spec, scope, q)).json);
         if (got < p.size) break;
       } else if (p.type === "offset" && p.in === "body") {
-        got = take((await this.send(spec, scope, {}, undefined, { [p.param]: page * p.size, [p.sizeParam]: p.size })).json);
+        got = take(counted(await this.send(spec, scope, {}, undefined, { [p.param]: page * p.size, [p.sizeParam]: p.size })).json);
         if (got < p.size) break;
       } else if (p.type === "offset") {
-        got = take((await this.send(spec, scope, { [p.param]: String(page * p.size), [p.sizeParam]: String(p.size) })).json);
+        got = take(counted(await this.send(spec, scope, { [p.param]: String(page * p.size), [p.sizeParam]: String(p.size) })).json);
         if (got < p.size) break;
       } else if (p.type === "scim") {
-        const r = (await this.send(spec, scope, { startIndex: String(1 + page * p.size), count: String(p.size) })).json as Record<string, unknown>;
+        const r = counted(await this.send(spec, scope, { startIndex: String(1 + page * p.size), count: String(p.size) })).json as Record<string, unknown>;
         got = take(r);
         const total = Number(r?.totalResults ?? 0);
         if (got === 0 || out.length >= total) break;
@@ -396,7 +409,7 @@ export class HttpSession {
         const q: Record<string, string> = {};
         if (cursor) q[p.param] = cursor;
         if (p.sizeParam && p.size) q[p.sizeParam] = String(p.size);
-        const { json } = await this.send(spec, scope, q);
+        const { json } = counted(await this.send(spec, scope, q));
         got = take(json);
         const c = readPath(json, p.from);
         cursor = typeof c === "string" && c ? c : null;
@@ -404,7 +417,7 @@ export class HttpSession {
       } else if (p.type === "link_header") {
         const q: Record<string, string> = {};
         if (p.sizeParam && p.size) q[p.sizeParam] = String(p.size);
-        const { json, headers } = next ? await this.send(spec, scope, {}, next) : await this.send(spec, scope, q);
+        const { json, headers } = counted(next ? await this.send(spec, scope, {}, next) : await this.send(spec, scope, q));
         got = take(json);
         next = parseLinkNext(headers.get("link"));
         if (!next || got === 0) break;
@@ -413,6 +426,16 @@ export class HttpSession {
       // INTEGRATION-P0-18: the last allowed page was read and the source still had more.
       if (page === LIMITS.pagesPerResource - 1 && report) report.truncated = true;
     }
-    return out.slice(0, maxRecords);
+    return finish();
   }
+}
+
+/**
+ * WID-H03: the record count a response reports, at a dot path or
+ * `header:<Name>`; null when it is declared but missing or not a count.
+ */
+export function reportedTotal(res: { json: unknown; headers: Headers }, path: string): number | null {
+  const raw = path.startsWith("header:") ? res.headers.get(path.slice(7)) : readPath(res.json, path);
+  const n = typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
+  return Number.isInteger(n) && n >= 0 ? n : null;
 }

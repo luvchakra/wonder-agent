@@ -2773,3 +2773,30 @@ without asking; recorded in `docs/WonderID/FINDINGS-REMEDIATION.md`.
   key.
 
 Verified: see the Access Agent entry of the same date (shared E2E run).
+
+### 2026-10-12 — Counted reads: fewer than the system reports is incomplete (WID-H03)
+
+- An http resource may declare `total`: a dot path in the first response,
+  or `header:<Name>`. It is validated in `checkResource`. SCIM pagination
+  uses `totalResults` without it.
+- `HttpSession.fetchAll` reads the count from the first response
+  (`reportedTotal`). It sets the report's `short` when the read ended with
+  fewer records, or the declared count was missing. Being cut at our own
+  record limit is `truncated`, not `short`.
+- The engine carries `short` per kind (only when true, so complete reports
+  keep their shape).
+- `kindCompleteness`: a short kind is incomplete ("fewer records were read
+  than the system reported"). `runStatus`: partial. The sync job lists the
+  reason.
+- Documented in `CONNECTOR-FRAMEWORK.md` (resource fields) and the
+  knowledge base ("Counted reads").
+
+Verified:
+- `npx vitest run modules/integrations`: 371 passed. New cases: body
+  count, header count, missing count, SCIM, our own limit; definition
+  validation; `kindCompleteness` and `runStatus`.
+- `npm run typecheck`, eslint on the changed files and `npm run build`:
+  clean.
+- E2E, local: `sync-failed-page` 4/4 (its 4th case is a page answering
+  200 with nothing while `X-Total-Count` says more), `connection-upgrade`
+  and `identity-sources`; 25 passed in all.

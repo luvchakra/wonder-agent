@@ -14,6 +14,9 @@ import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
  *   accounts on the failed page, nor the deleted one.
  * - Once the system recovers, a complete read marks only the deleted
  *   account missing.
+ * - A page that silently comes back short (200, but fewer records than the
+ *   system's X-Total-Count) is caught the same way: the run is partial and
+ *   nothing is marked missing.
  */
 
 const stamp = Date.now();
@@ -22,6 +25,8 @@ const PAGE_SIZE = 2;
 const system = {
   users: ["u-1", "u-2", "u-3", "u-4", "u-5"].map((id) => ({ id, login: `${id}-${stamp}` })),
   failPage: null as number | null,
+  // A page that answers 200 with nothing, though the count says otherwise.
+  emptyPage: null as number | null,
 };
 let stub: Server;
 let baseUrl = "";
@@ -41,7 +46,7 @@ function definition() {
     auth: { type: "bearer", token: "{secret.token}", fields: [{ key: "token", label: "Token" }] },
     test: { request: { path: "/ping" } },
     resources: {
-      account: { request: { path: "/users" }, records: "", pagination: { type: "page", param: "page", size: PAGE_SIZE }, fields: { externalId: "id", username: "login" } },
+      account: { request: { path: "/users" }, records: "", total: "header:X-Total-Count", pagination: { type: "page", param: "page", size: PAGE_SIZE }, fields: { externalId: "id", username: "login" } },
     },
   };
 }
@@ -78,6 +83,8 @@ test.beforeAll(async () => {
         res.statusCode = 503;
         return res.end(JSON.stringify({ error: "maintenance" }));
       }
+      res.setHeader("X-Total-Count", String(system.users.length));
+      if (system.emptyPage === page) return res.end("[]");
       return res.end(JSON.stringify(system.users.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)));
     }
     res.statusCode = 404;
@@ -122,5 +129,17 @@ test.describe.serial("a read that fails partway through its pages", () => {
     test.setTimeout(150_000);
     expect((await syncAndWait(request)).status).toBe("succeeded");
     expect(await staged()).toEqual({ "u-1": false, "u-2": false, "u-3": false, "u-4": false, "u-5": true });
+  });
+
+  test("a page that silently comes back short is caught by the system's count: partial, nothing more marked missing", async ({ request }) => {
+    test.setTimeout(150_000);
+    system.emptyPage = 2;
+    try {
+      const job = await syncAndWait(request);
+      expect(job.status).toBe("partial");
+      expect(await staged()).toEqual({ "u-1": false, "u-2": false, "u-3": false, "u-4": false, "u-5": true });
+    } finally {
+      system.emptyPage = null;
+    }
   });
 });
