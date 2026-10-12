@@ -31,11 +31,11 @@ met, with evidence), or Waiting on the owner.
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
 | WID-C01 Approval policy | P2 | Waiting on the owner | Maker/checker on loosening request-policy changes: an organization with one administrator could not loosen a policy |
-| WID-C02 Revocation and expiry | P2 | Partly fixed | Integration tests for a connector outage and a failed deprovisioning; owner decision on connectors carrying out a leaver's removals |
+| WID-C02 Revocation and expiry | P2 | Partly fixed | Owner decision on connectors carrying out a leaver's removals |
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Process-crash tests; compensation for a partly created account |
-| WID-H03 Incomplete syncs | P2 | Partly fixed | A test for a failed page in the middle of a read |
+| WID-H03 Incomplete syncs | P2 | Partly fixed | Proof of completeness (page counts or checksums where a system offers them) |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
@@ -125,9 +125,19 @@ goes to the access managers (holders of `access.approve`), once
 Priority lowered to P2: the urgent paths exist, and what remains is tests
 and an owner decision.
 
+**Done:** an E2E test of a leaver's removal through outage and failure
+(`connector-provisioning.spec.ts`, "WID-C02 leaver"; 22/22 locally). Even
+with writes on, leaving opens a person's removal task and no connector
+write. Then:
+- **outage:** the system is down, so the read fails; the task stays open
+  and the grant pending removal;
+- **failed deprovisioning:** someone marks the removal done, but the
+  system still has the access. The task stays completed, not verified, and
+  the grant `removed_unverified`, not revoked;
+- **recovery:** once the access is really gone, the next read verifies
+  the task and revokes the grant.
+
 **Next:**
-- Integration tests for a connector outage, a delayed sync and a failed
-  deprovisioning.
 - **Owner decision:** may a connection with changes turned on carry out a
   leaver's removals by itself? Today a person does each one.
 
@@ -271,8 +281,16 @@ Tests:
 - `stagingRules.test.ts`, "massMissingThreshold (WID-H03)";
 - `tests/integrations/staging-missing.sql`, check 4b: 20/20 passed live.
 
+**Done:** an E2E test for a page that fails in the middle of a read
+(`tests/e2e/sync-failed-page.spec.ts`, 3/3 locally). A stub pages five
+accounts two at a time:
+- page 2 fails while one account was really deleted: the run does not
+  succeed, and nothing is marked missing;
+- once the system recovers, only the deleted account is marked missing.
+
 **Next:**
-- An E2E test for a page that fails in the middle of a read.
+- Proof of completeness where a system offers it (a total count or a
+  checksum to compare with what was read).
 
 ### WID-H04: rogue access provenance (P2, partly fixed)
 

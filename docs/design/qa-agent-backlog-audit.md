@@ -1711,3 +1711,33 @@ remaining story; it does not gate the phase.
 **Left out.** A per-organization (all connections) limit, and a held
 "approve the rest" queue like the mass-missing guard's: refused changes
 stay ordinary tasks for their owners.
+
+### 2026-10-12 — Failed-page and leaver-outage tests (WID-H03, WID-C02)
+
+Two tracked findings items that needed tests only.
+- **`tests/e2e/sync-failed-page.spec.ts` (new, WID-H03).** A stub system
+  pages five accounts two at a time.
+  - A full read stages all five.
+  - Page 2 then fails (503) while `u-5` was really deleted. The run does
+    not succeed, and no account is marked missing, neither the unread
+    `u-3` and `u-4` nor the deleted `u-5`.
+  - Once it recovers, a complete read marks only `u-5` missing.
+- **`connector-provisioning.spec.ts`, "WID-C02 leaver" (new case).**
+  - Eve leaves (DISABLED) while the connection's writes are on. One
+    removal task opens (reason `leaver`, no connector status), and no
+    write is sent.
+  - With the stub down (`system.down`), the sync fails. The task stays
+    open and the grant `pending_removal`.
+  - Claimed and marked done while the system still has the membership,
+    the next read leaves the task `completed` and the grant
+    `removed_unverified`, not revoked.
+  - Once the membership is really removed, the next read verifies the
+    task and revokes the grant.
+
+Verified, locally against a production build (`npm run build` of main
+d58957b):
+- `sync-failed-page.spec.ts`: 3/3.
+- `connector-provisioning.spec.ts`: 22/22 (8.7 min).
+- `tsc --noEmit` and eslint on both specs: clean.
+
+No product code changed.
