@@ -65,8 +65,11 @@ export function assessRisk(input: { privilegeLevel?: string | null; dataClassifi
 }
 
 /** A person approves at or above the policy's risk threshold, or whenever the policy does not auto-approve. */
+/** WID-C01 (owner decision 2026-10-12): from this risk up, a person always approves, whatever the policy's threshold. */
+export const ALWAYS_HUMAN_RISK: RiskLevel = "high";
+
 export function needsApproval(policy: Pick<RequestPolicy, "autoApprove" | "riskThreshold">, risk: RiskLevel): boolean {
-  return !policy.autoApprove || rank(risk) >= rank(policy.riskThreshold);
+  return !policy.autoApprove || rank(risk) >= Math.min(rank(policy.riskThreshold), rank(ALWAYS_HUMAN_RISK));
 }
 
 /** What a request will meet: automatic approval, an approval route, or nothing (not requestable). */

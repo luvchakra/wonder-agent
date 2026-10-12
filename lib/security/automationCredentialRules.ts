@@ -120,12 +120,20 @@ export function overRateLimit(callsThisMinute: number, limit: number): boolean {
 }
 
 /**
+ * Permissions an automation credential never holds, whatever its roles
+ * (owner decision 2026-10-12, WID-H06): it must not mint or approve
+ * credentials, approve access, or certify. Those are people's decisions
+ * (non-negotiable #15). getTenantContext() also strips them from an
+ * automation call's effective permissions.
+ */
+export const HUMAN_ONLY_PERMISSIONS: readonly string[] = ["automation.manage", "access.approve", "agent.certify"];
+
+/**
  * Permissions a role would give a credential that the person assigning it
- * does not hold, plus automation.manage, which a credential never holds
- * (it must not mint or approve credentials). Empty when the role may be
- * assigned.
+ * does not hold, plus the human-only ones, which a credential never holds.
+ * Empty when the role may be assigned.
  */
 export function roleEscalation(rolePermissions: readonly string[], actorPermissions: readonly string[]): string[] {
   const held = new Set(actorPermissions);
-  return [...new Set(rolePermissions.filter((p) => p === "automation.manage" || !held.has(p)))].sort();
+  return [...new Set(rolePermissions.filter((p) => HUMAN_ONLY_PERMISSIONS.includes(p) || !held.has(p)))].sort();
 }

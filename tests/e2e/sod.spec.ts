@@ -8,8 +8,9 @@ import { authFile } from "./support/testUsers";
  * blocking rule cannot leak into another spec.
  * - with a blocking SoD policy, the person who requested access for an
  *   agent cannot also approve it (409 SOD_CONFLICT), and nothing changes
- * - someone else could; a flag-only policy records the conflict and lets
- *   it proceed
+ * - with a flag-only policy the conflict is recorded, and the approval is
+ *   still refused: nobody approves a request they made (SELF_APPROVAL,
+ *   owner decision 2026-10-12, WID-C01)
  */
 
 async function registerAgent(page: Page): Promise<string> {
@@ -24,7 +25,7 @@ async function registerAgent(page: Page): Promise<string> {
 test.describe.serial("separation of duties", () => {
   test.use({ storageState: authFile("adminTwo") });
 
-  test("the requester of access cannot also approve it under a blocking policy; a flag policy records it and proceeds", async ({ page }) => {
+  test("the requester of access cannot also approve it under a blocking policy; a flag policy records it and still refuses self-approval", async ({ page }) => {
     const agentId = await registerAgent(page);
     const app = (await (await page.request.post("/api/v1/access/applications", { data: { name: `E2E SoD App ${Date.now()}` } })).json()).data;
     const policy = (
@@ -47,11 +48,13 @@ test.describe.serial("separation of duties", () => {
       const list = (await (await page.request.get(`/api/v1/access/requests?agentId=${agentId}`)).json()).data as Array<{ id: string; status: string }>;
       expect(list.find((r) => r.id === requestId)?.status).toBe("pending");
 
-      // A flag-only policy: the conflict is recorded, the approval goes through.
+      // A flag-only policy: the conflict is recorded, and self-approval is still refused (WID-C01).
       expect((await page.request.patch(`/api/v1/policies/${policy.id}`, { data: { action: "flag" } })).status()).toBe(200);
       const flagged = await page.request.post(`/api/v1/access/requests/${requestId}/decision`, { data: { decision: "approved" } });
-      expect(flagged.status()).toBe(200);
-      expect((await flagged.json()).data.status).toBe("approved");
+      expect(flagged.status()).toBe(409);
+      expect((await flagged.json()).error.code).toBe("SELF_APPROVAL");
+      const after = (await (await page.request.get(`/api/v1/access/requests?agentId=${agentId}`)).json()).data as Array<{ id: string; status: string }>;
+      expect(after.find((r) => r.id === requestId)?.status).toBe("pending");
     } finally {
       await page.request.patch(`/api/v1/policies/${policy.id}`, { data: { status: "disabled" } });
     }

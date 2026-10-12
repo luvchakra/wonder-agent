@@ -113,6 +113,11 @@ export async function decideAccessRequest(
   if (existing.agent_id && !existing.subject_identity_id) {
     // ACCESS-P0-14: e.g. the person who requested access may not also approve it.
     await enforceSoD(tenantId, actorId, `access.request_${decision}`, existing.agent_id);
+    // WID-C01 (owner decision 2026-10-12): whatever the SoD policies say, nobody
+    // approves or rejects a request they made. Fulfilling is a separate act.
+    if (decision !== "fulfilled" && existing.requested_by === actorId) {
+      throw new ApiError(409, "SELF_APPROVAL", "Nobody approves or rejects a request they made");
+    }
   } else if (decision !== "fulfilled") {
     // ACCESS-P0-19: a catalog request is approved or rejected only through
     // its approval chain (approvals.ts), step by step, never directly here.

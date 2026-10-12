@@ -3,6 +3,7 @@ import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { decideAccessRequest, decideApprovalStep, getRequestWithApprovals } from "@/modules/access-governance/service";
 import { errorResponse } from "@/modules/access-governance/http";
+import { refuseAutomationCaller } from "@/lib/security/automationCredentials";
 
 /**
  * A decision on an access request.
@@ -17,6 +18,8 @@ import { errorResponse } from "@/modules/access-governance/http";
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ctx = await requireAnyPermission(["access.approve", "access.request", "access.read"]);
+    // WID-H06: approving, rejecting or fulfilling access is a person's decision.
+    await refuseAutomationCaller("Deciding an access request");
     const { id } = await params;
     const body = (await request.json().catch(() => ({}))) as { decision?: unknown; comment?: unknown };
     const canApprove = ctx.permissions.includes("access.approve");

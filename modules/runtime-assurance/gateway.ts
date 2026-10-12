@@ -136,6 +136,30 @@ type DecisionRow = {
   created_at: string;
 };
 
+/**
+ * WID-C03 (owner decision 2026-10-12): emergency controls, and a decision
+ * that could not be worked out, block in every mode. Observe mode advises
+ * on everything else.
+ */
+export const ALWAYS_BLOCKING_CODES: ReadonlySet<string> = new Set(["KILL_SWITCH", "TOOL_SUSPENDED", "MCP_SERVER_SUSPENDED", "SESSION_TERMINATED", "EVALUATION_FAILED"]);
+
+/**
+ * What the agent is told: the real answer in ENFORCE; in OBSERVE_ONLY,
+ * ALLOW unless the decision, or any of its steps, denied with a code that
+ * always blocks (the decision's own code names its first failing check,
+ * which may come before the emergency one).
+ */
+export function effectiveDecisionOf(
+  decision: GatewayDecision["decision"],
+  code: string,
+  enforced: boolean,
+  steps: readonly { outcome?: string; code?: string }[] = [],
+): GatewayDecision["decision"] {
+  if (enforced) return decision;
+  const blocking = ALWAYS_BLOCKING_CODES.has(code) || steps.some((s) => s.outcome === "DENY" && ALWAYS_BLOCKING_CODES.has(s.code ?? ""));
+  return decision === "DENY" && blocking ? "DENY" : "ALLOW";
+}
+
 function toGatewayDecision(row: DecisionRow, replayed: boolean): GatewayDecision {
   return {
     decisionId: row.id,
@@ -144,7 +168,7 @@ function toGatewayDecision(row: DecisionRow, replayed: boolean): GatewayDecision
     mode: row.mode,
     enforced: row.enforced,
     decision: row.decision,
-    effectiveDecision: row.enforced ? row.decision : "ALLOW",
+    effectiveDecision: effectiveDecisionOf(row.decision, row.code, row.enforced, row.steps ?? []),
     code: row.code,
     reason: row.reason,
     policyId: row.policy_id,
@@ -404,7 +428,8 @@ export async function filterGatewayTools(
   return {
     mode,
     enforced,
-    visible: enforced ? results.filter((r) => r.visible).map((r) => r.tool) : tools,
+    // WID-C03: a suspended tool or server (or one that could not be evaluated) is hidden in every mode.
+    visible: enforced ? results.filter((r) => r.visible).map((r) => r.tool) : results.filter((r) => r.visible || !ALWAYS_BLOCKING_CODES.has(r.code ?? "")).map((r) => r.tool),
     wouldHide: hidden,
   };
 }

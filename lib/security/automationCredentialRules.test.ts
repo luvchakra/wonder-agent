@@ -10,6 +10,7 @@ import {
   overRateLimit,
   parseCidrs,
   roleEscalation,
+  HUMAN_ONLY_PERMISSIONS,
   refusalFor,
 } from "./automationCredentialRules";
 
@@ -108,5 +109,12 @@ describe("role escalation", () => {
     expect(roleEscalation(["integration.read"], ["integration.read", "automation.manage"])).toEqual([]);
     expect(roleEscalation(["integration.read", "users.view"], ["integration.read"])).toEqual(["users.view"]);
     expect(roleEscalation(["automation.manage"], ["automation.manage"])).toEqual(["automation.manage"]);
+  });
+});
+
+describe("WID-H06 (owner decision 2026-10-12): human-only permissions", () => {
+  it("a credential can never be given approval, certification or credential management, even by someone who holds them", () => {
+    for (const p of HUMAN_ONLY_PERMISSIONS) expect(roleEscalation([p, "access.read"], [p, "access.read"])).toEqual([p]);
+    expect(HUMAN_ONLY_PERMISSIONS).toEqual(expect.arrayContaining(["access.approve", "agent.certify", "automation.manage"]));
   });
 });

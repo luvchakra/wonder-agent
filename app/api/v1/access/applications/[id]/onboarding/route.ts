@@ -11,6 +11,7 @@ import {
 } from "@/modules/access-governance/service";
 import { errorResponse } from "@/modules/access-governance/http";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { refuseAutomationCaller } from "@/lib/security/automationCredentials";
 
 // ACCESS-P0-16 — an application's onboarding (GET; null when not started)
 // and its stages (POST { action }): start, configure, validate, simulate,
@@ -48,6 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         break;
       case "approve":
       case "reject":
+        // WID-H06: the four-eyes approval of an onboarding is a person's decision.
+        await refuseAutomationCaller("Approving an onboarding");
         data = await decideOnboarding(tenantId, actorId, id, { approve: body.action === "approve", note: body.note });
         break;
       case "promote":

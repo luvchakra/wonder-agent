@@ -10,10 +10,8 @@ import { Badge, Button, Card, CardBody, CardHeader, ConfirmActionDialog, EmptySt
 /**
  * RUNTIME-P0-18 — emergency controls the Runtime Gateway honours. Every
  * action here needs runtime.emergency (the server actions check it),
- * a confirmation and a reason, and is audited. While the gateway is
- * observe-only, the controls change the recorded decision (e.g.
- * KILL_SWITCH) without blocking the agent. The card says so, rather than
- * implying a block that does not happen (§17.5).
+ * a confirmation and a reason, and is audited. They block in every mode,
+ * Observe included (WID-C03, owner decision 2026-10-12); the card says so.
  */
 
 const LABEL: Record<EmergencyControl["controlType"], string> = {
@@ -47,7 +45,7 @@ export function EmergencyControlsPanel({ controls, canManage }: { controls: Emer
     <Card className={killSwitch ? "border-destructive/40 bg-destructive/[0.04]" : undefined}>
       <CardHeader
         title="Emergency controls"
-        description="Kill switch, tool and MCP server suspension, and session termination. Observe-only: they change the gateway's recorded decision; nothing is blocked until enforcement is on."
+        description="Kill switch, tool and MCP server suspension, and session termination. They block at once, in Observe mode too."
         actions={
           canManage ? (
             killSwitch ? (

@@ -392,7 +392,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Agents can ask the Runtime Gateway before acting; it decides from the agent's contract, effective access and policies. It runs in observe-only mode by default: the decision is recorded but the agent is told to go ahead.",
     body: [
       "An agent calls the gateway with its API key and the action it intends. The decision — Allow, Allow with restrictions, Require approval or Deny, with the reason — is recorded and appears under Authorization decisions on the Runtime page and in the agent's activity. The decision comes from rules, never from a model.",
-      "In observe-only mode the gateway records what it would have decided without blocking anything, and the page marks those decisions “observed”. The Runtime page says so: nothing is blocked until enforcement is on for your organization. Enforcement is not a setting on any customer screen; when it is on for an organization, a Deny or Require-approval decision is returned to the agent and the organization is notified.",
+      "In observe-only mode the gateway records what it would have decided without blocking, except for emergency controls, which always block, and the page marks those decisions “observed”. Enforcement is not a setting on any customer screen; when it is on for an organization, a Deny or Require-approval decision is returned to the agent and the organization is notified.",
       "Repeating a request id returns the same decision rather than a second one. The tenant and agent always come from the API key, never from the request body.",
     ],
     keywords: ["gateway", "runtime gateway", "enforce", "enforcement", "observe mode", "observe only", "observed", "allow", "deny", "require approval", "decision", "authorization decisions"],
@@ -406,7 +406,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Incident responders can engage a kill switch, suspend a tool or an MCP server, or terminate a session — each with a reason, each audited, each reversible.",
     body: [
       "The Emergency controls card on the Runtime page offers four controls: a kill switch (every request from every agent in the organization is decided Deny until it is released), tool suspension, MCP server suspension and session termination. Engaging one requires a confirmation and a reason; lifting it does too.",
-      "While the gateway is observe-only, the controls change the decision it records but nothing is blocked until enforcement is on, and the card says so. To cut off one agent's credentials, use Revoke all keys on that agent's API keys panel.",
+      "The controls block at once, in observe-only mode too: an agent asking the gateway is told no. To cut off one agent's credentials, use Revoke all keys on that agent's API keys panel.",
       "These actions need the runtime emergency permission, which is deliberately separate from everyday agent administration.",
     ],
     keywords: ["emergency", "kill switch", "incident", "stop agent", "block", "suspend tools", "suspend tool", "mcp server suspension", "session termination", "panic"],

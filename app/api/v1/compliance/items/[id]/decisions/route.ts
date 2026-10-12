@@ -3,10 +3,13 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { recordDecision } from "@/modules/certification-compliance/service";
 import { errorResponse } from "@/modules/certification-compliance/http";
 import type { DecisionType } from "@/lib/shared/types/compliance";
+import { refuseAutomationCaller } from "@/lib/security/automationCredentials";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ctx = await requirePermission("compliance.manage");
+    // WID-H06: certifying is a person's decision.
+    await refuseAutomationCaller("A certification decision");
     const { id } = await params;
     const body = await request.json();
     const decision = await recordDecision(ctx.tenantId!, ctx.userId, id, {

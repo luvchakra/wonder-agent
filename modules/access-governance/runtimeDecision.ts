@@ -400,23 +400,30 @@ export function filterToolsForAgent(
   tools: string[],
   mcpServer?: string,
 ): ToolVisibility[] {
+  // Emergency controls are named first (WID-C03): they hide a tool in every
+  // gateway mode, so their code must not be masked by a later reason.
   const blanket = (() => {
     if (!facts.tenantActive) return { code: "TENANT_INACTIVE", reason: "The organization is not active." };
     if (!facts.agent) return { code: "UNKNOWN_AGENT", reason: "The agent is not known in this organization." };
     if (facts.emergency.killSwitch) return { code: "KILL_SWITCH", reason: "The emergency kill switch is engaged." };
-    if (!OPERATING_STATES.has(facts.agent.lifecycleState)) {
-      return { code: "AGENT_NOT_OPERATING", reason: `An agent in lifecycle state ${facts.agent.lifecycleState} may not act.` };
-    }
-    if (!facts.contract) return { code: "NO_ACTIVE_CONTRACT", reason: "The agent has no active contract." };
     if (mcpServer && inList(facts.emergency.suspendedMcpServers ?? [], mcpServer)) {
       return { code: "MCP_SERVER_SUSPENDED", reason: `MCP server ${mcpServer} is suspended.` };
     }
+    return null;
+  })();
+  const agent = facts.agent;
+  const standing = (() => {
+    if (!agent || !OPERATING_STATES.has(agent.lifecycleState)) {
+      return { code: "AGENT_NOT_OPERATING", reason: `An agent in lifecycle state ${agent?.lifecycleState ?? "unknown"} may not act.` };
+    }
+    if (!facts.contract) return { code: "NO_ACTIVE_CONTRACT", reason: "The agent has no active contract." };
     return null;
   })();
 
   return tools.map((tool) => {
     if (blanket) return { tool, visible: false, ...blanket };
     if (inList(facts.emergency.suspendedTools, tool)) return { tool, visible: false, code: "TOOL_SUSPENDED", reason: `Tool ${tool} is suspended.` };
+    if (standing) return { tool, visible: false, ...standing };
     const allowed = facts.contract!.allowedTools;
     if (allowed.length > 0 && !inList(allowed, tool)) return { tool, visible: false, code: "TOOL_NOT_APPROVED", reason: `Tool ${tool} is not approved.` };
     return { tool, visible: true, code: "VISIBLE", reason: "Approved and not suspended." };

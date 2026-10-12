@@ -95,7 +95,7 @@ export default async function RuntimeIndexPage() {
       <Card className="min-w-0">
         <CardHeader
           title="Authorization decisions"
-          description="The Runtime Gateway's decision on each request an agent made before acting. Observe-only: decisions are recorded, nothing is blocked yet."
+          description="The Runtime Gateway's decision on each request an agent made before acting. Observe-only: decisions are recorded; only emergency controls block."
         />
         <CardBody className="pt-0">
           {decisions.length === 0 ? (

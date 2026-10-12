@@ -558,3 +558,12 @@ async function automationAccessNow(): Promise<{ accessToken: string; userId: str
   return { accessToken, userId: row.backing_user_id };
 }
 
+/**
+ * WID-H06 (owner decision 2026-10-12): a decision that must be a person's
+ * (approving access, certifying) is refused for an automation credential's
+ * call, whatever permissions its roles carry.
+ */
+export async function refuseAutomationCaller(what: string): Promise<void> {
+  if (await getAutomationAccess()) throw new ApiError(403, "HUMAN_DECISION_REQUIRED", `${what} is a person's decision; an automation credential cannot make it`);
+}
+

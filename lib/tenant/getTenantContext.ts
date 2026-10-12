@@ -213,6 +213,14 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
     if (g.tenant_id !== tenantId || g.groups?.status !== "active") continue;
     for (const gr of g.groups.group_roles) if (gr.roles && gr.roles.status === "active") grants.push(grantOf(gr, gr.roles, "GROUP", g.groups.name));
   }
+  // WID-H06 (owner decision 2026-10-12): an automation credential's call never
+  // carries a human-only permission (approving access, certifying, managing
+  // credentials), whatever its roles say.
+  const { getAutomationAccess } = await import("@/lib/security/automationCredentials");
+  if (await getAutomationAccess()) {
+    const { HUMAN_ONLY_PERMISSIONS } = await import("@/lib/security/automationCredentialRules");
+    for (let i = 0; i < grants.length; i++) grants[i] = { ...grants[i], permissions: grants[i].permissions.filter((k) => !HUMAN_ONLY_PERMISSIONS.includes(k)) };
+  }
   // Policies that cannot be read are never permission (CLAUDE.md §17.4):
   // the context then carries no permissions at all.
   if (policyRows === null) {

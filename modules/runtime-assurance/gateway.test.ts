@@ -217,6 +217,16 @@ describe("filterGatewayTools (RUNTIME-P0-18)", () => {
     ]);
   });
 
+  it("WID-C03: observe-only hides a suspended tool, and only reports what else enforcement would hide", async () => {
+    visibility.mockResolvedValueOnce([
+      { tool: "get_account", visible: true, code: "OK", reason: "ok" },
+      { tool: "wipe", visible: false, code: "TOOL_SUSPENDED", reason: "suspended" },
+      { tool: "delete_account", visible: false, code: "TOOL_NOT_APPROVED", reason: "no" },
+    ]);
+    const r = await filterGatewayTools(principal, { tools: ["get_account", "wipe", "delete_account"] });
+    expect(r.visible).toEqual(["get_account", "delete_account"]);
+  });
+
   it("observe-only hides nothing, and reports what enforcement would hide", async () => {
     const r = await filterGatewayTools(principal, { tools: ["get_account", "delete_account"] });
     expect(r.mode).toBe("OBSERVE_ONLY");
@@ -242,17 +252,32 @@ describe("gateway feature flags (PLATFORM-P0-12)", () => {
     expect(decisions.at(-1)).toMatchObject({ mode: "ENFORCE", enforced: true });
   });
 
-  it("WID-C03: a decision that cannot be worked out blocks in ENFORCE, and only advises in OBSERVE_ONLY", async () => {
+  it("WID-C03: a decision that cannot be worked out blocks in every mode", async () => {
     evaluate.mockResolvedValue({ decision: "DENY", code: "EVALUATION_FAILED", reason: "policies could not be read", steps: [] });
     flags.runtime_enforce = true;
     expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "fail-enf", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "DENY" });
     flags.runtime_enforce = false;
-    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "fail-obs", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "ALLOW", enforced: false });
+    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "fail-obs", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "DENY", enforced: false });
   });
 
-  it("WID-C03: the kill switch is recorded in OBSERVE_ONLY but does not block there", async () => {
-    evaluate.mockResolvedValue({ decision: "DENY", code: "KILL_SWITCH", reason: "kill switch on", steps: [] });
-    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "kill-obs", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "ALLOW" });
+  it("WID-C03 (owner decision): emergency controls block in OBSERVE_ONLY too; other denials only advise there", async () => {
+    for (const code of ["KILL_SWITCH", "TOOL_SUSPENDED", "MCP_SERVER_SUSPENDED", "SESSION_TERMINATED"]) {
+      evaluate.mockResolvedValue({ decision: "DENY", code, reason: "emergency", steps: [] });
+      expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: `obs-${code}`, action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "DENY", enforced: false });
+    }
+    evaluate.mockResolvedValue({ decision: "DENY", code: "DATA_PROHIBITED", reason: "contract", steps: [] });
+    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "obs-contract", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "ALLOW" });
+    // The decision's code names its first failing check; the kill switch in a later step still blocks.
+    evaluate.mockResolvedValue({
+      decision: "DENY",
+      code: "DATA_PROHIBITED",
+      reason: "contract",
+      steps: [
+        { step: "approved_access", outcome: "DENY", code: "DATA_PROHIBITED", reason: "x" },
+        { step: "emergency", outcome: "DENY", code: "KILL_SWITCH", reason: "kill switch on" },
+      ],
+    });
+    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "obs-kill-step", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "DENY" });
   });
 
   it("runtime_enforce without runtime_observe is not enforcement: the gateway is off", async () => {

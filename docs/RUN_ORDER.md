@@ -697,3 +697,16 @@ The rest is recorded per module backlog. Owner decisions are open for
 WID-C01, C02, C03, H02, H04 and H06. Next in F3: INTEGRATION-P0-22 (SCIM;
 LDAP and http writes).
 
+## 2026-10-12 — Four security decisions; findings tracked separately
+
+The owner approved four safeguards, all shipped together:
+- automation credentials never approve or certify;
+- emergency controls block in every gateway mode;
+- high-risk access always needs a person;
+- nobody approves their own agent request.
+
+The owner also decided that the high-risk findings register is read, never
+edited. Remediation priorities and status live in
+`docs/WonderID/FINDINGS-REMEDIATION.md`, which Claude keeps current and
+works through without asking (CLAUDE.md §19.12).
+

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { refuseAutomationCaller } from "@/lib/security/automationCredentials";
 import { recordAttestation, listAttestationsForAgent } from "@/modules/certification-compliance/service";
 import { errorResponse } from "@/modules/certification-compliance/http";
 import type { AttestationDecision } from "@/lib/shared/types/compliance";
@@ -18,6 +19,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const ctx = await requirePermission("compliance.manage");
+    // WID-H06: an attestation is a person's statement.
+    await refuseAutomationCaller("An attestation");
     const { id } = await params;
     const body = await request.json();
     if (!body.policyRequirement || typeof body.policyRequirement !== "string") {
