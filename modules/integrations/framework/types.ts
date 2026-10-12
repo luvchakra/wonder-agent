@@ -248,6 +248,11 @@ export type RecordFilter = {
   notPrefix?: string;
 };
 
+export type ChangesSpec = { request: HttpRequestSpec; records?: string | string[]; pagination?: Pagination };
+
+/** The cursor values a `changes` request may use. */
+export const CURSOR_FIELDS = ["since", "sinceEpoch", "sinceEpochMs"] as const;
+
 export type ResourceSpec = {
   /** http driver */
   request?: HttpRequestSpec;
@@ -283,6 +288,15 @@ export type ResourceSpec = {
    * values become one membership each). Plain values arrive as `{ value }`.
    */
   unwind?: string;
+  /**
+   * INTEGRATION-P0-21: how to ask the system for only what changed since the
+   * last successful sync (http driver, a resource without forEach or
+   * unwind). The request uses `{cursor.since}` (ISO 8601),
+   * `{cursor.sinceEpoch}` or `{cursor.sinceEpochMs}`; records and
+   * pagination default to the resource's own. Scheduled syncs use it; a
+   * full sync (and everything that verifies a change) reads the whole list.
+   */
+  changes?: ChangesSpec;
   /** Keep only records matching every filter. */
   where?: RecordFilter[];
   /** A 404 means "none" rather than a failed sync (an empty LIST in Vault, a feature not enabled). */

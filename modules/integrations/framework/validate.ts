@@ -1,6 +1,7 @@
 import {
   CANONICAL_FIELDS,
   CONNECTOR_CATEGORIES,
+  CURSOR_FIELDS,
   CONNECTOR_DRIVERS,
   DEFINITION_SCHEMA_VERSION,
   DEFINITION_WRITE_OPERATIONS,
@@ -88,7 +89,7 @@ function issue(ctx: Ctx, path: string, message: string) {
 }
 
 /** Every `{…}` in a template must name something the scope will have. */
-type Scope = "settings" | "record" | "parent" | "secret" | "auth" | "target";
+type Scope = "settings" | "record" | "parent" | "secret" | "auth" | "target" | "cursor";
 /** What a write may name: the account and entitlement it changes, or, for a new account, who it is for. */
 const TARGET_FIELDS = ["account", "entitlement", "email", "username", "displayName"] as const;
 
@@ -101,6 +102,7 @@ function checkTemplate(ctx: Ctx, path: string, template: string, allowed: Scope[
     }
     if (scope === "settings" && !ctx.settings.has(rest[0])) issue(ctx, path, `"{${name}}" names no setting`);
     if (scope === "secret" && !ctx.secrets.has(rest[0])) issue(ctx, path, `"{${name}}" names no secret field`);
+    if (scope === "cursor" && !(rest.length === 1 && (CURSOR_FIELDS as readonly string[]).includes(rest[0]))) issue(ctx, path, `"{${name}}" must be one of ${CURSOR_FIELDS.map((f) => `{cursor.${f}}`).join(", ")}`);
     if (scope === "target" && !(rest.length === 1 && (TARGET_FIELDS as readonly string[]).includes(rest[0]))) issue(ctx, path, `"{${name}}" must be one of ${TARGET_FIELDS.map((f) => `{target.${f}}`).join(", ")}`);
   }
 }
@@ -232,6 +234,23 @@ function checkMapping(ctx: Ctx, path: string, m: unknown, kind: ResourceKind | "
   void kind;
 }
 
+/** INTEGRATION-P0-21: a resource's incremental request. */
+function checkChanges(ctx: Ctx, path: string, r: Record<string, unknown>) {
+  const c = r.changes;
+  if (!isObj(c) || !isObj(c.request)) return issue(ctx, path, "must be { request, records?, pagination? }");
+  if (r.forEach !== undefined || r.unwind !== undefined) issue(ctx, path, "is only for a resource without forEach or unwind");
+  checkRequest(ctx, `${path}.request`, c.request, ["settings", "cursor"]);
+  if (c.records !== undefined) checkRecordsPath(ctx, `${path}.records`, c.records);
+  if (c.pagination !== undefined) checkPagination(ctx, `${path}.pagination`, c.pagination);
+  const req = c.request;
+  const strings: [string, string][] = [];
+  eachString(req.body, `${path}.request.body`, strings);
+  for (const [where, text] of strings) checkTemplate(ctx, where, text, ["settings", "cursor"]);
+  const used = [String(req.path ?? ""), ...Object.values(isObj(req.query) ? req.query : {}).flat().map(String), ...strings.map(([, t]) => t)].flatMap((t) => templateVariables(t));
+  if (!used.some((v) => v.startsWith("cursor."))) issue(ctx, `${path}.request`, "must use {cursor.since}, {cursor.sinceEpoch} or {cursor.sinceEpochMs}");
+  if (Object.keys(c).some((k) => !["request", "records", "pagination"].includes(k))) issue(ctx, path, "takes only request, records and pagination");
+}
+
 function checkResource(ctx: Ctx, def: Record<string, unknown>, kind: ResourceKind, r: unknown, kinds: Set<string>, path: string) {
   if (!isObj(r)) return issue(ctx, path, "must be an object");
   const driver = def.driver;
@@ -242,6 +261,7 @@ function checkResource(ctx: Ctx, def: Record<string, unknown>, kind: ResourceKin
     checkRecordsPath(ctx, `${path}.records`, r.records);
     if (r.recordsKeyed !== undefined && typeof r.recordsKeyed !== "boolean") issue(ctx, `${path}.recordsKeyed`, "must be true or false");
     checkPagination(ctx, `${path}.pagination`, r.pagination);
+    if (r.changes !== undefined) checkChanges(ctx, `${path}.changes`, r);
   } else if (driver === "file") {
     checkFileSource(ctx, path, kind, r, isObj(def.receive) && def.receive.file !== undefined);
   } else if (driver === "ldap") {

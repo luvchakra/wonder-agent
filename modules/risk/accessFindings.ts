@@ -17,6 +17,11 @@ import type { AccessFinding, FindingStatus, RiskSeverity, RogueAccess } from "@/
  * the open ones that are no longer rogue (an approval appeared, or the
  * access was removed or revoked). Remediation is RISK-P0-13 (F3).
  *
+ * Each one carries a ticket number (RA-000001, per organization), drawn by
+ * the database as it is inserted (migration 0131). The ticket is the
+ * finding: open until the access is approved or removed, resolved (verified
+ * fixed) when reconciliation confirms it.
+ *
  * Findings are evidentiary: written with the service role only (no client
  * write policy, 0034), every statement filtered on `tenantId` (§14).
  */
@@ -34,6 +39,7 @@ type Row = Record<string, unknown>;
 function toAccessFinding(r: Row): AccessFinding {
   return {
     id: r.id as string,
+    ticketNumber: (r.ticket_number as string | null) ?? null,
     category: "rogue_access",
     severity: r.severity as RiskSeverity,
     status: r.status as FindingStatus,
@@ -115,6 +121,8 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
   const result = { created: 0, resolved: 0, failed: 0 };
   const createdIds: string[] = [];
   const resolvedIds: string[] = [];
+  const createdTickets: string[] = [];
+  const resolvedTickets: string[] = [];
 
   for (const [key, r] of wanted) {
     if (open.has(key)) continue;
@@ -137,7 +145,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
         explanation: `This access was first seen on ${r.firstSeenAt.slice(0, 10)}, after WonderID's baseline for the application (${r.baselineAt.slice(0, 10)}), and no request, access package or administrator grant in WonderID covers it.`,
         recommendation: "Find out who granted it. Request it through WonderID if it is needed, or have it removed on the target.",
       })
-      .select("id")
+      .select("id, ticket_number")
       .single();
     // 23505: another refresh opened the same finding first; that one stands.
     if (error?.code === "23505") continue;
@@ -147,6 +155,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
     }
     result.created++;
     createdIds.push(data.id as string);
+    if (data.ticket_number) createdTickets.push(data.ticket_number as string);
     if (r.accessGrantId) {
       await admin.from("risk_evidence").insert({ finding_id: data.id, evidence_type: "access_grant", reference_id: r.accessGrantId, summary: `Grant ${r.label}, no WonderID approval` });
     }
@@ -166,13 +175,14 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
       .eq("tenant_id", tenantId)
       .eq("category", "rogue_access")
       .in("id", part)
-      .select("id");
+      .select("id, ticket_number");
     if (error) {
       result.failed += part.length;
       continue;
     }
     result.resolved += (data ?? []).length;
     resolvedIds.push(...((data ?? []) as Row[]).map((r) => r.id as string));
+    resolvedTickets.push(...((data ?? []) as Row[]).map((r) => r.ticket_number as string | null).filter((t): t is string => !!t));
   }
 
   if (createdIds.length || resolvedIds.length) {
@@ -183,7 +193,13 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
       objectType: "tenant",
       objectId: tenantId,
       outcome: result.failed ? "failure" : "success",
-      metadata: { created: createdIds.slice(0, 500), resolved: resolvedIds.slice(0, 500), failed: result.failed },
+      metadata: {
+        created: createdIds.slice(0, 500),
+        resolved: resolvedIds.slice(0, 500),
+        ticketsOpened: createdTickets.slice(0, 500),
+        ticketsResolved: resolvedTickets.slice(0, 500),
+        failed: result.failed,
+      },
     });
   }
   return result;

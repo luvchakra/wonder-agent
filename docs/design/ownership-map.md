@@ -92,6 +92,7 @@ excluded (list in the migration's header).
 | `runtime_resources` | RA | Resource inventory observed at runtime |
 | `risk_findings` | RiskA | Findings (rogue/policy/risk) |
 | `risk_evidence` | RiskA | Evidence records backing a finding |
+| `risk_ticket_counters` | RiskA | Per-organization counter for rogue-access ticket numbers (RA-000001), drawn by the `risk_findings_assign_ticket` trigger (0131) |
 | `risk_severity_weights` | RiskA | Tenant-configurable severity-factor weight overrides (RISK-P0-02.2) |
 | `certification_campaigns` | CA | Certification campaign definitions |
 | `certification_items` | CA | Individual access items under review in a campaign |

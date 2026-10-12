@@ -13,7 +13,7 @@ import { getDecryptedCredential } from "./credentials";
 import { openGateway, type GatewaySession } from "./gateway/gateway";
 import { planAfterSync, runPipeline } from "./syncPipeline";
 import { pipelineStatusOf, type ImportOutcome } from "./pipelineRules";
-import { heldKinds, kindCompleteness, missingStatusOf, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
+import { chooseRunMode, heldKinds, kindCompleteness, missingStatusOf, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -155,6 +155,32 @@ async function markMissing(tenantId: string, jobId: string, mode: SyncJobMode, k
   return summary;
 }
 
+/**
+ * INTEGRATION-P0-21: when this connection's last successful run, and last
+ * successful full run, started (the incremental cursor and the daily full
+ * read). Partial runs (object-page files) never count.
+ */
+async function lastGoodRuns(tenantId: string, integrationId: string, jobId: string): Promise<{ lastSucceededStart: string | null; lastFullSucceededStart: string | null }> {
+  const base = () =>
+    supabaseServiceRole()
+      .from("integration_sync_jobs")
+      .select("started_at")
+      .eq("tenant_id", tenantId)
+      .eq("integration_id", integrationId)
+      .eq("status", "succeeded")
+      .neq("id", jobId)
+      .not("started_at", "is", null)
+      .order("started_at", { ascending: false })
+      .limit(1);
+  const [{ data: latest, error: latestError }, { data: full, error: fullError }] = await Promise.all([base().in("mode", ["full", "incremental"]), base().eq("mode", "full")]);
+  // Not knowing is never a reason to skip: without a cursor the run reads in full.
+  if (latestError || fullError) return { lastSucceededStart: null, lastFullSucceededStart: null };
+  return {
+    lastSucceededStart: ((latest ?? [])[0]?.started_at as string | undefined) ?? null,
+    lastFullSucceededStart: ((full ?? [])[0]?.started_at as string | undefined) ?? null,
+  };
+}
+
 /** integration_objects rows stored per request. */
 const UPSERT_CHUNK = 500;
 
@@ -196,6 +222,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     .eq("id", jobId);
 
   const errors: { objectType?: string; message: string }[] = [];
+  // The run's mode as it actually ran (a scheduled run may become incremental).
+  let mode: SyncJobMode = jobRow.mode ?? "full";
   let recordsProcessed = 0;
   let recordsFailed = 0;
   // INTEGRATION-P0-18: what each kind's import did, to decide whether it may mark objects missing.
@@ -219,6 +247,22 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     gateway = openGateway({ tenantId, integrationId: integration.id, status: integration.status });
     const connector = createConnector(integration.integration_type_id, gateway);
     await connector.authenticate(integration.config ?? {}, secret);
+
+    // INTEGRATION-P0-21: a scheduled run reads only what changed, when it may (chooseRunMode).
+    const requested: SyncJobMode = jobRow.mode ?? "full";
+    if (requested !== "partial" && (requested === "incremental" || jobRow.trigger === "scheduled")) {
+      const supportsIncremental = connector.supportsIncremental();
+      const decided = chooseRunMode({
+        requested,
+        trigger: jobRow.trigger,
+        supportsIncremental,
+        ...(supportsIncremental ? await lastGoodRuns(tenantId, integration.id, jobId) : { lastSucceededStart: null, lastFullSucceededStart: null }),
+        now: new Date(),
+      });
+      if (decided.since) connector.readChangesSince(decided.since);
+      if (decided.mode !== requested) await supabase.from("integration_sync_jobs").update({ mode: decided.mode }).eq("tenant_id", tenantId).eq("id", jobId);
+      mode = decided.mode;
+    }
 
     // Every kind the connection's definition reads, in import order (an MCP
     // server before its tools, so the inventory can tell what is still declared).
@@ -278,13 +322,13 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     const finalStatus = errors.length === 0 ? "succeeded" : recordsProcessed > 0 ? "partial" : "failed";
 
     // INTEGRATION-P0-18: objects a complete full read did not see are missing at the source.
-    const missingSummary = finalStatus === "failed" ? {} : await markMissing(tenantId, jobId, jobRow.mode ?? "full", kindRuns);
+    const missingSummary = finalStatus === "failed" ? {} : await markMissing(tenantId, jobId, mode, kindRuns);
     const missingStatus = missingStatusOf(missingSummary);
 
     // INTEGRATION-P0-19: what follows the import (identity sources, then account reconciliation),
     // saved with the import's result so the job never looks finished while it runs.
     const importOutcome: ImportOutcome = {
-      mode: jobRow.mode ?? "full",
+      mode,
       status: finalStatus,
       kindsRead: [...kindRuns.keys()],
       kindsFailed: [...kindRuns].filter(([, r]) => r.failed).map(([kind]) => kind),

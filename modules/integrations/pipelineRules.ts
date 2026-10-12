@@ -33,7 +33,9 @@ export function planPipeline(
   applications: { id: string; name: string; entitlementsFromConnector?: boolean }[],
 ): PipelineStep[] {
   // An object-page import already applied its rows; nothing is promoted from a partial run.
-  if (outcome.mode !== "full") return [];
+  // An incremental run (INTEGRATION-P0-21) updated what changed; staging is still the whole
+  // picture, so promotion and reconciliation from it stay correct (it marks nothing missing).
+  if (outcome.mode === "partial") return [];
   const steps: PipelineStep[] = [];
   if (outcome.kindsRead.includes("identity")) {
     for (const s of sources) steps.push({ kind: "identities", targetId: s.id, name: s.name, status: "pending" });

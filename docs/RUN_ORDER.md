@@ -636,3 +636,16 @@ connection types cannot write, and that no attempt reaches a system twice.
 Next in F3: INTEGRATION-P0-21 (definition extensions), then INTEGRATION-P0-22
 (SCIM; LDAP and http writes). The relay and named connectors wait on D7 and
 D9.
+
+## 2026-10-12 — Incremental syncs; ticket numbers for rogue access
+
+- Connection types may declare a `changes` request. Scheduled syncs then
+  read only what changed since the last good run, with a full read at least
+  daily, and incremental runs mark nothing missing (INTEGRATION-P0-21
+  slice 2).
+- Owner request: every rogue-access finding is a ticket, RA-000001… per
+  organization (migration 0131). The removal request quotes it, and it
+  resolves with the finding once reconciliation confirms the account is
+  fixed.
+- The plain-language guide is now `docs/WonderID/KNOWLEDGE-BASE.md`, covering
+  the whole product with a dated revision history.

@@ -172,6 +172,8 @@ export class DefinitionConnector implements ConnectorAdapter {
   private issues: { objectType: string; message: string }[] = [];
   /** INTEGRATION-P0-18: per kind, whether this run read everything (see FetchReport). */
   private reports = new Map<ResourceKind, FetchReport>();
+  /** INTEGRATION-P0-21: set for an incremental run; resources with `changes` then read only what changed since. */
+  private since: Date | null = null;
   private context: DriverContext | undefined;
 
   constructor(private readonly drivers: DriverFactories) {}
@@ -201,6 +203,7 @@ export class DefinitionConnector implements ConnectorAdapter {
       this.secrets = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
     }
     this.session = null;
+    this.since = null;
     this.rawCache.clear();
     this.issues = [];
     this.reports.clear();
@@ -227,6 +230,17 @@ export class DefinitionConnector implements ConnectorAdapter {
 
   healthCheck() {
     return this.testConnection();
+  }
+
+  /** INTEGRATION-P0-21: whether any resource can read only what changed. */
+  supportsIncremental(): boolean {
+    return this.def.driver === "http" && Object.values(this.def.resources ?? {}).some((r) => (Array.isArray(r) ? r : [r]).some((s) => s?.changes));
+  }
+
+  /** Makes this run incremental: resources with `changes` read what changed since `since`; the rest read in full. */
+  readChangesSince(since: Date): void {
+    this.since = since;
+    this.rawCache.clear();
   }
 
   /** The kinds this connection's definition reads, in import order. */
@@ -306,6 +320,17 @@ export class DefinitionConnector implements ConnectorAdapter {
           rows.push({ record: item && typeof item === "object" ? item : { value: item }, parent, spec });
         }
       }
+    } else if (this.since && spec.changes) {
+      // Only what changed: the resource's own mapping and filters, the changes request.
+      const changed: ResourceSpec = {
+        ...spec,
+        request: spec.changes.request,
+        records: spec.changes.records ?? spec.records,
+        pagination: spec.changes.pagination ?? spec.pagination,
+        optional: false,
+      };
+      const cursor = { since: this.since.toISOString(), sinceEpoch: String(Math.floor(this.since.getTime() / 1000)), sinceEpochMs: String(this.since.getTime()) };
+      for (const record of await this.fetchOptional(session, changed, { settings: this.settings, cursor }, max, kind)) rows.push({ record, spec });
     } else {
       for (const record of await this.fetchOptional(session, spec, { settings: this.settings }, max, kind)) rows.push({ record, spec });
     }

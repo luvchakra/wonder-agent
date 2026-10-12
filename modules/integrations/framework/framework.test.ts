@@ -613,3 +613,55 @@ describe("definition extensions (INTEGRATION-P0-21 slice 1)", () => {
     await expect(s.send({ path: "/users" }, { settings: {} })).rejects.toThrow(/cannot be a GET/);
   });
 });
+
+describe("incremental resources (INTEGRATION-P0-21 slice 2)", () => {
+  const withChanges: ConnectorDefinition = {
+    ...fast,
+    key: "acme-changes",
+    resources: {
+      identity: {
+        request: { path: "/users" },
+        records: "users",
+        changes: { request: { path: "/users", query: { updated_since: "{cursor.since}" } }, records: "changed" },
+        fields: { externalId: "id", displayName: "name" },
+      },
+      account: { request: { path: "/accounts" }, records: "", fields: { externalId: "id" } },
+    },
+  };
+  const config = { definition: { key: withChanges.key, version: withChanges.version, origin: "custom" }, manifest: withChanges, settings: { baseUrl: "https://acme.example" } };
+
+  it("validates a changes request: it must use the cursor, only with http and no forEach", () => {
+    expect(validateDefinition(withChanges).issues).toEqual([]);
+    const bad = (changes: unknown, extra: Record<string, unknown> = {}) =>
+      validateDefinition({ ...withChanges, resources: { ...withChanges.resources, identity: { ...(withChanges.resources.identity as ResourceSpec), changes, ...extra } } })
+        .issues.map((i) => `${i.path}: ${i.message}`)
+        .join("\n");
+    expect(bad({ request: { path: "/users" } })).toMatch(/must use \{cursor.since\}/);
+    expect(bad({ request: { path: "/users", query: { since: "{cursor.until}" } } })).toMatch(/must be one of \{cursor.since\}/);
+    expect(bad({ request: { path: "/users", query: { since: "{secret.token}" } } })).toMatch(/not allowed here|secret/);
+    expect(bad({ request: { path: "/u/{cursor.sinceEpoch}" }, extra: 1 })).toMatch(/takes only request, records and pagination/);
+    expect(bad({ request: { path: "/u/{cursor.since}" } }, { forEach: "account" })).toMatch(/only for a resource without forEach or unwind/);
+    expect(validateDefinition({ ...withChanges, resources: { ...withChanges.resources, account: { request: { path: "/accounts", query: { s: "{cursor.since}" } }, fields: { externalId: "id" } } } }).issues.map((i) => i.message).join()).toMatch(/not allowed here/);
+  });
+
+  it("a full run reads the whole list; an incremental run asks for changes since the cursor and reads other kinds in full", async () => {
+    const { fetchImpl, calls } = fakeFetch((u) => (u.pathname === "/accounts" ? json([{ id: "a1" }]) : u.searchParams.has("updated_since") ? json({ changed: [{ id: "u2", name: "Bo" }] }) : json({ users: [{ id: "u1", name: "Ava" }, { id: "u2", name: "Bo" }] })));
+    const c = new DefinitionConnector({ http: httpDriver(fetchImpl) });
+    await c.authenticate(config, JSON.stringify({ token: "t" }));
+    expect(c.supportsIncremental()).toBe(true);
+    expect((await c.importKind("identity")).map((r) => r.externalId)).toEqual(["u1", "u2"]);
+
+    await c.authenticate(config, JSON.stringify({ token: "t" }));
+    c.readChangesSince(new Date("2026-10-12T10:55:00Z"));
+    expect((await c.importKind("identity")).map((r) => r.externalId)).toEqual(["u2"]);
+    expect((await c.importKind("account")).map((r) => r.externalId)).toEqual(["a1"]);
+    expect(calls.at(-2)!.url.searchParams.get("updated_since")).toBe("2026-10-12T10:55:00.000Z");
+
+    // A new authentication (the next run) starts full again.
+    await c.authenticate(config, JSON.stringify({ token: "t" }));
+    expect((await c.importKind("identity")).length).toBe(2);
+    const plain = new DefinitionConnector({ http: httpDriver(fetchImpl) });
+    await plain.authenticate({ ...config, manifest: base }, JSON.stringify({ token: "t" }));
+    expect(plain.supportsIncremental()).toBe(false);
+  });
+});

@@ -14,7 +14,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   try {
     const ctx = await requirePermission("integration.execute");
     const { id } = await params;
-    const job = await createSyncJob(ctx.tenantId!, id, "manual");
+    // INTEGRATION-P0-21: { "mode": "incremental" } asks for only what changed; the run reads in full when it cannot (chooseRunMode).
+    const body = (await request.json().catch(() => null)) as { mode?: unknown } | null;
+    if (body?.mode !== undefined && body.mode !== "full" && body.mode !== "incremental") {
+      return NextResponse.json({ ok: false, error: { code: "VALIDATION_FAILED", message: "mode: full or incremental" } }, { status: 400 });
+    }
+    const job = await createSyncJob(ctx.tenantId!, id, "manual", body?.mode === "incremental" ? "incremental" : "full");
 
     after(() => runSyncJob(ctx.tenantId!, job.id));
 

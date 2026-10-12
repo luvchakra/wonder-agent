@@ -170,7 +170,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
                       {e.lastVerifiedAt ? ` · last seen at source ${when(e.lastVerifiedAt)}` : ""}
                     </span>
                     {e.missingFromSourceAt ? <Badge tone="neutral">Gone from source</Badge> : null}
-                    {finding ? <Badge tone="danger">Finding open</Badge> : null}
+                    {finding ? <Badge tone="danger">{finding.ticketNumber ? `${finding.ticketNumber} open` : "Finding open"}</Badge> : null}
                     {finding && remediationLabel(finding.remediationRequestStatus) ? <Badge tone="info">{remediationLabel(finding.remediationRequestStatus)}</Badge> : null}
                     {finding && canRemediate && (!finding.remediationRequestStatus || ["rejected", "cancelled", "expired"].includes(finding.remediationRequestStatus)) ? (
                       <RemoveRogueAccessButton findingId={finding.id} what={e.entitlementName ?? "this account"} disable={!e.entitlementId} />

@@ -34,7 +34,7 @@ export async function requestAccessFindingRemoval(
   const admin = supabaseServiceRole();
   const { data: finding, error } = await admin
     .from("risk_findings")
-    .select("id, tenant_id, category, status, title, identity_id, application_id, entitlement_id, account_id, remediation_request_id")
+    .select("id, tenant_id, category, status, title, ticket_number, identity_id, application_id, entitlement_id, account_id, remediation_request_id")
     .eq("tenant_id", tenantId)
     .eq("id", findingId)
     .maybeSingle<Row>();
@@ -65,7 +65,7 @@ export async function requestAccessFindingRemoval(
     applicationId: plan.applicationId,
     entitlementId: plan.entitlementId ?? undefined,
     requestType: plan.requestType,
-    justification: `Rogue access finding: ${String(finding.title).slice(0, 300)}`,
+    justification: `${finding.ticket_number ? `Ticket ${String(finding.ticket_number)}: ` : ""}rogue access finding: ${String(finding.title).slice(0, 300)}`,
   });
 
   const { error: updateError } = await admin
@@ -82,7 +82,7 @@ export async function requestAccessFindingRemoval(
     objectType: "risk_finding",
     objectId: findingId,
     outcome: "success",
-    metadata: { category: "rogue_access", requestId: request.id, requestType: plan.requestType, requestStatus: request.status, duplicate, accountId: finding.account_id ?? null, entitlementId: plan.entitlementId },
+    metadata: { category: "rogue_access", ticketNumber: (finding.ticket_number as string | null) ?? null, requestId: request.id, requestType: plan.requestType, requestStatus: request.status, duplicate, accountId: finding.account_id ?? null, entitlementId: plan.entitlementId },
   });
   return { requestId: request.id, requestStatus: request.status, duplicate };
 }

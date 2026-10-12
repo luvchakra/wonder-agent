@@ -31,6 +31,8 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  *   limit (nothing sent, the owner's task with the reason) and "Try again"
  *   works once the limit allows; no attempt key ever reaches the system
  *   twice, and every change the system received is recorded once.
+ * - INTEGRATION-P0-21: an incremental sync asks the system only for what
+ *   changed since the last good run, stores it, and marks nothing missing.
  * - Writes turned off: the next change is a person's task again.
  */
 
@@ -46,9 +48,10 @@ const system = {
     { id: "u-bob", username: "bob", email: mail("bob"), enabled: true },
     { id: "u-cy", username: "cy", email: mail("cy"), enabled: true },
     { id: "u-dee", username: "dee", email: mail("dee"), enabled: true },
-  ],
+  ] as { id: string; username: string; email: string; enabled: boolean; changedAt?: string }[],
   members: { "g-fin": ["u-ana", "u-bob", "u-cy"], "g-ops": [] } as Record<string, string[]>,
   failWrites: false,
+  reads: [] as string[],
   writes: [] as Call[],
 };
 
@@ -80,7 +83,7 @@ function definition() {
     // Staged records name the application they belong to: the one onboarded below.
     application: `E2E Prov App ${stamp}`,
     resources: {
-      account: { request: { path: "/users" }, records: "", fields: { externalId: "id", username: "username", email: "email", status: { path: "enabled", transform: [{ map: { true: "active", false: "disabled" } }] } } },
+      account: { request: { path: "/users" }, records: "", changes: { request: { path: "/users", query: { since: "{cursor.since}" } } }, fields: { externalId: "id", username: "username", email: "email", status: { path: "enabled", transform: [{ map: { true: "active", false: "disabled" } }] } } },
       entitlement: { request: { path: "/groups" }, records: "", fields: { externalId: "id", name: "name", type: { value: "group" } } },
       access_grant: { forEach: "entitlement", request: { path: "/groups/{parent.id}/members" }, records: "", fields: { externalId: { template: "{parent.id}:{record.id}" }, accountExternalId: "id", entitlementExternalId: "parent.id" } },
     },
@@ -116,7 +119,11 @@ test.beforeAll(async () => {
     };
     if (req.headers.authorization !== "Bearer e2e-token") return send(401, { error: "unauthorized" });
     if (req.method === "GET" && url.pathname === "/api/ping") return send(200, { ok: true });
-    if (req.method === "GET" && url.pathname === "/users") return send(200, system.users);
+    if (req.method === "GET" && url.pathname === "/users") {
+      system.reads.push(url.search);
+      const since = url.searchParams.get("since");
+      return send(200, since ? system.users.filter((u) => u.changedAt && u.changedAt > since) : system.users);
+    }
     if (req.method === "GET" && url.pathname === "/groups") return send(200, [{ id: "g-fin", name: "Finance" }, { id: "g-ops", name: "Operations" }]);
     const members = /^\/groups\/([^/]+)\/members$/.exec(url.pathname);
     if (req.method === "GET" && members) return send(200, (system.members[members[1]] ?? []).map((id) => ({ id })));
@@ -130,7 +137,7 @@ test.beforeAll(async () => {
         const created = JSON.parse((await body(req)) || "{}") as { email?: string };
         const username = (created.email ?? "").split("@")[0].replace(/^e2e-prov-|-\d+$/g, "");
         const id = `u-${username}`;
-        if (!system.users.some((u) => u.id === id)) system.users.push({ id, username, email: created.email ?? "", enabled: true });
+        if (!system.users.some((u) => u.id === id)) system.users.push({ id, username, email: created.email ?? "", enabled: true, changedAt: new Date().toISOString() });
         return send(201, { id });
       }
       if (membership && req.method === "PUT" && !system.members[membership[1]]?.includes(membership[2])) system.members[membership[1]].push(membership[2]);
@@ -284,13 +291,16 @@ test.describe.serial("connector provisioning", () => {
     await syncAndWait(request);
     const { data: dee } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-dee").single();
     const findingOf = async () =>
-      (await db.from("risk_findings").select("id, status, resolution_type, remediation_request_id").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).order("created_at", { ascending: false }).limit(1)).data?.[0];
+      (await db.from("risk_findings").select("id, status, resolution_type, remediation_request_id, ticket_number").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).order("created_at", { ascending: false }).limit(1)).data?.[0];
     await expect.poll(async () => (await findingOf())?.status, { timeout: 60_000 }).toBe("open");
+    // The finding is a ticket people can quote, numbered per organization.
+    const ticket = (await findingOf())!.ticket_number as string;
+    expect(ticket).toMatch(/^RA-\d{6}$/);
 
     // A reviewer asks for it to be removed, from the account page.
     await page.goto(`/access/accounts/${dee!.id}`);
     const row = page.getByRole("listitem").filter({ hasText: "Finance" });
-    await expect(row).toContainText("Finding open");
+    await expect(row).toContainText(`${ticket} open`);
     await row.getByRole("button", { name: "Remove access" }).click();
     await page.getByRole("button", { name: "Request it" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Done." })).toBeVisible({ timeout: 30_000 });
@@ -303,6 +313,10 @@ test.describe.serial("connector provisioning", () => {
     await expect.poll(async () => (await findingOf())?.status, { timeout: 90_000 }).toBe("resolved");
     expect((await findingOf())?.resolution_type).toBe("verified_fixed");
     expect((await viewOf(request, raised!.remediation_request_id as string)).fulfilment).toBe("verified");
+    // The removal request quoted the ticket, and the ticket resolved with the finding.
+    const { data: req } = await db.from("access_requests").select("justification").eq("tenant_id", tenantId).eq("id", raised!.remediation_request_id as string).single();
+    expect(req!.justification).toContain(`Ticket ${ticket}`);
+    expect((await findingOf())?.ticket_number).toBe(ticket);
 
     // A second ask is refused: the finding is closed.
     const again = await request.post(`/api/v1/findings/${raised!.id}/request-removal`);
@@ -416,6 +430,35 @@ test.describe.serial("connector provisioning", () => {
     // Every request the system saw has its one record; blocked ones never reached it.
     expect(sent.map((r) => r.idempotency_key).sort()).toEqual([...keys].sort());
     expect((rows ?? []).filter((r) => r.status === "blocked").every((r) => !keys.includes(r.idempotency_key))).toBe(true);
+  });
+
+  test("INTEGRATION-P0-21: an incremental sync reads only what changed and marks nothing missing", async ({ request }) => {
+    test.setTimeout(120_000);
+    // A user appears on the system; another disappears (an incremental run must not call that missing).
+    system.users.push({ id: "u-gus", username: "gus", email: mail("gus"), enabled: true, changedAt: new Date().toISOString() });
+    const cy = system.users.splice(system.users.findIndex((u) => u.id === "u-cy"), 1)[0];
+    const readsBefore = system.reads.length;
+    try {
+      const res = await request.post(`/api/v1/integrations/${integrationId}/sync`, { data: { mode: "incremental" } });
+      expect(res.status(), await res.text()).toBe(202);
+      const jobId = (await res.json()).data.id as string;
+      type Job = { id: string; status: string; mode: string; missingSummary: Record<string, { status: string; reason?: string }> };
+      const jobOf = async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as Job[]).find((j) => j.id === jobId);
+      await expect.poll(async () => (await jobOf())?.status, { timeout: 60_000 }).toMatch(/succeeded|partial/);
+      const job = (await jobOf())!;
+      expect(job.mode).toBe("incremental");
+      expect(job.missingSummary.account).toEqual({ status: "skipped", reason: "incremental run" });
+      // Users were read with a cursor, and only once.
+      const reads = system.reads.slice(readsBefore);
+      expect(reads).toHaveLength(1);
+      expect(reads[0]).toMatch(/^\?since=\d{4}-\d{2}-\d{2}T/);
+
+      const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+      const { data: staged } = await db.from("integration_objects").select("external_id, missing_at_source_at").eq("tenant_id", tenantId).eq("integration_id", integrationId).eq("object_type", "account").in("external_id", ["u-gus", "u-cy"]);
+      expect(Object.fromEntries((staged ?? []).map((o) => [o.external_id, o.missing_at_source_at]))).toEqual({ "u-gus": null, "u-cy": null });
+    } finally {
+      system.users.push(cy);
+    }
   });
 
   test("writes off again: the next change is a person's task", async ({ request }) => {

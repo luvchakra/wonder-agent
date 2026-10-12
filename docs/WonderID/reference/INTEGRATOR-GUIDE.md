@@ -53,7 +53,8 @@ read-only statement), `mcp`, `file`, `none` (receive only); authentication
 `none`, `basic`, `bearer`, `header`, `query`, `body`, `oauth2_client_credentials`,
 `ldap_simple`, `sql_password`; pagination `none`, `page`, `offset`, `cursor`,
 `link_header`, `scim`; field paths, templates, a fixed transform list and
-`where` filters; `forEach`, `unwind`, keyed records; inbound channels
+`where` filters; `forEach`, `unwind`, keyed records; incremental `changes`
+requests for scheduled syncs; inbound channels
 (`receive`) for webhooks, files, runtime events and the gateway. The full
 reference is `CONNECTOR-FRAMEWORK.md`, "Definition reference".
 
