@@ -2293,3 +2293,57 @@ upgrading a connection with a mapping-difference preview.
 
 **Left out.** Token-based cursors; OAuth authorization code, JWT and
 certificate auth; export/import and connection upgrade.
+
+### 2026-10-12 — Definition extensions, part 3a: private-key sign-in and client certificates (INTEGRATION-P0-21, #69)
+
+**Built (framework and outbound fetch, no migration).**
+- **Signing with a private key** (RFC 7523), on `oauth2_client_credentials`:
+  - `clientAuth: "private_key_jwt"` sends `client_assertion` (signed,
+    `iss` = `sub` = client id, `aud` = the token address) instead of a
+    secret;
+  - `grant: "jwt_bearer"` requests the token with a signed `assertion` for
+    `subject` (default the client) and `scope`: the service-account flow.
+
+  Details:
+  - `privateKey` must be a `{secret.…}` field (PEM); RS256 (default) or
+    ES256; optional `keyId`.
+  - Assertions live 5 minutes with a random `jti` (`framework/jwt.ts`,
+    `node:crypto`, server only).
+  - A key of the wrong kind or an unreadable key fails with a reason that
+    never quotes the key.
+  - The validator requires `clientSecret` only when no key signs, and
+    refuses key fields without a signing mode.
+- **Client certificates** (`auth.type: client_certificate`, http):
+  - `certificate` and `privateKey` (`{secret.…}`, PEM) are passed to the
+    TLS layer through a new `clientCert` option of `guardedFetch`.
+  - The certificate goes only to the connection's own address (resolve()
+    already refuses others) and only over https.
+  - It is dropped on a redirect to another origin, like the credential
+    headers.
+  - The credential is recorded as auth type `mtls`.
+- The validator still runs in the browser: the algorithm list lives in
+  `types.ts`, and signing stays in the server-only driver.
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `npx vitest run modules/integrations`: 315 passed.
+  - `jwt.test.ts`: RS256 and ES256 tokens verify with the public key; claims
+    and lifetime; wrong-type and unreadable keys are refused without
+    echoing them.
+  - The validator modes.
+  - `private_key_jwt` and `jwt_bearer` token requests: the assertion
+    verifies, and no secret is sent.
+  - A client certificate travels in the fetch init and never in headers;
+    it is refused over http.
+  - **Live** `outboundFetch.mtls.test.ts`: a local TLS server that only
+    trusts a throwaway client certificate (made with openssl for the run,
+    nothing committed) lets the connection in; it refuses no certificate
+    and an untrusted one; a redirect to another origin is followed
+    without presenting the certificate.
+- `tests/architecture` (connector boundary): 7 passed.
+- E2E `integrations.spec.ts`, local: 13 passed (6 in the spec, 7 setup).
+- `next build` succeeds.
+
+**Left out.** OAuth authorization code (a "Connect" consent flow with a
+callback receiver; next); export and import of definitions and connection
+upgrade.

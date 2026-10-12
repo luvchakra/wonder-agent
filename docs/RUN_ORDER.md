@@ -657,3 +657,11 @@ account's rogue-access findings share one ticket, RA-000001… per
 organization. It resolves when the last of them is fixed, and rogue access
 found later opens a new ticket. The database opens and resolves tickets
 itself.
+
+## 2026-10-12 — Connections sign in with a private key or a client certificate
+
+`oauth2_client_credentials` can sign its token request with the
+organization's private key (`private_key_jwt`, or the `jwt_bearer` grant for
+service accounts), and the new `client_certificate` auth presents a client
+certificate (mutual TLS) to the connection's own address only
+(INTEGRATION-P0-21 part 3a). Next: OAuth authorization code.

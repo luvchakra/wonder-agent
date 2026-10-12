@@ -624,7 +624,8 @@ The same operations are available over the API (session authentication):
 | `header` | http, mcp, file | `name` and `value`, for example `Authorization: token {secret.key}:{secret.secret}` |
 | `query` | http | `name` and `value` (avoid it where the API offers a header) |
 | `body` | http | `name` and `value`, added as a field of every request's JSON body, for APIs that take the key there. Every request must then be a POST (or a write method) with an object body, or the validator refuses the definition |
-| `oauth2_client_credentials` | http | `tokenUrl` (relative, or starting with a url setting), `clientId`, `clientSecret`, optional `scope`, `clientAuth` (`body` or `basic`). The token is cached, and refreshed once on a 401. |
+| `oauth2_client_credentials` | http | `tokenUrl` (relative, or starting with a url setting), `clientId`, `clientSecret`, optional `scope`, `clientAuth` (`body` or `basic`). The token is cached, and refreshed once on a 401. **Signing with a private key** (RFC 7523): `clientAuth: "private_key_jwt"` sends a signed client assertion instead of a secret, and `grant: "jwt_bearer"` asks for a token with a signed assertion (the service-account flow, for `subject` or the client itself). Both need `privateKey` (a `{secret.…}` field holding a PEM key) and take optional `algorithm` (`RS256`, the default, or `ES256`) and `keyId`. Assertions last 5 minutes and carry a unique `jti`; a broken key fails the sign-in with a reason that never quotes the key. |
+| `client_certificate` | http | `certificate` and `privateKey`, both `{secret.…}` fields holding PEM: mutual TLS. The certificate is presented only to the connection's own address, only over https, and never after a redirect to another origin. |
 | `ldap_simple` | ldap | `bindDn`, `password` |
 | `sql_password` | sql | `username`, `password` |
 

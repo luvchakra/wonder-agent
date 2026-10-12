@@ -1,3 +1,4 @@
+import { assertionClaims, privateKeyFrom, signJwt } from "./jwt";
 import type { AuthSpec, ConnectorDefinition, HttpRequestSpec, Pagination } from "./types";
 import { fillTemplate, readPath, type TemplateScope } from "./mapping";
 
@@ -9,7 +10,9 @@ import { fillTemplate, readPath, type TemplateScope } from "./mapping";
  * accounting) and the unit tests use a fake.
  */
 
-export type FetchLike = (url: string, init: { method?: string; headers?: Record<string, string>; body?: string }) => Promise<Response>;
+/** `clientCert` (INTEGRATION-P0-21): a PEM certificate and key the TLS layer presents (mutual TLS). */
+export type ClientCertificate = { cert: string; key: string };
+export type FetchLike = (url: string, init: { method?: string; headers?: Record<string, string>; body?: string; clientCert?: ClientCertificate }) => Promise<Response>;
 
 export class ConnectorRequestError extends Error {
   constructor(
@@ -91,14 +94,34 @@ export class HttpSession {
     const scope = this.authScope();
     const tokenUrl = this.resolve(fillTemplate(auth.tokenUrl, scope));
     const clientId = fillTemplate(auth.clientId, scope);
-    const clientSecret = fillTemplate(auth.clientSecret, scope);
-    const form = new URLSearchParams({ grant_type: "client_credentials" });
-    if (auth.scope) form.set("scope", auth.scope);
     const headers: Record<string, string> = { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" };
-    if (auth.clientAuth === "basic") headers.Authorization = `Basic ${Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString("base64")}`;
-    else {
-      form.set("client_id", clientId);
-      form.set("client_secret", clientSecret);
+    let form: URLSearchParams;
+    if (auth.grant === "jwt_bearer" || auth.clientAuth === "private_key_jwt") {
+      // INTEGRATION-P0-21 (RFC 7523): a short-lived assertion signed with the organization's private key.
+      const algorithm = auth.algorithm ?? "RS256";
+      const key = privateKeyFrom(fillTemplate(auth.privateKey ?? "", scope), algorithm);
+      const keyId = auth.keyId ? fillTemplate(auth.keyId, scope, { allowMissing: true }) || undefined : undefined;
+      const audience = tokenUrl.toString();
+      if (auth.grant === "jwt_bearer") {
+        const subject = auth.subject ? fillTemplate(auth.subject, scope, { allowMissing: true }) || clientId : clientId;
+        form = new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer" });
+        form.set("assertion", signJwt(assertionClaims({ issuer: clientId, subject, audience, scope: auth.scope }), key, algorithm, keyId));
+      } else {
+        form = new URLSearchParams({ grant_type: "client_credentials" });
+        if (auth.scope) form.set("scope", auth.scope);
+        form.set("client_id", clientId);
+        form.set("client_assertion_type", "urn:ietf:params:oauth:client-assertion-type:jwt-bearer");
+        form.set("client_assertion", signJwt(assertionClaims({ issuer: clientId, subject: clientId, audience }), key, algorithm, keyId));
+      }
+    } else {
+      const clientSecret = fillTemplate(auth.clientSecret ?? "", scope);
+      form = new URLSearchParams({ grant_type: "client_credentials" });
+      if (auth.scope) form.set("scope", auth.scope);
+      if (auth.clientAuth === "basic") headers.Authorization = `Basic ${Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret)}`).toString("base64")}`;
+      else {
+        form.set("client_id", clientId);
+        form.set("client_secret", clientSecret);
+      }
     }
     this.requestCount++;
     const res = await this.fetchImpl(tokenUrl.toString(), { method: "POST", headers, body: form.toString() });
@@ -107,6 +130,18 @@ export class HttpSession {
     if (!body.access_token) throw new ConnectorRequestError("Getting an access token failed: no access_token in the response");
     this.token = { value: body.access_token, expiresAt: Date.now() + Math.max(30, Number(body.expires_in) || 300) * 1000 };
     return this.token.value;
+  }
+
+  /**
+   * INTEGRATION-P0-21: the connection's client certificate, for a request
+   * to its own address (resolve() refuses any other) over https only.
+   */
+  private clientCertificate(url: URL): ClientCertificate | null {
+    const auth = this.def.auth;
+    if (auth.type !== "client_certificate") return null;
+    if (url.protocol !== "https:") throw new ConnectorRequestError(`${url.pathname}: a client certificate is only sent over https`);
+    const scope = this.authScope();
+    return { cert: fillTemplate(auth.certificate, scope), key: fillTemplate(auth.privateKey, scope) };
   }
 
   private async authApply(url: URL, headers: Record<string, string>, forceToken = false) {
@@ -135,6 +170,9 @@ export class HttpSession {
         return;
       case "oauth2_client_credentials":
         headers.Authorization = `Bearer ${await this.oauthToken(forceToken)}`;
+        return;
+      case "client_certificate":
+        // Presented by the TLS layer (clientCertificate()); nothing goes in the request.
         return;
       default:
         throw new ConnectorRequestError(`The http driver cannot use ${auth.type} authentication`);
@@ -182,7 +220,8 @@ export class HttpSession {
         body = JSON.stringify(extra && typeof base === "object" && !Array.isArray(base) ? { ...base, ...extra } : base);
       }
       // The definition's rateLimitPerSecond is enforced by the gateway, around fetchImpl.
-      const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body });
+      const clientCert = this.clientCertificate(target);
+      const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body, ...(clientCert ? { clientCert } : {}) });
       if (res.status === 401 && attempt === 0 && this.def.auth.type === "oauth2_client_credentials") continue;
       if (!res.ok) throw new ConnectorRequestError(`${label} failed: HTTP ${res.status}`, res.status);
       const text = await res.text();

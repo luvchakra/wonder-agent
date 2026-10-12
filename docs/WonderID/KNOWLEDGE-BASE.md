@@ -51,6 +51,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Automation credentials for your own tools; connected systems that make approved changes themselves; removing rogue access through a request; a limit on mass changes; richer connection types; faster scheduled syncs that read only what changed. |
 | 12 Oct 2026 | This guide rewritten to cover the whole product. |
 | 12 Oct 2026 | Every rogue account gets a ticket number (RA-000001, …), one per account, that closes once the account is fixed. |
+| 12 Oct 2026 | Connections can sign in with a private key instead of a shared secret, or with a client certificate. |
 
 ---
 
@@ -195,6 +196,8 @@ All information from your systems reaches WonderID through **connections**. Ther
 - **Checked as you type:** the editor checks the definition and can try it against the real system before saving.
 - **Cleaning up values:** values can be changed into the form WonderID needs. For example: make text lowercase, look values up in a table, pick out part of a value with a pattern, replace text, fall back to another field, or shift a date.
 - **Sign-in styles for the system:** none, basic, bearer token, API key (in a header, the address or the request body), OAuth client credentials, LDAP bind and database user.
+  - **With a private key instead of a shared secret:** for OAuth, the connection signs a short-lived token with your organization's private key (the style service accounts use). The key is stored encrypted and never shown or logged.
+  - **With a client certificate:** for systems that require one (mutual TLS). The certificate is only ever presented to that connection's own secure address.
 
 **Syncing**
 - **Schedule:** each connection syncs on a schedule, or on demand with "Sync now".
@@ -526,7 +529,7 @@ These pages are for the WonderID service operator only, never for customers:
 
 ## 18. Coming soon
 
-- **More sign-in types for connections:** OAuth authorization code, signed JWT and client certificates.
+- **"Sign in with the provider" for connections:** OAuth authorization code, where an administrator approves the connection in the system's own sign-in page.
 - **Sharing connection types:** export a connection type as a file, import it elsewhere, and upgrade a connection to a newer version with a preview of what changes.
 - **Standard user provisioning:** SCIM, and changes through LDAP directories.
 - **A relay** to reach systems inside your own network without opening it up.

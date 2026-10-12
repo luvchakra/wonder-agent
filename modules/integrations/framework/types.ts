@@ -153,6 +153,10 @@ export type SettingField = {
 export type SecretField = { key: string; label: string; help?: string; optional?: boolean };
 
 /** Authentication. Secret values are only ever referenced here, as `{secret.<key>}`. */
+/** INTEGRATION-P0-21: how a private key signs a JWT assertion. */
+export const JWT_ALGORITHMS = ["RS256", "ES256"] as const;
+export type JwtAlgorithm = (typeof JWT_ALGORITHMS)[number];
+
 export type AuthSpec =
   | { type: "none" }
   | { type: "basic"; username: string; password: string; fields: SecretField[] }
@@ -165,12 +169,31 @@ export type AuthSpec =
       type: "oauth2_client_credentials";
       tokenUrl: string;
       clientId: string;
-      clientSecret: string;
+      /** Required unless the client proves itself with a private key (private_key_jwt, or the jwt_bearer grant). */
+      clientSecret?: string;
       scope?: string;
-      /** Where the client credentials go: the form body (default) or HTTP Basic. */
-      clientAuth?: "body" | "basic";
+      /**
+       * How the client proves itself: its secret in the form body (default)
+       * or HTTP Basic, or (INTEGRATION-P0-21) a JWT signed with its private
+       * key (RFC 7523 `private_key_jwt`).
+       */
+      clientAuth?: "body" | "basic" | "private_key_jwt";
+      /**
+       * INTEGRATION-P0-21: `jwt_bearer` asks for a token with a signed
+       * assertion instead (RFC 7523 §2.1, the service-account flow), issued
+       * by `clientId` for `subject` (default the client itself).
+       */
+      grant?: "client_credentials" | "jwt_bearer";
+      /** `{secret.…}`: the PEM private key that signs assertions. */
+      privateKey?: string;
+      /** RS256 (default) or ES256. */
+      algorithm?: JwtAlgorithm;
+      keyId?: string;
+      subject?: string;
       fields: SecretField[];
     }
+  /** INTEGRATION-P0-21: mutual TLS: the connection presents a client certificate (PEM) to its own address only. */
+  | { type: "client_certificate"; certificate: string; privateKey: string; fields: SecretField[] }
   | { type: "ldap_simple"; bindDn: string; password: string; fields: SecretField[] }
   | { type: "sql_password"; username: string; password: string; fields: SecretField[] };
 
