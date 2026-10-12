@@ -159,6 +159,8 @@ export type AuthSpec =
   | { type: "bearer"; token: string; fields: SecretField[] }
   | { type: "header"; name: string; value: string; fields: SecretField[] }
   | { type: "query"; name: string; value: string; fields: SecretField[] }
+  /** INTEGRATION-P0-21: an API key sent as a field of every request's JSON body (the API takes POST only). */
+  | { type: "body"; name: string; value: string; fields: SecretField[] }
   | {
       type: "oauth2_client_credentials";
       tokenUrl: string;
@@ -203,7 +205,19 @@ export type Transform =
   /** Whether the text starts with this prefix ("service-account-"). */
   | { prefix: string }
   /** Whether a list holds this value, or a space- or comma-separated text holds it as a word. */
-  | { contains: string };
+  | { contains: string }
+  /**
+   * INTEGRATION-P0-21: the part of the text a regular expression matches:
+   * capture `group` (default the first group, or the whole match when the
+   * pattern has none); null when it does not match.
+   */
+  | { regex: string; group?: number }
+  /** Every occurrence of this text replaced (not a pattern). */
+  | { replace: string; with: string }
+  /** When the value is empty, the first of these fields that is not. */
+  | { coalesce: string[] }
+  /** The date moved by this many days (or months, or years); null when the value is not a date. */
+  | { dateAdd: number; unit?: "days" | "months" | "years" };
 
 /**
  * Where a canonical field comes from:

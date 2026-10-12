@@ -86,7 +86,65 @@ function toDate(value: unknown): string | null {
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString().slice(0, 10);
 }
 
-export function applyTransform(value: unknown, transform: Transform): unknown {
+/** Longest pattern a definition may use, and longest text one is run on (a bound on matching time). */
+export const REGEX_MAX_PATTERN = 200;
+export const REGEX_MAX_INPUT = 2000;
+
+/**
+ * Whether a definition's pattern is safe to run on fetched text: it
+ * compiles, is short, and has no quantified group that itself repeats
+ * (`(a+)+`, `(a|aa)*`), the shape of catastrophic backtracking.
+ */
+export function safePattern(pattern: string): string | null {
+  if (pattern.length === 0 || pattern.length > REGEX_MAX_PATTERN) return `must be 1 to ${REGEX_MAX_PATTERN} characters`;
+  try {
+    new RegExp(pattern);
+  } catch {
+    return "is not a valid regular expression";
+  }
+  if (/\([^()]*[+*}][^()]*\)[+*{]/.test(pattern) || /\([^()]*\|[^()]*\)[+*{]/.test(pattern) || /\\\d/.test(pattern)) {
+    return "must not repeat a group that itself repeats or alternates, or use back-references";
+  }
+  return null;
+}
+
+function addToDate(value: unknown, n: number, unit: "days" | "months" | "years"): string | null {
+  const date = toDate(Array.isArray(value) ? value[0] : value);
+  if (!date) return null;
+  const d = new Date(`${date}T00:00:00Z`);
+  if (unit === "days") d.setUTCDate(d.getUTCDate() + n);
+  else if (unit === "months") d.setUTCMonth(d.getUTCMonth() + n);
+  else d.setUTCFullYear(d.getUTCFullYear() + n);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
+}
+
+const isEmpty = (v: unknown) => v === undefined || v === null || (typeof v === "string" && v.trim() === "") || (Array.isArray(v) && v.length === 0);
+
+/** One transform. `scope` is the record being mapped (for coalesce). */
+export function applyTransform(value: unknown, transform: Transform, scope?: TemplateScope): unknown {
+  if (typeof transform === "object" && "regex" in transform) {
+    const text = Array.isArray(value) ? value[0] : value;
+    if (text === null || text === undefined || typeof text === "object") return null;
+    if (safePattern(transform.regex)) return null;
+    const re = new RegExp(transform.regex);
+    const match = re.exec(String(text).slice(0, REGEX_MAX_INPUT));
+    if (!match) return null;
+    const group = transform.group ?? (match.length > 1 ? 1 : 0);
+    return match[group] ?? null;
+  }
+  if (typeof transform === "object" && "replace" in transform) {
+    const swap = (v: unknown) => (typeof v === "string" ? v.split(transform.replace).join(transform.with) : v);
+    return Array.isArray(value) ? value.map(swap) : swap(value);
+  }
+  if (typeof transform === "object" && "coalesce" in transform) {
+    if (!isEmpty(value) || !scope) return value;
+    for (const p of transform.coalesce) {
+      const v = readField(scope, p);
+      if (!isEmpty(v)) return v;
+    }
+    return value;
+  }
+  if (typeof transform === "object" && "dateAdd" in transform) return addToDate(value, transform.dateAdd, transform.unit ?? "days");
   if (typeof transform === "object" && "contains" in transform) {
     const items = Array.isArray(value) ? value.map(String) : typeof value === "string" ? value.split(/[\s,]+/) : [];
     return items.includes(transform.contains);
@@ -160,7 +218,7 @@ export function mapField(mapping: FieldMapping, scope: TemplateScope): unknown {
       if (clean(value) !== undefined && value !== null) break;
     }
   }
-  for (const t of mapping.transform ?? []) value = applyTransform(value, t);
+  for (const t of mapping.transform ?? []) value = applyTransform(value, t, scope);
   value = clean(value);
   if ((value === undefined || value === null || value === "") && mapping.default !== undefined) value = mapping.default;
   return value;

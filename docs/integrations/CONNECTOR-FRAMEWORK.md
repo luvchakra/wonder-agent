@@ -623,6 +623,7 @@ The same operations are available over the API (session authentication):
 | `bearer` | http, mcp, file | `token` (an optional token field sends no header when empty) |
 | `header` | http, mcp, file | `name` and `value`, for example `Authorization: token {secret.key}:{secret.secret}` |
 | `query` | http | `name` and `value` (avoid it where the API offers a header) |
+| `body` | http | `name` and `value`, added as a field of every request's JSON body, for APIs that take the key there. Every request must then be a POST (or a write method) with an object body, or the validator refuses the definition |
 | `oauth2_client_credentials` | http | `tokenUrl` (relative, or starting with a url setting), `clientId`, `clientSecret`, optional `scope`, `clientAuth` (`body` or `basic`). The token is cached, and refreshed once on a 401. |
 | `ldap_simple` | ldap | `bindDn`, `password` |
 | `sql_password` | sql | `username`, `password` |
@@ -707,7 +708,11 @@ may be a list, tried in order: the first non-empty value wins. In a path:
 - `present`, true when the value is non-empty;
 - `{ "map": { from: to }, "default"? }`;
 - `{ "prefix": "…" }`, true when the text starts with it;
-- `{ "contains": "…" }`, true when a list holds the value, or a space- or comma-separated text holds it as a word.
+- `{ "contains": "…" }`, true when a list holds the value, or a space- or comma-separated text holds it as a word;
+- `{ "regex": "…", "group"? }`, the part a regular expression matches: capture `group` (0 to 9; default the first group, or the whole match when there is none), or null when it does not match. Patterns are at most 200 characters, may not repeat a group that itself repeats or alternates (`(a+)+`, `(a|b)*`) or use back-references, and run on at most the first 2,000 characters;
+- `{ "replace": "…", "with": "…" }`, every occurrence of a text replaced (plain text, not a pattern);
+- `{ "coalesce": ["path", …] }`, when the value is empty, the first of these fields (of the record, or `parent.…`) that is not;
+- `{ "dateAdd": n, "unit"? }`, the date moved by `n` days (or `months`, `years`), as `YYYY-MM-DD`; null when the value is not a date.
 
 **Filters** (`where` items): `{ path, equals?, notEquals?, in?, notIn?,
 exists?, prefix?, notPrefix? }`. The path may start with `parent.`.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { applyTransform, fillTemplate, mapRecord, matchesFilters, readPath, TemplateError } from "./mapping";
+import { applyTransform, fillTemplate, mapField, mapRecord, matchesFilters, readPath, TemplateError } from "./mapping";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { HttpSession, parseLinkNext, type FetchLike } from "./http";
 import { DefinitionConnector, capabilitiesOf, httpDriver, writeCapabilitiesOf } from "./engine";
@@ -546,5 +546,70 @@ describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
     await expect(c.write("create_account", { username: "dee" }, "k-00000004")).rejects.toThrow(/target.email\}" has no value/);
     await expect(c.write("revoke_access", { account: "u1" }, "k-00000002")).rejects.toThrow(/has no value/);
     await expect(c.write("disable_account", { account: "u1" }, "k-00000003")).rejects.toThrow(/HTTP 500/);
+  });
+});
+
+describe("definition extensions (INTEGRATION-P0-21 slice 1)", () => {
+  it("regex extracts a group, the whole match, or null; replace swaps plain text", () => {
+    expect(applyTransform("CN=Ava Lee,OU=Finance,DC=acme", { regex: "OU=([^,]+)" })).toBe("Finance");
+    expect(applyTransform("emp-00412", { regex: "\\d+" })).toBe("00412");
+    expect(applyTransform("ava@acme.example", { regex: "^([^@]+)@(.+)$", group: 2 })).toBe("acme.example");
+    expect(applyTransform("no digits", { regex: "\\d+" })).toBeNull();
+    expect(applyTransform(null, { regex: "x" })).toBeNull();
+    expect(applyTransform("a.b.c", { replace: ".", with: "/" })).toBe("a/b/c");
+    expect(applyTransform(["x-1", "x-2"], { replace: "x-", with: "" })).toEqual(["1", "2"]);
+  });
+
+  it("an unsafe pattern never runs, even if it reached a stored definition", () => {
+    expect(applyTransform("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!", { regex: "(a+)+$" })).toBeNull();
+  });
+
+  it("coalesce falls back to other fields; dateAdd moves a date", () => {
+    const scope = { record: { empty: "", alt: "", work: "w@acme.example", hired: "2026-01-31" } };
+    expect(mapField({ path: "empty", transform: [{ coalesce: ["alt", "work"] }] }, scope)).toBe("w@acme.example");
+    expect(mapField({ path: "work", transform: [{ coalesce: ["alt"] }] }, scope)).toBe("w@acme.example");
+    expect(mapField({ path: "hired", transform: [{ dateAdd: 90 }] }, scope)).toBe("2026-05-01");
+    expect(mapField({ path: "hired", transform: [{ dateAdd: 1, unit: "months" }] }, scope)).toBe("2026-03-03");
+    expect(mapField({ path: "hired", transform: [{ dateAdd: -1, unit: "years" }] }, scope)).toBe("2025-01-31");
+    expect(mapField({ path: "work", transform: [{ dateAdd: 1 }] }, scope)).toBeNull();
+  });
+
+  it("the validator checks the new transforms, and refuses unsafe patterns", () => {
+    const identity = base.resources.identity as ResourceSpec;
+    const withFields = (fields: Record<string, unknown>) => ({ ...base, resources: { ...base.resources, identity: { ...identity, fields: { ...identity.fields, ...fields } } } });
+    expect(validateDefinition(withFields({ department: { path: "dn", transform: [{ regex: "OU=([^,]+)" }, { replace: "_", with: " " }, { coalesce: ["dept"] }] }, startDate: { path: "start", transform: [{ dateAdd: -7 }] } })).issues).toEqual([]);
+    const bad = (t: unknown) => validateDefinition(withFields({ department: { path: "dn", transform: [t] } })).issues.map((i) => `${i.path}: ${i.message}`).join("\n");
+    expect(bad({ regex: "(a+)+" })).toMatch(/must not repeat a group/);
+    expect(bad({ regex: "(a|aa)*" })).toMatch(/must not repeat a group/);
+    expect(bad({ regex: "(a)\\1" })).toMatch(/back-references/);
+    expect(bad({ regex: "[" })).toMatch(/not a valid regular expression/);
+    expect(bad({ regex: "x".repeat(201) })).toMatch(/1 to 200 characters/);
+    expect(bad({ regex: "x", group: 12 })).toMatch(/group: must be 0 to 9/);
+    expect(bad({ replace: "", with: "x" })).toMatch(/replace, with/);
+    expect(bad({ coalesce: [] })).toMatch(/1 to 10 field paths/);
+    expect(bad({ dateAdd: 1.5 })).toMatch(/whole number/);
+    expect(bad({ dateAdd: 1, unit: "weeks" })).toMatch(/days, months or years/);
+  });
+
+  it("an API key in the body: every request must carry a body; the key joins it and never the URL", async () => {
+    const bodyAuth: ConnectorDefinition = {
+      ...fast,
+      key: "acme-body",
+      auth: { type: "body", name: "api_key", value: "{secret.key}", fields: [{ key: "key", label: "API key" }] },
+      test: { request: { method: "POST", path: "/ping", body: {} } },
+      resources: { identity: { request: { method: "POST", path: "/users/search", body: { status: "all" } }, records: "users", fields: { externalId: "id", displayName: "name" } } },
+    };
+    expect(validateDefinition(bodyAuth).issues).toEqual([]);
+    const getIssues = validateDefinition({ ...bodyAuth, test: { request: { path: "/ping" } } }).issues.map((i) => `${i.path}: ${i.message}`).join("\n");
+    expect(getIssues).toMatch(/test.request.method: must not be GET/);
+    expect(validateDefinition({ ...bodyAuth, resources: { identity: { ...(bodyAuth.resources.identity as ResourceSpec), request: { path: "/users", body: { api_key: "{secret.key}" } } } } }).issues.map((i) => i.message).join("\n")).toMatch(/secret/);
+
+    const { fetchImpl, calls } = fakeFetch(() => json({ users: [{ id: "u1", name: "Ava" }] }));
+    const s = new HttpSession(bodyAuth, { baseUrl: "https://acme.example" }, { key: "k3y" }, fetchImpl);
+    await s.fetchAll((bodyAuth.resources.identity as ResourceSpec).request!, "users", undefined, { settings: {} }, 100);
+    expect(JSON.parse(calls[0].body!)).toEqual({ status: "all", api_key: "k3y" });
+    expect(calls[0].url.search).toBe("");
+    expect(calls[0].headers.Authorization).toBeUndefined();
+    await expect(s.send({ path: "/users" }, { settings: {} })).rejects.toThrow(/cannot be a GET/);
   });
 });

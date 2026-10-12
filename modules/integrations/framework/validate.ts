@@ -11,7 +11,7 @@ import {
   type DefinitionIssue,
   type ResourceKind,
 } from "./types";
-import { templateVariables } from "./mapping";
+import { safePattern, templateVariables } from "./mapping";
 
 /**
  * Checks a connector definition before anything runs it. Built-in and
@@ -37,7 +37,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const MAX_BYTES = 256 * 1024;
 
 const AUTH_BY_DRIVER: Record<string, string[]> = {
-  http: ["none", "basic", "bearer", "header", "query", "oauth2_client_credentials"],
+  http: ["none", "basic", "bearer", "header", "query", "body", "oauth2_client_credentials"],
   ldap: ["ldap_simple"],
   sql: ["sql_password"],
   mcp: ["none", "bearer", "header"],
@@ -77,7 +77,8 @@ function checkFileSource(ctx: Ctx, path: string, kind: ResourceKind, r: Record<s
   if (file.url === undefined && !receivesFiles) issue(ctx, `${path}.file.url`, "is required unless the connector receives files (receive.file)");
 }
 
-type Ctx = { issues: DefinitionIssue[]; settings: Map<string, string>; secrets: Set<string> };
+/** `bodyAuth`: the key travels in the body, so every request must have one (no GET). */
+type Ctx = { issues: DefinitionIssue[]; settings: Map<string, string>; secrets: Set<string>; bodyAuth?: boolean };
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const str = (v: unknown, max = 500): v is string => typeof v === "string" && v.trim().length > 0 && v.length <= max;
@@ -123,6 +124,7 @@ function checkRelativePath(ctx: Ctx, path: string, value: unknown, allowed: Scop
 function checkRequest(ctx: Ctx, path: string, req: unknown, allowed: Scope[], methods: string[] = ["GET", "POST"]) {
   if (!isObj(req)) return issue(ctx, path, "must be an object");
   if (req.method !== undefined && !methods.includes(String(req.method))) issue(ctx, `${path}.method`, `must be ${methods.join(", ")}`);
+  if (ctx.bodyAuth && (req.method === undefined || req.method === "GET")) issue(ctx, `${path}.method`, "must not be GET: the API key travels in the body (auth type body)");
   checkRelativePath(ctx, `${path}.path`, req.path, allowed);
   for (const key of ["query", "headers"] as const) {
     const v = req[key];
@@ -206,6 +208,21 @@ function checkMapping(ctx: Ctx, path: string, m: unknown, kind: ResourceKind | "
       m.transform.forEach((t, i) => {
         if (typeof t === "string") {
           if (!(TRANSFORMS as readonly string[]).includes(t)) issue(ctx, `${path}.transform[${i}]`, `must be one of ${TRANSFORMS.join(", ")}, { map: {…} } or { prefix: \"…\" }`);
+        } else if (isObj(t) && t.regex !== undefined) {
+          const problem = typeof t.regex === "string" ? safePattern(t.regex) : "must be text";
+          if (problem) issue(ctx, `${path}.transform[${i}].regex`, problem);
+          if (t.group !== undefined && (!Number.isInteger(t.group) || (t.group as number) < 0 || (t.group as number) > 9)) issue(ctx, `${path}.transform[${i}].group`, "must be 0 to 9");
+          if (Object.keys(t).some((k) => k !== "regex" && k !== "group")) issue(ctx, `${path}.transform[${i}]`, "{ regex } takes only regex and group");
+        } else if (isObj(t) && t.replace !== undefined) {
+          if (!str(t.replace, 200) || typeof t.with !== "string" || t.with.length > 200 || Object.keys(t).length !== 2) issue(ctx, `${path}.transform[${i}]`, "{ replace, with } takes two texts (replace not empty), at most 200 characters");
+        } else if (isObj(t) && t.coalesce !== undefined) {
+          if (!Array.isArray(t.coalesce) || t.coalesce.length === 0 || t.coalesce.length > 10 || !t.coalesce.every((p) => str(p, 200)) || Object.keys(t).length !== 1) {
+            issue(ctx, `${path}.transform[${i}].coalesce`, "must list 1 to 10 field paths");
+          }
+        } else if (isObj(t) && t.dateAdd !== undefined) {
+          if (!Number.isInteger(t.dateAdd) || Math.abs(t.dateAdd as number) > 36500) issue(ctx, `${path}.transform[${i}].dateAdd`, "must be a whole number (at most 36500)");
+          if (t.unit !== undefined && !["days", "months", "years"].includes(String(t.unit))) issue(ctx, `${path}.transform[${i}].unit`, "must be days, months or years");
+          if (Object.keys(t).some((k) => k !== "dateAdd" && k !== "unit")) issue(ctx, `${path}.transform[${i}]`, "{ dateAdd } takes only dateAdd and unit");
         } else if (isObj(t) && (t.prefix !== undefined || t.contains !== undefined)) {
           const v = t.prefix ?? t.contains;
           if (!str(v, 200) || Object.keys(t).length !== 1) issue(ctx, `${path}.transform[${i}]`, "{ prefix } and { contains } take one non-empty string");
@@ -347,6 +364,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
   if (!isObj(input)) return { definition: null, issues: [{ path: "", message: "must be a JSON object" }] };
   if (JSON.stringify(input).length > MAX_BYTES) return { definition: null, issues: [{ path: "", message: "is larger than 256 KB" }] };
   const d = input;
+  ctx.bodyAuth = isObj(d.auth) && d.auth.type === "body";
 
   if (d.schemaVersion !== DEFINITION_SCHEMA_VERSION) issue(ctx, "schemaVersion", `must be ${DEFINITION_SCHEMA_VERSION}`);
   if (typeof d.key !== "string" || !KEY_RE.test(d.key)) issue(ctx, "key", "must be lowercase letters, digits and dashes, 2–63 characters, starting with a letter");
@@ -400,6 +418,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
       bearer: ["token"],
       header: ["name", "value"],
       query: ["name", "value"],
+      body: ["name", "value"],
       oauth2_client_credentials: ["clientId", "clientSecret"],
       ldap_simple: ["bindDn", "password"],
       sql_password: ["username", "password"],

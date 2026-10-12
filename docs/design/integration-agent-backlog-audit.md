@@ -2202,3 +2202,45 @@ is `overWriteLimit()` in `connectorWriteRules.ts`. The count uses the
 existing `connector_write_operations_integration_idx` (integration, tenant,
 created_at), so there is no migration. Tests and verification are in the
 QA audit log entry of the same date.
+
+### 2026-10-12 — Definition extensions, slice 1: four transforms and an API key in the body (INTEGRATION-P0-21, #69)
+
+**Built (framework only, no migration).**
+- **Transforms** (`mapping.ts`, `types.ts`, validator):
+  - `{ regex, group? }` returns a capture (default the first group, or the
+    whole match), or null when nothing matches.
+  - `{ replace, with }` replaces every occurrence of a plain text.
+  - `{ coalesce: [paths] }`: when the value is empty, the first non-empty of
+    the record's (or `parent.`'s) other fields.
+  - `{ dateAdd: n, unit? }` moves a date by days, months or years and gives
+    `YYYY-MM-DD`; null for a value that is not a date.
+- **Regular expressions are bounded**, because a definition is
+  organization-authored and runs on fetched text on the server:
+  - A pattern is at most 200 characters, must compile, and may not repeat a
+    group that itself repeats or alternates (`(a+)+`, `(a|aa)*`) or use
+    back-references (`safePattern()`).
+  - The pattern runs on at most the first 2,000 characters.
+  - The transform re-checks the pattern, so an unsafe one never runs even
+    if it reached a stored definition.
+- **`auth.type: body`** (http): `name` and `value` are added to every
+  request's JSON body.
+  - The validator refuses any GET request in such a definition (resources,
+    test and writes), and the session refuses to send one.
+  - `{secret.…}` stays allowed only inside `auth`, so a body template cannot
+    carry a secret. The key never reaches the URL or a header.
+  - The connection-type summary says "API key in the request body".
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on `modules/integrations/framework`.
+- `npx vitest run modules/integrations`: 300 passed, including new tests for
+  each transform, the pattern refusals (nested quantifier, alternation,
+  back-reference, invalid, too long), a catastrophic pattern returning null
+  instead of running, and body auth (the key in the body only, GET refused).
+- `tests/architecture` (connector boundary): 7 passed.
+- E2E `integrations` and `file-import`, local: 23 passed (16 in the specs, 7 setup).
+- `next build` succeeds.
+
+**Left out (later slices of this story).** Incremental `changes` resources
+with a `since` cursor; OAuth 2.0 authorization code, private-key JWT and
+client-certificate authentication; export and import of a definition and
+upgrading a connection with a mapping-difference preview.

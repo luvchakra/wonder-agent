@@ -130,6 +130,9 @@ export class HttpSession {
       case "query":
         url.searchParams.set(fillTemplate(auth.name, scope), fillTemplate(auth.value, scope));
         return;
+      case "body":
+        // Added to the body in send(); nothing goes in the URL or headers.
+        return;
       case "oauth2_client_credentials":
         headers.Authorization = `Bearer ${await this.oauthToken(forceToken)}`;
         return;
@@ -167,10 +170,16 @@ export class HttpSession {
       const target = new URL(url);
       await this.authApply(target, headers, attempt > 0);
       let body: string | undefined;
-      if (spec.body !== undefined || extraBody) {
+      // INTEGRATION-P0-21: an API key in the body is one more body field, filled from the secret.
+      const auth = this.def.auth;
+      const authBody = auth.type === "body" ? { [fillTemplate(auth.name, this.authScope())]: fillTemplate(auth.value, this.authScope()) } : undefined;
+      if (authBody && (spec.method ?? "GET") === "GET") throw new ConnectorRequestError(`${label}: the API key travels in the body, so the request cannot be a GET`);
+      const extra = extraBody || authBody ? { ...(extraBody ?? {}), ...(authBody ?? {}) } : undefined;
+      if (spec.body !== undefined || extra) {
         headers["Content-Type"] = "application/json";
         const base = spec.body && typeof spec.body === "object" && !Array.isArray(spec.body) ? spec.body : spec.body === undefined ? {} : spec.body;
-        body = JSON.stringify(extraBody && typeof base === "object" && !Array.isArray(base) ? { ...base, ...extraBody } : base);
+        if (authBody && (typeof base !== "object" || base === null || Array.isArray(base))) throw new ConnectorRequestError(`${label}: the API key travels in the body, so the body must be an object`);
+        body = JSON.stringify(extra && typeof base === "object" && !Array.isArray(base) ? { ...base, ...extra } : base);
       }
       // The definition's rateLimitPerSecond is enforced by the gateway, around fetchImpl.
       const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body });
