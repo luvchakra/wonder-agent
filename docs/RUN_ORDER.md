@@ -649,3 +649,11 @@ D9.
   fixed.
 - The plain-language guide is now `docs/WonderID/KNOWLEDGE-BASE.md`, covering
   the whole product with a dated revision history.
+
+## 2026-10-12 — One rogue-access ticket per account (owner decision)
+
+Tickets are now per account (migration 0132), not per entitlement. An
+account's rogue-access findings share one ticket, RA-000001… per
+organization. It resolves when the last of them is fixed, and rogue access
+found later opens a new ticket. The database opens and resolves tickets
+itself.

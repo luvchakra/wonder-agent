@@ -1138,3 +1138,58 @@ resolved once the account is remediated.
   rogue access is its own ticket, which resolves on its own.
 - Mirroring tickets into ServiceNow waits for that connector
   (INTEGRATION-P0-26).
+
+### 2026-10-12 — One ticket per rogue account (owner decision; migration 0132)
+
+The owner decided that tickets are per account, not per entitlement. One
+ticket covers every piece of rogue access on an account and is resolved once
+the account is remediated.
+
+**Built (migration 0132, applied).**
+- **The ticket table.** `risk_access_tickets` (id, tenant_id, account_id,
+  ticket_number, status open | resolved, opened_at, resolved_at,
+  resolution) has:
+  - same-tenant keys to accounts;
+  - one open ticket per account (partial unique index);
+  - unique numbers per organization;
+  - RLS with a member read policy and no client write path.
+
+  `risk_findings.access_ticket_id` links each finding to its ticket
+  (same-tenant key, covered by an index).
+- **Opening.** The 0131 `BEFORE INSERT` trigger now joins a new
+  rogue-access finding to its account's open ticket, or opens the next
+  number. The organization's counter row lock serializes this, so two
+  findings on one account at once still share one ticket.
+- **Resolving.** A new `AFTER UPDATE OF status` trigger
+  (`risk_findings_close_ticket`) resolves the ticket when its last finding
+  is resolved or a false positive. Resolution is "Verified fixed: no rogue
+  access remains on the account", or "Closed as a false positive". Rogue
+  access found on the account afterwards opens a new ticket.
+- **Migrating 0131's numbers.** The per-finding numbers from 0131 were
+  retired (the column stays, unused). Existing findings were grouped into
+  account tickets numbered RA-000001… in the order the accounts were first
+  found rogue: 11 tickets on dev, 2 of them open.
+- **App.** The ticket is read through the same-tenant embed.
+  - The account page shows "Ticket RA-… open" once, in the Access card
+    header; each row says "Finding open".
+  - Risk Overview names the ticket.
+  - The removal request quotes it.
+  - The sync audit lists tickets touched and tickets resolved.
+
+**Verified.**
+- `tests/risk/rogue-access-tickets-isolation.sql`, rewritten for 0132:
+  11/11.
+  - Two findings on one account share RA-000001; the other account gets
+    RA-000002; organization B starts at RA-000001.
+  - The ticket stays open after one of two findings is fixed, and resolves
+    (with resolved_at) after the second.
+  - Rogue access found again opens RA-000003.
+  - A finding cannot name another organization's ticket (23503).
+  - A member reads only their organization's tickets and counter, cannot
+    open a ticket (42501), and closes or resets nothing (0 rows).
+- Supabase advisors: no new security or performance warning.
+- `npx vitest run modules/risk`: 73 passed. Typecheck and eslint clean.
+- E2E: the F3 exit test checks the account's ticket (open, the header
+  badge, quoted in the request, resolved once Dee's only rogue access is
+  removed). `connector-provisioning` and `f1-reconciliation`, local: 32
+  passed (25 in the specs, 7 setup). `next build` succeeds.

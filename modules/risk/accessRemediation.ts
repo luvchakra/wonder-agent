@@ -34,10 +34,14 @@ export async function requestAccessFindingRemoval(
   const admin = supabaseServiceRole();
   const { data: finding, error } = await admin
     .from("risk_findings")
-    .select("id, tenant_id, category, status, title, ticket_number, identity_id, application_id, entitlement_id, account_id, remediation_request_id")
+    .select("id, tenant_id, category, status, title, identity_id, application_id, entitlement_id, account_id, remediation_request_id, access_ticket_id")
     .eq("tenant_id", tenantId)
     .eq("id", findingId)
     .maybeSingle<Row>();
+  // 0132: the account's ticket, read in the same organization.
+  const ticketNumber = finding?.access_ticket_id
+    ? (((await admin.from("risk_access_tickets").select("tenant_id, ticket_number").eq("tenant_id", tenantId).eq("id", finding.access_ticket_id as string).maybeSingle()).data as Row | null)?.ticket_number as string | undefined) ?? null
+    : null;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   if (!finding || finding.tenant_id !== tenantId) throw new ApiError(404, "FINDING_NOT_FOUND");
 
@@ -65,7 +69,7 @@ export async function requestAccessFindingRemoval(
     applicationId: plan.applicationId,
     entitlementId: plan.entitlementId ?? undefined,
     requestType: plan.requestType,
-    justification: `${finding.ticket_number ? `Ticket ${String(finding.ticket_number)}: ` : ""}rogue access finding: ${String(finding.title).slice(0, 300)}`,
+    justification: `${ticketNumber ? `Ticket ${ticketNumber}: ` : ""}rogue access finding: ${String(finding.title).slice(0, 300)}`,
   });
 
   const { error: updateError } = await admin
@@ -82,7 +86,7 @@ export async function requestAccessFindingRemoval(
     objectType: "risk_finding",
     objectId: findingId,
     outcome: "success",
-    metadata: { category: "rogue_access", ticketNumber: (finding.ticket_number as string | null) ?? null, requestId: request.id, requestType: plan.requestType, requestStatus: request.status, duplicate, accountId: finding.account_id ?? null, entitlementId: plan.entitlementId },
+    metadata: { category: "rogue_access", ticketNumber, requestId: request.id, requestType: plan.requestType, requestStatus: request.status, duplicate, accountId: finding.account_id ?? null, entitlementId: plan.entitlementId },
   });
   return { requestId: request.id, requestStatus: request.status, duplicate };
 }

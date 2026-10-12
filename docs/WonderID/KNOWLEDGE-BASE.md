@@ -1,5 +1,28 @@
 # WonderID knowledge base
 
+## Contents
+
+1. [What WonderID is](#1-what-wonderid-is)
+2. [Signing in and getting around](#2-signing-in-and-getting-around)
+3. [Identities](#3-identities)
+4. [AI agents](#4-ai-agents)
+5. [Connecting your systems](#5-connecting-your-systems)
+6. [Applications, accounts and access](#6-applications-accounts-and-access)
+7. [Requesting access](#7-requesting-access)
+8. [Making the change: by a person or automatically](#8-making-the-change-by-a-person-or-automatically)
+9. [Risk and findings](#9-risk-and-findings)
+10. [Reviews, policies and compliance](#10-reviews-policies-and-compliance)
+11. [Users, roles and permissions](#11-users-roles-and-permissions)
+12. [Audit, reports, notifications and search](#12-audit-reports-notifications-and-search)
+13. [Privacy](#13-privacy)
+14. [Billing](#14-billing)
+15. [Organization settings](#15-organization-settings)
+16. [Vendor administration](#16-vendor-administration)
+17. [Safety and trust](#17-safety-and-trust)
+18. [Coming soon](#18-coming-soon)
+
+[Revision history](#revision-history) is below.
+
 **Last updated:** 12 October 2026
 
 A plain-language guide to what WonderID does, how its parts fit together and where to find each feature. It is kept current as the product changes.
@@ -27,30 +50,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 11 Oct 2026 | Detecting what was removed in a connected system; automatic flow after every sync; access imported from connected systems and labelled approved, legacy, unproven or rogue; service accounts and agents as owned identities; access requests that end verified, with tasks for application owners; time-bound access; one inbox; bulk invitations. |
 | 12 Oct 2026 | Automation credentials for your own tools; connected systems that make approved changes themselves; removing rogue access through a request; a limit on mass changes; richer connection types; faster scheduled syncs that read only what changed. |
 | 12 Oct 2026 | This guide rewritten to cover the whole product. |
-| 12 Oct 2026 | Every rogue-access finding gets a ticket number (RA-000001, …) that closes once the account is fixed. |
-
----
-
-## Contents
-
-1. [What WonderID is](#1-what-wonderid-is)
-2. [Signing in and getting around](#2-signing-in-and-getting-around)
-3. [Identities](#3-identities)
-4. [AI agents](#4-ai-agents)
-5. [Connecting your systems](#5-connecting-your-systems)
-6. [Applications, accounts and access](#6-applications-accounts-and-access)
-7. [Requesting access](#7-requesting-access)
-8. [Making the change: by a person or automatically](#8-making-the-change-by-a-person-or-automatically)
-9. [Risk and findings](#9-risk-and-findings)
-10. [Reviews, policies and compliance](#10-reviews-policies-and-compliance)
-11. [Users, roles and permissions](#11-users-roles-and-permissions)
-12. [Audit, reports, notifications and search](#12-audit-reports-notifications-and-search)
-13. [Privacy](#13-privacy)
-14. [Billing](#14-billing)
-15. [Organization settings](#15-organization-settings)
-16. [Vendor administration](#16-vendor-administration)
-17. [Safety and trust](#17-safety-and-trust)
-18. [Coming soon](#18-coming-soon)
+| 12 Oct 2026 | Every rogue account gets a ticket number (RA-000001, …), one per account, that closes once the account is fixed. |
 
 ---
 
@@ -356,9 +356,9 @@ Findings are raised for:
 
 **Rogue access**
 - **Raising:** access that appeared in a system with no approval raises a finding.
-- **Ticket number:** each rogue-access finding is a ticket with its own number, such as **RA-000012**, numbered in order within your organization. You can quote it in conversations and other tools; it shows on the account page and in Risk Overview.
-- **Fixing:** a reviewer clicks **Remove access**, which raises an ordinary request under the application's rules. The request quotes the ticket number.
-- **Closing:** once the access is removed and the next sync confirms it, the ticket closes as "verified fixed". It also closes if the access is approved after all.
+- **One ticket per account:** a rogue account gets one ticket, such as **RA-000012**, numbered in order within your organization. Everything rogue found on that account belongs to the same ticket. You can quote the number in conversations and other tools; it shows on the account page and in Risk Overview.
+- **Fixing:** for each piece of rogue access, a reviewer clicks **Remove access**, which raises an ordinary request under the application's rules. The request quotes the account's ticket number.
+- **Closing:** the ticket stays open until all of the account's rogue access is dealt with (removed, and confirmed by the next sync, or approved after all). Then it closes as "verified fixed". If rogue access turns up on the same account later, a new ticket opens.
 
 **Investigations**
 - Group findings and evidence into a case and work it to a conclusion.

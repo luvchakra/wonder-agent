@@ -17,16 +17,18 @@ import type { AccessFinding, FindingStatus, RiskSeverity, RogueAccess } from "@/
  * the open ones that are no longer rogue (an approval appeared, or the
  * access was removed or revoked). Remediation is RISK-P0-13 (F3).
  *
- * Each one carries a ticket number (RA-000001, per organization), drawn by
- * the database as it is inserted (migration 0131). The ticket is the
- * finding: open until the access is approved or removed, resolved (verified
- * fixed) when reconciliation confirms it.
+ * Each rogue account has one ticket (RA-000001, per organization) that
+ * holds every rogue-access finding on it (migration 0132). The database
+ * opens it with the account's first finding and resolves it when the last
+ * one closes, i.e. once the account is remediated.
  *
  * Findings are evidentiary: written with the service role only (no client
  * write policy, 0034), every statement filtered on `tenantId` (§14).
  */
 
 const PAGE = 1000;
+/** The account's ticket, embedded through the same-tenant key. */
+const TICKET = "ticket:risk_access_tickets!risk_findings_access_ticket_fkey(ticket_number, status)";
 const OPEN: FindingStatus[] = ["open", "acknowledged", "investigating", "assigned", "remediation_in_progress", "mitigated", "exception"];
 
 /** The finding key for one account, or one entitlement of it. */
@@ -39,7 +41,8 @@ type Row = Record<string, unknown>;
 function toAccessFinding(r: Row): AccessFinding {
   return {
     id: r.id as string,
-    ticketNumber: (r.ticket_number as string | null) ?? null,
+    ticketNumber: ((r.ticket as Row | null)?.ticket_number as string | undefined) ?? null,
+    ticketStatus: ((r.ticket as Row | null)?.status as "open" | "resolved" | undefined) ?? null,
     category: "rogue_access",
     severity: r.severity as RiskSeverity,
     status: r.status as FindingStatus,
@@ -62,7 +65,7 @@ function toAccessFinding(r: Row): AccessFinding {
 
 /** An account's access findings, open first (for the account page). */
 export async function listAccessFindings(tenantId: string, filter: { accountId?: string; openOnly?: boolean } = {}): Promise<AccessFinding[]> {
-  let q = supabaseServiceRole().from("risk_findings").select().eq("tenant_id", tenantId).eq("category", "rogue_access");
+  let q = supabaseServiceRole().from("risk_findings").select(`*, ${TICKET}`).eq("tenant_id", tenantId).eq("category", "rogue_access");
   if (filter.accountId) q = q.eq("account_id", filter.accountId);
   if (filter.openOnly) q = q.in("status", OPEN);
   const { data, error } = await q.order("created_at", { ascending: false }).limit(200);
@@ -145,7 +148,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
         explanation: `This access was first seen on ${r.firstSeenAt.slice(0, 10)}, after WonderID's baseline for the application (${r.baselineAt.slice(0, 10)}), and no request, access package or administrator grant in WonderID covers it.`,
         recommendation: "Find out who granted it. Request it through WonderID if it is needed, or have it removed on the target.",
       })
-      .select("id, ticket_number")
+      .select(`id, access_ticket_id, ${TICKET}`)
       .single();
     // 23505: another refresh opened the same finding first; that one stands.
     if (error?.code === "23505") continue;
@@ -155,7 +158,8 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
     }
     result.created++;
     createdIds.push(data.id as string);
-    if (data.ticket_number) createdTickets.push(data.ticket_number as string);
+    const ticket = (data as Row).ticket as Row | null;
+    if (ticket?.ticket_number) createdTickets.push(ticket.ticket_number as string);
     if (r.accessGrantId) {
       await admin.from("risk_evidence").insert({ finding_id: data.id, evidence_type: "access_grant", reference_id: r.accessGrantId, summary: `Grant ${r.label}, no WonderID approval` });
     }
@@ -175,14 +179,18 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
       .eq("tenant_id", tenantId)
       .eq("category", "rogue_access")
       .in("id", part)
-      .select("id, ticket_number");
+      .select(`id, ${TICKET}`);
     if (error) {
       result.failed += part.length;
       continue;
     }
     result.resolved += (data ?? []).length;
     resolvedIds.push(...((data ?? []) as Row[]).map((r) => r.id as string));
-    resolvedTickets.push(...((data ?? []) as Row[]).map((r) => r.ticket_number as string | null).filter((t): t is string => !!t));
+    // The trigger resolves an account's ticket when its last finding closes: name those.
+    for (const r of (data ?? []) as Row[]) {
+      const t = r.ticket as Row | null;
+      if (t?.status === "resolved" && t.ticket_number) resolvedTickets.push(t.ticket_number as string);
+    }
   }
 
   if (createdIds.length || resolvedIds.length) {
@@ -196,8 +204,8 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
       metadata: {
         created: createdIds.slice(0, 500),
         resolved: resolvedIds.slice(0, 500),
-        ticketsOpened: createdTickets.slice(0, 500),
-        ticketsResolved: resolvedTickets.slice(0, 500),
+        tickets: [...new Set(createdTickets)].slice(0, 500),
+        ticketsResolved: [...new Set(resolvedTickets)].slice(0, 500),
         failed: result.failed,
       },
     });

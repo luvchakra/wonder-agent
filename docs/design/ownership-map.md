@@ -93,6 +93,7 @@ excluded (list in the migration's header).
 | `risk_findings` | RiskA | Findings (rogue/policy/risk) |
 | `risk_evidence` | RiskA | Evidence records backing a finding |
 | `risk_ticket_counters` | RiskA | Per-organization counter for rogue-access ticket numbers (RA-000001), drawn by the `risk_findings_assign_ticket` trigger (0131) |
+| `risk_access_tickets` | RiskA | One ticket per rogue account (RA-000001…), holding its rogue-access findings (`risk_findings.access_ticket_id`); opened and resolved only by triggers (0132) |
 | `risk_severity_weights` | RiskA | Tenant-configurable severity-factor weight overrides (RISK-P0-02.2) |
 | `certification_campaigns` | CA | Certification campaign definitions |
 | `certification_items` | CA | Individual access items under review in a campaign |
