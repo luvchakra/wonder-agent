@@ -67,6 +67,7 @@ export default async function FulfilmentTasksPage({ searchParams }: { searchPara
                         )}
                       </p>
                       <p className="text-xs text-muted-foreground">
+                        {t.reason === "leaver" ? "Person left · " : t.reason === "expired" ? "Approval ended · " : ""}
                         Account {accountLabel(t.accountName)} · {t.assigneeName ? `owner ${t.assigneeName}` : "no owner: access managers"} · due {day(t.dueAt)}
                         {t.failureReason && t.status === "failed" ? ` · ${t.failureReason}` : ""}
                         {t.connectorError && t.connectorStatus === "failed" && t.status === "open" ? ` · Connector: ${t.connectorError}` : ""}

@@ -43,6 +43,18 @@ export function statusForState(state: HumanLifecycleState, current: IdentityStat
   }
 }
 
+/**
+ * WID-C02: the moment a person stops working (disabled, terminated or
+ * archived, from a working or notice state), what they hold becomes
+ * removal work, one task per grant (Access Agent's openLeaverRemovals).
+ * Serving notice is not that moment; later steps (disabled, then
+ * terminated) do not open it again.
+ */
+const DEPARTED = new Set<HumanLifecycleState>(["DISABLED", "TERMINATED", "ARCHIVED"]);
+export function opensAccessRemoval(d: Pick<DetectedEvent, "fromState" | "toState">): boolean {
+  return d.toState !== null && DEPARTED.has(d.toState) && !(d.fromState !== null && DEPARTED.has(d.fromState));
+}
+
 const MOVER_FIELDS = ["department", "title", "businessUnit", "location"] as const;
 const GONE = new Set<HumanLifecycleState>(["LEAVE_PENDING", "DISABLED", "TERMINATED", "ARCHIVED"]);
 

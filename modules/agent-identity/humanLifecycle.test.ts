@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedTransitions, detectLifecycleEvents, statusForState, tasksForEvent } from "./humanLifecycle";
+import { allowedTransitions, detectLifecycleEvents, opensAccessRemoval, statusForState, tasksForEvent } from "./humanLifecycle";
 
 describe("human lifecycle transitions", () => {
   it("allows the governed path and rehire, never skipping to terminated from active", () => {
@@ -62,5 +62,20 @@ describe("tasksForEvent", () => {
     expect(tasksForEvent("leaver", { hasSignIn: true })).toEqual(["transfer_ownership", "revoke_access", "disable_sign_in"]);
     expect(tasksForEvent("leaver", { hasSignIn: false })).toEqual(["transfer_ownership", "revoke_access"]);
     expect(tasksForEvent("manager_change", { hasSignIn: true })).toEqual([]);
+  });
+});
+
+describe("opensAccessRemoval (WID-C02)", () => {
+  it("opens removals when a person stops working, not while serving notice", () => {
+    expect(opensAccessRemoval({ fromState: "ACTIVE", toState: "DISABLED" })).toBe(true);
+    expect(opensAccessRemoval({ fromState: "LEAVE_PENDING", toState: "DISABLED" })).toBe(true);
+    expect(opensAccessRemoval({ fromState: "ACTIVE", toState: "TERMINATED" })).toBe(true);
+    expect(opensAccessRemoval({ fromState: "PRE_JOIN", toState: "ARCHIVED" })).toBe(true);
+    expect(opensAccessRemoval({ fromState: "ACTIVE", toState: "LEAVE_PENDING" })).toBe(false);
+  });
+  it("does not open them again on later steps, or for someone returning", () => {
+    expect(opensAccessRemoval({ fromState: "DISABLED", toState: "TERMINATED" })).toBe(false);
+    expect(opensAccessRemoval({ fromState: "TERMINATED", toState: "ARCHIVED" })).toBe(false);
+    expect(opensAccessRemoval({ fromState: "DISABLED", toState: "ACTIVE" })).toBe(false);
   });
 });

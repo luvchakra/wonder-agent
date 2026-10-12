@@ -1637,3 +1637,22 @@ it belongs to. Every other membership behaves as before; the status trigger
 is unchanged (it finds no identity to update for an automation member).
 Verified by `tests/foundation/automation-credentials-isolation.sql`
 ("automation membership creates a person identity", 0).
+
+### 2026-10-12 — A person's departure opens their access removals (WID-C02)
+
+`recordLifecycleEvents` now calls the Access Agent's published
+`openLeaverRemovals` when an event takes a person to disabled, terminated
+or archived for the first time. The pure rule is `opensAccessRemoval` in
+`humanLifecycle.ts`. Serving notice (LEAVE_PENDING) does not trigger it,
+and later steps do not trigger it again.
+
+The Access service is loaded at call time, because it already imports
+this module's service. The `revoke_access` lifecycle task stays as the
+person-level checklist, and each removal is its own fulfilment task, done
+by a person.
+
+Verified:
+- `humanLifecycle.test.ts` (new `opensAccessRemoval` cases);
+- E2E `human-lifecycle.spec.ts` 7/7 and `leaver-removals.spec.ts` 2/2.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

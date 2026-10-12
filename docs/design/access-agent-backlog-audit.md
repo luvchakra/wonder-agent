@@ -2905,3 +2905,41 @@ Verified:
 
 Left out: the urgent leaver path (Identity module). Tracked in
 `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — A leaver's access becomes removal work; overdue removals escalate (WID-C02)
+
+- `openLeaverRemovals` (new, `leaverRemovals.ts`, published in `service.ts`)
+  takes the live grants on a person's accounts:
+  - fulfilled grants are marked `pending_removal`, and each gets a
+    `remove` task with `reason` 'leaver';
+  - grants never fulfilled are withdrawn.
+
+  It never throws: a failure is audited. The audit action is
+  `access.leaver_removals_opened`.
+- `openFulfilmentTask` takes `reason` and `manual`. A manual task makes no
+  connector attempt. Leaver removals are manual. Expiry removals now carry
+  `reason` 'expired' and still run through a connector, as before.
+- `remindOverdueFulfilmentTasks` escalates a `remove` or `disable_account`
+  task that is more than `ESCALATE_AFTER_DAYS` (1) overdue. It goes once
+  to every holder of `access.approve` (`needsEscalation`, `escalated_at`).
+- Migration 0135 adds `access_fulfilment_tasks.reason` and `escalated_at`.
+  It is applied.
+- The Fulfilment Tasks page shows "Person left" or "Approval ended" on such
+  tasks. The task API gains a `reason` field.
+
+Verified:
+- `npx vitest run modules/access-governance modules/agent-identity "app/(customer)/access" lib/config`:
+  358 passed.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local:
+  - `leaver-removals.spec.ts` 2/2 (new) and `human-lifecycle.spec.ts` 7/7;
+  - `f1-reconciliation.spec.ts` 13/13, including the time-bound expiry
+    test. The first run failed the accounts step at the default 30 s
+    limit. It took 26 s locally against the remote database, which this
+    change does not touch, and passed with `--timeout 120000`.
+
+Left out:
+- the owner decision on connectors carrying out a leaver's removals;
+- tests for a connector outage and a failed deprovisioning.
+
+Both are tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

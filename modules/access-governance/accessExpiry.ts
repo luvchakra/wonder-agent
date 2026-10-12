@@ -62,6 +62,7 @@ export async function sweepAccessExpiry(tenantId: string | null, now = new Date(
     const marked = await queueRemoval(
       tenant,
       rows.filter((g) => g.fulfilment_status !== "pending_fulfilment").map((g) => ({ grantId: g.id as string, applicationId: req.application_id as string })),
+      { reason: "expired" },
     );
     // Stamped last, and only once: a run that stopped part way picks the request up again, and queueRemoval does nothing twice.
     const { data: stamped, error: stampError } = await admin

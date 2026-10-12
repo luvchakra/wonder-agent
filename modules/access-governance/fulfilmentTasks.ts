@@ -6,7 +6,8 @@ import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
-import { canAct, isOverdue, taskDueAt, needsReminder, needsUnconfirmedRemovalReminder, UNCONFIRMED_REMOVAL_DAYS, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
+import { listPermissionHolders } from "@/lib/rbac/permissionHolders";
+import { canAct, ESCALATE_AFTER_DAYS, isOverdue, needsEscalation, taskDueAt, needsReminder, needsUnconfirmedRemovalReminder, UNCONFIRMED_REMOVAL_DAYS, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
 import { accountToCreateFirst, planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
 
@@ -40,6 +41,8 @@ export type FulfilmentTask = {
   accessGrantId: string | null;
   accountId: string | null;
   requestId: string | null;
+  /** WID-C02: why a removal no request asked for exists. */
+  reason: "expired" | "leaver" | null;
   applicationId: string;
   applicationName: string | null;
   entitlementName: string | null;
@@ -72,6 +75,7 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
     accessGrantId: ((r.access_grant_id as string | null) ?? (r.removal_grant_id as string | null)) ?? null,
     accountId: (r.account_id as string | null) ?? null,
     requestId: (r.request_id as string | null) ?? null,
+    reason: (r.reason as FulfilmentTask["reason"]) ?? null,
     applicationId: r.application_id as string,
     applicationName: ((app?.display_name as string | null) ?? (app?.name as string | null)) ?? null,
     entitlementName: (((grant?.entitlements as Row | null)?.name as string | undefined) ?? null) as string | null,
@@ -91,7 +95,7 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
 
 const GRANT_FIELDS = "entitlements(name), accounts(account_name, external_account_ref)";
 const SELECT =
-  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, connector_status, connector_error, created_at, " +
+  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, reason, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, connector_status, connector_error, created_at, " +
   `applications(name, display_name), grant:access_grants!access_fulfilment_tasks_grant_fkey(${GRANT_FIELDS}), removal:access_grants!access_fulfilment_tasks_removal_grant_fkey(${GRANT_FIELDS}), ` +
   "account:accounts!access_fulfilment_tasks_account_fkey(account_name, external_account_ref), assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name)";
 
@@ -109,7 +113,17 @@ const KIND_TITLE: Record<FulfilmentTaskKind, string> = {
  */
 export async function openFulfilmentTask(
   tenantId: string,
-  line: { kind?: FulfilmentTaskKind; grantId?: string | null; accountId?: string | null; requestId: string | null; applicationId: string },
+  line: {
+    kind?: FulfilmentTaskKind;
+    grantId?: string | null;
+    accountId?: string | null;
+    requestId: string | null;
+    applicationId: string;
+    /** WID-C02: why a removal no request asked for exists. */
+    reason?: "expired" | "leaver";
+    /** WID-C02: a person does it; a connector never makes this change on its own (a leaver's removals, #15). */
+    manual?: boolean;
+  },
 ): Promise<void> {
   const kind = line.kind ?? "grant";
   try {
@@ -132,15 +146,16 @@ export async function openFulfilmentTask(
         request_id: line.requestId,
         application_id: line.applicationId,
         assignee_identity_id: assignee,
+        reason: line.reason ?? null,
         due_at: taskDueAt(kind, new Date(), config["access.fulfilmentSlaDays"]),
       })
       .select("id")
       .single();
     if (insertError?.code === "23505") return; // a live task for the same grant or account is open already
     if (insertError || !data) throw new ApiError(500, "CREATE_FAILED", insertError?.message ?? "Could not open the task");
-    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { kind, grantId: line.grantId ?? null, accountId: line.accountId ?? null, requestId: line.requestId, assigneeIdentityId: assignee } });
+    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { kind, grantId: line.grantId ?? null, accountId: line.accountId ?? null, requestId: line.requestId, assigneeIdentityId: assignee, reason: line.reason ?? null } });
     // INTEGRATION-P0-13: a connector with writes turned on makes the change; its owner hears only if it cannot.
-    const plan = await planConnectorFulfilment(tenantId, data.id as string).catch(() => null);
+    const plan = line.manual ? null : await planConnectorFulfilment(tenantId, data.id as string).catch(() => null);
     if (plan) {
       runAfterResponse(() => runConnectorFulfilment(tenantId, plan));
       return;
@@ -366,6 +381,44 @@ export async function remindOverdueFulfilmentTasks(tenantId: string | null, now 
     });
     await supabaseServiceRole().from("access_fulfilment_tasks").update({ reminded_at: now.toISOString() }).eq("tenant_id", tenant).eq("id", t.id as string);
     reminded++;
+  }
+
+  // WID-C02: a removal or disable a day past due goes to the organization's access managers, once.
+  let late = supabaseServiceRole()
+    .from("access_fulfilment_tasks")
+    .select("id, tenant_id, kind, status, due_at, escalated_at, reason, applications(name, display_name)")
+    .in("kind", ["remove", "disable_account"])
+    .in("status", ["open", "claimed", "failed"])
+    .is("escalated_at", null)
+    .lt("due_at", new Date(now.getTime() - ESCALATE_AFTER_DAYS * 86_400_000).toISOString())
+    .order("due_at")
+    .limit(500);
+  if (tenantId) late = late.eq("tenant_id", tenantId);
+  const { data: overdue, error: lateError } = await late;
+  if (lateError) throw new ApiError(500, "QUERY_FAILED", lateError.message);
+  const managers = new Map<string, string[]>();
+  for (const t of (overdue ?? []) as unknown as Row[]) {
+    const tenant = t.tenant_id as string;
+    if (tenantId && tenant !== tenantId) continue;
+    const task = { kind: t.kind as string, status: t.status as FulfilmentTaskStatus, dueAt: t.due_at as string, escalatedAt: (t.escalated_at as string | null) ?? null };
+    if (!needsEscalation(task, now)) continue;
+    if (!managers.has(tenant)) managers.set(tenant, await listPermissionHolders(tenant, "access.approve"));
+    const app = (t.applications as Row | null) ?? null;
+    const appName = (app?.display_name as string | null) ?? (app?.name as string | null) ?? "an application";
+    const why = t.reason === "leaver" ? " for someone who has left" : t.reason === "expired" ? " whose approval has ended" : "";
+    for (const userId of managers.get(tenant)!) {
+      await notify({
+        tenantId: tenant,
+        userId,
+        type: "fulfilment_task",
+        title: `Escalated: ${t.kind === "remove" ? "access to remove" : "account to disable"} in ${appName}`,
+        body: `A removal${why} is more than ${ESCALATE_AFTER_DAYS} day overdue. Open Fulfilment Tasks.`,
+        referenceType: "access_fulfilment_task",
+        referenceId: t.id as string,
+      });
+    }
+    await supabaseServiceRole().from("access_fulfilment_tasks").update({ escalated_at: now.toISOString() }).eq("tenant_id", tenant).eq("id", t.id as string).is("escalated_at", null);
+    await writeAudit({ tenantId: tenant, actorType: "system", action: "access.fulfilment_task_escalated", objectType: "access_fulfilment_task", objectId: t.id as string, outcome: "success", metadata: { kind: t.kind, reason: t.reason ?? null, dueAt: t.due_at, recipients: managers.get(tenant)!.length } });
   }
   return { reminded };
 }

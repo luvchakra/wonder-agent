@@ -58,6 +58,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Stronger safeguards: emergency controls block in every gateway mode; high-risk access always needs a person; nobody approves their own request; automation credentials never approve or certify. |
 | 12 Oct 2026 | A role given to an automation credential pauses it until a second administrator approves; owners are reminded about removals that the system has not confirmed. |
 | 12 Oct 2026 | Ended access shows whether it is really gone; removing access and disabling accounts are due within a day; refused automation calls are audited, and the database caps automation credential expiry at a year. |
+| 12 Oct 2026 | When someone leaves, each access they hold becomes its own removal task, due within a day; removals more than a day overdue go to the access managers. |
 
 ---
 
@@ -128,7 +129,9 @@ The everyday cycle looks like this:
 - **No owner, no requests:** nobody can request access for an identity without an owner.
 
 **Joiners, movers and leavers**
-- When someone joins, changes role or leaves, WonderID creates the work that follows: tasks to hand over ownership and remove access. People do this work; leaver tasks have no deadline yet.
+- When someone joins, changes role or leaves, WonderID creates the work that follows: tasks to hand over ownership and remove access. People do this work.
+- When someone actually stops working (disabled, terminated or archived), each access they hold gets its own removal task on Fulfilment Tasks, marked "Person left" and due within a day. Access approved but never set up is withdrawn. Serving notice does not start this.
+- A person makes each of these removals, even where a connection could; it counts as removed only when a later read of the system no longer finds it.
 - When a person leaves, what they owned is transferred to someone else, never left without an owner.
 
 **Identity sources**
@@ -337,6 +340,7 @@ An approved request is not access yet. It becomes access once the change is made
 - **Verified:** after the change, WonderID reads the system again and marks it verified only if the change is really there.
 - **If it fails:** the task goes back to its owner with the reason. They can do it by hand or press "Try again".
 - **Not confirmed:** if a removal was marked done but the system still has not confirmed it 2 days later, its owner is reminded daily to check.
+- **Escalated:** a removal or account disable more than a day overdue goes to the organization's access managers, once.
 
 **Limit on mass changes**
 - A connection may make at most 100 changes an hour by default. You can change this in Global Configuration → Connections.

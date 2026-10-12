@@ -31,7 +31,7 @@ met, with evidence), or Waiting on the owner.
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
 | WID-C01 Approval policy | P2 | Partly fixed | Maker/checker on request-policy changes |
-| WID-C02 Revocation and expiry | P1 | In progress | An urgent leaver path: one removal per grant, with an owner and a deadline, escalated |
+| WID-C02 Revocation and expiry | P2 | Partly fixed | Integration tests for a connector outage and a failed deprovisioning; owner decision on connectors carrying out a leaver's removals |
 | WID-C03 Gateway bypass | P2 | Partly fixed | Flag runtime events that have no matching gateway decision |
 | WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
@@ -90,9 +90,33 @@ See `endedRemoval` in `pendingGrantRules.ts` and `ENDED` in
 keeps the SLA (`taskDueAt` in `fulfilmentTaskRules.ts`; test in
 `fulfilmentTaskRules.test.ts`).
 
-**Next:** an urgent leaver path: one removal per grant, with an owner and a
-deadline, escalated. This is in the Identity module's lifecycle
-(`humanLifecycleService.ts`), so it gets its own pull request.
+**Done:** the urgent leaver path. When a person stops working (disabled,
+terminated or archived, not while serving notice):
+- each live grant on their accounts gets its own removal task, marked
+  "leaver", due within a day and owned by the application's owner;
+- grants approved but never fulfilled are withdrawn;
+- later steps open nothing twice;
+- a person does each removal: no connector acts on its own (#15, and the
+  lifecycle rule that a task is a person's job).
+
+See `opensAccessRemoval` in `humanLifecycle.ts` and `openLeaverRemovals`
+in `leaverRemovals.ts`; tests in `humanLifecycle.test.ts` and
+`tests/e2e/leaver-removals.spec.ts`.
+
+**Done:** escalation. A removal or account disable more than a day overdue
+goes to the access managers (holders of `access.approve`), once
+(`needsEscalation`, migration 0135 `escalated_at`, audit
+`access.fulfilment_task_escalated`). Removal tasks also say why they exist
+(`reason`: leaver or expired).
+
+Priority lowered to P2: the urgent paths exist, and what remains is tests
+and an owner decision.
+
+**Next:**
+- Integration tests for a connector outage, a delayed sync and a failed
+  deprovisioning.
+- **Owner decision:** may a connection with changes turned on carry out a
+  leaver's removals by itself? Today a person does each one.
 
 ### WID-C03: gateway coverage (P2, partly fixed)
 
