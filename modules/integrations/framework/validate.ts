@@ -2,6 +2,7 @@ import {
   CANONICAL_FIELDS,
   CONNECTOR_CATEGORIES,
   CURSOR_FIELDS,
+  JWT_ALGORITHMS,
   CONNECTOR_DRIVERS,
   DEFINITION_SCHEMA_VERSION,
   DEFINITION_WRITE_OPERATIONS,
@@ -38,7 +39,7 @@ const SEMVER_RE = /^\d+\.\d+\.\d+$/;
 const MAX_BYTES = 256 * 1024;
 
 const AUTH_BY_DRIVER: Record<string, string[]> = {
-  http: ["none", "basic", "bearer", "header", "query", "body", "oauth2_client_credentials"],
+  http: ["none", "basic", "bearer", "header", "query", "body", "oauth2_client_credentials", "client_certificate"],
   ldap: ["ldap_simple"],
   sql: ["sql_password"],
   mcp: ["none", "bearer", "header"],
@@ -439,7 +440,8 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
       header: ["name", "value"],
       query: ["name", "value"],
       body: ["name", "value"],
-      oauth2_client_credentials: ["clientId", "clientSecret"],
+      oauth2_client_credentials: ["clientId"],
+      client_certificate: ["certificate", "privateKey"],
       ldap_simple: ["bindDn", "password"],
       sql_password: ["username", "password"],
     };
@@ -448,7 +450,31 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
       else checkTemplate(ctx, `auth.${k}`, auth[k] as string, ["secret", "settings"]);
     }
     if (auth.type === "header" && typeof auth.name === "string" && /^(host|cookie)$/i.test(auth.name)) issue(ctx, "auth.name", "cannot be Host or Cookie");
+    if (auth.type === "client_certificate") {
+      for (const k of ["certificate", "privateKey"] as const) {
+        if (typeof auth[k] === "string" && !/\{secret\./.test(auth[k] as string)) issue(ctx, `auth.${k}`, "must come from a secret field ({secret.…})");
+      }
+    }
     if (auth.type === "oauth2_client_credentials") {
+      // INTEGRATION-P0-21: a secret, or a private key that signs assertions.
+      const signed = auth.clientAuth === "private_key_jwt" || auth.grant === "jwt_bearer";
+      if (auth.grant !== undefined && auth.grant !== "client_credentials" && auth.grant !== "jwt_bearer") issue(ctx, "auth.grant", "must be client_credentials or jwt_bearer");
+      if (auth.grant === "jwt_bearer" && auth.clientAuth !== undefined && auth.clientAuth !== "body") issue(ctx, "auth.clientAuth", "is not used with the jwt_bearer grant");
+      const own = signed ? ["privateKey"] : ["clientSecret"];
+      for (const k of own) {
+        if (!str(auth[k], 1000)) issue(ctx, `auth.${k}`, signed ? "is required: the private key that signs the assertion" : "is required");
+        else checkTemplate(ctx, `auth.${k}`, auth[k] as string, ["secret", "settings"]);
+      }
+      if (signed && auth.privateKey !== undefined && typeof auth.privateKey === "string" && !/\{secret\./.test(auth.privateKey)) issue(ctx, "auth.privateKey", "must come from a secret field ({secret.…})");
+      if (auth.algorithm !== undefined && !(JWT_ALGORITHMS as readonly string[]).includes(String(auth.algorithm))) issue(ctx, "auth.algorithm", `must be ${JWT_ALGORITHMS.join(" or ")}`);
+      for (const k of ["keyId", "subject"] as const) {
+        if (auth[k] === undefined) continue;
+        if (!str(auth[k], 300)) issue(ctx, `auth.${k}`, "must be text");
+        else checkTemplate(ctx, `auth.${k}`, auth[k] as string, ["settings", "secret"]);
+      }
+      if (!signed && (auth.privateKey !== undefined || auth.algorithm !== undefined || auth.keyId !== undefined || auth.subject !== undefined)) {
+        issue(ctx, "auth", "privateKey, algorithm, keyId and subject need clientAuth private_key_jwt or the jwt_bearer grant");
+      }
       const t = auth.tokenUrl;
       if (!str(t, 1000)) issue(ctx, "auth.tokenUrl", "is required");
       else {
@@ -459,7 +485,7 @@ export function validateDefinition(input: unknown): { definition: ConnectorDefin
         checkTemplate(ctx, "auth.tokenUrl", t, ["settings"]);
       }
       if (auth.scope !== undefined && typeof auth.scope !== "string") issue(ctx, "auth.scope", "must be text");
-      if (auth.clientAuth !== undefined && auth.clientAuth !== "body" && auth.clientAuth !== "basic") issue(ctx, "auth.clientAuth", "must be body or basic");
+      if (auth.clientAuth !== undefined && !["body", "basic", "private_key_jwt"].includes(String(auth.clientAuth))) issue(ctx, "auth.clientAuth", "must be body, basic or private_key_jwt");
     }
   }
 

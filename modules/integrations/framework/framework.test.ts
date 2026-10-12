@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { generateKeyPairSync, verify } from "node:crypto";
 import { applyTransform, fillTemplate, mapField, mapRecord, matchesFilters, readPath, TemplateError } from "./mapping";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { HttpSession, parseLinkNext, type FetchLike } from "./http";
@@ -663,5 +664,91 @@ describe("incremental resources (INTEGRATION-P0-21 slice 2)", () => {
     const plain = new DefinitionConnector({ http: httpDriver(fetchImpl) });
     await plain.authenticate({ ...config, manifest: base }, JSON.stringify({ token: "t" }));
     expect(plain.supportsIncremental()).toBe(false);
+  });
+});
+
+describe("signing in with a private key or a client certificate (INTEGRATION-P0-21 part 3)", () => {
+  const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+  const keyPem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
+  const oauth = (extra: Record<string, unknown>): ConnectorDefinition =>
+    ({
+      ...fast,
+      key: "acme-jwt",
+      auth: { type: "oauth2_client_credentials", tokenUrl: "/oauth/token", clientId: "{secret.clientId}", fields: [{ key: "clientId", label: "Client ID" }, { key: "privateKey", label: "Private key" }], ...extra },
+    }) as unknown as ConnectorDefinition;
+
+  it("validates the private-key modes and client certificates", () => {
+    const msgs = (d: unknown) => validateDefinition(d).issues.map((i) => `${i.path}: ${i.message}`).join("\n");
+    expect(msgs(oauth({ clientAuth: "private_key_jwt", privateKey: "{secret.privateKey}", keyId: "k1" }))).toBe("");
+    expect(msgs(oauth({ grant: "jwt_bearer", privateKey: "{secret.privateKey}", algorithm: "ES256", subject: "{settings.baseUrl}" }))).toBe("");
+    expect(msgs(oauth({ clientAuth: "private_key_jwt" }))).toMatch(/auth.privateKey: is required: the private key/);
+    expect(msgs(oauth({ clientAuth: "private_key_jwt", privateKey: "{settings.baseUrl}" }))).toMatch(/must come from a secret field/);
+    expect(msgs(oauth({ grant: "jwt_bearer", privateKey: "{secret.privateKey}", algorithm: "HS256" }))).toMatch(/algorithm: must be RS256 or ES256/);
+    expect(msgs(oauth({ grant: "password", privateKey: "{secret.privateKey}" }))).toMatch(/grant: must be client_credentials or jwt_bearer/);
+    expect(msgs(oauth({ privateKey: "{secret.privateKey}" }))).toMatch(/auth.clientSecret: is required/);
+    expect(msgs(oauth({ clientSecret: "{secret.privateKey}", keyId: "k1" }))).toMatch(/need clientAuth private_key_jwt or the jwt_bearer grant/);
+    const cert = { ...fast, key: "acme-mtls", auth: { type: "client_certificate", certificate: "{secret.cert}", privateKey: "{secret.key}", fields: [{ key: "cert", label: "Certificate" }, { key: "key", label: "Key" }] } };
+    expect(msgs(cert)).toBe("");
+    expect(msgs({ ...cert, auth: { ...cert.auth, certificate: "-----BEGIN CERTIFICATE-----" } })).toMatch(/certificate: must come from a secret field/);
+    expect(msgs({ ...cert, driver: "ldap", resources: {} })).toMatch(/auth.type: must be one of/);
+  });
+
+  it("private_key_jwt: the token request carries a signed client assertion and no secret", async () => {
+    let form = new URLSearchParams();
+    const { fetchImpl, calls } = fakeFetch(async (u, init) => {
+      if (u.pathname === "/oauth/token") {
+        form = new URLSearchParams(init.body);
+        return json({ access_token: "tok", expires_in: 300 });
+      }
+      return json({ data: [] });
+    });
+    const s = new HttpSession(oauth({ clientAuth: "private_key_jwt", privateKey: "{secret.privateKey}", keyId: "k1" }), { baseUrl: "https://idp.example" }, { clientId: "client-1", privateKey: keyPem }, fetchImpl);
+    await s.send({ path: "/users" }, { settings: {} });
+    expect(form.get("grant_type")).toBe("client_credentials");
+    expect(form.get("client_id")).toBe("client-1");
+    expect(form.get("client_secret")).toBeNull();
+    expect(form.get("client_assertion_type")).toBe("urn:ietf:params:oauth:client-assertion-type:jwt-bearer");
+    const [h, c, sig] = form.get("client_assertion")!.split(".");
+    expect(verify("sha256", Buffer.from(`${h}.${c}`), publicKey, Buffer.from(sig, "base64url"))).toBe(true);
+    expect(JSON.parse(Buffer.from(c, "base64url").toString())).toMatchObject({ iss: "client-1", sub: "client-1", aud: "https://idp.example/oauth/token" });
+    expect(calls[1].headers.Authorization).toBe("Bearer tok");
+  });
+
+  it("jwt_bearer: the assertion is the grant, for the subject given", async () => {
+    let form = new URLSearchParams();
+    const { fetchImpl } = fakeFetch(async (u, init) => {
+      if (u.pathname === "/oauth/token") {
+        form = new URLSearchParams(init.body);
+        return json({ access_token: "tok" });
+      }
+      return json({});
+    });
+    const s = new HttpSession(oauth({ grant: "jwt_bearer", privateKey: "{secret.privateKey}", subject: "admin@acme.example", scope: "directory.read" }), { baseUrl: "https://idp.example" }, { clientId: "svc@acme.example", privateKey: keyPem }, fetchImpl);
+    await s.send({ path: "/users" }, { settings: {} });
+    expect(form.get("grant_type")).toBe("urn:ietf:params:oauth:grant-type:jwt-bearer");
+    expect(form.get("client_assertion")).toBeNull();
+    const claims = JSON.parse(Buffer.from(form.get("assertion")!.split(".")[1], "base64url").toString());
+    expect(claims).toMatchObject({ iss: "svc@acme.example", sub: "admin@acme.example", scope: "directory.read" });
+  });
+
+  it("a broken key fails the sign-in with a reason that does not contain the key", async () => {
+    const { fetchImpl } = fakeFetch(() => json({}));
+    const s = new HttpSession(oauth({ clientAuth: "private_key_jwt", privateKey: "{secret.privateKey}" }), { baseUrl: "https://idp.example" }, { clientId: "c", privateKey: "-----BEGIN PRIVATE KEY-----\nnot-really\n-----END PRIVATE KEY-----" }, fetchImpl);
+    const err = await s.send({ path: "/users" }, { settings: {} }).catch((e: Error) => e);
+    expect(String(err)).toMatch(/not a PEM private key/);
+    expect(String(err)).not.toMatch(/not-really/);
+  });
+
+  it("client_certificate: the request carries the certificate to the connection's own https address, and nothing in its headers", async () => {
+    const def = { ...fast, key: "acme-mtls", auth: { type: "client_certificate", certificate: "{secret.cert}", privateKey: "{secret.key}", fields: [{ key: "cert", label: "Certificate" }, { key: "key", label: "Key" }] } } as unknown as ConnectorDefinition;
+    const seen: { clientCert?: unknown; headers?: Record<string, string> }[] = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      seen.push(init);
+      return json({});
+    };
+    await new HttpSession(def, { baseUrl: "https://acme.example" }, { cert: "CERT", key: "KEY" }, fetchImpl).send({ path: "/users" }, { settings: {} });
+    expect(seen[0].clientCert).toEqual({ cert: "CERT", key: "KEY" });
+    expect(seen[0].headers?.Authorization).toBeUndefined();
+    await expect(new HttpSession(def, { baseUrl: "http://acme.example" }, { cert: "CERT", key: "KEY" }, fetchImpl).send({ path: "/users" }, { settings: {} })).rejects.toThrow(/only sent over https/);
   });
 });

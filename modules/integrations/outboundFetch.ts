@@ -33,6 +33,8 @@ export type GuardedInit = {
   timeoutMs?: number;
   maxBytes?: number;
   policy?: OutboundPolicy;
+  /** INTEGRATION-P0-21: a client certificate for mutual TLS; https only, and never followed to another origin. */
+  clientCert?: { cert: string; key: string };
 };
 
 export function guardedLookup(policy: OutboundPolicy): LookupFunction {
@@ -62,6 +64,7 @@ function once(url: URL, init: GuardedInit, policy: OutboundPolicy): Promise<{ st
         headers: { ...(init.headers ?? {}), ...(init.body !== undefined ? { "content-length": Buffer.byteLength(init.body).toString() } : {}) },
         lookup: guardedLookup(policy),
         timeout: timeoutMs,
+        ...(init.clientCert && url.protocol === "https:" ? { cert: init.clientCert.cert, key: init.clientCert.key } : {}),
       },
       (res) => {
         const chunks: Buffer[] = [];
@@ -111,6 +114,8 @@ export async function guardedFetch(input: string | URL, init: GuardedInit = {}):
       url = checkOutboundUrl(new URL(location, url), policy);
       const headers = { ...(current.headers ?? {}) };
       if (url.origin !== origin) for (const h of Object.keys(headers)) if (CREDENTIAL_HEADERS.includes(h.toLowerCase())) delete headers[h];
+      // The client certificate is the connection's credential too: never presented to another origin.
+      if (url.origin !== origin) current = { ...current, clientCert: undefined };
       const toGet = res.status === 303 || ((res.status === 301 || res.status === 302) && (current.method ?? "GET") !== "GET");
       current = { ...current, headers, ...(toGet ? { method: "GET", body: undefined } : {}) };
       continue;

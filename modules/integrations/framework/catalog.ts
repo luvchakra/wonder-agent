@@ -173,6 +173,7 @@ const AUTH_TYPE_FOR: Record<ConnectorDefinition["auth"]["type"], AuthType> = {
   header: "api_key",
   query: "api_key",
   body: "api_key",
+  client_certificate: "mtls",
   oauth2_client_credentials: "oauth2",
   ldap_simple: "basic",
   sql_password: "basic",
