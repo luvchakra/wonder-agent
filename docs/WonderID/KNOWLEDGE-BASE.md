@@ -62,6 +62,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Identity providers and HR systems can push people to WonderID over SCIM 2.0 as they join, change and leave. |
 | 12 Oct 2026 | Agents that act without asking the Runtime Gateway, or despite a "no", now get a gateway bypass finding. |
 | 12 Oct 2026 | A sync cut short at a limit counts as partial, so the next sync still reads everything it missed. |
+| 12 Oct 2026 | Rogue access that was approved later is recorded as "approved afterwards", with its request, never as fixed. |
 
 ---
 
@@ -393,7 +394,7 @@ Findings are raised for:
 - **Raising:** access that appeared in a system with no approval raises a finding.
 - **One ticket per account:** a rogue account gets one ticket, such as **RA-000012**, numbered in order within your organization. Everything rogue found on that account belongs to the same ticket. You can quote the number in conversations and other tools; it shows on the account page and in Risk Overview.
 - **Fixing:** for each piece of rogue access, a reviewer clicks **Remove access**, which raises an ordinary request under the application's rules. The request quotes the account's ticket number.
-- **Closing:** the ticket stays open until all of the account's rogue access is dealt with (removed, and confirmed by the next sync, or approved after all). Then it closes as "verified fixed". This status does not yet say which of the two happened; the access history keeps the earlier Rogue status. If rogue access turns up on the same account later, a new ticket opens.
+- **Closing:** the ticket stays open until all of the account's rogue access is dealt with. Each finding records how: **removed** (confirmed by a later sync), or **approved afterwards**, with the request that approved it attached. The access history keeps the earlier Rogue status either way. If rogue access turns up on the same account later, a new ticket opens.
 
 **Investigations**
 - Group findings and evidence into a case and work it to a conclusion.

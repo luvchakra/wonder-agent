@@ -1222,3 +1222,34 @@ Verified:
 
 Left out: making the gateway the only path. That is an owner decision,
 tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — Rogue access approved afterwards is its own resolution (WID-H04)
+
+- New pure rule `rogueResolution` (`accessFindingRules.ts`) works out how
+  a finding ended from its grant now:
+  - revoked, missing at the source, or gone: `verified_fixed`;
+  - still there with a request, a package item or another approval:
+    `approved_afterwards`.
+- `syncRogueAccessFindings` now reads each stale finding's grant
+  (`resolutionsFor`) and resolves it with that type and reason, one update
+  per finding, guarded on an open status. An approval through a request is
+  attached as `access_request` evidence. The sync audit gains
+  `approvedAfterwards`.
+- `AccessFinding` gains `resolutionType`. `ResolutionType` and
+  `EvidenceType` each gain one value.
+- Migration 0138 extends both check constraints (applied).
+  `approved_afterwards` is set only by the system; the manual resolve route
+  still accepts only its three types.
+
+Verified:
+- `npx vitest run modules/risk`: 80 passed, including
+  `accessFindingRules.test.ts`.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local: `f1-reconciliation` 13/13 (the "removed at the source" test
+  now also checks `verified_fixed`) and `connector-provisioning` 12/12.
+  Both ran against a production build started with the config's own test
+  settings, because the config's build-and-start went past its 3-minute
+  limit.
+
+Left out: accepted-exception and false-positive closure for rogue findings
+on human accounts.

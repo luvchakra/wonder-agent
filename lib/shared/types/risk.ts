@@ -41,7 +41,7 @@ export type FindingStatus =
   | "false_positive"
   | "exception";
 
-export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event" | "governance_baseline" | "agent_relationship";
+export type EvidenceType = "access_grant" | "runtime_event" | "policy_evaluation" | "ownership_fact" | "lifecycle_event" | "governance_baseline" | "agent_relationship" | "access_request";
 
 export type RiskEvidence = {
   id: string;
@@ -52,7 +52,8 @@ export type RiskEvidence = {
   createdAt: string;
 };
 
-export type ResolutionType = "verified_fixed" | "accepted_risk" | "false_positive";
+/** WID-H04: `approved_afterwards` is set only by the system, for rogue access approved after it appeared. */
+export type ResolutionType = "verified_fixed" | "accepted_risk" | "false_positive" | "approved_afterwards";
 
 export type RiskFinding = {
   id: string;
@@ -171,6 +172,8 @@ export type AccessFinding = {
   agentId: string | null;
   createdAt: string;
   resolvedAt: string | null;
+  /** WID-H04: removed (`verified_fixed`) or approved after it appeared (`approved_afterwards`). */
+  resolutionType: ResolutionType | null;
   resolutionReason: string | null;
   /** RISK-P0-13: the removal request raised for it, and that request's status. */
   remediationRequestId: string | null;

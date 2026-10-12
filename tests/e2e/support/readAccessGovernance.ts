@@ -27,15 +27,15 @@ export async function ledgerEvents(tenantId: string, accountId: string): Promise
   return (data ?? []).map((r) => r.event_type as string);
 }
 
-export async function accessFindings(tenantId: string, accountId: string): Promise<{ status: string; entitlementId: string | null; title: string }[]> {
+export async function accessFindings(tenantId: string, accountId: string): Promise<{ status: string; entitlementId: string | null; title: string; resolutionType: string | null }[]> {
   const { data, error } = await adminClient()
     .from("risk_findings")
-    .select("status, entitlement_id, title")
+    .select("status, entitlement_id, title, resolution_type")
     .eq("tenant_id", tenantId)
     .eq("category", "rogue_access")
     .eq("account_id", accountId);
   if (error) throw new Error(`accessFindings: ${error.message}`);
-  return (data ?? []).map((r) => ({ status: r.status, entitlementId: r.entitlement_id, title: r.title }));
+  return (data ?? []).map((r) => ({ status: r.status, entitlementId: r.entitlement_id, title: r.title, resolutionType: r.resolution_type }));
 }
 
 export async function grantsOf(tenantId: string, accountId: string): Promise<{ entitlementId: string; revokedAt: string | null; missingFromSourceAt: string | null }[]> {
