@@ -178,6 +178,9 @@ export type AccessFinding = {
   /** RISK-P0-13: the removal request raised for it, and that request's status. */
   remediationRequestId: string | null;
   remediationRequestStatus: string | null;
+  /** WID-H04: an accepted exception's end, and why a person excepted or closed it. */
+  exceptionUntil?: string | null;
+  decisionReason?: string | null;
 };
 
 /** What Access reports as rogue now: one entry per account (entitlementId null) or account and entitlement. */

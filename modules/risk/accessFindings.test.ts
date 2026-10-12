@@ -29,6 +29,9 @@ function query(table: string) {
     update: (set: Row) => ((op = { kind: "update", set }), b),
     eq: (c: string, v: unknown) => (filters.push((r) => r[c] === v), b),
     in: (c: string, vs: unknown[]) => (filters.push((r) => vs.includes(r[c])), b),
+    lte: (c: string, v: string) => (filters.push((r) => typeof r[c] === "string" && (r[c] as string) <= v), b),
+    not: (c: string, _op: "is", v: null) => (filters.push((r) => (r[c] ?? null) !== v), b),
+    maybeSingle: () => ((single = true), b),
     order: () => b,
     limit: () => b,
     range: () => b,
@@ -42,8 +45,10 @@ vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ from: query }) }));
 const audits: Row[] = [];
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: vi.fn(async (e: Row) => void audits.push(e)) }));
+let deciderIdentity: string | null = "reviewer-1";
+vi.mock("@/modules/agent-identity/service", () => ({ getIdentityForUser: vi.fn(async () => (deciderIdentity ? { id: deciderIdentity } : null)) }));
 
-import { listAccessFindings, syncRogueAccessFindings } from "./accessFindings";
+import { decideRogueFinding, listAccessFindings, syncRogueAccessFindings } from "./accessFindings";
 
 const T = "t1";
 const rogue = (over: Partial<RogueAccess> = {}): RogueAccess => ({
@@ -63,6 +68,7 @@ beforeEach(() => {
   for (const k of Object.keys(db)) delete db[k];
   audits.length = 0;
   conflictOnInsert = false;
+  deciderIdentity = "reviewer-1";
 });
 
 describe("syncRogueAccessFindings", () => {
@@ -114,5 +120,45 @@ describe("syncRogueAccessFindings", () => {
     await syncRogueAccessFindings(T, []);
     expect(db.risk_findings[0].status).toBe("open");
     expect(await listAccessFindings(T)).toEqual([]);
+  });
+});
+
+describe("rogue-access decisions (WID-H04)", () => {
+  const FID = "11111111-1111-4111-8111-111111111111";
+  const now = new Date("2026-10-12T10:00:00Z");
+  const seed = (over: Row = {}) => {
+    db.risk_findings = [{ id: FID, tenant_id: T, category: "rogue_access", status: "open", identity_id: "person-1", account_id: "acct-1", subject_key: "acct-1|ent-1", access_grant_id: "grant-1", ...over }];
+  };
+
+  it("an exception records who, why and until when, and is audited", async () => {
+    seed();
+    const f = await decideRogueFinding(T, "user-9", FID, { outcome: "exception", reason: "Month-end close", until: "2026-11-01" }, now);
+    expect(f.status).toBe("exception");
+    expect(db.risk_findings[0]).toMatchObject({ status: "exception", exception_until: "2026-11-01T23:59:59.000Z", decided_by: "user-9", decision_reason: "Month-end close" });
+    expect(audits.at(-1)).toMatchObject({ action: "risk.access_finding_decided", metadata: { outcome: "exception" } });
+  });
+
+  it("the account's owner cannot decide, and another organization's finding is not found", async () => {
+    seed();
+    deciderIdentity = "person-1";
+    await expect(decideRogueFinding(T, "user-1", FID, { outcome: "false_positive", reason: "mine" }, now)).rejects.toMatchObject({ code: "SELF_DECISION" });
+    deciderIdentity = "reviewer-1";
+    await expect(decideRogueFinding("t2", "user-9", FID, { outcome: "false_positive", reason: "x" }, now)).rejects.toMatchObject({ code: "FINDING_NOT_FOUND" });
+    expect(db.risk_findings[0].status).toBe("open");
+  });
+
+  it("a false positive is not flagged again for the same grant; a new grant on the same access is", async () => {
+    seed();
+    await decideRogueFinding(T, "user-9", FID, { outcome: "false_positive", reason: "Granted by payroll" }, now);
+    expect(await syncRogueAccessFindings(T, [rogue()])).toMatchObject({ created: 0 });
+    expect(await syncRogueAccessFindings(T, [rogue({ accessGrantId: "grant-2" })])).toMatchObject({ created: 1 });
+  });
+
+  it("an ended exception reopens on the next sync, and is not duplicated while it lasts", async () => {
+    seed({ status: "exception", exception_until: "2026-10-01T00:00:00Z" });
+    await syncRogueAccessFindings(T, [rogue()]);
+    expect(db.risk_findings.filter((f) => f.category === "rogue_access")).toHaveLength(1);
+    expect(db.risk_findings[0]).toMatchObject({ status: "open", exception_until: null });
+    expect(audits.some((a) => a.action === "risk.access_finding_exception_ended")).toBe(true);
   });
 });

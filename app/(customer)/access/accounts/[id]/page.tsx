@@ -9,6 +9,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Badge, Button, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { LinkAccountForm } from "../AccountForms";
 import { RemoveRogueAccessButton } from "./RemoveRogueAccessButton";
+import { CloseRogueFinding } from "./CloseRogueFinding";
 import { ACCOUNT_TYPE_LABEL, CORRELATION_LABEL, IDENTITY_TYPE_LABEL, when } from "../labels";
 
 // ACCESS-P0-17 — one account: who it belongs to and how that was decided,
@@ -176,11 +177,18 @@ export default async function AccountDetailPage({ params, searchParams }: { para
                       {e.lastVerifiedAt ? ` · last seen at source ${when(e.lastVerifiedAt)}` : ""}
                     </span>
                     {e.missingFromSourceAt ? <Badge tone="neutral">Gone from source</Badge> : null}
-                    {finding ? <Badge tone="danger">Finding open</Badge> : null}
+                    {finding ? (
+                      finding.status === "exception" ? (
+                        <Badge tone="warning">{`Exception until ${(finding.exceptionUntil ?? "").slice(0, 10)}`}</Badge>
+                      ) : (
+                        <Badge tone="danger">Finding open</Badge>
+                      )
+                    ) : null}
                     {finding && remediationLabel(finding.remediationRequestStatus) ? <Badge tone="info">{remediationLabel(finding.remediationRequestStatus)}</Badge> : null}
                     {finding && canRemediate && (!finding.remediationRequestStatus || ["rejected", "cancelled", "expired"].includes(finding.remediationRequestStatus)) ? (
                       <RemoveRogueAccessButton findingId={finding.id} what={e.entitlementName ?? "this account"} disable={!e.entitlementId} />
                     ) : null}
+                    {finding && canRemediate ? <CloseRogueFinding findingId={finding.id} /> : null}
                   </li>
                 );
               })}
