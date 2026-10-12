@@ -2132,6 +2132,16 @@ follow.
   - a 503 is tried three times (keys `:1`, `:2`, `:3`), the task goes back
     with "HTTP 503", and Try again succeeds and is verified;
   - with writes off again, the next change is a person's task.
+- Affected specs (§17.8: connectors), local, one worker: `f1-reconciliation`,
+  `file-import`, `integrations`, `connection-schedule`, `outbound-guard`,
+  `identity-sources` and `connector-provisioning`. 50 passed and 1 failed:
+  - The failure was the object-page import's "1 added" wait in
+    `file-import`. That import runs the connection's whole sync, about 10 s
+    from this runner, and the wait was 10 s. It also failed once on
+    2026-10-11.
+  - The 5 tests after it in that serial spec did not run.
+  - `file-import` alone: 10/10.
+  - That wait is now 30 s; this change does not touch the file-import path.
 - Supabase advisors: the new foreign key is covered by a composite index.
   - On dev an extra single-column index from the first apply remains: the
     MCP tool refuses `drop index`, and the migration file creates only the
