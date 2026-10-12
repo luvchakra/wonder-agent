@@ -63,6 +63,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Agents that act without asking the Runtime Gateway, or despite a "no", now get a gateway bypass finding. |
 | 12 Oct 2026 | A sync cut short at a limit counts as partial, so the next sync still reads everything it missed. |
 | 12 Oct 2026 | Rogue access that was approved later is recorded as "approved afterwards", with its request, never as fixed. |
+| 12 Oct 2026 | An account matched to a person stays with them when an email address or username is reused; the sync results say so. |
 
 ---
 
@@ -265,6 +266,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 
 **Accounts**
 - Each account is matched to its identity.
+- **Once matched, an account stays with its person.** If a later sync would match it to someone else (for example, an email address given to a new person), the account keeps its person. The connection's sync results count it as "kept with their person"; relink it by hand if it really changed hands.
 - Accounts are flagged when:
   - they match no one (*orphan*);
   - they match more than one identity (*ambiguous*);

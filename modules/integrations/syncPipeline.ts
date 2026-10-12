@@ -80,7 +80,7 @@ async function runStep(tenantId: string, jobId: string, integrationId: string, s
       ...step,
       status: run.status === "succeeded" ? "succeeded" : "failed",
       runId: run.id,
-      counts: { seen: run.sourceAccounts, created: run.created, updated: run.updated, correlated: run.correlated, orphan: run.orphan, ambiguous: run.ambiguous, notInSource: run.notInSource },
+      counts: { seen: run.sourceAccounts, created: run.created, updated: run.updated, correlated: run.correlated, orphan: run.orphan, ambiguous: run.ambiguous, notInSource: run.notInSource, relinkHeld: run.relinkHeld },
       reason: run.error ?? undefined,
     };
   } catch (err) {

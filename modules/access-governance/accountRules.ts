@@ -133,7 +133,13 @@ export type ReconciliationPlan = {
   upserts: AccountUpsert[];
   /** Accounts reconciliation imported earlier that the source no longer lists. */
   missingIds: string[];
-  counts: { sourceAccounts: number; created: number; updated: number; correlated: number; orphan: number; ambiguous: number; missingIdentifier: number; notInSource: number };
+  counts: { sourceAccounts: number; created: number; updated: number; correlated: number; orphan: number; ambiguous: number; missingIdentifier: number; notInSource: number; relinkHeld: number };
+  /**
+   * WID-H01: accounts already linked to a person that would now match
+   * someone else (a reassigned email, a reused username). The link is
+   * kept; a person relinks by hand if the account really changed hands.
+   */
+  relinkHeld: { ref: string; keptIdentityId: string; matchedIdentityId: string | null; matched: Correlation }[];
   /** IDENTITY-P0-20: non-human accounts no person matches, for Identity to give each its own identity. */
   nonHumanAccounts: { ref: string; displayName: string; identityType: "SERVICE_ACCOUNT" | "MACHINE" | "WORKLOAD" | "APPLICATION" | "API"; ownerRef: string | null }[];
 };
@@ -141,8 +147,10 @@ export type ReconciliationPlan = {
 /**
  * What a reconciliation run writes. For each imported account with the
  * configured identifier: an existing account keeps a person's manual link
- * and an agent's ownership (only its last-seen and last-used move); any
- * other account is correlated afresh. Accounts WonderID imported before
+ * and an agent's ownership (only its last-seen and last-used move); an
+ * account correlated to a person before keeps that person (WID-H01: a
+ * different match is held, not applied); any other account is correlated
+ * afresh. Accounts WonderID imported before
  * that the source no longer lists are counted, never deleted: the
  * connected system is the source of truth, and removal is a governed
  * action (#7, #15).
@@ -160,7 +168,8 @@ export function planReconciliation(input: {
   const index = buildIndex(input.rule, input.identities);
   const byRef = new Map(input.existing.map((a) => [a.externalAccountRef, a]));
   const seen = new Set<string>();
-  const counts: ReconciliationPlan["counts"] = { sourceAccounts: input.sourceAccounts.length, created: 0, updated: 0, correlated: 0, orphan: 0, ambiguous: 0, missingIdentifier: 0, notInSource: 0 };
+  const counts: ReconciliationPlan["counts"] = { sourceAccounts: input.sourceAccounts.length, created: 0, updated: 0, correlated: 0, orphan: 0, ambiguous: 0, missingIdentifier: 0, notInSource: 0, relinkHeld: 0 };
+  const relinkHeld: ReconciliationPlan["relinkHeld"] = [];
   const upserts: AccountUpsert[] = [];
   const nonHumanAccounts: ReconciliationPlan["nonHumanAccounts"] = [];
   const nowIso = input.now.toISOString();
@@ -193,6 +202,13 @@ export function planReconciliation(input: {
       correlation = "correlated";
     } else {
       ({ identityId, correlation } = matchIdentity(input.rule, raw, index));
+      // WID-H01: an account already linked to a person stays with them. A match elsewhere is held for a person, never moved.
+      if (current?.identityId && current.correlation === "correlated" && identityId !== current.identityId) {
+        relinkHeld.push({ ref, keptIdentityId: current.identityId, matchedIdentityId: identityId, matched: correlation });
+        counts.relinkHeld++;
+        identityId = current.identityId;
+        correlation = "correlated";
+      }
     }
     // A non-human account no person matches: its own governed identity (Identity creates or finds it).
     const nonHuman = correlation === "orphan" && !agentId ? nonHumanTypeOf(raw) : null;
@@ -219,5 +235,5 @@ export function planReconciliation(input: {
   }
   const missingIds = input.existing.filter((a) => a.source === "reconciliation" && !seen.has(a.externalAccountRef)).map((a) => a.id);
   counts.notInSource = missingIds.length;
-  return { upserts, missingIds, counts, nonHumanAccounts };
+  return { upserts, missingIds, counts, nonHumanAccounts, relinkHeld };
 }

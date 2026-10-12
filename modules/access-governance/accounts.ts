@@ -238,6 +238,8 @@ export type ReconciliationRun = {
   ambiguous: number;
   missingIdentifier: number;
   notInSource: number;
+  /** WID-H01: accounts kept with their person although they now match someone else. */
+  relinkHeld: number;
   error: string | null;
   triggeredBy: string | null;
   startedAt: string;
@@ -258,6 +260,7 @@ function toRun(r: Record<string, unknown>): ReconciliationRun {
     ambiguous: Number(r.ambiguous),
     missingIdentifier: Number(r.missing_identifier),
     notInSource: Number(r.not_in_source),
+    relinkHeld: Number(r.relink_held ?? 0),
     error: (r.error as string | null) ?? null,
     triggeredBy: (r.triggered_by as string | null) ?? null,
     startedAt: r.started_at as string,
@@ -449,8 +452,9 @@ async function reconcileAccounts(
       ambiguous: c.ambiguous,
       missing_identifier: c.missingIdentifier,
       not_in_source: c.notInSource,
+      relink_held: c.relinkHeld,
     });
-    await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c } });
+    await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c, relinkHeldAccounts: plan.relinkHeld.slice(0, 100) } });
     // ACCESS-P0-25: the first reconciliation is the baseline; what it found is legacy, anything later without approval is rogue.
     await ensureAccessBaseline(tenantId, applicationId, "accounts", run.id);
     // The ledger looks for the approval behind each account (ACCESS-P0-24); the daily sweep catches up if this fails.
