@@ -559,16 +559,66 @@ function eachString(value: unknown, path: string, out: [string, string][]) {
   else if (isObj(value)) for (const [k, v] of Object.entries(value)) eachString(v, `${path}.${k}`, out);
 }
 
+const LDAP_ATTRIBUTE_RE = /^[a-zA-Z][a-zA-Z0-9-]{0,63}$/;
+
+/** INTEGRATION-P0-22: an LDAP change, `{ ldap: { dn, modify | add } }`. */
+function checkLdapWrite(ctx: Ctx, p: string, op: string, ldap: unknown) {
+  if (!isObj(ldap)) return issue(ctx, p, "must be { ldap: { dn, modify } } or, to create an account, { ldap: { dn, add } }");
+  const allowed: Scope[] = ["settings", "target"];
+  const strings: [string, string][] = [];
+  if (!str(ldap.dn, 500)) issue(ctx, `${p}.ldap.dn`, "is required");
+  else strings.push([`${p}.ldap.dn`, ldap.dn]);
+  const hasModify = ldap.modify !== undefined;
+  const hasAdd = ldap.add !== undefined;
+  if (hasModify === hasAdd) issue(ctx, `${p}.ldap`, "needs exactly one of modify or add");
+  if (hasAdd && op !== "create_account") issue(ctx, `${p}.ldap.add`, "only create_account adds an entry");
+  if (op === "create_account" && !hasAdd) issue(ctx, `${p}.ldap`, "create_account adds an entry: use add");
+  if (hasModify) {
+    if (!Array.isArray(ldap.modify) || ldap.modify.length === 0 || ldap.modify.length > 10) issue(ctx, `${p}.ldap.modify`, "must list 1 to 10 changes");
+    else
+      ldap.modify.forEach((c, i) => {
+        const q = `${p}.ldap.modify[${i}]`;
+        if (!isObj(c)) return issue(ctx, q, "must be { operation, attribute, values }");
+        if (!["add", "delete", "replace"].includes(String(c.operation))) issue(ctx, `${q}.operation`, "must be add, delete or replace");
+        if (typeof c.attribute !== "string" || !LDAP_ATTRIBUTE_RE.test(c.attribute)) issue(ctx, `${q}.attribute`, "must be an attribute name");
+        if (!Array.isArray(c.values) || c.values.length > 20 || c.values.some((v) => !str(v, 500))) issue(ctx, `${q}.values`, "must be up to 20 text values");
+        else c.values.forEach((v, j) => strings.push([`${q}.values[${j}]`, v as string]));
+      });
+  }
+  if (hasAdd) {
+    if (!isObj(ldap.add) || !Object.keys(ldap.add).some((k) => k.toLowerCase() === "objectclass")) issue(ctx, `${p}.ldap.add`, "must give the entry's objectClass");
+    else
+      for (const [k, v] of Object.entries(ldap.add)) {
+        if (!LDAP_ATTRIBUTE_RE.test(k)) issue(ctx, `${p}.ldap.add.${k}`, "must be an attribute name");
+        if (!Array.isArray(v) || v.length === 0 || v.length > 20 || v.some((x) => !str(x, 500))) issue(ctx, `${p}.ldap.add.${k}`, "must be 1 to 20 text values");
+        else v.forEach((x, j) => strings.push([`${p}.ldap.add.${k}[${j}]`, x as string]));
+      }
+  }
+  for (const [where, text] of strings) checkTemplate(ctx, where, text, allowed);
+  const used = new Set(strings.flatMap(([, t]) => templateVariables(t)));
+  if (op === "create_account") {
+    if (!used.has("target.email") && !used.has("target.username")) issue(ctx, `${p}.ldap`, "must use {target.email} or {target.username}");
+    return;
+  }
+  if (!used.has("target.account")) issue(ctx, `${p}.ldap`, "must use {target.account}");
+  if ((op === "revoke_access" || op === "grant_access") && !used.has("target.entitlement")) issue(ctx, `${p}.ldap`, "must use {target.entitlement}");
+}
+
 function checkWrite(ctx: Ctx, write: unknown, driver: unknown) {
   if (!isObj(write)) return issue(ctx, "write", "must be an object");
-  if (driver !== "http") return issue(ctx, "write", "only an http connector can write");
+  if (driver !== "http" && driver !== "ldap") return issue(ctx, "write", "only an http or ldap connector can write");
   for (const [op, spec] of Object.entries(write)) {
     const p = `write.${op}`;
     if (!(DEFINITION_WRITE_OPERATIONS as readonly string[]).includes(op)) {
       issue(ctx, p, `must be one of ${DEFINITION_WRITE_OPERATIONS.join(", ")}`);
       continue;
     }
-    if (!isObj(spec) || !isObj(spec.request)) {
+    if (driver === "ldap") {
+      if (!isObj(spec) || spec.request !== undefined) issue(ctx, p, "an ldap connector writes with { ldap }, not { request }");
+      else checkLdapWrite(ctx, p, op, spec.ldap);
+      continue;
+    }
+    if (!isObj(spec) || spec.ldap !== undefined || !isObj(spec.request)) {
       issue(ctx, p, "must be { request }");
       continue;
     }

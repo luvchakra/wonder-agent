@@ -1,13 +1,15 @@
 import "server-only";
 
-import { Client } from "ldapts";
+import { Attribute, Change, Client } from "ldapts";
 import type { DriverFactory } from "../engine";
 import { fillTemplate } from "../mapping";
 import { resolveSafeHost } from "./net";
+import { alreadyApplied, planLdapWrite } from "../ldapWrite";
 
 /**
  * The ldap driver: LDAPS only (validate.ts refuses ldap://), a simple bind
- * with the organization's read-only account, paged searches. Values filled
+ * with the organization's account, paged searches, and (INTEGRATION-P0-22)
+ * the changes a definition declares, once writes are turned on. Values filled
  * into a filter from a parent record are escaped (RFC 4515), so a group
  * name can never widen a search. A custom CA (settings.caCertificate, PEM)
  * is honoured for directories with an internal certificate authority.
@@ -64,6 +66,18 @@ export const ldapDriver: DriverFactory = async (def, settings, secrets) => {
     async fetch(resource, tplScope, max) {
       if (!resource.search) throw new Error("This resource has no search");
       return search(resource.search, tplScope, max);
+    },
+    // INTEGRATION-P0-22: one declared change, with the organization's bind account.
+    async ldapWrite(spec, tplScope) {
+      const plan = planLdapWrite(spec, tplScope);
+      try {
+        if (plan.kind === "add") await client.add(plan.dn, plan.attributes);
+        else await client.modify(plan.dn, plan.changes.map((c) => new Change({ operation: c.operation, modification: new Attribute({ type: c.attribute, values: c.values }) })));
+      } catch (err) {
+        if (alreadyApplied((err as { code?: unknown }).code, plan)) return;
+        // The directory's message names the entry at most; never the bind password.
+        throw new Error(`The directory refused the change${typeof (err as { code?: unknown }).code === "number" ? ` (LDAP result ${(err as { code: number }).code})` : ""}`);
+      }
     },
     async close() {
       await client.unbind().catch(() => undefined);

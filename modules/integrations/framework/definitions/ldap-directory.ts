@@ -4,10 +4,11 @@ import type { ConnectorDefinition } from "../types";
 export const ldapDirectory: ConnectorDefinition = {
   schemaVersion: 1,
   key: "ldap-directory",
-  version: "1.0.0",
+  version: "1.1.0",
   name: "LDAP directory",
   category: "directory",
-  description: "Accounts, groups and group memberships from any LDAP v3 directory over LDAPS, with a read-only bind. Groups use the member attribute (groupOfNames).",
+  description:
+    "Accounts, groups and group memberships from any LDAP v3 directory over LDAPS. Groups use the member attribute (groupOfNames). Can add and remove group members once an administrator turns changes on, if the bind account may change groups.",
   driver: "ldap",
   settings: [
     { key: "url", label: "Directory address", type: "url", required: true, help: "ldaps://directory.example.com:636" },
@@ -21,7 +22,7 @@ export const ldapDirectory: ConnectorDefinition = {
     bindDn: "{secret.bindDn}",
     password: "{secret.password}",
     fields: [
-      { key: "bindDn", label: "Bind DN", help: "A read-only service account, for example cn=wonderid-reader,ou=services,dc=example,dc=com" },
+      { key: "bindDn", label: "Bind DN", help: "A service account, for example cn=wonderid,ou=services,dc=example,dc=com. Read-only is enough unless changes are turned on; then it must be able to change group membership." },
       { key: "password", label: "Password" },
     ],
   },
@@ -55,5 +56,10 @@ export const ldapDirectory: ConnectorDefinition = {
         grantType: { value: "group" },
       },
     },
+  },
+  // INTEGRATION-P0-22 (1.1.0): group membership changes; ids are DNs, so the change names them as they are.
+  write: {
+    grant_access: { ldap: { dn: "{target.entitlement}", modify: [{ operation: "add", attribute: "member", values: ["{target.account}"] }] } },
+    revoke_access: { ldap: { dn: "{target.entitlement}", modify: [{ operation: "delete", attribute: "member", values: ["{target.account}"] }] } },
   },
 };

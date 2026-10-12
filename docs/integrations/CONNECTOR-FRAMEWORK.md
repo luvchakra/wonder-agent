@@ -172,7 +172,7 @@ owner's action.
 |---|---|---|---|
 | `frappe-hr` | HR | http | identities (people, managers, joiners and leavers) |
 | `erpnext` | application | http | accounts, roles, role assignments |
-| `ldap-directory` | directory | ldap | accounts, groups, memberships |
+| `ldap-directory` | directory | ldap | accounts, groups, memberships; **writes** (1.1.0, once turned on): add and remove group members |
 | `keycloak` | identity provider | http | accounts (service accounts too), groups and realm roles, grants |
 | `gitea` | application | http | accounts and bots, organization teams, membership |
 | `mattermost` | application | http | accounts and bots, teams, membership |
@@ -182,6 +182,7 @@ owner's action.
 | `kubernetes` | infrastructure | http | service accounts, Roles and ClusterRoles, bindings |
 | `saviynt` | identity provider | http | identities, accounts, endpoints, entitlements, assignments, security systems |
 | `zendesk` | application | http | staff accounts, groups, membership |
+| `scim-2` | application | http | users, groups, membership from any SCIM 2.0 service (RFC 7644 paging); **writes** (once turned on): add and remove group members by PATCH, disable a user (`active: false`), create a user (INTEGRATION-P0-22) |
 | `mcp-server` | AI runtime | mcp | server, tools (classified read/write), resources; **receives** tool calls |
 | `runtime-gateway` | AI runtime | none | **receives** Runtime Gateway calls and agent activity |
 | `webhook` | event source | none | **receives** signed events from any system |
@@ -455,7 +456,7 @@ turned on by the organization and gated by approval. Reversible changes
 came first (slice 1); adding access and creating accounts followed
 (slice 2, 2026-10-12).
 
-**Declaring writes.** An http definition may list, under `write`:
+**Declaring writes.** An http or ldap definition may list, under `write`:
 
 | Operation | What it does | Must use |
 |---|---|---|
@@ -481,8 +482,32 @@ attempt. For example:
 }
 ```
 
-Reads still may only GET or POST. Built-in definitions declare no writes
-yet; which systems come first is decision D9.
+Reads still may only GET or POST. Built-in writes so far (INTEGRATION-P0-22):
+`scim-2` (all four) and `ldap-directory` 1.1.0 (adding and removing group
+members).
+
+**LDAP changes** (ldap driver, INTEGRATION-P0-22). Each operation is
+`{ "ldap": { "dn", "modify" } }`, or `{ "ldap": { "dn", "add" } }` for
+`create_account`:
+- `dn` is exactly `{target.account}` or `{target.entitlement}` (a DN read
+  from the directory, used as it is), or a template such as
+  `uid={target.username},ou=People,{settings.baseDn}`. Target values filled
+  into a template are escaped as DN values (RFC 4514); settings are not.
+- `modify` lists 1 to 10 `{ operation: add | delete | replace, attribute,
+  values }`.
+- `add` is the new entry's attributes, `objectClass` included.
+
+LDAP has no idempotency key. A directory answer that the change is already
+there counts as done: adding a value that exists (result 20), deleting one
+that is gone (16), adding an entry that exists (68). A retry is then safe.
+For example (the built-in directory type):
+
+```json
+"write": {
+  "grant_access": { "ldap": { "dn": "{target.entitlement}", "modify": [{ "operation": "add", "attribute": "member", "values": ["{target.account}"] }] } },
+  "revoke_access": { "ldap": { "dn": "{target.entitlement}", "modify": [{ "operation": "delete", "attribute": "member", "values": ["{target.account}"] }] } }
+}
+```
 
 **Turning writes on.** A connection whose definition declares writes shows
 "Changes in the system" on its page: Off by default. Turning it on (or
@@ -617,7 +642,7 @@ The same operations are available over the API (session authentication):
 | `application` | The application name recorded on accounts and entitlements. It may use `{settings.…}`. |
 | `resources` | One request per canonical kind, or a list of up to 10 whose records are combined. Empty for a `none` connector. |
 | `rateLimitPerSecond` | Request rate. The default is 10. |
-| `write` | Optional, http driver only: the changes this connector can make in the system, `revoke_access` and `disable_account` (see "Changes in the system"). |
+| `write` | Optional, http or ldap driver: the changes this connector can make in the system, `revoke_access`, `disable_account`, `grant_access` and `create_account` (see "Changes in the system"). |
 
 ### Authentication (`auth.type`)
 

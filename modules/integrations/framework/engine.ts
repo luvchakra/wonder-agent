@@ -15,6 +15,7 @@ import {
   type ConnectorIntegrationConfig,
   type DefinitionWriteOperation,
   type HttpRequestSpec,
+  type LdapWriteSpec,
   type ResourceKind,
   type ResourceSpec,
 } from "./types";
@@ -50,6 +51,8 @@ export interface ConnectorDriverSession {
   fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number, kind: ResourceKind, report?: FetchReport): Promise<unknown[]>;
   /** INTEGRATION-P0-13: one write request (http driver). Throws on a failed response. */
   send?(request: HttpRequestSpec, scope: TemplateScope): Promise<unknown>;
+  /** INTEGRATION-P0-22: one LDAP change (ldap driver). Throws on a failure the directory reports. */
+  ldapWrite?(spec: LdapWriteSpec, scope: TemplateScope): Promise<void>;
   /** INTEGRATION-P0-21 (authorization code, http driver): the provider's sign-in address. */
   authorizationUrl?(input: { state: string; codeChallenge: string; redirectUri: string }): string;
   /** INTEGRATION-P0-21: trades a sign-in code for tokens. */
@@ -398,8 +401,14 @@ export class DefinitionConnector implements ConnectorAdapter {
     const spec = this.def.write?.[operation as DefinitionWriteOperation];
     if (!spec) throw new Error(`This connector cannot ${operation.replace("_", " ")}`);
     const session = await this.open();
-    if (!session.send) throw new Error(`The ${this.def.driver} driver cannot write`);
     const scope: TemplateScope = { settings: this.settings, target };
+    if (spec.ldap) {
+      // INTEGRATION-P0-22: LDAP has no idempotency key; the driver treats "already there" answers as done.
+      if (!session.ldapWrite) throw new Error(`The ${this.def.driver} driver cannot make LDAP changes`);
+      await session.ldapWrite(spec.ldap, scope);
+      return {};
+    }
+    if (!session.send || !spec.request) throw new Error(`The ${this.def.driver} driver cannot write`);
     const request: HttpRequestSpec = {
       ...spec.request,
       headers: { ...(spec.request.headers ?? {}), "Idempotency-Key": idempotencyKey },

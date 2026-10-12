@@ -2517,3 +2517,96 @@ evidence, and all ten are `CHANGED`.
 Definition files are not signed; signed configuration bundles are
 PLATFORM-P0-13.
 
+### 2026-10-12 — Standard provisioning, slice 1: the SCIM 2.0 connection type (INTEGRATION-P0-22)
+
+**Built (no migration).** A built-in definition, `scim-2`
+(`framework/definitions/scim.ts`), runs over the http driver and the
+existing write pipeline (INTEGRATION-P0-13). No engine change.
+- Settings: the SCIM root address and the application's name. Sign-in: a
+  bearer SCIM token. Test: `GET /ServiceProviderConfig`.
+- Reads, with RFC 7644 `startIndex`/`count` paging:
+  - `/Users` become accounts (email from `emails[0].value`, else
+    `userName`; status from `active`);
+  - `/Groups` become entitlements;
+  - group `members` are unwound into access grants.
+- Writes. They stay off until an administrator turns them on, with the mass-change
+  guard and verification as for every connection:
+  - `grant_access`: PATCH the group, `add` to `members`;
+  - `revoke_access`: PATCH the group, `remove` with the value filter
+    `members[value eq "…"]`;
+  - `disable_account`: PATCH the user, `replace active false`;
+  - `create_account`: POST `/Users` (`userName` = email).
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean.
+- `npx vitest run modules/integrations tests/architecture`: 344 passed,
+  including `definitions.test.ts` (every built-in validates) and the new
+  `scim.test.ts`. Against a fake SCIM service, the new test checks:
+  - 150 users read in two pages, with mapping and status;
+  - groups and memberships;
+  - the bearer token on every call;
+  - the exact RFC 7644 request for each of the four changes.
+- No E2E before merge (CLAUDE.md §17.8, as confirmed today): this is a
+  connection type, and the write pipeline it uses is already covered by
+  `connector-provisioning.spec.ts`. The nightly run covers the rest.
+
+**Left out (next slices).**
+- LDAP writes (modify group `member`; disable through `userAccountControl`
+  or a configured attribute).
+- The inbound SCIM receiver at `/api/connect/v1/<connection>/scim/v2/…`
+  for HR and IdP push.
+- RFC 9967 events.
+- `If-Match`, `/Bulk`, and cursor paging (RFC 9865).
+
+### 2026-10-12 — Standard provisioning, slice 2: LDAP changes (INTEGRATION-P0-22)
+
+**Built (no migration).**
+- `WriteSpec` is now `{ request }` (http) or `{ ldap: { dn, modify | add } }`
+  (ldap) (`types.ts`). `checkLdapWrite` validates it:
+  - exactly one of modify or add; `add` only for `create_account`, and it
+    includes `objectClass`;
+  - attribute names checked; at most 10 changes and 20 values;
+  - templates only from settings and target;
+  - the same target rules as http (`{target.account}`, plus the
+    entitlement for membership changes).
+- `framework/ldapWrite.ts`, pure:
+  - `escapeDnValue` (RFC 4514);
+  - `fillDn`: a DN WonderID read is used as is; target values in a
+    template are escaped;
+  - `planLdapWrite`;
+  - `alreadyApplied`: results 20, 16 and 68 mean the change is already
+    there, so a retry is safe without an idempotency key (relevant to
+    WID-H02).
+- `fillTemplate`'s escape now covers `target.` values as well as fetched
+  record values. Settings stay unescaped.
+- The ldap driver's `ldapWrite` uses ldapts `modify`/`add` with the
+  organization's bind. Its errors name only the LDAP result code.
+  - The engine routes `{ ldap }` changes to the driver.
+  - The gateway meters them as `ldap modify`, under the connection's
+    budget and rate limit.
+- The built-in `ldap-directory` is now 1.1.0, adding `grant_access` and
+  `revoke_access` on group `member`. The one existing connection keeps its
+  1.0.0 copy and shows 1.1.0 as available (checked in the database:
+  `config.manifest` present).
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean.
+- `npx vitest run modules/integrations tests/architecture`: 350 passed. The
+  new `ldapWrite.test.ts` covers:
+  - DN escaping;
+  - a whole DN versus a template;
+  - the modify and add plans;
+  - which answers mean already done;
+  - validation, including the built-in;
+  - the engine routing a change to the driver.
+- E2E, local: `connector-provisioning.spec.ts`, 12/12 (the engine's write
+  path changed).
+- There is no LDAP server in CI or locally. The driver's ldapts calls are
+  covered by types and the pure plan; the live suite
+  (`framework/live.test.ts`) can exercise a real directory.
+
+**Left out.** Disabling and creating directory users are left out, because
+they depend on the directory (`userAccountControl`, `nsAccountLock`,
+`pwdAccountLockedTime`); a custom definition can declare them. The inbound
+SCIM receiver and RFC 9967 events are the next slice.
+

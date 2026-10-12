@@ -66,8 +66,8 @@ export function fillTemplate(
       throw new TemplateError(`"{${name}}" has no value`);
     }
     const text = Array.isArray(value) ? value.join(",") : String(value);
-    // Values from a fetched record are escaped; the organization's own settings are not.
-    if (opts.escape && (name.startsWith("parent.") || name.startsWith("record."))) return opts.escape(text);
+    // Values from a fetched record, or from the person or account a change is for, are escaped; the organization's own settings are not.
+    if (opts.escape && (name.startsWith("parent.") || name.startsWith("record.") || name.startsWith("target."))) return opts.escape(text);
     return opts.encode ? encodeURIComponent(text) : text;
   });
 }

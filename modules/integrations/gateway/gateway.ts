@@ -225,6 +225,8 @@ export class GatewaySession {
       return {
         test: () => this.metered(operationLabel(kind, verb), host, () => session.test()),
         fetch: (resource, scope, max, resourceKind) => this.metered(operationLabel(kind, verb), host, () => session.fetch(resource, scope, max, resourceKind), approximateBytes),
+        // INTEGRATION-P0-22: an LDAP change passes the same budget, rate limit and accounting.
+        ldapWrite: session.ldapWrite ? (spec, scope) => this.metered(operationLabel(kind, "modify"), host, () => session.ldapWrite!(spec, scope)) : undefined,
         close: session.close ? () => session.close!() : undefined,
       };
     };
