@@ -452,7 +452,8 @@ only.
 
 Decision D3 (approved 2026-10-12): writes are per connection, declared,
 turned on by the organization and gated by approval. Reversible changes
-come first.
+came first (slice 1); adding access and creating accounts followed
+(slice 2, 2026-10-12).
 
 **Declaring writes.** An http definition may list, under `write`:
 
@@ -460,22 +461,28 @@ come first.
 |---|---|---|
 | `revoke_access` | Removes one entitlement from one account (a group membership, a role) | `{target.account}` and `{target.entitlement}` |
 | `disable_account` | Disables one account | `{target.account}` |
+| `grant_access` | Adds one entitlement to one account | `{target.account}` and `{target.entitlement}` |
+| `create_account` | Creates an account for a person or agent | `{target.email}` or `{target.username}` (`{target.displayName}` may also be used) |
 
 Each is one request (`method` POST, PUT, PATCH or DELETE; `path`, `query`,
 `headers` and `body` strings may use `{settings.…}` and the target). The
 target values are the ids the system itself gave the account and the
-entitlement, as imported. The request carries `Idempotency-Key`, one per
+entitlement, as imported; for a new account, the email, username and
+display name of the identity it is for (a value the identity lacks fails
+the write with that reason, and the task goes to its owner). The request carries `Idempotency-Key`, one per
 attempt. For example:
 
 ```json
 "write": {
   "revoke_access": { "request": { "method": "DELETE", "path": "/groups/{target.entitlement}/members/{target.account}" } },
-  "disable_account": { "request": { "method": "PATCH", "path": "/users/{target.account}", "body": { "enabled": false } } }
+  "disable_account": { "request": { "method": "PATCH", "path": "/users/{target.account}", "body": { "enabled": false } } },
+  "grant_access": { "request": { "method": "PUT", "path": "/groups/{target.entitlement}/members/{target.account}" } },
+  "create_account": { "request": { "method": "POST", "path": "/users", "body": { "email": "{target.email}", "name": "{target.displayName}" } } }
 }
 ```
 
-Reads still may only GET or POST. Granting access and creating accounts
-come later in F3.
+Reads still may only GET or POST. Built-in definitions declare no writes
+yet; which systems come first is decision D9.
 
 **Turning writes on.** A connection whose definition declares writes shows
 "Changes in the system" on its page: Off by default. Turning it on (or
@@ -484,10 +491,12 @@ declares the connection's write capabilities, exactly what its definition
 supports; turning it off declares none, and any write is refused at once.
 Both are audited (`integration.writes_enabled` / `_disabled`).
 
-**What happens to an approved change.** When a remove-access or
-disable-account fulfilment task opens, and the account came from a
-connection with writes on that supports the operation (for a removal, the
-entitlement must come from that same connection):
+**What happens to an approved change.** When a fulfilment task opens
+(access to add or remove, an account to create or disable) and a
+connection with writes on supports the operation, the connector does it.
+The connection is the one the account was imported from (for access, the
+entitlement must come from that same connection); for a new account, the
+connection the application's live onboarding reconciles against.
 
 1. The task is claimed for the connector; nobody else can act on it while
    it runs.
@@ -495,16 +504,28 @@ entitlement must come from that same connection):
    record, capability check, the Connector Gateway, audit
    `integration.write_*`). A network failure, 429 or 5xx is retried twice,
    after 2 and 8 seconds.
-3. On success the task completes (not yet verified) and a sync with trigger
-   `verification` reads the system again. Reconciliation closes the task as
-   verified only when the change is really there.
+3. On success the task completes (not yet verified; added access is
+   `fulfilled_unverified`) and a sync with trigger `verification` reads the
+   system again. Reconciliation closes the task as verified only when the
+   change is really there.
 4. On failure the task stays open for its owner with the reason, and the
    owner is told. Whoever may work on the task can do it by hand or "Try
    again" (`retry_connector`). A run that never reports back is handed back
    by the daily sweep after 15 minutes, saying its outcome is unknown.
 
+**Access for someone with no account yet.** The approved access waits on a
+placeholder account. When the connection can both create accounts and add
+access, a create-account task opens for the placeholder and the connector
+creates the account; the access task waits without notifying its owner.
+The verification sync reads the new account, account reconciliation
+correlates it to the identity and replaces the placeholder (the
+create-account task is verified), and then the connector adds the access
+(`resumeConnectorGrants`), verified by the next read. If the create fails,
+its owner is told; the access task stays open for them too.
+
 Tasks the connector cannot do (writes off, an operation not supported, an
-account or entitlement without a system id) stay a person's task, as before.
+account or entitlement without a system id, a new account with no
+email or username) stay a person's task, as before.
 
 ## Writing a connector
 

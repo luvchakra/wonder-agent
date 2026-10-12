@@ -4,11 +4,13 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
+import { runAfterResponse } from "@/lib/shared/afterResponse";
 import { connectionCanWrite, executeConnectorWrite, startVerificationSync } from "@/modules/integrations/service";
 import {
   attemptKey,
   connectorOperation,
   connectorTarget,
+  newAccountTarget,
   retryDelayMs,
   runIsLost,
   shouldRetry,
@@ -31,8 +33,9 @@ import type { FulfilmentTaskKind } from "./fulfilmentTaskRules";
  * only when the change is really there) → audit at each step.
  *
  * A failure leaves the task open for its owner, with the reason, and tells
- * them. Nothing here grants access: only removals and disabling, the
- * reversible operations D3 allows first.
+ * them. Access for an account that does not exist yet waits for it: the
+ * connector creates the account, the next read brings it in and replaces
+ * the placeholder, and then the access is added (resumeConnectorGrants).
  *
  * Service role (the task tables have no client write policy, 0122), every
  * statement filtered on `tenantId`, every row checked against it (§14).
@@ -47,7 +50,7 @@ export async function planConnectorFulfilment(tenantId: string, taskId: string):
   const admin = supabaseServiceRole();
   const { data: task, error } = await admin
     .from("access_fulfilment_tasks")
-    .select("id, tenant_id, kind, status, removal_grant_id, account_id")
+    .select("id, tenant_id, kind, status, access_grant_id, removal_grant_id, account_id, application_id")
     .eq("tenant_id", tenantId)
     .eq("id", taskId)
     .maybeSingle();
@@ -55,37 +58,137 @@ export async function planConnectorFulfilment(tenantId: string, taskId: string):
   if (!task || task.tenant_id !== tenantId) return null;
   const operation = connectorOperation(task.kind as FulfilmentTaskKind);
   if (!operation) return null;
+  const planned =
+    operation === "create_account"
+      ? await planNewAccount(tenantId, (task.account_id as string | null) ?? null, task.application_id as string)
+      : await planExistingAccount(tenantId, operation, task);
+  if (!planned) return null;
+  if (!(await connectionCanWrite(tenantId, planned.integrationId, operation))) return null;
+  return { taskId, operation, ...planned };
+}
 
+/** Disable, add or remove: the account (and entitlement) as imported, through the connection they came from. */
+async function planExistingAccount(tenantId: string, operation: Exclude<ConnectorOperation, "create_account">, task: Row) {
+  const admin = supabaseServiceRole();
   let accountId = (task.account_id as string | null) ?? null;
   let entitlementId: string | null = null;
-  if (operation === "revoke_access") {
-    const { data: grant } = await admin
-      .from("access_grants")
-      .select("tenant_id, account_id, entitlement_id")
-      .eq("tenant_id", tenantId)
-      .eq("id", task.removal_grant_id as string)
-      .maybeSingle();
+  const grantId = operation === "revoke_access" ? (task.removal_grant_id as string | null) : operation === "grant_access" ? (task.access_grant_id as string | null) : null;
+  if (operation !== "disable_account") {
+    if (!grantId) return null;
+    const { data: grant } = await admin.from("access_grants").select("tenant_id, account_id, entitlement_id").eq("tenant_id", tenantId).eq("id", grantId).maybeSingle();
     if (!grant || grant.tenant_id !== tenantId) return null;
     accountId = grant.account_id as string;
     entitlementId = grant.entitlement_id as string;
   }
   if (!accountId) return null;
   const [{ data: account }, { data: entitlement }] = await Promise.all([
-    admin.from("accounts").select("tenant_id, external_account_ref, source_integration_id").eq("tenant_id", tenantId).eq("id", accountId).maybeSingle(),
+    admin.from("accounts").select("tenant_id, external_account_ref, source_integration_id, status").eq("tenant_id", tenantId).eq("id", accountId).maybeSingle(),
     entitlementId
       ? admin.from("entitlements").select("tenant_id, external_ref, source_integration_id").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
   if (!account || account.tenant_id !== tenantId) return null;
   if (entitlement && entitlement.tenant_id !== tenantId) return null;
-  const planned = connectorTarget(
+  return connectorTarget(
     operation,
-    { externalRef: (account.external_account_ref as string | null) ?? null, integrationId: (account.source_integration_id as string | null) ?? null },
+    { externalRef: (account.external_account_ref as string | null) ?? null, integrationId: (account.source_integration_id as string | null) ?? null, pending: account.status === "pending" },
     entitlement ? { externalRef: (entitlement.external_ref as string | null) ?? null, integrationId: (entitlement.source_integration_id as string | null) ?? null } : null,
   );
-  if (!planned) return null;
-  if (!(await connectionCanWrite(tenantId, planned.integrationId, operation))) return null;
-  return { taskId, operation, ...planned };
+}
+
+/**
+ * Create: the placeholder account names who it is for; the application's
+ * live onboarding names the connection it reconciles against, which is the
+ * one that reads the new account back to verify it.
+ */
+async function planNewAccount(tenantId: string, accountId: string | null, applicationId: string) {
+  if (!accountId) return null;
+  const admin = supabaseServiceRole();
+  const [{ data: account }, { data: onboarding }] = await Promise.all([
+    admin.from("accounts").select("tenant_id, status, identity_id, agent_id, application_id").eq("tenant_id", tenantId).eq("id", accountId).maybeSingle(),
+    admin.from("application_onboardings").select("tenant_id, promoted_config").eq("tenant_id", tenantId).eq("application_id", applicationId).maybeSingle(),
+  ]);
+  // Only a placeholder is created: a real account already exists on the system.
+  if (!account || account.tenant_id !== tenantId || account.status !== "pending" || account.application_id !== applicationId) return null;
+  if (!onboarding || onboarding.tenant_id !== tenantId) return null;
+  const integrationId = ((onboarding.promoted_config as { integrationId?: string | null } | null)?.integrationId ?? null) || null;
+  let q = admin.from("identities").select("tenant_id, email, username, display_name").eq("tenant_id", tenantId);
+  q = account.agent_id ? q.eq("agent_id", account.agent_id as string) : q.eq("id", account.identity_id as string);
+  const { data: identity } = await q.limit(1).maybeSingle();
+  if (!identity || identity.tenant_id !== tenantId) return null;
+  return newAccountTarget(
+    { email: (identity.email as string | null) ?? null, username: (identity.username as string | null) ?? null, displayName: (identity.display_name as string | null) ?? null },
+    integrationId,
+  );
+}
+
+/**
+ * Access for an account that does not exist yet: when a connector can
+ * both create the account and then add the access, it creates the account
+ * first. Returns the placeholder to create (its task then runs through the
+ * connector), or null when a person handles it as before. A create the
+ * connector already failed is the owner's again, so nothing waits on it.
+ */
+export async function accountToCreateFirst(tenantId: string, grantTaskId: string): Promise<string | null> {
+  const admin = supabaseServiceRole();
+  const { data: task } = await admin.from("access_fulfilment_tasks").select("tenant_id, kind, access_grant_id, application_id").eq("tenant_id", tenantId).eq("id", grantTaskId).maybeSingle();
+  if (!task || task.tenant_id !== tenantId || task.kind !== "grant" || !task.access_grant_id) return null;
+  const { data: grant } = await admin.from("access_grants").select("tenant_id, account_id").eq("tenant_id", tenantId).eq("id", task.access_grant_id as string).maybeSingle();
+  if (!grant || grant.tenant_id !== tenantId) return null;
+  const placeholder = await planNewAccount(tenantId, grant.account_id as string, task.application_id as string);
+  if (!placeholder) return null;
+  const [canCreate, canGrant] = await Promise.all([
+    connectionCanWrite(tenantId, placeholder.integrationId, "create_account"),
+    connectionCanWrite(tenantId, placeholder.integrationId, "grant_access"),
+  ]);
+  if (!canCreate || !canGrant) return null;
+  const { data: failed } = await admin
+    .from("access_fulfilment_tasks")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("kind", "create_account")
+    .eq("account_id", grant.account_id as string)
+    .eq("status", "open")
+    .eq("connector_status", "failed")
+    .limit(1);
+  if ((failed ?? []).length) return null;
+  return grant.account_id as string;
+}
+
+/**
+ * Once a placeholder's real account has arrived (pendingGrants.ts), the
+ * access waiting on it can be added: each open grant task on the account
+ * that no one has started goes to the connector, when one can do it.
+ */
+export async function resumeConnectorGrants(tenantId: string, accountId: string): Promise<number> {
+  const admin = supabaseServiceRole();
+  const { data: grants, error } = await admin
+    .from("access_grants")
+    .select("id, tenant_id")
+    .eq("tenant_id", tenantId)
+    .eq("account_id", accountId)
+    .eq("fulfilment_status", "pending_fulfilment")
+    .limit(200);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const grantIds = ((grants ?? []) as Row[]).filter((g) => g.tenant_id === tenantId).map((g) => g.id as string);
+  if (!grantIds.length) return 0;
+  const { data: tasks, error: taskError } = await admin
+    .from("access_fulfilment_tasks")
+    .select("id, tenant_id")
+    .eq("tenant_id", tenantId)
+    .eq("kind", "grant")
+    .eq("status", "open")
+    .is("connector_status", null)
+    .in("access_grant_id", grantIds);
+  if (taskError) throw new ApiError(500, "QUERY_FAILED", taskError.message);
+  let started = 0;
+  for (const t of ((tasks ?? []) as Row[]).filter((r) => r.tenant_id === tenantId)) {
+    const plan = await planConnectorFulfilment(tenantId, t.id as string).catch(() => null);
+    if (!plan) continue;
+    started++;
+    runAfterResponse(() => runConnectorFulfilment(tenantId, plan));
+  }
+  return started;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -107,7 +210,7 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
     .eq("id", plan.taskId)
     .eq("status", "open")
     .or("connector_status.is.null,connector_status.eq.failed")
-    .select("id, tenant_id, kind, removal_grant_id, request_id, assignee_identity_id, connector_attempts")
+    .select("id, tenant_id, kind, access_grant_id, removal_grant_id, request_id, assignee_identity_id, connector_attempts")
     .maybeSingle();
   if (claimError) throw new ApiError(500, "UPDATE_FAILED", claimError.message);
   if (!claimed || claimed.tenant_id !== tenantId) return "busy";
@@ -143,6 +246,15 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
       .eq("id", plan.taskId)
       .eq("connector_status", "running");
     if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+    if (claimed.kind === "grant") {
+      const { error: grantError } = await admin
+        .from("access_grants")
+        .update({ fulfilment_status: "fulfilled_unverified", updated_at: done })
+        .eq("tenant_id", tenantId)
+        .eq("id", claimed.access_grant_id as string)
+        .eq("fulfilment_status", "pending_fulfilment");
+      if (grantError) throw new ApiError(500, "UPDATE_FAILED", grantError.message);
+    }
     if (claimed.kind === "remove") {
       const { error: grantError } = await admin
         .from("access_grants")

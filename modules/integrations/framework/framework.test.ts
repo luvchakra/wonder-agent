@@ -489,6 +489,8 @@ describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
     write: {
       revoke_access: { request: { method: "DELETE", path: "/groups/{target.entitlement}/members/{target.account}" } },
       disable_account: { request: { method: "PATCH", path: "/users/{target.account}", body: { enabled: false, note: "by {settings.baseUrl}" } } },
+      grant_access: { request: { method: "PUT", path: "/groups/{target.entitlement}/members/{target.account}" } },
+      create_account: { request: { method: "POST", path: "/users", body: { userName: "{target.username}", email: "{target.email}", name: "{target.displayName}" } } },
     },
   };
   const config = { definition: { key: writer.key, version: writer.version, origin: "custom" }, manifest: writer, settings: { baseUrl: "https://acme.example" } };
@@ -501,11 +503,13 @@ describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
     const bad = (write: unknown, extra: Partial<ConnectorDefinition> = {}) => validateDefinition({ ...writer, ...extra, write }).issues.map((i) => `${i.path}: ${i.message}`).join("\n");
     expect(bad({ revoke_access: { request: { method: "DELETE", path: "/groups/{target.entitlement}" } } })).toMatch(/must use \{target.account\}/);
     expect(bad({ revoke_access: { request: { method: "DELETE", path: "/users/{target.account}" } } })).toMatch(/must use \{target.entitlement\}/);
-    expect(bad({ grant_access: { request: { method: "POST", path: "/users/{target.account}" } } })).toMatch(/write.grant_access: must be one of revoke_access, disable_account/);
+    expect(bad({ grant_access: { request: { method: "POST", path: "/users/{target.account}" } } })).toMatch(/write.grant_access.request: must use \{target.entitlement\}/);
+    expect(bad({ create_account: { request: { method: "POST", path: "/users", body: { name: "{target.displayName}" } } } })).toMatch(/must use \{target.email\} or \{target.username\}/);
+    expect(bad({ delete_account: { request: { method: "DELETE", path: "/users/{target.account}" } } })).toMatch(/write.delete_account: must be one of revoke_access, disable_account, grant_access, create_account/);
     expect(bad({ disable_account: { request: { method: "GET", path: "/users/{target.account}" } } })).toMatch(/method: must be POST, PUT, PATCH, DELETE/);
     expect(bad({ disable_account: { request: { path: "/users/{target.account}" } } })).toMatch(/method: is required/);
     expect(bad({ disable_account: { request: { method: "PUT", path: "/users/{target.account}", body: { by: "{record.id}" } } } })).toMatch(/\{record.id\}" is not allowed here/);
-    expect(bad({ disable_account: { request: { method: "PUT", path: "/users/{target.who}" } } })).toMatch(/must be \{target.account\} or \{target.entitlement\}/);
+    expect(bad({ disable_account: { request: { method: "PUT", path: "/users/{target.who}" } } })).toMatch(/must be one of \{target.account\}, \{target.entitlement\}/);
     expect(bad({ disable_account: { request: { method: "PUT", path: "/u/{target.account}", body: { k: "{secret.token}" } } } })).toMatch(/secrets may only be used in the auth block/);
     // Reads still may not delete.
     expect(validateDefinition({ ...writer, resources: { account: { request: { method: "DELETE", path: "/users" }, records: "", fields: { externalId: "id" } } } }).issues.map((i) => i.message).join()).toMatch(/must be GET, POST/);
@@ -514,8 +518,8 @@ describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
   it("supports writes, but never declares them on its own", () => {
     expect(capabilitiesOf(writer)).toMatchObject({ provision: false, deprovision: false });
     expect(capabilitiesOf(writer).revokeAccess).toBeUndefined();
-    expect(writeCapabilitiesOf(writer)).toEqual({ revokeAccess: true, disableAccount: true, deprovision: true });
-    expect(writeCapabilitiesOf(base)).toEqual({ revokeAccess: false, disableAccount: false, deprovision: false });
+    expect(writeCapabilitiesOf(writer)).toEqual({ revokeAccess: true, disableAccount: true, grantAccess: true, createAccount: true, deprovision: true, provision: true });
+    expect(writeCapabilitiesOf(base)).toEqual({ revokeAccess: false, disableAccount: false, grantAccess: false, createAccount: false, deprovision: false, provision: false });
   });
 
   it("sends the declared request with the target filled in and the idempotency key", async () => {
@@ -524,16 +528,22 @@ describe("writes (INTEGRATION-P0-11 / P0-13)", () => {
     await c.authenticate(config, JSON.stringify({ token: "t" }));
     await c.write("revoke_access", { account: "u 1", entitlement: "g/1" }, "fulfil:task:1");
     await c.write("disable_account", { account: "u1" }, "fulfil:task:2");
-    expect(calls.map((x) => `${x.method} ${x.url.pathname}`)).toEqual(["DELETE /groups/g%2F1/members/u%201", "PATCH /users/u1"]);
+    await c.write("grant_access", { account: "u1", entitlement: "g1" }, "fulfil:task:3");
+    await c.write("create_account", { email: "dee@acme.example", username: "dee", displayName: "Dee" }, "fulfil:task:4");
+    expect(calls.map((x) => `${x.method} ${x.url.pathname}`)).toEqual(["DELETE /groups/g%2F1/members/u%201", "PATCH /users/u1", "PUT /groups/g1/members/u1", "POST /users"]);
     expect(calls[0].headers["Idempotency-Key"]).toBe("fulfil:task:1");
     expect(JSON.parse(calls[1].body!)).toEqual({ enabled: false, note: "by https://acme.example" });
+    expect(JSON.parse(calls[3].body!)).toEqual({ userName: "dee", email: "dee@acme.example", name: "Dee" });
   });
 
   it("fails truthfully: an undeclared operation, a missing target, an error response", async () => {
     const { fetchImpl } = fakeFetch(() => new Response("{}", { status: 500 }));
     const c = new DefinitionConnector({ http: httpDriver(fetchImpl) });
     await c.authenticate(config, JSON.stringify({ token: "t" }));
-    await expect(c.write("grant_access", { account: "u1" }, "k-00000001")).rejects.toThrow(/cannot grant access/);
+    const readOnly = new DefinitionConnector({ http: httpDriver(fetchImpl) });
+    await readOnly.authenticate({ ...config, manifest: { ...writer, write: { disable_account: writer.write!.disable_account } } }, JSON.stringify({ token: "t" }));
+    await expect(readOnly.write("grant_access", { account: "u1" }, "k-00000001")).rejects.toThrow(/cannot grant access/);
+    await expect(c.write("create_account", { username: "dee" }, "k-00000004")).rejects.toThrow(/target.email\}" has no value/);
     await expect(c.write("revoke_access", { account: "u1" }, "k-00000002")).rejects.toThrow(/has no value/);
     await expect(c.write("disable_account", { account: "u1" }, "k-00000003")).rejects.toThrow(/HTTP 500/);
   });

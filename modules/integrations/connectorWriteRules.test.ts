@@ -74,6 +74,10 @@ describe("writes per connection (INTEGRATION-P0-13)", () => {
     const off = capabilitiesWithWrites(on, supported, false);
     expect(off).toMatchObject({ importAccounts: true, revokeAccess: false, disableAccount: false, deprovision: false });
     expect(writesEnabled(off)).toBe(false);
+    // Adding and creating (slice 2) come with provision.
+    const adds = capabilitiesWithWrites(reads, { ...supported, grantAccess: true, createAccount: true, provision: true }, true);
+    expect(adds).toMatchObject({ grantAccess: true, createAccount: true, provision: true, deprovision: true });
+    expect(capabilitiesWithWrites(adds, { ...supported, grantAccess: true, createAccount: true, provision: true }, false)).toMatchObject({ grantAccess: false, createAccount: false, provision: false });
     // Never more than supported, whatever was stored before.
     expect(capabilitiesWithWrites({ ...reads, grantAccess: true }, { revokeAccess: true }, true)).toMatchObject({ grantAccess: false, revokeAccess: true, disableAccount: false });
   });

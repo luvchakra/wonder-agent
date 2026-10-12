@@ -83,7 +83,10 @@ export function decideWrite(operation: ConnectorWriteOperation, declared: Connec
 export function capabilitiesWithWrites(current: ConnectorCapabilities, supported: ConnectorCapabilities, enabled: boolean): ConnectorCapabilities {
   const next: ConnectorCapabilities = { ...current, provision: false, deprovision: false };
   for (const key of WRITE_CAPABILITY_KEYS) next[key] = enabled && supported[key] === true;
-  if (enabled) next.deprovision = supported.deprovision === true;
+  if (enabled) {
+    next.deprovision = supported.deprovision === true;
+    next.provision = supported.provision === true;
+  }
   return next;
 }
 

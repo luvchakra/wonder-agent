@@ -1,12 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { attemptKey, connectorOperation, connectorTarget, retryDelayMs, runIsLost, shouldRetry, MAX_ATTEMPTS_PER_RUN, MAX_ATTEMPTS_TOTAL } from "./connectorFulfilmentRules";
+import { attemptKey, connectorOperation, connectorTarget, newAccountTarget, retryDelayMs, runIsLost, shouldRetry, MAX_ATTEMPTS_PER_RUN, MAX_ATTEMPTS_TOTAL } from "./connectorFulfilmentRules";
 
 describe("connector fulfilment rules (INTEGRATION-P0-13)", () => {
-  it("does removals and disabling only (D3: reversible first)", () => {
+  it("maps each task kind to its write (D3)", () => {
     expect(connectorOperation("remove")).toBe("revoke_access");
     expect(connectorOperation("disable_account")).toBe("disable_account");
-    expect(connectorOperation("grant")).toBeNull();
-    expect(connectorOperation("create_account")).toBeNull();
+    expect(connectorOperation("grant")).toBe("grant_access");
+    expect(connectorOperation("create_account")).toBe("create_account");
+  });
+
+  it("adds access only to a real account, with an entitlement from its own connection", () => {
+    const account = { externalRef: "u1", integrationId: "conn-a" };
+    expect(connectorTarget("grant_access", account, { externalRef: "g1", integrationId: "conn-a" })).toEqual({ integrationId: "conn-a", target: { account: "u1", entitlement: "g1" } });
+    expect(connectorTarget("grant_access", account, { externalRef: "g1", integrationId: "conn-b" })).toBeNull();
+    expect(connectorTarget("grant_access", { ...account, pending: true }, { externalRef: "g1", integrationId: "conn-a" })).toBeNull();
+    expect(connectorTarget("grant_access", account, null)).toBeNull();
+  });
+
+  it("names a new account after its subject, through the application's connection", () => {
+    expect(newAccountTarget({ email: " dee@acme.example ", username: "dee", displayName: "Dee" }, "conn-a")).toEqual({ integrationId: "conn-a", target: { email: "dee@acme.example", username: "dee", displayName: "Dee" } });
+    expect(newAccountTarget({ email: null, username: "bot-7", displayName: null }, "conn-a")).toEqual({ integrationId: "conn-a", target: { username: "bot-7" } });
+    // A display name alone is not unique; no connection, no subject: a person's task.
+    expect(newAccountTarget({ email: null, username: "  ", displayName: "Dee" }, "conn-a")).toBeNull();
+    expect(newAccountTarget({ email: "dee@acme.example", username: null, displayName: null }, null)).toBeNull();
+    expect(newAccountTarget(null, "conn-a")).toBeNull();
   });
 
   it("targets the account's own connection, and a removal only an entitlement from that same connection", () => {

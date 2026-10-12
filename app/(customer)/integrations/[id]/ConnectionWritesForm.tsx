@@ -2,7 +2,7 @@ import { PendingSubmitButton } from "@/modules/ui";
 import { setConnectionWritesAction } from "@/app/actions/connectorFiles";
 import type { ConnectionWrites } from "@/modules/integrations/service";
 
-const OPERATION: Record<string, string> = { revoke_access: "remove access", disable_account: "disable accounts" };
+const OPERATION: Record<string, string> = { revoke_access: "remove access", disable_account: "disable accounts", grant_access: "add access", create_account: "create accounts" };
 
 /**
  * INTEGRATION-P0-13 (decision D3): whether this connection makes approved
@@ -10,7 +10,8 @@ const OPERATION: Record<string, string> = { revoke_access: "remove access", disa
  * type supports. Turning it on or off needs integration.update.
  */
 export function ConnectionWritesForm({ integrationId, writes, canEdit }: { integrationId: string; writes: ConnectionWrites; canEdit: boolean }) {
-  const what = writes.supported.map((op) => OPERATION[op] ?? op).join(" and ");
+  const ops = writes.supported.map((op) => OPERATION[op] ?? op);
+  const what = ops.length > 1 ? `${ops.slice(0, -1).join(", ")} and ${ops.at(-1)}` : (ops[0] ?? "");
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-foreground">

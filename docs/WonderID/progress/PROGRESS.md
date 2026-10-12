@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-12 |
 | Current phase | F3 in progress. The exit scenario runs end to end against a stub system (2026-10-12): rogue access removed through the connector after a reviewer asks, verified, finding resolved |
-| Next story | F3: INTEGRATION-P0-13 grants and account creation (D3's second step); the remaining F3 stories wait on D7 (relay) and D9 (connectors) |
+| Next story | F3: QA-P0-26 provisioning safety suite (mass-change guard), then INTEGRATION-P0-21 and P0-22; the relay and named connectors wait on D7 and D9 |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -94,8 +94,8 @@ Exit test: not run.
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| INTEGRATION-P0-11 (finish) Write interface with a caller | Integration | | Done | 2026-10-12. Definitions declare writes (`write`: revoke_access, disable_account; http driver); a connection writes only after an administrator turns writes on (Connection → Changes in the system; audited); retryable failures marked |
-| INTEGRATION-P0-13 Provisioning pipeline | Integration + Access | | In progress | Slice 1 (2026-10-12, migrations 0128–0129): remove-access and disable-account tasks done by the connector (claim, idempotent attempts, two retries, verification sync, reconciliation verifies); failures back to the owner with the reason, Try again, lost-run sweep. Next: grants and account creation (D3's second step) |
+| INTEGRATION-P0-11 (finish) Write interface with a caller | Integration | | Done | 2026-10-12. Definitions declare writes (`write`: revoke_access, disable_account, grant_access, create_account; http driver); a connection writes only after an administrator turns writes on (Connection → Changes in the system; audited); retryable failures marked |
+| INTEGRATION-P0-13 Provisioning pipeline | Integration + Access | | Done | 2026-10-12. Slice 1 (migrations 0128–0129): remove-access and disable-account tasks done by the connector (claim, idempotent attempts, two retries, verification sync, reconciliation verifies); failures back to the owner with the reason, Try again, lost-run sweep. Slice 2 (no migration): approved access added and accounts created by the connector; access for someone with no account waits while the connector creates it, then is added once the account is read back. Ticketed fulfilment is INTEGRATION-P0-26 |
 | INTEGRATION-P0-21 Definition extensions | Integration | #69 | Not started | |
 | INTEGRATION-P0-22 † SCIM client; LDAP and http writes | Integration | | Not started | |
 | INTEGRATION-P0-23 † WonderID Relay | Integration | | Not started | Needs D7 |

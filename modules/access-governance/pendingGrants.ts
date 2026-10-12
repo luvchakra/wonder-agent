@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { chooseAccount, placeholderRef, requestProgress, type FulfilmentState } from "./pendingGrantRules";
 import { closeTasksForAccounts, closeTasksForGrants, completeTasksForRequest, openFulfilmentTask } from "./fulfilmentTasks";
+import { resumeConnectorGrants } from "./connectorFulfilment";
 
 /**
  * ACCESS-P0-28 — an approved request (or package assignment) becomes a
@@ -458,6 +459,8 @@ export async function replacePlaceholders(tenantId: string, applicationId: strin
     const { error: deleteError } = await admin.from("accounts").delete().eq("tenant_id", tenantId).eq("id", p.id as string).eq("status", "pending");
     if (deleteError) throw new ApiError(500, "UPDATE_FAILED", deleteError.message);
     replaced++;
+    // INTEGRATION-P0-13: the access that waited for this account can now be added by a connector.
+    await resumeConnectorGrants(tenantId, real[0].id as string).catch(() => 0);
     await writeAudit({
       tenantId,
       actorType: "system",

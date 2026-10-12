@@ -88,6 +88,8 @@ function issue(ctx: Ctx, path: string, message: string) {
 
 /** Every `{…}` in a template must name something the scope will have. */
 type Scope = "settings" | "record" | "parent" | "secret" | "auth" | "target";
+/** What a write may name: the account and entitlement it changes, or, for a new account, who it is for. */
+const TARGET_FIELDS = ["account", "entitlement", "email", "username", "displayName"] as const;
 
 function checkTemplate(ctx: Ctx, path: string, template: string, allowed: Scope[]) {
   for (const name of templateVariables(template)) {
@@ -98,7 +100,7 @@ function checkTemplate(ctx: Ctx, path: string, template: string, allowed: Scope[
     }
     if (scope === "settings" && !ctx.settings.has(rest[0])) issue(ctx, path, `"{${name}}" names no setting`);
     if (scope === "secret" && !ctx.secrets.has(rest[0])) issue(ctx, path, `"{${name}}" names no secret field`);
-    if (scope === "target" && !(rest.length === 1 && (rest[0] === "account" || rest[0] === "entitlement"))) issue(ctx, path, `"{${name}}" must be {target.account} or {target.entitlement}`);
+    if (scope === "target" && !(rest.length === 1 && (TARGET_FIELDS as readonly string[]).includes(rest[0]))) issue(ctx, path, `"{${name}}" must be one of ${TARGET_FIELDS.map((f) => `{target.${f}}`).join(", ")}`);
   }
 }
 
@@ -504,8 +506,13 @@ function checkWrite(ctx: Ctx, write: unknown, driver: unknown) {
     for (const [where, text] of strings) checkTemplate(ctx, where, text, allowed);
     // A write must name what it changes, or it would hit the same address for everyone.
     const used = new Set([String(spec.request.path ?? ""), ...strings.map(([, t]) => t)].flatMap((t) => templateVariables(t)));
+    if (op === "create_account") {
+      // A new account has no id yet: it is named after the person or agent it is for.
+      if (!used.has("target.email") && !used.has("target.username")) issue(ctx, `${p}.request`, "must use {target.email} or {target.username} in its path or body");
+      continue;
+    }
     if (!used.has("target.account")) issue(ctx, `${p}.request`, "must use {target.account} in its path or body");
-    if (op === "revoke_access" && !used.has("target.entitlement")) issue(ctx, `${p}.request`, "must use {target.entitlement} in its path or body");
+    if ((op === "revoke_access" || op === "grant_access") && !used.has("target.entitlement")) issue(ctx, `${p}.request`, "must use {target.entitlement} in its path or body");
   }
 }
 
