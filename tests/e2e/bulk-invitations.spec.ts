@@ -51,7 +51,9 @@ test.describe.serial("bulk invitation", () => {
   });
 
   test("a 50-row CSV: the preview shows new, already-member and invalid rows; Confirm invites exactly the new ones, once", async ({ page }) => {
-    test.setTimeout(240_000);
+    // 42 invitations run one after another, about 3 s each against the dev
+    // project from a remote runner (~260 ms per round trip; 2026-10-12).
+    test.setTimeout(360_000);
     const members = [TEST_USERS.readOnly, TEST_USERS.requester, TEST_USERS.iamAdminOne, TEST_USERS.multiOrg, TEST_USERS.signOutOnly].map((u) => `${u.email},Already Here,`);
     const invalid = ["not-an-email,Bad Address,", `${mail("noname")},,`, `${mail("badrole")},Bad Role,NO_SUCH_ROLE`];
     const fresh = Array.from({ length: 42 }, (_, i) => `${mail(`csv${i}`)},Bulk Person ${i},READ_ONLY`);
@@ -69,7 +71,7 @@ test.describe.serial("bulk invitation", () => {
     await expect(table).toContainText("Already in this organization");
     await expect(table).toContainText("Unknown role: NO_SUCH_ROLE");
     await dialog.getByRole("button", { name: /Confirm import \(42\)/ }).click();
-    await expect(dialog.getByRole("status")).toContainText("42 added", { timeout: 120_000 });
+    await expect(dialog.getByRole("status")).toContainText("42 added", { timeout: 240_000 });
     await dialog.getByRole("button", { name: "Close" }).click();
 
     // Exactly those invitations, each with the role it asked for, and nobody else.

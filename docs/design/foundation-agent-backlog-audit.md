@@ -2956,6 +2956,19 @@ story; F1 is complete.
   backing account is not in the users directory.
 - Supabase advisors: only the expected "RLS enabled, no policy" note on the
   service-only usage table.
+- Affected specs (§17.8: sessions, `proxy.ts`, RBAC), local against dev:
+  `auth`, `csrf`, `authorization`, `multi-org-isolation`, `users`,
+  `custom-roles`, `groups`, `global-configuration`, `agent-api-keys`,
+  `tenant-address`, `runtime-gateway` and `bulk-invitations` 96/96. The
+  first run had one failure: the 42-row import in `bulk-invitations` did not
+  finish within 120 s while dev Supabase was slow (password sign-in 7 s,
+  auth health 0.6–2.2 s). The same spec on `main` passed after the
+  recovery, and on this branch it then passed in the same 2.1 min. With
+  temporary counters on both branches, an invitation API call made the same
+  number of session lookups, clients and service-role calls (31 / 48 / 16
+  for two invitations), at the same speed. That import wait was already at
+  its limit: 42 sequential invitations take about 3 s each from a remote
+  runner. It is now 240 s, within a 360 s test budget.
 
 **Left out.**
 - Four-eyes on an extension is enforced in the service (the requester
