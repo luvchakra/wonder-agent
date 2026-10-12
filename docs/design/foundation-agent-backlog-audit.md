@@ -3004,3 +3004,21 @@ Verified:
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`. Next: four-eyes on role
 changes to an active credential.
+
+### 2026-10-12 — Automation address allow-list trusts only the edge (WID-H08)
+
+Raised by the hourly findings audit. `automationAccessNow` took the
+caller's first `x-forwarded-for` value, which a caller can set. Now
+`trustedClientIp` reads:
+- the header named by `CLIENT_IP_HEADER` (self-hosted ingress; last hop);
+- on Vercel, `x-vercel-forwarded-for` or `x-real-ip`;
+- otherwise nothing, so a credential with address limits is refused.
+
+Credentials without address limits are unaffected.
+
+Verified: `npx vitest run lib/security`, 71 passed, including the new
+WID-H08 tests (spoofed header ignored, Vercel headers, configured header's
+last hop, unknown address refused).
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+

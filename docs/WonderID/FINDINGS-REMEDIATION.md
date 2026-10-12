@@ -38,6 +38,7 @@ met, with evidence), or Waiting on the owner.
 | WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
 | WID-H06 Automation credentials | P1 | Partly fixed | Four-eyes on role changes to an active credential |
 | WID-H07 Audit and erasure | P3 | Waiting on the owner | SQL test for the append-only and purge rules; retention defaults need owner and legal input |
+| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment |
 
 ## Detail
 
@@ -160,3 +161,24 @@ Test: `automationCredentialRules.test.ts`.
   done now).
 - Waiting on the owner and legal: a default retention period, minimising
   free-text metadata, crypto-erasure.
+
+### WID-H08: automation credential address allow-list (P1, partly fixed)
+
+**Done:** the caller's address now comes only from a header the
+platform's edge sets (`trustedClientIp` in `automationCredentialRules.ts`):
+- a self-hosted deployment names the header its ingress overwrites
+  (`CLIENT_IP_HEADER`, documented in `.env.local.example`), and the last
+  hop is used;
+- on Vercel, `x-vercel-forwarded-for` or `x-real-ip`, which Vercel sets
+  itself;
+- otherwise the address is unknown, and a credential limited to certain
+  addresses is refused (fails closed).
+
+A caller's own `x-forwarded-for` is never trusted. Test:
+`automationCredentialRules.test.ts`, "WID-H08".
+
+**Next:**
+- Verify at the deployed ingress (Vercel production) that spoofed headers
+  cannot change the address.
+- Document the setting in the self-hosting kit.
+

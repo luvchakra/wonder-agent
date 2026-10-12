@@ -20,6 +20,7 @@ import {
   hashAutomationKey,
   isWellFormedAutomationKey,
   overRateLimit,
+  trustedClientIp,
   parseCidrs,
   roleEscalation,
   refusalFor,
@@ -511,7 +512,8 @@ async function automationAccessNow(): Promise<{ accessToken: string; userId: str
   if (found.kind === "invalid") throw new ApiError(401, "UNAUTHENTICATED", "Invalid credential");
   const { row } = found;
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+  // WID-H08: only a header the platform's edge sets; never the caller's own x-forwarded-for.
+  const ip = trustedClientIp((name) => h.get(name), { CLIENT_IP_HEADER: process.env.CLIENT_IP_HEADER, VERCEL: process.env.VERCEL });
   const request = h.get("x-wonderid-request") ?? "";
   const [method, path] = request.split(" ");
   const now = new Date();
