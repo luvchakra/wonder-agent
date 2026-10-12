@@ -91,6 +91,7 @@ const AUTH_LABEL: Record<AuthSpec["type"], string> = {
   body: "API key in the request body",
   client_certificate: "Client certificate (mutual TLS)",
   oauth2_client_credentials: "OAuth 2.0 client credentials",
+  oauth2_authorization_code: "OAuth 2.0 sign-in with the provider",
   ldap_simple: "LDAP simple bind",
   sql_password: "Database user and password",
 };

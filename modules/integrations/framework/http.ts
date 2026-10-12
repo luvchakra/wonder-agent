@@ -1,5 +1,5 @@
 import { assertionClaims, privateKeyFrom, signJwt } from "./jwt";
-import type { AuthSpec, ConnectorDefinition, HttpRequestSpec, Pagination } from "./types";
+import { OAUTH_TOKEN_KEYS, type AuthSpec, type ConnectorDefinition, type HttpRequestSpec, type Pagination } from "./types";
 import { fillTemplate, readPath, type TemplateScope } from "./mapping";
 
 /**
@@ -66,6 +66,8 @@ export class HttpSession {
   requestCount = 0;
   private readonly base: string;
   private readonly origins: Set<string>;
+  /** INTEGRATION-P0-21: tokens this session obtained, for the caller to store encrypted (rotatedSecrets()). */
+  private obtained: Record<string, string> = {};
 
   constructor(
     private readonly def: ConnectorDefinition,
@@ -75,6 +77,12 @@ export class HttpSession {
   ) {
     this.base = baseUrlOf(def, settings);
     this.origins = allowedOrigins(def, settings);
+    // A stored access token still valid is used as is, so a run need not refresh.
+    if (def.auth.type === "oauth2_authorization_code") {
+      const value = secrets[OAUTH_TOKEN_KEYS.access];
+      const expiresAt = Number(secrets[OAUTH_TOKEN_KEYS.expiresAt]);
+      if (value && Number.isFinite(expiresAt)) this.token = { value, expiresAt };
+    }
   }
 
   private authScope(): TemplateScope {
@@ -89,6 +97,7 @@ export class HttpSession {
   }
 
   private async oauthToken(force = false): Promise<string> {
+    if (this.def.auth.type === "oauth2_authorization_code") return this.refreshedToken(force);
     const auth = this.def.auth as Extract<AuthSpec, { type: "oauth2_client_credentials" }>;
     if (!force && this.token && this.token.expiresAt > Date.now() + 30_000) return this.token.value;
     const scope = this.authScope();
@@ -132,6 +141,88 @@ export class HttpSession {
     return this.token.value;
   }
 
+  private codeAuth() {
+    const auth = this.def.auth;
+    if (auth.type !== "oauth2_authorization_code") throw new ConnectorRequestError("This connection does not sign in with the provider");
+    const scope = this.authScope();
+    return { auth, tokenUrl: this.resolve(fillTemplate(auth.tokenUrl, scope)), clientId: fillTemplate(auth.clientId, scope), clientSecret: fillTemplate(auth.clientSecret, scope) };
+  }
+
+  /** One token request of the authorization-code flow; keeps what it obtains (rotatedSecrets()). */
+  private async tokenRequest(form: URLSearchParams, failure: string): Promise<{ refreshToken?: string }> {
+    const { tokenUrl, clientId, clientSecret } = this.codeAuth();
+    form.set("client_id", clientId);
+    form.set("client_secret", clientSecret);
+    this.requestCount++;
+    const res = await this.fetchImpl(tokenUrl.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded", Accept: "application/json" },
+      body: form.toString(),
+    });
+    // The provider's error body may echo what was sent; only the status is reported.
+    if (!res.ok) throw new ConnectorRequestError(`${failure}: HTTP ${res.status}`, res.status);
+    const body = (await res.json().catch(() => ({}))) as { access_token?: unknown; expires_in?: unknown; refresh_token?: unknown };
+    if (typeof body.access_token !== "string" || !body.access_token) throw new ConnectorRequestError(`${failure}: no access_token in the response`);
+    const expiresAt = Date.now() + Math.max(30, Number(body.expires_in) || 300) * 1000;
+    this.token = { value: body.access_token, expiresAt };
+    this.obtained[OAUTH_TOKEN_KEYS.access] = body.access_token;
+    this.obtained[OAUTH_TOKEN_KEYS.expiresAt] = String(expiresAt);
+    const refreshToken = typeof body.refresh_token === "string" && body.refresh_token ? body.refresh_token : undefined;
+    if (refreshToken) this.obtained[OAUTH_TOKEN_KEYS.refresh] = refreshToken;
+    return { refreshToken };
+  }
+
+  /** INTEGRATION-P0-21: an access token from the stored refresh token (authorization code). */
+  private async refreshedToken(force: boolean): Promise<string> {
+    if (!force && this.token && this.token.expiresAt > Date.now() + 30_000) return this.token.value;
+    const refreshToken = this.obtained[OAUTH_TOKEN_KEYS.refresh] ?? this.secrets[OAUTH_TOKEN_KEYS.refresh];
+    if (!refreshToken) throw new ConnectorRequestError("Not connected yet: an administrator must connect this connection on its page");
+    const form = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshToken });
+    const { auth } = this.codeAuth();
+    if (auth.scope) form.set("scope", auth.scope);
+    try {
+      await this.tokenRequest(form, "Refreshing the sign-in failed");
+    } catch (err) {
+      if (err instanceof ConnectorRequestError && (err.status === 400 || err.status === 401)) {
+        throw new ConnectorRequestError("The sign-in has expired or was revoked: connect the connection again", err.status);
+      }
+      throw err;
+    }
+    return this.token!.value;
+  }
+
+  /**
+   * INTEGRATION-P0-21: the provider's sign-in address for this connection,
+   * with PKCE. Only its own address (resolve() refuses any other) and no
+   * secret: the browser sees it.
+   */
+  authorizationUrl(input: { state: string; codeChallenge: string; redirectUri: string }): string {
+    const { auth } = this.codeAuth();
+    const scope = this.authScope();
+    const url = this.resolve(fillTemplate(auth.authorizeUrl, scope));
+    for (const [k, v] of Object.entries(auth.authorizeParams ?? {})) url.searchParams.set(k, fillTemplate(v, { settings: this.settings }));
+    url.searchParams.set("response_type", "code");
+    url.searchParams.set("client_id", fillTemplate(auth.clientId, scope));
+    url.searchParams.set("redirect_uri", input.redirectUri);
+    if (auth.scope) url.searchParams.set("scope", auth.scope);
+    url.searchParams.set("state", input.state);
+    url.searchParams.set("code_challenge", input.codeChallenge);
+    url.searchParams.set("code_challenge_method", "S256");
+    return url.toString();
+  }
+
+  /** INTEGRATION-P0-21: trades the code from the callback for tokens; the provider must give a refresh token. */
+  async exchangeCode(code: string, codeVerifier: string, redirectUri: string): Promise<void> {
+    const form = new URLSearchParams({ grant_type: "authorization_code", code, redirect_uri: redirectUri, code_verifier: codeVerifier });
+    const { refreshToken } = await this.tokenRequest(form, "Connecting failed");
+    if (!refreshToken) throw new ConnectorRequestError("Connecting failed: the provider gave no refresh token (ask for offline access in authorizeParams)");
+  }
+
+  /** The tokens this session obtained (to store with the connection's credentials), or null. */
+  rotatedSecrets(): Record<string, string> | null {
+    return Object.keys(this.obtained).length ? { ...this.obtained } : null;
+  }
+
   /**
    * INTEGRATION-P0-21: the connection's client certificate, for a request
    * to its own address (resolve() refuses any other) over https only.
@@ -169,6 +260,7 @@ export class HttpSession {
         // Added to the body in send(); nothing goes in the URL or headers.
         return;
       case "oauth2_client_credentials":
+      case "oauth2_authorization_code":
         headers.Authorization = `Bearer ${await this.oauthToken(forceToken)}`;
         return;
       case "client_certificate":
@@ -222,7 +314,7 @@ export class HttpSession {
       // The definition's rateLimitPerSecond is enforced by the gateway, around fetchImpl.
       const clientCert = this.clientCertificate(target);
       const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body, ...(clientCert ? { clientCert } : {}) });
-      if (res.status === 401 && attempt === 0 && this.def.auth.type === "oauth2_client_credentials") continue;
+      if (res.status === 401 && attempt === 0 && (this.def.auth.type === "oauth2_client_credentials" || this.def.auth.type === "oauth2_authorization_code")) continue;
       if (!res.ok) throw new ConnectorRequestError(`${label} failed: HTTP ${res.status}`, res.status);
       const text = await res.text();
       if (!text.trim()) return { json: null, headers: res.headers };

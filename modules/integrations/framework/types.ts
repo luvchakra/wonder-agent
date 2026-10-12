@@ -152,11 +152,18 @@ export type SettingField = {
 /** A secret value the organization enters. `optional` ones may be left empty (an MCP server without auth). */
 export type SecretField = { key: string; label: string; help?: string; optional?: boolean };
 
-/** Authentication. Secret values are only ever referenced here, as `{secret.<key>}`. */
+/**
+ * INTEGRATION-P0-21: where an authorization-code connection keeps its tokens
+ * inside its encrypted credential. A definition's secret fields may not use
+ * these names (or any name starting with `_`).
+ */
+export const OAUTH_TOKEN_KEYS = { refresh: "_oauth_refresh_token", access: "_oauth_access_token", expiresAt: "_oauth_expires_at" } as const;
+
 /** INTEGRATION-P0-21: how a private key signs a JWT assertion. */
 export const JWT_ALGORITHMS = ["RS256", "ES256"] as const;
 export type JwtAlgorithm = (typeof JWT_ALGORITHMS)[number];
 
+/** Authentication. Secret values are only ever referenced here, as `{secret.<key>}`. */
 export type AuthSpec =
   | { type: "none" }
   | { type: "basic"; username: string; password: string; fields: SecretField[] }
@@ -190,6 +197,24 @@ export type AuthSpec =
       algorithm?: JwtAlgorithm;
       keyId?: string;
       subject?: string;
+      fields: SecretField[];
+    }
+  /**
+   * INTEGRATION-P0-21: OAuth 2.0 authorization code with PKCE. An
+   * administrator connects once on the system's own sign-in page; the
+   * callback arrives at the connection's receiver; the refresh token is kept
+   * encrypted with the connection's credentials and used for every sync.
+   * `authorizeUrl` and `tokenUrl` are paths or start with a url setting.
+   */
+  | {
+      type: "oauth2_authorization_code";
+      authorizeUrl: string;
+      tokenUrl: string;
+      clientId: string;
+      clientSecret: string;
+      scope?: string;
+      /** Extra query parameters for the sign-in page (access_type=offline, prompt=consent); never secrets. */
+      authorizeParams?: Record<string, string>;
       fields: SecretField[];
     }
   /** INTEGRATION-P0-21: mutual TLS: the connection presents a client certificate (PEM) to its own address only. */

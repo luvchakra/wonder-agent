@@ -9,6 +9,7 @@ import type {
   NormalizedIdentity,
 } from "@/lib/shared/types/integrations";
 import {
+  OAUTH_TOKEN_KEYS,
   RESOURCE_KINDS,
   type ConnectorDefinition,
   type ConnectorIntegrationConfig,
@@ -49,6 +50,12 @@ export interface ConnectorDriverSession {
   fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number, kind: ResourceKind, report?: FetchReport): Promise<unknown[]>;
   /** INTEGRATION-P0-13: one write request (http driver). Throws on a failed response. */
   send?(request: HttpRequestSpec, scope: TemplateScope): Promise<unknown>;
+  /** INTEGRATION-P0-21 (authorization code, http driver): the provider's sign-in address. */
+  authorizationUrl?(input: { state: string; codeChallenge: string; redirectUri: string }): string;
+  /** INTEGRATION-P0-21: trades a sign-in code for tokens. */
+  exchangeCode?(code: string, codeVerifier: string, redirectUri: string): Promise<void>;
+  /** INTEGRATION-P0-21: tokens the session obtained, to store with the credentials. */
+  rotatedSecrets?(): Record<string, string> | null;
   close?(): Promise<void>;
 }
 
@@ -81,6 +88,9 @@ export function httpDriver(fetchImpl: FetchLike): DriverFactory {
       async send(request, scope) {
         return (await session.send(request, scope)).json;
       },
+      authorizationUrl: (input) => session.authorizationUrl(input),
+      exchangeCode: (code, verifier, redirectUri) => session.exchangeCode(code, verifier, redirectUri),
+      rotatedSecrets: () => session.rotatedSecrets(),
     };
   };
 }
@@ -175,6 +185,8 @@ export class DefinitionConnector implements ConnectorAdapter {
   /** INTEGRATION-P0-21: set for an incremental run; resources with `changes` then read only what changed since. */
   private since: Date | null = null;
   private context: DriverContext | undefined;
+  /** INTEGRATION-P0-21: tokens obtained this run (authorization code), kept past close(). */
+  private obtained: Record<string, string> = {};
 
   constructor(private readonly drivers: DriverFactories) {}
 
@@ -203,6 +215,7 @@ export class DefinitionConnector implements ConnectorAdapter {
       this.secrets = Object.fromEntries(Object.entries(parsed as Record<string, unknown>).map(([k, v]) => [k, String(v)]));
     }
     this.session = null;
+    this.obtained = {};
     this.since = null;
     this.rawCache.clear();
     this.issues = [];
@@ -396,7 +409,45 @@ export class DefinitionConnector implements ConnectorAdapter {
     return {};
   }
 
+  /** INTEGRATION-P0-21: an authorization-code connection no administrator has connected yet. */
+  awaitsAuthorization(): boolean {
+    return this.def.auth.type === "oauth2_authorization_code" && !this.secrets[OAUTH_TOKEN_KEYS.refresh];
+  }
+
+  /** INTEGRATION-P0-21: the provider's sign-in address (authorization code with PKCE). */
+  async authorizationUrl(input: { state: string; codeChallenge: string; redirectUri: string }): Promise<string> {
+    if (this.def.auth.type !== "oauth2_authorization_code") throw new Error("This connection does not sign in with the provider");
+    const session = await this.open();
+    if (!session.authorizationUrl) throw new Error(`The ${this.def.driver} driver cannot sign in with the provider`);
+    return session.authorizationUrl(input);
+  }
+
+  /** INTEGRATION-P0-21: trades the callback's code for tokens; updatedCredential() then holds them. */
+  async exchangeAuthorizationCode(code: string, codeVerifier: string, redirectUri: string): Promise<void> {
+    if (this.def.auth.type !== "oauth2_authorization_code") throw new Error("This connection does not sign in with the provider");
+    const session = await this.open();
+    if (!session.exchangeCode) throw new Error(`The ${this.def.driver} driver cannot sign in with the provider`);
+    await session.exchangeCode(code, codeVerifier, redirectUri);
+    this.collectObtained();
+  }
+
+  private collectObtained() {
+    const rotated = this.session?.rotatedSecrets?.();
+    if (rotated) this.obtained = { ...this.obtained, ...rotated };
+  }
+
+  /**
+   * INTEGRATION-P0-21: the tokens this run obtained (a refreshed access
+   * token, a rotated refresh token), or null when there are none. The
+   * caller stores them encrypted with the connection's credentials.
+   */
+  obtainedTokens(): Record<string, string> | null {
+    this.collectObtained();
+    return Object.keys(this.obtained).length ? { ...this.obtained } : null;
+  }
+
   async close() {
+    this.collectObtained();
     await this.session?.close?.();
     this.session = null;
   }

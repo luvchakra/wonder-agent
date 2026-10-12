@@ -752,3 +752,116 @@ describe("signing in with a private key or a client certificate (INTEGRATION-P0-
     await expect(new HttpSession(def, { baseUrl: "http://acme.example" }, { cert: "CERT", key: "KEY" }, fetchImpl).send({ path: "/users" }, { settings: {} })).rejects.toThrow(/only sent over https/);
   });
 });
+
+describe("signing in with the provider (INTEGRATION-P0-21 part 3b)", () => {
+  const code = (extra: Record<string, unknown> = {}): ConnectorDefinition =>
+    ({
+      ...fast,
+      key: "acme-code",
+      settings: [...fast.settings, { key: "loginUrl", label: "Sign-in address", type: "url", required: true }],
+      auth: {
+        type: "oauth2_authorization_code",
+        authorizeUrl: "{settings.loginUrl}/authorize",
+        tokenUrl: "{settings.loginUrl}/token",
+        clientId: "{secret.clientId}",
+        clientSecret: "{secret.clientSecret}",
+        scope: "directory.read offline_access",
+        fields: [{ key: "clientId", label: "Client ID" }, { key: "clientSecret", label: "Client secret" }],
+        ...extra,
+      },
+    }) as unknown as ConnectorDefinition;
+  const settings = { baseUrl: "https://api.acme.example", loginUrl: "https://login.acme.example" };
+  const secrets = { clientId: "client-1", clientSecret: "s3cret" };
+
+  it("validates the sign-in and token addresses, the client secret and the extra sign-in parameters", () => {
+    const msgs = (d: unknown) => validateDefinition(d).issues.map((i) => `${i.path}: ${i.message}`).join("\n");
+    expect(msgs(code({ authorizeParams: { prompt: "consent", access_type: "offline" } }))).toBe("");
+    expect(msgs(code({ authorizeUrl: "https://evil.example/authorize" }))).toMatch(/auth.authorizeUrl: must be a path/);
+    expect(msgs(code({ tokenUrl: undefined }))).toMatch(/auth.tokenUrl: is required/);
+    expect(msgs(code({ clientSecret: "{settings.baseUrl}" }))).toMatch(/clientSecret: must come from a secret field/);
+    expect(msgs(code({ authorizeParams: { redirect_uri: "https://evil.example" } }))).toMatch(/redirect_uri: is set by WonderID/);
+    expect(msgs(code({ authorizeParams: { hint: "{secret.clientSecret}" } }))).toMatch(/cannot hold a secret/);
+    expect(msgs(code({ fields: [{ key: "_oauth_refresh_token", label: "Sneaky" }, { key: "clientId", label: "Id" }, { key: "clientSecret", label: "S" }] }))).toMatch(/fields\[0\]\.key: must be letters/);
+    expect(msgs({ ...code(), driver: "ldap", resources: {} })).toMatch(/auth.type: must be one of/);
+  });
+
+  it("builds the provider's sign-in address with PKCE, on the connection's own address only", () => {
+    const { fetchImpl, calls } = fakeFetch(() => json({}));
+    const s = new HttpSession(code({ authorizeParams: { prompt: "consent" } }), settings, secrets, fetchImpl);
+    const url = new URL(s.authorizationUrl({ state: "st", codeChallenge: "ch", redirectUri: "https://id.example/api/connect/v1/c/oauth/callback" }));
+    expect(url.origin + url.pathname).toBe("https://login.acme.example/authorize");
+    expect(Object.fromEntries(url.searchParams)).toEqual({
+      prompt: "consent",
+      response_type: "code",
+      client_id: "client-1",
+      redirect_uri: "https://id.example/api/connect/v1/c/oauth/callback",
+      scope: "directory.read offline_access",
+      state: "st",
+      code_challenge: "ch",
+      code_challenge_method: "S256",
+    });
+    expect(url.toString()).not.toMatch(/s3cret/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("trades the code for tokens and refuses a provider that gives no refresh token", async () => {
+    let form = new URLSearchParams();
+    const { fetchImpl } = fakeFetch(async (u, init) => {
+      form = new URLSearchParams(init.body);
+      return json({ access_token: "at-1", refresh_token: "rt-1", expires_in: 3600 });
+    });
+    const s = new HttpSession(code(), settings, secrets, fetchImpl);
+    await s.exchangeCode("the-code", "the-verifier", "https://id.example/cb");
+    expect(Object.fromEntries(form)).toEqual({ grant_type: "authorization_code", code: "the-code", redirect_uri: "https://id.example/cb", code_verifier: "the-verifier", client_id: "client-1", client_secret: "s3cret" });
+    expect(s.rotatedSecrets()).toMatchObject({ _oauth_refresh_token: "rt-1", _oauth_access_token: "at-1" });
+    const noRefresh = new HttpSession(code(), settings, secrets, fakeFetch(() => json({ access_token: "at" })).fetchImpl);
+    await expect(noRefresh.exchangeCode("c", "v", "https://id.example/cb")).rejects.toThrow(/no refresh token/);
+  });
+
+  it("refreshes with the stored refresh token, keeps a rotated one, and uses the stored access token while it is valid", async () => {
+    const forms: URLSearchParams[] = [];
+    const { fetchImpl, calls } = fakeFetch(async (u, init) => {
+      if (u.pathname === "/token") {
+        forms.push(new URLSearchParams(init.body));
+        return json({ access_token: "at-new", refresh_token: "rt-2", expires_in: 3600 });
+      }
+      return json({ ok: true });
+    });
+    const s = new HttpSession(code(), settings, { ...secrets, _oauth_refresh_token: "rt-1" }, fetchImpl);
+    await s.send({ path: "/users" }, { settings: {} });
+    expect(forms[0].get("grant_type")).toBe("refresh_token");
+    expect(forms[0].get("refresh_token")).toBe("rt-1");
+    expect(calls.at(-1)!.headers.Authorization).toBe("Bearer at-new");
+    expect(s.rotatedSecrets()).toMatchObject({ _oauth_refresh_token: "rt-2", _oauth_access_token: "at-new" });
+
+    const cached = fakeFetch(() => json({ ok: true }));
+    const later = new HttpSession(code(), settings, { ...secrets, _oauth_refresh_token: "rt-2", _oauth_access_token: "at-kept", _oauth_expires_at: String(Date.now() + 600_000) }, cached.fetchImpl);
+    await later.send({ path: "/users" }, { settings: {} });
+    expect(cached.calls).toHaveLength(1);
+    expect(cached.calls[0].headers.Authorization).toBe("Bearer at-kept");
+    expect(later.rotatedSecrets()).toBeNull();
+  });
+
+  it("not connected yet, or a revoked sign-in, fails with what to do and no token in the message", async () => {
+    const s = new HttpSession(code(), settings, secrets, fakeFetch(() => json({})).fetchImpl);
+    await expect(s.send({ path: "/users" }, { settings: {} })).rejects.toThrow(/Not connected yet/);
+    const revoked = new HttpSession(code(), settings, { ...secrets, _oauth_refresh_token: "rt-old" }, fakeFetch(() => json({ error: "invalid_grant", refresh_token: "rt-old" }, { status: 400 })).fetchImpl);
+    const err = await revoked.send({ path: "/users" }, { settings: {} }).catch((e: Error) => e);
+    expect(String(err)).toMatch(/expired or was revoked: connect the connection again/);
+    expect(String(err)).not.toMatch(/rt-old/);
+  });
+
+  it("the connector reports a connection that awaits sign-in, and the tokens a run obtained", async () => {
+    const { fetchImpl } = fakeFetch(async (u) => (u.pathname === "/token" ? json({ access_token: "at", refresh_token: "rt-9", expires_in: 60 }) : json({})));
+    const c = new DefinitionConnector({ http: httpDriver(fetchImpl) });
+    const config = { definition: { key: "acme-code", version: "1.0.0", origin: "custom" }, manifest: code(), settings };
+    await c.authenticate(config, JSON.stringify(secrets));
+    expect(c.awaitsAuthorization()).toBe(true);
+    expect((await c.testConnection()).message).toMatch(/Not connected yet/);
+    await c.authenticate(config, JSON.stringify({ ...secrets, _oauth_refresh_token: "rt-1" }));
+    expect(c.awaitsAuthorization()).toBe(false);
+    expect((await c.testConnection()).ok).toBe(true);
+    await c.close();
+    expect(c.obtainedTokens()).toMatchObject({ _oauth_refresh_token: "rt-9" });
+  });
+});

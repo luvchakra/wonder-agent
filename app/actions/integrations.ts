@@ -1,10 +1,11 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { createSyncJob, discoverMcpTools, resolveHeldMissing, runSyncJob, testIntegrationConnection } from "@/modules/integrations/service";
+import { createSyncJob, discoverMcpTools, resolveHeldMissing, runSyncJob, startConnectorSignIn, testIntegrationConnection } from "@/modules/integrations/service";
 
 export async function testConnectionAction(integrationId: string) {
   const ctx = await requirePermission("integration.execute");
@@ -20,6 +21,35 @@ export async function triggerSyncAction(integrationId: string) {
   // action still returns promptly.
   void runSyncJob(ctx.tenantId!, job.id);
   redirect(`/integrations/${integrationId}`);
+}
+
+/**
+ * INTEGRATION-P0-21 — "Connect" on a sign-in-with-the-provider connection:
+ * sets the httpOnly cookie only the connection's callback receives, then
+ * sends the browser to the provider's own sign-in page. A server action
+ * redirect is a script navigation, so the CSP form-action allow-list (which
+ * names hosted payment pages only) does not need every provider added.
+ */
+export async function connectSignInAction(integrationId: string) {
+  const ctx = await requirePermission("integration.update");
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost"}`;
+  let location: string;
+  try {
+    const started = await startConnectorSignIn(ctx.tenantId!, ctx.userId, integrationId, origin);
+    (await cookies()).set(started.cookie.name, started.cookie.value, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: started.cookie.secure,
+      path: started.cookie.path,
+      maxAge: started.cookie.maxAge,
+    });
+    location = started.location;
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status === 404) throw err;
+    location = `/integrations/${integrationId}?oauth=${err.code === "CREDENTIALS_REQUIRED" ? "needs_credentials" : "failed"}`;
+  }
+  redirect(location);
 }
 
 /**

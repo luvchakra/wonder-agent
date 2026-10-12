@@ -9,7 +9,7 @@ import type { IntegrationSyncJob, SyncJobMode, SyncJobTrigger } from "@/lib/shar
 import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { toSyncJob } from "./mappers";
 import { createConnector } from "./registry";
-import { getDecryptedCredential } from "./credentials";
+import { getDecryptedCredential, keepObtainedTokens } from "./credentials";
 import { openGateway, type GatewaySession } from "./gateway/gateway";
 import { planAfterSync, runPipeline } from "./syncPipeline";
 import { pipelineStatusOf, type ImportOutcome } from "./pipelineRules";
@@ -230,6 +230,8 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
   const kindRuns = new Map<string, KindRun>();
   // The run's Connector Gateway session: every request of this sync passes it; flushed at the end.
   let gateway: GatewaySession | null = null;
+  // INTEGRATION-P0-21: kept so tokens a run obtained are stored even when it fails part way.
+  let runConnector: object | null = null;
 
   try {
     const { data: integration, error: integrationError } = await supabase
@@ -246,6 +248,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
     // The gateway session names the connection (its own tenant); the file driver reads received files for it only.
     gateway = openGateway({ tenantId, integrationId: integration.id, status: integration.status });
     const connector = createConnector(integration.integration_type_id, gateway);
+    runConnector = connector;
     await connector.authenticate(integration.config ?? {}, secret);
 
     // INTEGRATION-P0-21: a scheduled run reads only what changed, when it may (chooseRunMode).
@@ -448,6 +451,7 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
       referenceId: jobId,
     });
   } finally {
+    await keepObtainedTokens(tenantId, jobRow.integration_id, runConnector);
     await gateway?.flush();
   }
 }

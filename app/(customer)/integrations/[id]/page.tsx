@@ -3,10 +3,10 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getConnectionSchedule, getConnectionWrites, getIntegration, getReceiverStatus, listSyncJobs, type ConnectionWrites } from "@/modules/integrations/service";
-import { resolveHeldMissingAction, testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
+import { getConnectionSchedule, getConnectionWrites, getIntegration, getReceiverStatus, listSyncJobs, OAUTH_OUTCOMES, redirectUriFor, type ConnectionWrites, type OAuthOutcome } from "@/modules/integrations/service";
+import { connectSignInAction, resolveHeldMissingAction, testConnectionAction, triggerSyncAction } from "@/app/actions/integrations";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { RecordProvenance, Card, CardHeader, CardBody, Badge, Button, EmptyState, type BadgeTone } from "@/modules/ui";
+import { RecordProvenance, Card, CardHeader, CardBody, Badge, Button, EmptyState, PendingSubmitButton, type BadgeTone } from "@/modules/ui";
 import { parseConnectorConfig } from "@/modules/integrations/framework/engine";
 import type { ConnectorDefinition } from "@/modules/integrations/framework/types";
 import { connectionTypeOf } from "@/modules/integrations/framework/typeSummary";
@@ -96,10 +96,10 @@ export default async function IntegrationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ credentials?: string; held?: string }>;
+  searchParams: Promise<{ credentials?: string; held?: string; oauth?: string }>;
 }) {
   const { id } = await params;
-  const { credentials, held } = await searchParams;
+  const { credentials, held, oauth } = await searchParams;
   let ctx;
   try {
     ctx = await requirePermission("integration.read");
@@ -115,13 +115,14 @@ export default async function IntegrationDetailPage({
   const connector = connectorDefinition(integration);
   const receive = connector?.receive;
   const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file);
+  const signsIn = connector?.auth.type === "oauth2_authorization_code";
 
   const reads = connector ? Object.keys(connector.resources).length > 0 : false;
   const writable = connector?.write ? Object.keys(connector.write).length > 0 : false;
   const [jobs, receiver, origin, configuration, provenance, schedule, writes] = await Promise.all([
     listSyncJobs(ctx.tenantId!, id),
     needsSecret ? getReceiverStatus(ctx.tenantId!, id) : Promise.resolve(null),
-    receive ? ownOrigin() : Promise.resolve(""),
+    receive || signsIn ? ownOrigin() : Promise.resolve(""),
     connector ? getConnectorConfiguration(ctx.tenantId!, id).catch(() => null as ConnectorConfiguration | null) : Promise.resolve(null),
     getRecordProvenance(ctx.tenantId!, "integrations", id),
     reads ? getConnectionSchedule(ctx.tenantId!, id) : Promise.resolve(null),
@@ -169,6 +170,12 @@ export default async function IntegrationDetailPage({
         </p>
       ) : null}
 
+      {oauth && oauth in OAUTH_OUTCOMES ? (
+        <p role={oauth === "connected" ? "status" : "alert"} className={`rounded-md border p-3 text-sm text-foreground ${oauth === "connected" ? "border-success/40 bg-success/10" : "border-warning/40 bg-warning/10"}`}>
+          {OAUTH_OUTCOMES[oauth as OAuthOutcome]}
+        </p>
+      ) : null}
+
       {connector && configuration ? (
         <Card>
           <CardHeader title="Settings" description={`What this connection was set up with, as ${connector.name} declares it.`} />
@@ -203,6 +210,25 @@ export default async function IntegrationDetailPage({
                 ))}
               </dl>
             )}
+            {signsIn ? (
+              <div className="mt-4 space-y-2 border-t border-border pt-4 text-sm">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-muted-foreground">Sign-in with the provider</span>
+                  <Badge tone={configuration?.signedIn ? "success" : "warning"}>{configuration?.signedIn ? "Connected" : "Not connected"}</Badge>
+                  {canEdit ? (
+                    <form action={connectSignInAction.bind(null, id)} className="ml-auto">
+                      <PendingSubmitButton variant={configuration?.signedIn ? "secondary" : "default"} pendingLabel="Opening sign-in…">
+                        {configuration?.signedIn ? "Reconnect" : "Connect"}
+                      </PendingSubmitButton>
+                    </form>
+                  ) : null}
+                </div>
+                <details>
+                  <summary className="cursor-pointer text-muted-foreground">Address to register with the provider</summary>
+                  <code className="mt-1 block break-all rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">{redirectUriFor(origin, id)}</code>
+                </details>
+              </div>
+            ) : null}
           </CardBody>
         </Card>
       ) : null}
