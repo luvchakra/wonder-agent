@@ -58,6 +58,7 @@ export const RECEIVE_LABEL: Record<string, string> = {
   webhook: "webhooks",
   gateway: "Runtime Gateway calls",
   file: "CSV files",
+  scim: "users over SCIM 2.0",
 };
 
 /** One line: what a connector reads and what it receives. */
@@ -205,6 +206,9 @@ export function receiveChannels(def: ConnectorDefinition): ReceiveSummary[] {
   }
   if (r.file) {
     out.push({ channel: "file", label: capitalize(RECEIVE_LABEL.file), paths: ["file"], auth: senderAuth(r.file.auth, r.file.signatureHeader) });
+  }
+  if (r.scim) {
+    out.push({ channel: "scim", label: capitalize(RECEIVE_LABEL.scim), paths: ["scim/v2/Users", "scim/v2/ServiceProviderConfig"], auth: senderAuth("bearer") });
   }
   return out;
 }

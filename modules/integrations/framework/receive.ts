@@ -21,6 +21,21 @@ import { MAX_CSV_BYTES, readCsvFile } from "./csv";
 import { storeConnectorFile } from "./files";
 import { fileColumns } from "./drivers/file";
 import { eventRecords, mapRuntimeEvent, uploadFilename, uploadTarget, verifySender, type ReceivedRuntimeEvent } from "./receiveRules";
+import { mapRecord } from "./mapping";
+import { runSourcesAfterPush } from "../identitySources";
+import {
+  SCIM_LIST_SCHEMA,
+  applyScimPatch,
+  cleanUser,
+  mappingScope,
+  parseScimFilter,
+  scimError,
+  scimPage,
+  scimTarget,
+  scimUser,
+  serviceProviderConfig,
+  type ScimResource,
+} from "./scimRules";
 import type { ConnectorDefinition } from "./types";
 
 /**
@@ -36,7 +51,7 @@ import type { ConnectorDefinition } from "./types";
  */
 
 /** `background` is work to run after the response is sent (the route passes it to after()). */
-export type ReceiveResult = { status: number; body: Record<string, unknown>; background?: () => Promise<void> };
+export type ReceiveResult = { status: number; body: Record<string, unknown> | null; background?: () => Promise<void>; contentType?: string };
 
 const fail = (status: number, code: string, message: string): ReceiveResult => ({ status, body: { ok: false, error: { code, message } } });
 
@@ -84,7 +99,7 @@ export async function rotateReceiverSecret(tenantId: string, actorId: string, co
   const conn = await loadConnection(connectionId);
   if (!conn || conn.tenantId !== tenantId || conn.status === "disabled") throw new ApiError(404, "INTEGRATION_NOT_FOUND");
   const r = conn.def.receive;
-  if (!r?.runtimeEvents && !r?.webhook && !r?.file) throw new ApiError(400, "NOT_A_RECEIVER", "This connection receives nothing that needs a secret");
+  if (!r?.runtimeEvents && !r?.webhook && !r?.file && !r?.scim) throw new ApiError(400, "NOT_A_RECEIVER", "This connection receives nothing that needs a secret");
   const secret = `wr_${randomBytes(32).toString("base64url")}`;
   const now = new Date().toISOString();
   const { error } = await supabaseServiceRole()
@@ -337,13 +352,187 @@ async function receiveGateway(conn: Connection, which: "authorize" | "tools/filt
   }
 }
 
+// ---------------------------------------------------------------- SCIM
+
+const SCIM_TYPE = "application/scim+json";
+const scim = (status: number, body: Record<string, unknown> | null, background?: () => Promise<void>): ReceiveResult => ({ status, body, contentType: SCIM_TYPE, background });
+const scimFail = (status: number, detail: string, scimType?: string): ReceiveResult => scim(status, scimError(status, detail, scimType));
+/** A SCIM value in a LIKE pattern matches itself only (§18.3.8). */
+const likeLiteral = (v: string) => v.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+type StoredUser = { id: string; user: ScimResource; created: string };
+
+async function storedUser(conn: Connection, id: string): Promise<StoredUser | null> {
+  const { data, error } = await supabaseServiceRole()
+    .from("integration_objects")
+    .select("tenant_id, external_id, raw")
+    .eq("tenant_id", conn.tenantId)
+    .eq("integration_id", conn.id)
+    .eq("object_type", "identity")
+    .eq("external_id", id)
+    .is("missing_at_source_at", null)
+    .maybeSingle<{ tenant_id: string; external_id: string; raw: ScimResource }>();
+  if (error) throw new ApiError(503, "UNAVAILABLE", "The user could not be read");
+  if (!data || data.tenant_id !== conn.tenantId) return null;
+  const { id: _id, meta, ...user } = data.raw;
+  void _id;
+  return { id: data.external_id, user, created: ((meta as { created?: string } | undefined)?.created ?? new Date().toISOString()) as string };
+}
+
+/** Whether another live user of this connection already has this userName (case-insensitive, RFC 7643 §4.1.1). */
+async function userNameTaken(conn: Connection, userName: string, exceptId: string | null): Promise<boolean> {
+  let q = supabaseServiceRole()
+    .from("integration_objects")
+    .select("external_id")
+    .eq("tenant_id", conn.tenantId)
+    .eq("integration_id", conn.id)
+    .eq("object_type", "identity")
+    .is("missing_at_source_at", null)
+    .ilike("raw->>userName", likeLiteral(userName))
+    .limit(2);
+  if (exceptId) q = q.neq("external_id", exceptId);
+  const { data, error } = await q;
+  if (error) throw new ApiError(503, "UNAVAILABLE", "Users could not be read");
+  return (data ?? []).length > 0;
+}
+
+/** Keeps the user as an identity of the connection, mapped by the definition. */
+async function saveUser(conn: Connection, base: string, id: string, user: ScimResource, created: string): Promise<ScimResource | string> {
+  const fields = { ...(conn.def.receive!.scim!.fields as Record<string, never>), externalId: { value: id } } as Parameters<typeof mapRecord>[1];
+  const mapped = mapRecord("identity", fields, mappingScope(user));
+  if ("invalid" in mapped) return mapped.invalid;
+  const now = new Date().toISOString();
+  const resource = scimUser(user, id, { created, lastModified: now, location: `${base}/Users/${id}` });
+  const { error } = await supabaseServiceRole()
+    .from("integration_objects")
+    .upsert(
+      { tenant_id: conn.tenantId, integration_id: conn.id, object_type: "identity", external_id: id, raw: resource, normalized: mapped.normalized, missing_at_source_at: null, imported_at: now },
+      { onConflict: "integration_id,object_type,external_id" },
+    );
+  if (error) throw new ApiError(500, "STORE_FAILED", "The user could not be stored");
+  return resource;
+}
+
+/**
+ * INTEGRATION-P0-22 slice 3: users pushed over SCIM 2.0. The connection's
+ * receiving secret is the bearer token. A change is kept in the
+ * connection's staging first, then the identity sources reading the
+ * connection run after the response (one at a time per source).
+ */
+async function receiveScim(conn: Connection, channel: string, method: string, query: URLSearchParams, rawBody: string, headers: Headers, base: string): Promise<ReceiveResult> {
+  const spec = conn.def.receive?.scim;
+  if (!spec) return fail(404, "NOT_FOUND", "This connection does not receive SCIM");
+  const secret = await receiverSecret(conn.tenantId, conn.id);
+  if (!secret || !verifySender("bearer", secret, rawBody, headers)) return scimFail(401, "A valid bearer token is required");
+  const target = scimTarget(channel);
+  if (!target) return scimFail(404, "Not found");
+  const scimBase = `${base}/scim/v2`;
+  if (target.kind === "config") return method === "GET" ? scim(200, serviceProviderConfig(`${scimBase}/ServiceProviderConfig`)) : scimFail(405, "Method not allowed");
+
+  const parse = (): unknown | ReceiveResult => {
+    try {
+      return JSON.parse(rawBody);
+    } catch {
+      return scimFail(400, "The body must be JSON", "invalidSyntax");
+    }
+  };
+  const isResult = (v: unknown): v is ReceiveResult => typeof v === "object" && v !== null && "status" in v && "contentType" in v;
+  const changed = async (operation: string, id: string) => {
+    await touch(conn.tenantId, conn.id);
+    // The id WonderID assigned, never the person's details (§17.7).
+    await writeAudit({ tenantId: conn.tenantId, actorType: "integration", action: "integration.scim_received", objectType: "integration", objectId: conn.id, outcome: "success", metadata: { operation, resourceId: id } });
+  };
+  const thenRun = () => runSourcesAfterPush(conn.tenantId, conn.id);
+
+  if (target.id === null) {
+    if (method === "GET") {
+      const filter = parseScimFilter(query.get("filter"));
+      if (filter === "invalid") return scimFail(400, 'Only userName eq "…" and externalId eq "…" filters are supported', "invalidFilter");
+      const { offset, limit } = scimPage(query.get("startIndex"), query.get("count"));
+      let q = supabaseServiceRole()
+        .from("integration_objects")
+        .select("raw", { count: "exact" })
+        .eq("tenant_id", conn.tenantId)
+        .eq("integration_id", conn.id)
+        .eq("object_type", "identity")
+        .is("missing_at_source_at", null)
+        .order("external_id");
+      if (filter?.attribute === "userName") q = q.ilike("raw->>userName", likeLiteral(filter.value));
+      if (filter?.attribute === "externalId") q = q.eq("raw->>externalId", filter.value);
+      const { data, count, error } = limit === 0 ? await q.range(0, 0) : await q.range(offset, offset + limit - 1);
+      if (error) return scimFail(503, "Users could not be read");
+      const resources = limit === 0 ? [] : (data ?? []).map((r) => r.raw as ScimResource);
+      return scim(200, { schemas: [SCIM_LIST_SCHEMA], totalResults: count ?? resources.length, startIndex: offset + 1, itemsPerPage: resources.length, Resources: resources });
+    }
+    if (method !== "POST") return scimFail(405, "Method not allowed");
+    const body = parse();
+    if (isResult(body)) return body;
+    const user = cleanUser(body);
+    if (typeof user === "string") return scimFail(400, user, "invalidValue");
+    if (await userNameTaken(conn, user.userName as string, null)) return scimFail(409, "A user with this userName exists", "uniqueness");
+    const id = randomUUID();
+    const saved = await saveUser(conn, scimBase, id, user, new Date().toISOString());
+    if (typeof saved === "string") return scimFail(400, saved, "invalidValue");
+    await changed("create", id);
+    return scim(201, saved, thenRun);
+  }
+
+  const current = await storedUser(conn, target.id);
+  if (!current) return scimFail(404, "No such user");
+  if (method === "GET") {
+    return scim(200, scimUser(current.user, current.id, { created: current.created, lastModified: current.created, location: `${scimBase}/Users/${current.id}` }));
+  }
+  if (method === "DELETE") {
+    const { error } = await supabaseServiceRole()
+      .from("integration_objects")
+      .update({ missing_at_source_at: new Date().toISOString() })
+      .eq("tenant_id", conn.tenantId)
+      .eq("integration_id", conn.id)
+      .eq("object_type", "identity")
+      .eq("external_id", current.id);
+    if (error) return scimFail(500, "The user could not be removed");
+    await changed("delete", current.id);
+    // Gone from the source: the next run of each source decides it as a leaver, under its guard.
+    return scim(204, null, thenRun);
+  }
+  if (method !== "PUT" && method !== "PATCH") return scimFail(405, "Method not allowed");
+  const body = parse();
+  if (isResult(body)) return body;
+  let next: ScimResource;
+  if (method === "PUT") {
+    const user = cleanUser(body);
+    if (typeof user === "string") return scimFail(400, user, "invalidValue");
+    next = user;
+  } else {
+    const patched = applyScimPatch(current.user, body);
+    if (!patched.ok) return scimFail(patched.status, patched.detail, patched.scimType);
+    next = patched.user;
+  }
+  if (await userNameTaken(conn, next.userName as string, current.id)) return scimFail(409, "A user with this userName exists", "uniqueness");
+  const saved = await saveUser(conn, scimBase, current.id, next, current.created);
+  if (typeof saved === "string") return scimFail(400, saved, "invalidValue");
+  await changed(method === "PUT" ? "replace" : "patch", current.id);
+  return scim(200, saved, thenRun);
+}
+
 // ---------------------------------------------------------------- entry point
 
-export const MAX_RECEIVE_BYTES: Record<string, number> = { events: 1024 * 1024, webhook: 1024 * 1024, gateway: 16 * 1024, file: MAX_CSV_BYTES };
+export const MAX_RECEIVE_BYTES: Record<string, number> = { events: 1024 * 1024, webhook: 1024 * 1024, gateway: 16 * 1024, file: MAX_CSV_BYTES, scim: 256 * 1024 };
 
-/** One received request: `channel` is events, webhook, file, gateway/authorize or gateway/tools/filter. */
-export async function receive(connectionId: string, channel: string, rawBody: string, headers: Headers): Promise<ReceiveResult> {
-  const kind = channel.startsWith("gateway/") ? "gateway" : channel;
+/**
+ * One received request: `channel` is events, webhook, file,
+ * gateway/authorize, gateway/tools/filter or scim/v2/…; `request` carries
+ * the method, query and the connection's own address (for SCIM).
+ */
+export async function receive(
+  connectionId: string,
+  channel: string,
+  rawBody: string,
+  headers: Headers,
+  request: { method: string; query: URLSearchParams; base: string } = { method: "POST", query: new URLSearchParams(), base: "" },
+): Promise<ReceiveResult> {
+  const kind = channel.startsWith("gateway/") ? "gateway" : channel.startsWith("scim/v2/") ? "scim" : channel;
+  if (kind !== "scim" && request.method !== "POST") return fail(405, "METHOD_NOT_ALLOWED", "Only POST is accepted on this channel");
   const limit = MAX_RECEIVE_BYTES[kind];
   if (!limit) return fail(404, "NOT_FOUND", "No such channel");
   if (Buffer.byteLength(rawBody, "utf8") > limit) return fail(413, "PAYLOAD_TOO_LARGE", `Request body exceeds ${Math.round(limit / 1024)} KB`);
@@ -360,12 +549,12 @@ export async function receive(connectionId: string, channel: string, rawBody: st
   const gateway = openGateway({ tenantId: conn.tenantId, integrationId: conn.id, status: conn.status });
   const started = Date.now();
   const admitted = gateway.admits();
-  const result = admitted ? await dispatch(conn, channel, rawBody, headers) : fail(404, "NOT_FOUND", "No such connection");
+  const result = admitted ? await dispatch(conn, channel, rawBody, headers, request) : fail(404, "NOT_FOUND", "No such connection");
   gateway.recordInbound({
     channel,
     status: result.status,
     bytesIn: Buffer.byteLength(rawBody, "utf8"),
-    bytesOut: Buffer.byteLength(JSON.stringify(result.body), "utf8"),
+    bytesOut: result.body ? Buffer.byteLength(JSON.stringify(result.body), "utf8") : 0,
     durationMs: Date.now() - started,
     refusal: admitted ? undefined : "disabled",
   });
@@ -373,8 +562,9 @@ export async function receive(connectionId: string, channel: string, rawBody: st
   return result;
 }
 
-async function dispatch(conn: Connection, channel: string, rawBody: string, headers: Headers): Promise<ReceiveResult> {
+async function dispatch(conn: Connection, channel: string, rawBody: string, headers: Headers, request: { method: string; query: URLSearchParams; base: string }): Promise<ReceiveResult> {
   try {
+    if (channel.startsWith("scim/v2/")) return await receiveScim(conn, channel, request.method, request.query, rawBody, headers, request.base);
     if (channel === "events") return await receiveRuntimeEvents(conn, rawBody, headers);
     if (channel === "webhook") return await receiveWebhook(conn, rawBody, headers);
     if (channel === "file") return await receiveFile(conn, rawBody, headers);

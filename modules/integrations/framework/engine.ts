@@ -116,7 +116,8 @@ export function specsOf(def: ConnectorDefinition, kind: ResourceKind): ResourceS
 export function capabilitiesOf(def: ConnectorDefinition): ConnectorCapabilities {
   const r = def.resources;
   return {
-    importIdentities: Boolean(r.identity),
+    // INTEGRATION-P0-22: users pushed over SCIM are identities of the connection too.
+    importIdentities: Boolean(r.identity || def.receive?.scim),
     importAccounts: Boolean(r.account),
     importEntitlements: Boolean(r.entitlement),
     importAccess: Boolean(r.access_grant),

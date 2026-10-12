@@ -13,6 +13,9 @@ import { OAUTH_COOKIE } from "@/modules/integrations/oauthCodeRules";
  *   POST /api/connect/v1/<connection id>/gateway/authorize      Runtime Gateway (agent API key)
  *   POST /api/connect/v1/<connection id>/gateway/tools/filter   Runtime Gateway (agent API key)
  *   GET  /api/connect/v1/<connection id>/oauth/callback         the provider's sign-in callback (signed state + cookie)
+ *   GET|POST|PUT|PATCH|DELETE /api/connect/v1/<connection id>/scim/v2/Users[/<id>]
+ *                                                               users pushed over SCIM 2.0 (connection secret as bearer)
+ *   GET  /api/connect/v1/<connection id>/scim/v2/ServiceProviderConfig
  *
  * No user session is read (proxy.ts skips /api/connect/). The body is read
  * as raw text so a signature is checked over the exact bytes sent. A
@@ -20,12 +23,24 @@ import { OAUTH_COOKIE } from "@/modules/integrations/oauthCodeRules";
  */
 export const maxDuration = 300;
 
-export async function POST(request: Request, { params }: { params: Promise<{ connectionId: string; channel: string[] }> }) {
+type Params = { params: Promise<{ connectionId: string; channel: string[] }> };
+
+async function handle(request: Request, { params }: Params): Promise<Response> {
   const { connectionId, channel } = await params;
-  const result = await receive(connectionId, channel.join("/"), await request.text(), request.headers);
+  const url = new URL(request.url);
+  // SCIM answers carry their own addresses; APP_BASE_URL when set, never a client's Host otherwise trusted (§18.2).
+  const base = `${process.env.APP_BASE_URL?.replace(/\/$/, "") ?? url.origin}/api/connect/v1/${connectionId}`;
+  const result = await receive(connectionId, channel.join("/"), await request.text(), request.headers, { method: request.method, query: url.searchParams, base });
   if (result.background) after(result.background);
-  return NextResponse.json(result.body, { status: result.status, headers: { "Cache-Control": "no-store" } });
+  const headers = { "Cache-Control": "no-store", "Content-Type": result.contentType ?? "application/json" };
+  if (result.body === null) return new NextResponse(null, { status: result.status, headers: { "Cache-Control": "no-store" } });
+  return new NextResponse(JSON.stringify(result.body), { status: result.status, headers });
 }
+
+export const POST = handle;
+export const PUT = handle;
+export const PATCH = handle;
+export const DELETE = handle;
 
 /**
  * INTEGRATION-P0-21: the provider sends an administrator's browser back
@@ -35,6 +50,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ con
  */
 export async function GET(request: Request, { params }: { params: Promise<{ connectionId: string; channel: string[] }> }) {
   const { connectionId, channel } = await params;
+  // INTEGRATION-P0-22: SCIM reads (users, the service's configuration).
+  if (channel[0] === "scim") return handle(request, { params: Promise.resolve({ connectionId, channel }) });
   if (channel.join("/") !== "oauth/callback") return NextResponse.json({ ok: false, error: { code: "NOT_FOUND", message: "Not found" } }, { status: 404 });
   const url = new URL(request.url);
   const cookie = request.headers.get("cookie")?.split(/;\s*/).find((c) => c.startsWith(`${OAUTH_COOKIE}=`));

@@ -613,7 +613,7 @@ export async function listSourcesReadingConnection(tenantId: string, integration
  * Queued and audited as the system, then run to the end; the outcome is
  * returned, never thrown, so the chain can record it.
  */
-export async function runSourceAfterSync(tenantId: string, source: IdentitySource, syncJobId: string): Promise<ReconciliationOutcome> {
+export async function runSourceAfterSync(tenantId: string, source: IdentitySource, syncJobId: string | null): Promise<ReconciliationOutcome> {
   const { data, error } = await supabaseServiceRole()
     .from("identity_reconciliation_runs")
     .insert({ tenant_id: tenantId, source_id: source.id, trigger: "integration", mode: "full", dry_run: false, created_by: null })
@@ -630,9 +630,69 @@ export async function runSourceAfterSync(tenantId: string, source: IdentitySourc
     objectId: source.id,
     outcome: "success",
     correlationId: data.id,
-    metadata: { runId: data.id, trigger: "integration", mode: "full", dryRun: false, syncJobId },
+    metadata: { runId: data.id, trigger: "integration", mode: "full", dryRun: false, syncJobId, ...(syncJobId ? {} : { pushed: true }) },
   });
   return executeReconciliation(tenantId, null, source, data.id, "full", null, false);
+}
+
+/**
+ * INTEGRATION-P0-22: a system pushed identities to the connection (SCIM).
+ * Each source reading it is asked to run; runs of one source never
+ * overlap (two at once could create the same person twice). Whoever holds
+ * the source's claim runs it again while requests arrived after its last
+ * start; everyone else only records the request. Never throws.
+ */
+export async function runSourcesAfterPush(tenantId: string, integrationId: string): Promise<void> {
+  let sources: IdentitySource[];
+  try {
+    sources = await listSourcesReadingConnection(tenantId, integrationId);
+  } catch (err) {
+    console.error("runSourcesAfterPush: sources unreadable", { integrationId, err: err instanceof Error ? err.message : "unknown" });
+    return;
+  }
+  const admin = supabaseServiceRole();
+  for (const source of sources) {
+    await admin.from("identity_sources").update({ run_requested_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("id", source.id);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const lastStart = await drainSource(tenantId, source.id);
+      if (lastStart === null) break;
+      // A request that arrived between the last check and the release is run now.
+      const { data } = await admin.from("identity_sources").select("run_requested_at").eq("tenant_id", tenantId).eq("id", source.id).maybeSingle();
+      if (!data?.run_requested_at || (data.run_requested_at as string) <= lastStart) break;
+    }
+  }
+}
+
+const CLAIM_TTL_MS = 10 * 60_000;
+const MAX_PUSH_RUNS = 5;
+
+/** Runs the source while it holds the claim; the start of its last run, or null when another worker holds it. */
+async function drainSource(tenantId: string, sourceId: string): Promise<string | null> {
+  const admin = supabaseServiceRole();
+  const claimedAt = new Date().toISOString();
+  const stale = new Date(Date.now() - CLAIM_TTL_MS).toISOString();
+  const { data: claimed } = await admin
+    .from("identity_sources")
+    .update({ run_claimed_at: claimedAt })
+    .eq("tenant_id", tenantId)
+    .eq("id", sourceId)
+    .or(`run_claimed_at.is.null,run_claimed_at.lt.${stale}`)
+    .select("id");
+  if (!claimed?.length) return null;
+  let lastStart = claimedAt;
+  try {
+    for (let i = 0; i < MAX_PUSH_RUNS; i++) {
+      const source = await getIdentitySource(tenantId, sourceId);
+      if (!source || source.status !== "active") break;
+      lastStart = new Date().toISOString();
+      await runSourceAfterSync(tenantId, source, null);
+      const { data } = await admin.from("identity_sources").select("run_requested_at").eq("tenant_id", tenantId).eq("id", sourceId).maybeSingle();
+      if (!data?.run_requested_at || (data.run_requested_at as string) <= lastStart) break;
+    }
+  } finally {
+    await admin.from("identity_sources").update({ run_claimed_at: null }).eq("tenant_id", tenantId).eq("id", sourceId).eq("run_claimed_at", claimedAt);
+  }
+  return lastStart;
 }
 
 // ---------------------------------------------------------------- pending correlations

@@ -335,8 +335,8 @@ const HEADER_RE = /^[a-zA-Z][a-zA-Z0-9-]{1,60}$/;
 function checkReceive(ctx: Ctx, rec: unknown, driver: unknown) {
   if (rec === undefined) return;
   if (!isObj(rec)) return issue(ctx, "receive", "must be an object");
-  const known = new Set(["runtimeEvents", "webhook", "gateway", "file"]);
-  for (const k of Object.keys(rec)) if (!known.has(k)) issue(ctx, `receive.${k}`, "must be runtimeEvents, webhook, gateway or file");
+  const known = new Set(["runtimeEvents", "webhook", "gateway", "file", "scim"]);
+  for (const k of Object.keys(rec)) if (!known.has(k)) issue(ctx, `receive.${k}`, "must be runtimeEvents, webhook, gateway, file or scim");
   const checkAuth = (path: string, c: Record<string, unknown>) => {
     if (c.auth !== "bearer" && c.auth !== "hmac_sha256") issue(ctx, `${path}.auth`, "must be bearer or hmac_sha256");
     if (c.signatureHeader !== undefined && !(typeof c.signatureHeader === "string" && HEADER_RE.test(c.signatureHeader))) issue(ctx, `${path}.signatureHeader`, "must be a header name");
@@ -377,6 +377,18 @@ function checkReceive(ctx: Ctx, rec: unknown, driver: unknown) {
     else checkAuth("receive.file", file);
     // Received files are read by the file driver's resources, so only a file connector receives them.
     if (driver !== "file") issue(ctx, "receive.file", "only a file connector (driver file) receives files");
+  }
+  // INTEGRATION-P0-22: SCIM users map to identity fields; the id is always the one WonderID assigns.
+  const scim = rec.scim;
+  if (scim !== undefined) {
+    if (!isObj(scim) || !isObj(scim.fields)) issue(ctx, "receive.scim", "must be { fields: { <identity field>: <mapping> } }");
+    else {
+      const allowed = new Set<string>(CANONICAL_FIELDS.identity.optional);
+      for (const [target, mapping] of Object.entries(scim.fields)) {
+        if (!allowed.has(target)) issue(ctx, `receive.scim.fields.${target}`, `is not an identity field (${[...allowed].join(", ")})`);
+        checkMapping(ctx, `receive.scim.fields.${target}`, mapping, "identity");
+      }
+    }
   }
 }
 

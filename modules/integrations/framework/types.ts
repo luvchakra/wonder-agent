@@ -471,6 +471,16 @@ export type ReceiveSpec = {
    * upload starts.
    */
   file?: { auth: "bearer" | "hmac_sha256"; signatureHeader?: string };
+  /**
+   * INTEGRATION-P0-22: users pushed over SCIM 2.0 (RFC 7644) to
+   * /api/connect/v1/<id>/scim/v2/Users, authenticated by the connection's
+   * receiving secret as a bearer token. Each user is kept as an `identity`
+   * of this connection, mapped with `fields` (paths into the SCIM user; the
+   * enterprise extension is also under `enterprise`); the identity sources
+   * that read the connection then take it in. A deleted user is marked
+   * missing, so the next run treats it as a leaver.
+   */
+  scim?: { fields: Partial<Record<(typeof CANONICAL_FIELDS)["identity"]["optional"][number], FieldMapping>> };
 };
 
 /** What an organization stores on an integration of type `connector`. */

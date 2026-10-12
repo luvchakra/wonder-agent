@@ -16,10 +16,11 @@ import { runtimeGateway } from "./runtime-gateway";
 import { webhook } from "./webhook";
 import { csvFile } from "./csv-file";
 import { scim } from "./scim";
+import { scimInbound } from "./scim-inbound";
 
 /**
  * WonderID's built-in connector definitions, one per product. Each is
  * generic: any organization running that product can use it by entering
  * its own address and credentials. definitions.test.ts validates every one.
  */
-export const BUILTIN_DEFINITIONS: ConnectorDefinition[] = [frappeHr, erpnext, ldapDirectory, keycloak, gitea, mattermost, nextcloud, postgresql, openbao, kubernetes, saviynt, zendesk, scim, mcpServer, runtimeGateway, webhook, csvFile];
+export const BUILTIN_DEFINITIONS: ConnectorDefinition[] = [frappeHr, erpnext, ldapDirectory, keycloak, gitea, mattermost, nextcloud, postgresql, openbao, kubernetes, saviynt, zendesk, scim, scimInbound, mcpServer, runtimeGateway, webhook, csvFile];
