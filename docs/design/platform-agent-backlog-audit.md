@@ -939,3 +939,22 @@ vendor-only `/platform-admin` boundary is unchanged. Still to do: the
 declarative configuration objects the spec lists (identity types,
 templates, workflows, terminology, navigation visibility), draft, simulate,
 approve and environment promotion.
+
+### 2026-10-12 — Audit retention defaults (WID-H07, owner decision)
+
+The owner chose, in the findings decision sheet: 1 year on Free and Pro, 3
+years on Max, 7 years on Enterprise.
+- `PLAN_DEFAULTS` (`modules/platform-admin/subscriptions.ts`) changed:
+  Free 30 to 365 days, Pro 90 to 365, Max 365 to 1095; Enterprise stays
+  2555. The pricing page and the billing page read these values.
+- Migration 0143 (applied):
+  - raises each existing subscription below its plan's new default (one
+    row: a Pro subscription already at 365, so unchanged);
+  - adds `subscriptions_audit_retention_floor` (at least 365 days).
+- Why: the purge never removes audit rows younger than 365 days (0104),
+  so the old Free and Pro values promised a retention the system did not
+  apply.
+
+Verified:
+- a live insert with 30 days is refused by the new constraint;
+- `npm run typecheck` and eslint on the changed file: clean.

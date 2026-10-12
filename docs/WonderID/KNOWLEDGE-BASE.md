@@ -67,6 +67,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A sync is held when every record of a kind would go missing at once, at any size; people are held at a lower share than other records. |
 | 12 Oct 2026 | A connection's change sends the system one key however often it is tried; a change that may already have been made is checked by reading the system before it is sent again. |
 | 12 Oct 2026 | A sync that reads fewer records than the system says it holds counts as partial and marks nothing missing. |
+| 12 Oct 2026 | Audit records are kept at least a year on every plan: 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. |
 
 ---
 
@@ -475,6 +476,7 @@ Findings are raised for:
 **Audit trail**
 - Every security-relevant action is recorded: who, what, when, the outcome and related records.
 - **Tamper-evident:** records can't be edited, and each one is chained to the one before. They are deleted only by your audit retention policy: oldest first, never the last 365 days, never under a legal hold.
+- **How long by default:** 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. Never less than a year.
 - **Integrity check:** Audit → Integrity proves the chain is intact.
 
 **Reports and exports**

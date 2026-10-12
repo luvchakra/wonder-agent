@@ -12,11 +12,16 @@ import { writePlatformAudit } from "./auditLog";
  * the chosen numbers in the audit log so the user can adjust them without
  * re-deriving the schema." Chosen here and documented in
  * docs/design/platform-agent-backlog-audit.md.
+ *
+ * Audit retention (WID-H07, owner decision 2026-10-12): 1 year on Free and
+ * Pro, 3 years on Max, 7 years on Enterprise. Never under a year: the
+ * purge keeps the last 365 days whatever the plan (migration 0104), and the
+ * database refuses less (migration 0143).
  */
 export const PLAN_DEFAULTS: Record<SubscriptionPlan, Omit<Subscription, "id" | "tenantId" | "status" | "startedAt" | "renewedAt" | "plan">> = {
-  free: { maxUsers: 3, maxAgents: 5, maxIntegrations: 1, maxRuntimeEventsPerMonth: 10_000, auditRetentionDays: 30 },
-  pro: { maxUsers: 25, maxAgents: 50, maxIntegrations: 5, maxRuntimeEventsPerMonth: 250_000, auditRetentionDays: 90 },
-  max: { maxUsers: 100, maxAgents: 250, maxIntegrations: 20, maxRuntimeEventsPerMonth: 2_000_000, auditRetentionDays: 365 },
+  free: { maxUsers: 3, maxAgents: 5, maxIntegrations: 1, maxRuntimeEventsPerMonth: 10_000, auditRetentionDays: 365 },
+  pro: { maxUsers: 25, maxAgents: 50, maxIntegrations: 5, maxRuntimeEventsPerMonth: 250_000, auditRetentionDays: 365 },
+  max: { maxUsers: 100, maxAgents: 250, maxIntegrations: 20, maxRuntimeEventsPerMonth: 2_000_000, auditRetentionDays: 1095 },
   enterprise: { maxUsers: 1_000_000, maxAgents: 1_000_000, maxIntegrations: 1_000_000, maxRuntimeEventsPerMonth: 1_000_000_000, auditRetentionDays: 2555 },
 };
 
