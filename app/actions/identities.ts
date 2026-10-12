@@ -125,14 +125,17 @@ export async function endRelationshipAction(identityId: string, relationshipId: 
 /** WID-H01: unlink a source record from this identity, restoring what it changed. */
 export async function unlinkSourceRecordAction(identityId: string, sourceId: string, externalId: string): Promise<IdentityFormState> {
   const ctx = await requirePermission("identity.manage");
-  let kept: string[];
+  let result: Awaited<ReturnType<typeof unlinkSourceRecord>>;
   try {
-    ({ kept } = await unlinkSourceRecord(ctx.tenantId!, ctx.userId, sourceId, externalId));
+    result = await unlinkSourceRecord(ctx.tenantId!, ctx.userId, sourceId, externalId);
   } catch (err) {
     return formError(err);
   }
   revalidatePath(`/identities/${identityId}`);
-  return { status: "saved", message: kept.length ? `Unlinked. Kept, as they changed since: ${kept.join(", ")}.` : "Unlinked; its values were restored." };
+  const parts = [result.kept.length ? `Unlinked. Kept, as they changed since: ${result.kept.join(", ")}.` : "Unlinked; its values were restored."];
+  if (result.accountsToRematch) parts.push(`${result.accountsToRematch} account(s) will be matched again at their next sync.`);
+  if (result.rematchError) parts.push("Its accounts could not be queued for matching again.");
+  return { status: "saved", message: parts.join(" ") };
 }
 
 export async function createAttributeDefinitionAction(_prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {

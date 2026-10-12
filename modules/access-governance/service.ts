@@ -83,6 +83,7 @@ export {
   getAccountSummary,
   getInventoryAccount,
   linkAccount,
+  requestAccountRematch,
   listReconciliationRuns,
   reconcileApplicationAccounts,
   reconcileApplicationAccountsAsSystem,

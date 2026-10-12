@@ -193,4 +193,65 @@ test.describe.serial("account inventory", () => {
     expect((await ro.request.post(`/api/v1/access/applications/${appId}/reconciliations`)).status()).toBe(403);
     await ro.close();
   });
+
+  test("WID-H01: an account unlinked from a person goes back for matching, never to that person by itself", async ({ request }) => {
+    const a1 = byRef((await accounts(request, "view=all")).rows, "A1");
+    expect(a1).toMatchObject({ identityId: anaId, correlation: "correlated" });
+    const unlinked = await request.patch(`/api/v1/access/accounts/${a1.id}`, { data: { identityId: null } });
+    expect((await unlinked.json()).data).toMatchObject({ identityId: null, correlation: "orphan" });
+    // Its email still matches Ana, but the run does not link it back to her.
+    expect((await request.post(`/api/v1/access/applications/${appId}/reconciliations`)).status()).toBe(201);
+    expect(byRef((await accounts(request, "view=all")).rows, "A1")).toMatchObject({ identityId: null, correlation: "orphan" });
+    // A person may link it back by hand.
+    const relinked = await request.patch(`/api/v1/access/accounts/${a1.id}`, { data: { identityId: anaId } });
+    expect((await relinked.json()).data).toMatchObject({ identityId: anaId, correlation: "manual" });
+  });
+
+  test("WID-H01: unlinking a source record that changed a person's email sends their accounts back for matching", async ({ request }) => {
+    test.setTimeout(150_000);
+    const tenantId = await getTenantIdBySlug(TENANT_ONE.slug);
+    const username = `e2e-acc-dee-${stamp}`;
+    const created = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E Acc dee ${stamp}`, email: mail("dee-own"), username } });
+    expect(created.status(), await created.text()).toBe(201);
+    const deeId = (await created.json()).data.id as string;
+
+    // A wrong HR record matched by username gives Dee another email ...
+    const src = await request.post("/api/v1/integrations/identity-sources", {
+      data: {
+        name: `E2E Acc HR ${stamp}`,
+        template: "csv",
+        authoritative: true,
+        priority: 10,
+        authoritativeFields: ["email"],
+        correlationRules: [{ kind: "username" }],
+        attributeMappings: [
+          { source: "id", target: "externalId" },
+          { source: "name", target: "displayName" },
+          { source: "email", target: "email" },
+          { source: "username", target: "username" },
+        ],
+      },
+    });
+    expect(src.status(), await src.text()).toBe(201);
+    const srcId = (await src.json()).data.id as string;
+    const started = await request.post(`/api/v1/integrations/identity-sources/${srcId}/runs`, {
+      data: { kind: "upload", mode: "partial", csvText: `id,name,email,username\nW1,E2E Acc dee ${stamp},${mail("wrong")},${username}` },
+    });
+    expect(started.status(), await started.text()).toBe(202);
+    const runId = (await started.json()).data.id as string;
+    await expect.poll(async () => ((await (await request.get(`/api/v1/integrations/identity-sources/runs/${runId}`)).json()).data as { status: string }).status, { timeout: 30_000 }).toBe("succeeded");
+
+    // ... and an account with that email is matched to her.
+    await replaceIntegrationAccounts(integrationId, tenantId, [...SOURCE.slice(0, 3), { externalId: "A6", raw: { id: "A6", username: "wrong", email: mail("wrong") } }]);
+    expect((await request.post(`/api/v1/access/applications/${appId}/reconciliations`)).status()).toBe(201);
+    expect(byRef((await accounts(request, "view=all")).rows, "A6")).toMatchObject({ identityId: deeId, correlation: "correlated" });
+
+    // Unlinking the record restores her email and sends the account back for matching.
+    const res = await request.post(`/api/v1/integrations/identity-sources/${srcId}/unlink`, { data: { externalId: "W1" } });
+    expect(res.status(), await res.text()).toBe(200);
+    expect((await res.json()).data).toMatchObject({ identityId: deeId, restored: ["email"], accountsToRematch: 1 });
+    expect((await request.post(`/api/v1/access/applications/${appId}/reconciliations`)).status()).toBe(201);
+    // Nobody has that email now: an orphan, not kept with Dee.
+    expect(byRef((await accounts(request, "view=all")).rows, "A6")).toMatchObject({ identityId: null, correlation: "orphan" });
+  });
 });

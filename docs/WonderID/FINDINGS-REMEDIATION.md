@@ -33,7 +33,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C01 Approval policy | P3 | Risk accepted by the owner | None: one administrator may loosen a request policy, audited (owner decision 12 Oct). Revisit under "Decisions to come" |
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Done: the connector disables a leaver's account at once (owner decision 12 Oct). For the register to assess |
 | WID-C03 Gateway bypass | P2 | Partly fixed | Done: a per-agent "gateway only" setting; a direct call is critical and suspends the agent at the gateway (owner decision 12 Oct). For the register to assess |
-| WID-H01 Identity correlation | P2 | Partly fixed | Conflict list and source-record unlink with undo done (owner decisions 12 Oct); next: an unlinked account goes back for matching |
+| WID-H01 Identity correlation | P2 | Fixed (owner decisions 12 Oct) | Conflict list; unlink with undo for source records and accounts |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
@@ -55,7 +55,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
 | 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Done: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
 | 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Done: when on, a detected direct call is a critical finding and the agent is suspended at the gateway automatically (`agent_suspension` control). The owner approved that automatic suspension under #15. |
-| 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Done for source records: an administrator unlinks a source record; the values it changed are restored from history; it is never re-matched to that person by itself; audited (migration 0148). Build: an unlinked account goes back for matching. |
+| 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Done: an administrator unlinks a source record (values it changed restored from history; never re-matched to that person by itself; the person's matched accounts go back for matching) or an account (goes back for matching, never to that person by itself); audited (migrations 0148, 0149). |
 | 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Done: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources (migrations 0146/0147). |
 | 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Done: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
 | 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
@@ -336,8 +336,22 @@ See `planRevert` in `sourcedMerge.ts`, `revertSourceRecord`,
 `unlinkSourceRecord` and `correlate`. Tests: `identitySourceRules.test.ts`
 ("WID-H01"), E2E `identity-sources` ("unlink with undo").
 
-**Next (P2):** an account unlinked from a person goes back for matching,
-but never to that person by itself.
+**Done (owner decision, 12 Oct):** accounts go back for matching
+(migration 0149, applied).
+- An account an administrator unlinks from a person
+  (`accounts.unlinked_identity_id`) is matched afresh by the next
+  reconciliation, but never to that person by itself. A link made by hand
+  clears this.
+- When unlinking a source record restores a person's email, username or
+  name (the values accounts match on), their automatically matched accounts
+  are flagged (`accounts.rematch_requested_at`). The next reconciliation
+  matches them afresh, without the hold that otherwise keeps an account
+  with its person, and clears the flag. Manual links and AI agents'
+  accounts are untouched.
+
+See `planReconciliation` (`accountRules.ts`), `requestAccountRematch` and
+`linkAccount`. Tests: `accountRules.test.ts` ("WID-H01"), E2E
+`account-inventory` (two WID-H01 cases).
 
 Earlier notes:
 - Merge reversal.

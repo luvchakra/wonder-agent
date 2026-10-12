@@ -73,6 +73,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Rogue access on an account can be accepted as an exception (up to 90 days) or closed as a false positive, with a reason, by someone other than the account's owner. |
 | 12 Oct 2026 | When two identity sources disagree on a detail, the higher-priority source still wins, and the disagreement is listed with both values and sources for review; it clears itself once they agree. |
 | 12 Oct 2026 | A source record matched to the wrong person can be unlinked from the person's page: the details it changed are restored (unless they changed since), and it is never matched to that person again without someone deciding. |
+| 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
 
 ---
 
@@ -282,6 +283,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 **Accounts**
 - Each account is matched to its identity.
 - **Once matched, an account stays with its person.** If a later sync would match it to someone else (for example, an email address given to a new person), the account keeps its person. The connection's sync results count it as "kept with their person"; relink it by hand if it really changed hands.
+- **Unlinking an account** sends it back for matching at the next sync, never back to the same person unless someone links it by hand. Undoing a wrong source match (see Identity sources) also re-matches that person's automatically matched accounts.
 - Accounts are flagged when:
   - they match no one (*orphan*);
   - they match more than one identity (*ambiguous*);

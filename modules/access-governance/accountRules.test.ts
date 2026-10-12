@@ -182,4 +182,24 @@ describe("WID-H01: an account linked to a person stays with them", () => {
     expect(plan.upserts.map((u) => u.identity_id)).toEqual(["p1", "p2"]);
     expect(plan.relinkHeld).toEqual([]);
   });
+  it("an account unlinked from a person goes back for matching, but never to that person by itself", () => {
+    const plan = planReconciliation({
+      ...base,
+      existing: [
+        existing({ externalAccountRef: "A1", identityId: null, correlation: "orphan", unlinkedIdentityId: "p1" }),
+        existing({ id: "y", externalAccountRef: "A2", identityId: null, correlation: "orphan", unlinkedIdentityId: "p1" }),
+      ],
+      sourceAccounts: [{ id: "A1", email: "ana@example.com" }, { id: "A2", email: "bo@example.com" }],
+    });
+    expect(plan.upserts.map((u) => [u.identity_id, u.correlation])).toEqual([[null, "orphan"], ["p2", "correlated"]]);
+  });
+  it("a re-match requested by an unlink moves the account without the hold, and is cleared", () => {
+    const plan = planReconciliation({
+      ...base,
+      existing: [existing({ externalAccountRef: "A1", identityId: "p1", correlation: "correlated", rematchRequested: true })],
+      sourceAccounts: [{ id: "A1", email: "bo@example.com" }],
+    });
+    expect(plan.upserts[0]).toMatchObject({ identity_id: "p2", correlation: "correlated", rematch_requested_at: null });
+    expect(plan.relinkHeld).toEqual([]);
+  });
 });
