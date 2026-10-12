@@ -677,3 +677,6 @@ connection upgrade.
 
 The owner confirmed that end-to-end tests are nightly; before a merge they
 run only for security-related or major changes (CLAUDE.md §17.8).
+After every merge, the high-risk findings register
+(`docs/WonderID/HIGH-RISK-FINDINGS.md`) is read, and what the next pull
+request can fix goes into it (CLAUDE.md §19.12, owner decision).
