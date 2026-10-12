@@ -33,7 +33,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C01 Approval policy | P2 | Partly fixed | Maker/checker on request-policy changes |
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Integration tests for a connector outage and a failed deprovisioning; owner decision on connectors carrying out a leaver's removals |
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
-| WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
+| WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Thresholds per kind; tests for a failed page in the middle of a read |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
@@ -160,9 +160,23 @@ decision.
 **Done:** a single match on a terminated or archived identity goes to
 Pending Matches (PR #106; `identitySourceRules.ts`, `correlate`).
 
+**Done:** an account already correlated to a person keeps that person when
+a later reconciliation would match it to someone else, to no one, or to
+several people (a reassigned email, a reused username). The move is held:
+- it is counted on the run (`relink_held`, migration 0139, applied) and
+  shown in the connection's sync results;
+- the held accounts are listed in the run's `account.reconciled` audit
+  event (`relinkHeldAccounts`).
+
+A person relinks by hand if the account really changed hands. Accounts
+with no person are still matched afresh. See `planReconciliation` in
+`accountRules.ts`; test in `accountRules.test.ts`, "WID-H01".
+
+Priority lowered to P3: what remains needs owner input.
+
 **Next:**
-- Freeze auto-correlated accounts, so a reassigned email cannot move them.
-- Merge reversal; a source-priority policy.
+- Merge reversal.
+- A source-priority policy.
 
 ### WID-H02: idempotency and partial failure (P2, partly fixed)
 

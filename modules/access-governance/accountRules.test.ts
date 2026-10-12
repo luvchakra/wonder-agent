@@ -151,3 +151,35 @@ describe("IDENTITY-P0-20: non-human accounts and agents' declared identifiers", 
     expect(plan.nonHumanAccounts).toEqual([]);
   });
 });
+
+describe("WID-H01: an account linked to a person stays with them", () => {
+  const base = { identifierField: "id", rule, identities, now };
+  it("keeps the link when the email now belongs to someone else, and holds the move for review", () => {
+    const plan = planReconciliation({
+      ...base,
+      existing: [existing({ externalAccountRef: "A1", identityId: "p1", correlation: "correlated" })],
+      sourceAccounts: [{ id: "A1", email: "bo@example.com" }],
+    });
+    expect(plan.upserts[0]).toMatchObject({ identity_id: "p1", correlation: "correlated" });
+    expect(plan.counts.relinkHeld).toBe(1);
+    expect(plan.relinkHeld).toEqual([{ ref: "A1", keptIdentityId: "p1", matchedIdentityId: "p2", matched: "correlated" }]);
+  });
+  it("keeps it too when the email now matches nobody or several people", () => {
+    const plan = planReconciliation({
+      ...base,
+      existing: [existing({ externalAccountRef: "A1", identityId: "p1", correlation: "correlated" }), existing({ id: "y", externalAccountRef: "A2", identityId: "p2", correlation: "correlated" })],
+      sourceAccounts: [{ id: "A1", email: "gone@example.com" }, { id: "A2", email: "twin@example.com" }],
+    });
+    expect(plan.upserts.map((u) => u.identity_id)).toEqual(["p1", "p2"]);
+    expect(plan.relinkHeld.map((h) => h.matched)).toEqual(["orphan", "ambiguous"]);
+  });
+  it("still links an account that had no person, and holds nothing when the match is unchanged", () => {
+    const plan = planReconciliation({
+      ...base,
+      existing: [existing({ externalAccountRef: "A1", identityId: null, correlation: "orphan" }), existing({ id: "y", externalAccountRef: "A2", identityId: "p2", correlation: "correlated" })],
+      sourceAccounts: [{ id: "A1", email: "ana@example.com" }, { id: "A2", email: "bo@example.com" }],
+    });
+    expect(plan.upserts.map((u) => u.identity_id)).toEqual(["p1", "p2"]);
+    expect(plan.relinkHeld).toEqual([]);
+  });
+});

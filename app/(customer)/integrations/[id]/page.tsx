@@ -44,7 +44,14 @@ function stepLine(step: SyncPipelineStep): string {
             c.grantsRestored ? `${c.grantsRestored} restored` : "",
             c.grantsUnresolved ? `${c.grantsUnresolved} unmatched` : "",
           ]
-        : [`${c.created ?? 0} new`, `${c.updated ?? 0} updated`, c.orphan ? `${c.orphan} orphan` : "", c.notInSource ? `${c.notInSource} gone from source` : ""];
+        : [
+            `${c.created ?? 0} new`,
+            `${c.updated ?? 0} updated`,
+            c.orphan ? `${c.orphan} orphan` : "",
+            c.notInSource ? `${c.notInSource} gone from source` : "",
+            // WID-H01: kept with their person; relink by hand if the account changed hands.
+            c.relinkHeld ? `${c.relinkHeld} kept with their person though they now match someone else` : "",
+          ];
   const detail = step.status === "succeeded" || step.status === "partial" ? counts.filter(Boolean).join(", ") : (step.reason ?? "");
   return detail ? `${what}: ${detail}` : what;
 }

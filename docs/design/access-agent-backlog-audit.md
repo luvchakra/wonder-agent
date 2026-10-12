@@ -2943,3 +2943,30 @@ Left out:
 - tests for a connector outage and a failed deprovisioning.
 
 Both are tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — An account matched to a person stays with them (WID-H01)
+
+- `planReconciliation` (`accountRules.ts`): an existing account with
+  `correlation: correlated` and a person keeps that person when a fresh
+  match would give someone else, no one, or several people. The move is
+  recorded in `relinkHeld` (the account ref, the person kept, the match and
+  its kind) and counted in `counts.relinkHeld`.
+  - Manual links and agents' accounts were already kept.
+  - Accounts with no person are matched afresh, as before.
+- `reconcileAccounts` stores the count in
+  `account_reconciliation_runs.relink_held` (migration 0139, applied). The
+  first 100 held accounts go in the `account.reconciled` audit event
+  (`relinkHeldAccounts`).
+- The sync pipeline's account step carries `relinkHeld`. The connection
+  page shows "N kept with their person though they now match someone
+  else".
+
+Verified:
+- `npx vitest run modules/access-governance modules/integrations`: 622
+  passed, including 3 new WID-H01 cases.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local: `f1-reconciliation` 13/13 (a production build started with
+  the config's test settings).
+
+Left out: merge reversal and a source-priority policy. Both are tracked in
+`docs/WonderID/FINDINGS-REMEDIATION.md`.
