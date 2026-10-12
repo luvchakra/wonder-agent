@@ -138,7 +138,9 @@ export async function engageEmergencyControl(
     objectType: "runtime_emergency_control",
     objectId: data.id,
     outcome: "success",
-    metadata: { controlType, target, reason },
+    metadata: { controlType, target },
+    // WID-H07: the reason stays on the control (reason).
+    typedText: { reason },
   });
   return toControl(data);
 }
@@ -201,7 +203,9 @@ export async function liftEmergencyControl(tenantId: string, actorId: string, co
     objectType: "runtime_emergency_control",
     objectId: controlId,
     outcome: "success",
-    metadata: { controlType: existing.control_type, target: existing.target, reason: liftReason },
+    metadata: { controlType: existing.control_type, target: existing.target },
+    // WID-H07: the reason stays on the control (lift_reason).
+    typedText: { reason: liftReason },
   });
   return toControl(data);
 }

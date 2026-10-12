@@ -136,6 +136,9 @@ describe("rogue-access decisions (WID-H04)", () => {
     expect(f.status).toBe("exception");
     expect(db.risk_findings[0]).toMatchObject({ status: "exception", exception_until: "2026-11-01T23:59:59.000Z", decided_by: "user-9", decision_reason: "Month-end close" });
     expect(audits.at(-1)).toMatchObject({ action: "risk.access_finding_decided", metadata: { outcome: "exception" } });
+    // WID-H07: the reason is on the finding; the audit event hands it over as typed text (fingerprinted by writeAudit), never as metadata.
+    expect(audits.at(-1)).toMatchObject({ typedText: { reason: "Month-end close" } });
+    expect(JSON.stringify((audits.at(-1) as Row).metadata)).not.toContain("Month-end");
   });
 
   it("the account's owner cannot decide, and another organization's finding is not found", async () => {

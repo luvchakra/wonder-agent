@@ -525,7 +525,7 @@ export async function assignPackageDirect(
   if (requestedDays !== null && (!Number.isInteger(requestedDays) || requestedDays < 1)) throw new ApiError(400, "VALIDATION_FAILED", "durationDays: a whole number of days");
   const expiry = assignmentExpiry(new Date(), requestedDays, pkg);
   const id = await createAssignment(tenantId, actorId, { packageId, identityId, requestId: null, justification, expiresAt: expiry.expiresAt });
-  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_assigned", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { assignmentId: id, identityId, source: "direct", expiresAt: expiry.expiresAt, justification } });
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_assigned", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { assignmentId: id, identityId, source: "direct", expiresAt: expiry.expiresAt }, typedText: { justification } });
   return (await getAssignment(tenantId, id))!;
 }
 
@@ -640,7 +640,7 @@ export async function setAssignmentItemStatus(tenantId: string, actorId: string,
   if (!updated) throw new ApiError(409, "CONFLICT", "The item changed meanwhile; reload");
   if (status === "fulfilled") await markGrantsFulfilled(tenantId, { itemId });
   await refreshAssignment(tenantId, item.assignment_id as string);
-  await writeAudit({ tenantId, actorId, actorType: "user", action: `access.package_item_${status}`, objectType: "access_package_assignment", objectId: item.assignment_id as string, outcome: "success", metadata: { itemId, from, detail: note } });
+  await writeAudit({ tenantId, actorId, actorType: "user", action: `access.package_item_${status}`, objectType: "access_package_assignment", objectId: item.assignment_id as string, outcome: "success", metadata: { itemId, from }, typedText: { detail: note } });
   return (await getAssignment(tenantId, item.assignment_id as string))!;
 }
 
@@ -683,7 +683,7 @@ export async function revokeAssignment(tenantId: string, actorId: string, assign
   const current = await getAssignment(tenantId, assignmentId);
   if (!current) throw new ApiError(404, "NOT_FOUND", "No such assignment");
   if (!(await endAssignment(tenantId, actorId, assignmentId, "revoked", why))) throw new ApiError(409, "ASSIGNMENT_ENDED", "This assignment has already ended");
-  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_revoked", objectType: "access_package_assignment", objectId: assignmentId, outcome: "success", metadata: { packageId: current.packageId, identityId: current.identityId, reason: why } });
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_revoked", objectType: "access_package_assignment", objectId: assignmentId, outcome: "success", metadata: { packageId: current.packageId, identityId: current.identityId }, typedText: { reason: why } });
   return (await getAssignment(tenantId, assignmentId))!;
 }
 

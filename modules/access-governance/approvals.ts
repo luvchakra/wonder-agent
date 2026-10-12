@@ -404,8 +404,9 @@ export async function decideApprovalStep(
       policyId: row.request_policy_id ?? null,
       policyVersion: decided.policy_version ?? null,
       approverRoles: actor.roles,
-      comment: note,
     },
+    // WID-H07: the comment stays on the approval step (access_request_approvals.comment).
+    typedText: { comment: note },
   });
 
   // Advance the chain from what is stored now.

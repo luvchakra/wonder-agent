@@ -261,7 +261,7 @@ export async function actOnFulfilmentTask(
   const now = new Date().toISOString();
   const set: Row =
     action === "claim"
-      ? { status: "claimed", claimed_by: actor.userId, claimed_at: now, failure_reason: null }
+      ? { status: "claimed", claimed_by: actor.userId, claimed_at: now, failure_reason: null, ...(text ? { note: text } : {}) }
       : action === "complete"
         ? { status: "completed", completed_by: actor.userId, completed_at: now, note: text }
         : { status: "failed", failure_reason: text };
@@ -294,7 +294,8 @@ export async function actOnFulfilmentTask(
       .eq("removal_status", "pending_removal");
     if (grantError) throw new ApiError(500, "UPDATE_FAILED", grantError.message);
   }
-  await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: `access.fulfilment_task_${action === "claim" ? "claimed" : action === "complete" ? "completed" : "failed"}`, objectType: "access_fulfilment_task", objectId: taskId, outcome: "success", metadata: { kind: task.kind, from: task.status, grantId: task.access_grant_id ?? task.removal_grant_id ?? null, note: text } });
+  // WID-H07: the note stays on the task (note, or failure_reason); the audit keeps its fingerprint.
+  await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: `access.fulfilment_task_${action === "claim" ? "claimed" : action === "complete" ? "completed" : "failed"}`, objectType: "access_fulfilment_task", objectId: taskId, outcome: "success", metadata: { kind: task.kind, from: task.status, grantId: task.access_grant_id ?? task.removal_grant_id ?? null }, typedText: { note: text } });
   const [fresh] = await listTaskById(tenantId, taskId);
   return fresh;
 }

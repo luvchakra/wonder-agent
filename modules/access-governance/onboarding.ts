@@ -141,8 +141,8 @@ async function syncCatalogStatus(tenantId: string, applicationId: string, status
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
 }
 
-function audit(tenantId: string, actorId: string, applicationId: string, action: string, metadata: Record<string, unknown>) {
-  return writeAudit({ tenantId, actorId, actorType: "user", action: `application.onboarding_${action}`, objectType: "application", objectId: applicationId, outcome: "success", metadata });
+function audit(tenantId: string, actorId: string, applicationId: string, action: string, metadata: Record<string, unknown>, typedText?: Record<string, string | null>) {
+  return writeAudit({ tenantId, actorId, actorType: "user", action: `application.onboarding_${action}`, objectType: "application", objectId: applicationId, outcome: "success", metadata, typedText });
 }
 
 /** A conditional update: applies only if the record is still in `expect`; otherwise 409. */
@@ -353,7 +353,7 @@ export async function decideOnboarding(
       : { status: "REJECTED", decision_note: note, submitted_by: null, submitted_at: null },
   );
   await syncCatalogStatus(tenantId, applicationId, decision.approve ? "APPROVED" : "REJECTED", Boolean(o.config.integrationId));
-  await audit(tenantId, actorId, applicationId, decision.approve ? "approved" : "rejected", { configVersion: o.configVersion, configHash: o.configHash, note });
+  await audit(tenantId, actorId, applicationId, decision.approve ? "approved" : "rejected", { configVersion: o.configVersion, configHash: o.configHash }, { note });
   return updated;
 }
 
@@ -401,13 +401,14 @@ export async function setApplicationLifecycle(tenantId: string, actorId: string,
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("applications")
-    .update({ onboarding_status: to, updated_at: new Date().toISOString() })
+    // WID-H07: the reason is kept on the application, not in the audit row.
+    .update({ onboarding_status: to, lifecycle_note: reason || null, updated_at: new Date().toISOString() })
     .eq("tenant_id", tenantId)
     .eq("id", applicationId)
     .eq("onboarding_status", app.onboardingStatus)
     .select("id");
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
   if (!data?.length) throw new ApiError(409, "CONFLICT", "The application changed meanwhile; reload and try again");
-  await writeAudit({ tenantId, actorId, actorType: "user", action: `application.${action === "resume" ? "resumed" : `${action}d`}`, objectType: "application", objectId: applicationId, outcome: "success", metadata: { from: app.onboardingStatus, to, reason } });
+  await writeAudit({ tenantId, actorId, actorType: "user", action: `application.${action === "resume" ? "resumed" : `${action}d`}`, objectType: "application", objectId: applicationId, outcome: "success", metadata: { from: app.onboardingStatus, to }, typedText: { reason: reason || null } });
   return to;
 }

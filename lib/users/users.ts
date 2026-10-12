@@ -629,7 +629,9 @@ export async function changeUserStatus(tenantId: string, actorId: string, userId
     objectType: "user",
     objectId: userId,
     outcome: "success",
-    metadata: { from: m.status, to: t.to, reason, sessionsEnded },
+    // WID-H07: the reason stays on the membership (status_reason); the audit keeps its fingerprint.
+    metadata: { from: m.status, to: t.to, sessionsEnded },
+    typedText: { reason },
   });
   return { status: t.to, sessionsEnded };
 }

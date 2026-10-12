@@ -44,6 +44,8 @@ export async function linkAgentIdentity(
       external_reference: externalReference,
       source_system: sourceSystem,
       confidence: provenance.confidence,
+      // WID-H07: the basis is kept on the link, not in the audit row.
+      link_basis: provenance.basis.slice(0, 500) || null,
     })
     .select()
     .single();
@@ -58,7 +60,8 @@ export async function linkAgentIdentity(
     objectType: "agent_identity",
     objectId: data.id,
     outcome: "success",
-    metadata: { agentId, identityType, sourceSystem, externalReference, confidence: provenance.confidence, basis: provenance.basis.slice(0, 500) },
+    metadata: { agentId, identityType, sourceSystem, externalReference, confidence: provenance.confidence },
+    typedText: { basis: provenance.basis.slice(0, 500) || null },
   });
   return toAgentIdentityLink(data);
 }

@@ -317,7 +317,9 @@ export async function transitionAgentLifecycle(
     objectType: "agent",
     objectId: agentId,
     outcome: "success",
-    metadata: { fromState: agent.lifecycleState, toState, reason },
+    metadata: { fromState: agent.lifecycleState, toState },
+    // WID-H07: the reason stays on the lifecycle event (agent_lifecycle_events.reason).
+    typedText: { reason: reason ?? null },
   });
 
   return toAgent(updatedRow);

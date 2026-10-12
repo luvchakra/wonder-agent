@@ -328,7 +328,9 @@ export async function decideRogueFinding(tenantId: string, actorId: string, find
     objectType: "risk_finding",
     objectId: findingId,
     outcome: "success",
-    metadata: { outcome: decision.outcome, reason: decision.reason, until: decision.until, fromStatus: finding.status },
+    metadata: { outcome: decision.outcome, until: decision.until, fromStatus: finding.status },
+    // WID-H07: the reason stays on the finding (decision_reason).
+    typedText: { reason: decision.reason },
   });
   return toAccessFinding(updated as Row);
 }

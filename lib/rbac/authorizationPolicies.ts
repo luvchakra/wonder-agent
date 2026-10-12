@@ -108,7 +108,9 @@ export async function createAuthorizationPolicy(tenantId: string, actorId: strin
     .select("id")
     .single<{ id: string }>();
   if (error || !data) throw refusal(error ?? {});
-  await writeAudit({ tenantId, actorId, actorType: "user", action: "authorization_policy.created", objectType: "authorization_policy", objectId: data.id, outcome: "success", metadata: toRow(v.value) });
+  // WID-H07: the description stays on the policy; the audit keeps its fingerprint.
+  const { description, ...created } = toRow(v.value);
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "authorization_policy.created", objectType: "authorization_policy", objectId: data.id, outcome: "success", metadata: created, typedText: { description: (description as string | null) ?? null } });
   return { ok: true, id: data.id };
 }
 
@@ -125,6 +127,8 @@ export async function updateAuthorizationPolicy(tenantId: string, actorId: strin
     .select("id");
   if (error) throw refusal(error);
   if (!data?.length) throw new ApiError(404, "NOT_FOUND", "No such policy in this organization");
+  // WID-H07: the description stays on the policy; the audit keeps its fingerprint.
+  const { description, ...afterRow } = toRow(v.value);
   await writeAudit({
     tenantId,
     actorId,
@@ -133,7 +137,8 @@ export async function updateAuthorizationPolicy(tenantId: string, actorId: strin
     objectType: "authorization_policy",
     objectId: id,
     outcome: "success",
-    metadata: { before: { effect: before.effect, permissions: before.permissions, scopeType: before.scopeType, scopeValues: before.scopeValues, exemptRoleIds: before.exemptRoleIds }, after: toRow(v.value) },
+    metadata: { before: { effect: before.effect, permissions: before.permissions, scopeType: before.scopeType, scopeValues: before.scopeValues, exemptRoleIds: before.exemptRoleIds }, after: afterRow },
+    typedText: { description: (description as string | null) ?? null },
   });
   return { ok: true, id };
 }

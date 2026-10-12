@@ -74,6 +74,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | When two identity sources disagree on a detail, the higher-priority source still wins, and the disagreement is listed with both values and sources for review; it clears itself once they agree. |
 | 12 Oct 2026 | A source record matched to the wrong person can be unlinked from the person's page: the details it changed are restored (unless they changed since), and it is never matched to that person again without someone deciding. |
 | 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
+| 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
 
 ---
 
@@ -420,7 +421,7 @@ Findings are raised for:
 - **Other outcomes:** under **Other outcomes** on the account page, someone with risk-management permission, and never the account's owner, can instead:
   - accept it as an **exception** until a date at most 90 days away, with a reason. The finding reopens on that date, and the ticket stays open meanwhile;
   - close it as a **false positive**, with a reason. The same access is not flagged again.
-  Both are kept on the finding and in the audit trail.
+  Both are kept on the finding; the audit trail records the decision and a fingerprint of the reason.
 - **Closing:** the ticket stays open until all of the account's rogue access is dealt with. Each finding records how: **removed** (confirmed by a later sync), or **approved afterwards**, with the request that approved it attached. The access history keeps the earlier Rogue status either way. If rogue access turns up on the same account later, a new ticket opens.
 
 **Investigations**
@@ -490,6 +491,7 @@ Findings are raised for:
 - Every security-relevant action is recorded: who, what, when, the outcome and related records.
 - **Tamper-evident:** records can't be edited, and each one is chained to the one before. They are deleted only by your audit retention policy: oldest first, never the last 365 days, never under a legal hold.
 - **How long by default:** 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. Never less than a year.
+- **What people type stays out of it:** reasons, comments, notes and justifications are kept on the request, task or finding they belong to, where privacy erasure can reach them. The audit record keeps a fingerprint, which proves what was written without revealing it.
 - **Integrity check:** Audit → Integrity proves the chain is intact.
 
 **Reports and exports**
