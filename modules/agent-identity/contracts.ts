@@ -198,8 +198,9 @@ export async function createContractVersion(
     outcome: "success",
     metadata: {
       agentId,
-      previousVersion: previousActive ? toAgentContract(previousActive) : null,
-      newVersion: toAgentContract(newContract),
+      // WID-H07: the versions by id and number; their typed text stays on agent_contracts.
+      previousVersion: previousActive ? { id: previousActive.id, version: previousActive.version } : null,
+      newVersion: { id: newContract.id, version: newContract.version },
       nextReviewAt: reviewDue,
     },
   });

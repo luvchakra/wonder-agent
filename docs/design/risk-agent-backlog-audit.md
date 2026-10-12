@@ -1311,3 +1311,7 @@ Verified:
   clean.
 - E2E, local against the production build: `connector-provisioning` and
   `f1-reconciliation`, 36 passed (9.7 min), including "WID-H04".
+
+### 2026-10-12 — WID-H07 (owner decision)
+
+Typed text out of audit records: the rogue-access decision reason is passed as `typedText` (kept on `risk_findings.decision_reason`); `accessFindings.test.ts` asserts the audit metadata no longer holds it. See the Foundation entry for the mechanism.

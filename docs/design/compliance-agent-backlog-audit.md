@@ -1145,3 +1145,6 @@ took about 28 s (measured), past the form's wait and §15.
 - What each item snapshots is unchanged.
 - The `launchCampaign.test.ts` stub accepts a bulk insert: 57 passed. E2E
   `compliance.spec.ts` passed.
+### 2026-10-12 — WID-H07 (owner decision)
+
+Typed text out of audit records: the attestation `policyRequirement` statement is passed as `typedText` (kept on `governance_attestations.policy_requirement`). See the Foundation entry for the mechanism.

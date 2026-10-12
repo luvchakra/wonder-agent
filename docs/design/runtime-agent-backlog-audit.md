@@ -954,3 +954,7 @@ Verified:
 - `emergency.test.ts` and `runtimeDecision.test.ts`: new cases.
 - `npm run typecheck`, eslint and `npm run build`: clean.
 - E2E `runtime-gateway`: see the Risk entry of the same date.
+
+### 2026-10-12 — WID-H07 (owner decision)
+
+Typed text out of audit records: emergency control engage and lift reasons are passed as `typedText` (kept on `runtime_emergency_controls`). See the Foundation entry for the mechanism.

@@ -3088,3 +3088,37 @@ migration 0104:
 
 Run against the live project on 12 October: "AUDIT TRAIL CHECKS PASSED".
 The block rolls back, so it leaves no fixtures. No code changed.
+
+### 2026-10-12 — typed text out of audit records (WID-H07, owner decision)
+
+- `lib/audit/typedText.ts`: `fingerprintText`, `matchesFingerprint` and
+  `withTypedText`. The fingerprint is HMAC-SHA256 under a key derived from
+  `SECRET_ENCRYPTION_KEY` (the retired keys in
+  `SECRET_ENCRYPTION_KEY_PREVIOUS` still verify), over the tenant id and
+  the text.
+- `AuditEvent.typedText` and `writeAudit` turn each value into
+  `metadata.typedText.<field> = { fingerprint, length }`. Any metadata key
+  of the same name is dropped. No new environment variable.
+- Foundation call sites converted:
+  - member status reason (`users.ts`);
+  - agent API key revocation, one and all (`agentApiKeys.ts`);
+  - automation credential revocation;
+  - authorization policy description (created and updated).
+- Other modules' call sites are listed in their audit logs and in
+  `docs/WonderID/FINDINGS-REMEDIATION.md` (WID-H07).
+
+Verified:
+- typecheck and eslint on the changed files: clean;
+- `npx vitest run lib modules`: 1360 passed, after updating the
+  identity-link audit assertion to the new shape;
+- E2E, run locally after rebasing on #129 (migration 0150 is on §17.8's
+  list):
+  - application-onboarding, emergency-controls, automation-credentials,
+    users, access-packages and approval-engine: 43 passed, 2 failed, 7
+    did not run;
+  - the 2 failures, approval-engine `:187` and automation-credentials
+    `:106`, passed when their two specs were rerun on their own with one
+    worker (20 passed);
+  - in parallel they read data other specs were changing (a manager
+    link, and the organization's connection list between two reads).
+    That is a QA follow-up, not this change.

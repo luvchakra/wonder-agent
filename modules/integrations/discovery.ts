@@ -191,8 +191,15 @@ async function recordCandidates(tenantId: string, actorId: string, candidates: D
   return result;
 }
 
-async function auditDiscovery(tenantId: string, actorId: string, action: string, object: { type: "application_discovery" | "integration"; id: string }, metadata: Record<string, unknown>) {
-  await writeAudit({ tenantId, actorId, actorType: "user", action: `application_discovery.${action}`, objectType: object.type, objectId: object.id, outcome: "success", metadata });
+async function auditDiscovery(
+  tenantId: string,
+  actorId: string,
+  action: string,
+  object: { type: "application_discovery" | "integration"; id: string },
+  metadata: Record<string, unknown>,
+  typedText?: Record<string, string | null>,
+) {
+  await writeAudit({ tenantId, actorId, actorType: "user", action: `application_discovery.${action}`, objectType: object.type, objectId: object.id, outcome: "success", metadata, typedText });
 }
 
 /** Discovers the applications a connector already imported. Reads only its stored objects. */
@@ -305,7 +312,6 @@ export async function decideDiscovery(tenantId: string, actorId: string, id: str
     from: d.status,
     to: data.status,
     applicationId,
-    note,
-  });
+  }, { note: note ?? null }); // WID-H07: the note stays on the discovery (decision_note).
   return toDiscovery(data);
 }

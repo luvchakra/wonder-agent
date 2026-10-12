@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import type { AuditEvent } from "@/lib/shared/types/foundation";
+import { withTypedText } from "./typedText";
 
 /**
  * The ONLY sanctioned way any module writes to audit_logs. Uses the
@@ -26,7 +27,8 @@ export async function writeAudit(event: AuditEvent): Promise<void> {
       object_type: event.objectType,
       object_id: event.objectId,
       outcome: event.outcome,
-      metadata: event.metadata ?? {},
+      // WID-H07: typed text is fingerprinted, never stored.
+      metadata: withTypedText(event.tenantId, event.metadata, event.typedText),
       ...(event.correlationId ? { correlation_id: event.correlationId } : {}),
     });
     if (error) {

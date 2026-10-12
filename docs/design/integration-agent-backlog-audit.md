@@ -2846,3 +2846,7 @@ returned as `rematchError` and recorded, without undoing the unlink. Tested
 by the E2E case in `account-inventory.spec.ts`: an account matched only
 through the wrong record's email becomes an orphan at the next
 reconciliation.
+
+### 2026-10-12 — WID-H07 (owner decision)
+
+Typed text out of audit records: the discovery decision note is passed as `typedText` (kept on `application_discoveries.decision_note`). See the Foundation entry for the mechanism.

@@ -76,7 +76,9 @@ export async function recordAttestation(
     objectType: "governance_attestation",
     objectId: attestation.id,
     outcome: "success",
-    metadata: { agentId, decision: input.decision, policyRequirement: input.policyRequirement },
+    metadata: { agentId, decision: input.decision },
+    // WID-H07: the statement stays on the attestation (policy_requirement).
+    typedText: { policyRequirement: input.policyRequirement ?? null },
   });
 
   return attestation;

@@ -39,7 +39,7 @@ met, with evidence), or Waiting on the owner.
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
-| WID-H07 Audit and erasure | P2 | Partly fixed | Retention defaults done (0143). Build: typed text out of audit records, then identifiers only (owner decisions 12 Oct) |
+| WID-H07 Audit and erasure | P2 | Partly fixed | Retention defaults (0143) and typed text out of audit records done. Build: identifiers only (owner decisions 12 Oct) |
 | WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
 
 ## Owner decisions
@@ -59,7 +59,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Done: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources (migrations 0146/0147). |
 | 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Done: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
 | 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
-| 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Build: audit rows keep the record's id and a fingerprint (hash) of the text; the words stay on the request or task, where erasure can reach them. |
+| 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Done: audit rows keep the record's id and a keyed fingerprint of the text (`metadata.typedText`); the words stay on the request, task or finding (migration 0150 gave the last two a home). |
 | 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Build, after the item above: audit records hold ids, never personal data; erasure pseudonymizes the records the ids point to. |
 | 12 Oct 2026 | WID-H06 | May an automation credential approve or certify? | **Never.** | Done: `access.approve`, `agent.certify` and `automation.manage` are human-only, in three layers. |
 | 12 Oct 2026 | WID-C03 | Do emergency controls block in Observe mode? | **Yes, in every mode.** | Done: kill switch, tool, MCP server and session suspension, and an undecidable decision block in every mode. |
@@ -622,7 +622,37 @@ database on 12 October and passing. It checks that:
   and a hash of the text;
 - **erasure:** identifiers only, after the typed-text change.
 
-**Next (P2):** typed text out of audit records, then identifiers only.
+**Done (owner decision, 12 Oct):** typed text out of audit records.
+- `writeAudit` takes `typedText`; each value is stored only as
+  `metadata.typedText.<field> = { fingerprint, length }`. The fingerprint is
+  an HMAC-SHA256 keyed from `SECRET_ENCRYPTION_KEY` and the tenant
+  (`lib/audit/typedText.ts`): anyone holding the text can prove it with
+  `matchesFingerprint`, a retired key still verifies, and a short reason
+  cannot be guessed from the trail. With no key configured the text is
+  still never stored.
+- The 20 sites a person's typing reached are converted. These cover
+  member status, API-key and automation-credential revocation, policy
+  descriptions, approval comments, fulfilment notes, onboarding notes,
+  application lifecycle reasons, package justifications, details and
+  revocations, discovery notes, agent lifecycle reasons, identity link
+  basis, attestation statements, rogue-access decisions, and emergency
+  controls. A contract update now audits version ids and numbers, not the
+  contract text.
+- Where the audit row was the only copy, the words now live on the
+  record. Migration 0150 (applied) adds `applications.lifecycle_note` and
+  `agent_identities.link_basis`, and a fulfilment claim note is kept in
+  the task's `note`.
+- Not covered: rows written before this change keep their text, under the
+  legal-obligation exemption; audit rows can never be changed. The
+  platform's own audit (vendor staff) is not covered either, and nor are
+  object names (organization, group and role names). Names are for the
+  identifiers-only step.
+
+Tests: `lib/audit/typedText.test.ts` (3); assertions in
+`accessFindings.test.ts` and `identities.test.ts`.
+
+**Next (P2):** identifiers only. Audit records hold ids, never personal
+data, and erasure pseudonymizes the records the ids point to.
 
 ### WID-H08: automation credential address allow-list (P1, partly fixed)
 

@@ -1752,3 +1752,6 @@ nightly. Verified:
 - `npx vitest run modules/agent-identity modules/integrations
   modules/certification-compliance`: 519 passed;
 - E2E `file-import` and `identity-sources`: passed.
+### 2026-10-12 — WID-H07 (owner decision)
+
+Typed text out of audit records: agent lifecycle reasons (kept on `agent_lifecycle_events`), the identity link basis (now kept in `agent_identities.link_basis`, migration 0150) and contract updates (the audit now names version ids and numbers, not the contract text). See the Foundation entry for the mechanism.

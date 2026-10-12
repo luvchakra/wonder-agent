@@ -204,7 +204,9 @@ export async function revokeAgentApiKey(
     objectType: "agent_api_key",
     objectId: keyId,
     outcome: "success",
-    metadata: { agentId, keyPrefix: existing.key_prefix, reason: reason.trim() || null },
+    metadata: { agentId, keyPrefix: existing.key_prefix },
+    // WID-H07: the reason stays on the key (revoked_reason).
+    typedText: { reason: reason.trim() || null },
   });
 
   return toAgentApiKey(data, new Date());
@@ -290,7 +292,9 @@ export async function revokeAllAgentApiKeys(tenantId: string, actorId: string, a
     objectType: "agent",
     objectId: agentId,
     outcome: "success",
-    metadata: { count: revoked.length, keyIds: revoked.map((r) => r.id), reason: why },
+    metadata: { count: revoked.length, keyIds: revoked.map((r) => r.id) },
+    // WID-H07: the reason stays on each key (revoked_reason).
+    typedText: { reason: why },
   });
   return revoked.length;
 }

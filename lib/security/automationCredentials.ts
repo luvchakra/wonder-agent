@@ -194,9 +194,17 @@ async function setMembership(tenantId: string, userId: string, actorId: string, 
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
 }
 
-async function audit(tenantId: string, actorId: string, action: string, row: Pick<Row, "id" | "identity_id" | "key_prefix">, metadata: Record<string, unknown> = {}, outcome: "success" | "failure" = "success") {
+async function audit(
+  tenantId: string,
+  actorId: string,
+  action: string,
+  row: Pick<Row, "id" | "identity_id" | "key_prefix">,
+  metadata: Record<string, unknown> = {},
+  outcome: "success" | "failure" = "success",
+  typedText?: Record<string, string | null>,
+) {
   // Never the secret or its hash (#10).
-  await writeAudit({ tenantId, actorId, actorType: "user", action, objectType: "automation_credential", objectId: row.id, outcome, metadata: { identityId: row.identity_id, keyPrefix: row.key_prefix, ...metadata } });
+  await writeAudit({ tenantId, actorId, actorType: "user", action, objectType: "automation_credential", objectId: row.id, outcome, metadata: { identityId: row.identity_id, keyPrefix: row.key_prefix, ...metadata }, typedText });
 }
 
 /** Roles the actor may give a credential: existing, active, and within the actor's own permissions (never automation.manage). */
@@ -356,7 +364,8 @@ export async function revokeAutomationCredential(tenantId: string, actorId: stri
   await setMembership(tenantId, row.backing_user_id, actorId, "deactivated", "Credential revoked");
   const { error } = await supabaseServiceRole().rpc("revoke_user_sessions", { p_user: row.backing_user_id });
   if (error) console.error("automation credential sessions not ended", { credentialId: id, error: error.message });
-  await audit(tenantId, actorId, "automation_credential.revoked", row, { reason: why });
+  // WID-H07: the reason stays on the credential (revoked_reason).
+  await audit(tenantId, actorId, "automation_credential.revoked", row, {}, "success", { reason: why });
 }
 
 /** A new secret for the same credential; the old one stops working at once. Returned once. */

@@ -23,9 +23,9 @@ beforeEach(() => {
 });
 
 describe("linkAgentIdentity (IDENTITY-P0-14, codebase-map D3)", () => {
-  it("stores the confidence the caller states, never a hard-coded one, and audits the link with its basis", async () => {
+  it("stores the confidence the caller states, never a hard-coded one, and keeps the basis on the link, not in the audit (WID-H07)", async () => {
     const link = await linkAgentIdentity("t1", "a1", "service_account", "svc-finance", "saviynt", { actorId: "u1", confidence: "probable", basis: "Matched by owner email" });
-    expect(inserted[0]).toMatchObject({ tenant_id: "t1", agent_id: "a1", confidence: "probable" });
+    expect(inserted[0]).toMatchObject({ tenant_id: "t1", agent_id: "a1", confidence: "probable", link_basis: "Matched by owner email" });
     expect(link.confidence).toBe("probable");
     expect(audits).toEqual([
       expect.objectContaining({
@@ -35,7 +35,8 @@ describe("linkAgentIdentity (IDENTITY-P0-14, codebase-map D3)", () => {
         action: "agent.identity_linked",
         objectType: "agent_identity",
         objectId: "link-1",
-        metadata: expect.objectContaining({ confidence: "probable", basis: "Matched by owner email", externalReference: "svc-finance" }),
+        metadata: expect.objectContaining({ confidence: "probable", externalReference: "svc-finance" }),
+        typedText: { basis: "Matched by owner email" },
       }),
     ]);
   });
