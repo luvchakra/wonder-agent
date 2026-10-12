@@ -14,7 +14,7 @@ import type {
   LifecycleTaskStatus,
   LifecycleTaskType,
 } from "@/lib/shared/types/agent-identity";
-import { HUMAN_TRANSITIONS, statusForState, tasksForEvent, type DetectedEvent } from "./humanLifecycle";
+import { HUMAN_TRANSITIONS, opensAccessRemoval, statusForState, tasksForEvent, type DetectedEvent } from "./humanLifecycle";
 import { assignOwner, removeOwner } from "./owners";
 
 /**
@@ -132,6 +132,13 @@ export async function recordLifecycleEvents(
         })),
       );
       if (taskError) throw new Error(`opening lifecycle tasks: ${taskError.message}`);
+    }
+
+    // WID-C02: a person who has left: one removal task per grant they hold, done by people.
+    // Loaded at call time: the Access Agent's service imports this module's service.
+    if (opensAccessRemoval(d)) {
+      const { openLeaverRemovals } = await import("@/modules/access-governance/service");
+      await openLeaverRemovals(tenantId, subject.id, { actorId: meta.actorId, eventId: event.id });
     }
 
     await writeAudit({

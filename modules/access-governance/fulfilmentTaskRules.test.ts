@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAct, dueAt, isOverdue, needsReminder, needsUnconfirmedRemovalReminder, taskDueAt } from "./fulfilmentTaskRules";
+import { canAct, dueAt, isOverdue, needsEscalation, needsReminder, needsUnconfirmedRemovalReminder, taskDueAt } from "./fulfilmentTaskRules";
 
 const owner = { userId: "u-owner", identityId: "i-owner", canApprove: false };
 const manager = { userId: "u-mgr", identityId: null, canApprove: true };
@@ -56,5 +56,26 @@ describe("WID-C02: removals marked done but not confirmed", () => {
     expect(needsUnconfirmedRemovalReminder(task({ kind: "grant" }), now)).toBe(false);
     expect(needsUnconfirmedRemovalReminder(task({ status: "verified" }), now)).toBe(false);
     expect(needsUnconfirmedRemovalReminder(task({ completedAt: null }), now)).toBe(false);
+  });
+});
+
+describe("escalation (WID-C02)", () => {
+  const now = new Date("2026-10-12T12:00:00Z");
+  const t = (over: Partial<{ kind: string; status: "open" | "claimed" | "failed" | "completed"; dueAt: string; escalatedAt: string | null }> = {}) => ({
+    kind: "remove",
+    status: "open" as const,
+    dueAt: "2026-10-11T11:00:00Z",
+    escalatedAt: null,
+    ...over,
+  });
+  it("escalates a removal or disable a day past due, once", () => {
+    expect(needsEscalation(t(), now)).toBe(true);
+    expect(needsEscalation(t({ kind: "disable_account", status: "failed" }), now)).toBe(true);
+    expect(needsEscalation(t({ escalatedAt: "2026-10-12T00:00:00Z" }), now)).toBe(false);
+  });
+  it("leaves alone what is less than a day late, done, or not a removal", () => {
+    expect(needsEscalation(t({ dueAt: "2026-10-11T13:00:00Z" }), now)).toBe(false);
+    expect(needsEscalation(t({ status: "completed" }), now)).toBe(false);
+    expect(needsEscalation(t({ kind: "grant" }), now)).toBe(false);
   });
 });

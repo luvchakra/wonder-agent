@@ -25,6 +25,7 @@ export { grantsForRequest, requestProgressFor } from "./pendingGrants";
 export { listFulfilmentTasks, actOnFulfilmentTask, remindOverdueFulfilmentTasks, type FulfilmentTask } from "./fulfilmentTasks";
 export { releaseLostConnectorRuns } from "./connectorFulfilment";
 export { sweepAccessExpiry, remindExpiringAccess } from "./accessExpiry";
+export { openLeaverRemovals } from "./leaverRemovals";
 export { endedRemoval, requestFulfilment, requestProgress, type FulfilmentState, type RemovalState } from "./pendingGrantRules";
 export {
   createPolicy,

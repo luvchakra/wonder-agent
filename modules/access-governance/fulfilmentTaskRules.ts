@@ -72,6 +72,16 @@ export function needsUnconfirmedRemovalReminder(
   return !task.remindedAt || now.getTime() - Date.parse(task.remindedAt) >= 86_400_000;
 }
 
+/** WID-C02: how long a removal or disable may be overdue before the organization's access managers hear of it. */
+export const ESCALATE_AFTER_DAYS = 1;
+
+/** WID-C02: an overdue removal or disable, a day past due and not escalated yet, goes to the access managers (once). */
+export function needsEscalation(task: { kind: string; status: FulfilmentTaskStatus; dueAt: string; escalatedAt: string | null }, now = new Date()): boolean {
+  if (task.kind !== "remove" && task.kind !== "disable_account") return false;
+  if (task.escalatedAt || !isOverdue(task, now)) return false;
+  return now.getTime() - Date.parse(task.dueAt) >= ESCALATE_AFTER_DAYS * 86_400_000;
+}
+
 /** Overdue and not reminded in the last day. */
 export function needsReminder(task: { status: FulfilmentTaskStatus; dueAt: string; remindedAt: string | null }, now = new Date()): boolean {
   return isOverdue(task, now) && (!task.remindedAt || now.getTime() - Date.parse(task.remindedAt) >= 86_400_000);

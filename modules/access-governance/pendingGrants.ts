@@ -276,7 +276,11 @@ async function pendExtension(tenantId: string, subject: Subject, applicationId: 
  * task per grant (0123), so running it again changes nothing. Returns the
  * grants it marked.
  */
-export async function queueRemoval(tenantId: string, lines: { grantId: string; applicationId: string }[]): Promise<string[]> {
+export async function queueRemoval(
+  tenantId: string,
+  lines: { grantId: string; applicationId: string }[],
+  opts: { reason?: "expired" | "leaver"; manual?: boolean } = {},
+): Promise<string[]> {
   if (!lines.length) return [];
   const { data, error } = await supabaseServiceRole()
     .from("access_grants")
@@ -289,7 +293,7 @@ export async function queueRemoval(tenantId: string, lines: { grantId: string; a
     .select("id");
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
   const marked = new Set(((data ?? []) as Row[]).map((r) => r.id as string));
-  for (const line of lines) if (marked.has(line.grantId)) await openFulfilmentTask(tenantId, { kind: "remove", grantId: line.grantId, requestId: null, applicationId: line.applicationId });
+  for (const line of lines) if (marked.has(line.grantId)) await openFulfilmentTask(tenantId, { kind: "remove", grantId: line.grantId, requestId: null, applicationId: line.applicationId, ...opts });
   return [...marked];
 }
 
