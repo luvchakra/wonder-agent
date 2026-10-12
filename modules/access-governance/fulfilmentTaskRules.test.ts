@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAct, dueAt, isOverdue, needsReminder } from "./fulfilmentTaskRules";
+import { canAct, dueAt, isOverdue, needsReminder, needsUnconfirmedRemovalReminder } from "./fulfilmentTaskRules";
 
 const owner = { userId: "u-owner", identityId: "i-owner", canApprove: false };
 const manager = { userId: "u-mgr", identityId: null, canApprove: true };
@@ -36,5 +36,21 @@ describe("SLA", () => {
     expect(needsReminder({ ...overdue, remindedAt: null }, now)).toBe(true);
     expect(needsReminder({ ...overdue, remindedAt: "2026-10-11T06:00:00Z" }, now)).toBe(false);
     expect(needsReminder({ ...overdue, remindedAt: "2026-10-10T11:00:00Z" }, now)).toBe(true);
+  });
+});
+
+describe("WID-C02: removals marked done but not confirmed", () => {
+  const now = new Date("2026-10-12T12:00:00Z");
+  const task = (over: Partial<Parameters<typeof needsUnconfirmedRemovalReminder>[0]> = {}) => ({ kind: "remove", status: "completed" as const, completedAt: "2026-10-09T12:00:00Z", remindedAt: null, ...over });
+  it("reminds after two days without confirmation, then at most daily", () => {
+    expect(needsUnconfirmedRemovalReminder(task(), now)).toBe(true);
+    expect(needsUnconfirmedRemovalReminder(task({ completedAt: "2026-10-11T12:00:00Z" }), now)).toBe(false);
+    expect(needsUnconfirmedRemovalReminder(task({ remindedAt: "2026-10-12T06:00:00Z" }), now)).toBe(false);
+    expect(needsUnconfirmedRemovalReminder(task({ remindedAt: "2026-10-11T06:00:00Z" }), now)).toBe(true);
+  });
+  it("only removals still waiting for the system", () => {
+    expect(needsUnconfirmedRemovalReminder(task({ kind: "grant" }), now)).toBe(false);
+    expect(needsUnconfirmedRemovalReminder(task({ status: "verified" }), now)).toBe(false);
+    expect(needsUnconfirmedRemovalReminder(task({ completedAt: null }), now)).toBe(false);
   });
 });

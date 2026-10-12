@@ -2865,3 +2865,16 @@ Verified:
   `approval-engine.spec.ts` pass.
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — Reminders for removals the system has not confirmed (WID-C02)
+
+`remindOverdueFulfilmentTasks` (daily) now also reminds the owner of a
+`remove` task that was marked completed (by a person or a connector) but
+that no read of the system has confirmed after `UNCONFIRMED_REMOVAL_DAYS`
+(2), at most once a day. A pure rule, `needsUnconfirmedRemovalReminder`,
+decides.
+
+Verified: `npx vitest run modules/access-governance`, 326 passed with
+`lib/security`, including the new rule tests.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

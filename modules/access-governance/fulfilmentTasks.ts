@@ -6,7 +6,7 @@ import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
-import { canAct, dueAt, isOverdue, needsReminder, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
+import { canAct, dueAt, isOverdue, needsReminder, needsUnconfirmedRemovalReminder, UNCONFIRMED_REMOVAL_DAYS, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
 import { accountToCreateFirst, planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
 
@@ -331,6 +331,39 @@ export async function remindOverdueFulfilmentTasks(tenantId: string | null, now 
     if (!userId) continue;
     const app = (t.applications as Row | null) ?? null;
     await notify({ tenantId: tenant, userId, type: "fulfilment_task", title: `Overdue: access to fulfil in ${(app?.display_name as string | null) ?? (app?.name as string | null) ?? "an application"}`, body: "This approved access is past its fulfilment time. Open Fulfilment Tasks.", referenceType: "access_fulfilment_task", referenceId: t.id as string });
+    await supabaseServiceRole().from("access_fulfilment_tasks").update({ reminded_at: now.toISOString() }).eq("tenant_id", tenant).eq("id", t.id as string);
+    reminded++;
+  }
+
+  // WID-C02: a removal marked done that no read of the system has confirmed: the access may still be there.
+  let unconfirmed = supabaseServiceRole()
+    .from("access_fulfilment_tasks")
+    .select("id, tenant_id, kind, status, completed_at, reminded_at, assignee_identity_id, applications(name, display_name)")
+    .eq("kind", "remove")
+    .eq("status", "completed")
+    .lt("completed_at", new Date(now.getTime() - UNCONFIRMED_REMOVAL_DAYS * 86_400_000).toISOString())
+    .order("completed_at")
+    .limit(500);
+  if (tenantId) unconfirmed = unconfirmed.eq("tenant_id", tenantId);
+  const { data: waiting, error: waitingError } = await unconfirmed;
+  if (waitingError) throw new ApiError(500, "QUERY_FAILED", waitingError.message);
+  for (const t of (waiting ?? []) as unknown as Row[]) {
+    const tenant = t.tenant_id as string;
+    if (tenantId && tenant !== tenantId) continue;
+    const task = { kind: t.kind as string, status: t.status as FulfilmentTaskStatus, completedAt: (t.completed_at as string | null) ?? null, remindedAt: (t.reminded_at as string | null) ?? null };
+    if (!needsUnconfirmedRemovalReminder(task, now)) continue;
+    const userId = t.assignee_identity_id ? await userOf(tenant, t.assignee_identity_id as string) : null;
+    if (!userId) continue;
+    const app = (t.applications as Row | null) ?? null;
+    await notify({
+      tenantId: tenant,
+      userId,
+      type: "fulfilment_task",
+      title: `Removal not confirmed in ${(app?.display_name as string | null) ?? (app?.name as string | null) ?? "an application"}`,
+      body: `This access was marked removed ${UNCONFIRMED_REMOVAL_DAYS}+ days ago, but the system still has not confirmed it. Check that it is really gone.`,
+      referenceType: "access_fulfilment_task",
+      referenceId: t.id as string,
+    });
     await supabaseServiceRole().from("access_fulfilment_tasks").update({ reminded_at: now.toISOString() }).eq("tenant_id", tenant).eq("id", t.id as string);
     reminded++;
   }
