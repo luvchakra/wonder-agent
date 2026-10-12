@@ -141,7 +141,7 @@ type DecisionRow = {
  * that could not be worked out, block in every mode. Observe mode advises
  * on everything else.
  */
-export const ALWAYS_BLOCKING_CODES: ReadonlySet<string> = new Set(["KILL_SWITCH", "TOOL_SUSPENDED", "MCP_SERVER_SUSPENDED", "SESSION_TERMINATED", "EVALUATION_FAILED"]);
+export const ALWAYS_BLOCKING_CODES: ReadonlySet<string> = new Set(["KILL_SWITCH", "AGENT_SUSPENDED", "TOOL_SUSPENDED", "MCP_SERVER_SUSPENDED", "SESSION_TERMINATED", "EVALUATION_FAILED"]);
 
 /**
  * What the agent is told: the real answer in ENFORCE; in OBSERVE_ONLY,

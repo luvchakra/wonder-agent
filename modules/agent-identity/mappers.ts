@@ -42,6 +42,7 @@ export function toAgent(row: any): Agent {
     lastSeenAt: row.last_seen_at,
     nextReviewAt: row.next_review_at,
     retirementDate: row.retirement_date,
+    gatewayOnly: row.gateway_only === true,
   };
 }
 

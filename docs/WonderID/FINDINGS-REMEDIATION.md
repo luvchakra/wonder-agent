@@ -32,7 +32,7 @@ met, with evidence), or Waiting on the owner.
 |---|---|---|---|
 | WID-C01 Approval policy | P3 | Risk accepted by the owner | None: one administrator may loosen a request policy, audited (owner decision 12 Oct). Revisit under "Decisions to come" |
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Done: the connector disables a leaver's account at once (owner decision 12 Oct). For the register to assess |
-| WID-C03 Gateway bypass | P2 | Partly fixed | Build: a per-agent "gateway only" setting; a direct call is critical and suspends the agent's key (owner decision 12 Oct) |
+| WID-C03 Gateway bypass | P2 | Partly fixed | Done: a per-agent "gateway only" setting; a direct call is critical and suspends the agent at the gateway (owner decision 12 Oct). For the register to assess |
 | WID-H01 Identity correlation | P2 | Partly fixed | Build: unlink with undo, and a conflict list beside the current source-priority rule (owner decisions 12 Oct) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
@@ -54,7 +54,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 |---|---|---|---|---|
 | 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
 | 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Done: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
-| 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Build: when on, a detected direct call is a critical finding and the agent's WonderID key is suspended automatically (the kill switch). The owner approved that automatic suspension under #15. |
+| 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Done: when on, a detected direct call is a critical finding and the agent is suspended at the gateway automatically (`agent_suspension` control). The owner approved that automatic suspension under #15. |
 | 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Build: an administrator unlinks a source record or account; the attribute values the link changed are restored from history; accounts go back for matching; audited. |
 | 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Build: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources. |
 | 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Build: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
@@ -78,7 +78,7 @@ stands. Claude raises each one with options when its trigger arrives.
 | WID-C02 | Should connectors also carry out a leaver's access removals (not only disable the account)? | Once disable-on-leave has run in production and its failure rate is known. | People remove each access; the connector only disables the account. |
 | WID-C02 | Should disable-on-leave be a per-connection setting instead of following the connection's changes switch? | A customer wants changes on for approved requests but not for leavers. | It follows the changes switch and the connection type's support for disabling. |
 | WID-C03 | Should WonderID hold agents' target credentials so the gateway becomes real prevention? | A customer needs prevention rather than detection, or detection proves too late. | Detection plus automatic suspension for agents set to "gateway only". |
-| WID-C03 | How is an agent suspended by "gateway only" restored: by any administrator, or only after a review? | When the setting is built. | Restoring follows the existing kill-switch rules. |
+| WID-C03 | How is an agent suspended by "gateway only" restored: by any administrator, or only after a review? | The first real suspension, or a customer asking for a review step. | Anyone with `runtime.emergency` lifts the `agent_suspension` control on the Runtime page, with a reason; audited. |
 | WID-H01 | Should email-only matches stop linking automatically (only stable ids and employee numbers)? | Unlink-with-undo is used often, which means wrong email matches are common. | Email matching continues; wrong links are undone with unlink. |
 | WID-H07 | Per-person encryption keys (crypto-erasure)? | An enterprise customer or regulator requires it. | Identifiers only, once built. |
 | WID-H07 | What happens to audit rows written before "identifiers only" that still hold personal data? | When identifiers-only ships. | They stay, under the legal-obligation exemption; audit rows can never be changed. |
@@ -241,11 +241,35 @@ The knowledge base says detection is after the fact.
 **Owner decision (12 Oct):** a per-agent "gateway only" setting, not
 credential brokering.
 
-**Next (P2):** build it. When it is on for an agent:
-- a detected direct call (`gateway_bypass`) is a critical finding;
-- the agent's WonderID key is suspended automatically through the existing
-  kill switch, which the owner approved as automatic remediation under
-  #15.
+**Done:** the "gateway only" setting. When it is on for an agent:
+- a detected direct call (`gateway_bypass`) is a critical finding
+  (`applyGatewayOnlyOverride` in `scoring.ts`);
+- the agent is suspended at the gateway at once: a new emergency control,
+  `agent_suspension` (target: the agent's id), engaged by the system
+  (`suspendAgentAtGateway` in `emergency.ts`), audited. The decision engine
+  denies every call for a suspended agent (`AGENT_SUSPENDED`, which blocks
+  in every mode, Observe included) and hides its tools. This is the
+  automatic remediation the owner approved under #15;
+- an administrator lifts it on the Runtime page, like any other control.
+
+The setting is `agents.gateway_only` (migration 0144, applied with the new
+control type). It is turned on or off on the agent page (API keys card,
+folded) or with `PUT /api/v1/agents/{id}/gateway-only`, and needs
+`runtime.emergency`. Audited as `agent.gateway_only_changed`.
+
+The first trigger revokes no keys, so lifting the suspension restores the
+agent. The existing rule still applies too: a critical finding moves an
+ACTIVE agent to RESTRICTED.
+
+Tests:
+- `runtimeDecision.test.ts`, `emergency.test.ts`, `rules.test.ts`
+  ("WID-C03, gateway only");
+- E2E `runtime-gateway`, "WID-C03 gateway only": allowed in Observe mode
+  before; after the setting and a direct call, the finding is critical and
+  the next call is refused (`AGENT_SUSPENDED`).
+
+**Next:** none of ours; see "Decisions to come" (credential brokering, how
+a suspended agent is restored).
 
 ### WID-H01: identity correlation (P2, partly fixed)
 

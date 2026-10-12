@@ -1656,3 +1656,16 @@ Verified:
 - E2E `human-lifecycle.spec.ts` 7/7 and `leaver-removals.spec.ts` 2/2.
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — `agents.gateway_only` (WID-C03, owner decision)
+
+- Migration 0144 (applied) adds `agents.gateway_only` (default false).
+  `Agent.gatewayOnly` is mapped.
+- `setAgentGatewayOnly` (`agents.ts`): runs under the caller's session
+  (RLS) with an explicit tenant filter; audited as
+  `agent.gateway_only_changed`.
+- `PUT /api/v1/agents/{id}/gateway-only` and `setGatewayOnlyAction`, both
+  requiring `runtime.emergency` (turning it on arms an automatic
+  suspension).
+- The agent page shows it folded in the API keys card: "Gateway only:
+  on/off", with one button.

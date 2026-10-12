@@ -1,11 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, KeyRound, Loader2, TriangleAlert } from "lucide-react";
 import type { AgentApiKey } from "@/lib/shared/types/foundation";
 import { createAgentApiKeyAction, revokeAgentApiKeyAction, type CreateAgentKeyState } from "@/app/actions/agentApiKeys";
-import { revokeAllAgentKeysAction } from "@/app/actions/runtime";
+import { revokeAllAgentKeysAction, setGatewayOnlyAction } from "@/app/actions/runtime";
 import { Badge, Button, Card, CardBody, CardHeader, ConfirmActionDialog, EmptyState } from "@/modules/ui";
 
 /**
@@ -59,13 +59,20 @@ export function AgentApiKeysPanel({
   keys,
   canCreate,
   canRevoke,
+  gatewayOnly = false,
+  canSetGatewayOnly = false,
 }: {
   agentId: string;
   keys: AgentApiKey[];
   canCreate: boolean;
   canRevoke: boolean;
+  /** WID-C03 */
+  gatewayOnly?: boolean;
+  canSetGatewayOnly?: boolean;
 }) {
   const router = useRouter();
+  const [switching, startSwitch] = useTransition();
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const [state, formAction, pending] = useActionState<CreateAgentKeyState, FormData>(
     createAgentApiKeyAction.bind(null, agentId),
     { status: "idle" },
@@ -167,6 +174,38 @@ export function AgentApiKeysPanel({
             </Button>
           </form>
         ) : null}
+
+        <details className="border-t border-border pt-3">
+          <summary className="cursor-pointer text-sm font-medium text-muted-foreground">Gateway only: {gatewayOnly ? "on" : "off"}</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <p className="min-w-0 flex-1 text-xs text-muted-foreground">
+              When on, an action this agent takes around the gateway is a critical finding and the agent is suspended at the gateway.
+            </p>
+            {canSetGatewayOnly ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={switching}
+                onClick={() =>
+                  startSwitch(async () => {
+                    const result = await setGatewayOnlyAction(agentId, !gatewayOnly);
+                    setSwitchError(result.success ? null : (result.error ?? "Could not change the setting"));
+                    if (result.success) router.refresh();
+                  })
+                }
+              >
+                {switching ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+                {gatewayOnly ? "Turn off" : "Turn on"}
+              </Button>
+            ) : null}
+          </div>
+          {switchError ? (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {switchError}
+            </p>
+          ) : null}
+        </details>
       </CardBody>
     </Card>
   );

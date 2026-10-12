@@ -204,3 +204,30 @@ export async function updateAgentRiskScore(tenantId: string, agentId: string, ri
     .eq("tenant_id", tenantId);
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
 }
+
+/**
+ * WID-C03 (owner decision 2026-10-12): turns "gateway only" on or off for
+ * an agent. When on, an action the agent takes around the Runtime Gateway
+ * is a critical finding and suspends the agent at the gateway. The route
+ * checks `runtime.emergency` (arming an automatic emergency control);
+ * the update runs under the caller's session (RLS) with an explicit tenant
+ * filter, and is audited.
+ */
+export async function setAgentGatewayOnly(tenantId: string, actorId: string, agentId: string, enabled: unknown): Promise<Agent> {
+  if (typeof enabled !== "boolean") throw new ApiError(400, "VALIDATION_FAILED", "enabled: true or false");
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("agents").update({ gateway_only: enabled }).eq("id", agentId).eq("tenant_id", tenantId).select().maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data || data.tenant_id !== tenantId) throw new ApiError(404, "AGENT_NOT_FOUND");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "agent.gateway_only_changed",
+    objectType: "agent",
+    objectId: agentId,
+    outcome: "success",
+    metadata: { enabled },
+  });
+  return toAgent(data);
+}

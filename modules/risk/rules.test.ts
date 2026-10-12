@@ -39,7 +39,9 @@ vi.mock("@/modules/access-governance/service", () => ({
   listApplications: (...a: unknown[]) => mockListApplications(...a),
   getEffectiveAccess: (...a: unknown[]) => mockGetEffectiveAccess(...a),
 }));
+const mockSuspendAgentAtGateway = vi.fn(async () => "suspended");
 vi.mock("@/modules/runtime-assurance/service", () => ({
+  suspendAgentAtGateway: (...a: unknown[]) => mockSuspendAgentAtGateway(...(a as [])),
   compareShouldCanDid: (...a: unknown[]) => mockCompareShouldCanDid(...a),
   getDid: (...a: unknown[]) => mockGetDid(...a),
   listRuntimeEvents: (...a: unknown[]) => mockListRuntimeEvents(...a),
@@ -415,5 +417,42 @@ describe("evaluateAgentRisk — RISK-P0-12, new signals", () => {
     const toolCall = mockCreateOrUpdateFinding.mock.calls.find((c) => c[2] === "unapproved_tool_use")!;
     expect(toolCall[3].evaluatorVersion).toBe(2);
     expect(toolCall[4]).toEqual([{ evidenceType: "runtime_event", referenceId: "e1", summary: "delete_customer at 2026-09-25T10:00:00Z" }]);
+  });
+});
+
+describe("evaluateAgentRisk — WID-C03, gateway only", () => {
+  const bypassEvents = [
+    { id: "d1", source: "gateway", eventType: "DECISION_ALLOWED", tool: "query_ledger", action: "READ", application: null, success: true, raw: { decision: "ALLOW" }, eventTime: "2026-10-12T09:55:00Z" },
+    { id: "e1", source: "mcp", eventType: "TOOL_EXECUTED", tool: "export_all", action: "READ", application: null, success: true, raw: {}, eventTime: "2026-10-12T10:00:00Z" },
+  ];
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCreateOrUpdateFinding.mockImplementation(async (_tenantId, agentId, category, fields) => ({
+      finding: { id: `finding-${category}`, tenantId: "tenant-a", agentId, category, ...fields, status: "open" },
+      created: true,
+    }));
+    mockGetAgentContract.mockResolvedValue({ approvedApplications: [], approvedData: [], prohibitedData: [], approvedActions: [], prohibitedActions: [] });
+    mockCompareShouldCanDid.mockResolvedValue({ can: [], outcomes: [] });
+    mockGetDid.mockResolvedValue({ tuples: [] });
+    mockListRuntimeEvents.mockResolvedValue({ events: bypassEvents });
+    for (const m of [mockGetOwnershipIssues, mockListAgentIdentities, mockListLifecycleEvents, mockListPolicyEvaluations, mockGetEffectiveAccess, mockListRelationships, mockListApplications, mockListAgentApiKeys, mockGetMcpInventory]) m.mockResolvedValue([]);
+    mockCountOverdue.mockResolvedValue(0);
+    mockTransitionAgentLifecycle.mockResolvedValue({});
+  });
+
+  it("a bypass by a gateway-only agent is critical and suspends the agent at the gateway", async () => {
+    mockGetAgent.mockResolvedValue({ id: "g1", agentName: "GateBot", environment: "staging", criticality: "low", lifecycleState: "ACTIVE", gatewayOnly: true });
+    const results = await evaluateAgentRisk("tenant-a", "g1");
+    const bypass = results.find((f) => f.category === "gateway_bypass");
+    expect(bypass?.severity).toBe("critical");
+    expect(bypass?.reasons).toContain("Acted around the Runtime Gateway although set to gateway only");
+    expect(mockSuspendAgentAtGateway).toHaveBeenCalledWith("tenant-a", "g1", expect.stringContaining("gateway only"));
+  });
+
+  it("without the setting, a bypass is scored as usual and nothing is suspended", async () => {
+    mockGetAgent.mockResolvedValue({ id: "g2", agentName: "FreeBot", environment: "staging", criticality: "low", lifecycleState: "ACTIVE" });
+    const results = await evaluateAgentRisk("tenant-a", "g2");
+    expect(results.find((f) => f.category === "gateway_bypass")?.severity).not.toBe("critical");
+    expect(mockSuspendAgentAtGateway).not.toHaveBeenCalled();
   });
 });

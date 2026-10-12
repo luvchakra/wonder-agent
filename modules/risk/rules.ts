@@ -7,11 +7,11 @@ import { getMcpInventory } from "@/modules/integrations/service";
 import { listAgentApiKeys } from "@/lib/security/agentApiKeys";
 import { credentialHealth, destructiveCapability, gatewayBypass, suspiciousDelegation, unapprovedToolUse } from "./signals";
 import { getEffectiveAccess, listApplications, listPolicyEvaluations } from "@/modules/access-governance/service";
-import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtime-assurance/service";
+import { compareShouldCanDid, getDid, listRuntimeEvents, suspendAgentAtGateway } from "@/modules/runtime-assurance/service";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { EvidenceType, RiskFactor, RiskFinding, RogueCategory } from "@/lib/shared/types/risk";
-import { applyProhibitedDataOverride, computeSeverity, resolveWeight } from "./scoring";
+import { applyGatewayOnlyOverride, applyProhibitedDataOverride, computeSeverity, resolveWeight } from "./scoring";
 import { createOrUpdateFinding } from "./findings";
 import { getSeverityWeights } from "./config";
 import { detectGovernanceDrift } from "./governanceDrift";
@@ -54,6 +54,8 @@ type Trigger = {
   recommendation: string;
   evidence: { evidenceType: EvidenceType; referenceId: string; summary: string }[];
   isProhibitedDataViolation?: boolean;
+  /** WID-C03: a bypass by an agent set to "gateway only". */
+  gatewayOnlyBypass?: boolean;
 };
 
 /**
@@ -293,7 +295,7 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   if (toolUse) triggers.push(toolUse);
   // WID-C03 — actions that went around the Runtime Gateway, for an agent that uses it.
   const bypass = gatewayBypass(agent.agentName, eventsPage.events);
-  if (bypass) triggers.push(bypass);
+  if (bypass) triggers.push(agent.gatewayOnly ? { ...bypass, gatewayOnlyBypass: true } : bypass);
 
   // governance_drift — RISK-P0-04, a separate cross-module diff signal,
   // not a duplicate of any category above (those compare current state
@@ -402,7 +404,8 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   let anyCritical = false;
 
   for (const trigger of triggers) {
-    const { severity, reasons } = applyProhibitedDataOverride(base.severity, base.reasons, Boolean(trigger.isProhibitedDataViolation));
+    const overridden = applyProhibitedDataOverride(base.severity, base.reasons, Boolean(trigger.isProhibitedDataViolation));
+    const { severity, reasons } = applyGatewayOnlyOverride(overridden.severity, overridden.reasons, Boolean(trigger.gatewayOnlyBypass));
     const { finding } = await createOrUpdateFinding(
       tenantId,
       agentId,
@@ -420,6 +423,13 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
     );
     results.push(finding);
     if (severity === "critical") anyCritical = true;
+  }
+
+  // WID-C03 (owner decision 2026-10-12): a "gateway only" agent that acted
+  // around the gateway is suspended there at once (automatic remediation
+  // approved under #15). Runtime engages and audits the control.
+  if (triggers.some((t) => t.gatewayOnlyBypass)) {
+    await suspendAgentAtGateway(tenantId, agentId, `Acted around the Runtime Gateway although set to gateway only (${agent.agentName}).`);
   }
 
   // Dependencies section: "transitionAgentLifecycle (Risk calls this to

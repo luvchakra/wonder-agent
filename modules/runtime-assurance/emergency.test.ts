@@ -53,14 +53,17 @@ describe("emergency controls — RUNTIME-P0-18", () => {
         { control_type: "tool_suspension", target: "delete_customer" },
         { control_type: "mcp_server_suspension", target: "crm" },
         { control_type: "session_termination", target: "s1" },
+        { control_type: "agent_suspension", target: "agent-1" },
       ]),
-    ).toEqual({ killSwitch: true, suspendedTools: ["delete_customer"], suspendedMcpServers: ["crm"], terminatedSessions: ["s1"] });
+    ).toEqual({ killSwitch: true, suspendedTools: ["delete_customer"], suspendedMcpServers: ["crm"], terminatedSessions: ["s1"], suspendedAgents: ["agent-1"] });
   });
 
   it("engaging requires a valid type, a reason, and a target except for the kill switch; it is audited", async () => {
     await expect(engageEmergencyControl("t-a", "u1", { controlType: "nuke", reason: "x" })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     await expect(engageEmergencyControl("t-a", "u1", { controlType: "kill_switch", reason: " " })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
     await expect(engageEmergencyControl("t-a", "u1", { controlType: "tool_suspension", reason: "x" })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
+    // WID-C03: an agent suspension names the agent's id.
+    await expect(engageEmergencyControl("t-a", "u1", { controlType: "agent_suspension", target: "GateBot", reason: "x" })).rejects.toMatchObject({ code: "VALIDATION_FAILED" });
 
     const c = await engageEmergencyControl("t-a", "u1", { controlType: "kill_switch", target: "ignored", reason: "incident 42" });
     expect(c).toMatchObject({ controlType: "kill_switch", target: null, active: true, tenantId: "t-a" });
@@ -75,7 +78,7 @@ describe("emergency controls — RUNTIME-P0-18", () => {
   it("the gateway reads only the key's tenant's active controls", async () => {
     await engageEmergencyControl("t-a", "u1", { controlType: "tool_suspension", target: "x", reason: "r" });
     await engageEmergencyControl("t-b", "u2", { controlType: "kill_switch", reason: "r" });
-    expect(await loadActiveEmergencyState("t-a")).toEqual({ killSwitch: false, suspendedTools: ["x"], suspendedMcpServers: [], terminatedSessions: [] });
+    expect(await loadActiveEmergencyState("t-a")).toEqual({ killSwitch: false, suspendedTools: ["x"], suspendedMcpServers: [], terminatedSessions: [], suspendedAgents: [] });
   });
 
   it("lifting needs a reason, is tenant-scoped and audited, and the control stops applying", async () => {

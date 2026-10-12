@@ -7,6 +7,7 @@ import { requireAnyPermissionFor } from "@/lib/rbac/authorize";
 import { agentResource } from "@/app/_shared/agentScope";
 import { engageEmergencyControl, ingestRuntimeEvent, liftEmergencyControl } from "@/modules/runtime-assurance/service";
 import { revokeAllAgentApiKeys } from "@/lib/security/agentApiKeys";
+import { setAgentGatewayOnly } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RuntimeEventSource } from "@/lib/shared/types/runtime";
 
@@ -38,6 +39,15 @@ async function asResult(fn: () => Promise<unknown>): Promise<ActionResult> {
     if (err instanceof ApiError) return { success: false, error: err.message };
     throw err;
   }
+}
+
+/** WID-C03: turns "gateway only" on or off for an agent (arms an automatic suspension, so runtime.emergency). */
+export async function setGatewayOnlyAction(agentId: string, enabled: boolean): Promise<ActionResult> {
+  return asResult(async () => {
+    const ctx = await requirePermission("runtime.emergency");
+    await setAgentGatewayOnly(ctx.tenantId!, ctx.userId, agentId, enabled);
+    revalidatePath(`/agents/${agentId}`);
+  });
 }
 
 export async function engageEmergencyControlAction(controlType: string, target: string | null, reason: string): Promise<ActionResult> {

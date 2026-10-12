@@ -37,7 +37,7 @@ function contractFacts(c: AgentContract): RuntimeContractFacts {
 
 export type RuntimePrincipal = { tenantId: string; agentId: string };
 
-const NO_EMERGENCY: RuntimeEmergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [] };
+const NO_EMERGENCY: RuntimeEmergencyState = { killSwitch: false, suspendedTools: [], suspendedMcpServers: [], terminatedSessions: [], suspendedAgents: [] };
 
 /** Emergency controls in force for the tenant (RUNTIME-P0-18, owned and loaded by Runtime). */
 export type RuntimeEmergencyState = {
@@ -45,6 +45,8 @@ export type RuntimeEmergencyState = {
   suspendedTools: string[];
   suspendedMcpServers: string[];
   terminatedSessions: string[];
+  /** WID-C03: agents suspended at the gateway (a "gateway only" bypass, or an administrator). */
+  suspendedAgents: string[];
 };
 
 async function loadEffectiveApplications(tenantId: string, agentId: string): Promise<string[]> {

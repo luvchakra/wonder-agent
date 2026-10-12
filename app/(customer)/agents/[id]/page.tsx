@@ -869,6 +869,8 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
         keys={apiKeys}
         canCreate={canUpdateHere}
         canRevoke={canUpdateHere || authorizeContext(ctx, "runtime.emergency", here).decision === "ALLOW"}
+        gatewayOnly={agent.gatewayOnly === true}
+        canSetGatewayOnly={authorizeContext(ctx, "runtime.emergency", here).decision === "ALLOW"}
       />
     </div>
   );

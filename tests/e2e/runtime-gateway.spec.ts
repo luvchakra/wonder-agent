@@ -14,7 +14,9 @@ import { openConnection, sendEvents, type ReceivingConnection } from "./support/
  *   and the caller is told ALLOW
  * - isolation: another organization never sees these decisions, and an
  *   agent key never works at another organization's connection
- * - WID-C03: an action reported with no gateway decision is a bypass finding
+ * - WID-C03: an action reported with no gateway decision is a bypass finding;
+ *   for an agent set to "gateway only" it is critical and the agent is
+ *   refused at the gateway in every mode
  *
  * Agents reach the gateway through their runtime's connection
  * (non-negotiable #20): /api/connect/v1/<connection>/gateway/authorize.
@@ -166,6 +168,30 @@ test.describe.serial("runtime gateway", () => {
     expect(evaluated.status(), await evaluated.text()).toBe(200);
     const bypass = ((await evaluated.json()).data as { category: string; explanation: string }[]).find((f) => f.category === "gateway_bypass");
     expect(bypass?.explanation).toContain(`${tool} with no gateway decision`);
+  });
+
+  test("WID-C03 gateway only: a direct call is critical and the agent is refused at the gateway in every mode", async ({ page }) => {
+    const auth = { authorization: `Bearer ${secret}` };
+    // Observe mode lets this agent's calls through before the setting.
+    const before = await authorize(auth, { requestId: `go-before-${Date.now()}`, action: "READ" });
+    expect((await before.json()).data.effectiveDecision).toBe("ALLOW");
+
+    const on = await page.request.put(`/api/v1/agents/${agentId}/gateway-only`, { data: { enabled: true } });
+    expect(on.status(), await on.text()).toBe(200);
+    expect((await on.json()).data.gatewayOnly).toBe(true);
+
+    const tool = `direct_tool_${Date.now()}`;
+    const sent = await sendEvents(anon, conn, { eventTime: new Date().toISOString(), action: "EXECUTE", success: true, tool, eventType: "TOOL_EXECUTED", agentIdentityRef: agentId });
+    expect(sent.status(), await sent.text()).toBe(202);
+    const evaluated = await page.request.post(`/api/v1/risk/agents/${agentId}/evaluate`);
+    expect(evaluated.status(), await evaluated.text()).toBe(200);
+    const bypass = ((await evaluated.json()).data as { category: string; severity: string }[]).find((f) => f.category === "gateway_bypass");
+    expect(bypass?.severity).toBe("critical");
+
+    const after = await authorize(auth, { requestId: `go-after-${Date.now()}`, action: "READ" });
+    const d = (await after.json()).data;
+    expect(d.effectiveDecision).toBe("DENY");
+    expect(d.steps.map((st: { code: string }) => st.code)).toContain("AGENT_SUSPENDED");
   });
 
   test("a revoked key stops working at once", async ({ page }) => {

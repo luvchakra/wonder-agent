@@ -313,7 +313,7 @@ export type GatewayDecisionRecord = GatewayDecision & {
 };
 
 // RUNTIME-P0-18 — emergency controls the gateway honours.
-export type EmergencyControlType = "kill_switch" | "tool_suspension" | "mcp_server_suspension" | "session_termination";
+export type EmergencyControlType = "kill_switch" | "tool_suspension" | "mcp_server_suspension" | "session_termination" | "agent_suspension";
 
 export type EmergencyControl = {
   id: string;
