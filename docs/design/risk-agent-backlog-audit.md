@@ -1301,7 +1301,12 @@ Verified:
   outcomes"); an excepted row shows "Exception until …".
 
 Verified:
-- `npx vitest run modules/risk`: 80 passed (including the new rule cases).
+- `npx vitest run modules/risk`: 90 passed. New cases: the rules, and in
+  `accessFindings.test.ts` exception, self-decision, other organization,
+  false positive not re-flagged (a new grant is), and an ended exception
+  reopening. The first run of that suite failed (6 tests): its in-memory
+  client had no `lte` and `not`, which the new reads use. Fixed in the
+  stub, before the pull request.
 - `npm run typecheck`, eslint on the changed files and `npm run build`:
   clean.
 - E2E, local against the production build: `connector-provisioning` and
