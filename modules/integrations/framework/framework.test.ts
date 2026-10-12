@@ -216,6 +216,46 @@ describe("HttpSession", () => {
     expect(await s4.fetchAll({ path: "/scim/v2/Users" }, undefined, { type: "scim", size: 2 }, {}, 100)).toHaveLength(5);
   });
 
+  it("WID-H03: a read with fewer records than the system reports is short", async () => {
+    const items = Array.from({ length: 5 }, (_, i) => ({ id: i }));
+    // A body count: page 2 comes back empty though the system says 5.
+    const body = fakeFetch((u) => json({ meta: { total: 5 }, data: u.searchParams.get("page") === "1" ? items.slice(0, 2) : [] }));
+    const s1 = new HttpSession(fast, { baseUrl: "https://hr.example" }, { token: "t" }, body.fetchImpl);
+    const r1 = { truncated: false, short: false };
+    expect(await s1.fetchAll({ path: "/users" }, "data", { type: "page", param: "page", size: 2 }, {}, 100, false, r1, "meta.total")).toHaveLength(2);
+    expect(r1.short).toBe(true);
+    // A header count that matches: complete.
+    const header = fakeFetch(() => json(items, { headers: { "X-Total-Count": "5" } }));
+    const s2 = new HttpSession(fast, { baseUrl: "https://hr.example" }, { token: "t" }, header.fetchImpl);
+    const r2 = { truncated: false, short: false };
+    expect(await s2.fetchAll({ path: "/users" }, "", undefined, {}, 100, false, r2, "header:X-Total-Count")).toHaveLength(5);
+    expect(r2.short).toBe(false);
+    // A declared count that is missing: never assumed complete.
+    const missing = fakeFetch(() => json(items));
+    const s3 = new HttpSession(fast, { baseUrl: "https://hr.example" }, { token: "t" }, missing.fetchImpl);
+    const r3 = { truncated: false, short: false };
+    await s3.fetchAll({ path: "/users" }, "", undefined, {}, 100, false, r3, "header:X-Total-Count");
+    expect(r3.short).toBe(true);
+    // SCIM without a declaration: totalResults, and a page that comes back empty early.
+    const scim = fakeFetch((u) => json({ totalResults: 5, Resources: Number(u.searchParams.get("startIndex")) === 1 ? items.slice(0, 2) : [] }));
+    const s4 = new HttpSession(fast, { baseUrl: "https://scim.example" }, { token: "t" }, scim.fetchImpl);
+    const r4 = { truncated: false, short: false };
+    expect(await s4.fetchAll({ path: "/scim/v2/Users" }, undefined, { type: "scim", size: 2 }, {}, 100, false, r4)).toHaveLength(2);
+    expect(r4.short).toBe(true);
+    // Cut at our own record limit: truncated by the engine, not short.
+    const r5 = { truncated: false, short: false };
+    await new HttpSession(fast, { baseUrl: "https://hr.example" }, { token: "t" }, header.fetchImpl).fetchAll({ path: "/users" }, "", undefined, {}, 3, false, r5, "header:X-Total-Count");
+    expect(r5.short).toBe(false);
+  });
+
+  it("WID-H03: validates where the count is read", () => {
+    const withTotal = (total: unknown) => validateDefinition({ ...base, resources: { identity: { ...base.resources.identity!, total } } } as unknown as ConnectorDefinition).issues.map((i) => i.message);
+    expect(withTotal("meta.total")).toEqual([]);
+    expect(withTotal("header:X-Total-Count")).toEqual([]);
+    expect(withTotal("header:bad name")).toEqual(["must be a dot path in the response or header:<Name>"]);
+    expect(withTotal(5)).toEqual(["must be a dot path in the response or header:<Name>"]);
+  });
+
   it("reads records keyed by id, and plain values as { value }", async () => {
     const keyed = fakeFetch(() => json({ ocs: { data: { users: { ava: { id: "ava", groups: ["admin"] }, bo: { id: "bo" } } } } }));
     const s1 = new HttpSession(fast, { baseUrl: "https://cloud.example" }, { token: "t" }, keyed.fetchImpl);

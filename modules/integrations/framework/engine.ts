@@ -42,7 +42,12 @@ import { ConnectorRequestError, HttpSession, LIMITS, type FetchLike } from "./ht
  * only for kinds read completely, so a cut-short read never looks like a
  * removal.
  */
-export type FetchReport = { truncated: boolean; unread: boolean };
+export type FetchReport = {
+  truncated: boolean;
+  unread: boolean;
+  /** WID-H03: the system said it holds more records than the read returned (or its count could not be read). */
+  short?: boolean;
+};
 
 /** A protocol driver: how records are fetched. Mapping is the engine's job. */
 export interface ConnectorDriverSession {
@@ -86,7 +91,7 @@ export function httpDriver(fetchImpl: FetchLike): DriverFactory {
       },
       fetch(resource, scope, maxRecords, _kind, report) {
         if (!resource.request) throw new Error("This resource has no request");
-        return session.fetchAll(resource.request, resource.records, resource.pagination, scope, maxRecords, resource.recordsKeyed, report);
+        return session.fetchAll(resource.request, resource.records, resource.pagination, scope, maxRecords, resource.recordsKeyed, report, resource.total);
       },
       async send(request, scope) {
         return (await session.send(request, scope)).json;
@@ -282,7 +287,7 @@ export class DefinitionConnector implements ConnectorAdapter {
 
   private note(kind: ResourceKind, report: Partial<FetchReport>) {
     const r = this.reports.get(kind) ?? { truncated: false, unread: false };
-    this.reports.set(kind, { truncated: r.truncated || Boolean(report.truncated), unread: r.unread || Boolean(report.unread) });
+    this.reports.set(kind, { truncated: r.truncated || Boolean(report.truncated), unread: r.unread || Boolean(report.unread), ...(r.short || report.short ? { short: true } : {}) });
   }
 
   /** Records that could not be mapped this run, for the sync job's error list. */
@@ -310,7 +315,7 @@ export class DefinitionConnector implements ConnectorAdapter {
     const report: FetchReport = { truncated: false, unread: false };
     try {
       const records = await session.fetch(spec, scope, max, kind, report);
-      this.note(kind, { truncated: report.truncated || records.length >= max, unread: report.unread });
+      this.note(kind, { truncated: report.truncated || records.length >= max, unread: report.unread, short: report.short });
       return records;
     } catch (err) {
       if (spec.optional && err instanceof ConnectorRequestError && err.status === 404) return [];

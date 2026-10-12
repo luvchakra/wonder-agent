@@ -713,6 +713,7 @@ Conventions the built-in connectors follow, so downstream modules can rely on th
 | `request` | http | `{ path, method?, query?, headers?, body? }`. `path` must be relative. Templates may use `{settings.…}`, and `{parent.…}` under `forEach`. |
 | `records` | http, mcp | Dot path to the list in the response (`"data"`, `"ocs.data.users"`). `""` means the response is the list. A list of paths is tried in order (Saviynt: `["userlist", ""]`). Plain values (ids, names) become `{ "value": … }`. |
 | `recordsKeyed` | http | The `records` path holds an object keyed by id. Each value is one record, and its key is available as `_key`. |
+| `total` | http | Where the system says how many records it holds: a dot path in the first response (`"meta.total"`) or `"header:X-Total-Count"`. If the read ends with fewer, or the count is missing, the kind counts as incomplete: nothing is marked missing and the run is partial (WID-H03). SCIM pagination reads `totalResults` without it. |
 | `pagination` | http | See below |
 | `search` | ldap | `{ base, filter, scope?, attributes? }`. Paged automatically. Under `forEach`, template values are LDAP-escaped. |
 | `query` | sql | One `SELECT` or `WITH` statement, with no templates. It runs in a read-only transaction with a row limit. |

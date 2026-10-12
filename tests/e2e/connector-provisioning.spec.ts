@@ -38,6 +38,10 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  *   "try again" waits for that read.
  * - INTEGRATION-P0-21: an incremental sync asks the system only for what
  *   changed since the last good run, stores it, and marks nothing missing.
+ * - WID-C02 leaver: leaving opens a person's removal task, never a
+ *   connector write. While the system is down the read fails and nothing
+ *   closes. A removal marked done that the system still shows stays
+ *   unconfirmed. Once it is really gone, the next read verifies it.
  * - Writes turned off: the next change is a person's task again.
  */
 
@@ -61,6 +65,8 @@ const system = {
   failWrites: false as false | "before" | "after",
   // While set, reads of /users wait for it (to hold a verification read).
   holdReads: null as Promise<void> | null,
+  // WID-C02: the whole system is unreachable (every request answers 503).
+  down: false,
   reads: [] as string[],
   writes: [] as Call[],
 };
@@ -128,6 +134,7 @@ test.beforeAll(async () => {
       res.end(payload === undefined ? "" : JSON.stringify(payload));
     };
     if (req.headers.authorization !== "Bearer e2e-token") return send(401, { error: "unauthorized" });
+    if (system.down) return send(503, { error: "down" });
     if (req.method === "GET" && url.pathname === "/api/ping") return send(200, { ok: true });
     if (req.method === "GET" && url.pathname === "/users") {
       if (system.holdReads) await system.holdReads;
@@ -542,6 +549,58 @@ test.describe.serial("connector provisioning", () => {
     } finally {
       system.users.push(cy);
     }
+  });
+
+  test("WID-C02 leaver: an outage closes nothing; a removal marked done but still in the system stays unconfirmed; verified once really gone", async ({ request }) => {
+    test.setTimeout(240_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    const { data: account } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-eve").single();
+    const { data: grant } = await db.from("access_grants").select("id").eq("tenant_id", tenantId).eq("account_id", account!.id).eq("entitlement_id", ops).is("revoked_at", null).single();
+    const grantState = async () => (await db.from("access_grants").select("removal_status, revoked_at").eq("id", grant!.id).single()).data!;
+    const taskOf = async () => (await db.from("access_fulfilment_tasks").select("id, status, reason, connector_status").eq("tenant_id", tenantId).eq("kind", "remove").eq("removal_grant_id", grant!.id)).data ?? [];
+    const syncEnds = async () => {
+      const res = await request.post(`/api/v1/integrations/${integrationId}/sync`);
+      expect(res.status(), await res.text()).toBe(202);
+      const jobId = (await res.json()).data.id as string;
+      await expect.poll(async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string; pipelineStatus?: string }[]).find((j) => j.id === jobId)?.status, { timeout: 90_000 }).toMatch(/succeeded|partial|failed/);
+      // Let the steps after the read (reconciliation) finish.
+      await expect.poll(async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; pipelineStatus?: string }[]).find((j) => j.id === jobId)?.pipelineStatus, { timeout: 90_000 }).not.toBe("running");
+      return ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string }[]).find((j) => j.id === jobId)!.status;
+    };
+
+    // Eve leaves: a person's removal task, due within a day; no connector write.
+    const writesBefore = system.writes.length;
+    const left = await request.post(`/api/v1/identities/${people.eve}/lifecycle`, { data: { toState: "DISABLED", note: "WID-C02 leaver" } });
+    expect(left.status(), await left.text()).toBe(201);
+    const [task] = await taskOf();
+    expect(task).toMatchObject({ status: "open", reason: "leaver", connector_status: null });
+    expect(system.writes.length).toBe(writesBefore);
+
+    // The system is down: the read fails, and nothing about the removal changes.
+    system.down = true;
+    try {
+      expect(await syncEnds()).toBe("failed");
+    } finally {
+      system.down = false;
+    }
+    expect((await taskOf())[0]).toMatchObject({ status: "open" });
+    expect(await grantState()).toMatchObject({ removal_status: "pending_removal", revoked_at: null });
+
+    // Someone marks it done, but the system still has the access: it stays unconfirmed.
+    const claimed = await request.post(`/api/v1/access/fulfilment-tasks/${task.id}`, { data: { action: "claim" } });
+    expect(claimed.status(), await claimed.text()).toBe(200);
+    const done = await request.post(`/api/v1/access/fulfilment-tasks/${task.id}`, { data: { action: "complete", note: "Removed (WID-C02)" } });
+    expect(done.status(), await done.text()).toBe(200);
+    expect(await syncEnds()).toBe("succeeded");
+    expect((await taskOf())[0]).toMatchObject({ status: "completed" });
+    expect(await grantState()).toMatchObject({ removal_status: "removed_unverified", revoked_at: null });
+
+    // Really removed in the system: the next read verifies the removal.
+    system.members["g-ops"] = system.members["g-ops"].filter((id) => id !== "u-eve");
+    expect(await syncEnds()).toBe("succeeded");
+    await expect.poll(async () => (await taskOf())[0]?.status, { timeout: 30_000 }).toBe("verified");
+    expect((await grantState()).revoked_at).not.toBeNull();
   });
 
   test("writes off again: the next change is a person's task", async ({ request }) => {

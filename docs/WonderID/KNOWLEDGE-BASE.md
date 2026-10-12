@@ -66,6 +66,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | An account matched to a person stays with them when an email address or username is reused; the sync results say so. |
 | 12 Oct 2026 | A sync is held when every record of a kind would go missing at once, at any size; people are held at a lower share than other records. |
 | 12 Oct 2026 | A connection's change sends the system one key however often it is tried; a change that may already have been made is checked by reading the system before it is sent again. |
+| 12 Oct 2026 | A sync that reads fewer records than the system says it holds counts as partial and marks nothing missing. |
 
 ---
 
@@ -223,6 +224,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 - **What happens after a sync:** WonderID updates identities, then accounts, then access, without anyone pressing a button. Each step shows its progress and counts on the connection's page.
 - **Faster scheduled syncs:** a connection type can say how to ask for **only what changed** since the last good sync. Scheduled syncs then read just the changes. If no full read has succeeded in the last day, the next scheduled sync reads in full. Records are marked missing only when every record of that kind was read.
 - **Cut-short runs:** a sync whose read stopped at a limit counts as partial and says why. It never moves the starting point of the next read of only the changes, and never counts as the day's full read.
+- **Counted reads:** when a system says how many records it holds (SCIM always does; other connection types can declare where), a read that brings back fewer counts as partial too, and nothing is marked missing.
 
 **Noticing removals**
 - When something disappears from a system, such as an account deleted or a person who left, a full sync marks it "missing at the source". Nothing is deleted, so the history stays.

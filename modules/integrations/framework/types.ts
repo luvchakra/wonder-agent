@@ -306,6 +306,14 @@ export type ResourceSpec = {
   request?: HttpRequestSpec;
   /** Dot path to the array of records in the response; "" when the response is the array. A list is tried in order. */
   records?: string | string[];
+  /**
+   * WID-H03: where the system says how many records it holds: a dot path
+   * in the first response (`meta.total`), or `header:<Name>`
+   * (`header:X-Total-Count`). A read that ends with fewer is incomplete:
+   * nothing is marked missing and the run is partial. SCIM pagination
+   * reads `totalResults` without it.
+   */
+  total?: string;
   /** The records path holds an object keyed by id (Nextcloud): each value is a record, its key `_key`. */
   recordsKeyed?: boolean;
   pagination?: Pagination;

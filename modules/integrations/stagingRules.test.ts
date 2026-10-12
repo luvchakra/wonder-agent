@@ -18,6 +18,7 @@ describe("kindCompleteness", () => {
     [{ failed: true }, "the import of this kind failed"],
     [{ unread: true }, "nothing was read (no new file)"],
     [{ truncated: true }, "the read stopped at a limit"],
+    [{ short: true }, "fewer records were read than the system reported"],
     [{ storeFailures: 3 }, "3 records could not be stored"],
     [{ unmapped: 1 }, "some records could not be mapped"],
   ])("skips a full run that read incompletely (%o)", (change, reason) => {
@@ -85,6 +86,9 @@ describe("runStatus (WID-H03)", () => {
   });
   it("is partial when a kind's read stopped at a limit, so the cursor and the daily full read do not move", () => {
     expect(runStatus(0, 500, [run(), run({ truncated: true })])).toBe("partial");
+  });
+  it("is partial when fewer records were read than the system reported", () => {
+    expect(runStatus(0, 4, [run({ short: true })])).toBe("partial");
   });
   it("keeps the error rules: partial when something was stored, failed when nothing was", () => {
     expect(runStatus(2, 10, [run()])).toBe("partial");
