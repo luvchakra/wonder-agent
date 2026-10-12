@@ -1668,3 +1668,46 @@ within its contract; approvals; tasks; the access added by hand; the next
 reconciliation marks each verified; removal and expiry end revoked") passes
 on the seeded test organization. FOUNDATION-P0-32 (bulk invitation) is F2's
 remaining story; it does not gate the phase.
+
+## 2026-10-12 — Provisioning safety suite (QA-P0-26, F3)
+
+**Built.**
+- **The mass-change guard on writes**, which did not exist before.
+  `executeConnectorWrite()` (Integration) refuses a write when the
+  connection has already made, or is making, the organization's limit of
+  changes in the last hour (`integration.maxWritesPerHour`, Global
+  Configuration → Connections, default 100, 1–10 000):
+  - The write is recorded `blocked` with the reason
+    (`integration.write_blocked`) and nothing is sent.
+  - The fulfilment task goes back to its owner, who is told. They can do it
+    by hand, or Try again once the hour allows.
+  - Counting happens after the idempotency claim, so writes racing each
+    other count each other and the guard errs towards refusing.
+  - If the count itself fails, the write is refused.
+  - Pure rule `overWriteLimit()`, unit-tested. The "Imports" section of
+    Global Configuration is now "Connections".
+- **The suite** (in `connector-provisioning.spec.ts`, alongside the
+  pipeline tests it relies on):
+  - Read-only enforcement: a connection type with no `write` reports
+    nothing supported, and turning writes on is refused (409). Writes off
+    leaves every change a person's task (existing tests).
+  - The guard: with the limit set to the changes this connection already
+    made this hour, an approved removal sends nothing, and the task goes to
+    its owner with "Mass-change guard … (limit n)". Try again at the limit is
+    refused the same way. With room again, Try again makes the change and
+    it is verified. The setting is restored afterwards.
+  - Idempotency: no attempt key reached the stub system twice, every request
+    it received has exactly one record, and blocked writes never reached it.
+  - Verification of every operation (remove, disable, add, create) was
+    already covered by INTEGRATION-P0-13's tests.
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `npx vitest run modules/integrations lib/config`: 305 passed.
+- `connector-provisioning.spec.ts`, local: 18 passed (11 in the spec, 7
+  setup), 6.0 min. `global-configuration.spec.ts`: 10 passed.
+- `next build` succeeds.
+
+**Left out.** A per-organization (all connections) limit, and a held
+"approve the rest" queue like the mass-missing guard's: refused changes
+stay ordinary tasks for their owners.

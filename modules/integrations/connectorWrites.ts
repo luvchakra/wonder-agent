@@ -9,7 +9,8 @@ import type { ConnectorCapabilities, ConnectorWriteResult } from "@/lib/shared/t
 import { createConnector } from "./registry";
 import { openGateway } from "./gateway/gateway";
 import { getDecryptedCredential } from "./credentials";
-import { capabilitiesWithWrites, decideWrite, requestFingerprint, retryableWriteFailure, validateWriteRequest, writesEnabled, type WriteRequestInput } from "./connectorWriteRules";
+import { getTenantConfig } from "@/lib/config/tenantConfig";
+import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, WRITE_WINDOW_MS, retryableWriteFailure, validateWriteRequest, writesEnabled, type WriteRequestInput } from "./connectorWriteRules";
 import { ConnectorRequestError } from "./framework/http";
 import { parseConnectorConfig, writeCapabilitiesOf } from "./framework/engine";
 import { DEFINITION_WRITE_OPERATIONS, type DefinitionWriteOperation } from "./framework/types";
@@ -23,7 +24,10 @@ import { CONNECTOR_WRITE_OPERATIONS, type ConnectorWriteOperation } from "@/lib/
  * after approval) call it through the module contract.
  *
  * Order: validate → claim the idempotency key (the unique insert is the
- * lock) → decide (declared capability, integration not disabled) → call
+ * lock) → decide (declared capability, integration not disabled, the
+ * mass-change guard of QA-P0-26: at most the configured changes per
+ * connection per hour; counting after the claim, so writes racing each
+ * other see each other and the guard errs towards refusing) → call
  * the connector → record the outcome → audit. A repeated key returns the
  * recorded outcome (or "requested" while the first call is still running);
  * a key reused for a different request is refused. Service role, with an
@@ -116,6 +120,22 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
 
   const decision = decideWrite(request.operation, (integration.capabilities ?? {}) as ConnectorCapabilities, integration.status as string);
   if (!decision.run) return finish("blocked", null, decision.reason);
+
+  // QA-P0-26: the mass-change guard. Changes made or in flight in the last hour, not counting this one.
+  const [{ count, error: countError }, config] = await Promise.all([
+    supabase
+      .from("connector_write_operations")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenantId)
+      .eq("integration_id", integrationId)
+      .in("status", ["requested", "succeeded"])
+      .neq("id", claimed.id as string)
+      .gte("created_at", new Date(Date.now() - WRITE_WINDOW_MS).toISOString()),
+    getTenantConfig(tenantId),
+  ]);
+  if (countError) return finish("blocked", null, "The mass-change guard could not count recent changes");
+  const guard = overWriteLimit(count ?? 0, config["integration.maxWritesPerHour"]);
+  if (!guard.run) return finish("blocked", null, guard.reason);
 
   // Any request a write makes passes the connection's Connector Gateway session.
   const gateway = openGateway({ tenantId, integrationId, status: integration.status as string });

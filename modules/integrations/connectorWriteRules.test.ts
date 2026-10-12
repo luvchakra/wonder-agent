@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { capabilitiesWithWrites, decideWrite, requestFingerprint, retryableWriteFailure, validateDeclaredCapabilities, validateWriteRequest, writesEnabled } from "./connectorWriteRules";
+import { capabilitiesWithWrites, decideWrite, overWriteLimit, requestFingerprint, retryableWriteFailure, validateDeclaredCapabilities, validateWriteRequest, writesEnabled } from "./connectorWriteRules";
 
 const err = (fn: () => unknown) => {
   try {
@@ -95,5 +95,16 @@ describe("writes per connection (INTEGRATION-P0-13)", () => {
     expect(retryableWriteFailure(404, "http")).toBe(false);
     expect(retryableWriteFailure(403, "http")).toBe(false);
     expect(retryableWriteFailure(undefined, "other")).toBe(false);
+  });
+});
+
+describe("mass-change guard (QA-P0-26)", () => {
+  it("allows changes up to the hourly limit and refuses the next with the reason", () => {
+    expect(overWriteLimit(0, 100)).toEqual({ run: true });
+    expect(overWriteLimit(99, 100)).toEqual({ run: true });
+    const refused = overWriteLimit(100, 100);
+    expect(refused).toMatchObject({ run: false, status: "blocked" });
+    expect(refused.run === false && refused.reason).toMatch(/Mass-change guard: .* 100 changes in the last hour \(limit 100\)/);
+    expect(overWriteLimit(5, 1).run).toBe(false);
   });
 });

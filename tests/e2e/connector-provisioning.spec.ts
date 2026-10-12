@@ -26,6 +26,11 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  *   and verified. For a person with no account yet, the connector creates
  *   the account first; the next read brings it in and replaces the
  *   placeholder, then the access is added and verified.
+ * - QA-P0-26 provisioning safety: a connection type without writes cannot
+ *   be turned on; the mass-change guard refuses the change past the hourly
+ *   limit (nothing sent, the owner's task with the reason) and "Try again"
+ *   works once the limit allows; no attempt key ever reaches the system
+ *   twice, and every change the system received is recorded once.
  * - Writes turned off: the next change is a person's task again.
  */
 
@@ -343,6 +348,74 @@ test.describe.serial("connector provisioning", () => {
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
     const { data: accounts } = await db.from("accounts").select("external_account_ref, status").eq("tenant_id", tenantId).eq("application_id", appId).eq("identity_id", people.eve);
     expect(accounts).toEqual([{ external_account_ref: "u-eve", status: "active" }]);
+  });
+
+  test("QA-P0-26 read-only: a connection type that declares no writes cannot be turned on", async ({ request }) => {
+    const readOnlyKey = `${KEY}-ro`;
+    const { write: _write, ...readOnly } = definition();
+    void _write;
+    const published = await request.post("/api/v1/integrations/connectors", { data: { ...readOnly, key: readOnlyKey, name: `E2E Read-only ${stamp}` } });
+    expect(published.status(), await published.text()).toBe(201);
+    const connected = await request.post("/api/v1/integrations/connectors/connect", { data: { origin: "custom", key: readOnlyKey, name: `E2E Read-only ${stamp}`, settings: { baseUrl }, secret: { token: "e2e-token" } } });
+    expect(connected.status(), await connected.text()).toBe(201);
+    const id = (await connected.json()).data.integration.id as string;
+    expect((await (await request.get(`/api/v1/integrations/${id}/writes`)).json()).data).toEqual({ supported: [], enabled: false });
+    const on = await request.put(`/api/v1/integrations/${id}/writes`, { data: { enabled: true } });
+    expect(on.status()).toBe(409);
+    expect((await (await request.get(`/api/v1/integrations/${id}/writes`)).json()).data.enabled).toBe(false);
+  });
+
+  test("QA-P0-26 mass-change guard: past the hourly limit nothing is sent and the owner gets the task; it runs once the limit allows", async ({ request }) => {
+    test.setTimeout(120_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const since = new Date(Date.now() - 3_600_000).toISOString();
+    const { count } = await db.from("connector_write_operations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("integration_id", integrationId).in("status", ["requested", "succeeded"]).gte("created_at", since);
+    const original = ((await (await request.get("/api/v1/tenant/configuration")).json()).data as Record<string, number>)["integration.maxWritesPerHour"];
+    const setLimit = async (n: number) => {
+      const res = await request.patch("/api/v1/tenant/configuration", { data: { "integration.maxWritesPerHour": n } });
+      expect([200, 409], await res.text()).toContain(res.status()); // 409: unchanged
+    };
+    try {
+      // This connection has made `count` changes this hour: make that the limit.
+      await setLimit(count!);
+      const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+      const before = system.writes.length;
+      const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.ana, applicationId: appId, entitlementId: ops, requestType: "remove", justification: "QA-P0-26 mass-change guard" } });
+      expect(res.status(), await res.text()).toBe(201);
+      const req = (await res.json()).data as { id: string; status: string };
+      expect(req.status).toBe("approved");
+      await expect.poll(async () => (await tasksOf(request, req.id))[0]?.connectorStatus, { timeout: 30_000 }).toBe("failed");
+      const [held] = await tasksOf(request, req.id);
+      expect(held).toMatchObject({ kind: "remove", status: "open", connectorError: expect.stringMatching(/Mass-change guard: .*\(limit \d+\)/) });
+      expect(system.writes.length).toBe(before);
+      expect(system.members["g-ops"]).toContain("u-ana");
+
+      // Still at the limit, trying again is refused the same way; nothing is sent.
+      const again = await request.post(`/api/v1/access/fulfilment-tasks/${held.id}`, { data: { action: "retry_connector" } });
+      expect((await again.json()).data).toMatchObject({ connectorStatus: "failed", connectorError: expect.stringMatching(/Mass-change guard/) });
+      expect(system.writes.length).toBe(before);
+
+      // Room again: the owner's "Try again" makes the change, verified as usual.
+      await setLimit(count! + 10);
+      const retried = await request.post(`/api/v1/access/fulfilment-tasks/${held.id}`, { data: { action: "retry_connector" } });
+      expect(retried.status(), await retried.text()).toBe(200);
+      expect(system.members["g-ops"]).not.toContain("u-ana");
+      await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 60_000 }).toBe("verified");
+    } finally {
+      await setLimit(original);
+    }
+  });
+
+  test("QA-P0-26 idempotency: no attempt key reached the system twice, and each change it received is recorded once", async () => {
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const keys = system.writes.map((w) => w.key);
+    expect(keys.every((k) => k !== null)).toBe(true);
+    expect(new Set(keys).size).toBe(keys.length);
+    const { data: rows } = await db.from("connector_write_operations").select("idempotency_key, status").eq("tenant_id", tenantId).eq("integration_id", integrationId);
+    const sent = (rows ?? []).filter((r) => r.status === "succeeded" || r.status === "failed");
+    // Every request the system saw has its one record; blocked ones never reached it.
+    expect(sent.map((r) => r.idempotency_key).sort()).toEqual([...keys].sort());
+    expect((rows ?? []).filter((r) => r.status === "blocked").every((r) => !keys.includes(r.idempotency_key))).toBe(true);
   });
 
   test("writes off again: the next change is a person's task", async ({ request }) => {

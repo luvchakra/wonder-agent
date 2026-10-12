@@ -2192,3 +2192,13 @@ follow.
 - Built-in definitions declaring writes (D9's connector stories).
 - SCIM and LDAP writes (INTEGRATION-P0-22), ticketed fulfilment
   (INTEGRATION-P0-26), the mass-change guard (QA-P0-26).
+
+### 2026-10-12 — The mass-change guard on connector writes (for QA-P0-26)
+
+`executeConnectorWrite()` now also refuses a write past the organization's
+hourly limit per connection (`integration.maxWritesPerHour`, default 100):
+it is recorded `blocked` with the reason and nothing is sent. The pure rule
+is `overWriteLimit()` in `connectorWriteRules.ts`. The count uses the
+existing `connector_write_operations_integration_idx` (integration, tenant,
+created_at), so there is no migration. Tests and verification are in the
+QA audit log entry of the same date.

@@ -22,7 +22,7 @@ export const SECTIONS: { key: ConfigSection; title: string; description: string 
   { key: "sessions", title: "Sessions", description: "How long a signed-in session lasts. Applies to every member, on their next page." },
   { key: "members", title: "Members", description: "Invitations to join the organization." },
   { key: "access", title: "Access", description: "How accounts are judged." },
-  { key: "imports", title: "Imports", description: "How a connection's sync treats records that are gone from the source." },
+  { key: "imports", title: "Connections", description: "How a connection's sync treats records gone from the source, and how many changes it may make." },
   { key: "agents", title: "AI agents and runtime", description: "Discovery and runtime alerts." },
   { key: "risk", title: "Risk", description: "When an agent's own credentials count as a risk." },
   { key: "certifications", title: "Certifications", description: "Defaults for new certification campaigns." },
@@ -209,6 +209,19 @@ export const CONFIG_SETTINGS = [
     max: 100,
     default: 20,
     unit: "%",
+  },
+  {
+    // QA-P0-26: read by executeConnectorWrite() (modules/integrations/connectorWrites.ts).
+    key: "integration.maxWritesPerHour",
+    section: "imports",
+    label: "Most changes a connection may make in an hour",
+    help: "Beyond this, a connection's further changes are refused and go to a person, until the hour has passed.",
+    permission: SETTINGS,
+    type: "int",
+    min: 1,
+    max: 10000,
+    default: 100,
+    unit: "changes",
   },
   {
     key: "sod.conflictWindowDays",

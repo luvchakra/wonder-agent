@@ -432,7 +432,7 @@ object's `missing_at_source_at`, carefully:
   after this one is never marked, so overlapping syncs cannot undo each
   other.
 - **The mass-missing guard.** When more than the organization's share
-  (Global Configuration, Imports, `integration.massMissingPercent`, default
+  (Global Configuration, Connections, `integration.massMissingPercent`, default
   20%) of a kind's present objects would be marked, and the kind has at
   least 20, nothing is marked: the run is held, the organization is notified
   ("Sync held for review"), and someone with `integration.update` approves
@@ -512,6 +512,16 @@ connection the application's live onboarding reconciles against.
    owner is told. Whoever may work on the task can do it by hand or "Try
    again" (`retry_connector`). A run that never reports back is handed back
    by the daily sweep after 15 minutes, saying its outcome is unknown.
+
+**The mass-change guard (QA-P0-26).** A connection makes at most the
+organization's limit of changes in an hour (Global Configuration,
+Connections, `integration.maxWritesPerHour`, default 100). Changes made or
+in flight in the last hour count; failed and refused ones do not. Past the
+limit, a write is refused before anything is sent (`integration.write_blocked`,
+with the reason), so its task goes back to its owner, who is told. The owner
+can do it by hand, or "Try again" once the hour allows. A run of bad
+approvals or a looping rule therefore stops at the limit instead of changing
+everything.
 
 **Access for someone with no account yet.** The approved access waits on a
 placeholder account. When the connection can both create accounts and add

@@ -75,6 +75,25 @@ export function decideWrite(operation: ConnectorWriteOperation, declared: Connec
   return { run: true };
 }
 
+/** The window of the mass-change guard (QA-P0-26). */
+export const WRITE_WINDOW_MS = 60 * 60_000;
+
+/**
+ * QA-P0-26 — the mass-change guard on writes: a connection that has already
+ * made (or is making) `limit` changes in the last hour makes no more until
+ * the hour has passed. A run of bad approvals, a broken rule or a loop then
+ * stops at the limit instead of changing everything; what is refused goes
+ * to a person with the reason.
+ */
+export function overWriteLimit(recentWrites: number, limit: number): WriteDecision {
+  if (recentWrites < limit) return { run: true };
+  return {
+    run: false,
+    status: "blocked",
+    reason: `Mass-change guard: this connection already made ${recentWrites} changes in the last hour (limit ${limit}). Do it by hand, or try again later`,
+  };
+}
+
 /**
  * INTEGRATION-P0-13: the capabilities a connection declares once an
  * administrator turns writes on (everything its definition supports) or

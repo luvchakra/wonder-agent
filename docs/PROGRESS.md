@@ -14,7 +14,7 @@ Generated 2026-10-12 from 11 module backlogs.
 
 ## Overall
 
-**220 of 268 tracked stories complete — 82%**
+**221 of 269 tracked stories complete — 82%**
 
 ```
 █████████████████████████████████░░░░░░░  82%
@@ -22,11 +22,11 @@ Generated 2026-10-12 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 220 |
+| Done | 221 |
 | Partial | 28 |
 | Deferred | 1 |
 | Not Started | 19 |
-| **Total tracked** | **268** |
+| **Total tracked** | **269** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 27 | 3 | 0 | 5 | 35 | `██████████████░░░░` 77% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 13 | 2 | 1 | 1 | 17 | `██████████████░░░░` 76% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 15 | 12 | 0 | 3 | 30 | `█████████░░░░░░░░░` 50% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 16 | 12 | 0 | 3 | 31 | `█████████░░░░░░░░░` 52% |
 
 ---
 
@@ -386,7 +386,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 15 done · 12 partial · 0 deferred · 3 not started (30 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 16 done · 12 partial · 0 deferred · 3 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -420,4 +420,5 @@ and are deliberately excluded from the counts above.
 | QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
 | QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Done — 2026-10-11: person, service account and agent to verified; removal and expiry revoked; approver ≠ requester; isolation SQL for 0123/0124; repeated reconciliation changes nothing |
+| QA-P0-26 | Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification (F3) | Done — 2026-10-12: the write mass-change guard (`integration.maxWritesPerHour`, default 100 per connection per hour) built and tested; read-only connection types cannot be turned on; no attempt key reaches a system twice; verification of every operation in `connector-provisioning.spec.ts` |
 

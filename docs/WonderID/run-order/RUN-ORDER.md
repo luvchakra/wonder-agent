@@ -138,7 +138,7 @@ Needs D3; the relay needs D7; connectors need D9. Tracking issue #57.
 | INTEGRATION-P0-25 † | HR connector: Workday or SuccessFactors (D9) | Integration | |
 | INTEGRATION-P0-26 † | ServiceNow ticketing connector for manual fulfilment | Integration | |
 | RISK-P0-13 | Rogue access management: remediation through approval and provisioning | Risk | |
-| QA-P0-26 † | Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification | QA | |
+| QA-P0-26 | Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification | QA | |
 
 **Exit test.** The P0 acceptance scenario (CLAUDE.md §11) runs with real
 removal: the unauthorized entitlement is removed through the connector after
