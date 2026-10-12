@@ -73,6 +73,17 @@ export function missingStatusOf(summary: MissingSummary): MissingStatus {
 /** Objects of a kind below this many present are never held: removing a few of a few is not a mass change. */
 export const MASS_MISSING_MIN_POPULATION = 20;
 
+/**
+ * WID-H03: people marked missing become leavers, so a sync holds earlier
+ * for identities: at most this share, whatever the organization's setting.
+ */
+export const IDENTITY_MASS_MISSING_CAP = 10;
+
+/** The mass-missing threshold for one kind: the organization's, capped for identities. */
+export function massMissingThreshold(kind: string, organizationPercent: number): number {
+  return kind === "identity" ? Math.min(organizationPercent, IDENTITY_MASS_MISSING_CAP) : organizationPercent;
+}
+
 /** Kinds still held in a summary (what an approve or discard decides). */
 export function heldKinds(summary: MissingSummary): string[] {
   return Object.entries(summary)

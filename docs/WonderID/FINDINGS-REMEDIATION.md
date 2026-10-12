@@ -35,7 +35,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
-| WID-H03 Incomplete syncs | P2 | Partly fixed | Thresholds per kind; tests for a failed page in the middle of a read |
+| WID-H03 Incomplete syncs | P2 | Partly fixed | A test for a failed page in the middle of a read |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
@@ -223,8 +223,18 @@ Tests:
 - E2E `connector-provisioning`, `identity-sources` and
   `connection-upgrade`: 26/26.
 
+**Done:** thresholds per kind.
+- People (`identity`) are held above 10%, or the organization's threshold
+  when it is lower (`massMissingThreshold` in `stagingRules.ts`).
+- Any kind, at any size, is held when every record of it would go missing
+  at once (`stage_mark_missing`, migration 0140). Before, a kind with
+  fewer than 20 records was never held.
+
+Tests:
+- `stagingRules.test.ts`, "massMissingThreshold (WID-H03)";
+- `tests/integrations/staging-missing.sql`, check 4b: 20/20 passed live.
+
 **Next:**
-- Mass-missing thresholds per kind.
 - An E2E test for a page that fails in the middle of a read.
 
 ### WID-H04: rogue access provenance (P2, partly fixed)

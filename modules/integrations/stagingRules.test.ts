@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heldKinds, kindCompleteness, missingStatusOf, runStatus, type KindRun } from "./stagingRules";
+import { heldKinds, kindCompleteness, massMissingThreshold, missingStatusOf, runStatus, type KindRun } from "./stagingRules";
 import { chooseRunMode } from "./stagingRules";
 
 const clean: KindRun = { failed: false, storeFailures: 0, unmapped: 0, truncated: false, unread: false };
@@ -89,5 +89,16 @@ describe("runStatus (WID-H03)", () => {
   it("keeps the error rules: partial when something was stored, failed when nothing was", () => {
     expect(runStatus(2, 10, [run()])).toBe("partial");
     expect(runStatus(2, 0, [run({ truncated: true })])).toBe("failed");
+  });
+});
+
+describe("massMissingThreshold (WID-H03)", () => {
+  it("caps identities at 10%, because people marked missing become leavers", () => {
+    expect(massMissingThreshold("identity", 20)).toBe(10);
+    expect(massMissingThreshold("identity", 5)).toBe(5);
+  });
+  it("keeps the organization's setting for every other kind", () => {
+    expect(massMissingThreshold("account", 20)).toBe(20);
+    expect(massMissingThreshold("access_grant", 35)).toBe(35);
   });
 });
