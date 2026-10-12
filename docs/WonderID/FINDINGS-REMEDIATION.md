@@ -1,8 +1,10 @@
 # High-risk findings: remediation tracker
 
 What WonderID is doing about each finding in
-[`HIGH-RISK-FINDINGS.md`](HIGH-RISK-FINDINGS.md). That register belongs to
-the hourly audit and is never edited here (CLAUDE.md §19.12). This tracker
+[`HIGH-RISK-FINDINGS.md`](HIGH-RISK-FINDINGS.md). That register is
+maintained by the hourly audit (ChatGPT, authorised by the owner), which
+updates it freely. Claude Code reads it and never edits it (CLAUDE.md
+§19.12). This tracker
 holds:
 - the priority of each finding;
 - its status;
