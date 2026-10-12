@@ -183,7 +183,9 @@ export async function getInventoryAccount(tenantId: string, accountId: string, d
 
 /**
  * Links an account to an identity by hand (a person's decision, kept by
- * later reconciliation runs) or unlinks it (identityId null → orphan). An
+ * later reconciliation runs) or unlinks it (identityId null → orphan; the
+ * next reconciliation matches it afresh, never back to that person by
+ * itself, WID-H01). An
  * AI agent's accounts are managed from the agent, never re-pointed here:
  * moving one would silently change the agent's CAN.
  */
@@ -204,7 +206,8 @@ export async function linkAccount(tenantId: string, actorId: string, accountId: 
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("accounts")
-    .update({ identity_id: target, correlation: target ? "manual" : "orphan", updated_at: new Date().toISOString() })
+    // WID-H01: an unlinked account goes back for matching, never to this person by itself; a link by hand clears that.
+    .update({ identity_id: target, correlation: target ? "manual" : "orphan", unlinked_identity_id: target ? null : account.identityId, updated_at: new Date().toISOString() })
     .eq("tenant_id", tenantId)
     .eq("id", accountId)
     .eq("updated_at", account.updatedAt)
@@ -223,6 +226,28 @@ export async function linkAccount(tenantId: string, actorId: string, accountId: 
     metadata: { applicationId: account.applicationId, from: account.identityId, to: target, previousCorrelation: account.correlation },
   });
   return (await getInventoryAccount(tenantId, accountId))!;
+}
+
+/**
+ * WID-H01: after an unlink restored a person's email, username or name
+ * (the values accounts match on), their automatically matched accounts are
+ * matched afresh by the next reconciliation instead of being kept with
+ * them. Manual links and AI agents' accounts are untouched. Service role,
+ * called by the Integration module after its own authorization; filtered on
+ * `tenantId`. Returns how many accounts will be re-matched.
+ */
+export async function requestAccountRematch(tenantId: string, identityId: string): Promise<number> {
+  if (!UUID_RE.test(identityId)) return 0;
+  const { data, error } = await supabaseServiceRole()
+    .from("accounts")
+    .update({ rematch_requested_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .eq("identity_id", identityId)
+    .eq("correlation", "correlated")
+    .is("agent_id", null)
+    .select("id");
+  if (error) throw new Error(`requestAccountRematch: ${error.message}`);
+  return data?.length ?? 0;
 }
 
 export type ReconciliationRun = {
@@ -377,7 +402,7 @@ async function reconcileAccounts(
       listAgentIdentifiers(tenantId),
       supabase
         .from("accounts")
-        .select("id, external_account_ref, agent_id, identity_id, correlation, account_type, status, source, last_used_at")
+        .select("id, external_account_ref, agent_id, identity_id, correlation, account_type, status, source, last_used_at, unlinked_identity_id, rematch_requested_at")
         .eq("tenant_id", tenantId)
         .eq("application_id", applicationId)
         .limit(RECONCILE_CAP * 2),
@@ -395,6 +420,8 @@ async function reconcileAccounts(
       status: r.status,
       source: r.source,
       lastUsedAt: r.last_used_at,
+      unlinkedIdentityId: r.unlinked_identity_id,
+      rematchRequested: r.rematch_requested_at !== null,
     }));
     const plan = planReconciliation({
       identifierField: config.accountIdentifierField,

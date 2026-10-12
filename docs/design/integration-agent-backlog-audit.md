@@ -2836,3 +2836,13 @@ Verified with the Identity entry's checks, plus E2E `identity-sources.spec.ts`, 
 - the next run holds the record in Pending Matches;
 - linking it back works;
 - another organization and a read-only member are refused.
+
+### 2026-10-12 — unlink also re-matches the person's accounts (WID-H01)
+
+`unlinkSourceRecord` now asks Access's `requestAccountRematch` when the
+unlink restored the email, username or display name. It returns
+`accountsToRematch` and records it in the audit event. A failure here is
+returned as `rematchError` and recorded, without undoing the unlink. Tested
+by the E2E case in `account-inventory.spec.ts`: an account matched only
+through the wrong record's email becomes an orphan at the next
+reconciliation.

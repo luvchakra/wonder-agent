@@ -878,10 +878,19 @@ export async function listSourceLinksForIdentity(tenantId: string, identityId: s
  *    matching never links them again by itself;
  * 3. the link is removed: the next run matches the record afresh, and a
  *    match only to this identity waits in Pending Matches for a person.
- * The record's identity is not deleted, and its own accounts stay as they
- * are. Audited.
+ * The identity is not deleted. When its email, username or name came back,
+ * its automatically matched accounts are matched afresh by their next
+ * reconciliation (Access's requestAccountRematch). Audited.
  */
-export async function unlinkSourceRecord(tenantId: string, actorId: string, sourceId: string, externalId: unknown): Promise<{ identityId: string; restored: string[]; kept: string[] }> {
+/** The identity values accounts are matched on (an account's correlation rule). */
+const MATCHED_ON = new Set(["email", "username", "displayName"]);
+
+export async function unlinkSourceRecord(
+  tenantId: string,
+  actorId: string,
+  sourceId: string,
+  externalId: unknown,
+): Promise<{ identityId: string; restored: string[]; kept: string[]; accountsToRematch: number; rematchError?: string }> {
   if (!UUID_RE.test(sourceId)) throw new ApiError(404, "NOT_FOUND", "No such identity source");
   if (typeof externalId !== "string" || !externalId.trim() || externalId.length > 300) throw new ApiError(400, "VALIDATION_FAILED", "externalId: the source record's id");
   const supabase = supabaseServiceRole();
@@ -915,6 +924,18 @@ export async function unlinkSourceRecord(tenantId: string, actorId: string, sour
     .eq("external_id", externalId)
     .eq("identity_id", identityId);
   if (deleteError) throw new ApiError(500, "WRITE_FAILED", `The values were restored, but the record is still linked: ${deleteError.message}`);
+  // WID-H01: the values accounts match on came back, so the person's automatically matched accounts are matched afresh.
+  // Loaded at call time: the Access service already imports this module's service.
+  let accountsToRematch = 0;
+  let rematchError: string | undefined;
+  if (undo.restored.some((f) => MATCHED_ON.has(f))) {
+    try {
+      const { requestAccountRematch } = await import("@/modules/access-governance/service");
+      accountsToRematch = await requestAccountRematch(tenantId, identityId);
+    } catch (err) {
+      rematchError = err instanceof Error ? err.message.slice(0, 200) : "accounts not queued for matching";
+    }
+  }
   await writeAudit({
     tenantId,
     actorId,
@@ -923,7 +944,7 @@ export async function unlinkSourceRecord(tenantId: string, actorId: string, sour
     objectType: "identity",
     objectId: identityId,
     outcome: "success",
-    metadata: { sourceId, externalId, restored: undo.restored, kept: undo.kept },
+    metadata: { sourceId, externalId, restored: undo.restored, kept: undo.kept, accountsToRematch, ...(rematchError ? { rematchError } : {}) },
   });
-  return { identityId, ...undo };
+  return { identityId, ...undo, accountsToRematch, ...(rematchError ? { rematchError } : {}) };
 }

@@ -3054,3 +3054,39 @@ Verified:
   with changes on: exactly one write (`PATCH /users/u-eve`), the disable
   task succeeds with reason `leaver`, and her access removal stays a
   person's task through the outage and the unconfirmed removal.
+
+### 2026-10-12 — unlinked accounts go back for matching (WID-H01, owner decision)
+
+- Migration 0149 (applied, additive) adds two columns to `accounts`:
+  - `unlinked_identity_id`, with a same-tenant composite foreign key and
+    on delete set null;
+  - `rematch_requested_at`.
+- `linkAccount`: an unlink records the person it was unlinked from; a link
+  by hand clears it.
+- `planReconciliation`:
+  - a match to `unlinkedIdentityId` stays an orphan;
+  - a correlated account with `rematchRequested` is matched afresh,
+    without the hold that keeps an account with its person;
+  - every upsert clears `rematch_requested_at`.
+- `requestAccountRematch(tenantId, identityId)` (service role, tenant
+  filter) flags the person's automatically correlated accounts. Manual
+  links and agents' accounts are left alone. Integration's
+  `unlinkSourceRecord` calls it when the unlink restored email, username or
+  display name. It loads the Access service at call time, because Access
+  already imports the Integration service.
+
+Verified:
+- typecheck, eslint on the changed files, `npm run build`: clean;
+- `npx vitest run modules/access-governance
+  modules/integrations/identitySourceRules.test.ts`: 313 passed,
+  including the two new `accountRules.test.ts` WID-H01 cases.
+- E2E, run locally:
+  - `account-inventory` run on its own: 15 passed, including the two new
+    WID-H01 cases;
+  - in a combined run with `identity-sources` and `f1-reconciliation`:
+    37 passed, 1 failed. The failure was "the inventory screens list,
+    filter and link accounts": the Link account save was still running at
+    the 10 s assertion. The same save took 12.4 s in the whole test when
+    the spec ran alone, and it passed.
+  - Not caused by this change, which adds one nullable column to that
+    update. The slow save is worth a look on its own.

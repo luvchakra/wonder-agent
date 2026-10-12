@@ -114,6 +114,10 @@ export type ExistingAccount = {
   status: "active" | "disabled";
   source: "manual" | "reconciliation";
   lastUsedAt: string | null;
+  /** WID-H01: the person an administrator unlinked it from; never matched back to them by itself. */
+  unlinkedIdentityId?: string | null;
+  /** WID-H01: the person's matching values were restored; match afresh instead of keeping the account with them. */
+  rematchRequested?: boolean;
 };
 
 export type AccountUpsert = {
@@ -127,6 +131,8 @@ export type AccountUpsert = {
   source: "manual" | "reconciliation";
   last_used_at: string | null;
   last_seen_at: string;
+  /** WID-H01: a requested re-match is done by this run. */
+  rematch_requested_at: null;
 };
 
 export type ReconciliationPlan = {
@@ -150,7 +156,8 @@ export type ReconciliationPlan = {
  * and an agent's ownership (only its last-seen and last-used move); an
  * account correlated to a person before keeps that person (WID-H01: a
  * different match is held, not applied); any other account is correlated
- * afresh. Accounts WonderID imported before
+ * afresh (never to a person an administrator unlinked it from, and
+ * without the hold when an unlink asked for a re-match). Accounts WonderID imported before
  * that the source no longer lists are counted, never deleted: the
  * connected system is the source of truth, and removal is a governed
  * action (#7, #15).
@@ -202,8 +209,14 @@ export function planReconciliation(input: {
       correlation = "correlated";
     } else {
       ({ identityId, correlation } = matchIdentity(input.rule, raw, index));
-      // WID-H01: an account already linked to a person stays with them. A match elsewhere is held for a person, never moved.
-      if (current?.identityId && current.correlation === "correlated" && identityId !== current.identityId) {
+      // WID-H01: never back to the person an administrator unlinked it from, by itself.
+      if (identityId && identityId === current?.unlinkedIdentityId) {
+        identityId = null;
+        correlation = "orphan";
+      }
+      // WID-H01: an account already linked to a person stays with them. A match elsewhere is held for a person, never moved,
+      // unless that person's matching values were restored by an unlink (a re-match was requested).
+      if (current?.identityId && current.correlation === "correlated" && identityId !== current.identityId && !current.rematchRequested) {
         relinkHeld.push({ ref, keptIdentityId: current.identityId, matchedIdentityId: identityId, matched: correlation });
         counts.relinkHeld++;
         identityId = current.identityId;
@@ -231,6 +244,7 @@ export function planReconciliation(input: {
       // Never move last use backwards.
       last_used_at: [lastUsed, current?.lastUsedAt ?? null].filter(Boolean).sort().at(-1) ?? null,
       last_seen_at: nowIso,
+      rematch_requested_at: null,
     });
   }
   const missingIds = input.existing.filter((a) => a.source === "reconciliation" && !seen.has(a.externalAccountRef)).map((a) => a.id);
