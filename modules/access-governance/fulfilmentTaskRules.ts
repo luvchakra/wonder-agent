@@ -46,6 +46,23 @@ export function isOverdue(task: { status: FulfilmentTaskStatus; dueAt: string },
   return (task.status === "open" || task.status === "claimed" || task.status === "failed") && Date.parse(task.dueAt) < now.getTime();
 }
 
+/** WID-C02: how long a removal may stay "marked done" without the system confirming it before its owner is reminded. */
+export const UNCONFIRMED_REMOVAL_DAYS = 2;
+
+/**
+ * WID-C02: a removal someone marked done, which no read of the system has
+ * confirmed after UNCONFIRMED_REMOVAL_DAYS, and not reminded in the last day.
+ * The access may still be there.
+ */
+export function needsUnconfirmedRemovalReminder(
+  task: { kind: string; status: FulfilmentTaskStatus; completedAt: string | null; remindedAt: string | null },
+  now = new Date(),
+): boolean {
+  if (task.kind !== "remove" || task.status !== "completed" || !task.completedAt) return false;
+  if (now.getTime() - Date.parse(task.completedAt) < UNCONFIRMED_REMOVAL_DAYS * 86_400_000) return false;
+  return !task.remindedAt || now.getTime() - Date.parse(task.remindedAt) >= 86_400_000;
+}
+
 /** Overdue and not reminded in the last day. */
 export function needsReminder(task: { status: FulfilmentTaskStatus; dueAt: string; remindedAt: string | null }, now = new Date()): boolean {
   return isOverdue(task, now) && (!task.remindedAt || now.getTime() - Date.parse(task.remindedAt) >= 86_400_000);

@@ -3022,3 +3022,26 @@ last hop, unknown address refused).
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
 
+### 2026-10-12 — Four-eyes on role changes to automation credentials (WID-H06)
+
+- Migration 0133 adds `automation_credentials.changed_by`, with the check
+  `automation_credentials_change_four_eyes` (approved_by <> changed_by).
+  Applied to the project; advisors show no new issue.
+- `assignAutomationCredentialRole` on an active credential:
+  - sets it to pending and clears the approval;
+  - records `changed_by`;
+  - drops the cached token, deactivates the backing membership and ends
+    its sessions, so the credential stops working at once.
+- On a pending credential it only records `changed_by`.
+- `approveAutomationCredential` refuses the creator and `changed_by`
+  (FOUR_EYES).
+- Audit: `automation_credential.role_change_requested`.
+- Removing a role needs no approval.
+
+Verified:
+- `npx vitest run lib/security`: 71 passed.
+- E2E `automation-credentials.spec.ts`: 5/5, including the new WID-H06
+  test. The paused credential gets 401; the role giver gets FOUR_EYES;
+  another administrator approves; then the credential works again.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

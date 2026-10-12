@@ -15,6 +15,8 @@ import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
  * - Every call is audited with the owner identity as on-behalf-of.
  * - Rate limit (429), expiry (401) and revocation (401) stop it.
  * - Roles beyond the giver's own permissions are refused.
+ * - WID-H06: a role given to an approved credential pauses it until someone
+ *   other than the giver approves; then it works again.
  */
 
 const stamp = Date.now();
@@ -157,6 +159,27 @@ test.describe.serial("automation credentials", () => {
     await page.goto("/settings/users");
     await expect(page.getByRole("heading", { name: "Users", exact: true })).toBeVisible();
     await expect(page.getByText(`Automation: ${credentialName}`)).toHaveCount(0);
+  });
+
+  test("WID-H06: a role given to an approved credential pauses it until someone else approves", async ({ page, browser, baseURL }) => {
+    const give = await page.request.post(`/api/v1/automation-credentials/${credentialId}`, { data: { action: "assign_role", role: "READ_ONLY" } });
+    expect(give.status(), await give.text()).toBeLessThan(300);
+    const { data: paused } = await db().from("automation_credentials").select("status, changed_by").eq("id", credentialId).single();
+    expect(paused!.status).toBe("pending");
+    // Paused: the credential stops working until approved.
+    const api = await bearer(baseURL);
+    expect((await api.get("/api/v1/integrations")).status()).toBe(401);
+    // The giver cannot approve their own change.
+    const self = await page.request.post(`/api/v1/automation-credentials/${credentialId}`, { data: { action: "approve" } });
+    expect(self.status()).toBe(403);
+    expect((await self.json()).error.code).toBe("FOUR_EYES");
+    // Someone else can; then it works again.
+    const approver = await signInAs(browser, TEST_USERS.iamAdminOne.email);
+    const ok = await approver.request.post(`/api/v1/automation-credentials/${credentialId}`, { data: { action: "approve" } });
+    expect(ok.status(), await ok.text()).toBeLessThan(300);
+    await approver.context().close();
+    expect((await api.get("/api/v1/integrations")).status()).toBe(200);
+    await api.dispose();
   });
 
   test("rate limit, expiry and revocation stop it", async ({ page, baseURL }) => {

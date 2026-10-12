@@ -70,6 +70,8 @@ type Row = {
   rate_limit_per_minute: number;
   created_by: string;
   approved_by: string | null;
+  /** WID-H06: who last gave the credential a role; cannot approve it. */
+  changed_by: string | null;
   approved_at: string | null;
   revoked_by: string | null;
   revoked_at: string | null;
@@ -79,7 +81,7 @@ type Row = {
 };
 
 const COLUMNS =
-  "id, tenant_id, identity_id, backing_user_id, name, key_prefix, status, expires_at, requested_expires_at, extension_requested_by, allowed_cidrs, rate_limit_per_minute, created_by, approved_by, approved_at, revoked_by, revoked_at, revoked_reason, last_used_at, created_at";
+  "id, tenant_id, identity_id, backing_user_id, name, key_prefix, status, expires_at, requested_expires_at, extension_requested_by, allowed_cidrs, rate_limit_per_minute, created_by, approved_by, changed_by, approved_at, revoked_by, revoked_at, revoked_reason, last_used_at, created_at";
 
 export type AutomationCredential = {
   id: string;
@@ -309,9 +311,9 @@ export async function createAutomationCredential(
 export async function approveAutomationCredential(tenantId: string, actorId: string, id: string): Promise<void> {
   const row = await loadRow(tenantId, id);
   if (row.status !== "pending") throw new ApiError(409, "NOT_PENDING", "Only a pending credential can be approved");
-  if (row.created_by === actorId) {
+  if (row.created_by === actorId || row.changed_by === actorId) {
     await audit(tenantId, actorId, "automation_credential.approved", row, { refused: "FOUR_EYES" }, "failure");
-    throw new ApiError(403, "FOUR_EYES", "Someone other than its creator must approve a credential");
+    throw new ApiError(403, "FOUR_EYES", "Someone other than its creator, or whoever last gave it a role, must approve a credential");
   }
   if (new Date(row.expires_at) <= new Date()) throw new ApiError(409, "EXPIRED", "This credential expired before it was approved; create a new one");
   await update(tenantId, id, { status: "active", approved_by: actorId, approved_at: new Date().toISOString() }, "pending");
@@ -376,7 +378,20 @@ export async function assignAutomationCredentialRole(
   const row = await loadRow(tenantId, id);
   if (row.status === "revoked") throw new ApiError(409, "REVOKED", "A revoked credential cannot be changed");
   await checkRoles(tenantId, actor.permissions, [role]);
+  // WID-H06 (owner decision 2026-10-12): more power needs a second person. An
+  // approved credential goes back to pending, and stops working, until
+  // someone other than the person giving the role approves it.
+  if (row.status === "active") {
+    await update(tenantId, id, { status: "pending", approved_by: null, approved_at: null, changed_by: actor.userId }, "active");
+    tokenCache.delete(id);
+    await setMembership(tenantId, row.backing_user_id, actor.userId, "deactivated", "Role change waiting for approval");
+    const { error } = await supabaseServiceRole().rpc("revoke_user_sessions", { p_user: row.backing_user_id });
+    if (error) console.error("automation credential sessions not ended", { credentialId: id, error: error.message });
+  } else {
+    await update(tenantId, id, { changed_by: actor.userId }, row.status);
+  }
   await assignRole(tenantId, actor.userId, row.backing_user_id, role, terms, { automation: true });
+  await audit(tenantId, actor.userId, "automation_credential.role_change_requested", row, { role, pausedUntilApproved: row.status === "active" });
 }
 
 export async function removeAutomationCredentialRole(tenantId: string, actorId: string, id: string, role: string): Promise<void> {

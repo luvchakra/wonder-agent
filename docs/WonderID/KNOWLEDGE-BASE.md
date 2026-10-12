@@ -56,6 +56,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Connection types can be downloaded and opened elsewhere, and a connection can move to a newer version after a preview; this guide was corrected where it promised more than the product does. |
 | 12 Oct 2026 | Any application with a SCIM 2.0 service can be connected and make approved changes (add and remove group members, disable and create users); LDAP directories can add and remove group members. |
 | 12 Oct 2026 | Stronger safeguards: emergency controls block in every gateway mode; high-risk access always needs a person; nobody approves their own request; automation credentials never approve or certify. |
+| 12 Oct 2026 | A role given to an automation credential pauses it until a second administrator approves; owners are reminded about removals that the system has not confirmed. |
 
 ---
 
@@ -333,6 +334,7 @@ An approved request is not access yet. It becomes access once the change is made
 - **Temporary errors:** rate limits and server errors are retried twice.
 - **Verified:** after the change, WonderID reads the system again and marks it verified only if the change is really there.
 - **If it fails:** the task goes back to its owner with the reason. They can do it by hand or press "Try again".
+- **Not confirmed:** if a removal was marked done but the system still has not confirmed it 2 days later, its owner is reminded daily to check.
 
 **Limit on mass changes**
 - A connection may make at most 100 changes an hour by default. You can change this in Global Configuration → Connections.
@@ -340,7 +342,7 @@ An approved request is not access yet. It becomes access once the change is made
 
 **Automation credentials**
 - Your own tools, such as pipelines or ticketing systems, can call WonderID's API with their own credential instead of a person's login.
-- **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it.
+- **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it. Giving it another role pauses it until a different administrator approves the change.
 - **Limits:** it expires within a year, can be limited to certain network addresses, and is rate-limited.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
 - **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions.

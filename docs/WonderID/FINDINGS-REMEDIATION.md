@@ -31,14 +31,14 @@ met, with evidence), or Waiting on the owner.
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
 | WID-C01 Approval policy | P2 | Partly fixed | Maker/checker on request-policy changes |
-| WID-C02 Revocation and expiry | P1 | Not started | Escalate removals marked done but never confirmed; show "expired, removal pending" on the request |
+| WID-C02 Revocation and expiry | P1 | In progress | Show "expired, removal pending" on the request; priority deadlines for removals |
 | WID-C03 Gateway bypass | P2 | Partly fixed | Flag runtime events that have no matching gateway decision |
 | WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
 | WID-H03 Incomplete syncs | P2 | Not started | A cut-short incremental run counts as partial and does not move the cursor |
 | WID-H04 Rogue access provenance | P2 | Not started | A separate "approved afterwards" resolution; closure for findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
-| WID-H06 Automation credentials | P1 | Partly fixed | Four-eyes on role changes to an active credential |
+| WID-H06 Automation credentials | P2 | Partly fixed | Audit 401 and 429 refusals; a database cap on expiry |
 | WID-H07 Audit and erasure | P3 | Waiting on the owner | SQL test for the append-only and purge rules; retention defaults need owner and legal input |
 | WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment |
 
@@ -61,18 +61,24 @@ met, with evidence), or Waiting on the owner.
 - Maker/checker on request-policy changes.
 - Link with WID-H04 for rogue access approved afterwards.
 
-### WID-C02: urgent revocation and time-bound access (P1, not started)
+### WID-C02: urgent revocation and time-bound access (P1, in progress)
 
 **Already true:** expiry and verified removal are separate states, and
 removal counts only after a later read of the system no longer finds the
 access.
 
+**Done:** a removal marked done that no read of the system has confirmed
+after 2 days reminds its owner, at most daily, that the access may still be
+there. This covers removals done by a person and by a connector
+(`needsUnconfirmedRemovalReminder`, `UNCONFIRMED_REMOVAL_DAYS` in
+`fulfilmentTaskRules.ts`, in the daily sweep `remindOverdueFulfilmentTasks`;
+tests in `fulfilmentTaskRules.test.ts`).
+
 **Next, in order:**
-1. Escalate a removal that is marked done but never confirmed.
-2. Show "expired, removal pending" against "removal verified" on the
+1. Show "expired, removal pending" against "removal verified" on the
    request.
-3. Give removals priority deadlines.
-4. An urgent leaver path: one removal per grant, an owner and a deadline,
+2. Give removals priority deadlines.
+3. An urgent leaver path: one removal per grant, an owner and a deadline,
    escalated.
 
 ### WID-C03: gateway coverage (P2, partly fixed)
@@ -137,7 +143,7 @@ claims "never applied twice".
   address.
 - 6to4 and Teredo ranges.
 
-### WID-H06: automation credential scope (P1, partly fixed)
+### WID-H06: automation credential scope (P2, partly fixed)
 
 **Done** (owner decision 2026-10-12): an automation credential never holds
 `access.approve`, `agent.certify` or `automation.manage`. Three layers
@@ -151,8 +157,14 @@ enforce it:
 
 Test: `automationCredentialRules.test.ts`.
 
+**Done:** giving a role to an approved credential puts it back to pending,
+so it stops working at once. It needs another administrator's approval:
+not its creator, and not whoever gave the role. Enforced in the service
+and by the database (migration 0133, `automation_credentials_change_four_eyes`).
+Test: `tests/e2e/automation-credentials.spec.ts`, "WID-H06". Removing a role
+only reduces power, so it needs no approval.
+
 **Next:**
-- Four-eyes on role changes to an active credential.
 - Audit 401 and 429 refusals.
 - A database cap on expiry.
 
