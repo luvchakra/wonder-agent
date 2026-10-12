@@ -3,8 +3,8 @@
 > **Purpose:** Living register for Critical and High-risk gaps found by the hourly audit of [WonderID Knowledge Base](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md), with follow-up verification against the repository where feasible. It is **not** a list of confirmed exploitable vulnerabilities.
 >
 > **Initial review:** 2026-10-12 (Asia/Kolkata)  
-> **Last check:** 2026-10-12 10:45 IST (manual review requested by user; next hourly run remains scheduled)  
-> **Source knowledge-base blob SHA:** `8218bec727a2f89a5b632154db888dfaa4bed2d7`  
+> **Last check:** 2026-10-12 11:34 IST (GitHub write-permission diagnostic; findings not fully revalidated this run)  
+> **Source knowledge-base blob SHA:** `3c370bad21093fe4900560ed939fffbd182edc18`  
 > **Owner:** WonderID project team (triage/assignee TBD)  
 > **Audit scope:** Source document reviewed in full. **Code and tests:** first post-merge review 2026-10-12 (CLAUDE.md §19.12); each finding's evidence names the files and tests checked. Runtime behavior and deployed controls not verified.
 >
@@ -200,3 +200,4 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 |---|---|---|---|
 | 2026-10-12 (baseline) | `4fc40ff98ed36a619d1073414b182a7ab4e2a36f` | Established 3 P0 and 7 P1 candidates from full document; implementation unverified | Register created |
 | 2026-10-12 10:45 IST (manual) | `8218bec727a2f89a5b632154db888dfaa4bed2d7` | Rechecked 3 P0 and 7 previously tracked P1; none verified fixed. Added WID-H08 after reviewing forwarding-header handling in automation credential middleware; ingress security not verified. | 1 P1 OPEN added; 3 P0 and 7 P1 remain CHANGED |
+| 2026-10-12 11:34 IST | `3c370bad21093fe4900560ed939fffbd182edc18` | Verified current document and repository write access; carried forward existing risk statuses without asserting a fix. No full code/security re-audit in this diagnostic. | Diagnostic history entry committed; 3 P0 CHANGED, 7 P1 CHANGED, 1 P1 OPEN |
