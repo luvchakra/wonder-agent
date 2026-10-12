@@ -21,6 +21,7 @@ describe("the settings", () => {
       "certification.highRiskScore": 50,
       "sod.conflictWindowDays": 30,
       "integration.massMissingPercent": 20,
+      "integration.maxWritesPerHour": 100,
     });
   });
 

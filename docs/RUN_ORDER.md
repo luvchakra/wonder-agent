@@ -625,3 +625,14 @@ creates the account; once the next read brings it in, the access is added
 and verified. No migration. Next in F3: QA-P0-26 (provisioning safety
 suite, including the mass-change guard), then INTEGRATION-P0-21 and P0-22;
 the relay and named connectors wait on D7 and D9.
+
+## 2026-10-12 — Provisioning safety suite (QA-P0-26)
+
+Connector writes now have a mass-change guard: at most
+`integration.maxWritesPerHour` changes per connection per hour (Global
+Configuration → Connections, default 100). Past it, nothing is sent and the
+task goes to its owner with the reason. The suite also proves read-only
+connection types cannot write, and that no attempt reaches a system twice.
+Next in F3: INTEGRATION-P0-21 (definition extensions), then INTEGRATION-P0-22
+(SCIM; LDAP and http writes). The relay and named connectors wait on D7 and
+D9.
