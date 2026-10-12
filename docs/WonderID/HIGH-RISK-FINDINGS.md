@@ -3,8 +3,8 @@
 > **Purpose:** Living register for Critical and High-risk gaps found by the hourly audit of [WonderID Knowledge Base](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md), with follow-up verification against the repository where feasible. It is **not** a list of confirmed exploitable vulnerabilities.
 >
 > **Initial review:** 2026-10-12 (Asia/Kolkata)  
-> **Last check:** 2026-10-12 12:40 IST (manual authorized retry; findings reconciled with latest remediation evidence)  
-> **Source knowledge-base blob SHA:** `5734cded248edddf2594b7773b3627da203ddc80`  
+> **Last check:** 2026-10-12 13:45 IST (continued manual audit, code/test and remediation evidence reviewed)  
+> **Source knowledge-base blob SHA:** `286f7d58165ce00c577b281e2de48124d896ba9d`  
 > **Owner:** WonderID project team (triage/assignee TBD)  
 > **Audit scope:** Source document reviewed in full. **Code and tests:** first post-merge review 2026-10-12 (CLAUDE.md §19.12); each finding's evidence names the files and tests checked. Runtime behavior and deployed controls not verified.
 >
@@ -86,6 +86,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Knowledge base §3 corrected (matching; duplicate merge applies only to AI agents).
   - **Open:** accounts that are not linked by hand are re-correlated each run, so a reassigned email moves the account; there is no merge reversal and no source-priority policy.
 - **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
+- **2026-10-12 follow-up (13:45 IST):** The [remediation tracker](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-h01-identity-correlation-p2-partly-fixed) documents holding account identity relinks when a later source match changes, and routing terminated/archived-person matches for review. **Still outstanding:** merge reversal and agreed source priority. No implementation-level fix declared.
 
 ### WID-H02 — Provisioning idempotency and partial-failure recovery
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -120,6 +121,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - This PR also makes the first sync after a connection upgrade a full read (`syncJobs.ts`, `lastGoodRuns`).
   - **Open:** treat a cut-short incremental run as partial (it changes run status and full-read frequency); per-kind thresholds; proof of completeness.
 - **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
+- **2026-10-12 follow-up (13:45 IST):** Verified [staging completeness/status rules](https://github.com/luvchakra/wonder-agent/blob/main/modules/integrations/stagingRules.ts#L29-L54) and [unit cases](https://github.com/luvchakra/wonder-agent/blob/main/modules/integrations/stagingRules.test.ts#L81-L103) for truncated partial runs and per-kind thresholds. The [remediation tracker](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-h03-incomplete-syncs-p2-partly-fixed) reports an applied all-missing guard for small populations. **Still outstanding:** E2E failed-middle-page test, with cursor/marking verification.
 
 ### WID-H04 — False positives and provenance gaps for rogue access
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)
@@ -135,6 +137,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Knowledge base §6 (Unproven) and §9 (closing) corrected.
   - **Owner decisions open:** a separate "approved afterwards" resolution, or the request id on the finding; exception and false-positive closure for rogue findings on human accounts.
 - **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
+- **2026-10-12 follow-up (13:45 IST):** Verified [rogue finding resolution rules](https://github.com/luvchakra/wonder-agent/blob/main/modules/risk/accessFindingRules.ts#L15-L29), [unit cases](https://github.com/luvchakra/wonder-agent/blob/main/modules/risk/accessFindingRules.test.ts#L6-L16), and [finding synchronization](https://github.com/luvchakra/wonder-agent/blob/main/modules/risk/accessFindings.ts#L210-L236): removal and retrospective approval now have separate resolution outcomes, preserving link to the approving request where available. **Still outstanding:** accepted-exception and false-positive closure criteria for human accounts; no full closure.
 
 ### WID-H05 — Connector security and tenant boundary for user-defined endpoints
 - **Status:** CHANGED (code verified, knowledge base corrected, partial fix shipped; closure criteria not yet met)
@@ -151,6 +154,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Knowledge base §5 corrected.
   - **Open:** tests for an actual DNS rebind and for a strict-policy redirect to a private address; 6to4/Teredo ranges; sandboxing and egress allow-lists (owner).
 - **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
+- **2026-10-12 follow-up (13:45 IST):** Verified [outbound private-address handling](https://github.com/luvchakra/wonder-agent/blob/main/modules/integrations/outboundPolicy.ts#L100-L125), [address-range tests](https://github.com/luvchakra/wonder-agent/blob/main/modules/integrations/outboundPolicy.test.ts#L16-L39), and [redirect/rebinding tests](https://github.com/luvchakra/wonder-agent/blob/main/modules/integrations/outboundFetch.test.ts#L89-L140). The specific SSRF and redirect concerns have stronger code/test evidence. **Still outstanding:** independent tenant-isolation, connector sandbox/egress and holistic threat-model validation; remain CHANGED.
 
 ### WID-H06 — Automation credential privilege scoping
 - **Status:** FIXED (repository implementation and committed test evidence verified 2026-10-12 12:40 IST; production not independently exercised)
@@ -185,6 +189,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - Knowledge base §12 and §17 corrected.
   - **Open:** a SQL test for the append-only and purge rules; owner/legal: default retention, minimising free-text metadata, crypto-erasure.
 - **Audit reassessment (2026-10-12 12:40 IST):** No new evidence satisfying the existing closure criteria was established during this retry; status carried forward. Consult remediation tracker for ongoing engineering progress.
+- **2026-10-12 follow-up (13:45 IST):** Verified presence of [audit retention/integrity SQL tests](https://github.com/luvchakra/wonder-agent/blob/main/tests/foundation/audit-trail-integrity.sql#L1-L78), including checks for immutable rows, 365-day protection, legal holds and retained-chain validation; the [remediation tracker](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/FINDINGS-REMEDIATION.md#wid-h07-audit-and-erasure-p3-waiting-on-the-owner) reports a successful live run, not independently executed here. **Still outstanding:** retention defaults, free-text PII minimization and crypto-erasure/legal sign-off.
 
 ### WID-H08 — Automation credential network allowlist trusts forwarding headers
 - **Status:** CHANGED (trusted-edge header logic and tests added; deployment verification still required)
@@ -213,3 +218,4 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 | 2026-10-12 10:45 IST (manual) | `8218bec727a2f89a5b632154db888dfaa4bed2d7` | Rechecked 3 P0 and 7 previously tracked P1; none verified fixed. Added WID-H08 after reviewing forwarding-header handling in automation credential middleware; ingress security not verified. | 1 P1 OPEN added; 3 P0 and 7 P1 remain CHANGED |
 | 2026-10-12 11:34 IST | `3c370bad21093fe4900560ed939fffbd182edc18` | Verified current document and repository write access; carried forward existing risk statuses without asserting a fix. No full code/security re-audit in this diagnostic. | Diagnostic history entry committed; 3 P0 CHANGED, 7 P1 CHANGED, 1 P1 OPEN |
 | 2026-10-12 12:40 IST (manual retry) | `5734cded248edddf2594b7773b3627da203ddc80` | Reassessed all 11 P0/P1 findings and current remediation; WID-H06 verified FIXED at implementation/test-evidence level. WID-H08 improved but deployment not verified. Remaining: 3 P0 + 7 P1. | 0 new, 1 fixed, 1 status advanced OPEN→CHANGED, 0 reopened; update committed on main |
+| 2026-10-12 13:45 IST (manual continuation) | `286f7d58165ce00c577b281e2de48124d896ba9d` | Rechecked 11 findings against the latest knowledge base, remediation tracker and selected implementation/tests. Evidence improved for H01, H03, H04, H05 and H07; no closure criteria satisfied. | 0 NEW, 0 status CHANGED, 0 FIXED, 0 REOPENED; unresolved 3 P0 + 7 P1; H06 remains FIXED |
