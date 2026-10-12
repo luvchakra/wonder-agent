@@ -470,6 +470,8 @@ export type ConnectorIntegrationConfig = {
    */
   manifest?: ConnectorDefinition;
   settings: Record<string, string | number | boolean>;
+  /** INTEGRATION-P0-21: when the connection last moved to another version; earlier runs are no base for an incremental read. */
+  upgradedAt?: string;
   /** The url setting the existing outbound guard checks at creation. */
   baseUrl?: string;
 };

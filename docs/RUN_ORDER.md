@@ -680,3 +680,20 @@ run only for security-related or major changes (CLAUDE.md §17.8).
 After every merge, the high-risk findings register
 (`docs/WonderID/HIGH-RISK-FINDINGS.md`) is read, and what the next pull
 request can fix goes into it (CLAUDE.md §19.12, owner decision).
+
+## 2026-10-12 — Sharing and upgrading connection types; first findings review
+
+INTEGRATION-P0-21 is done: definitions download as files and open in the
+editor, and a connection moves to another version of its type after a
+preview of what changes. The first post-merge review of the high-risk
+findings register (CLAUDE.md §19.12) checked all ten findings against the
+code:
+- fixed a credential leak on cross-origin redirects (WID-H05);
+- sent single matches on former identities to review (WID-H01);
+- pinned confirmed behaviour with tests;
+- corrected the knowledge base where it promised more than the code.
+
+The rest is recorded per module backlog. Owner decisions are open for
+WID-C01, C02, C03, H02, H04 and H06. Next in F3: INTEGRATION-P0-22 (SCIM;
+LDAP and http writes).
+

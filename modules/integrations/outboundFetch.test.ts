@@ -15,6 +15,7 @@ import { guardedFetch, guardedLookup } from "./outboundFetch";
 let base = "";
 let otherBase = "";
 const seenAuth: (string | undefined)[] = [];
+const seenKey: (string | string[] | undefined)[] = [];
 const servers: http.Server[] = [];
 
 function listen(handler: http.RequestListener): Promise<string> {
@@ -26,6 +27,7 @@ function listen(handler: http.RequestListener): Promise<string> {
 beforeAll(async () => {
   otherBase = await listen((req, res) => {
     seenAuth.push(req.headers.authorization);
+    seenKey.push(req.headers["x-acme-key"]);
     res.setHeader("content-type", "application/json");
     res.end(JSON.stringify({ where: "other" }));
   });
@@ -81,6 +83,17 @@ describe("guardedFetch", () => {
     const res = await guardedFetch(`${base}/to-other`, { headers: { Authorization: "Bearer secret" }, policy: dev });
     expect(await res.json()).toEqual({ where: "other" });
     expect(seenAuth.at(-1)).toBeUndefined();
+  });
+
+  it("WID-H05: drops a connection's custom credential header on a redirect to another origin", async () => {
+    await guardedFetch(`${base}/to-other`, { headers: { "X-Acme-Key": "k-secret" }, credentialHeaders: ["X-Acme-Key"], policy: dev });
+    expect(seenKey.at(-1)).toBeUndefined();
+  });
+
+  it("WID-H05: refuses a 307 to another origin that would resend the request body", async () => {
+    const before = seenAuth.length;
+    await expect(guardedFetch(`${base}/to-other`, { method: "POST", body: '{"api_key":"k-secret"}', policy: dev })).rejects.toThrow(/would resend the request body/);
+    expect(seenAuth.length).toBe(before);
   });
 
   it("caps the response size and times out slow servers", async () => {

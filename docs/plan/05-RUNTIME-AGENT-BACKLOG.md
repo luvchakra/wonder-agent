@@ -504,3 +504,9 @@ Suspended agents, MCP servers and tools resolve to DENY at the gateway; kill swi
 - Any risk severity, finding, or remediation recommendation (Risk Agent).
 - Effective access computation itself (Access Agent) — Runtime only consumes it.
 - Any connector/credential logic (Integration Agent).
+
+## High-risk findings follow-ups (2026-10-12)
+
+From the first post-merge review of `docs/WonderID/HIGH-RISK-FINDINGS.md` (CLAUDE.md §19.12). Not scheduled stories yet; each needs the noted decision or a slot in this backlog.
+
+- WID-C03: whether the kill switch and lookup failures block even in Observe mode; flag runtime events with no matching gateway decision (owner decisions).

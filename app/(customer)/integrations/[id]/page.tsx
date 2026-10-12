@@ -11,7 +11,8 @@ import { parseConnectorConfig } from "@/modules/integrations/framework/engine";
 import type { ConnectorDefinition } from "@/modules/integrations/framework/types";
 import { connectionTypeOf } from "@/modules/integrations/framework/typeSummary";
 import { ConnectorCredentialsForm, ConnectorSettingsForm, ReceiverSecretForm } from "../types/ConnectorForms";
-import { getConnectorConfiguration, type ConnectorConfiguration } from "@/modules/integrations/framework/catalog";
+import { connectionUpgradeVersions, getConnectorConfiguration, type ConnectorConfiguration } from "@/modules/integrations/framework/catalog";
+import { compareVersions } from "@/modules/integrations/framework/upgrade";
 import { Suspense } from "react";
 import { TrafficCard, TrafficCardSkeleton } from "./TrafficCard";
 import { ConnectorFilesCard } from "./ConnectorFilesCard";
@@ -96,10 +97,10 @@ export default async function IntegrationDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ credentials?: string; held?: string; oauth?: string }>;
+  searchParams: Promise<{ credentials?: string; held?: string; oauth?: string; upgraded?: string }>;
 }) {
   const { id } = await params;
-  const { credentials, held, oauth } = await searchParams;
+  const { credentials, held, oauth, upgraded } = await searchParams;
   let ctx;
   try {
     ctx = await requirePermission("integration.read");
@@ -119,7 +120,7 @@ export default async function IntegrationDetailPage({
 
   const reads = connector ? Object.keys(connector.resources).length > 0 : false;
   const writable = connector?.write ? Object.keys(connector.write).length > 0 : false;
-  const [jobs, receiver, origin, configuration, provenance, schedule, writes] = await Promise.all([
+  const [jobs, receiver, origin, configuration, provenance, schedule, writes, versions] = await Promise.all([
     listSyncJobs(ctx.tenantId!, id),
     needsSecret ? getReceiverStatus(ctx.tenantId!, id) : Promise.resolve(null),
     receive || signsIn ? ownOrigin() : Promise.resolve(""),
@@ -127,7 +128,10 @@ export default async function IntegrationDetailPage({
     getRecordProvenance(ctx.tenantId!, "integrations", id),
     reads ? getConnectionSchedule(ctx.tenantId!, id) : Promise.resolve(null),
     writable ? getConnectionWrites(ctx.tenantId!, id).catch(() => null as ConnectionWrites | null) : Promise.resolve(null),
+    connector ? connectionUpgradeVersions(ctx.tenantId!, id).catch(() => [] as string[]) : Promise.resolve([] as string[]),
   ]);
+  // INTEGRATION-P0-21: the newest version of this connection's type, when it is newer.
+  const newer = connector ? versions.find((v) => compareVersions(v, connector.version) > 0) : undefined;
   const canEdit = ctx.permissions.includes("integration.update");
   const type = connectionTypeOf(integration);
   const testConnectionWithId = testConnectionAction.bind(null, id);
@@ -155,6 +159,14 @@ export default async function IntegrationDetailPage({
             type.name
           )}
           {reads ? ` · Has credentials: ${integration.hasCredentials ? "yes" : "no"} · Last sync: ${integration.lastSyncAt ?? "never"}` : ""}
+          {newer ? (
+            <>
+              {" · "}
+              <Link href={`/integrations/${id}/upgrade?version=${newer}`} className="text-primary hover:underline">
+                v{newer} available
+              </Link>
+            </>
+          ) : null}
         </p>
       </div>
 
@@ -167,6 +179,12 @@ export default async function IntegrationDetailPage({
       {credentials === "failed" && !integration.hasCredentials ? (
         <p role="alert" className="rounded-md border border-warning/40 bg-warning/10 p-3 text-sm text-foreground">
           The connection test failed, so the credentials were not saved. Check the address and credentials, then save them again.
+        </p>
+      ) : null}
+
+      {upgraded && connector?.version === upgraded ? (
+        <p role="status" className="rounded-md border border-success/40 bg-success/10 p-3 text-sm text-foreground">
+          Upgraded to v{upgraded}. The next sync reads everything again with this version.
         </p>
       ) : null}
 

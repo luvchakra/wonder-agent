@@ -53,6 +53,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Every rogue account gets a ticket number (RA-000001, …), one per account, that closes once the account is fixed. |
 | 12 Oct 2026 | Connections can sign in with a private key instead of a shared secret, or with a client certificate. |
 | 12 Oct 2026 | Connections can sign in with the provider: an administrator presses Connect and approves on the system's own sign-in page. |
+| 12 Oct 2026 | Connection types can be downloaded and opened elsewhere, and a connection can move to a newer version after a preview; this guide was corrected where it promised more than the product does. |
 
 ---
 
@@ -77,7 +78,7 @@ The everyday cycle looks like this:
 
 **Two principles hold everywhere:**
 - **Nothing counts until it is verified.** A change counts as done only after WonderID reads the system again and sees it.
-- **People decide.** Every change to someone's access is approved by a person. Automation and AI only carry out or suggest; they never decide.
+- **People decide.** Access changes are approved by people, or automatically under a request policy an administrator set; automatic approvals are recorded as such. AI only suggests.
 
 **What WonderID is not:**
 - It is not your sign-in provider, HR system, password vault or security monitoring tool.
@@ -123,17 +124,17 @@ The everyday cycle looks like this:
 - **No owner, no requests:** nobody can request access for an identity without an owner.
 
 **Joiners, movers and leavers**
-- When someone joins, changes role or leaves, WonderID creates the work that follows: tasks for the right people, and ownership handed over.
+- When someone joins, changes role or leaves, WonderID creates the work that follows: tasks to hand over ownership and remove access. People do this work; leaver tasks have no deadline yet.
 - When a person leaves, what they owned is transferred to someone else, never left without an owner.
 
 **Identity sources**
 - An HR system or directory can be the source of people's details.
-- **Matching:** WonderID matches each record to the right identity using fixed rules: an id first, then an employee number, then a verified email. Unclear matches wait in **Pending Matches** for a person to decide.
+- **Matching:** a record keeps the identity the source already linked it to. Otherwise the source's rules are tried in order (email by default; username or a combination of fields can be added). One match links automatically; several, or a single match on someone who has left, wait in **Pending Matches** for a person to decide.
 - **Which source wins:** you choose which source owns which detail.
 - **Custom details:** your own fields, such as cost centre, can be filled from a source. Each value is checked and WonderID records which source set it.
 
 **Duplicates**
-- Possible duplicates are flagged for review and merged only after a person agrees.
+- Possible duplicate AI agents are flagged for review and merged only after a person agrees. A merge cannot be undone.
 
 ---
 
@@ -158,11 +159,11 @@ A gap between them, such as access the agent shouldn't have or something it did 
 - You review what it found and register it, or dismiss it.
 
 **The Runtime Gateway**
-- **What it is:** agents can send each action through the gateway before taking it.
+- **What it is:** agents can ask the gateway before taking an action. Only actions sent to the gateway are checked; an agent that calls a system directly is not checked or stopped.
 - **Two modes:**
-  - *Observe:* records the action.
-  - *Enforce:* allows or blocks the action against the agent's contract and access. Each organization chooses the mode.
-- **Emergency controls:** suspend an agent at once, or block specific tools.
+  - *Observe* (the default): the decision is recorded and the agent is told to go ahead.
+  - *Enforce:* the agent is told to allow or block the action, against its contract and access. A platform administrator switches it on for an organization. If no decision can be worked out, the answer is block.
+- **Emergency controls:** an organization-wide stop, or blocking a tool, an MCP server or a session. They block only in Enforce mode; in Observe they are recorded. To stop one agent, suspend it.
 - **API keys:** each agent can have its own API key for the gateway.
 
 **Inventories**
@@ -195,6 +196,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 **Your own connection types**
 - An integrator can describe any system with an HTTP, LDAP, SQL, MCP or file interface: no code, just a definition.
 - **Checked as you type:** the editor checks the definition and can try it against the real system before saving.
+- **Sharing and upgrading:** download a connection type as a file and open it in another organization's editor. When a newer version is published, a connection shows "available"; its preview lists what changes (settings, sign-in, what it reads and how fields are mapped) before you upgrade. An upgrade never allows more changes in the system than before, and the next sync reads everything again.
 - **Cleaning up values:** values can be changed into the form WonderID needs. For example: make text lowercase, look values up in a table, pick out part of a value with a pattern, replace text, fall back to another field, or shift a date.
 - **Sign-in styles for the system:** none, basic, bearer token, API key (in a header, the address or the request body), OAuth client credentials, LDAP bind and database user.
   - **With a private key instead of a shared secret:** for OAuth, the connection signs a short-lived token with your organization's private key (the style service accounts use). The key is stored encrypted and never shown or logged.
@@ -204,11 +206,11 @@ All information from your systems reaches WonderID through **connections**. Ther
 **Syncing**
 - **Schedule:** each connection syncs on a schedule, or on demand with "Sync now".
 - **What happens after a sync:** WonderID updates identities, then accounts, then access, without anyone pressing a button. Each step shows its progress and counts on the connection's page.
-- **Faster scheduled syncs:** a connection type can say how to ask for **only what changed** since the last good sync. Scheduled syncs then read just the changes. A full read still happens at least once a day, so deletions are noticed.
+- **Faster scheduled syncs:** a connection type can say how to ask for **only what changed** since the last good sync. Scheduled syncs then read just the changes. If no full read has succeeded in the last day, the next scheduled sync reads in full. Records are marked missing only when every record of that kind was read.
 
 **Noticing removals**
 - When something disappears from a system, such as an account deleted or a person who left, a full sync marks it "missing at the source". Nothing is deleted, so the history stays.
-- **Mass-missing guard:** if a sync would suddenly mark a large share as missing (more than 20% by default), it is held until a person approves or discards it. A broken file can't wipe out your data.
+- **Mass-missing guard:** if a sync would suddenly mark a large share as missing (more than 20% of a kind with 20 or more records, by default), it is held until a person approves or discards it. A broken file can't wipe out your data.
 
 **Files**
 - Every list in WonderID has **Import** and **Export**.
@@ -217,7 +219,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 
 **The Connector Gateway**
 - Every call to or from your systems passes through one gateway.
-- It blocks calls to internal or unexpected addresses and limits the request rate.
+- It blocks calls to internal or unexpected addresses, for every organization, and limits the request rate. A connection's credentials are not sent when a system redirects elsewhere.
 - It also counts usage.
 
 ---
@@ -254,7 +256,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 |---|---|
 | **Approved** | WonderID has the request or decision behind it |
 | **Legacy** | It was already there when the application was first connected |
-| **Unproven** | Not yet checked |
+| **Unproven** | No WonderID approval found, and it can't yet be called legacy or rogue (no baseline yet, or not reported by a connection) |
 | **Rogue** | It appeared later with no approval; this raises a finding |
 
 **The access ledger**
@@ -282,7 +284,8 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
   - whether low-risk requests are approved automatically;
   - how long access may last;
   - whether a reason is required.
-- Nobody can approve their own request.
+- Nobody can approve a catalog request they made, or one that is for them.
+- A request policy can approve requests below its risk level automatically; these are recorded as approved automatically.
 - Separation-of-duties rules can block a request that would give a conflicting combination of access.
 
 **Access packages**
@@ -291,7 +294,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 **Time-bound access**
 - Access can have an end date.
 - You are reminded before it ends and can ask to extend it.
-- At the end date the access is removed and recorded as expired.
+- At the end date the access is no longer approved and shows as expired. WonderID opens a task to remove it, usually within a day, and counts it as removed only when a later read of the system no longer finds it.
 
 **Tracking**
 - **Access Requests:** shows where each request really stands:
@@ -324,8 +327,8 @@ An approved request is not access yet. It becomes access once the change is made
   - create accounts.
 - **Off until switched on:** this is off until an administrator turns it on for that connection (the connection's page → "Changes in the system"), and only for the changes its type supports.
 - **No account yet:** for someone with no account, the connection creates the account first, then adds the access once the account appears.
-- **Never applied twice:** each attempt carries a unique key, so a system never applies the same change twice.
-- **Temporary errors:** these are retried twice.
+- **Attempt keys:** each attempt carries its own key; systems that support these keys ignore a repeated attempt. A retry is a new attempt, so after an unclear failure, check the system before pressing "Try again".
+- **Temporary errors:** rate limits and server errors are retried twice.
 - **Verified:** after the change, WonderID reads the system again and marks it verified only if the change is really there.
 - **If it fails:** the task goes back to its owner with the reason. They can do it by hand or press "Try again".
 
@@ -338,7 +341,8 @@ An approved request is not access yet. It becomes access once the change is made
 - **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it.
 - **Limits:** it expires within a year, can be limited to certain network addresses, and is rate-limited.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
-- **Audit:** every call is audited.
+- **What it can do:** only what its roles allow. It can never manage automation credentials.
+- **Audit:** every call it is allowed to make is audited, and so is every call refused for its network address.
 - **Where:** Settings → Automation Credentials.
 
 ---
@@ -363,7 +367,7 @@ Findings are raised for:
 - **Raising:** access that appeared in a system with no approval raises a finding.
 - **One ticket per account:** a rogue account gets one ticket, such as **RA-000012**, numbered in order within your organization. Everything rogue found on that account belongs to the same ticket. You can quote the number in conversations and other tools; it shows on the account page and in Risk Overview.
 - **Fixing:** for each piece of rogue access, a reviewer clicks **Remove access**, which raises an ordinary request under the application's rules. The request quotes the account's ticket number.
-- **Closing:** the ticket stays open until all of the account's rogue access is dealt with (removed, and confirmed by the next sync, or approved after all). Then it closes as "verified fixed". If rogue access turns up on the same account later, a new ticket opens.
+- **Closing:** the ticket stays open until all of the account's rogue access is dealt with (removed, and confirmed by the next sync, or approved after all). Then it closes as "verified fixed". This status does not yet say which of the two happened; the access history keeps the earlier Rogue status. If rogue access turns up on the same account later, a new ticket opens.
 
 **Investigations**
 - Group findings and evidence into a case and work it to a conclusion.
@@ -430,7 +434,7 @@ Findings are raised for:
 
 **Audit trail**
 - Every security-relevant action is recorded: who, what, when, the outcome and related records.
-- **Tamper-evident:** records can't be edited or deleted, and each one is chained to the one before.
+- **Tamper-evident:** records can't be edited, and each one is chained to the one before. They are deleted only by your audit retention policy: oldest first, never the last 365 days, never under a legal hold.
 - **Integrity check:** Audit → Integrity proves the chain is intact.
 
 **Reports and exports**
@@ -514,13 +518,13 @@ These pages are for the WonderID service operator only, never for customers:
 | One organization seeing another's data | Every record carries its organization and the database itself refuses access across organizations; this is tested for every feature |
 | A bad file or feed makes everything look deleted | The mass-missing guard holds the sync for a person to approve |
 | A runaway rule or bad approvals change too much | At most 100 changes per connection per hour, by default |
-| A change applied twice | Every attempt carries a unique key |
+| A change applied twice | Every attempt carries a key that systems supporting it use to ignore repeats; changes are verified by reading the system again |
 | "Done" without it really being done | Nothing is verified until WonderID reads the system again |
 | A connection writing when it shouldn't | Changes are off until an administrator turns them on, and only for what the connection type supports |
-| Someone approving their own access | Not allowed; key actions need a second person |
+| Someone approving their own access | Not allowed for catalog requests; key actions need a second person |
 | AI making a decision | AI only suggests; fixed rules and people decide |
 | Leaked passwords or keys | Secrets are encrypted, shown masked, never logged, and never sent to the browser |
-| Tampering with the record | The audit trail is append-only and chained |
+| Tampering with the record | The audit trail can't be edited, is chained, and is purged only by retention policy |
 
 **Also built in:**
 - strict browser security headers;
@@ -531,7 +535,6 @@ These pages are for the WonderID service operator only, never for customers:
 
 ## 18. Coming soon
 
-- **Sharing connection types:** export a connection type as a file, import it elsewhere, and upgrade a connection to a newer version with a preview of what changes.
 - **Standard user provisioning:** SCIM, and changes through LDAP directories.
 - **A relay** to reach systems inside your own network without opening it up.
 - **Ready-made connections** for Microsoft Entra ID, an HR system (Workday or SuccessFactors) and ServiceNow ticketing.

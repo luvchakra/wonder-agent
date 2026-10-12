@@ -987,3 +987,9 @@ this backlog. Their goals, order, dependencies and exit tests are in
 the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
 and each story's acceptance criteria in its GitHub issue (number in the
 tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).
+
+## High-risk findings follow-ups (2026-10-12)
+
+From the first post-merge review of `docs/WonderID/HIGH-RISK-FINDINGS.md` (CLAUDE.md §19.12). Not scheduled stories yet; each needs the noted decision or a slot in this backlog.
+
+- WID-H06: decide whether automation credentials may hold `access.approve` (today they can approve access); four-eyes on role changes to an active credential; audit 401/429 refusals; a database cap on expiry.

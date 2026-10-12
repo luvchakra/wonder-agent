@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { upgradeConnection } from "@/modules/integrations/framework/catalog";
 import { createSyncJob, discoverMcpTools, resolveHeldMissing, runSyncJob, startConnectorSignIn, testIntegrationConnection } from "@/modules/integrations/service";
 
 export async function testConnectionAction(integrationId: string) {
@@ -50,6 +51,22 @@ export async function connectSignInAction(integrationId: string) {
     location = `/integrations/${integrationId}?oauth=${err.code === "CREDENTIALS_REQUIRED" ? "needs_credentials" : "failed"}`;
   }
   redirect(location);
+}
+
+/**
+ * INTEGRATION-P0-21 — moves a connection to another version of its type.
+ * A refusal (something blocks it) returns to the preview with the reason.
+ */
+export async function upgradeConnectionAction(integrationId: string, version: string) {
+  const ctx = await requirePermission("integration.update");
+  let target = `/integrations/${integrationId}?upgraded=${encodeURIComponent(version)}`;
+  try {
+    await upgradeConnection(ctx.tenantId!, ctx.userId, integrationId, version);
+  } catch (err) {
+    if (!(err instanceof ApiError) || err.status === 404) throw err;
+    target = `/integrations/${integrationId}/upgrade?version=${encodeURIComponent(version)}&failed=1`;
+  }
+  redirect(target);
 }
 
 /**

@@ -14,6 +14,9 @@ import { createDefinitionConnector } from "./connector";
 import { openGateway } from "../gateway/gateway";
 import { validateDefinition, validateSecrets, validateSettings } from "./validate";
 import { protocolLabel } from "./typeSummary";
+import { compareVersions, planUpgrade, upgradedCapabilities, type UpgradePlan } from "./upgrade";
+import { writesEnabled } from "../connectorWriteRules";
+import type { ConnectorCapabilities } from "@/lib/shared/types/integrations";
 import { OAUTH_TOKEN_KEYS, RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type DefinitionIssue, type ResourceKind, type ResourceSpec } from "./types";
 
 /**
@@ -409,4 +412,83 @@ export async function previewConnector(
     metadata: { resource, count: result.count },
   });
   return result;
+}
+
+// ------------------------------------------------- INTEGRATION-P0-21 part 4
+
+/** The versions a connection could move to (built-in: the one in code; custom: this organization's), newest first. */
+export async function connectionUpgradeVersions(tenantId: string, integrationId: string): Promise<string[]> {
+  const row = await loadConnectorRow(tenantId, integrationId);
+  const current = (row.config as Partial<ConnectorIntegrationConfig> | null)?.definition;
+  if (!current?.key) return [];
+  const versions =
+    current.origin === "builtin"
+      ? BUILTIN_DEFINITIONS.filter((d) => d.key === current.key).map((d) => d.version)
+      : (await listCustomDefinitionVersions(tenantId, current.key)).map((d) => d.version);
+  return [...new Set(versions)].filter((v) => v !== current.version).sort((a, b) => compareVersions(b, a));
+}
+
+async function upgradeContext(tenantId: string, integrationId: string, version: string) {
+  const row = await loadConnectorRow(tenantId, integrationId);
+  const config = (row.config ?? {}) as Partial<ConnectorIntegrationConfig>;
+  const { def: from, settings } = parseConnectorConfig(row.config ?? {});
+  const origin = config.definition?.origin === "builtin" ? "builtin" : "custom";
+  if (typeof version !== "string" || !/^\d+\.\d+\.\d+$/.test(version)) throw new ApiError(400, "INVALID_INPUT", "version: like 1.2.0");
+  const to = await getConnectorDefinition(tenantId, origin, from.key, version);
+  if (!to) throw new ApiError(404, "DEFINITION_NOT_FOUND", `There is no version ${version} of this connection type`);
+  const stored = await storedSecrets(tenantId, integrationId, from);
+  const { data: caps } = await (await supabaseServer())
+    .from("integrations")
+    .select("capabilities")
+    .eq("id", integrationId)
+    .eq("tenant_id", tenantId)
+    .maybeSingle<{ capabilities: ConnectorCapabilities | null }>();
+  const plan = planUpgrade(from, to, settings, Object.keys(stored ?? {}), writesEnabled(caps?.capabilities ?? {}));
+  return { row, config, origin, from, to, plan };
+}
+
+/** What upgrading a connection to `version` would change, and what stops it. Changes nothing. */
+export async function previewConnectionUpgrade(tenantId: string, integrationId: string, version: string): Promise<UpgradePlan & { name: string }> {
+  const { plan, from } = await upgradeContext(tenantId, integrationId, version);
+  return { ...plan, name: from.name };
+}
+
+/**
+ * Moves a connection to another version of its connection type
+ * (integration.update). Refused while the plan has blockers. Settings are
+ * re-validated and their addresses checked; changes in the system are never
+ * widened (upgradedCapabilities). The next sync reads in full, so every
+ * record is mapped again (`upgradedAt`, read by the sync's mode choice).
+ */
+export async function upgradeConnection(tenantId: string, actorId: string, integrationId: string, version: string): Promise<UpgradePlan> {
+  const { row, config, origin, to, plan } = await upgradeContext(tenantId, integrationId, version);
+  if (plan.blockers.length) throw new ApiError(409, "UPGRADE_BLOCKED", plan.blockers[0]);
+  checkConnectorAddresses(to, plan.settings);
+  const urlKeys = to.settings.filter((s) => s.type === "url").map((s) => s.key);
+  const baseUrl = plan.settings[urlKeys.includes("baseUrl") ? "baseUrl" : urlKeys[0]];
+  const next = {
+    ...Object.fromEntries(Object.entries(config).filter(([k]) => k !== "baseUrl")),
+    definition: { key: to.key, version: to.version, origin },
+    manifest: to,
+    settings: plan.settings,
+    upgradedAt: new Date().toISOString(),
+    ...(typeof baseUrl === "string" && /^https?:/.test(baseUrl) ? { baseUrl } : {}),
+  };
+  const { error } = await (await supabaseServer())
+    .from("integrations")
+    .update({ config: next, capabilities: upgradedCapabilities(to, plan) })
+    .eq("id", row.id)
+    .eq("tenant_id", tenantId);
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "integration.definition_upgraded",
+    objectType: "integration",
+    objectId: integrationId,
+    outcome: "success",
+    metadata: { key: to.key, from: plan.from, to: plan.to, changes: plan.changes.length, writes: plan.writes },
+  });
+  return plan;
 }

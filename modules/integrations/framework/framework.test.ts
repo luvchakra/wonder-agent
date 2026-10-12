@@ -865,3 +865,17 @@ describe("signing in with the provider (INTEGRATION-P0-21 part 3b)", () => {
     expect(c.obtainedTokens()).toMatchObject({ _oauth_refresh_token: "rt-9" });
   });
 });
+
+describe("WID-H05: a custom API-key header is named to the guard", () => {
+  it("passes the header's name as a credential header, so a redirect to another origin drops it", async () => {
+    const seen: { credentialHeaders?: string[]; headers?: Record<string, string> }[] = [];
+    const fetchImpl: FetchLike = async (_url, init) => {
+      seen.push(init);
+      return json({});
+    };
+    const def = { ...fast, auth: { type: "header", name: "X-Acme-Key", value: "{secret.key}", fields: [{ key: "key", label: "Key" }] } } as unknown as ConnectorDefinition;
+    await new HttpSession(def, { baseUrl: "https://acme.example" }, { key: "k" }, fetchImpl).send({ path: "/users" }, { settings: {} });
+    expect(seen[0].credentialHeaders).toEqual(["X-Acme-Key"]);
+    expect(seen[0].headers?.["X-Acme-Key"]).toBe("k");
+  });
+});

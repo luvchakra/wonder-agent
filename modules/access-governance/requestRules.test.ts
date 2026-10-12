@@ -69,9 +69,13 @@ describe("evaluateRequest (spec §11.5)", () => {
     const r = evaluateRequest(ctx());
     expect(r).toMatchObject({ ok: true, initialStatus: "approved", durationDays: 30, expiresAt: "2026-10-26T00:00:00.000Z" });
   });
-  it("high-risk requests always route to approval, whatever the policy says about auto-approval", () => {
+  it("requests at or above the policy's risk threshold, or under a policy without auto-approval, route to approval", () => {
     expect(evaluateRequest(ctx({ risk: "high" }))).toMatchObject({ ok: true, initialStatus: "pending" });
     expect(evaluateRequest(ctx({ policy: policy({ autoApprove: false }) }))).toMatchObject({ ok: true, initialStatus: "pending" });
+  });
+  it("WID-C01: a policy whose threshold is critical approves a high-risk request automatically (today's behaviour)", () => {
+    expect(evaluateRequest(ctx({ risk: "high", policy: policy({ riskThreshold: "critical" }) }))).toMatchObject({ ok: true, initialStatus: "approved" });
+    expect(evaluateRequest(ctx({ risk: "critical", policy: policy({ riskThreshold: "critical" }) }))).toMatchObject({ ok: true, initialStatus: "pending" });
   });
   it("missing justification blocks submission where required", () => {
     expect(evaluateRequest(ctx({ justification: " short " }))).toMatchObject({ ok: false, code: "JUSTIFICATION_REQUIRED" });

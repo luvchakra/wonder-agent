@@ -141,6 +141,14 @@ describe("correlate", () => {
     { id: "i3", email: "twin@example.test", username: "twin2", displayName: "Twin", startDate: null },
   ];
 
+  it("WID-H01: a single match on an identity that has left goes to review, not an automatic link", () => {
+    const withLeaver = [...index, { id: "i4", email: "back@example.test", username: "back", displayName: "Back", startDate: null, status: "terminated" }, { id: "i5", email: "on@example.test", username: "on", displayName: "On", startDate: null, status: "active" }];
+    expect(correlate(rec({ email: "back@example.test" }), [{ kind: "email" }], withLeaver, null, new Set())).toMatchObject({ kind: "ambiguous", candidateIds: ["i4"], reason: expect.stringMatching(/has left \(terminated\)/) });
+    expect(correlate(rec({ email: "on@example.test" }), [{ kind: "email" }], withLeaver, null, new Set())).toMatchObject({ kind: "matched", identityId: "i5" });
+    // A record the source already links keeps its link, whatever the identity's status.
+    expect(correlate(rec({ email: "back@example.test" }), [{ kind: "email" }], withLeaver, "i4", new Set())).toEqual({ kind: "linked", identityId: "i4" });
+  });
+
   it("keeps an existing link above every rule", () => {
     expect(correlate(rec({ email: "twin@example.test" }), [{ kind: "email" }], index, "i1", new Set())).toEqual({ kind: "linked", identityId: "i1" });
   });
