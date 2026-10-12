@@ -1,6 +1,6 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
-import { openConnection, type ReceivingConnection } from "./support/connections";
+import { openConnection, sendEvents, type ReceivingConnection } from "./support/connections";
 
 /**
  * RUNTIME-P0-15 — the Runtime Gateway, against the real app and database.
@@ -14,6 +14,7 @@ import { openConnection, type ReceivingConnection } from "./support/connections"
  *   and the caller is told ALLOW
  * - isolation: another organization never sees these decisions, and an
  *   agent key never works at another organization's connection
+ * - WID-C03: an action reported with no gateway decision is a bypass finding
  *
  * Agents reach the gateway through their runtime's connection
  * (non-negotiable #20): /api/connect/v1/<connection>/gateway/authorize.
@@ -154,6 +155,17 @@ test.describe.serial("runtime gateway", () => {
     await expect(page.getByText("Approved (SHOULD)", { exact: true })).toBeVisible();
     // The newest decision for this agent is a DENY recorded in observe-only mode.
     await expect(page.getByText(/deny \(observed\)/i)).toBeVisible();
+  });
+
+  test("WID-C03: an action reported without a gateway decision is flagged as a bypass", async ({ page }) => {
+    const tool = `bypass_tool_${Date.now()}`;
+    const sent = await sendEvents(anon, conn, { eventTime: new Date().toISOString(), action: "EXECUTE", success: true, tool, eventType: "TOOL_EXECUTED", agentIdentityRef: agentId });
+    expect(sent.status(), await sent.text()).toBe(202);
+    expect((await sent.json()).data.runtime).toBe("recorded");
+    const evaluated = await page.request.post(`/api/v1/risk/agents/${agentId}/evaluate`);
+    expect(evaluated.status(), await evaluated.text()).toBe(200);
+    const bypass = ((await evaluated.json()).data as { category: string; explanation: string }[]).find((f) => f.category === "gateway_bypass");
+    expect(bypass?.explanation).toContain(`${tool} with no gateway decision`);
   });
 
   test("a revoked key stops working at once", async ({ page }) => {

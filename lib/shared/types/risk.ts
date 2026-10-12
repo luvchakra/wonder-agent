@@ -19,7 +19,9 @@ export type RogueCategory =
   | "suspicious_delegation"
   | "unapproved_tool_use"
   // ACCESS-P0-25: access that appeared on a target after its baseline with no WonderID approval.
-  | "rogue_access";
+  | "rogue_access"
+  // WID-C03: an agent that uses the Runtime Gateway acted with no gateway decision, or despite a DENY.
+  | "gateway_bypass";
 
 export type RiskSeverity = "info" | "low" | "medium" | "high" | "critical";
 

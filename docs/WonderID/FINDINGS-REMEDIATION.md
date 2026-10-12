@@ -32,7 +32,7 @@ met, with evidence), or Waiting on the owner.
 |---|---|---|---|
 | WID-C01 Approval policy | P2 | Partly fixed | Maker/checker on request-policy changes |
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Integration tests for a connector outage and a failed deprovisioning; owner decision on connectors carrying out a leaver's removals |
-| WID-C03 Gateway bypass | P2 | Partly fixed | Flag runtime events that have no matching gateway decision |
+| WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
 | WID-H03 Incomplete syncs | P2 | Not started | A cut-short incremental run counts as partial and does not move the cursor |
@@ -130,9 +130,30 @@ and an owner decision.
 - The knowledge base says only calls sent to the gateway are checked.
 - Tests: `gateway.test.ts`, `tests/e2e/emergency-controls.spec.ts`.
 
-**Next:**
-- Flag runtime events that have no matching gateway decision (bypass
-  detection).
+**Done:** bypass detection. For an agent that uses the gateway, the risk
+evaluation flags as `gateway_bypass`:
+- an observed action (from MCP, a runtime or a webhook) with no matching
+  gateway decision in the 15 minutes before it;
+- an action that succeeded although its decision was DENY.
+
+Matching is on the tool, or without a tool on the action and application.
+Actions before the agent's first decision are not judged. Migration 0137
+adds the category (applied).
+
+See `gatewayBypass` in `modules/risk/signals.ts`. Tests:
+- `signals.test.ts`;
+- `tests/e2e/runtime-gateway.spec.ts`, "WID-C03".
+
+The knowledge base says detection is after the fact.
+
+**Limits:**
+- It sees only actions reported to WonderID.
+- The evaluation reads the agent's last 200 events.
+
+**Next (owner decision):** whether to make the gateway the only path, for
+example by holding agents' target credentials so they cannot call a
+system directly. Priority lowered to P3, because what remains is that
+decision.
 
 ### WID-H01: identity correlation (P2, partly fixed)
 
