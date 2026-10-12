@@ -2244,3 +2244,52 @@ QA audit log entry of the same date.
 with a `since` cursor; OAuth 2.0 authorization code, private-key JWT and
 client-certificate authentication; export and import of a definition and
 upgrading a connection with a mapping-difference preview.
+
+### 2026-10-12 — Definition extensions, slice 2: incremental `changes` resources (INTEGRATION-P0-21, #69)
+
+**Built (no migration).**
+- **Declaring it.** A resource may declare `changes: { request, records?,
+  pagination? }` (http driver, a resource without `forEach` or `unwind`).
+  - The request must use `{cursor.since}`, `{cursor.sinceEpoch}` or
+    `{cursor.sinceEpochMs}`.
+  - The validator refuses other `{cursor.…}` names, `{cursor.…}` anywhere
+    else, and any other key.
+- **When a run is incremental** (`chooseRunMode()` in `stagingRules.ts`,
+  pure):
+  - A scheduled run, or `POST …/sync {"mode":"incremental"}`, is
+    incremental when the definition can read changes, a run has succeeded
+    before, and a full run succeeded within 24 hours.
+  - Otherwise it reads in full.
+  - Sync now and verification syncs stay full.
+- **The cursor** is the start of the connection's last succeeded run
+  (full or incremental) less 5 minutes (`lastGoodRuns()`). There is no new
+  storage.
+- **An incremental run** (`DefinitionConnector.readChangesSince()`):
+  - reads changed records through the resource's own mapping and filters;
+  - reads other kinds in full;
+  - is recorded as mode `incremental`;
+  - marks nothing missing (the existing `kindCompleteness`).
+
+  The post-sync pipeline now follows incremental runs too (not partial
+  ones): staging stays the whole picture.
+- Token cursors (delta links, sync tokens) are not supported yet.
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `npx vitest run modules/integrations`: 305 passed, including
+  `chooseRunMode`, the `changes` validator, and the engine reading changes
+  only when told to.
+- E2E `connector-provisioning.spec.ts`, local: 12/12 in the spec, 19 with
+  setup. The new test: a new user and a removed user on the stub; an
+  incremental sync reads `/users?since=…` once, the job is `incremental`,
+  account marking is "skipped: incremental run", the new user is staged,
+  and the removed one is not marked missing.
+- With the rogue-access ticket numbers (Risk audit log, same date):
+  - `npx vitest run modules/risk modules/integrations`: 378 passed;
+  - `connector-provisioning` and `f1-reconciliation`, local: 32 passed
+    (25 in the specs, 7 setup). The F3 exit test checks the ticket number,
+    the badge, the ticket in the removal request, and that it resolves.
+- `next build` succeeds.
+
+**Left out.** Token-based cursors; OAuth authorization code, JWT and
+certificate auth; export/import and connection upgrade.

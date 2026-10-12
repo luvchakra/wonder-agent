@@ -148,6 +148,8 @@ export type InvestigationDetail = Investigation & {
  */
 export type AccessFinding = {
   id: string;
+  /** The ticket people quote (RA-000001), per organization; it resolves with the finding (0131). */
+  ticketNumber: string | null;
   category: "rogue_access";
   severity: RiskSeverity;
   status: FindingStatus;

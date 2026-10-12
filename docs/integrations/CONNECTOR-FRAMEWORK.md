@@ -670,6 +670,7 @@ Conventions the built-in connectors follow, so downstream modules can rely on th
 | `optional` | http | A 404 means "none" rather than a failed sync. Use it for an empty LIST in Vault or OpenBao, or a feature that may be turned off. |
 | `fields` | all | Canonical field → mapping |
 | `maxRecords` | all | A ceiling for one sync. The default is 50,000. |
+| `changes` | http | `{ request, records?, pagination? }`: how to ask for only what changed since the last successful sync. The request must use `{cursor.since}` (ISO 8601), `{cursor.sinceEpoch}` or `{cursor.sinceEpochMs}`; records and pagination default to the resource's own. Only for a resource without `forEach` or `unwind`. See "Incremental syncs". |
 
 **Pagination** (`pagination.type`):
 
@@ -716,6 +717,43 @@ may be a list, tried in order: the first non-empty value wins. In a path:
 
 **Filters** (`where` items): `{ path, equals?, notEquals?, in?, notIn?,
 exists?, prefix?, notPrefix? }`. The path may start with `parent.`.
+
+### Incremental syncs (INTEGRATION-P0-21)
+
+A resource with `changes` lets a connection read only what changed. Which
+runs do that:
+
+- **Scheduled syncs** are incremental when the definition has a `changes`
+  request, the connection has succeeded before, and a full sync succeeded
+  in the last 24 hours. Otherwise the run reads in full, so deletions are
+  still seen at least once a day.
+- **`POST /api/v1/integrations/{id}/sync {"mode": "incremental"}`** asks for
+  the same, under the same conditions.
+- **Sync now, a verification after a write and file imports** read in full
+  (or partly, for a file): verifying a removal needs the whole list.
+
+The cursor is when the connection's last successful run started, less 5
+minutes, so clock differences lose nothing (records changed in that overlap
+are simply read twice). An incremental run:
+
+- is marked `incremental` on the job;
+- marks nothing missing at the source;
+- reads kinds without `changes` in full;
+- reads `forEach` children only for the parents that changed.
+
+Identity sources and account reconciliation still follow it, from staging,
+which remains the whole picture.
+
+```json
+"account": {
+  "request": { "path": "/users" },
+  "changes": { "request": { "path": "/users", "query": { "updated_since": "{cursor.since}" } } },
+  "fields": { "externalId": "id" }
+}
+```
+
+A token-based cursor (a delta link or sync token returned by the system)
+is not supported yet.
 
 ### Security rules the validator enforces
 

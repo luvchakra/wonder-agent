@@ -66,3 +66,41 @@ export function heldKinds(summary: MissingSummary): string[] {
     .filter(([, k]) => k.status === "held")
     .map(([kind]) => kind);
 }
+
+// ------------------------------------------------- INTEGRATION-P0-21
+
+/** An incremental run reads from a little before the last good run started, so clock skew loses nothing. */
+export const INCREMENTAL_OVERLAP_MS = 5 * 60_000;
+/** Deletions show only in a full read, so a connection reads in full at least this often. */
+export const FULL_RUN_EVERY_MS = 24 * 3_600_000;
+
+export type RunModeInput = {
+  /** What the job was created as (a person may ask for incremental over the API). */
+  requested: SyncMode;
+  trigger: string;
+  /** The definition has a `changes` request on some resource. */
+  supportsIncremental: boolean;
+  /** When the connection's last successful run (full or incremental) started. */
+  lastSucceededStart: string | null;
+  /** When its last successful full run started. */
+  lastFullSucceededStart: string | null;
+  now: Date;
+};
+
+/**
+ * INTEGRATION-P0-21: whether a run reads only what changed. A scheduled run
+ * (or one asked for as incremental) is incremental when the definition can
+ * read changes, a run has succeeded before (the cursor), and a full run
+ * succeeded within a day; otherwise it reads in full. Every other run (sync
+ * now, a verification after a write) is full: verifying a removal needs to
+ * see the whole list.
+ */
+export function chooseRunMode(input: RunModeInput): { mode: SyncMode; since: Date | null; reason?: string } {
+  if (input.requested === "partial") return { mode: "partial", since: null };
+  const wantsIncremental = input.requested === "incremental" || input.trigger === "scheduled";
+  if (!wantsIncremental) return { mode: "full", since: null };
+  if (!input.supportsIncremental) return { mode: "full", since: null, reason: "the connection type cannot read only changes" };
+  if (!input.lastSucceededStart || !input.lastFullSucceededStart) return { mode: "full", since: null, reason: "no earlier successful full run" };
+  if (input.now.getTime() - Date.parse(input.lastFullSucceededStart) > FULL_RUN_EVERY_MS) return { mode: "full", since: null, reason: "the daily full run is due" };
+  return { mode: "incremental", since: new Date(Date.parse(input.lastSucceededStart) - INCREMENTAL_OVERLAP_MS) };
+}

@@ -68,7 +68,7 @@ export default async function RiskIndexPage() {
       .map((f) => ({
         id: f.id,
         href: `/access/accounts/${f.accountId}`,
-        subject: "Application account",
+        subject: f.ticketNumber ? `${f.ticketNumber} · Application account` : "Application account",
         title: f.title,
         severity: f.severity,
         category: f.category,

@@ -17,7 +17,7 @@ import { pipelineStatusOf, planPipeline, skipFrom, type ImportOutcome, type Pipe
 
 /** The steps that will follow this import, or one failed step when they cannot be determined. */
 export async function planAfterSync(tenantId: string, integrationId: string, outcome: ImportOutcome): Promise<PipelineStep[]> {
-  if (outcome.mode !== "full") return [];
+  if (outcome.mode === "partial") return [];
   try {
     const [sources, applications] = await Promise.all([
       outcome.kindsRead.includes("identity") ? listSourcesReadingConnection(tenantId, integrationId) : Promise.resolve([]),

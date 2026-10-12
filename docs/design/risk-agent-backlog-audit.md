@@ -1089,3 +1089,52 @@ account.
 - **Exit-test wording.** "After human approval" is the reviewer's explicit
   request plus whatever approval the application's policy requires. With an
   auto-approval policy the request needs no second person.
+
+
+### 2026-10-12 — Ticket numbers for rogue-access findings (owner request)
+
+The owner asked that every rogue account identified get a ticket number,
+resolved once the account is remediated.
+
+**Built (migration 0131, applied to dev).**
+- **The number.** Each rogue-access finding is a ticket with a number
+  people can quote, `RA-000001`, `RA-000002`, … per organization.
+  - The number is drawn by a `BEFORE INSERT` trigger
+    (`risk_findings_assign_ticket`, security definer, execute revoked from
+    every client role) from `risk_ticket_counters`, one row per
+    organization.
+  - The counter row is locked within the inserting transaction, so two
+    findings never share a number; a unique index on (tenant, ticket)
+    backs that up.
+  - The 7 rogue-access findings already on dev were numbered RA-000001 to
+    RA-000007 in the order they were created, and the counter was set to
+    match.
+- **The lifecycle is the finding's:**
+  - open while the access is investigated;
+  - remediation in progress once someone asks for the removal (the removal
+    request's justification starts "Ticket RA-…");
+  - resolved, verified fixed, when reconciliation confirms the access is
+    gone or an approval appears.
+
+  The `risk.access_findings_synced` audit lists the tickets opened and
+  resolved, and `risk.remediation_requested` names the ticket.
+- **Where it shows:** the account page ("RA-000012 open") and Risk Overview.
+- **Isolation.** `risk_ticket_counters` has `tenant_id`, RLS and a read
+  policy for members; there is no client write path.
+
+**Verified.**
+- `tests/risk/rogue-access-tickets-isolation.sql`: 9/9. Each organization
+  numbers from RA-000001; a reused number is refused (23505); a member
+  cannot read another organization's counter; a member cannot reset a
+  counter or renumber a ticket (0 rows); the other organization reads none.
+- Supabase security advisors: no new warning.
+- E2E: the F3 exit test in `connector-provisioning.spec.ts` checks the
+  `RA-` number, the account page badge, the ticket in the removal request,
+  and that the ticket resolves with the finding (results in the
+  Integration entry of the same date).
+
+**Left out.**
+- One ticket per account for several rogue entitlements: each piece of
+  rogue access is its own ticket, which resolves on its own.
+- Mirroring tickets into ServiceNow waits for that connector
+  (INTEGRATION-P0-26).

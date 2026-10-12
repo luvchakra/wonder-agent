@@ -27,7 +27,8 @@ describe("planPipeline", () => {
 
   it("never follows a partial or incremental run", () => {
     expect(planPipeline({ ...ok, mode: "partial" }, SOURCES, APPS)).toEqual([]);
-    expect(planPipeline({ ...ok, mode: "incremental" }, SOURCES, APPS)).toEqual([]);
+    // An incremental run updated staging, which stays the whole picture: the same steps follow.
+    expect(planPipeline({ ...ok, mode: "incremental" }, SOURCES, APPS)).toEqual(planPipeline(ok, SOURCES, APPS));
   });
 
   it("skips every step, with the reason, when the import or a kind's import failed", () => {
