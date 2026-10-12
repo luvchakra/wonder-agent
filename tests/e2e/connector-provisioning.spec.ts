@@ -291,16 +291,20 @@ test.describe.serial("connector provisioning", () => {
     await syncAndWait(request);
     const { data: dee } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-dee").single();
     const findingOf = async () =>
-      (await db.from("risk_findings").select("id, status, resolution_type, remediation_request_id, ticket_number").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).order("created_at", { ascending: false }).limit(1)).data?.[0];
+      (await db.from("risk_findings").select("id, status, resolution_type, remediation_request_id, ticket:risk_access_tickets!risk_findings_access_ticket_fkey(ticket_number, status)").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).order("created_at", { ascending: false }).limit(1)).data?.[0];
     await expect.poll(async () => (await findingOf())?.status, { timeout: 60_000 }).toBe("open");
-    // The finding is a ticket people can quote, numbered per organization.
-    const ticket = (await findingOf())!.ticket_number as string;
+    // The rogue account has one ticket people can quote, numbered per organization.
+    type Ticket = { ticket_number: string; status: string };
+    const ticketOf = async () => (await findingOf())?.ticket as unknown as Ticket | null;
+    const ticket = (await ticketOf())!.ticket_number;
     expect(ticket).toMatch(/^RA-\d{6}$/);
+    expect((await ticketOf())?.status).toBe("open");
 
     // A reviewer asks for it to be removed, from the account page.
     await page.goto(`/access/accounts/${dee!.id}`);
     const row = page.getByRole("listitem").filter({ hasText: "Finance" });
-    await expect(row).toContainText(`${ticket} open`);
+    await expect(page.getByText(`Ticket ${ticket} open`)).toBeVisible();
+    await expect(row).toContainText("Finding open");
     await row.getByRole("button", { name: "Remove access" }).click();
     await page.getByRole("button", { name: "Request it" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Done." })).toBeVisible({ timeout: 30_000 });
@@ -316,7 +320,8 @@ test.describe.serial("connector provisioning", () => {
     // The removal request quoted the ticket, and the ticket resolved with the finding.
     const { data: req } = await db.from("access_requests").select("justification").eq("tenant_id", tenantId).eq("id", raised!.remediation_request_id as string).single();
     expect(req!.justification).toContain(`Ticket ${ticket}`);
-    expect((await findingOf())?.ticket_number).toBe(ticket);
+    // Dee's only rogue access is gone: the account's ticket resolved with it.
+    expect(await ticketOf()).toEqual({ ticket_number: ticket, status: "resolved" });
 
     // A second ask is refused: the finding is closed.
     const again = await request.post(`/api/v1/findings/${raised!.id}/request-removal`);

@@ -1294,7 +1294,8 @@ beats exhaustive pre-push verification.
   - `docs/WonderID/KNOWLEDGE-BASE.md`, the plain-language product guide
     (owner request, 2026-10-12): for each user-visible change, add a dated
     row to its revision history and update the section it belongs to. Keep
-    it knowledge-base style, with no story IDs or phase names.
+    it knowledge-base style, with no story IDs or phase names, the table of
+    contents at the very top and the revision history right after it.
 
   Don't update the user-facing help guide (`modules/ui/help/content.ts`,
   `/help`) unless asked.

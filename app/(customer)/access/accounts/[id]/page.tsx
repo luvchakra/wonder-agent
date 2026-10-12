@@ -44,6 +44,8 @@ export default async function AccountDetailPage({ params, searchParams }: { para
     listAccessFindings(tenantId, { accountId: id, openOnly: true }).catch(() => []),
   ]);
   if (!account) notFound();
+  // One ticket per rogue account (0132): open while any of its rogue access is.
+  const openTicket = findings.find((f) => f.ticketStatus === "open" && f.ticketNumber)?.ticketNumber ?? null;
   const identities =
     canManage && !account.agentId
       ? (await listIdentities(tenantId, { types: ["HUMAN", "EXTERNAL", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API", "MACHINE"], status: "active", q: find || undefined, pageSize: 50 })).rows
@@ -151,7 +153,11 @@ export default async function AccountDetailPage({ params, searchParams }: { para
       </div>
 
       <Card>
-        <CardHeader title="Access" description="Whether WonderID can prove each piece of this account's access was approved." />
+        <CardHeader
+          title="Access"
+          description="Whether WonderID can prove each piece of this account's access was approved."
+          actions={openTicket ? <Badge tone="danger">{`Ticket ${openTicket} open`}</Badge> : undefined}
+        />
         <CardBody>
           {ledger === null ? (
             <p role="status" className="text-sm text-warning">The access record could not be read just now.</p>
@@ -170,7 +176,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
                       {e.lastVerifiedAt ? ` · last seen at source ${when(e.lastVerifiedAt)}` : ""}
                     </span>
                     {e.missingFromSourceAt ? <Badge tone="neutral">Gone from source</Badge> : null}
-                    {finding ? <Badge tone="danger">{finding.ticketNumber ? `${finding.ticketNumber} open` : "Finding open"}</Badge> : null}
+                    {finding ? <Badge tone="danger">Finding open</Badge> : null}
                     {finding && remediationLabel(finding.remediationRequestStatus) ? <Badge tone="info">{remediationLabel(finding.remediationRequestStatus)}</Badge> : null}
                     {finding && canRemediate && (!finding.remediationRequestStatus || ["rejected", "cancelled", "expired"].includes(finding.remediationRequestStatus)) ? (
                       <RemoveRogueAccessButton findingId={finding.id} what={e.entitlementName ?? "this account"} disable={!e.entitlementId} />
