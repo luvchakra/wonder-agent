@@ -3,7 +3,8 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import type { AccessFinding, FindingStatus, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
+import type { AccessFinding, FindingStatus, ResolutionType, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
+import { rogueResolution, type RogueResolution } from "./accessFindingRules";
 
 /**
  * ACCESS-P0-25 — findings about access on an application account (a
@@ -57,6 +58,7 @@ function toAccessFinding(r: Row): AccessFinding {
     agentId: (r.agent_id as string | null) ?? null,
     createdAt: r.created_at as string,
     resolvedAt: (r.resolved_at as string | null) ?? null,
+    resolutionType: (r.resolution_type as ResolutionType | null) ?? null,
     resolutionReason: (r.resolution_reason as string | null) ?? null,
     remediationRequestId: (r.remediation_request_id as string | null) ?? null,
     remediationRequestStatus: null,
@@ -95,6 +97,46 @@ export async function countOpenAccessFindings(tenantId: string): Promise<number>
     .eq("category", "rogue_access")
     .eq("status", "open");
   return error ? 0 : (count ?? 0);
+}
+
+/** How each finding ended, from its grant now. A grant that cannot be read counts as gone only when it is truly absent. */
+async function resolutionsFor(tenantId: string, findingIds: string[]): Promise<Map<string, RogueResolution>> {
+  const out = new Map<string, RogueResolution>();
+  const admin = supabaseServiceRole();
+  for (let i = 0; i < findingIds.length; i += 200) {
+    const part = findingIds.slice(i, i + 200);
+    const { data: findings, error } = await admin.from("risk_findings").select("id, tenant_id, access_grant_id").eq("tenant_id", tenantId).in("id", part);
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    const own = ((findings ?? []) as Row[]).filter((f) => f.tenant_id === tenantId);
+    const grantIds = own.map((f) => f.access_grant_id as string | null).filter((g): g is string => !!g);
+    const grants = new Map<string, Row>();
+    if (grantIds.length) {
+      const { data, error: grantError } = await admin
+        .from("access_grants")
+        .select("id, tenant_id, revoked_at, missing_from_source_at, request_id, access_package_assignment_item_id")
+        .eq("tenant_id", tenantId)
+        .in("id", grantIds);
+      if (grantError) throw new ApiError(500, "QUERY_FAILED", grantError.message);
+      for (const g of (data ?? []) as Row[]) if (g.tenant_id === tenantId) grants.set(g.id as string, g);
+    }
+    for (const f of own) {
+      const g = f.access_grant_id ? grants.get(f.access_grant_id as string) : undefined;
+      out.set(
+        f.id as string,
+        rogueResolution(
+          g
+            ? {
+                revokedAt: (g.revoked_at as string | null) ?? null,
+                missingFromSourceAt: (g.missing_from_source_at as string | null) ?? null,
+                requestId: (g.request_id as string | null) ?? null,
+                packageItemId: (g.access_package_assignment_item_id as string | null) ?? null,
+              }
+            : null,
+        ),
+      );
+    }
+  }
+  return out;
 }
 
 /**
@@ -165,32 +207,34 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
     }
   }
 
+  // WID-H04: each stale finding closes as what happened to its grant: removed, or approved afterwards.
   const stale = [...open.entries()].filter(([key]) => !wanted.has(key)).map(([, id]) => id);
-  for (let i = 0; i < stale.length; i += 200) {
-    const part = stale.slice(i, i + 200);
+  const outcomes = await resolutionsFor(tenantId, stale);
+  const approvedAfterwards: string[] = [];
+  const resolvedAt = new Date().toISOString();
+  for (const [id, outcome] of outcomes) {
     const { data, error } = await admin
       .from("risk_findings")
-      .update({
-        status: "resolved",
-        resolution_type: "verified_fixed",
-        resolution_reason: "No longer rogue: an approval was found, or the access was removed or revoked.",
-        resolved_at: new Date().toISOString(),
-      })
+      .update({ status: "resolved", resolution_type: outcome.type, resolution_reason: outcome.reason, resolved_at: resolvedAt })
       .eq("tenant_id", tenantId)
       .eq("category", "rogue_access")
-      .in("id", part)
+      .eq("id", id)
+      .in("status", OPEN)
       .select(`id, ${TICKET}`);
     if (error) {
-      result.failed += part.length;
+      result.failed++;
       continue;
     }
-    result.resolved += (data ?? []).length;
-    resolvedIds.push(...((data ?? []) as Row[]).map((r) => r.id as string));
-    // The trigger resolves an account's ticket when its last finding closes: name those.
-    for (const r of (data ?? []) as Row[]) {
-      const t = r.ticket as Row | null;
-      if (t?.status === "resolved" && t.ticket_number) resolvedTickets.push(t.ticket_number as string);
+    if (!data?.length) continue;
+    result.resolved++;
+    resolvedIds.push(id);
+    if (outcome.type === "approved_afterwards") approvedAfterwards.push(id);
+    if (outcome.requestId) {
+      await admin.from("risk_evidence").insert({ finding_id: id, evidence_type: "access_request", reference_id: outcome.requestId, summary: "The request that approved it afterwards" });
     }
+    // The trigger resolves an account's ticket when its last finding closes: name those.
+    const t = (data[0] as Row).ticket as Row | null;
+    if (t?.status === "resolved" && t.ticket_number) resolvedTickets.push(t.ticket_number as string);
   }
 
   if (createdIds.length || resolvedIds.length) {
@@ -204,6 +248,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
       metadata: {
         created: createdIds.slice(0, 500),
         resolved: resolvedIds.slice(0, 500),
+        approvedAfterwards: approvedAfterwards.slice(0, 500),
         tickets: [...new Set(createdTickets)].slice(0, 500),
         ticketsResolved: [...new Set(resolvedTickets)].slice(0, 500),
         failed: result.failed,

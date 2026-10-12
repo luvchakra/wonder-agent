@@ -36,11 +36,11 @@ met, with evidence), or Waiting on the owner.
 | WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Thresholds per kind; tests for a failed page in the middle of a read |
-| WID-H04 Rogue access provenance | P2 | Not started | A separate "approved afterwards" resolution; closure for findings on human accounts |
+| WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
-| WID-H06 Automation credentials | P2 | Fixed | Nothing left from the register's closure criteria; refusals with an unknown key have no organization to audit to |
+| WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P3 | Waiting on the owner | SQL test for the append-only and purge rules; retention defaults need owner and legal input |
-| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment |
+| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
 
 ## Detail
 
@@ -200,13 +200,29 @@ Tests:
 - Mass-missing thresholds per kind.
 - An E2E test for a page that fails in the middle of a read.
 
-### WID-H04: rogue access provenance (P2, not started)
+### WID-H04: rogue access provenance (P2, partly fixed)
+
+**Done:** a rogue-access finding that is no longer rogue closes as what
+happened to its grant (`rogueResolution` in `accessFindingRules.ts`,
+applied in `syncRogueAccessFindings`):
+- **removed:** revoked, missing at the source, or gone. The resolution is
+  `verified_fixed`.
+- **approved afterwards:** still there, now covered by a request, a package
+  assignment or another approval. The resolution is the new
+  `approved_afterwards`, and the approving request is attached as
+  `access_request` evidence.
+
+The ledger keeps the earlier ROGUE status either way. Migration 0138 adds
+the resolution and the evidence type (applied).
+
+Tests:
+- `accessFindingRules.test.ts`;
+- E2E `f1-reconciliation` (removed at the source, so `verified_fixed`)
+  and `connector-provisioning`.
 
 **Next:**
-- A separate "approved afterwards" resolution, or the request id on the
-  finding.
-- Accepted-exception and false-positive closure for rogue findings on human
-  accounts.
+- Accepted-exception and false-positive closure for rogue findings on
+  human accounts.
 
 ### WID-H05: connector security (P3, partly fixed)
 
@@ -220,6 +236,9 @@ Tests:
 - 6to4 and Teredo ranges.
 
 ### WID-H06: automation credential scope (P2, fixed)
+
+The register marked it FIXED on 12 October (12:40 IST), from the code and
+committed tests. Production was not exercised in that audit.
 
 **Done** (owner decision 2026-10-12): an automation credential never holds
 `access.approve`, `agent.certify` or `automation.manage`. Three layers

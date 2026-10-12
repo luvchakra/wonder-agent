@@ -201,6 +201,8 @@ test.describe.serial("F1 reconciliation chain", () => {
     const findings = await accessFindings(tenantId, accounts.ana.id);
     expect(findings).toHaveLength(1);
     expect(findings[0].status).toBe("resolved");
+    // WID-H04: removed, not approved afterwards.
+    expect(findings[0].resolutionType).toBe("verified_fixed");
   });
 
   test("ACCESS-P0-28: an approved request becomes a pending grant on a placeholder account; marked fulfilled it is unverified; the next reconciliations verify it", async ({ request, page }) => {
