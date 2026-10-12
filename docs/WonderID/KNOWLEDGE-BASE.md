@@ -59,6 +59,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A role given to an automation credential pauses it until a second administrator approves; owners are reminded about removals that the system has not confirmed. |
 | 12 Oct 2026 | Ended access shows whether it is really gone; removing access and disabling accounts are due within a day; refused automation calls are audited, and the database caps automation credential expiry at a year. |
 | 12 Oct 2026 | When someone leaves, each access they hold becomes its own removal task, due within a day; removals more than a day overdue go to the access managers. |
+| 12 Oct 2026 | Identity providers and HR systems can push people to WonderID over SCIM 2.0 as they join, change and leave. |
 
 ---
 
@@ -194,7 +195,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 | Kind of system | Built-in types |
 |---|---|
 | HR | Frappe HR |
-| Directories and identity providers | LDAP directory (which can also add and remove group members), Keycloak, Saviynt |
+| Directories and identity providers | LDAP directory (which can also add and remove group members), Keycloak, Saviynt, and any identity provider or HR system that pushes people over SCIM 2.0 |
 | Applications | ERPNext, Gitea, Mattermost, Nextcloud, Zendesk, and any application with a SCIM 2.0 service (which can also add and remove group members, disable and create users) |
 | Infrastructure and data | PostgreSQL, Kubernetes, OpenBao (secrets) |
 | AI | MCP server, Runtime Gateway |
@@ -218,6 +219,17 @@ All information from your systems reaches WonderID through **connections**. Ther
 **Noticing removals**
 - When something disappears from a system, such as an account deleted or a person who left, a full sync marks it "missing at the source". Nothing is deleted, so the history stays.
 - **Mass-missing guard:** if a sync would suddenly mark a large share as missing (more than 20% of a kind with 20 or more records, by default), it is held until a person approves or discards it. A broken file can't wipe out your data.
+
+**People pushed to WonderID over SCIM**
+- An identity provider or HR system that provisions users over SCIM 2.0 (for example Okta or Microsoft Entra ID) can send its people to WonderID as they join, change and leave.
+- **Setting it up:**
+  1. Create a connection of the type "SCIM 2.0 provisioning (incoming)" and issue its secret.
+  2. Enter the connection's SCIM address and secret in the system's provisioning settings.
+  3. Add an identity source that reads the connection.
+- **What happens:** each user the system creates, changes, deactivates or deletes is kept on the connection first. The identity source then takes it in, with its own mappings, matching and the fields it owns.
+  - For the person's id, map `normalized.externalId`: that is the id WonderID gave the user. The system's own id stays in the record as `externalId`.
+- **Leavers:** a deleted user is marked missing, never erased, and the source treats them as a leaver, under its leaver guard.
+- **Groups:** groups pushed over SCIM are not received yet.
 
 **Files**
 - Every list in WonderID has **Import** and **Export**.
@@ -545,7 +557,7 @@ These pages are for the WonderID service operator only, never for customers:
 
 ## 18. Coming soon
 
-- **Receiving users pushed over SCIM:** an HR system or identity provider sends joiners, movers and leavers to WonderID as they happen.
+- **Groups pushed over SCIM**, and standard security events (RFC 9967) from identity providers.
 - **A relay** to reach systems inside your own network without opening it up.
 - **Ready-made connections** for Microsoft Entra ID, an HR system (Workday or SuccessFactors) and ServiceNow ticketing.
 - **Joiner, mover and leaver automation** with default ("birthright") access, and reviews for every identity type.

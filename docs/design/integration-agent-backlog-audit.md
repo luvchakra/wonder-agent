@@ -2610,3 +2610,69 @@ they depend on the directory (`userAccountControl`, `nsAccountLock`,
 `pwdAccountLockedTime`); a custom definition can declare them. The inbound
 SCIM receiver and RFC 9967 events are the next slice.
 
+
+### 2026-10-12 — INTEGRATION-P0-22 slice 3: users pushed over SCIM 2.0
+
+What was built:
+- **A `scim` receiving channel** (`ReceiveSpec.scim`, validated in
+  `validate.ts`, described in `typeSummary.ts`). A system pushes users to
+  `/api/connect/v1/<id>/scim/v2/Users[/<id>]`, authenticated by the
+  connection's receiving secret as a bearer token:
+  - POST creates a user. A userName that already exists (in any case) is
+    refused with 409 uniqueness.
+  - GET lists users, with paging and the `userName eq` and `externalId eq`
+    filters; any other filter is refused with invalidFilter.
+  - GET, PUT, PATCH and DELETE act on one user.
+  - `ServiceProviderConfig` says what is supported.
+  - Answers and errors are SCIM JSON.
+- **Pure rules** in `scimRules.ts`: the path, filter and page; cleaning a
+  user (`id`, `meta` and `password` from the sender are dropped); PATCH
+  with add, replace and remove on simple and extension paths. Filters in
+  PATCH paths are refused, and Entra's string booleans are coerced.
+- **Staging.** Each user is kept in `integration_objects` as an
+  `identity`, mapped with the definition's `receive.scim.fields`. The
+  enterprise extension is readable as `enterprise.*`. `externalId` is
+  always the id WonderID assigned. DELETE sets `missing_at_source_at`, so
+  the next run of each source treats the user as a leaver under its guard.
+  Nothing is erased.
+- **Reconciliation after a push** (`runSourcesAfterPush`,
+  `identitySources.ts`). The sources reading the connection run after the
+  response. Runs of one source never overlap, because two at once could
+  create the same person twice:
+  - a push records `run_requested_at`;
+  - one worker holds `run_claimed_at` (taken as abandoned after 10
+    minutes) and runs again while requests arrived after its last start,
+    up to 5 runs.
+
+  Migration 0136 adds these columns. It is applied.
+- **The built-in `scim-inbound` type**, "SCIM 2.0 provisioning (incoming)",
+  maps the core and enterprise attributes. `active` maps to the status.
+- **The route** now exports PUT, PATCH and DELETE, and GET for SCIM paths.
+  Every other channel answers only POST (405 otherwise).
+  - A response's addresses use `APP_BASE_URL` when it is set.
+  - `capabilitiesOf` counts SCIM as importing identities.
+  - The connection page offers the receiving secret for SCIM connections.
+- **Audit:** `integration.scim_received`, with the operation and the
+  resource id only. It never names the person.
+
+Verified:
+- `npx vitest run modules/integrations`: 355 passed, including
+  `scimRules.test.ts` (11) and the definition and type-summary tests.
+- `tests/architecture`: 7 passed, so the connector boundary holds.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local:
+  - `scim-receiver.spec.ts` 4/4 (new): the secret is required; create,
+    find, deactivate, replace and delete; the person is created, then
+    disabled, then their title changes; the deleted user is marked missing;
+    the audit has no email address;
+  - `runtime-gateway`, `oauth-connect` and `mcp-bridge`: 21/21 on the
+    changed route.
+
+Found while testing: a source updates only the fields it is authoritative
+for. That is intended, so the spec's source owns department, title and
+status. The staged record also carries the sender's own `externalId`, so
+a source maps `normalized.externalId` for WonderID's id. The knowledge
+base says so.
+
+Left out (next slices): SCIM Groups, bulk operations, RFC 9967 security
+events, and a mapping preset for SCIM in the identity source form.

@@ -115,7 +115,7 @@ export default async function IntegrationDetailPage({
   if (!integration) notFound();
   const connector = connectorDefinition(integration);
   const receive = connector?.receive;
-  const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file);
+  const needsSecret = Boolean(receive?.runtimeEvents || receive?.webhook || receive?.file || receive?.scim);
   const signsIn = connector?.auth.type === "oauth2_authorization_code";
 
   const reads = connector ? Object.keys(connector.resources).length > 0 : false;

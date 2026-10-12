@@ -202,6 +202,7 @@ may send. Each channel is served per connection:
 | `webhook` | `POST /api/connect/v1/<id>/webhook` | the receiving secret (bearer or HMAC) | The event is kept as an `activity` record; a redelivery with the same id is stored once. |
 | `gateway` | `POST /api/connect/v1/<id>/gateway/authorize` and `…/gateway/tools/filter` | the agent's own API key, which must belong to the connection's organization | Runtime's decision (or tool filter) for that agent. |
 | `file` | `POST /api/connect/v1/<id>/file`, the CSV as the body, header `x-wonderid-kind` (and optionally `x-wonderid-filename`) | the receiving secret (bearer or HMAC) | The file is checked, stored (`connector_files`) and read by the sync it starts. See "Files, schedules and imports". |
+| `scim` | `GET/POST /api/connect/v1/<id>/scim/v2/Users`, `GET/PUT/PATCH/DELETE …/scim/v2/Users/<id>`, `GET …/scim/v2/ServiceProviderConfig` | the receiving secret, as `Authorization: Bearer …` | Users pushed over SCIM 2.0 (RFC 7644). Each is kept as an `identity` of the connection in `integration_objects`, mapped by `receive.scim.fields` (the enterprise extension is also readable as `enterprise.*`). The id is WonderID's (`normalized.externalId`). The identity sources reading the connection then run, one at a time per source (`runSourcesAfterPush`, migration 0136). DELETE marks the user missing at the source. Filters: `userName eq` and `externalId eq` only; PATCH paths without filters only. Answers are SCIM JSON (`application/scim+json`). The built-in is `scim-inbound` (INTEGRATION-P0-22). |
 
 The rules every receiver follows:
 
@@ -212,7 +213,8 @@ The rules every receiver follows:
 - **Order of checks.** The sender is authenticated before the body is even
   parsed, so an unauthenticated sender learns nothing about the expected
   shape. Bodies are capped (1 MB for events and webhooks, 10 MB for a file,
-  16 KB for the gateway).
+  16 KB for the gateway, 256 KB for SCIM). Only SCIM takes methods other
+  than POST.
 - **The receiving secret.** WonderID issues it from the connection's page
   ("Issue secret") or `POST /api/v1/integrations/<id>/receiver-secret`. It is
   shown once and kept only encrypted. Replacing it stops the old one at once.
