@@ -13,7 +13,7 @@ import { getDecryptedCredential, keepObtainedTokens } from "./credentials";
 import { openGateway, type GatewaySession } from "./gateway/gateway";
 import { planAfterSync, runPipeline } from "./syncPipeline";
 import { pipelineStatusOf, type ImportOutcome } from "./pipelineRules";
-import { chooseRunMode, heldKinds, kindCompleteness, missingStatusOf, runStatus, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
+import { chooseRunMode, heldKinds, kindCompleteness, massMissingThreshold, missingStatusOf, runStatus, MASS_MISSING_MIN_POPULATION, type KindMissing, type KindRun, type MissingSummary } from "./stagingRules";
 
 /**
  * INTEGRATION-P0-01.3. Creating a job only ever inserts a 'queued' row — RLS
@@ -136,11 +136,12 @@ async function markMissing(tenantId: string, jobId: string, mode: SyncJobMode, k
       summary[kind] = { status: "skipped", reason: decision.reason };
       continue;
     }
+    const kindThreshold = massMissingThreshold(kind, threshold);
     const { data, error } = await supabaseServiceRole().rpc("stage_mark_missing", {
       p_tenant: tenantId,
       p_job: jobId,
       p_kind: kind,
-      p_threshold_percent: threshold,
+      p_threshold_percent: kindThreshold,
       p_min_population: MASS_MISSING_MIN_POPULATION,
     });
     const row = (Array.isArray(data) ? data[0] : data) as { candidates: number; present_before: number; marked: number; held: boolean } | null;
@@ -149,7 +150,7 @@ async function markMissing(tenantId: string, jobId: string, mode: SyncJobMode, k
       continue;
     }
     summary[kind] = row.held
-      ? { status: "held", candidates: row.candidates, presentBefore: row.present_before, thresholdPercent: threshold }
+      ? { status: "held", candidates: row.candidates, presentBefore: row.present_before, thresholdPercent: kindThreshold }
       : { status: "marked", marked: row.marked, candidates: row.candidates, presentBefore: row.present_before };
   }
   return summary;

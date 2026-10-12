@@ -64,6 +64,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A sync cut short at a limit counts as partial, so the next sync still reads everything it missed. |
 | 12 Oct 2026 | Rogue access that was approved later is recorded as "approved afterwards", with its request, never as fixed. |
 | 12 Oct 2026 | An account matched to a person stays with them when an email address or username is reused; the sync results say so. |
+| 12 Oct 2026 | A sync is held when every record of a kind would go missing at once, at any size; people are held at a lower share than other records. |
 
 ---
 
@@ -224,7 +225,10 @@ All information from your systems reaches WonderID through **connections**. Ther
 
 **Noticing removals**
 - When something disappears from a system, such as an account deleted or a person who left, a full sync marks it "missing at the source". Nothing is deleted, so the history stays.
-- **Mass-missing guard:** if a sync would suddenly mark a large share as missing (more than 20% of a kind with 20 or more records, by default), it is held until a person approves or discards it. A broken file can't wipe out your data.
+- **Mass-missing guard:** if a sync would suddenly mark a large share as missing, it is held until a person approves or discards it. A broken file can't wipe out your data.
+  - Most kinds are held above 20% of a kind with 20 or more records, by default.
+  - People are held above 10%, or the organization's setting if it is lower.
+  - Any kind, at any size, is held when every record of it would go missing at once.
 
 **People pushed to WonderID over SCIM**
 - An identity provider or HR system that provisions users over SCIM 2.0 (for example Okta or Microsoft Entra ID) can send its people to WonderID as they join, change and leave.

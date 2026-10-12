@@ -2719,3 +2719,24 @@ that fails in the middle of a read. Both are tracked in
 Verified:
 - `npx vitest run modules/integrations`: passed, including the new cases.
 - `npm run typecheck` and eslint on the changed files: clean.
+
+### 2026-10-12 — Mass-missing thresholds per kind (WID-H03)
+
+- Migration 0140 (applied): `stage_mark_missing` also holds a kind when
+  every present record of it would be marked missing, at any population.
+  Before, a kind with fewer than 20 records was never held, so a broken
+  read could mark all of a small kind missing.
+- `massMissingThreshold` (`stagingRules.ts`): people (`identity`) are held
+  above 10%, or the organization's threshold when lower. Other kinds keep
+  the organization's threshold. `markMissing` (`syncJobs.ts`) passes it to
+  the function and reports it on a held run.
+
+Verified:
+- `tests/integrations/staging-missing.sql` through `execute_sql`: 20/20,
+  including the new check 4b (3 of 3 gone is held).
+- `npx vitest run modules/integrations`: 363 passed, including 2 new
+  `massMissingThreshold` cases.
+- `npm run typecheck` and eslint on the changed files: clean.
+
+Left out: an E2E test for a page that fails in the middle of a read
+(tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`).

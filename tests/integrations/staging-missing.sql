@@ -6,6 +6,7 @@
 -- run has seen; objects never tagged with a run are candidates; the
 -- mass-missing guard holds a kind (nothing marked) above the threshold once
 -- the population is large enough, and a null threshold applies a held kind;
+-- a kind whose every object is gone is held at any size (0140);
 -- a job of another organization, or one not yet started, is refused; no
 -- client can call the function or create a job that claims a missing result;
 -- another organization's staged objects stay invisible.
@@ -101,6 +102,13 @@ insert into check_results values ('identities approved: marked/held (expect 15/f
 -- 4. Entitlements: 5 present (4 + e1) is below the population, so never held.
 select * into r from stage_mark_missing(ta, j2, 'entitlement', 20);
 insert into check_results values ('small kind not held: candidates/present/marked/held (expect 4/5/4/false)',
+  r.candidates || '/' || r.present_before || '/' || r.marked || '/' || r.held);
+
+-- 4b. WID-H03 (0140): a small kind whose every object is gone is held anyway.
+insert into integration_objects (tenant_id, integration_id, object_type, external_id, raw, normalized, sync_job_id)
+  select ta, ca, 'access_grant', 'g' || g, '{}', '{}', j1 from generate_series(1, 3) g;
+select * into r from stage_mark_missing(ta, j2, 'access_grant', 20);
+insert into check_results values ('small kind all gone is held: candidates/present/marked/held (expect 3/3/0/true)',
   r.candidates || '/' || r.present_before || '/' || r.marked || '/' || r.held);
 
 -- 5. Refusals: another organization's job; a job that never started.
