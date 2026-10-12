@@ -242,6 +242,19 @@ describe("gateway feature flags (PLATFORM-P0-12)", () => {
     expect(decisions.at(-1)).toMatchObject({ mode: "ENFORCE", enforced: true });
   });
 
+  it("WID-C03: a decision that cannot be worked out blocks in ENFORCE, and only advises in OBSERVE_ONLY", async () => {
+    evaluate.mockResolvedValue({ decision: "DENY", code: "EVALUATION_FAILED", reason: "policies could not be read", steps: [] });
+    flags.runtime_enforce = true;
+    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "fail-enf", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "DENY" });
+    flags.runtime_enforce = false;
+    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "fail-obs", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "ALLOW", enforced: false });
+  });
+
+  it("WID-C03: the kill switch is recorded in OBSERVE_ONLY but does not block there", async () => {
+    evaluate.mockResolvedValue({ decision: "DENY", code: "KILL_SWITCH", reason: "kill switch on", steps: [] });
+    expect(await authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "kill-obs", action: "READ" }))).toMatchObject({ decision: "DENY", effectiveDecision: "ALLOW" });
+  });
+
   it("runtime_enforce without runtime_observe is not enforcement: the gateway is off", async () => {
     flags = { ...DEFAULT_FLAGS, runtime_observe: false, runtime_enforce: true };
     await expect(authorizeRuntimeRequest(principal, parseGatewayRequest({ requestId: "off-1", action: "READ" }))).rejects.toMatchObject({

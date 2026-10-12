@@ -45,7 +45,7 @@ for every non-"Done" row is in
 | INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
 | INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Done — 2026-10-11: migration 0118 (isolation SQL 7/7); identities and accounts chained after every full sync; entitlements and grants follow with ACCESS-P0-27 |
 | INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Done — 2026-10-11: `attribute:<name>` targets validated on save, typed and written with provenance by Identity; schedule on every reading connection and `/api/v1/integrations/<id>/schedule` |
-| INTEGRATION-P0-21 | Definition extensions for integrators (F3, #69) | Partial — 2026-10-12 slice 1: transforms `regex` (safe patterns only), `replace`, `coalesce`, `dateAdd`; API key in the request body (`auth.type: body`). Slice 2: incremental `changes` resources (scheduled syncs read only what changed, with a full read at least daily; incremental runs mark nothing missing). Part 3a: signing in with a private key (`private_key_jwt`, the `jwt_bearer` grant; RS256/ES256) and client certificates (mutual TLS). Part 3b: OAuth authorization code with PKCE ("Connect" on the connection's page; the callback arrives at the connection's receiver; tokens encrypted, refreshed and rotated). Export/import with connection upgrade follows |
+| INTEGRATION-P0-21 | Definition extensions for integrators (F3, #69) | Done — 2026-10-12 slice 1: transforms `regex` (safe patterns only), `replace`, `coalesce`, `dateAdd`; API key in the request body (`auth.type: body`). Slice 2: incremental `changes` resources (scheduled syncs read only what changed, with a full read at least daily; incremental runs mark nothing missing). Part 3a: signing in with a private key (`private_key_jwt`, the `jwt_bearer` grant; RS256/ES256) and client certificates (mutual TLS). Part 3b: OAuth authorization code with PKCE ("Connect" on the connection's page; the callback arrives at the connection's receiver; tokens encrypted, refreshed and rotated). Part 4: definitions download as files and open in the editor; a connection upgrades to another version after a preview of what changes, never widening writes, with a full read next |
 
 ---
 
@@ -552,3 +552,11 @@ this backlog. Their goals, order, dependencies and exit tests are in
 the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
 and each story's acceptance criteria in its GitHub issue (number in the
 tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).
+
+## High-risk findings follow-ups (2026-10-12)
+
+From the first post-merge review of `docs/WonderID/HIGH-RISK-FINDINGS.md` (CLAUDE.md §19.12). Not scheduled stories yet; each needs the noted decision or a slot in this backlog.
+
+- WID-H02: one idempotency key per task instead of per attempt; read the system before a retry after an unclear failure; declare which connection types honour `Idempotency-Key` (owner decision).
+- WID-H03: a cut-short incremental run still counts as succeeded and moves the cursor; per-kind thresholds and proof of completeness.
+- WID-H05: tests for a real DNS rebind and a strict-policy redirect to a private address; 6to4 and Teredo ranges; sandboxing and egress allow-lists (owner decision).

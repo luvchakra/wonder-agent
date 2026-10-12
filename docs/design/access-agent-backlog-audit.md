@@ -2827,3 +2827,21 @@ second step.
 **Left out.** A grant task waiting for a connector-created account whose
 read-back never correlates (e.g. the system changed the email) stays open
 with its SLA reminder; it is not escalated sooner.
+
+### 2026-10-12 — High-risk findings review: WID-C01, C02, H04 (CLAUDE.md §19.12)
+
+The first post-merge review checked the access findings against the code;
+the evidence is in `docs/WonderID/HIGH-RISK-FINDINGS.md`. Code: no change.
+- `requestRules.test.ts`:
+  - pins that a policy with threshold `critical` auto-approves high-risk
+    requests (WID-C01);
+  - renames the test that claimed high risk always needs approval.
+- The knowledge base was corrected on approvals, self-approval, expiry and
+  rogue closure.
+- Owner decisions are listed under "High-risk findings follow-ups" in
+  `04-ACCESS-AGENT-BACKLOG.md`. One is a self-approval block on the
+  agent-request path, which today is allowed under a flag-only SoD policy
+  (`sod.spec.ts`).
+
+Verified: `npx vitest run modules/access-governance/requestRules.test.ts`
+passed.

@@ -112,6 +112,10 @@ export default async function ConnectionTypePage({ params }: { params: Promise<{
           <Link href={`/integrations/types/new?from=${t.origin}:${encodeURIComponent(t.key)}`} className="text-primary hover:underline">
             Use as a starting point
           </Link>
+          {" · "}
+          <a href={`/api/v1/integrations/connectors/${t.origin}/${encodeURIComponent(t.key)}/export?version=${t.version}`} download className="text-primary hover:underline">
+            Download (.json)
+          </a>
         </p>
       </details>
     </div>

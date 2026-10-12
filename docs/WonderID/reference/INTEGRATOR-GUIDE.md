@@ -57,13 +57,13 @@ read-only statement), `mcp`, `file`, `none` (receive only); authentication
 `ldap_simple`, `sql_password`; pagination `none`, `page`, `offset`, `cursor`,
 `link_header`, `scim`; field paths, templates, a fixed transform list and
 `where` filters; `forEach`, `unwind`, keyed records; incremental `changes`
-requests for scheduled syncs; inbound channels
+requests for scheduled syncs; export as a file and import elsewhere; upgrading a
+connection to a newer version after a preview of what changes; inbound channels
 (`receive`) for webhooks, files, runtime events and the gateway. The full
 reference is `CONNECTOR-FRAMEWORK.md`, "Definition reference".
 
 Needs a WonderID change today: other SQL engines; SOAP; transforms outside the fixed list
-(which now includes `regex`, `replace`, `coalesce` and `dateAdd`); a
-connection upgrading to a newer definition version. Write operations are
+(which now includes `regex`, `replace`, `coalesce` and `dateAdd`). Write operations are
 declared in a definition's `write` (see "Changes in the system"). These
 are the extensions in the design's §5.8.2 (F3, F7).
 

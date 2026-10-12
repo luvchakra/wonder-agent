@@ -539,3 +539,9 @@ Extend campaigns to human, external, privileged, machine, service-account and AI
   role-assignment service (never a direct write).
 - Decisions are audit evidence (ACCESS_CERTIFIED / ACCESS_REVOKED).
 - Reviewers never certify their own assignments.
+
+## High-risk findings follow-ups (2026-10-12)
+
+From the first post-merge review of `docs/WonderID/HIGH-RISK-FINDINGS.md` (CLAUDE.md §19.12). Not scheduled stories yet; each needs the noted decision or a slot in this backlog.
+
+- WID-H07: a SQL test for the append-only trigger and `purge_audit_logs`; default retention, minimising free-text audit metadata and crypto-erasure (owner/legal).

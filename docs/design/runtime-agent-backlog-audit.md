@@ -895,3 +895,18 @@ follows the same pattern and joins `lib/provenance/tables.ts`.
 `modules/runtime-assurance/unregistered.ts` (window, `runtime.unregisteredWindowDays`) and `decisionNotifications.ts` (throttle, `runtime.alertThrottleMinutes`; `notificationForDecision()` takes it, default 15) read the organization's settings. Defaults equal the previous constants. Cross-module change by explicit
 owner request; the mechanism is Foundation's `lib/config` (CLAUDE.md §19.11,
 Foundation log).
+
+### 2026-10-12 — High-risk findings review: WID-C03 (CLAUDE.md §19.12)
+
+The gateway is advisory and Observe mode always says go ahead. Two tests in
+`gateway.test.ts` now pin this:
+- a decision that cannot be worked out is DENY in Enforce and advice only
+  in Observe;
+- the kill switch is recorded in Observe but does not block.
+
+The knowledge base §4 was corrected. Open (owner): blocking in Observe for
+the kill switch and lookup failures; detecting calls that bypass the
+gateway.
+
+Verified: `npx vitest run modules/runtime-assurance/gateway.test.ts`
+passed.

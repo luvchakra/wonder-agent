@@ -2436,3 +2436,84 @@ upgrade.
 **Also recorded.** The owner confirmed that end-to-end tests are nightly.
 Before a merge they run only for security-related or major changes
 (CLAUDE.md §17.8 updated).
+
+### 2026-10-12 — Definition extensions, part 4: sharing and upgrading; first high-risk findings review (INTEGRATION-P0-21, #69; WID-H01, WID-H05)
+
+**Built (no migration).**
+- **Export:** `GET /api/v1/integrations/connectors/{origin}/{key}/export`
+  (integration.read) downloads `<key>-<version>.json`. A definition holds
+  only `{secret.…}` references, never values. The type page has "Download
+  (.json)".
+- **Import:** the editor opens a JSON file (512 KB at most) into the text
+  area. It is then checked and published as usual, under the same
+  validation and versioning.
+- **Upgrade:**
+  - `framework/upgrade.ts`, pure: `planUpgrade` lists changes to settings,
+    sign-in, reads, field mappings, writes and receiving channels.
+  - Blockers: another key, the same version, another driver, another
+    sign-in style, a required setting with no default, or a required
+    credential the connection lacks.
+  - Writes: kept only when the new version adds no new kind of change,
+    otherwise turned off. `upgradedCapabilities` sets every write key
+    explicitly, so writes are never widened.
+  - Service, in `catalog.ts`:
+    - `connectionUpgradeVersions`: built-in, the version in code; custom,
+      the organization's versions.
+    - `previewConnectionUpgrade`.
+    - `upgradeConnection` (integration.update): re-validates settings and
+      addresses, stores `upgradedAt`, and audits
+      `integration.definition_upgraded` with from, to, the change count and
+      the writes outcome.
+  - The sync's mode choice ignores runs before `upgradedAt`
+    (`lastGoodRuns`), so the next sync reads in full and every record is
+    mapped again.
+  - API: `GET/POST /api/v1/integrations/{id}/upgrade`.
+  - UI:
+    - the connection header shows "v… available";
+    - `/integrations/{id}/upgrade?version=` lists the changes by area,
+      with one Upgrade button or the blockers;
+    - after an upgrade, one status line.
+
+**Findings review (CLAUDE.md §19.12)**, first pass over
+`docs/WonderID/HIGH-RISK-FINDINGS.md`. Three read-only reviews checked
+every finding against the code; the register now carries file and test
+evidence, and all ten are `CHANGED`.
+- **WID-H05, fixed in part:**
+  - `guardedFetch` drops the connection's custom API-key header on a
+    redirect to another origin. `HttpSession` names it in
+    `credentialHeaders`.
+  - A 307/308 redirect to another origin that would resend the body
+    (which may hold an API key) is refused.
+- **WID-H01, fixed in part:** `correlate` sends a single match on a
+  terminated or archived identity to Pending Matches instead of linking it
+  (a rehire or a reused email).
+- **Pinning tests:** `gateway.test.ts` (WID-C03) and `requestRules.test.ts`
+  (WID-C01; the misleading test name was corrected).
+- **Knowledge base:** corrected in §1, §3, §4, §5, §6, §7, §8, §9, §12 and
+  the safety table.
+- **Not done here:** a self-approval block on the older agent-request path
+  contradicts the tested SoD flag behaviour (`sod.spec.ts`, D5). It is an
+  owner decision, like the rest listed in each module backlog's
+  "High-risk findings follow-ups".
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files;
+  `next build` clean.
+- `npx vitest run modules/integrations modules/runtime-assurance/gateway.test.ts modules/access-governance/requestRules.test.ts`:
+  all passed. New tests:
+  - `upgrade.test.ts`: 4;
+  - outbound redirect: 2;
+  - credential header hand-off: 1;
+  - former-identity correlation: 1;
+  - gateway modes: 2;
+  - auto-approval threshold: 1.
+- E2E, local (connector and outbound changes):
+  - new `connection-upgrade.spec.ts`, 3/3: export, a blocked preview,
+    upgrade and a full re-map;
+  - `outbound-guard`, `integrations` and `identity-sources` all passed:
+    22 tests in total.
+
+**Left out.** Scripts through the relay (D7) stay outside P0-21.
+Definition files are not signed; signed configuration bundles are
+PLATFORM-P0-13.
+

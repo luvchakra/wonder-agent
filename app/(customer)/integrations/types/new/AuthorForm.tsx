@@ -26,6 +26,19 @@ export function AuthorForm({ initial }: { initial: string }) {
   return (
     <div className="space-y-4">
       <form action={publish} className="space-y-3">
+        <label className="block text-sm text-muted-foreground">
+          {/* INTEGRATION-P0-21: a definition exported elsewhere opens here, to check and publish as usual. */}
+          Open a definition file{" "}
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="mt-1 block text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1 file:text-sm file:text-secondary-foreground"
+            onChange={async (e) => {
+              const file = e.target.files?.[0];
+              if (file && file.size <= 512_000) setText(await file.text());
+            }}
+          />
+        </label>
         <TextareaField
           label="Definition (JSON)"
           name="definition"

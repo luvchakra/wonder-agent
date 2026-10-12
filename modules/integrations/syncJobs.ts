@@ -160,7 +160,9 @@ async function markMissing(tenantId: string, jobId: string, mode: SyncJobMode, k
  * successful full run, started (the incremental cursor and the daily full
  * read). Partial runs (object-page files) never count.
  */
-async function lastGoodRuns(tenantId: string, integrationId: string, jobId: string): Promise<{ lastSucceededStart: string | null; lastFullSucceededStart: string | null }> {
+async function lastGoodRuns(tenantId: string, integrationId: string, jobId: string, notBefore?: string): Promise<{ lastSucceededStart: string | null; lastFullSucceededStart: string | null }> {
+  // INTEGRATION-P0-21: runs before an upgrade mapped records the old way, so they are no base.
+  const since = notBefore && !Number.isNaN(Date.parse(notBefore)) ? notBefore : "1970-01-01T00:00:00Z";
   const base = () =>
     supabaseServiceRole()
       .from("integration_sync_jobs")
@@ -170,6 +172,7 @@ async function lastGoodRuns(tenantId: string, integrationId: string, jobId: stri
       .eq("status", "succeeded")
       .neq("id", jobId)
       .not("started_at", "is", null)
+      .gte("started_at", since)
       .order("started_at", { ascending: false })
       .limit(1);
   const [{ data: latest, error: latestError }, { data: full, error: fullError }] = await Promise.all([base().in("mode", ["full", "incremental"]), base().eq("mode", "full")]);
@@ -259,7 +262,9 @@ export async function runSyncJob(tenantId: string, jobId: string): Promise<void>
         requested,
         trigger: jobRow.trigger,
         supportsIncremental,
-        ...(supportsIncremental ? await lastGoodRuns(tenantId, integration.id, jobId) : { lastSucceededStart: null, lastFullSucceededStart: null }),
+        ...(supportsIncremental
+          ? await lastGoodRuns(tenantId, integration.id, jobId, (integration.config as { upgradedAt?: string } | null)?.upgradedAt)
+          : { lastSucceededStart: null, lastFullSucceededStart: null }),
         now: new Date(),
       });
       if (decided.since) connector.readChangesSince(decided.since);

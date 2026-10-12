@@ -561,6 +561,11 @@ The same operations are available over the API (session authentication):
 | `POST /api/v1/integrations/connectors/preview` | `integration.create` | Runs one resource. Body: `{ manifest, settings, secret, resource, limit? }` |
 | `POST /api/v1/integrations/connectors/connect` | `integration.create` | Creates a connection. Body: `{ origin, key, version?, name, settings, secret? }` |
 | `POST /api/v1/integrations/{id}/connector-credentials` | `integration.update` | Replaces a connection's credentials. Body: `{ secret: { … } }` |
+| `GET /api/v1/integrations/connectors/{builtin\|custom}/{key}/export` | `integration.read` | Downloads one definition (`?version=`) as `<key>-<version>.json`. A definition holds no secret values, so the file can be shared; import it by opening it in the editor (or `POST /api/v1/integrations/connectors`), which validates and versions it as usual |
+| `GET /api/v1/integrations/{id}/upgrade?version=` | `integration.read` | Previews moving a connection to another version of its type: changed settings, sign-in, reads, field mappings, writes and receiving channels, and what blocks the move. Changes nothing |
+| `POST /api/v1/integrations/{id}/upgrade` | `integration.update` | Moves the connection to `{ version }`. Refused while anything blocks it: another protocol or sign-in style, a new required setting without a default, or a new required credential the connection does not have. Settings carry over and new ones take their defaults; addresses are checked again. Changes in the system are never widened: they stay on only when the new version adds no new kind of change, otherwise they turn off until an administrator turns them on again. The next sync reads in full, so every record is mapped again. Audited as `integration.definition_upgraded` |
+
+**Sharing and upgrading.** The connection type's page has "Download (.json)"; the editor ("New connection type") opens a file. A connection whose type has a newer version shows "v… available" in its header, which leads to the preview and its one action, Upgrade.
 
 ## Definition reference (schema version 1)
 

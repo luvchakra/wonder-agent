@@ -311,7 +311,10 @@ export function normalizeRecord(
 
 // ---------------------------------------------------------------- correlation
 
-export type CorrelationIndexEntry = { id: string; email: string | null; username: string | null } & Partial<Record<SourcedIdentityField, string | null>>;
+export type CorrelationIndexEntry = { id: string; email: string | null; username: string | null; status?: string | null } & Partial<Record<SourcedIdentityField, string | null>>;
+
+/** WID-H01: identities that have left; a record matching one is a person's decision (a rehire, or a reused email). */
+const FORMER_STATUSES = new Set(["terminated", "archived"]);
 
 export type CorrelationOutcome =
   | { kind: "linked"; identityId: string }
@@ -326,7 +329,8 @@ const norm = (v: unknown) => (typeof v === "string" ? v.trim().toLowerCase() : "
  * rule in order, where exactly one candidate is a match, several are
  * ambiguous (a person decides, never the closest guess, §17.6), and none
  * falls through to the next rule. Identities already linked to another
- * record of this source are never candidates.
+ * record of this source are never candidates. A single match on an identity
+ * that has left is not linked automatically either (WID-H01).
  */
 export function correlate(
   record: NormalizedSourceRecord,
@@ -354,6 +358,9 @@ export function correlate(
       if (values.some((v) => !v)) continue;
       matches = pool.filter((e) => fields.every((f, i) => norm(e[f]) === values[i]));
       label = `composite(${fields.join("+")})`;
+    }
+    if (matches.length === 1 && FORMER_STATUSES.has(String(matches[0].status ?? ""))) {
+      return { kind: "ambiguous", candidateIds: [matches[0].id], reason: `The only match on ${label} is an identity that has left (${matches[0].status}): a rehire or a reused value` };
     }
     if (matches.length === 1) return { kind: "matched", identityId: matches[0].id, rule: label };
     if (matches.length > 1) {

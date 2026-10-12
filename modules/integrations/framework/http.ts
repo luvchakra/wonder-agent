@@ -12,7 +12,10 @@ import { fillTemplate, readPath, type TemplateScope } from "./mapping";
 
 /** `clientCert` (INTEGRATION-P0-21): a PEM certificate and key the TLS layer presents (mutual TLS). */
 export type ClientCertificate = { cert: string; key: string };
-export type FetchLike = (url: string, init: { method?: string; headers?: Record<string, string>; body?: string; clientCert?: ClientCertificate }) => Promise<Response>;
+export type FetchLike = (
+  url: string,
+  init: { method?: string; headers?: Record<string, string>; body?: string; clientCert?: ClientCertificate; credentialHeaders?: string[] },
+) => Promise<Response>;
 
 export class ConnectorRequestError extends Error {
   constructor(
@@ -313,7 +316,9 @@ export class HttpSession {
       }
       // The definition's rateLimitPerSecond is enforced by the gateway, around fetchImpl.
       const clientCert = this.clientCertificate(target);
-      const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body, ...(clientCert ? { clientCert } : {}) });
+      // WID-H05: a custom API-key header is the credential; the guard drops it on a redirect to another origin.
+      const credentialHeaders = auth.type === "header" ? [fillTemplate(auth.name, this.authScope())] : undefined;
+      const res = await this.fetchImpl(target.toString(), { method: spec.method ?? "GET", headers, body, ...(clientCert ? { clientCert } : {}), ...(credentialHeaders ? { credentialHeaders } : {}) });
       if (res.status === 401 && attempt === 0 && (this.def.auth.type === "oauth2_client_credentials" || this.def.auth.type === "oauth2_authorization_code")) continue;
       if (!res.ok) throw new ConnectorRequestError(`${label} failed: HTTP ${res.status}`, res.status);
       const text = await res.text();

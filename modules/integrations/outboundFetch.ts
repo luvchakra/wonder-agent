@@ -35,6 +35,8 @@ export type GuardedInit = {
   policy?: OutboundPolicy;
   /** INTEGRATION-P0-21: a client certificate for mutual TLS; https only, and never followed to another origin. */
   clientCert?: { cert: string; key: string };
+  /** WID-H05: headers that carry this connection's credential (a custom API-key header), dropped like Authorization on a redirect to another origin. */
+  credentialHeaders?: string[];
 };
 
 export function guardedLookup(policy: OutboundPolicy): LookupFunction {
@@ -111,12 +113,17 @@ export async function guardedFetch(input: string | URL, init: GuardedInit = {}):
     const location = res.headers.location;
     if (res.status >= 300 && res.status < 400 && location) {
       if (hop >= MAX_REDIRECTS) throw new OutboundBlockedError(`Too many redirects from ${url.hostname}`);
+      const from = url.hostname;
       url = checkOutboundUrl(new URL(location, url), policy);
       const headers = { ...(current.headers ?? {}) };
-      if (url.origin !== origin) for (const h of Object.keys(headers)) if (CREDENTIAL_HEADERS.includes(h.toLowerCase())) delete headers[h];
+      const crossOrigin = url.origin !== origin;
+      const sensitive = new Set([...CREDENTIAL_HEADERS, ...(init.credentialHeaders ?? []).map((h) => h.toLowerCase())]);
+      if (crossOrigin) for (const h of Object.keys(headers)) if (sensitive.has(h.toLowerCase())) delete headers[h];
       // The client certificate is the connection's credential too: never presented to another origin.
-      if (url.origin !== origin) current = { ...current, clientCert: undefined };
+      if (crossOrigin) current = { ...current, clientCert: undefined };
       const toGet = res.status === 303 || ((res.status === 301 || res.status === 302) && (current.method ?? "GET") !== "GET");
+      // WID-H05: a 307/308 resends the body, which may hold a credential (an API key in the body); never to another origin.
+      if (crossOrigin && !toGet && current.body !== undefined) throw new OutboundBlockedError(`Refused a redirect from ${from} to another origin that would resend the request body`);
       current = { ...current, headers, ...(toGet ? { method: "GET", body: undefined } : {}) };
       continue;
     }

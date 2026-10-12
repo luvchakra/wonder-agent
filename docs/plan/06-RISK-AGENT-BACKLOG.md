@@ -629,3 +629,9 @@ These stories extend this module's own tables, services and routes.
 ### RISK-P0-13 — Rogue Access management
 
 Rogue Access inventory across identity types, investigation view with evidence, remediation actions (revoke, create authorization, access package, legacy recognition, owner, exception, time-bound, escalate, quarantine), severity from privilege/sensitivity/external/inactive/owner/provenance/blast radius, and trend. Builds on existing findings, evidence and investigations.
+
+## High-risk findings follow-ups (2026-10-12)
+
+From the first post-merge review of `docs/WonderID/HIGH-RISK-FINDINGS.md` (CLAUDE.md §19.12). Not scheduled stories yet; each needs the noted decision or a slot in this backlog.
+
+- WID-H04: a separate "approved afterwards" resolution, or the request id on the finding; accepted-exception and false-positive closure for rogue findings on human accounts.
