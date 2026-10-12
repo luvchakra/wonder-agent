@@ -38,9 +38,9 @@ met, with evidence), or Waiting on the owner.
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Thresholds per kind; tests for a failed page in the middle of a read |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
-| WID-H06 Automation credentials | P2 | Fixed | Nothing left from the register's closure criteria; refusals with an unknown key have no organization to audit to |
+| WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P3 | Waiting on the owner | SQL test for the append-only and purge rules; retention defaults need owner and legal input |
-| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment |
+| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
 
 ## Detail
 
@@ -236,6 +236,9 @@ Tests:
 - 6to4 and Teredo ranges.
 
 ### WID-H06: automation credential scope (P2, fixed)
+
+The register marked it FIXED on 12 October (12:40 IST), from the code and
+committed tests. Production was not exercised in that audit.
 
 **Done** (owner decision 2026-10-12): an automation credential never holds
 `access.approve`, `agent.certify` or `automation.manage`. Three layers
