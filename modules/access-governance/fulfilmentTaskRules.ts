@@ -41,6 +41,15 @@ export function dueAt(openedAt: Date, slaDays: number): string {
   return new Date(openedAt.getTime() + slaDays * 86_400_000).toISOString();
 }
 
+/** WID-C02: access still held after its approval ends is a risk, so taking it away is due sooner than giving it. */
+export const REMOVAL_SLA_DAYS = 1;
+
+/** When a task of this kind is due: removals and disables within REMOVAL_SLA_DAYS, whatever the organization's longer SLA. */
+export function taskDueAt(kind: FulfilmentTaskKind, openedAt: Date, slaDays: number): string {
+  const removal = kind === "remove" || kind === "disable_account";
+  return dueAt(openedAt, removal ? Math.min(slaDays, REMOVAL_SLA_DAYS) : slaDays);
+}
+
 /** Still to do and past its due time. */
 export function isOverdue(task: { status: FulfilmentTaskStatus; dueAt: string }, now = new Date()): boolean {
   return (task.status === "open" || task.status === "claimed" || task.status === "failed") && Date.parse(task.dueAt) < now.getTime();

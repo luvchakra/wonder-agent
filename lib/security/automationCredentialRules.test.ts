@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   addressAllowed,
+  firstOverRateLimit,
+  refusalAuditDue,
   automationBearer,
   credentialState,
   expiryFrom,
@@ -137,5 +139,23 @@ describe("WID-H08: the caller's address comes only from a trusted header", () =>
   it("an unknown address fails closed for a credential limited to certain addresses", () => {
     expect(addressAllowed(null, ["203.0.113.0/24"])).toBe(false);
     expect(addressAllowed(null, [])).toBe(true);
+  });
+});
+
+describe("auditing refusals (WID-H06)", () => {
+  it("audits the first call over the rate limit in a minute, not the rest", () => {
+    expect(firstOverRateLimit(60, 60)).toBe(false);
+    expect(firstOverRateLimit(61, 60)).toBe(true);
+    expect(firstOverRateLimit(62, 60)).toBe(false);
+  });
+  it("audits a refusal once per credential and reason a minute, within a bounded memory", () => {
+    const seen = new Map<string, number>();
+    expect(refusalAuditDue(seen, "c1:CREDENTIAL_REVOKED", 0)).toBe(true);
+    expect(refusalAuditDue(seen, "c1:CREDENTIAL_REVOKED", 59_999)).toBe(false);
+    expect(refusalAuditDue(seen, "c1:ADDRESS_NOT_ALLOWED", 59_999)).toBe(true);
+    expect(refusalAuditDue(seen, "c1:CREDENTIAL_REVOKED", 60_000)).toBe(true);
+    const small = new Map<string, number>();
+    for (let i = 0; i < 5; i++) refusalAuditDue(small, `k${i}`, 0, 3);
+    expect(small.size).toBe(3);
   });
 });

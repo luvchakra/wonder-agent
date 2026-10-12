@@ -12,6 +12,7 @@ import { rolesWithPermissions } from "@/lib/users/users";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
   DEFAULT_RATE_LIMIT,
+  firstOverRateLimit,
   MAX_RATE_LIMIT,
   automationBearer,
   credentialState,
@@ -23,6 +24,7 @@ import {
   trustedClientIp,
   parseCidrs,
   roleEscalation,
+  refusalAuditDue,
   refusalFor,
   type CredentialState,
   type CredentialStatus,
@@ -510,6 +512,8 @@ async function backingToken(row: Row & { backing_secret_enc: string }): Promise<
 }
 
 const LAST_USED_REFRESH_MS = 60_000;
+/** When each credential's refusal for each reason was last audited (bounded; see refusalAuditDue). */
+const refusalAudits = new Map<string, number>();
 
 /**
  * For an automation call, the backing member's access token after the
@@ -517,7 +521,9 @@ const LAST_USED_REFRESH_MS = 60_000;
  * expired, organization active, source address allowed, under its rate
  * limit. Null for a request without an automation bearer. Throws ApiError
  * (401, 403, 429, 503) otherwise; never falls back to a cookie session.
- * Each allowed call is audited (#11).
+ * Each allowed call is audited (#11), and so is a refusal: once per
+ * credential and reason a minute, and the first call over the rate limit
+ * in each minute (WID-H06).
  */
 export const getAutomationAccess = (): Promise<{ accessToken: string; userId: string } | null> => oncePerRequest("access", automationAccessNow);
 
@@ -533,26 +539,31 @@ async function automationAccessNow(): Promise<{ accessToken: string; userId: str
   const [method, path] = request.split(" ");
   const now = new Date();
 
+  const refused = (code: string) =>
+    writeAudit({
+      tenantId: row.tenant_id,
+      actorId: row.backing_user_id,
+      actorType: "integration",
+      action: "automation.api_call",
+      objectType: "automation_credential",
+      objectId: row.id,
+      outcome: "failure",
+      metadata: { credentialId: row.id, onBehalfOf: row.identity_id, ownerIdentityId: found.ownerIdentityId, method, path, refused: code },
+    });
+
   const refusal = refusalFor({ ...row, tenant_status: found.tenantStatus }, ip, now);
   if (refusal) {
-    if (refusal.status === 403) {
-      await writeAudit({
-        tenantId: row.tenant_id,
-        actorId: row.backing_user_id,
-        actorType: "integration",
-        action: "automation.api_call",
-        objectType: "automation_credential",
-        objectId: row.id,
-        outcome: "failure",
-        metadata: { credentialId: row.id, onBehalfOf: row.identity_id, ownerIdentityId: found.ownerIdentityId, method, path, refused: refusal.code },
-      });
-    }
+    // WID-H06: every reason is audited (pending, revoked, expired, address), once per credential and reason a minute.
+    if (refusalAuditDue(refusalAudits, `${row.id}:${refusal.code}`, now.getTime())) await refused(refusal.code);
     throw new ApiError(refusal.status, refusal.code, refusal.message);
   }
 
   const { data: calls, error: hitError } = await supabaseServiceRole().rpc("automation_credential_hit", { p_credential: row.id, p_tenant: row.tenant_id });
   if (hitError) throw new ApiError(503, "RATE_LIMIT_UNAVAILABLE", "The call could not be counted; try again shortly");
-  if (overRateLimit(Number(calls), row.rate_limit_per_minute)) throw new ApiError(429, "RATE_LIMITED", `More than ${row.rate_limit_per_minute} calls this minute`);
+  if (overRateLimit(Number(calls), row.rate_limit_per_minute)) {
+    if (firstOverRateLimit(Number(calls), row.rate_limit_per_minute)) await refused("RATE_LIMITED");
+    throw new ApiError(429, "RATE_LIMITED", `More than ${row.rate_limit_per_minute} calls this minute`);
+  }
 
   const accessToken = await backingToken(row);
   await writeAudit({

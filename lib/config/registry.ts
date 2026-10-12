@@ -104,7 +104,7 @@ export const CONFIG_SETTINGS = [
     key: "access.fulfilmentSlaDays",
     section: "access",
     label: "Fulfil approved access within",
-    help: "A fulfilment task is due this long after approval, then overdue, with a daily reminder to its owner.",
+    help: "Giving access is due this long after approval; removing it, within a day at most. Overdue tasks remind their owner daily.",
     permission: SETTINGS,
     type: "int",
     min: 1,

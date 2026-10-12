@@ -20,6 +20,10 @@ describe("lineState (EXPERIENCE-P0-29)", () => {
   });
   it("time-bound access past its end date has ended, whatever its progress", () => {
     expect(lineState(req({ requestedExpiry: "2026-10-10T00:00:00Z" }), "verified", NOW).label).toBe("Ended");
+    // WID-C02: ended access shows whether it is really gone.
+    expect(lineState(req({ requestedExpiry: "2026-10-10T00:00:00Z" }), "verified", NOW, "pending")).toMatchObject({ label: "Ended · removal pending", tone: "warning" });
+    expect(lineState(req({ requestedExpiry: "2026-10-10T00:00:00Z" }), "verified", NOW, "removed_unverified").label).toBe("Ended · removed, not yet verified");
+    expect(lineState(req({ requestedExpiry: "2026-10-10T00:00:00Z" }), "verified", NOW, "verified")).toMatchObject({ label: "Ended · removal verified", tone: "success" });
     expect(lineState(req({ requestedExpiry: "2026-10-20T00:00:00Z" }), "verified", NOW).label).toBe("Verified at the source");
   });
 });

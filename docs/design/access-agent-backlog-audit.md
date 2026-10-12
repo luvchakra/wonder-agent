@@ -2878,3 +2878,30 @@ Verified: `npx vitest run modules/access-governance`, 326 passed with
 `lib/security`, including the new rule tests.
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — Ended access shows whether it is gone; removals due within a day (WID-C02)
+
+- `endedRemoval` (pure, `pendingGrantRules.ts`) works out, from a
+  request's grants, whether ended access is gone:
+  - pending: a grant is live and not marked removed;
+  - removed, not yet verified: every live grant is marked removed;
+  - verified: every grant is revoked;
+  - never fulfilled: every grant was withdrawn.
+- `grantsForRequest` and `requestProgressFor` now read `removal_status`.
+  `requestProgressFor` returns `{ progress, removal }` per request.
+- The request list, the request page and `GET /api/v1/access/requests/[id]`
+  (new field `removal`) show it. Before this, an ended request showed
+  "Ended" whether or not the access was still there.
+- `taskDueAt` (`fulfilmentTaskRules.ts`): `remove` and `disable_account`
+  tasks are due within `REMOVAL_SLA_DAYS` (1), capped below the
+  organization's `access.fulfilmentSlaDays`. The setting's help text says so.
+
+Verified:
+- `npx vitest run modules/access-governance lib/config "app/(customer)/access"`:
+  274 passed.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E was not run: this is a display change and a shorter deadline, not a
+  security-path change (§17.8). The nightly run covers it.
+
+Left out: the urgent leaver path (Identity module). Tracked in
+`docs/WonderID/FINDINGS-REMEDIATION.md`.

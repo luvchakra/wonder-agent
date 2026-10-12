@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { getRequestWithApprovals, grantsForRequest, listFulfilmentTasks, requestProgress, sweepApprovalTimeouts } from "@/modules/access-governance/service";
+import { endedRemoval, getRequestWithApprovals, grantsForRequest, listFulfilmentTasks, requestProgress, sweepApprovalTimeouts } from "@/modules/access-governance/service";
 import { errorResponse } from "@/modules/access-governance/http";
 
 /**
@@ -17,7 +17,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const found = await getRequestWithApprovals(ctx.tenantId!, id);
     if (!found) throw new ApiError(404, "REQUEST_NOT_FOUND");
     const [grants, tasks] = await Promise.all([grantsForRequest(ctx.tenantId!, id), listFulfilmentTasks(ctx.tenantId!, { requestId: id })]);
-    return NextResponse.json({ ok: true, data: { ...found, grants, tasks, fulfilment: requestProgress(tasks, grants) } });
+    return NextResponse.json({ ok: true, data: { ...found, grants, tasks, fulfilment: requestProgress(tasks, grants), removal: endedRemoval(grants) } });
   } catch (err) {
     return errorResponse(err);
   }

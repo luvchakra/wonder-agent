@@ -57,3 +57,21 @@ export function requestProgress(
   if (live.some((t) => t.status === "completed")) return "fulfilled_unverified";
   return "verified";
 }
+
+export type RemovalState = "pending" | "removed_unverified" | "verified" | "never_fulfilled";
+
+/**
+ * WID-C02: once time-bound access has ended, whether it is really gone.
+ * Verified only when every grant the request made is revoked, which
+ * happens when a read of the system no longer finds it; grants never
+ * fulfilled were withdrawn and never existed. While any grant is live, the
+ * removal is still pending, or done but not yet seen at the source. Null
+ * when the request made no grant.
+ */
+export function endedRemoval(grants: { fulfilmentStatus: string; revokedAt: string | null; removalStatus: string | null }[]): RemovalState | null {
+  if (!grants.length) return null;
+  const live = grants.filter((g) => g.revokedAt === null);
+  if (live.some((g) => g.removalStatus !== "removed_unverified")) return "pending";
+  if (live.length) return "removed_unverified";
+  return grants.every((g) => g.fulfilmentStatus === "pending_fulfilment") ? "never_fulfilled" : "verified";
+}

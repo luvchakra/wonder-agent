@@ -177,6 +177,7 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
               <tbody>
                 {rows.map((r) => {
                   const mine = r.requestedBy === ctx.userId;
+                  const state = lineState(r, progress.get(r.id)?.progress, undefined, progress.get(r.id)?.removal);
                   return (
                     <Tr key={r.id}>
                       <Td>
@@ -200,8 +201,8 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
                         {mine ? <span className="block text-xs text-muted-foreground">Requested by you</span> : null}
                       </Td>
                       <Td>
-                        <Badge tone={lineState(r, progress.get(r.id)).tone} className="whitespace-nowrap">
-                          {lineState(r, progress.get(r.id)).label}
+                        <Badge tone={state.tone} className="whitespace-nowrap">
+                          {state.label}
                         </Badge>
                         {r.status === "pending" && r.approvalStage ? <span className="mt-0.5 block text-xs text-muted-foreground">Stage {r.approvalStage}</span> : null}
                         {r.requestedExpiry && ["pending", "approved", "fulfilled"].includes(r.status) ? <span className="mt-0.5 block text-xs text-muted-foreground">Until {when(r.requestedExpiry)}</span> : null}

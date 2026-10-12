@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chooseAccount, placeholderRef, requestFulfilment, requestProgress } from "./pendingGrantRules";
+import { chooseAccount, endedRemoval, placeholderRef, requestFulfilment, requestProgress } from "./pendingGrantRules";
 
 describe("chooseAccount (ACCESS-P0-28)", () => {
   it("uses the subject's one real account, ahead of a placeholder", () => {
@@ -45,5 +45,24 @@ describe("requestProgress (ACCESS-P0-30)", () => {
   it("falls back to the grants when the request has no task", () => {
     expect(requestProgress([], [{ fulfilmentStatus: "none", revokedAt: null }])).toBe("verified");
     expect(requestProgress([t("cancelled")], [])).toBe("untracked");
+  });
+});
+
+describe("endedRemoval (WID-C02)", () => {
+  const g = (fulfilmentStatus: string, removalStatus: string | null, revokedAt: string | null = null) => ({ fulfilmentStatus, removalStatus, revokedAt });
+  const GONE = "2026-10-11T00:00:00Z";
+  it("is pending while any grant is live and not marked removed, including before the sweep marks it", () => {
+    expect(endedRemoval([g("verified", null)])).toBe("pending");
+    expect(endedRemoval([g("verified", "pending_removal"), g("verified", "removed_unverified")])).toBe("pending");
+  });
+  it("is removed but not verified until a read of the system revokes every grant", () => {
+    expect(endedRemoval([g("verified", "removed_unverified"), g("verified", "removed_unverified", GONE)])).toBe("removed_unverified");
+  });
+  it("is verified only when every grant is revoked", () => {
+    expect(endedRemoval([g("verified", "removed_unverified", GONE), g("pending_fulfilment", null, GONE)])).toBe("verified");
+  });
+  it("tells withdrawn grants (never fulfilled) apart, and has nothing to say without grants", () => {
+    expect(endedRemoval([g("pending_fulfilment", null, GONE)])).toBe("never_fulfilled");
+    expect(endedRemoval([])).toBeNull();
   });
 });

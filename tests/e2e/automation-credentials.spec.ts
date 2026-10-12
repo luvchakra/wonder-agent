@@ -13,7 +13,8 @@ import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
  *   Configuration, but cannot list users (403); nothing of another
  *   organization is reachable; pages are refused (401).
  * - Every call is audited with the owner identity as on-behalf-of.
- * - Rate limit (429), expiry (401) and revocation (401) stop it.
+ * - Rate limit (429), expiry (401) and revocation (401) stop it, and each
+ *   refusal is audited (WID-H06); the database caps expiry at 365 days.
  * - Roles beyond the giver's own permissions are refused.
  * - WID-H06: a role given to an approved credential pauses it until someone
  *   other than the giver approves; then it works again.
@@ -182,21 +183,44 @@ test.describe.serial("automation credentials", () => {
     await api.dispose();
   });
 
-  test("rate limit, expiry and revocation stop it", async ({ page, baseURL }) => {
+  test("rate limit, expiry, rotation and revocation stop it", async ({ page, baseURL }) => {
     const api = await bearer(baseURL);
     await db().from("automation_credentials").update({ rate_limit_per_minute: 1 }).eq("id", credentialId);
-    // The counter may already hold this minute's calls; within two calls the limit applies.
-    const statuses = [(await api.get("/api/v1/integrations")).status(), (await api.get("/api/v1/integrations")).status()];
+    await db().from("automation_credential_usage").delete().eq("credential_id", credentialId);
+    // Three calls: the second is over the limit, or the third if the minute turns after the first.
+    const statuses: number[] = [];
+    for (let i = 0; i < 3; i++) statuses.push((await api.get("/api/v1/integrations")).status());
     expect(statuses).toContain(429);
     await db().from("automation_credentials").update({ rate_limit_per_minute: 120 }).eq("id", credentialId);
+    // WID-H06: refusals leave evidence; the first call over the limit each minute is audited.
+    const refusals = async () =>
+      ((await db().from("audit_logs").select("metadata").eq("tenant_id", tenantId).eq("object_id", credentialId).eq("action", "automation.api_call").eq("outcome", "failure")).data ?? []).map(
+        (r) => (r.metadata as { refused?: string }).refused,
+      );
+    expect(await refusals()).toContain("RATE_LIMITED");
+
+    // WID-H06: the database refuses an expiry more than 365 days ahead, whoever writes it.
+    const tooFar = await db().from("automation_credentials").update({ expires_at: new Date(Date.now() + 400 * 86_400_000).toISOString() }).eq("id", credentialId);
+    expect(tooFar.error?.message).toMatch(/at most 365 days/);
 
     const { data: before } = await db().from("automation_credentials").select("expires_at").eq("id", credentialId).single();
     await db().from("automation_credentials").update({ expires_at: new Date(Date.now() - 60_000).toISOString() }).eq("id", credentialId);
     const expired = await api.get("/api/v1/integrations");
     expect(expired.status()).toBe(401);
     expect((await expired.json()).error.code).toBe("CREDENTIAL_EXPIRED");
+    expect(await refusals()).toContain("CREDENTIAL_EXPIRED");
     await db().from("automation_credentials").update({ expires_at: before!.expires_at }).eq("id", credentialId);
     expect((await api.get("/api/v1/integrations")).status()).toBe(200);
+
+    // WID-H06: rotating the secret stops the old one at once; the new one works.
+    const rotated = await page.request.post(`/api/v1/automation-credentials/${credentialId}`, { data: { action: "rotate" } });
+    expect(rotated.status(), await rotated.text()).toBe(200);
+    const old = api;
+    expect((await old.get("/api/v1/integrations")).status()).toBe(401);
+    secret = (await rotated.json()).data.secret as string;
+    const fresh = await bearer(baseURL);
+    expect((await fresh.get("/api/v1/integrations")).status()).toBe(200);
+    await old.dispose();
 
     await page.goto("/settings/automation");
     const item = page.getByRole("row", { name: new RegExp(credentialName) });
@@ -205,9 +229,10 @@ test.describe.serial("automation credentials", () => {
     await item.getByRole("button", { name: "Revoke" }).click();
     await expect(item).toContainText("Revoked");
 
-    const revoked = await api.get("/api/v1/integrations");
+    const revoked = await fresh.get("/api/v1/integrations");
     expect(revoked.status()).toBe(401);
     expect((await revoked.json()).error.code).toBe("CREDENTIAL_REVOKED");
-    await api.dispose();
+    expect(await refusals()).toContain("CREDENTIAL_REVOKED");
+    await fresh.dispose();
   });
 });
