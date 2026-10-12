@@ -9,6 +9,8 @@ import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { listPermissionHolders } from "@/lib/rbac/permissionHolders";
 import { canAct, ESCALATE_AFTER_DAYS, isOverdue, needsEscalation, taskDueAt, needsReminder, needsUnconfirmedRemovalReminder, UNCONFIRMED_REMOVAL_DAYS, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
 import { accountToCreateFirst, planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
+import { retryWaitsForRead } from "./connectorFulfilmentRules";
+import { readFinishedSince } from "@/modules/integrations/service";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
 
 /**
@@ -224,7 +226,7 @@ export async function actOnFulfilmentTask(
   const admin = supabaseServiceRole();
   const { data: task, error } = await admin
     .from("access_fulfilment_tasks")
-    .select("id, tenant_id, kind, status, assignee_identity_id, claimed_by, access_grant_id, removal_grant_id, connector_status")
+    .select("id, tenant_id, kind, status, assignee_identity_id, claimed_by, access_grant_id, removal_grant_id, connector_status, connector_integration_id, connector_uncertain_at")
     .eq("tenant_id", tenantId)
     .eq("id", taskId)
     .maybeSingle();
@@ -244,6 +246,10 @@ export async function actOnFulfilmentTask(
   // INTEGRATION-P0-13: whoever may work on the task may ask the connector to try again.
   if (action === "retry_connector") {
     if (task.connector_status !== "failed" || task.status !== "open") throw new ApiError(409, "INVALID_TRANSITION", "Only an open task the connector failed can be tried again");
+    // WID-H02: the system may already have made this change; never send it again before reading it.
+    const uncertainAt = (task.connector_uncertain_at as string | null) ?? null;
+    const readFinished = uncertainAt && task.connector_integration_id ? await readFinishedSince(tenantId, task.connector_integration_id as string, uncertainAt) : false;
+    if (retryWaitsForRead(uncertainAt, readFinished)) throw new ApiError(409, "READ_PENDING", "The system may already have this change. Wait for WonderID's read of the system to finish, then try again if the task is still open.");
     const plan = await planConnectorFulfilment(tenantId, taskId);
     if (!plan) throw new ApiError(409, "CONNECTOR_UNAVAILABLE", "No connector can make this change now (writes are off, or the system does not support it)");
     const result = await runConnectorFulfilment(tenantId, plan, actor.userId);

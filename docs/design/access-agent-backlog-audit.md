@@ -2970,3 +2970,40 @@ Verified:
 
 Left out: merge reversal and a source-priority policy. Both are tracked in
 `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — Connector tasks: one key per task, read before retrying an unclear change (WID-H02)
+
+With the Integration Agent entry of the same date (the write path).
+- `connectorFulfilment.ts` passes `taskKey` (`fulfil:<task>`), so every
+  attempt at a task's change sends the system the same key. Attempt
+  records keep `attemptKey`.
+- An `uncertain` write result is not retried. The task goes back to its
+  owner with `uncertainReason` ("the system may have made this change…"),
+  `connector_uncertain_at` is set (migration 0142, applied), and a
+  verification sync starts. Reconciliation closes the task if the change
+  is there (`closeTasksForGrants` already takes open tasks).
+- A connector run that never reported back (`releaseLostConnectorRuns`) is
+  treated the same way: uncertain, with a verification sync.
+- "Try again" (`retry_connector`) is refused with 409 `READ_PENDING` until
+  a complete read of the connection, started after the unclear outcome,
+  has finished (`retryWaitsForRead`, Integration's `readFinishedSince`).
+  The claim clears the mark.
+
+Verified:
+- `npx vitest run modules/integrations modules/access-governance`: 633
+  passed, plus the restored mass-change guard case (13/13 in
+  `connectorWriteRules.test.ts`).
+- `npm run typecheck`, eslint on the changed files and `npm run build`:
+  clean.
+- E2E, local, against the production build:
+  `connector-provisioning.spec.ts` 21/21 (8.2 min). New cases:
+  - a repeatable change: three tries with one key;
+  - a non-repeatable change made, then answered 503: sent once, and
+    closed by the read;
+  - a non-repeatable change that failed: the retry is refused until the
+    held read is released, then works with the same key.
+  The first run found a fixture clash (a disabled account, a person the
+  F3 test uses); the people were changed.
+
+Left out (tracked): process-level crash tests, and compensation for an
+account created whose access was not added.

@@ -22,7 +22,7 @@ export {
   type CreateIntegrationInput,
 } from "./integrations";
 export { setCredential } from "./credentials";
-export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs, listLatestCompletedSyncStarts, resolveHeldMissing } from "./syncJobs";
+export { createSyncJob, runSyncJob, getSyncJob, listSyncJobs, listLatestCompletedSyncStarts, readFinishedSince, resolveHeldMissing } from "./syncJobs";
 export { getNormalizedObjects, getNormalizedObjectsAsSystem, getNormalizedObjectsForTenant } from "./objects";
 export { discoverMcpTools } from "./mcpTools";
 export { getMcpInventory } from "./mcpInventory";

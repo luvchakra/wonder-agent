@@ -113,6 +113,26 @@ export async function listLatestCompletedSyncStarts(tenantId: string): Promise<M
 }
 
 /**
+ * WID-H02: whether a complete read of a connection that started at or
+ * after `since` has finished, the steps after it (reconciliation) included.
+ * Service role, filtered on the tenant: the caller (a fulfilment task's
+ * retry) has already checked the task belongs to it.
+ */
+export async function readFinishedSince(tenantId: string, integrationId: string, since: string): Promise<boolean> {
+  const { data, error } = await supabaseServiceRole()
+    .from("integration_sync_jobs")
+    .select("id, tenant_id")
+    .eq("tenant_id", tenantId)
+    .eq("integration_id", integrationId)
+    .eq("status", "succeeded")
+    .neq("pipeline_status", "running")
+    .gte("started_at", since)
+    .limit(1);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return ((data ?? []) as { tenant_id: string }[]).some((r) => r.tenant_id === tenantId);
+}
+
+/**
  * INTEGRATION-P0-18. For each kind this run read completely (stagingRules),
  * marks the staged objects it did not see as missing at the source, through
  * stage_mark_missing() (0117), which applies the organization's mass-missing

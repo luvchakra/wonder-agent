@@ -472,14 +472,35 @@ Each is one request (`method` POST, PUT, PATCH or DELETE; `path`, `query`,
 target values are the ids the system itself gave the account and the
 entitlement, as imported; for a new account, the email, username and
 display name of the identity it is for (a value the identity lacks fails
-the write with that reason, and the task goes to its owner). The request carries `Idempotency-Key`, one per
-attempt. For example:
+the write with that reason, and the task goes to its owner). The request carries `Idempotency-Key`. Since
+WID-H02 (2026-10-12) it is one per task and change, not per attempt: every
+attempt at the same change sends the same key, and a changed request (a
+corrected definition) sends a new one.
+
+**Repeatable changes** (WID-H02). Add `"repeatable": true` to an http
+operation when sending the same change twice cannot make it twice: the
+system honours `Idempotency-Key`, or the change sets a state (adding a
+member who is already there, setting `enabled` to false). It decides what
+happens when the outcome of a change is unclear (a timeout, a dropped
+connection, 408 or 5xx):
+- **Repeatable:** WonderID sends it again, up to three tries.
+- **Not repeatable** (the default): WonderID does not send it again. It
+  reads the system (a verification sync). If the change is there,
+  reconciliation closes the task. If not, the task's owner may try again,
+  but only once that read has finished.
+
+A 429, or a connection that never reached the system, is retried either
+way. A 4xx is never retried. LDAP changes are always repeatable: the
+directory's "already there" answer counts as done. In `scim-2`, adding,
+removing and disabling are repeatable; creating a user is not.
+
+For example:
 
 ```json
 "write": {
   "revoke_access": { "request": { "method": "DELETE", "path": "/groups/{target.entitlement}/members/{target.account}" } },
-  "disable_account": { "request": { "method": "PATCH", "path": "/users/{target.account}", "body": { "enabled": false } } },
-  "grant_access": { "request": { "method": "PUT", "path": "/groups/{target.entitlement}/members/{target.account}" } },
+  "disable_account": { "repeatable": true, "request": { "method": "PATCH", "path": "/users/{target.account}", "body": { "enabled": false } } },
+  "grant_access": { "repeatable": true, "request": { "method": "PUT", "path": "/groups/{target.entitlement}/members/{target.account}" } },
   "create_account": { "request": { "method": "POST", "path": "/users", "body": { "email": "{target.email}", "name": "{target.displayName}" } } }
 }
 ```

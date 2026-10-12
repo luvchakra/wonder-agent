@@ -147,6 +147,16 @@ export function writeCapabilitiesOf(def: ConnectorDefinition): ConnectorCapabili
   };
 }
 
+/**
+ * WID-H02: whether sending a definition's change twice cannot make it
+ * twice (see WriteSpec). LDAP: always; http: only when declared.
+ */
+export function writeIsRepeatable(def: ConnectorDefinition, operation: DefinitionWriteOperation): boolean {
+  const spec = def.write?.[operation];
+  if (!spec) return false;
+  return spec.ldap !== undefined || spec.repeatable === true;
+}
+
 /** Fills every string in a write body from the scope (settings and target). */
 function fillBody(value: unknown, scope: TemplateScope): unknown {
   if (typeof value === "string") return fillTemplate(value, scope);

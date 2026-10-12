@@ -382,8 +382,16 @@ export type LdapWriteSpec = {
   add?: Record<string, string[]>;
 };
 
-/** One declared change: an http request (http driver) or an LDAP change (ldap driver). */
-export type WriteSpec = { request: HttpRequestSpec; ldap?: never } | { ldap: LdapWriteSpec; request?: never };
+/**
+ * One declared change: an http request (http driver) or an LDAP change (ldap driver).
+ * WID-H02: `repeatable: true` declares that sending the same http change
+ * twice cannot make it twice: the system honours `Idempotency-Key`, or the
+ * change sets a state (adds a member who may already be there, sets
+ * `active` to false). Only then is a change whose outcome is unclear (a
+ * timeout, a 5xx) sent again without reading the system first. LDAP
+ * changes are always repeatable: "already there" counts as done.
+ */
+export type WriteSpec = { request: HttpRequestSpec; repeatable?: boolean; ldap?: never } | { ldap: LdapWriteSpec; request?: never; repeatable?: never };
 
 export type FileSourceSpec = {
   /** `{settings.<url setting>}`: the HTTPS address of the CSV. Empty means "read uploaded files". */
