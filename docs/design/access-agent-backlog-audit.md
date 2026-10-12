@@ -2795,3 +2795,35 @@ Verified with the EXPERIENCE-P0-29 entry (Experience audit log).
 
 **Left out.** Grant and create-account tasks stay a person's work until D3's
 second step.
+
+### 2026-10-12 — Connector adds access and creates accounts (INTEGRATION-P0-13 slice 2, with ACCESS-P0-28/29/30)
+
+**Built (`connectorFulfilment.ts`, `connectorFulfilmentRules.ts`, no migration).**
+- **Grant tasks.** A grant task on a real account is planned like a
+  removal: the account's own connection, an entitlement from that same
+  connection, writes on and `grant_access` supported. On success the grant
+  becomes `fulfilled_unverified`, as when a person completes it, and
+  reconciliation verifies it. A placeholder account is never written to.
+- **Create-account tasks.** Planned only for a placeholder (`status
+  pending`): the target is the identity's email, username and display
+  name (`newAccountTarget`; an email or username is required), through the
+  connection the application's live onboarding reconciles against.
+- **Access for someone with no account.** When the grant task's account is
+  a placeholder and that connection can both create accounts and add
+  access (`accountToCreateFirst`), a create-account task opens for the
+  placeholder and the connector creates the account; the grant task waits
+  and its owner is not notified. The verification sync reads the account,
+  `replacePlaceholders()` moves the grant and closes the create task as
+  verified, then `resumeConnectorGrants()` sends each open, untouched grant
+  task on that account to the connector. If the connector failed to
+  create the account, a new grant task notifies its owner as before.
+- Every statement is filtered on `tenantId` and every row is checked
+  against it (§14); no new table, so the slice 1 isolation SQL still
+  covers the columns used.
+
+**Verified.** See the Integration audit log entry of the same date
+(typecheck, eslint, 546 unit tests, E2E `connector-provisioning` 8/8).
+
+**Left out.** A grant task waiting for a connector-created account whose
+read-back never correlates (e.g. the system changed the email) stays open
+with its SLA reminder; it is not escalated sooner.

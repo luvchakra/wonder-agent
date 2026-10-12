@@ -23,7 +23,7 @@ Two things to know first:
 | Create a connection from a type: name, settings, credentials (tested before they are stored, then encrypted) | the type's page → Create connection | `integration.create` |
 | Run a sync now; see sync history | the connection's page (`/integrations/{id}`) | `integration.update` |
 | Schedule (daily; "hourly" also runs daily today) | every connection's page; `PUT /api/v1/integrations/{id}/schedule` | `integration.update` |
-| Let a connection make approved changes in the system (remove access, disable accounts), when its connection type declares `write`. Off by default; failures go back to the task's owner | the connection's page → Changes in the system; `PUT /api/v1/integrations/{id}/writes` | `integration.update` |
+| Let a connection make approved changes in the system (add or remove access, create or disable accounts), when its connection type declares `write`. Off by default; failures go back to the task's owner | the connection's page → Changes in the system; `PUT /api/v1/integrations/{id}/writes` | `integration.update` |
 | Replace credentials | the connection's page; `POST /api/v1/integrations/{id}/connector-credentials` | `integration.update` |
 
 Built-in types: Frappe HR, ERPNext, LDAP directory, Keycloak, Gitea,

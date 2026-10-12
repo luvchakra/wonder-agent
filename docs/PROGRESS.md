@@ -14,7 +14,7 @@ Generated 2026-10-12 from 11 module backlogs.
 
 ## Overall
 
-**219 of 268 tracked stories complete — 82%**
+**220 of 268 tracked stories complete — 82%**
 
 ```
 █████████████████████████████████░░░░░░░  82%
@@ -22,8 +22,8 @@ Generated 2026-10-12 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 219 |
-| Partial | 29 |
+| Done | 220 |
+| Partial | 28 |
 | Deferred | 1 |
 | Not Started | 19 |
 | **Total tracked** | **268** |
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 2 | 45 | `████████████████░░` 89% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 24 | 3 | 0 | 0 | 27 | `████████████████░░` 89% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 25 | 2 | 0 | 0 | 27 | `█████████████████░` 93% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
@@ -142,7 +142,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 24 done · 3 partial · 0 deferred · 0 not started (27 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 25 done · 2 partial · 0 deferred · 0 not started (27 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -165,7 +165,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-10 | Application discovery and unrecognized applications | Done — 2026-09-26, migration 0090 |
 | INTEGRATION-P0-11 | Connector capability model, write interface with idempotency, SSRF guard | Done — 2026-10-12: the write interface has its caller (INTEGRATION-P0-13); definitions declare writes (`write`, http driver); a connection writes only after an administrator turns writes on (D3); failures say whether a retry may help |
 | INTEGRATION-P0-12 | AI-assisted onboarding proposals | Done — 2026-09-26, migration 0091 |
-| INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Partial — 2026-10-12 (D3, migrations 0128–0129): removal and disabling through the connector, retried, verified by a verification sync and reconciliation, failures back to the owner; grants and account creation follow |
+| INTEGRATION-P0-13 | Provisioning and deprovisioning pipeline | Done — 2026-10-12 (D3, migrations 0128–0129): removal, disabling, adding access and creating accounts through the connector, retried, verified by a verification sync and reconciliation, failures back to the owner; access for someone with no account waits for the connector to create it. Ticketed fulfilment is INTEGRATION-P0-26 |
 | INTEGRATION-P0-14 | Connector framework: declarative definitions, http/ldap/sql drivers, catalog, authoring, preview (INTEG-P2-01/P2-03 brought forward by user request) | Done — 2026-10-10, migration 0108 |
 | INTEGRATION-P0-15 | Built-in connectors: Frappe HR, ERPNext, LDAP, Keycloak, Gitea, Mattermost, Nextcloud, PostgreSQL, OpenBao, Kubernetes | Done — 2026-10-10, each certified live against the Planet Express demo company |
 | INTEGRATION-P0-16 | Connector boundary (non-negotiable #20): receivers, Runtime Gateway, MCP driver, Saviynt/Zendesk/MCP/webhook definitions; old adapters and routes removed | Done — 2026-10-10: migration 0109 applied and merged; receivers, Runtime Gateway, MCP driver and the Saviynt/Zendesk/MCP/webhook definitions live, old adapters and routes removed, `connector-boundary.test.ts` enforcing (gateway allowlist entry approved by the user). Retired types and the stale Zendesk credential removed by migration 0113 (run by the owner, 2026-10-10) |

@@ -7,7 +7,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { canAct, dueAt, isOverdue, needsReminder, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
-import { planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
+import { accountToCreateFirst, planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
 
 /**
@@ -143,6 +143,12 @@ export async function openFulfilmentTask(
     const plan = await planConnectorFulfilment(tenantId, data.id as string).catch(() => null);
     if (plan) {
       runAfterResponse(() => runConnectorFulfilment(tenantId, plan));
+      return;
+    }
+    // Access for an account still to be created: the connector creates it first, and adds the access once it is read back.
+    const createFirst = kind === "grant" ? await accountToCreateFirst(tenantId, data.id as string).catch(() => null) : null;
+    if (createFirst) {
+      await openFulfilmentTask(tenantId, { kind: "create_account", accountId: createFirst, requestId: line.requestId, applicationId: line.applicationId });
       return;
     }
     const userId = assignee ? await userOf(tenantId, assignee) : null;

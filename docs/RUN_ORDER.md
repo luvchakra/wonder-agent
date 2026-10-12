@@ -615,3 +615,13 @@ raises a request under the application's policy. The connector removes the
 access, reconciliation verifies it, and the finding resolves as verified
 fixed. `connector-provisioning.spec.ts` runs that scenario end to end against
 a stub system over HTTP (migration 0130). The real target systems wait on D9.
+
+## 2026-10-12 — Connectors add access and create accounts (INTEGRATION-P0-13 done)
+
+D3's second step. A connection with writes on now also adds approved access
+and creates accounts (`grant_access`, `create_account` in a definition's
+`write`). Access for someone with no account waits while the connector
+creates the account; once the next read brings it in, the access is added
+and verified. No migration. Next in F3: QA-P0-26 (provisioning safety
+suite, including the mass-change guard), then INTEGRATION-P0-21 and P0-22;
+the relay and named connectors wait on D7 and D9.

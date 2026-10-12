@@ -2154,3 +2154,41 @@ follow.
 - SCIM and LDAP writes (INTEGRATION-P0-22) and ticketed fulfilment
   (INTEGRATION-P0-26).
 - A mass-change guard on writes (QA-P0-26).
+
+### 2026-10-12 — Connectors add access and create accounts (INTEGRATION-P0-13 slice 2, done; decision D3)
+
+**Built (no migration).**
+- **Definitions.** `write` may now also declare `grant_access` (must use
+  `{target.account}` and `{target.entitlement}`) and `create_account` (must
+  use `{target.email}` or `{target.username}`; `{target.displayName}` is
+  also allowed). Any other `{target.…}` name is refused.
+  `writeCapabilitiesOf()` reports `grantAccess`, `createAccount` and
+  `provision`; turning writes on declares them when supported, turning
+  writes off clears them (`capabilitiesWithWrites`).
+- **Connection page.** "Changes in the system" lists every supported
+  operation ("remove access, disable accounts, add access and create
+  accounts").
+- **The pipeline** is slice 1's (claim, per-attempt idempotency key, two
+  retries on network/429/5xx, verification sync, reconciliation verifies,
+  failures back to the owner). The Access side plans grants and new
+  accounts (Access audit log).
+
+**Verified.**
+- `npm run typecheck` clean; eslint clean on the changed files.
+- `npx vitest run modules/access-governance modules/integrations`:
+  56 files, 546 tests passed (framework write tests cover the new
+  operations, target names, the refusal of `delete_account`, and a missing
+  identity value failing with its reason; `capabilitiesWithWrites` covers
+  `provision`).
+- E2E `connector-provisioning.spec.ts`, local: 8/8 in the spec, plus 7 setup projects (15 passed, 5.3 min). Two new tests:
+  an approved grant added with one PUT and verified; a person with no
+  account: POST /users, then once the account is read back PUT membership,
+  both tasks verified, the placeholder gone).
+- Affected specs (§17.8: connectors), local: `f1-reconciliation`,
+  `access-packages` and `request-catalog`, 35 passed (they go through
+  `replacePlaceholders` and task opening). `next build` succeeds.
+
+**Left out.**
+- Built-in definitions declaring writes (D9's connector stories).
+- SCIM and LDAP writes (INTEGRATION-P0-22), ticketed fulfilment
+  (INTEGRATION-P0-26), the mass-change guard (QA-P0-26).

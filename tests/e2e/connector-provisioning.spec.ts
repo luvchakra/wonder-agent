@@ -22,6 +22,10 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  *   is rogue with a finding; a reviewer asks to remove it; the request is
  *   approved under the application's policy, the connector removes it,
  *   reconciliation verifies it, and the finding resolves.
+ * - Adding access (slice 2): an approved grant is added by the connector
+ *   and verified. For a person with no account yet, the connector creates
+ *   the account first; the next read brings it in and replaces the
+ *   placeholder, then the access is added and verified.
  * - Writes turned off: the next change is a person's task again.
  */
 
@@ -30,6 +34,7 @@ const KEY = `e2e-writer-${stamp}`;
 const mail = (who: string) => `e2e-prov-${who}-${stamp}@example.test`;
 
 type Call = { method: string; path: string; key: string | null };
+const ALL_WRITES = ["revoke_access", "disable_account", "grant_access", "create_account"];
 const system = {
   users: [
     { id: "u-ana", username: "ana", email: mail("ana"), enabled: true },
@@ -37,7 +42,7 @@ const system = {
     { id: "u-cy", username: "cy", email: mail("cy"), enabled: true },
     { id: "u-dee", username: "dee", email: mail("dee"), enabled: true },
   ],
-  members: { "g-fin": ["u-ana", "u-bob", "u-cy"] } as Record<string, string[]>,
+  members: { "g-fin": ["u-ana", "u-bob", "u-cy"], "g-ops": [] } as Record<string, string[]>,
   failWrites: false,
   writes: [] as Call[],
 };
@@ -77,6 +82,8 @@ function definition() {
     write: {
       revoke_access: { request: { method: "DELETE", path: "/groups/{target.entitlement}/members/{target.account}" } },
       disable_account: { request: { method: "PATCH", path: "/users/{target.account}", body: { enabled: false } } },
+      grant_access: { request: { method: "PUT", path: "/groups/{target.entitlement}/members/{target.account}" } },
+      create_account: { request: { method: "POST", path: "/users", body: { email: "{target.email}", name: "{target.displayName}" } } },
     },
   };
 }
@@ -105,16 +112,24 @@ test.beforeAll(async () => {
     if (req.headers.authorization !== "Bearer e2e-token") return send(401, { error: "unauthorized" });
     if (req.method === "GET" && url.pathname === "/api/ping") return send(200, { ok: true });
     if (req.method === "GET" && url.pathname === "/users") return send(200, system.users);
-    if (req.method === "GET" && url.pathname === "/groups") return send(200, [{ id: "g-fin", name: "Finance" }]);
+    if (req.method === "GET" && url.pathname === "/groups") return send(200, [{ id: "g-fin", name: "Finance" }, { id: "g-ops", name: "Operations" }]);
     const members = /^\/groups\/([^/]+)\/members$/.exec(url.pathname);
     if (req.method === "GET" && members) return send(200, (system.members[members[1]] ?? []).map((id) => ({ id })));
     const key = (req.headers["idempotency-key"] as string | undefined) ?? null;
     const membership = /^\/groups\/([^/]+)\/members\/([^/]+)$/.exec(url.pathname);
     const user = /^\/users\/([^/]+)$/.exec(url.pathname);
-    if ((req.method === "DELETE" && membership) || (req.method === "PATCH" && user)) {
+    if ((req.method === "POST" && url.pathname === "/users") || ((req.method === "DELETE" || req.method === "PUT") && membership) || (req.method === "PATCH" && user)) {
       system.writes.push({ method: req.method, path: url.pathname, key });
       if (system.failWrites) return send(503, { error: "maintenance" });
-      if (membership) system.members[membership[1]] = (system.members[membership[1]] ?? []).filter((id) => id !== membership[2]);
+      if (req.method === "POST") {
+        const created = JSON.parse((await body(req)) || "{}") as { email?: string };
+        const username = (created.email ?? "").split("@")[0].replace(/^e2e-prov-|-\d+$/g, "");
+        const id = `u-${username}`;
+        if (!system.users.some((u) => u.id === id)) system.users.push({ id, username, email: created.email ?? "", enabled: true });
+        return send(201, { id });
+      }
+      if (membership && req.method === "PUT" && !system.members[membership[1]]?.includes(membership[2])) system.members[membership[1]].push(membership[2]);
+      if (membership && req.method === "DELETE") system.members[membership[1]] = (system.members[membership[1]] ?? []).filter((id) => id !== membership[2]);
       if (user) {
         const patch = JSON.parse((await body(req)) || "{}") as { enabled?: boolean };
         const u = system.users.find((x) => x.id === user[1]);
@@ -138,7 +153,7 @@ test.describe.serial("connector provisioning", () => {
   test("setup: a writing connection, synced, its application onboarded and reconciled; writes start off", async ({ request, browser }) => {
     test.setTimeout(180_000);
     tenantId = await getTenantIdBySlug(TENANT_ONE.slug);
-    for (const who of ["ana", "bob", "cy", "dee"]) {
+    for (const who of ["ana", "bob", "cy", "dee", "eve"]) {
       const res = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E Prov ${who} ${stamp}`, email: mail(who) } });
       expect(res.status(), await res.text()).toBe(201);
       people[who] = (await res.json()).data.id;
@@ -151,7 +166,7 @@ test.describe.serial("connector provisioning", () => {
 
     // Supported, but off: a new connection writes nothing.
     const writes = await request.get(`/api/v1/integrations/${integrationId}/writes`);
-    expect((await writes.json()).data).toEqual({ supported: ["revoke_access", "disable_account"], enabled: false });
+    expect((await writes.json()).data).toEqual({ supported: ALL_WRITES, enabled: false });
 
     await syncAndWait(request);
 
@@ -201,7 +216,7 @@ test.describe.serial("connector provisioning", () => {
   test("writes on: an approved removal is made by the connector, then verified by reading the system again", async ({ request, page }) => {
     test.setTimeout(120_000);
     const on = await request.put(`/api/v1/integrations/${integrationId}/writes`, { data: { enabled: true } });
-    expect((await on.json()).data).toEqual({ supported: ["revoke_access", "disable_account"], enabled: true });
+    expect((await on.json()).data).toEqual({ supported: ALL_WRITES, enabled: true });
 
     const finance = (await entitlementIdByRef(tenantId, appId, "g-fin"))!;
     const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.ana, applicationId: appId, entitlementId: finance, requestType: "remove", justification: "INTEGRATION-P0-13 connector removal" } });
@@ -287,6 +302,47 @@ test.describe.serial("connector provisioning", () => {
     // A second ask is refused: the finding is closed.
     const again = await request.post(`/api/v1/findings/${raised!.id}/request-removal`);
     expect(again.status()).toBe(409);
+  });
+
+  test("slice 2: approved access is added by the connector and verified", async ({ request }) => {
+    test.setTimeout(120_000);
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    const before = system.writes.length;
+    const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.ana, applicationId: appId, entitlementId: ops, requestType: "grant", justification: "INTEGRATION-P0-13 connector grant" } });
+    expect(res.status(), await res.text()).toBe(201);
+    const req = (await res.json()).data as { id: string; status: string };
+    expect(req.status).toBe("approved");
+
+    await expect.poll(() => system.members["g-ops"].includes("u-ana"), { timeout: 30_000 }).toBe(true);
+    expect(system.writes.slice(before)).toEqual([{ method: "PUT", path: "/groups/g-ops/members/u-ana", key: expect.stringMatching(/^fulfil:[0-9a-f-]+:1$/) }]);
+    await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 60_000 }).toBe("verified");
+    const [task] = await tasksOf(request, req.id);
+    expect(task).toMatchObject({ kind: "grant", status: "verified", connectorStatus: "succeeded" });
+  });
+
+  test("slice 2: no account yet: the connector creates it, the next read brings it in, then the access is added and verified", async ({ request }) => {
+    test.setTimeout(180_000);
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    const before = system.writes.length;
+    const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.eve, applicationId: appId, entitlementId: ops, requestType: "grant", justification: "INTEGRATION-P0-13 create then grant" } });
+    expect(res.status(), await res.text()).toBe(201);
+    const req = (await res.json()).data as { id: string; status: string };
+    expect(req.status).toBe("approved");
+
+    // Account first, named after Eve; then, once it is read back, the access.
+    await expect.poll(() => system.members["g-ops"].includes("u-eve"), { timeout: 90_000 }).toBe(true);
+    expect(system.writes.slice(before).map((w) => `${w.method} ${w.path}`)).toEqual(["POST /users", "PUT /groups/g-ops/members/u-eve"]);
+    expect(system.users.find((u) => u.id === "u-eve")?.email).toBe(mail("eve"));
+    await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 90_000 }).toBe("verified");
+    const tasks = await tasksOf(request, req.id);
+    expect(tasks.map((t) => [t.kind, t.status, t.connectorStatus]).sort()).toEqual([
+      ["create_account", "verified", "succeeded"],
+      ["grant", "verified", "succeeded"],
+    ]);
+    // The placeholder is gone: Eve has one account, the real one.
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const { data: accounts } = await db.from("accounts").select("external_account_ref, status").eq("tenant_id", tenantId).eq("application_id", appId).eq("identity_id", people.eve);
+    expect(accounts).toEqual([{ external_account_ref: "u-eve", status: "active" }]);
   });
 
   test("writes off again: the next change is a person's task", async ({ request }) => {

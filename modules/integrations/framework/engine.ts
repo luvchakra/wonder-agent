@@ -123,7 +123,14 @@ export function capabilitiesOf(def: ConnectorDefinition): ConnectorCapabilities 
  */
 export function writeCapabilitiesOf(def: ConnectorDefinition): ConnectorCapabilities {
   const w = def.write ?? {};
-  return { revokeAccess: Boolean(w.revoke_access), disableAccount: Boolean(w.disable_account), deprovision: Boolean(w.revoke_access || w.disable_account) };
+  return {
+    revokeAccess: Boolean(w.revoke_access),
+    disableAccount: Boolean(w.disable_account),
+    grantAccess: Boolean(w.grant_access),
+    createAccount: Boolean(w.create_account),
+    deprovision: Boolean(w.revoke_access || w.disable_account),
+    provision: Boolean(w.grant_access || w.create_account),
+  };
 }
 
 /** Fills every string in a write body from the scope (settings and target). */

@@ -283,7 +283,7 @@ export type ResourceSpec = {
  * definition can make. Reversible ones come first: removing an
  * entitlement from an account and disabling an account.
  */
-export const DEFINITION_WRITE_OPERATIONS = ["revoke_access", "disable_account"] as const;
+export const DEFINITION_WRITE_OPERATIONS = ["revoke_access", "disable_account", "grant_access", "create_account"] as const;
 export type DefinitionWriteOperation = (typeof DEFINITION_WRITE_OPERATIONS)[number];
 
 /**
