@@ -55,6 +55,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Connections can sign in with the provider: an administrator presses Connect and approves on the system's own sign-in page. |
 | 12 Oct 2026 | Connection types can be downloaded and opened elsewhere, and a connection can move to a newer version after a preview; this guide was corrected where it promised more than the product does. |
 | 12 Oct 2026 | Any application with a SCIM 2.0 service can be connected and make approved changes (add and remove group members, disable and create users); LDAP directories can add and remove group members. |
+| 12 Oct 2026 | Stronger safeguards: emergency controls block in every gateway mode; high-risk access always needs a person; nobody approves their own request; automation credentials never approve or certify. |
 
 ---
 
@@ -79,7 +80,7 @@ The everyday cycle looks like this:
 
 **Two principles hold everywhere:**
 - **Nothing counts until it is verified.** A change counts as done only after WonderID reads the system again and sees it.
-- **People decide.** Access changes are approved by people, or automatically under a request policy an administrator set; automatic approvals are recorded as such. AI only suggests.
+- **People decide.** Access changes are approved by people. A request policy can approve low- and medium-risk requests automatically, recorded as such; high-risk access always needs a person. Automation credentials and AI never approve.
 
 **What WonderID is not:**
 - It is not your sign-in provider, HR system, password vault or security monitoring tool.
@@ -162,9 +163,9 @@ A gap between them, such as access the agent shouldn't have or something it did 
 **The Runtime Gateway**
 - **What it is:** agents can ask the gateway before taking an action. Only actions sent to the gateway are checked; an agent that calls a system directly is not checked or stopped.
 - **Two modes:**
-  - *Observe* (the default): the decision is recorded and the agent is told to go ahead.
+  - *Observe* (the default): the decision is recorded and the agent is told to go ahead, except when an emergency control applies or no decision can be worked out: then it is told no.
   - *Enforce:* the agent is told to allow or block the action, against its contract and access. A platform administrator switches it on for an organization. If no decision can be worked out, the answer is block.
-- **Emergency controls:** an organization-wide stop, or blocking a tool, an MCP server or a session. They block only in Enforce mode; in Observe they are recorded. To stop one agent, suspend it.
+- **Emergency controls:** an organization-wide stop, or blocking a tool, an MCP server or a session. They block at once, in both modes. To stop one agent, suspend it.
 - **API keys:** each agent can have its own API key for the gateway.
 
 **Inventories**
@@ -285,8 +286,8 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
   - whether low-risk requests are approved automatically;
   - how long access may last;
   - whether a reason is required.
-- Nobody can approve a catalog request they made, or one that is for them.
-- A request policy can approve requests below its risk level automatically; these are recorded as approved automatically.
+- Nobody can approve a request they made, or one that is for them.
+- A request policy can approve low- and medium-risk requests automatically; these are recorded as approved automatically. High-risk requests always wait for a person.
 - Separation-of-duties rules can block a request that would give a conflicting combination of access.
 
 **Access packages**
@@ -342,7 +343,7 @@ An approved request is not access yet. It becomes access once the change is made
 - **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it.
 - **Limits:** it expires within a year, can be limited to certain network addresses, and is rate-limited.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
-- **What it can do:** only what its roles allow. It can never manage automation credentials.
+- **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions.
 - **Audit:** every call it is allowed to make is audited, and so is every call refused for its network address.
 - **Where:** Settings → Automation Credentials.
 
@@ -522,7 +523,7 @@ These pages are for the WonderID service operator only, never for customers:
 | A change applied twice | Every attempt carries a key that systems supporting it use to ignore repeats; changes are verified by reading the system again |
 | "Done" without it really being done | Nothing is verified until WonderID reads the system again |
 | A connection writing when it shouldn't | Changes are off until an administrator turns them on, and only for what the connection type supports |
-| Someone approving their own access | Not allowed for catalog requests; key actions need a second person |
+| Someone approving their own access | Not allowed; key actions need a second person |
 | AI making a decision | AI only suggests; fixed rules and people decide |
 | Leaked passwords or keys | Secrets are encrypted, shown masked, never logged, and never sent to the browser |
 | Tampering with the record | The audit trail can't be edited, is chained, and is purged only by retention policy |

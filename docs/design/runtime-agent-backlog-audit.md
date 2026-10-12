@@ -910,3 +910,23 @@ gateway.
 
 Verified: `npx vitest run modules/runtime-assurance/gateway.test.ts`
 passed.
+
+### 2026-10-12 — Emergency controls block in every gateway mode (WID-C03, owner decision)
+
+- `effectiveDecisionOf` (`gateway.ts`): in Observe mode the agent is told
+  DENY when the decision, or any of its steps, denied with KILL_SWITCH,
+  TOOL_SUSPENDED, MCP_SERVER_SUSPENDED, SESSION_TERMINATED or
+  EVALUATION_FAILED. Every other denial only advises.
+  - The steps matter: the first E2E run showed that the decision's own
+    code names its first failing check, which may come before the
+    emergency step.
+- The tool filter hides those tools in Observe mode too.
+- The emergency card, the Runtime page and the help text now say so.
+
+Verified:
+- `gateway.test.ts` (runtime suite): 75 passed.
+- E2E: `emergency-controls`, `runtime-gateway` and `gateway-enforcement`
+  pass.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`. Next: bypass
+detection.

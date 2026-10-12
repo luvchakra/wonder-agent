@@ -8,7 +8,7 @@ import { openConnection, type ReceivingConnection } from "./support/connections"
  * - the kill switch and a tool suspension are engaged through the UI (with
  *   confirmation and reason), change the gateway's recorded decision, and
  *   can be lifted
- * - tool filtering in observe-only mode hides nothing but reports what
+ * - tool filtering in observe-only mode hides a suspended tool (WID-C03) and reports what
  *   enforcement would hide
  * - "Revoke all keys" cuts the agent off at once
  * - a read-only user sees the controls but cannot operate them
@@ -92,8 +92,8 @@ test.describe.serial("emergency controls", () => {
     try {
       const d = await decide({ requestId: `ks-${Date.now()}`, action: "READ" });
       expect(emergencyStep(d.steps)).toBe("KILL_SWITCH");
-      // Observe-only: recorded, not enforced.
-      expect(d.effectiveDecision).toBe("ALLOW");
+      // WID-C03 (owner decision 2026-10-12): the kill switch blocks in every mode.
+      expect(d.effectiveDecision).toBe("DENY");
     } finally {
       await page.getByRole("button", { name: "Release kill switch" }).click();
       await confirmWithReason(page, "Release", "E2E drill over");
@@ -122,8 +122,8 @@ test.describe.serial("emergency controls", () => {
     expect(filter.status()).toBe(200);
     const f = (await filter.json()).data;
     expect(f.mode).toBe("OBSERVE_ONLY");
-    // Observe-only: nothing is hidden, but enforcement's verdict is reported.
-    expect(f.visible).toEqual([tool, "get_customer"]);
+    // WID-C03: a suspended tool is hidden in every mode; enforcement's full verdict is still reported.
+    expect(f.visible).toEqual(["get_customer"]);
     expect(f.wouldHide.map((h: { tool: string }) => h.tool)).toContain(tool);
 
     await row.getByRole("button", { name: "Lift" }).click();

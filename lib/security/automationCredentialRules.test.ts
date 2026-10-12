@@ -10,6 +10,8 @@ import {
   overRateLimit,
   parseCidrs,
   roleEscalation,
+  trustedClientIp,
+  HUMAN_ONLY_PERMISSIONS,
   refusalFor,
 } from "./automationCredentialRules";
 
@@ -108,5 +110,32 @@ describe("role escalation", () => {
     expect(roleEscalation(["integration.read"], ["integration.read", "automation.manage"])).toEqual([]);
     expect(roleEscalation(["integration.read", "users.view"], ["integration.read"])).toEqual(["users.view"]);
     expect(roleEscalation(["automation.manage"], ["automation.manage"])).toEqual(["automation.manage"]);
+  });
+});
+
+describe("WID-H06 (owner decision 2026-10-12): human-only permissions", () => {
+  it("a credential can never be given approval, certification or credential management, even by someone who holds them", () => {
+    for (const p of HUMAN_ONLY_PERMISSIONS) expect(roleEscalation([p, "access.read"], [p, "access.read"])).toEqual([p]);
+    expect(HUMAN_ONLY_PERMISSIONS).toEqual(expect.arrayContaining(["access.approve", "agent.certify", "automation.manage"]));
+  });
+});
+
+describe("WID-H08: the caller's address comes only from a trusted header", () => {
+  const headers = (h: Record<string, string>) => (name: string) => h[name] ?? null;
+  it("never trusts a caller-supplied x-forwarded-for", () => {
+    expect(trustedClientIp(headers({ "x-forwarded-for": "10.0.0.5" }), {})).toBeNull();
+    expect(trustedClientIp(headers({ "x-forwarded-for": "10.0.0.5", "x-real-ip": "10.0.0.5" }), {})).toBeNull();
+  });
+  it("on Vercel, reads the headers Vercel sets", () => {
+    expect(trustedClientIp(headers({ "x-forwarded-for": "10.0.0.5", "x-vercel-forwarded-for": "203.0.113.7" }), { VERCEL: "1" })).toBe("203.0.113.7");
+    expect(trustedClientIp(headers({ "x-real-ip": "203.0.113.8" }), { VERCEL: "1" })).toBe("203.0.113.8");
+  });
+  it("self-hosted: the configured header, last hop when several", () => {
+    expect(trustedClientIp(headers({ "x-forwarded-for": "10.0.0.5, 198.51.100.4" }), { CLIENT_IP_HEADER: "X-Forwarded-For" })).toBe("198.51.100.4");
+    expect(trustedClientIp(headers({}), { CLIENT_IP_HEADER: "x-client-ip" })).toBeNull();
+  });
+  it("an unknown address fails closed for a credential limited to certain addresses", () => {
+    expect(addressAllowed(null, ["203.0.113.0/24"])).toBe(false);
+    expect(addressAllowed(null, [])).toBe(true);
   });
 });

@@ -20,6 +20,7 @@ import {
   hashAutomationKey,
   isWellFormedAutomationKey,
   overRateLimit,
+  trustedClientIp,
   parseCidrs,
   roleEscalation,
   refusalFor,
@@ -511,7 +512,8 @@ async function automationAccessNow(): Promise<{ accessToken: string; userId: str
   if (found.kind === "invalid") throw new ApiError(401, "UNAUTHENTICATED", "Invalid credential");
   const { row } = found;
   const h = await headers();
-  const ip = h.get("x-forwarded-for")?.split(",")[0]?.trim() || h.get("x-real-ip") || null;
+  // WID-H08: only a header the platform's edge sets; never the caller's own x-forwarded-for.
+  const ip = trustedClientIp((name) => h.get(name), { CLIENT_IP_HEADER: process.env.CLIENT_IP_HEADER, VERCEL: process.env.VERCEL });
   const request = h.get("x-wonderid-request") ?? "";
   const [method, path] = request.split(" ");
   const now = new Date();
@@ -556,5 +558,14 @@ async function automationAccessNow(): Promise<{ accessToken: string; userId: str
     });
   }
   return { accessToken, userId: row.backing_user_id };
+}
+
+/**
+ * WID-H06 (owner decision 2026-10-12): a decision that must be a person's
+ * (approving access, certifying) is refused for an automation credential's
+ * call, whatever permissions its roles carry.
+ */
+export async function refuseAutomationCaller(what: string): Promise<void> {
+  if (await getAutomationAccess()) throw new ApiError(403, "HUMAN_DECISION_REQUIRED", `${what} is a person's decision; an automation credential cannot make it`);
 }
 

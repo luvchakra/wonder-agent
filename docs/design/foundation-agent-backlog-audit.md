@@ -2982,3 +2982,43 @@ story; F1 is complete.
 - Other modules' member pickers (owners, investigations) may list an
   automation member by its "Automation: …" name; excluding them there is
   for those modules.
+
+### 2026-10-12 — Automation credentials never approve or certify (WID-H06, owner decision)
+
+The owner approved forbidding automation credentials from approving access.
+- `HUMAN_ONLY_PERMISSIONS` (`automationCredentialRules.ts`) =
+  `automation.manage`, `access.approve`, `agent.certify`.
+- `roleEscalation` refuses assigning them, even when the assigner holds
+  them.
+- `getTenantContext` strips them from an automation call's grants, so a
+  role changed later cannot reintroduce them.
+- `refuseAutomationCaller` refuses automation callers at:
+  - access decisions;
+  - certification decisions and attestations, which use
+    `compliance.manage`, a permission automation legitimately holds;
+  - onboarding approval.
+
+Verified:
+- `automationCredentialRules.test.ts`: 13 passed.
+- E2E `automation-credentials.spec.ts`: 4/4.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`. Next: four-eyes on role
+changes to an active credential.
+
+### 2026-10-12 — Automation address allow-list trusts only the edge (WID-H08)
+
+Raised by the hourly findings audit. `automationAccessNow` took the
+caller's first `x-forwarded-for` value, which a caller can set. Now
+`trustedClientIp` reads:
+- the header named by `CLIENT_IP_HEADER` (self-hosted ingress; last hop);
+- on Vercel, `x-vercel-forwarded-for` or `x-real-ip`;
+- otherwise nothing, so a credential with address limits is refused.
+
+Credentials without address limits are unaffected.
+
+Verified: `npx vitest run lib/security`, 71 passed, including the new
+WID-H08 tests (spoofed header ignored, Vercel headers, configured header's
+last hop, unknown address refused).
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+

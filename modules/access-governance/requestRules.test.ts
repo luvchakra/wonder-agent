@@ -73,9 +73,10 @@ describe("evaluateRequest (spec §11.5)", () => {
     expect(evaluateRequest(ctx({ risk: "high" }))).toMatchObject({ ok: true, initialStatus: "pending" });
     expect(evaluateRequest(ctx({ policy: policy({ autoApprove: false }) }))).toMatchObject({ ok: true, initialStatus: "pending" });
   });
-  it("WID-C01: a policy whose threshold is critical approves a high-risk request automatically (today's behaviour)", () => {
-    expect(evaluateRequest(ctx({ risk: "high", policy: policy({ riskThreshold: "critical" }) }))).toMatchObject({ ok: true, initialStatus: "approved" });
+  it("WID-C01 (owner decision): high and critical risk always need a person, even under a policy whose threshold is critical", () => {
+    expect(evaluateRequest(ctx({ risk: "high", policy: policy({ riskThreshold: "critical" }) }))).toMatchObject({ ok: true, initialStatus: "pending" });
     expect(evaluateRequest(ctx({ risk: "critical", policy: policy({ riskThreshold: "critical" }) }))).toMatchObject({ ok: true, initialStatus: "pending" });
+    expect(evaluateRequest(ctx({ risk: "medium", policy: policy({ riskThreshold: "critical" }) }))).toMatchObject({ ok: true, initialStatus: "approved" });
   });
   it("missing justification blocks submission where required", () => {
     expect(evaluateRequest(ctx({ justification: " short " }))).toMatchObject({ ok: false, code: "JUSTIFICATION_REQUIRED" });

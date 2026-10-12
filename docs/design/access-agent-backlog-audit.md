@@ -2845,3 +2845,23 @@ the evidence is in `docs/WonderID/HIGH-RISK-FINDINGS.md`. Code: no change.
 
 Verified: `npx vitest run modules/access-governance/requestRules.test.ts`
 passed.
+
+### 2026-10-12 — High risk always needs a person; no self-approval anywhere (WID-C01, owner decisions)
+
+- `needsApproval` now always routes high and critical risk to a person,
+  whatever the policy's threshold (`ALWAYS_HUMAN_RISK`).
+- `decideAccessRequest` refuses SELF_APPROVAL when the requester approves
+  or rejects their own agent request. The check runs after the SoD check:
+  a blocking SoD policy still answers SOD_CONFLICT, and a flag-only one
+  records the conflict, then refuses.
+- `filterToolsForAgent` names emergency controls before lifecycle and
+  contract reasons. Each tool is hidden exactly as before; only the
+  reported code changes, so the gateway can hide suspended tools in
+  Observe mode (WID-C03).
+
+Verified:
+- `requestRules.test.ts` and the access suite: 253 passed.
+- E2E: `sod.spec.ts`, `request-catalog.spec.ts` and
+  `approval-engine.spec.ts` pass.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

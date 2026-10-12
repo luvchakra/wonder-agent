@@ -73,6 +73,28 @@ export function parseCidrs(input: unknown): { ok: true; cidrs: string[] } | { ok
 }
 
 /** Whether `ip` falls in the allowlist. An empty list allows any address; an unknown address never matches a list. */
+/**
+ * WID-H08: the caller's address, only from a header that the platform's own
+ * edge sets, never from one the caller can supply.
+ * - `CLIENT_IP_HEADER` (a self-hosted deployment): the header the trusted
+ *   ingress overwrites. If it lists several addresses, the last is the one
+ *   that ingress added.
+ * - On Vercel: `x-vercel-forwarded-for`, then `x-real-ip`. Vercel sets both
+ *   and does not pass a client's own values through.
+ * - Otherwise: unknown (null), so a credential limited to certain addresses
+ *   is refused (addressAllowed fails closed).
+ */
+export function trustedClientIp(get: (name: string) => string | null, env: { CLIENT_IP_HEADER?: string; VERCEL?: string }): string | null {
+  const configured = env.CLIENT_IP_HEADER?.trim().toLowerCase();
+  if (configured) {
+    const value = get(configured);
+    const last = value?.split(",").map((v) => v.trim()).filter(Boolean).at(-1);
+    return last || null;
+  }
+  if (env.VERCEL === "1") return get("x-vercel-forwarded-for")?.split(",")[0]?.trim() || get("x-real-ip")?.trim() || null;
+  return null;
+}
+
 export function addressAllowed(ip: string | null, cidrs: readonly string[]): boolean {
   if (cidrs.length === 0) return true;
   if (!ip) return false;
@@ -120,12 +142,20 @@ export function overRateLimit(callsThisMinute: number, limit: number): boolean {
 }
 
 /**
+ * Permissions an automation credential never holds, whatever its roles
+ * (owner decision 2026-10-12, WID-H06): it must not mint or approve
+ * credentials, approve access, or certify. Those are people's decisions
+ * (non-negotiable #15). getTenantContext() also strips them from an
+ * automation call's effective permissions.
+ */
+export const HUMAN_ONLY_PERMISSIONS: readonly string[] = ["automation.manage", "access.approve", "agent.certify"];
+
+/**
  * Permissions a role would give a credential that the person assigning it
- * does not hold, plus automation.manage, which a credential never holds
- * (it must not mint or approve credentials). Empty when the role may be
- * assigned.
+ * does not hold, plus the human-only ones, which a credential never holds.
+ * Empty when the role may be assigned.
  */
 export function roleEscalation(rolePermissions: readonly string[], actorPermissions: readonly string[]): string[] {
   const held = new Set(actorPermissions);
-  return [...new Set(rolePermissions.filter((p) => p === "automation.manage" || !held.has(p)))].sort();
+  return [...new Set(rolePermissions.filter((p) => HUMAN_ONLY_PERMISSIONS.includes(p) || !held.has(p)))].sort();
 }
