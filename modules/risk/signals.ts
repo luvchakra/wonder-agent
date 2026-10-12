@@ -120,3 +120,47 @@ export function destructiveCapability(effectiveAccess: AccessGrant[], destructiv
   }
   return { present: names.size > 0, names: [...names].sort() };
 }
+
+/** WID-C03: how long before an observed action its gateway decision may have been asked, and how much clock skew is allowed after it. */
+export const BYPASS_WINDOW_BEFORE_MS = 15 * 60_000;
+export const BYPASS_WINDOW_AFTER_MS = 2 * 60_000;
+const OBSERVED = new Set(["TOOL_EXECUTED", "API_CALL", "DATA_ACCESS", "DELEGATION"]);
+const same = (a: string | null, b: string | null) => (a ?? "").toLowerCase() === (b ?? "").toLowerCase();
+
+/**
+ * WID-C03: gateway bypass. Once an agent asks the Runtime Gateway before
+ * it acts, an action observed from another source (MCP, REST, webhook)
+ * with no matching gateway decision shortly before it went around the
+ * gateway. One that did proceed although its decision was DENY ignored
+ * the gateway. A decision matches on the tool, or, without a tool, on the
+ * action and application. Actions before the agent's first gateway
+ * decision are not judged: nothing was expected of it then. An agent
+ * that never used the gateway is not judged at all.
+ */
+export function gatewayBypass(agentName: string, events: RuntimeEvent[]): SignalTrigger | null {
+  const decisions = events.filter((e) => e.source === "gateway");
+  if (!decisions.length) return null;
+  const enrolledAt = Math.min(...decisions.map((d) => Date.parse(d.eventTime)));
+  const observed = events.filter((e) => e.source !== "gateway" && OBSERVED.has(e.eventType) && Date.parse(e.eventTime) >= enrolledAt);
+  const bypassed: { event: RuntimeEvent; why: string }[] = [];
+  for (const e of observed) {
+    const at = Date.parse(e.eventTime);
+    const match = decisions.find((d) => {
+      const t = Date.parse(d.eventTime);
+      if (t < at - BYPASS_WINDOW_BEFORE_MS || t > at + BYPASS_WINDOW_AFTER_MS) return false;
+      return e.tool ? same(d.tool, e.tool) : same(d.action, e.action) && same(d.application, e.application);
+    });
+    const what = e.tool ?? `${e.action}${e.application ? ` on ${e.application}` : ""}`;
+    if (!match) bypassed.push({ event: e, why: `${what} with no gateway decision` });
+    else if (match.raw?.decision === "DENY" && e.success) bypassed.push({ event: e, why: `${what} although the gateway said DENY` });
+  }
+  if (!bypassed.length) return null;
+  const shown = bypassed.slice(0, 10);
+  return {
+    category: "gateway_bypass",
+    title: `${agentName} acted without the Runtime Gateway`,
+    explanation: `${agentName} uses the Runtime Gateway, but ${bypassed.length} recorded action${bypassed.length === 1 ? "" : "s"} did not follow a gateway decision: ${shown.map((b) => b.why).join("; ")}${bypassed.length > shown.length ? "; and more" : ""}. Only calls sent to the gateway are checked.`,
+    recommendation: "Route every tool call through the gateway (and remove the agent's direct credentials to the target), or suspend the agent while you find the path it used.",
+    evidence: shown.map((b) => ({ evidenceType: "runtime_event" as const, referenceId: b.event.id, summary: `${b.why} at ${b.event.eventTime}` })),
+  };
+}

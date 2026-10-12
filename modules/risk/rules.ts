@@ -5,7 +5,7 @@ import { getAgent, getAgentContract, getOwnershipIssues, listAgentIdentities, li
 import { countOverdueCertificationItems } from "@/modules/certification-compliance/service";
 import { getMcpInventory } from "@/modules/integrations/service";
 import { listAgentApiKeys } from "@/lib/security/agentApiKeys";
-import { credentialHealth, destructiveCapability, suspiciousDelegation, unapprovedToolUse } from "./signals";
+import { credentialHealth, destructiveCapability, gatewayBypass, suspiciousDelegation, unapprovedToolUse } from "./signals";
 import { getEffectiveAccess, listApplications, listPolicyEvaluations } from "@/modules/access-governance/service";
 import { compareShouldCanDid, getDid, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import { writeAudit } from "@/lib/audit/writeAudit";
@@ -291,6 +291,9 @@ export async function evaluateAgentRisk(tenantId: string, agentId: string): Prom
   const unapprovedTools = comparison.outcomes.filter((o) => o.type === "unapproved_tool").map((o) => String(o.evidence.tool));
   const toolUse = unapprovedToolUse(agent.agentName, unapprovedTools, eventsPage.events, contract?.allowedTools ?? []);
   if (toolUse) triggers.push(toolUse);
+  // WID-C03 — actions that went around the Runtime Gateway, for an agent that uses it.
+  const bypass = gatewayBypass(agent.agentName, eventsPage.events);
+  if (bypass) triggers.push(bypass);
 
   // governance_drift — RISK-P0-04, a separate cross-module diff signal,
   // not a duplicate of any category above (those compare current state

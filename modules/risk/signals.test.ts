@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { credentialHealth, destructiveCapability, suspiciousDelegation, unapprovedToolUse } from "./signals";
+import { credentialHealth, destructiveCapability, gatewayBypass, suspiciousDelegation, unapprovedToolUse } from "./signals";
 import type { AgentApiKey } from "@/lib/shared/types/foundation";
 import type { AccessGrant } from "@/lib/shared/types/access-governance";
 import type { AgentRelationship } from "@/lib/shared/types/agent-identity";
@@ -112,5 +112,49 @@ describe("destructiveCapability (CAN)", () => {
   it("a destructive MCP tool only counts when held as a tool permission", () => {
     expect(destructiveCapability([grant("post_journal_entry")], new Set(["post_journal_entry"])).present).toBe(false);
     expect(destructiveCapability([grant("CustomerDB_READ")], new Set()).present).toBe(false);
+  });
+});
+
+describe("gatewayBypass (WID-C03)", () => {
+  const ev = (id: string, over: Partial<RuntimeEvent>): RuntimeEvent =>
+    ({ id, source: "mcp", eventType: "TOOL_EXECUTED", tool: null, action: "READ", application: null, success: true, raw: {}, eventTime: "2026-10-12T10:00:00Z", ...over }) as RuntimeEvent;
+  const decision = (id: string, at: string, over: Partial<RuntimeEvent> = {}) => ev(id, { source: "gateway", eventType: "DECISION_ALLOWED" as RuntimeEvent["eventType"], eventTime: at, raw: { decision: "ALLOW" }, ...over });
+
+  it("judges nothing for an agent that never used the gateway", () => {
+    expect(gatewayBypass("FinanceBot", [ev("e1", { tool: "query_ledger" })])).toBeNull();
+  });
+
+  it("passes an action that followed a matching decision within the window", () => {
+    const events = [decision("d1", "2026-10-12T09:55:00Z", { tool: "query_ledger" }), ev("e1", { tool: "QUERY_LEDGER" })];
+    expect(gatewayBypass("FinanceBot", events)).toBeNull();
+  });
+
+  it("flags an action with no decision, a decision too long before, or for another tool", () => {
+    const events = [
+      decision("d1", "2026-10-12T09:00:00Z", { tool: "query_ledger" }),
+      decision("d2", "2026-10-12T10:59:00Z", { tool: "export_all" }),
+      ev("e1", { tool: "query_ledger", eventTime: "2026-10-12T09:30:00Z" }),
+      ev("e2", { tool: "delete_customer", eventTime: "2026-10-12T11:00:00Z" }),
+    ];
+    const t = gatewayBypass("FinanceBot", events);
+    expect(t?.category).toBe("gateway_bypass");
+    expect(t?.evidence.map((e) => e.referenceId)).toEqual(["e1", "e2"]);
+    expect(t?.explanation).toContain("2 recorded actions");
+  });
+
+  it("flags an action that went ahead although the gateway said DENY", () => {
+    const events = [decision("d1", "2026-10-12T09:59:00Z", { tool: "export_all", raw: { decision: "DENY" } }), ev("e1", { tool: "export_all" })];
+    expect(gatewayBypass("FinanceBot", events)?.evidence[0].summary).toContain("although the gateway said DENY");
+    // A denied action that did not succeed is the gateway working.
+    expect(gatewayBypass("FinanceBot", [events[0], ev("e1", { tool: "export_all", success: false })])).toBeNull();
+  });
+
+  it("matches on action and application when there is no tool, and ignores what came before the first decision", () => {
+    const events = [
+      ev("early", { eventTime: "2026-10-12T08:00:00Z", application: "SAP" }),
+      decision("d1", "2026-10-12T09:58:00Z", { application: "sap" }),
+      ev("e1", { application: "SAP" }),
+    ];
+    expect(gatewayBypass("FinanceBot", events)).toBeNull();
   });
 });

@@ -1193,3 +1193,32 @@ the account is remediated.
   badge, quoted in the request, resolved once Dee's only rogue access is
   removed). `connector-provisioning` and `f1-reconciliation`, local: 32
   passed (25 in the specs, 7 setup). `next build` succeeds.
+
+### 2026-10-12 — Gateway bypass findings (WID-C03)
+
+- New pure signal `gatewayBypass` (`signals.ts`), run by
+  `evaluateAgentRisk` on the agent's last 200 runtime events. For an agent
+  with at least one gateway decision event (`source: gateway`), an
+  observed event from another source after its first decision is flagged
+  when:
+  - no decision matches it from `BYPASS_WINDOW_BEFORE_MS` (15 min) before
+    to `BYPASS_WINDOW_AFTER_MS` (2 min) after; a decision matches on the
+    tool, or without a tool on the action and application, ignoring case;
+  - or its matching decision was DENY and the event succeeded.
+
+  Up to 10 events are cited as evidence.
+- The new category is `gateway_bypass` (`RogueCategory`). Migration 0137
+  extends `risk_findings_category_check`; it is applied, and the severity
+  rules are unchanged.
+
+Verified:
+- `npx vitest run modules/risk`: 78 passed, including 5 new
+  `gatewayBypass` cases.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local: `runtime-gateway.spec.ts` 12/12, including the new WID-C03
+  case. An agent with gateway decisions reports a tool call over its
+  runtime's events channel with no decision, and evaluation returns a
+  `gateway_bypass` finding naming the tool.
+
+Left out: making the gateway the only path. That is an owner decision,
+tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

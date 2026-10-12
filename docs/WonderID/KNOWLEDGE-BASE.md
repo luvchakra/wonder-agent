@@ -60,6 +60,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Ended access shows whether it is really gone; removing access and disabling accounts are due within a day; refused automation calls are audited, and the database caps automation credential expiry at a year. |
 | 12 Oct 2026 | When someone leaves, each access they hold becomes its own removal task, due within a day; removals more than a day overdue go to the access managers. |
 | 12 Oct 2026 | Identity providers and HR systems can push people to WonderID over SCIM 2.0 as they join, change and leave. |
+| 12 Oct 2026 | Agents that act without asking the Runtime Gateway, or despite a "no", now get a gateway bypass finding. |
 
 ---
 
@@ -168,6 +169,7 @@ A gap between them, such as access the agent shouldn't have or something it did 
 
 **The Runtime Gateway**
 - **What it is:** agents can ask the gateway before taking an action. Only actions sent to the gateway are checked; an agent that calls a system directly is not checked or stopped.
+- **Bypass detection:** once an agent uses the gateway, any action WonderID sees from another source (MCP, a runtime or a webhook) without a gateway decision for it shortly before becomes a "gateway bypass" finding. So does an action that went ahead although the gateway said no. This finds a bypass after the fact; it does not stop it. Agents that never use the gateway are not judged.
 - **Two modes:**
   - *Observe* (the default): the decision is recorded and the agent is told to go ahead, except when an emergency control applies or no decision can be worked out: then it is told no.
   - *Enforce:* the agent is told to allow or block the action, against its contract and access. A platform administrator switches it on for an organization. If no decision can be worked out, the answer is block.
