@@ -31,7 +31,7 @@ met, with evidence), or Waiting on the owner.
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
 | WID-C01 Approval policy | P3 | Risk accepted by the owner | None: one administrator may loosen a request policy, audited (owner decision 12 Oct). Revisit under "Decisions to come" |
-| WID-C02 Revocation and expiry | P1 | Partly fixed | Build: the connector disables a leaver's account at once; removals stay with people (owner decision 12 Oct) |
+| WID-C02 Revocation and expiry | P2 | Partly fixed | Done: the connector disables a leaver's account at once (owner decision 12 Oct). For the register to assess |
 | WID-C03 Gateway bypass | P2 | Partly fixed | Build: a per-agent "gateway only" setting; a direct call is critical and suspends the agent's key (owner decision 12 Oct) |
 | WID-H01 Identity correlation | P2 | Partly fixed | Build: unlink with undo, and a conflict list beside the current source-priority rule (owner decisions 12 Oct) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
@@ -53,7 +53,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | Date | Finding | Question | Decision | What it means for the work |
 |---|---|---|---|---|
 | 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
-| 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Build: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
+| 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Done: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
 | 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Build: when on, a detected direct call is a critical finding and the agent's WonderID key is suspended automatically (the kill switch). The owner approved that automatic suspension under #15. |
 | 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Build: an administrator unlinks a source record or account; the attribute values the link changed are restored from history; accounts go back for matching; audited. |
 | 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Build: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources. |
@@ -183,12 +183,28 @@ write. Then:
 **Owner decision (12 Oct):** the connector disables a leaver's account at
 once; removing each access stays a person's task.
 
-**Next (P1):** build disable-on-leave. When a person is disabled or
-terminated, each of their accounts on a connection that supports disabling,
-with changes turned on, is disabled by the connector. This is the
-approved automation path under #15. It goes through the mass-change
-guard, and a failure becomes the account owner's task. Verified by the next
-read, like any connector change.
+**Done:** disable-on-leave. When a person stops working (disabled,
+terminated or archived), each of their accounts gets a disable task
+(reason `leaver`) that the connector carries out at once, the approved
+automation path under #15, if:
+- it is a real account on the system (an id and the connection it came
+  from), not disabled and not a placeholder;
+- its connection has changes turned on and supports disabling.
+
+It goes through the usual write path: the mass-change guard, one key per
+change, verification by the next read. A failure stays with the
+application's owner. Accounts no connector can disable get no extra task.
+Removing each access stays a person's task.
+
+See `accountsToDisableOnLeave` in `connectorFulfilmentRules.ts` and
+`disableOnLeave` in `leaverRemovals.ts`. Tests:
+- `connectorFulfilmentRules.test.ts`;
+- E2E `connector-provisioning`, "WID-C02 leaver": eve leaves, the connector
+  disables her account (one PATCH), and her access removal stays a
+  person's task through an outage and an unconfirmed removal.
+
+**Next:** none of ours; see "Decisions to come" for the per-connection
+setting and connector removals.
 
 ### WID-C03: gateway coverage (P2, partly fixed)
 

@@ -38,8 +38,9 @@ import { entitlementIdByRef } from "./support/readAccessGovernance";
  *   "try again" waits for that read.
  * - INTEGRATION-P0-21: an incremental sync asks the system only for what
  *   changed since the last good run, stores it, and marks nothing missing.
- * - WID-C02 leaver: leaving opens a person's removal task, never a
- *   connector write. While the system is down the read fails and nothing
+ * - WID-C02 leaver: leaving opens a person's removal task for each access,
+ *   and (owner decision 2026-10-12) the connector disables the account at
+ *   once, verified by the next read. While the system is down the read fails and nothing
  *   closes. A removal marked done that the system still shows stays
  *   unconfirmed. Once it is really gone, the next read verifies it.
  * - Writes turned off: the next change is a person's task again.
@@ -569,13 +570,18 @@ test.describe.serial("connector provisioning", () => {
       return ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string }[]).find((j) => j.id === jobId)!.status;
     };
 
-    // Eve leaves: a person's removal task, due within a day; no connector write.
+    // Eve leaves: a person's removal task for her access, due within a day;
+    // the connector disables her account at once, and only that.
     const writesBefore = system.writes.length;
     const left = await request.post(`/api/v1/identities/${people.eve}/lifecycle`, { data: { toState: "DISABLED", note: "WID-C02 leaver" } });
     expect(left.status(), await left.text()).toBe(201);
     const [task] = await taskOf();
     expect(task).toMatchObject({ status: "open", reason: "leaver", connector_status: null });
-    expect(system.writes.length).toBe(writesBefore);
+    await expect.poll(() => system.users.find((u) => u.id === "u-eve")?.enabled, { timeout: 30_000 }).toBe(false);
+    expect(system.writes.slice(writesBefore).map((w) => `${w.method} ${w.path}`)).toEqual(["PATCH /users/u-eve"]);
+    const disableTask = async () => (await db.from("access_fulfilment_tasks").select("status, reason, connector_status").eq("tenant_id", tenantId).eq("kind", "disable_account").eq("account_id", account!.id)).data ?? [];
+    await expect.poll(async () => (await disableTask())[0]?.connector_status, { timeout: 30_000 }).toBe("succeeded");
+    expect((await disableTask())[0]).toMatchObject({ reason: "leaver" });
 
     // The system is down: the read fails, and nothing about the removal changes.
     system.down = true;
