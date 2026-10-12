@@ -3109,5 +3109,16 @@ The block rolls back, so it leaves no fixtures. No code changed.
 
 Verified:
 - typecheck and eslint on the changed files: clean;
-- `npx vitest run lib modules`: 1360 tests. The one failure was the
-  identity-link audit assertion, now updated to the new shape.
+- `npx vitest run lib modules`: 1360 passed, after updating the
+  identity-link audit assertion to the new shape;
+- E2E, run locally after rebasing on #129 (migration 0150 is on §17.8's
+  list):
+  - application-onboarding, emergency-controls, automation-credentials,
+    users, access-packages and approval-engine: 43 passed, 2 failed, 7
+    did not run;
+  - the 2 failures, approval-engine `:187` and automation-credentials
+    `:106`, passed when their two specs were rerun on their own with one
+    worker (20 passed);
+  - in parallel they read data other specs were changing (a manager
+    link, and the organization's connection list between two reads).
+    That is a QA follow-up, not this change.
