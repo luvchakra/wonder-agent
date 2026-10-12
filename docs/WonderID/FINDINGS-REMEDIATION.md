@@ -24,27 +24,68 @@ request as each fix.
 **Status:** Not started, In progress, Partly fixed, Fixed (closure criteria
 met, with evidence), or Waiting on the owner.
 
-**Last updated:** 12 October 2026
+**Last updated:** 12 October 2026 (owner decisions recorded)
 
 ## Summary
 
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
-| WID-C01 Approval policy | P2 | Waiting on the owner | Maker/checker on loosening request-policy changes: an organization with one administrator could not loosen a policy |
-| WID-C02 Revocation and expiry | P2 | Partly fixed | Owner decision on connectors carrying out a leaver's removals |
-| WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
-| WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
+| WID-C01 Approval policy | P3 | Risk accepted by the owner | None: one administrator may loosen a request policy, audited (owner decision 12 Oct). Revisit under "Decisions to come" |
+| WID-C02 Revocation and expiry | P1 | Partly fixed | Build: the connector disables a leaver's account at once; removals stay with people (owner decision 12 Oct) |
+| WID-C03 Gateway bypass | P2 | Partly fixed | Build: a per-agent "gateway only" setting; a direct call is critical and suspends the agent's key (owner decision 12 Oct) |
+| WID-H01 Identity correlation | P2 | Partly fixed | Build: unlink with undo, and a conflict list beside the current source-priority rule (owner decisions 12 Oct) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
-| WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
+| WID-H04 Rogue access provenance | P2 | Partly fixed | Build: accepted exception (90 days at most, decided by someone else) and false positive for findings on people's accounts (owner decision 12 Oct) |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
-| WID-H07 Audit and erasure | P3 | Waiting on the owner | Retention defaults, free-text minimisation and crypto-erasure need owner and legal input |
+| WID-H07 Audit and erasure | P2 | Partly fixed | Retention defaults done (0143). Build: typed text out of audit records, then identifiers only (owner decisions 12 Oct) |
 | WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
+
+## Owner decisions
+
+Every decision the owner makes on a finding is recorded here, newest first,
+in the same pull request that records or acts on it. When a finding needs
+a decision, Claude lists the options with their upsides, downsides and
+build effort, recommends one, and the owner chooses. The 12 October set
+was chosen in the sheet "WonderID: decisions pending with the owner".
+
+| Date | Finding | Question | Decision | What it means for the work |
+|---|---|---|---|---|
+| 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
+| 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Build: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
+| 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Build: when on, a detected direct call is a critical finding and the agent's WonderID key is suspended automatically (the kill switch). The owner approved that automatic suspension under #15. |
+| 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Build: an administrator unlinks a source record or account; the attribute values the link changed are restored from history; accounts go back for matching; audited. |
+| 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Build: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources. |
+| 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Build: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
+| 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
+| 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Build: audit rows keep the record's id and a fingerprint (hash) of the text; the words stay on the request or task, where erasure can reach them. |
+| 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Build, after the item above: audit records hold ids, never personal data; erasure pseudonymizes the records the ids point to. |
+| 12 Oct 2026 | WID-H06 | May an automation credential approve or certify? | **Never.** | Done: `access.approve`, `agent.certify` and `automation.manage` are human-only, in three layers. |
+| 12 Oct 2026 | WID-C03 | Do emergency controls block in Observe mode? | **Yes, in every mode.** | Done: kill switch, tool, MCP server and session suspension, and an undecidable decision block in every mode. |
+| 12 Oct 2026 | WID-C01 | May anyone decide their own agent request? | **No, whatever the SoD policy.** | Done: `SELF_APPROVAL` refusal in `decideAccessRequest`. |
+| 12 Oct 2026 | WID-C01 | May auto-approval cover high or critical risk? | **No: high and critical always need a person.** | Done: `ALWAYS_HUMAN_RISK` in `requestRules.ts`. |
+| 12 Oct 2026 | All | Who prioritises the findings? | **Claude, without asking**, tracked in this file. | This tracker's priorities and order of work. |
+
+## Decisions to come
+
+Decisions known to be ahead. Until each is made, the current behavior
+stands. Claude raises each one with options when its trigger arrives.
+
+| Finding | Question | Trigger | Until then |
+|---|---|---|---|
+| WID-C01 | Add a second-administrator approval for loosening request policies after all? | An enterprise customer or a SOX/SOC 2 auditor asks for maker/checker on configuration. | One administrator may loosen a policy, audited. |
+| WID-C02 | Should connectors also carry out a leaver's access removals (not only disable the account)? | Once disable-on-leave has run in production and its failure rate is known. | People remove each access; the connector only disables the account. |
+| WID-C02 | Should disable-on-leave be a per-connection setting instead of following the connection's changes switch? | A customer wants changes on for approved requests but not for leavers. | It follows the changes switch and the connection type's support for disabling. |
+| WID-C03 | Should WonderID hold agents' target credentials so the gateway becomes real prevention? | A customer needs prevention rather than detection, or detection proves too late. | Detection plus automatic suspension for agents set to "gateway only". |
+| WID-C03 | How is an agent suspended by "gateway only" restored: by any administrator, or only after a review? | When the setting is built. | Restoring follows the existing kill-switch rules. |
+| WID-H01 | Should email-only matches stop linking automatically (only stable ids and employee numbers)? | Unlink-with-undo is used often, which means wrong email matches are common. | Email matching continues; wrong links are undone with unlink. |
+| WID-H07 | Per-person encryption keys (crypto-erasure)? | An enterprise customer or regulator requires it. | Identifiers only, once built. |
+| WID-H07 | What happens to audit rows written before "identifiers only" that still hold personal data? | When identifiers-only ships. | They stay, under the legal-obligation exemption; audit rows can never be changed. |
 
 ## Detail
 
-### WID-C01: approval policy (P2, partly fixed)
+### WID-C01: approval policy (P3, risk accepted by the owner)
 
 **Done:**
 - Catalog requests already blocked self-approval in the planner, the
@@ -60,16 +101,18 @@ met, with evidence), or Waiting on the owner.
 Linked with WID-H04: rogue access approved afterwards is now recorded as
 such (PR #115).
 
-**Waiting on the owner:** maker/checker on request-policy changes. The plan
-is ready:
+**Owner decision (12 Oct): leave as it is.** One administrator may loosen
+a request policy; the change is audited. The plan below was offered and not
+taken; it is kept for if the decision is revisited (see "Decisions to
+come"):
 - a change that loosens control is held until another administrator
   approves it. That covers turning on auto-approval, raising the risk
   threshold, dropping an approver, dropping the justification, lengthening
   the maximum duration, or making something requestable;
 - tightening changes apply at once.
 
-It needs a decision first:
-- an organization with a single administrator could then never loosen a
+Its cost was the reason:
+- an organization with a single administrator could never loosen a
   policy;
 - three E2E specs that turn on auto-approval would need a second
   administrator.
@@ -137,9 +180,15 @@ write. Then:
 - **recovery:** once the access is really gone, the next read verifies
   the task and revokes the grant.
 
-**Next:**
-- **Owner decision:** may a connection with changes turned on carry out a
-  leaver's removals by itself? Today a person does each one.
+**Owner decision (12 Oct):** the connector disables a leaver's account at
+once; removing each access stays a person's task.
+
+**Next (P1):** build disable-on-leave. When a person is disabled or
+terminated, each of their accounts on a connection that supports disabling,
+with changes turned on, is disabled by the connector. This is the
+approved automation path under #15. It goes through the mass-change
+guard, and a failure becomes the account owner's task. Verified by the next
+read, like any connector change.
 
 ### WID-C03: gateway coverage (P2, partly fixed)
 
@@ -173,10 +222,14 @@ The knowledge base says detection is after the fact.
 - It sees only actions reported to WonderID.
 - The evaluation reads the agent's last 200 events.
 
-**Next (owner decision):** whether to make the gateway the only path, for
-example by holding agents' target credentials so they cannot call a
-system directly. Priority lowered to P3, because what remains is that
-decision.
+**Owner decision (12 Oct):** a per-agent "gateway only" setting, not
+credential brokering.
+
+**Next (P2):** build it. When it is on for an agent:
+- a detected direct call (`gateway_bypass`) is a critical finding;
+- the agent's WonderID key is suspended automatically through the existing
+  kill switch, which the owner approved as automatic remediation under
+  #15.
 
 ### WID-H01: identity correlation (P2, partly fixed)
 
@@ -195,9 +248,18 @@ A person relinks by hand if the account really changed hands. Accounts
 with no person are still matched afresh. See `planReconciliation` in
 `accountRules.ts`; test in `accountRules.test.ts`, "WID-H01".
 
-Priority lowered to P3: what remains needs owner input.
+**Owner decisions (12 Oct):** unlink with undo, and the current
+source-priority rule plus a conflict list.
 
-**Next:**
+**Next (P2):**
+- unlink with undo: an administrator unlinks a source record or account
+  from a person; the attribute values that link changed are restored from
+  history; accounts go back for matching; audited;
+- a conflict list: when sources disagree on an owned field, the
+  higher-priority value still wins and the disagreement is listed with both
+  values and their sources.
+
+Earlier notes:
 - Merge reversal.
 - A source-priority policy.
 
@@ -342,9 +404,15 @@ Tests:
 - E2E `f1-reconciliation` (removed at the source, so `verified_fixed`)
   and `connector-provisioning`.
 
-**Next:**
-- Accepted-exception and false-positive closure for rogue findings on
-  human accounts.
+**Owner decision (12 Oct):** accepted exception and false positive, both
+governed.
+
+**Next (P2):** build them for rogue-access findings on people's accounts:
+- an accepted exception needs a reason, an end date at most 90 days away,
+  and a decider other than the account's owner; the finding reopens when it
+  ends;
+- a false positive needs a reason;
+- both are audited and kept in the finding's history.
 
 ### WID-H05: connector security (P3, partly fixed)
 
@@ -419,7 +487,7 @@ Tests:
   - cross-tenant: the credential reads only its own organization;
   - the refusal audit rows, and the database refusing 400 days.
 
-### WID-H07: audit and erasure (P3, waiting on the owner)
+### WID-H07: audit and erasure (P2, partly fixed)
 
 **Done:** a SQL test of the audit trail's rules
 (`tests/foundation/audit-trail-integrity.sql`), run against the live
@@ -430,10 +498,17 @@ database on 12 October and passing. It checks that:
 - once released, it removes only the old row, records the purge, and the
   chain still verifies.
 
-**Waiting on the owner and legal:**
-- a default retention period;
-- minimising free-text metadata;
-- crypto-erasure.
+**Owner decisions (12 Oct):**
+- **retention:** 1 year on Free and Pro, 3 years on Max, 7 years on
+  Enterprise. **Done:** `PLAN_DEFAULTS` changed; migration 0143 (applied)
+  raised the one existing subscription below its new default and makes the
+  database refuse less than 365 days (checked live: an insert with 30 days
+  is refused);
+- **typed text:** kept out of audit records; the row keeps the record's id
+  and a hash of the text;
+- **erasure:** identifiers only, after the typed-text change.
+
+**Next (P2):** typed text out of audit records, then identifiers only.
 
 ### WID-H08: automation credential address allow-list (P1, partly fixed)
 
