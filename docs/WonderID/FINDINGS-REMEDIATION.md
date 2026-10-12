@@ -31,14 +31,14 @@ met, with evidence), or Waiting on the owner.
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
 | WID-C01 Approval policy | P2 | Partly fixed | Maker/checker on request-policy changes |
-| WID-C02 Revocation and expiry | P1 | In progress | Show "expired, removal pending" on the request; priority deadlines for removals |
+| WID-C02 Revocation and expiry | P1 | In progress | An urgent leaver path: one removal per grant, with an owner and a deadline, escalated |
 | WID-C03 Gateway bypass | P2 | Partly fixed | Flag runtime events that have no matching gateway decision |
 | WID-H01 Identity correlation | P2 | Partly fixed | Stop auto-correlated accounts moving when an email is reassigned |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
 | WID-H03 Incomplete syncs | P2 | Not started | A cut-short incremental run counts as partial and does not move the cursor |
 | WID-H04 Rogue access provenance | P2 | Not started | A separate "approved afterwards" resolution; closure for findings on human accounts |
 | WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
-| WID-H06 Automation credentials | P2 | Partly fixed | Audit 401 and 429 refusals; a database cap on expiry |
+| WID-H06 Automation credentials | P2 | Fixed | Nothing left from the register's closure criteria; refusals with an unknown key have no organization to audit to |
 | WID-H07 Audit and erasure | P3 | Waiting on the owner | SQL test for the append-only and purge rules; retention defaults need owner and legal input |
 | WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment |
 
@@ -74,12 +74,25 @@ there. This covers removals done by a person and by a connector
 `fulfilmentTaskRules.ts`, in the daily sweep `remindOverdueFulfilmentTasks`;
 tests in `fulfilmentTaskRules.test.ts`).
 
-**Next, in order:**
-1. Show "expired, removal pending" against "removal verified" on the
-   request.
-2. Give removals priority deadlines.
-3. An urgent leaver path: one removal per grant, an owner and a deadline,
-   escalated.
+**Done:** ended access shows on the request (list, page and API) whether
+it is gone:
+- "Ended · removal pending";
+- "Ended · removed, not yet verified";
+- "Ended · removal verified", only once every grant is revoked by a read of
+  the system.
+
+See `endedRemoval` in `pendingGrantRules.ts` and `ENDED` in
+`access/requests/labels.ts`; tests in `pendingGrantRules.test.ts` and
+`labels.test.ts`.
+
+**Done:** removal and disable tasks are due within 1 day
+(`REMOVAL_SLA_DAYS`), whatever the organization's longer SLA. Granting
+keeps the SLA (`taskDueAt` in `fulfilmentTaskRules.ts`; test in
+`fulfilmentTaskRules.test.ts`).
+
+**Next:** an urgent leaver path: one removal per grant, with an owner and a
+deadline, escalated. This is in the Identity module's lifecycle
+(`humanLifecycleService.ts`), so it gets its own pull request.
 
 ### WID-C03: gateway coverage (P2, partly fixed)
 
@@ -143,7 +156,7 @@ claims "never applied twice".
   address.
 - 6to4 and Teredo ranges.
 
-### WID-H06: automation credential scope (P2, partly fixed)
+### WID-H06: automation credential scope (P2, fixed)
 
 **Done** (owner decision 2026-10-12): an automation credential never holds
 `access.approve`, `agent.certify` or `automation.manage`. Three layers
@@ -164,9 +177,30 @@ and by the database (migration 0133, `automation_credentials_change_four_eyes`).
 Test: `tests/e2e/automation-credentials.spec.ts`, "WID-H06". Removing a role
 only reduces power, so it needs no approval.
 
-**Next:**
-- Audit 401 and 429 refusals.
-- A database cap on expiry.
+**Done:** refused calls are audited (`automation.api_call`, outcome
+failure, `refused` = the reason):
+- pending, revoked or expired credentials (401), and an address that is not
+  allowed (403), at most once per credential and reason a minute
+  (`refusalAuditDue`);
+- the first call over the rate limit in each minute (429,
+  `firstOverRateLimit`), so a flood cannot fill the trail.
+
+A key that matches no credential has no organization to audit to, so it is
+answered 401 only.
+
+**Done:** the database refuses an expiry, or a requested extension, more
+than 365 days ahead of the write (migration 0134, trigger
+`automation_credentials_expiry_cap`; applied, advisors unchanged).
+
+Tests:
+- `automationCredentialRules.test.ts`;
+- `tests/e2e/automation-credentials.spec.ts`, which covers the register's
+  closure criteria:
+  - denied access: pending, address, rate limit, expired, revoked;
+  - revoke and rotate: after a rotation the old secret gets 401 at once and
+    the new one works;
+  - cross-tenant: the credential reads only its own organization;
+  - the refusal audit rows, and the database refusing 400 days.
 
 ### WID-H07: audit and erasure (P3, waiting on the owner)
 

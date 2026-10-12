@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
+  endedRemoval,
   getRequestCatalogItem,
   getRequestWithApprovals,
   grantsForRequest,
@@ -114,7 +115,7 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
-  const status = lineState(r, requestProgress(tasks, grants));
+  const status = lineState(r, requestProgress(tasks, grants), undefined, endedRemoval(grants));
   const live = steps.filter((s) => s.status !== "invalidated");
   const invalidated = steps.filter((s) => s.status === "invalidated");
   const stages = [...new Set(live.map((s) => s.stage))].sort((a, b) => a - b);

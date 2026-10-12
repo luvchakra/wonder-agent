@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canAct, dueAt, isOverdue, needsReminder, needsUnconfirmedRemovalReminder } from "./fulfilmentTaskRules";
+import { canAct, dueAt, isOverdue, needsReminder, needsUnconfirmedRemovalReminder, taskDueAt } from "./fulfilmentTaskRules";
 
 const owner = { userId: "u-owner", identityId: "i-owner", canApprove: false };
 const manager = { userId: "u-mgr", identityId: null, canApprove: true };
@@ -27,6 +27,10 @@ describe("SLA", () => {
   const now = new Date("2026-10-11T12:00:00Z");
   it("is due the SLA's days after opening, and overdue only while still to do", () => {
     expect(dueAt(now, 3)).toBe("2026-10-14T12:00:00.000Z");
+    // WID-C02: removals and disables are due within a day; granting keeps the organization's SLA.
+    expect(taskDueAt("grant", now, 3)).toBe("2026-10-14T12:00:00.000Z");
+    expect(taskDueAt("remove", now, 3)).toBe("2026-10-12T12:00:00.000Z");
+    expect(taskDueAt("disable_account", now, 3)).toBe("2026-10-12T12:00:00.000Z");
     expect(isOverdue({ status: "open", dueAt: "2026-10-10T00:00:00Z" }, now)).toBe(true);
     expect(isOverdue({ status: "completed", dueAt: "2026-10-10T00:00:00Z" }, now)).toBe(false);
     expect(isOverdue({ status: "claimed", dueAt: "2026-10-12T00:00:00Z" }, now)).toBe(false);

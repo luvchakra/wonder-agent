@@ -3,7 +3,7 @@ import "server-only";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { chooseAccount, placeholderRef, requestProgress, type FulfilmentState } from "./pendingGrantRules";
+import { chooseAccount, endedRemoval, placeholderRef, requestProgress, type FulfilmentState, type RemovalState } from "./pendingGrantRules";
 import { closeTasksForAccounts, closeTasksForGrants, completeTasksForRequest, openFulfilmentTask } from "./fulfilmentTasks";
 import { resumeConnectorGrants } from "./connectorFulfilment";
 
@@ -383,10 +383,13 @@ export async function withdrawPendingGrants(tenantId: string, itemIds: string[])
 }
 
 /** The grants a request asked for (its own and its package items'), for the request page. */
-export async function grantsForRequest(tenantId: string, requestId: string): Promise<{ id: string; entitlementId: string; accountId: string; fulfilmentStatus: string; verifiedAt: string | null; revokedAt: string | null }[]> {
+export async function grantsForRequest(
+  tenantId: string,
+  requestId: string,
+): Promise<{ id: string; entitlementId: string; accountId: string; fulfilmentStatus: string; removalStatus: string | null; verifiedAt: string | null; revokedAt: string | null }[]> {
   const { data, error } = await supabaseServiceRole()
     .from("access_grants")
-    .select("id, tenant_id, entitlement_id, account_id, fulfilment_status, verified_at, revoked_at")
+    .select("id, tenant_id, entitlement_id, account_id, fulfilment_status, removal_status, verified_at, revoked_at")
     .eq("tenant_id", tenantId)
     .eq("request_id", requestId)
     .limit(200);
@@ -398,30 +401,34 @@ export async function grantsForRequest(tenantId: string, requestId: string): Pro
       entitlementId: r.entitlement_id as string,
       accountId: r.account_id as string,
       fulfilmentStatus: r.fulfilment_status as string,
+      removalStatus: (r.removal_status as string | null) ?? null,
       verifiedAt: (r.verified_at as string | null) ?? null,
       revokedAt: (r.revoked_at as string | null) ?? null,
     }));
 }
 
-/** EXPERIENCE-P0-29: the progress of a page of requests, in two reads (grants and tasks by request). */
-export async function requestProgressFor(tenantId: string, requestIds: string[]): Promise<Map<string, FulfilmentState>> {
-  const out = new Map<string, FulfilmentState>();
+/** EXPERIENCE-P0-29: the progress of a page of requests, in two reads (grants and tasks by request); WID-C02: and, once ended, whether the access is gone. */
+export async function requestProgressFor(tenantId: string, requestIds: string[]): Promise<Map<string, { progress: FulfilmentState; removal: RemovalState | null }>> {
+  const out = new Map<string, { progress: FulfilmentState; removal: RemovalState | null }>();
   if (!requestIds.length) return out;
   const admin = supabaseServiceRole();
   const [grants, tasks] = await Promise.all([
-    admin.from("access_grants").select("tenant_id, request_id, fulfilment_status, revoked_at").eq("tenant_id", tenantId).in("request_id", requestIds).limit(2000),
+    admin.from("access_grants").select("tenant_id, request_id, fulfilment_status, removal_status, revoked_at").eq("tenant_id", tenantId).in("request_id", requestIds).limit(2000),
     admin.from("access_fulfilment_tasks").select("tenant_id, request_id, status").eq("tenant_id", tenantId).in("request_id", requestIds).limit(2000),
   ]);
   if (grants.error || tasks.error) throw new ApiError(500, "QUERY_FAILED", (grants.error ?? tasks.error)!.message);
   const own = (rows: Row[] | null) => (rows ?? []).filter((r) => r.tenant_id === tenantId);
   for (const id of requestIds) {
-    out.set(
-      id,
-      requestProgress(
+    const lines = own(grants.data as Row[])
+      .filter((g) => g.request_id === id)
+      .map((g) => ({ fulfilmentStatus: g.fulfilment_status as string, removalStatus: (g.removal_status as string | null) ?? null, revokedAt: (g.revoked_at as string | null) ?? null }));
+    out.set(id, {
+      progress: requestProgress(
         own(tasks.data as Row[]).filter((t) => t.request_id === id).map((t) => ({ status: t.status as string })),
-        own(grants.data as Row[]).filter((g) => g.request_id === id).map((g) => ({ fulfilmentStatus: g.fulfilment_status as string, revokedAt: (g.revoked_at as string | null) ?? null })),
+        lines,
       ),
-    );
+      removal: endedRemoval(lines),
+    });
   }
   return out;
 }

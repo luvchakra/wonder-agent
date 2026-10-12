@@ -57,6 +57,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Any application with a SCIM 2.0 service can be connected and make approved changes (add and remove group members, disable and create users); LDAP directories can add and remove group members. |
 | 12 Oct 2026 | Stronger safeguards: emergency controls block in every gateway mode; high-risk access always needs a person; nobody approves their own request; automation credentials never approve or certify. |
 | 12 Oct 2026 | A role given to an automation credential pauses it until a second administrator approves; owners are reminded about removals that the system has not confirmed. |
+| 12 Oct 2026 | Ended access shows whether it is really gone; removing access and disabling accounts are due within a day; refused automation calls are audited, and the database caps automation credential expiry at a year. |
 
 ---
 
@@ -297,7 +298,8 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 **Time-bound access**
 - Access can have an end date.
 - You are reminded before it ends and can ask to extend it.
-- At the end date the access is no longer approved and shows as expired. WonderID opens a task to remove it, usually within a day, and counts it as removed only when a later read of the system no longer finds it.
+- At the end date the access is no longer approved. WonderID opens a task to remove it, due within a day, and counts it as removed only when a later read of the system no longer finds it.
+- The request shows where that stands: "Ended · removal pending", "Ended · removed, not yet verified" or "Ended · removal verified".
 
 **Tracking**
 - **Access Requests:** shows where each request really stands:
@@ -343,10 +345,10 @@ An approved request is not access yet. It becomes access once the change is made
 **Automation credentials**
 - Your own tools, such as pipelines or ticketing systems, can call WonderID's API with their own credential instead of a person's login.
 - **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it. Giving it another role pauses it until a different administrator approves the change.
-- **Limits:** it expires within a year, can be limited to certain network addresses, and is rate-limited.
+- **Limits:** it expires within a year (the database refuses anything longer), can be limited to certain network addresses, and is rate-limited.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
 - **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions.
-- **Audit:** every call it is allowed to make is audited, and so is every call refused for its network address.
+- **Audit:** every call it is allowed to make is audited. Refused calls are audited too, whether the credential is pending, revoked or expired, the address is not allowed, or it is over its rate limit. To keep the record readable, each reason is recorded at most once a minute per credential.
 - **Where:** Settings → Automation Credentials.
 
 ---

@@ -141,6 +141,25 @@ export function overRateLimit(callsThisMinute: number, limit: number): boolean {
   return callsThisMinute > limit;
 }
 
+/** WID-H06: the first call over the limit in a minute is audited; the rest of that minute's refusals are not, so a flood cannot fill the audit trail. */
+export function firstOverRateLimit(callsThisMinute: number, limit: number): boolean {
+  return callsThisMinute === limit + 1;
+}
+
+/**
+ * WID-H06: whether a refused call (pending, revoked, expired, address) is
+ * audited: once per credential and reason a minute, so a leaked key used in
+ * a loop leaves evidence without flooding the trail. `seen` is the caller's
+ * bounded memory of the last audit per key; it is updated here.
+ */
+export function refusalAuditDue(seen: Map<string, number>, key: string, now: number, maxEntries = 1000): boolean {
+  const last = seen.get(key);
+  if (last !== undefined && now - last < 60_000) return false;
+  if (seen.size >= maxEntries && last === undefined) seen.delete(seen.keys().next().value!);
+  seen.set(key, now);
+  return true;
+}
+
 /**
  * Permissions an automation credential never holds, whatever its roles
  * (owner decision 2026-10-12, WID-H06): it must not mint or approve

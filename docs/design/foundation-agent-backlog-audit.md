@@ -3045,3 +3045,32 @@ Verified:
   another administrator approves; then the credential works again.
 
 Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
+
+### 2026-10-12 — Refused automation calls are audited; database cap on expiry (WID-H06)
+
+- `getAutomationAccess` audits every refusal with a known credential as
+  `automation.api_call`, outcome failure, with `refused` set to the code:
+  - pending, revoked and expired (401), and an address that is not allowed
+    (403): at most once per credential and code a minute. A bounded
+    in-process map decides (`refusalAuditDue`, 1,000 keys). Before this,
+    only 403 was audited, on every call;
+  - the rate limit (429): only the call that first goes over in a minute
+    (`firstOverRateLimit`: calls = limit + 1). The database counter decides
+    this, so it holds across instances.
+- An unknown key has no tenant to audit to. It is answered 401, as before.
+- Migration 0134 adds the `automation_credentials_expiry_cap` trigger. An
+  `expires_at` or `requested_expires_at` that is set or changed may be at
+  most 366 days after the write: 365 days plus one day of slack. It is
+  applied to the dev/prod project; security advisors show nothing new.
+
+Verified:
+- `npx vitest run lib/security modules/access-governance "app/(customer)/access" lib/config`:
+  347 passed.
+- `npm run typecheck` and eslint on the changed files: clean.
+- E2E, local: `automation-credentials.spec.ts` 5/5. The rate limit, expiry
+  and revocation test now also checks:
+  - the RATE_LIMITED, CREDENTIAL_EXPIRED and CREDENTIAL_REVOKED audit rows;
+  - that the database refuses an expiry 400 days ahead;
+  - rotation: the old secret gets 401 at once, and the new one works.
+
+Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.

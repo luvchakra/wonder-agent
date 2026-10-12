@@ -6,7 +6,7 @@ import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { notify } from "@/modules/operations/service";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
-import { canAct, dueAt, isOverdue, needsReminder, needsUnconfirmedRemovalReminder, UNCONFIRMED_REMOVAL_DAYS, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
+import { canAct, isOverdue, taskDueAt, needsReminder, needsUnconfirmedRemovalReminder, UNCONFIRMED_REMOVAL_DAYS, type FulfilmentTaskAction, type FulfilmentTaskKind, type FulfilmentTaskStatus } from "./fulfilmentTaskRules";
 import { accountToCreateFirst, planConnectorFulfilment, runConnectorFulfilment } from "./connectorFulfilment";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
 
@@ -132,7 +132,7 @@ export async function openFulfilmentTask(
         request_id: line.requestId,
         application_id: line.applicationId,
         assignee_identity_id: assignee,
-        due_at: dueAt(new Date(), config["access.fulfilmentSlaDays"]),
+        due_at: taskDueAt(kind, new Date(), config["access.fulfilmentSlaDays"]),
       })
       .select("id")
       .single();

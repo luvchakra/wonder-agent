@@ -48,15 +48,24 @@ export const FULFILMENT: Record<string, Record<string, Label>> = {
   },
 };
 
-/** One line's state: its status, or once approved its real progress; time-bound access past its end date has ended. */
+// WID-C02: ended access is not gone until a read of the system confirms it.
+export const ENDED: Record<string, Label> = {
+  pending: { label: "Ended · removal pending", tone: "warning" },
+  removed_unverified: { label: "Ended · removed, not yet verified", tone: "warning" },
+  verified: { label: "Ended · removal verified", tone: "success" },
+  never_fulfilled: { label: "Ended · never fulfilled", tone: "neutral" },
+};
+
+/** One line's state: its status, or once approved its real progress; time-bound access past its end date has ended, and shows whether it is gone. */
 export function lineState(
   r: { status: string; requestType: string; requestedExpiry: string | null },
   progress: string | null | undefined,
   now = new Date(),
+  removal?: string | null,
 ): Label {
   const approved = r.status === "approved" || r.status === "fulfilled";
   if (approved && (r.requestType === "grant" || r.requestType === "extend") && r.requestedExpiry && Date.parse(r.requestedExpiry) <= now.getTime()) {
-    return { label: "Ended", tone: "neutral" };
+    return (removal && ENDED[removal]) || { label: "Ended", tone: "neutral" };
   }
   const real = approved && progress ? (FULFILMENT[r.requestType] ?? FULFILMENT.grant)[progress] : undefined;
   return real ?? STATUS[r.status] ?? { label: r.status, tone: "neutral" };
