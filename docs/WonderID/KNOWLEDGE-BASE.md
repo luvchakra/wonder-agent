@@ -76,6 +76,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
 | 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
 | 12 Oct 2026 | Audit records hold identifiers, not personal data: accounts, people and outside systems' ids are recorded by id or as a fingerprint, never as an email, name or login. |
+| 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
 
 ---
 
@@ -519,6 +520,7 @@ Findings are raised for:
 **For administrators:** the privacy centre (Settings → Privacy) handles:
 - **Requests:** access and erasure requests, with the legal deadlines built in (GDPR, UK GDPR, DPDP, CCPA).
 - **Erasure:** needs two people, and never touches the audit trail.
+  It pseudonymises the person, their account names, the values sources sent about them, and the email, login and name in connector changes. An account's reference in its system stays while the account exists there, so its access is still governed. The result lists what a source or system still holds: erase it there, or the next import brings it back.
 - **Consent:** records of who agreed to what, with the notice version they saw.
 - **Retention:** applied daily. Legal holds always win.
 - **Breaches:** records with their notification deadlines.

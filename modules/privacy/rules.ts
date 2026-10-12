@@ -252,3 +252,18 @@ export function retentionCutoff(now: Date, days: number): Date {
 export function pseudonymLabel(hashHex: string): string {
   return `erased-${hashHex.slice(0, 16)}`;
 }
+
+/** The fields of a connector write target that name a person (a new account's login and name). */
+export const PERSONAL_TARGET_FIELDS = ["email", "username", "displayName"] as const;
+
+/**
+ * WID-H07 erasure: a connector write target with the person's name, email
+ * and login replaced by the pseudonym. The target system's own account and
+ * entitlement references stay: they are what the access is governed by
+ * while the account exists there.
+ */
+export function pseudonymiseWriteTarget(target: Record<string, unknown>, label: string): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...target };
+  for (const key of PERSONAL_TARGET_FIELDS) if (key in out) out[key] = label;
+  return out;
+}

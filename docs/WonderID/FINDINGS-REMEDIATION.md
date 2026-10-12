@@ -39,7 +39,7 @@ met, with evidence), or Waiting on the owner.
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
-| WID-H07 Audit and erasure | P2 | Partly fixed | Retention defaults (0143), typed text out of audit records, and identifiers only in audit records done. Next: erasure of accounts and connector write targets |
+| WID-H07 Audit and erasure | P2 | Fixed | Retention defaults (0143), typed text out of audit records, identifiers only in audit records, and erasure of accounts, source values and connector write targets done |
 | WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
 
 ## Owner decisions
@@ -60,7 +60,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Done: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
 | 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
 | 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Done: audit rows keep the record's id and a keyed fingerprint of the text (`metadata.typedText`); the words stay on the request, task or finding (migration 0150 gave the last two a home). |
-| 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Audit side done: audit records hold ids, field names and fingerprints, never personal data. Erasure already pseudonymizes identities, users, consent and requests; extending it to accounts and connector write targets is next. |
+| 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Done: audit records hold ids, field names and fingerprints, never personal data, and erasure reaches what those ids point to (accounts, source values, connector write targets, guests and partners). |
 | 12 Oct 2026 | WID-H06 | May an automation credential approve or certify? | **Never.** | Done: `access.approve`, `agent.certify` and `automation.manage` are human-only, in three layers. |
 | 12 Oct 2026 | WID-C03 | Do emergency controls block in Observe mode? | **Yes, in every mode.** | Done: kill switch, tool, MCP server and session suspension, and an undecidable decision block in every mode. |
 | 12 Oct 2026 | WID-C01 | May anyone decide their own agent request? | **No, whatever the SoD policy.** | Done: `SELF_APPROVAL` refusal in `decideAccessRequest`. |
@@ -601,7 +601,7 @@ Tests:
   - cross-tenant: the credential reads only its own organization;
   - the refusal audit rows, and the database refusing 400 days.
 
-### WID-H07: audit and erasure (P2, partly fixed)
+### WID-H07: audit and erasure (P2, fixed)
 
 **Done:** a SQL test of the audit trail's rules
 (`tests/foundation/audit-trail-integrity.sql`), run against the live
@@ -674,10 +674,32 @@ Not changed:
 - error text returned by outside systems, kept for diagnosis. It may
   quote an account name; it is cut to 200 to 1,000 characters.
 
-**Next (P2):** erasure still leaves the person's `accounts.account_name` and
-`external_account_ref`, `identities.source_native_id`, connector write
-targets, and EXTERNAL identities. Those are the records the audit's ids
-now point to.
+**Done (owner decision, 12 Oct):** identifiers only, on the erasure side
+(`modules/privacy/subjectData.ts`, `eraseLinkedRecords`). Erasure and the
+removed-member retention run now also:
+- cover EXTERNAL identities (guests, partners, contractors), not only HUMAN;
+- clear the identity's `source_native_id` and `correlation_key`;
+- set the person's accounts' `account_name` to the pseudonym;
+- delete the values sources sent about the person
+  (`identity_source_changes`, `identity_source_conflicts`), so a
+  source-match undo is no longer possible for them;
+- replace the email, login and name in connector write targets that named
+  the person (`pseudonymiseWriteTarget`). The outcome, the idempotency
+  record and the system's account and entitlement references stay.
+
+Kept, on purpose:
+- an account's `external_account_ref` and a source link's `external_id`.
+  The account or record still exists in its system, and its access must
+  stay governed (non-negotiable #7: the system is the record holder).
+- The erasure result reports `stillHeldAtSource` (source records still
+  present, accounts still active). The organization erases those at the
+  source; otherwise the next import brings the data back.
+
+Tests: `modules/privacy/rules.test.ts` and `subjectData.test.ts` (17 passed, 5 new; the latter checks every statement carries the tenant filter, against a stub client); the JSON-path filters
+the erasure uses were checked read-only against the live API.
+
+**Still open (decision to come):** per-person encryption keys, if a
+customer or regulator requires crypto-erasure.
 
 ### WID-H08: automation credential address allow-list (P1, partly fixed)
 

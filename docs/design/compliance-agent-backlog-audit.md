@@ -1148,3 +1148,31 @@ took about 28 s (measured), past the form's wait and §15.
 ### 2026-10-12 — WID-H07 (owner decision)
 
 Typed text out of audit records: the attestation `policyRequirement` statement is passed as `typedText` (kept on `governance_attestations.policy_requirement`). See the Foundation entry for the mechanism.
+
+### 2026-10-12 — WID-H07 erasure reaches what the audit's ids point to (owner decision "identifiers only")
+
+`modules/privacy/subjectData.ts`:
+- `eraseSubject` and the removed-member retention run cover EXTERNAL
+  identities as well as HUMAN, and clear `source_native_id` and
+  `correlation_key`.
+- A new `eraseLinkedRecords` step:
+  - sets the person's account names to the pseudonym;
+  - deletes the source values held about them (`identity_source_changes`,
+    `identity_source_conflicts`);
+  - replaces the email, login and name in the connector write targets that
+    named them (`pseudonymiseWriteTarget` in `rules.ts`).
+- The result reports `stillHeldAtSource`. Account references and source
+  links stay, because the systems still hold them (non-negotiable #7). The
+  organization erases there.
+- Every statement is filtered by the server-resolved tenant (§14).
+- The retention run skips members it has already pseudonymised.
+
+Cross-module writes: these are Access, Identity and Integration tables. This
+is the same erasure path COMPLIANCE-P0-12 already ran over `identities` and
+`users`, and erasure is this module's (GDPR Art. 17).
+
+Verified:
+- typecheck and eslint;
+- `npx vitest run modules/privacy`: 17 passed (new `subjectData.test.ts`: every statement carries the tenant filter, only HUMAN and EXTERNAL identities, account references kept, write targets pseudonymised);
+- the `target->>email` and `target->>username` filters, read-only against
+  the live API.

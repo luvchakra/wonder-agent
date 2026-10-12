@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addMonths,
+  pseudonymiseWriteTarget,
   breachObligations,
   canTransition,
   checkExtension,
@@ -108,5 +109,16 @@ describe("retention floors", () => {
   it("keeps audit logs at least a year", () => {
     expect(minRetentionDays("audit_logs")).toBe(365);
     expect(minRetentionDays("notifications")).toBe(30);
+  });
+});
+
+describe("pseudonymiseWriteTarget (WID-H07 erasure)", () => {
+  it("replaces the person's email, login and name, and keeps the system's references", () => {
+    expect(
+      pseudonymiseWriteTarget({ email: "ann@example.com", username: "ann", displayName: "Ann Lee", account: "acc-1", entitlement: "ent-9" }, "erased-abc"),
+    ).toEqual({ email: "erased-abc", username: "erased-abc", displayName: "erased-abc", account: "acc-1", entitlement: "ent-9" });
+  });
+  it("adds no fields the target did not have", () => {
+    expect(pseudonymiseWriteTarget({ account: "acc-1" }, "erased-abc")).toEqual({ account: "acc-1" });
   });
 });
