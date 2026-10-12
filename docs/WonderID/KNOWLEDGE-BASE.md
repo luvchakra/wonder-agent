@@ -54,6 +54,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Connections can sign in with a private key instead of a shared secret, or with a client certificate. |
 | 12 Oct 2026 | Connections can sign in with the provider: an administrator presses Connect and approves on the system's own sign-in page. |
 | 12 Oct 2026 | Connection types can be downloaded and opened elsewhere, and a connection can move to a newer version after a preview; this guide was corrected where it promised more than the product does. |
+| 12 Oct 2026 | Any application with a SCIM 2.0 service can be connected and make approved changes (add and remove group members, disable and create users); LDAP directories can add and remove group members. |
 
 ---
 
@@ -187,8 +188,8 @@ All information from your systems reaches WonderID through **connections**. Ther
 | Kind of system | Built-in types |
 |---|---|
 | HR | Frappe HR |
-| Directories and identity providers | LDAP directory, Keycloak, Saviynt |
-| Applications | ERPNext, Gitea, Mattermost, Nextcloud, Zendesk |
+| Directories and identity providers | LDAP directory (which can also add and remove group members), Keycloak, Saviynt |
+| Applications | ERPNext, Gitea, Mattermost, Nextcloud, Zendesk, and any application with a SCIM 2.0 service (which can also add and remove group members, disable and create users) |
 | Infrastructure and data | PostgreSQL, Kubernetes, OpenBao (secrets) |
 | AI | MCP server, Runtime Gateway |
 | Anything else | Webhook (signed events from any system), CSV files |
@@ -535,7 +536,7 @@ These pages are for the WonderID service operator only, never for customers:
 
 ## 18. Coming soon
 
-- **Standard user provisioning:** SCIM, and changes through LDAP directories.
+- **Receiving users pushed over SCIM:** an HR system or identity provider sends joiners, movers and leavers to WonderID as they happen.
 - **A relay** to reach systems inside your own network without opening it up.
 - **Ready-made connections** for Microsoft Entra ID, an HR system (Workday or SuccessFactors) and ServiceNow ticketing.
 - **Joiner, mover and leaver automation** with default ("birthright") access, and reviews for every identity type.

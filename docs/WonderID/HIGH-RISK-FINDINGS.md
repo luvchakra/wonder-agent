@@ -96,6 +96,7 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
   - "Try again" sends a new attempt without reading the system first.
   - The knowledge base claim "a system never applies the same change twice" was wrong. §8 and §17 are corrected.
   - **Owner decisions open:** one key per task instead of per attempt; reading the system before a retry after an unclear failure; declaring which connection types support idempotency.
+  - Since INTEGRATION-P0-22 slice 2 (LDAP changes): a directory answer that the change is already there (results 20, 16 and 68) counts as done (`framework/ldapWrite.ts`, `alreadyApplied`; tests in `ldapWrite.test.ts`), so an LDAP retry cannot apply a change twice. http connections are unchanged.
 
 ### WID-H03 — Incomplete sync and false deletion detection
 - **Status:** CHANGED (code verified, knowledge base corrected; closure criteria not yet met)

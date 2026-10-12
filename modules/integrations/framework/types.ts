@@ -370,7 +370,20 @@ export type DefinitionWriteOperation = (typeof DEFINITION_WRITE_OPERATIONS)[numb
  * declares what its definition supports but writes only once an
  * administrator turns writes on for it.
  */
-export type WriteSpec = { request: HttpRequestSpec };
+/**
+ * INTEGRATION-P0-22: an LDAP change. `dn` is the entry: exactly
+ * `{target.account}` or `{target.entitlement}` (a DN WonderID read), or a
+ * template whose filled values are escaped as DN values (RFC 4514).
+ * `modify` changes attributes of an existing entry; `add` creates one.
+ */
+export type LdapWriteSpec = {
+  dn: string;
+  modify?: { operation: "add" | "delete" | "replace"; attribute: string; values: string[] }[];
+  add?: Record<string, string[]>;
+};
+
+/** One declared change: an http request (http driver) or an LDAP change (ldap driver). */
+export type WriteSpec = { request: HttpRequestSpec; ldap?: never } | { ldap: LdapWriteSpec; request?: never };
 
 export type FileSourceSpec = {
   /** `{settings.<url setting>}`: the HTTPS address of the CSV. Empty means "read uploaded files". */
