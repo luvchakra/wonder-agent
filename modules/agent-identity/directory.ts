@@ -289,6 +289,52 @@ export async function getIdentityNames(tenantId: string, ids: string[]): Promise
   return out;
 }
 
+export type SourceDisagreementRow = {
+  id: string;
+  identityId: string;
+  displayName: string;
+  /** The identity field, or `attributes.<name>` for a custom attribute. */
+  field: string;
+  keptValue: string | null;
+  keptSourceId: string | null;
+  otherValue: string | null;
+  otherSourceId: string;
+  firstSeenAt: string;
+  lastSeenAt: string;
+};
+
+/**
+ * WID-H01 (owner decision): open disagreements between identity sources,
+ * newest first. The higher-priority value is the one on the identity; the
+ * other is what a lower-priority source sent. Read as the user (RLS),
+ * filtered by tenant.
+ */
+export async function listSourceDisagreements(tenantId: string, limit = 100): Promise<SourceDisagreementRow[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("identity_source_conflicts")
+    .select("id, identity_id, field, kept_value, kept_source_id, other_value, other_source_id, first_seen_at, last_seen_at")
+    .eq("tenant_id", tenantId)
+    .is("resolved_at", null)
+    .order("last_seen_at", { ascending: false })
+    .limit(Math.min(Math.max(limit, 1), 500));
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = (data ?? []) as Record<string, unknown>[];
+  const names = await getIdentityNames(tenantId, rows.map((r) => r.identity_id as string));
+  return rows.map((r) => ({
+    id: r.id as string,
+    identityId: r.identity_id as string,
+    displayName: names.get(r.identity_id as string)?.displayName ?? "Unknown identity",
+    field: r.field as string,
+    keptValue: (r.kept_value as string | null) ?? null,
+    keptSourceId: (r.kept_source_id as string | null) ?? null,
+    otherValue: (r.other_value as string | null) ?? null,
+    otherSourceId: r.other_source_id as string,
+    firstSeenAt: r.first_seen_at as string,
+    lastSeenAt: r.last_seen_at as string,
+  }));
+}
+
 /**
  * ACCESS-P0-31: the active identities a person may request access for as
  * their owner: the non-human identities they own, and the AI agents they

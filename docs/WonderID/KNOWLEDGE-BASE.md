@@ -71,6 +71,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | When someone leaves, a connection that can disable accounts (with changes turned on) disables their account at once; people still remove each access. |
 | 12 Oct 2026 | A "gateway only" setting per agent: acting around the gateway is critical and suspends the agent at the gateway. |
 | 12 Oct 2026 | Rogue access on an account can be accepted as an exception (up to 90 days) or closed as a false positive, with a reason, by someone other than the account's owner. |
+| 12 Oct 2026 | When two identity sources disagree on a detail, the higher-priority source still wins, and the disagreement is listed with both values and sources for review; it clears itself once they agree. |
 
 ---
 
@@ -150,7 +151,7 @@ The everyday cycle looks like this:
 **Identity sources**
 - An HR system or directory can be the source of people's details.
 - **Matching:** a record keeps the identity the source already linked it to. Otherwise the source's rules are tried in order (email by default; username or a combination of fields can be added). One match links automatically; several, or a single match on someone who has left, wait in **Pending Matches** for a person to decide.
-- **Which source wins:** you choose which source owns which detail.
+- **Which source wins:** you choose which source owns which detail, and each source's priority. When a lower-priority source sends a different value for a detail a higher one owns, the higher value stays; the disagreement is listed under **Pending Matches → Disagreements between sources**, with both values and both sources. It clears itself when the sources agree again.
 - **Custom details:** your own fields, such as cost centre, can be filled from a source. Each value is checked and WonderID records which source set it.
 
 **Duplicates**

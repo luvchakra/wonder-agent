@@ -494,6 +494,9 @@ export async function executeReconciliation(
         counts.errors++;
         if (errors.length < 200) errors.push({ ref: r.ref, message: `lifecycle: ${r.lifecycleError}` });
       }
+      // WID-H01: reported, but not counted: a review list that missed an
+      // update does not make the import itself unsafe, nor hold back leavers.
+      if (r.conflictsError && errors.length < 200) errors.push({ ref: r.ref, message: `disagreements: ${r.conflictsError}` });
     }
 
     // 8. Leavers: only after a full run with every record handled.

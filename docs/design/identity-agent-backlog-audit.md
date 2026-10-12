@@ -1669,3 +1669,36 @@ Tracked in `docs/WonderID/FINDINGS-REMEDIATION.md`.
   suspension).
 - The agent page shows it folded in the API keys card: "Gateway only:
   on/off", with one button.
+
+### 2026-10-12 — disagreements between identity sources (WID-H01, owner decision)
+
+The owner kept the source-priority rule and asked for a conflict list.
+- Migrations 0146 and 0147 (applied): `identity_source_conflicts`, one open
+  row per person, field and disagreeing source, with both values and
+  sources. RLS select under the identities rule; no client write policy;
+  same-tenant composite foreign keys to `identities` and `identity_sources`.
+- `mergeSourced` now also returns `disagreements` (an owned field a
+  higher-priority source set to something else). The pure
+  `planDisagreements` decides what opens, refreshes and resolves.
+- `applySourcedIdentities` reads the open rows for the people in the batch
+  once, then writes per person. It resolves a row when the disagreeing
+  source agrees again, or when the owning source moves to its value.
+  Audited as `identity.source_disagreements_changed`, with field names
+  only. A failure is put on the result (`conflictsError`) and never undoes
+  the change.
+- The preview's `skipped` keeps its old shape (field and reason only).
+- `listSourceDisagreements` (RLS, tenant filter) is published through the
+  service.
+
+Verified:
+- `npm run typecheck`, eslint on the changed files, `npm run build`:
+  clean;
+- `npx vitest run modules/integrations modules/agent-identity`: 458
+  passed;
+- E2E `identity-sources.spec.ts`, local: 18 passed;
+- `tests/integration/identity-sources-isolation.sql` against the dev
+  project: 19/19 checks as expected. Its fixture cleanup call was
+  cancelled twice; the two fixture tenants (`fixture-tenant-a81-test`,
+  `fixture-tenant-b81-test`) remain until the cleanup lines are run.
+
+Not done here: unlink with undo (the next WID-H01 item).

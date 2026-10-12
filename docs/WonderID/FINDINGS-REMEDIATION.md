@@ -33,7 +33,7 @@ met, with evidence), or Waiting on the owner.
 | WID-C01 Approval policy | P3 | Risk accepted by the owner | None: one administrator may loosen a request policy, audited (owner decision 12 Oct). Revisit under "Decisions to come" |
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Done: the connector disables a leaver's account at once (owner decision 12 Oct). For the register to assess |
 | WID-C03 Gateway bypass | P2 | Partly fixed | Done: a per-agent "gateway only" setting; a direct call is critical and suspends the agent at the gateway (owner decision 12 Oct). For the register to assess |
-| WID-H01 Identity correlation | P2 | Partly fixed | Build: unlink with undo, and a conflict list beside the current source-priority rule (owner decisions 12 Oct) |
+| WID-H01 Identity correlation | P2 | Partly fixed | Conflict list done (owner decision 12 Oct); next: unlink with undo |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
@@ -56,7 +56,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Done: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
 | 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Done: when on, a detected direct call is a critical finding and the agent is suspended at the gateway automatically (`agent_suspension` control). The owner approved that automatic suspension under #15. |
 | 12 Oct 2026 | WID-H01 | How is a wrong match between a source record and a person undone? | **Unlink with undo.** | Build: an administrator unlinks a source record or account; the attribute values the link changed are restored from history; accounts go back for matching; audited. |
-| 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Build: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources. |
+| 12 Oct 2026 | WID-H01 | Which identity source wins when sources disagree? | **The current rule, plus a conflict list.** | Done: the higher-priority source still wins its owned fields; each disagreement appears on a review list with both values and sources (migrations 0146/0147). |
 | 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Done: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
 | 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
 | 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Build: audit rows keep the record's id and a fingerprint (hash) of the text; the words stay on the request or task, where erasure can reach them. |
@@ -291,13 +291,29 @@ with no person are still matched afresh. See `planReconciliation` in
 **Owner decisions (12 Oct):** unlink with undo, and the current
 source-priority rule plus a conflict list.
 
-**Next (P2):**
-- unlink with undo: an administrator unlinks a source record or account
-  from a person; the attribute values that link changed are restored from
-  history; accounts go back for matching; audited;
-- a conflict list: when sources disagree on an owned field, the
-  higher-priority value still wins and the disagreement is listed with both
-  values and their sources.
+**Done (owner decision, 12 Oct):** the conflict list. When a
+lower-priority source sends a different value for a field a higher-priority
+source owns, the higher value still wins (unchanged), and the disagreement
+is kept in `identity_source_conflicts` (migrations 0146 and 0147, applied):
+- one open row per person, field and disagreeing source, with both values
+  and both sources; custom attributes are listed as `attributes.<name>`;
+- it is refreshed on each run of either source, and resolves by itself when
+  the disagreeing source agrees again, or the owning source moves to its
+  value;
+- the import writes it (service role, same-tenant composite foreign keys);
+  members read it under the identities rule; audits name fields only;
+- a failure to update it is reported on the run, never undoing the import
+  or holding back leavers;
+- shown folded on **Pending Matches** ("Disagreements between sources").
+
+See `planDisagreements` in `sourcedMerge.ts` and `applySourcedIdentities`.
+Tests: `identitySourceRules.test.ts` ("WID-H01"), E2E `identity-sources`
+("a lower-precedence source cannot overwrite…"), and
+`tests/integration/identity-sources-isolation.sql`.
+
+**Next (P2):** unlink with undo: an administrator unlinks a source record
+or account from a person; the attribute values that link changed are
+restored from history; accounts go back for matching; audited.
 
 Earlier notes:
 - Merge reversal.

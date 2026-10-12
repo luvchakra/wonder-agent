@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext } from "@playwright/test";
 import { authFile, TENANT_ONE } from "./support/testUsers";
 import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
 import { fieldProvenanceOf } from "./support/readAccessGovernance";
+import { createClient } from "@supabase/supabase-js";
 
 /**
  * INTEGRATION-P0-08/09 — identity sources and reconciliation, against the
@@ -116,6 +117,26 @@ test.describe.serial("identity sources", () => {
     const run = await runCsv(request, dirId, csv([["D1", `E2E Existing ${stamp}`, mail("existing"), "Marketing", "Controller", "", "active"]]), "partial");
     expect(run).toMatchObject({ status: "succeeded", createdCount: 0, pendingCount: 0 });
     expect(await identity(request, existingId)).toMatchObject({ department: "Finance" });
+
+    // WID-H01 (owner decision): the disagreement is on the review list, with both values and sources.
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const open = async () => {
+      const { data, error } = await db
+        .from("identity_source_conflicts")
+        .select("field, kept_value, kept_source_id, other_value, other_source_id")
+        .eq("identity_id", existingId)
+        .is("resolved_at", null);
+      expect(error).toBeNull();
+      return data ?? [];
+    };
+    expect(await open()).toEqual([{ field: "department", kept_value: "Finance", kept_source_id: hrId, other_value: "Marketing", other_source_id: dirId }]);
+    const page = await (await request.get("/integrations/correlations")).text();
+    expect(page).toContain("Disagreements between sources");
+    expect(page).toContain(`E2E Directory ${stamp}`);
+
+    // Once the directory agrees, it resolves by itself.
+    await runCsv(request, dirId, csv([["D1", `E2E Existing ${stamp}`, mail("existing"), "Finance", "Controller", "", "active"]]), "partial");
+    expect(await open()).toEqual([]);
   });
 
   test("a pending match is decided once, by a person", async ({ request }) => {

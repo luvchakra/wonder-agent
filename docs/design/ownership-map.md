@@ -62,6 +62,7 @@ excluded (list in the migration's header).
 | `identity_source_links` | INT | Which source record is which identity; written by the worker only |
 | `connector_write_operations` | INT | Idempotency record of every connector write (the key is the lock); written by the write interface only (INTEGRATION-P0-11) |
 | `pending_identity_correlations` | INT | Ambiguous matches waiting for a person; decided through INT's service, which calls IA's `applySourcedIdentities()` |
+| `identity_source_conflicts` | IA | Open and resolved disagreements between identity sources on a person's owned field, both values and sources (WID-H01); written only by IA's `applySourcedIdentities()`, read by INT's Pending Matches page through IA's `listSourceDisagreements()` |
 | `applications` | AA | Canonical application registry (governed access-graph entity); since ACCESS-P0-15 also the WonderID application catalog (type, owners as identities, classification, onboarding status) |
 | `application_onboardings` | AA | ACCESS-P0-16: one onboarding record per application — versioned, hashed configuration; validation, simulation, four-eyes approval and promotion each tied to the hash they ran against. Members read only; the service writes (service role, tenant-filtered) |
 | `accounts` | AA | Accounts an agent/identity holds on an application. Since ACCESS-P0-17 an account belongs to any identity (`identity_id`; `agent_id` only for an AI agent's), with correlation (matched / linked by hand / orphan / ambiguous), type, last use, last seen and missing-from-source |
