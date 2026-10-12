@@ -30,16 +30,16 @@ met, with evidence), or Waiting on the owner.
 
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
-| WID-C01 Approval policy | P2 | Partly fixed | Maker/checker on request-policy changes |
+| WID-C01 Approval policy | P2 | Waiting on the owner | Maker/checker on loosening request-policy changes: an organization with one administrator could not loosen a policy |
 | WID-C02 Revocation and expiry | P2 | Partly fixed | Integration tests for a connector outage and a failed deprovisioning; owner decision on connectors carrying out a leaver's removals |
 | WID-C03 Gateway bypass | P3 | Partly fixed | Owner decision: make the gateway the only path (agents without direct credentials) |
 | WID-H01 Identity correlation | P3 | Partly fixed | Merge reversal and a source-priority policy (owner input) |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | One key per task; read the system before a retry after an unclear failure |
 | WID-H03 Incomplete syncs | P2 | Partly fixed | Thresholds per kind; tests for a failed page in the middle of a read |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Accepted-exception and false-positive closure for rogue findings on human accounts |
-| WID-H05 Connector security | P3 | Partly fixed | Tests for a real DNS rebind and for a strict-policy redirect to a private address |
+| WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
-| WID-H07 Audit and erasure | P3 | Waiting on the owner | SQL test for the append-only and purge rules; retention defaults need owner and legal input |
+| WID-H07 Audit and erasure | P3 | Waiting on the owner | Retention defaults, free-text minimisation and crypto-erasure need owner and legal input |
 | WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
 
 ## Detail
@@ -57,9 +57,22 @@ met, with evidence), or Waiting on the owner.
   `requestRules.test.ts`).
 - Auto-approval is recorded distinctly (audit `access.request_auto_approved`).
 
-**Next:**
-- Maker/checker on request-policy changes.
-- Link with WID-H04 for rogue access approved afterwards.
+Linked with WID-H04: rogue access approved afterwards is now recorded as
+such (PR #115).
+
+**Waiting on the owner:** maker/checker on request-policy changes. The plan
+is ready:
+- a change that loosens control is held until another administrator
+  approves it. That covers turning on auto-approval, raising the risk
+  threshold, dropping an approver, dropping the justification, lengthening
+  the maximum duration, or making something requestable;
+- tightening changes apply at once.
+
+It needs a decision first:
+- an organization with a single administrator could then never loosen a
+  policy;
+- three E2E specs that turn on auto-approval would need a second
+  administrator.
 
 ### WID-C02: urgent revocation and time-bound access (P1, in progress)
 
@@ -244,10 +257,23 @@ Tests:
 - Custom credential headers and request bodies no longer follow a redirect
   to another origin (PR #106; `outboundFetch.ts`, `credentialHeaders`).
 
-**Next:**
-- Tests for a real DNS rebind and for a strict-policy redirect to a private
-  address.
-- 6to4 and Teredo ranges.
+**Done:** more ways an IPv6 address hides a private one are refused
+(`isPrivateAddress` in `outboundPolicy.ts`):
+- 6to4 (`2002::/16`) and IPv4-compatible (`::a.b.c.d`) addresses are
+  judged by the IPv4 address inside them;
+- Teredo (`2001:0::/32`) and local-use NAT64 (`64:ff9b:1::/48`) are
+  always refused;
+- the 6to4 relay range (`192.88.99.0/24`) is refused.
+
+**Done:** DNS rebinding tests (`outboundFetch.test.ts`):
+- a name that is public on one lookup and loopback on the next is refused
+  at the connect that would reach loopback;
+- a name that resolves to a public and a private address is refused.
+
+A redirect is checked hop by hop with the same check as the first
+request (`checkOutboundUrl`, then the connect-time lookup). Under the
+strict policy no local server can be the first hop, so the existing
+redirect-to-metadata test covers that path.
 
 ### WID-H06: automation credential scope (P2, fixed)
 
@@ -300,11 +326,19 @@ Tests:
 
 ### WID-H07: audit and erasure (P3, waiting on the owner)
 
-**Next:**
-- A SQL test for the append-only trigger and `purge_audit_logs` (can be
-  done now).
-- Waiting on the owner and legal: a default retention period, minimising
-  free-text metadata, crypto-erasure.
+**Done:** a SQL test of the audit trail's rules
+(`tests/foundation/audit-trail-integrity.sql`), run against the live
+database on 12 October and passing. It checks that:
+- a row cannot be updated or deleted;
+- the purge refuses a cut inside 365 days;
+- a legal hold stops it;
+- once released, it removes only the old row, records the purge, and the
+  chain still verifies.
+
+**Waiting on the owner and legal:**
+- a default retention period;
+- minimising free-text metadata;
+- crypto-erasure.
 
 ### WID-H08: automation credential address allow-list (P1, partly fixed)
 

@@ -27,6 +27,13 @@ describe("isPrivateAddress", () => {
     }
     for (const ip of ["2606:4700:4700::1111", "::ffff:8.8.8.8"]) expect(isPrivateAddress(ip), ip).toBe(false);
   });
+
+  it("WID-H05: judges the IPv4 inside 6to4 and IPv4-compatible addresses, and refuses Teredo, local NAT64 and the 6to4 relay", () => {
+    for (const ip of ["2002:7f00:1::1", "2002:a9fe:a9fe::", "2002:c0a8:101::5", "::127.0.0.1", "::a9fe:a9fe", "2001:0:4136:e378:8000:63bf:3fff:fdd2", "64:ff9b:1::a00:1", "192.88.99.1"]) {
+      expect(isPrivateAddress(ip), ip).toBe(true);
+    }
+    for (const ip of ["2002:808:808::1", "::8.8.8.8"]) expect(isPrivateAddress(ip), ip).toBe(false);
+  });
 });
 
 describe("checkOutboundUrl", () => {

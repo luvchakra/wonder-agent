@@ -44,6 +44,7 @@ const V4_BLOCKED: [string, number][] = [
   ["172.16.0.0", 12],
   ["192.0.0.0", 24],
   ["192.0.2.0", 24],
+  ["192.88.99.0", 24], // 6to4 relay anycast (WID-H05)
   ["192.168.0.0", 16],
   ["198.18.0.0", 15],
   ["198.51.100.0", 24],
@@ -108,6 +109,15 @@ export function isPrivateAddress(ip: string): boolean {
   const embedded = (hi: number, lo: number) => `${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`;
   if (g.slice(0, 5).every((x) => x === 0) && g[5] === 0xffff) return isPrivateAddress(embedded(g[6], g[7]));
   if (g[0] === 0x64 && g[1] === 0xff9b && g.slice(2, 6).every((x) => x === 0)) return isPrivateAddress(embedded(g[6], g[7]));
+  // WID-H05: other ways an IPv6 address carries an IPv4 one.
+  // IPv4-compatible (::a.b.c.d, deprecated): the IPv4 part decides.
+  if (g.slice(0, 6).every((x) => x === 0)) return isPrivateAddress(embedded(g[6], g[7]));
+  // 6to4 (2002:aabb:ccdd::/48): the IPv4 address in the second and third groups decides.
+  if (g[0] === 0x2002) return isPrivateAddress(embedded(g[1], g[2]));
+  // Teredo (2001:0::/32) tunnels through a relay to an obfuscated address: never a connection's target.
+  if (g[0] === 0x2001 && g[1] === 0x0000) return true;
+  // Local-use NAT64 (64:ff9b:1::/48) is translated inside the operator's own network.
+  if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 0x1) return true;
   if ((g[0] & 0xfe00) === 0xfc00) return true; // fc00::/7 unique local
   if ((g[0] & 0xffc0) === 0xfe80) return true; // fe80::/10 link-local
   if ((g[0] & 0xff00) === 0xff00) return true; // multicast
