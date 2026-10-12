@@ -14,7 +14,7 @@ Generated 2026-10-12 from 11 module backlogs.
 
 ## Overall
 
-**221 of 269 tracked stories complete — 82%**
+**221 of 270 tracked stories complete — 82%**
 
 ```
 █████████████████████████████████░░░░░░░  82%
@@ -23,10 +23,10 @@ Generated 2026-10-12 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 221 |
-| Partial | 28 |
+| Partial | 29 |
 | Deferred | 1 |
 | Not Started | 19 |
-| **Total tracked** | **269** |
+| **Total tracked** | **270** |
 
 Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 2 | 45 | `████████████████░░` 89% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 25 | 2 | 0 | 0 | 27 | `█████████████████░` 93% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 25 | 3 | 0 | 0 | 28 | `████████████████░░` 89% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
@@ -142,7 +142,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 25 done · 2 partial · 0 deferred · 0 not started (27 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 25 done · 3 partial · 0 deferred · 0 not started (28 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -173,6 +173,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-18 | Staging reflects the source: run tracking, missing-at-source after complete full runs, mass-missing guard (F1, #42) | Done — 2026-10-11: migration 0117 (isolation SQL 19/19); held runs approved or discarded on the connection page |
 | INTEGRATION-P0-19 | Scheduled import and promotion; identity-source schedules run; run now (F1, #43) | Done — 2026-10-11: migration 0118 (isolation SQL 7/7); identities and accounts chained after every full sync; entitlements and grants follow with ACCESS-P0-27 |
 | INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Done — 2026-10-11: `attribute:<name>` targets validated on save, typed and written with provenance by Identity; schedule on every reading connection and `/api/v1/integrations/<id>/schedule` |
+| INTEGRATION-P0-21 | Definition extensions for integrators (F3, #69) | Partial — 2026-10-12 slice 1: transforms `regex` (safe patterns only), `replace`, `coalesce`, `dateAdd`; API key in the request body (`auth.type: body`). Incremental `changes` resources, OAuth authorization code, JWT and certificate auth, and export/import with connection upgrade follow |
 
 ### 04 — Access Agent
 

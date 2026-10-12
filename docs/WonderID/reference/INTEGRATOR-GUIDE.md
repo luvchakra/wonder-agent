@@ -50,7 +50,7 @@ or open a built-in type and use **Use as a starting point**.
 
 What a definition can do: drivers `http`, `ldap`, `sql` (PostgreSQL, one
 read-only statement), `mcp`, `file`, `none` (receive only); authentication
-`none`, `basic`, `bearer`, `header`, `query`, `oauth2_client_credentials`,
+`none`, `basic`, `bearer`, `header`, `query`, `body`, `oauth2_client_credentials`,
 `ldap_simple`, `sql_password`; pagination `none`, `page`, `offset`, `cursor`,
 `link_header`, `scim`; field paths, templates, a fixed transform list and
 `where` filters; `forEach`, `unwind`, keyed records; inbound channels
@@ -58,8 +58,10 @@ read-only statement), `mcp`, `file`, `none` (receive only); authentication
 reference is `CONNECTOR-FRAMEWORK.md`, "Definition reference".
 
 Needs a WonderID change today: OAuth authorization code, JWT or certificate
-authentication; other SQL engines; SOAP; write operations; transforms outside
-the fixed list; a connection upgrading to a newer definition version. These
+authentication; other SQL engines; SOAP; transforms outside the fixed list
+(which now includes `regex`, `replace`, `coalesce` and `dateAdd`); a
+connection upgrading to a newer definition version. Write operations are
+declared in a definition's `write` (see "Changes in the system"). These
 are the extensions in the design's §5.8.2 (F3, F7).
 
 ## 3. Bring identities in

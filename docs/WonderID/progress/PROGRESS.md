@@ -96,7 +96,7 @@ Exit test: not run.
 |---|---|---|---|---|
 | INTEGRATION-P0-11 (finish) Write interface with a caller | Integration | | Done | 2026-10-12. Definitions declare writes (`write`: revoke_access, disable_account, grant_access, create_account; http driver); a connection writes only after an administrator turns writes on (Connection → Changes in the system; audited); retryable failures marked |
 | INTEGRATION-P0-13 Provisioning pipeline | Integration + Access | | Done | 2026-10-12. Slice 1 (migrations 0128–0129): remove-access and disable-account tasks done by the connector (claim, idempotent attempts, two retries, verification sync, reconciliation verifies); failures back to the owner with the reason, Try again, lost-run sweep. Slice 2 (no migration): approved access added and accounts created by the connector; access for someone with no account waits while the connector creates it, then is added once the account is read back. Ticketed fulfilment is INTEGRATION-P0-26 |
-| INTEGRATION-P0-21 Definition extensions | Integration | #69 | Not started | |
+| INTEGRATION-P0-21 Definition extensions | Integration | #69 | In progress | Slice 1 (2026-10-12): transforms `regex`, `replace`, `coalesce`, `dateAdd`; API key in the request body. Next: incremental `changes` resources, then OAuth authorization code, JWT and certificate auth, then export/import and connection upgrade |
 | INTEGRATION-P0-22 † SCIM client; LDAP and http writes | Integration | | Not started | |
 | INTEGRATION-P0-23 † WonderID Relay | Integration | | Not started | Needs D7 |
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |

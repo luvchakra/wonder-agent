@@ -88,6 +88,7 @@ const AUTH_LABEL: Record<AuthSpec["type"], string> = {
   bearer: "Bearer token",
   header: "API key in a header",
   query: "API key in the query string",
+  body: "API key in the request body",
   oauth2_client_credentials: "OAuth 2.0 client credentials",
   ldap_simple: "LDAP simple bind",
   sql_password: "Database user and password",
@@ -156,7 +157,7 @@ export function authSummary(auth: AuthSpec): AuthSummary {
     type: auth.type,
     label: AUTH_LABEL[auth.type],
     fields: auth.type === "none" ? [] : auth.fields.map((f) => (f.optional ? `${f.label} (optional)` : f.label)),
-    carrier: auth.type === "header" || auth.type === "query" ? auth.name : null,
+    carrier: auth.type === "header" || auth.type === "query" || auth.type === "body" ? auth.name : null,
   };
 }
 
