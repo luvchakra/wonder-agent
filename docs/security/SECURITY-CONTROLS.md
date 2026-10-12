@@ -98,3 +98,18 @@ them under the ePrivacy rules.
   protection stays off; the advisor warning is accepted.
 - `security.txt` contact set to `connect@wonderapps.biz` (owner, 2026-10-10), with
   the policy and canonical addresses on `id.wonderapps.biz`.
+
+## 5. Automation credential address limits, per deployment (WID-H08)
+
+A credential limited to certain addresses is checked against the caller's
+address as the platform's own edge reports it (`trustedClientIp` in
+`lib/security/automationCredentialRules.ts`), never a header the caller can
+set. When the address is unknown, such a credential is refused.
+
+| Deployment | Address taken from | Setting | Verified |
+|---|---|---|---|
+| Vercel (production, `id.wonderapps.biz`) | `x-vercel-forwarded-for`, then `x-real-ip`, which Vercel's edge sets itself | none (`VERCEL=1` is set by Vercel) | Each night, `automation-credentials.spec.ts` calls production through the edge with six spoofed address headers (`x-forwarded-for`, `x-vercel-forwarded-for`, `x-real-ip`, `forwarded`, `true-client-ip`, `x-client-ip`). The call is refused (403 `ADDRESS_NOT_ALLOWED`). With every address allowed, the same calls pass the address check. Run by hand against production on 12 October 2026: passed. |
+| Self-hosted behind an ingress (load balancer, reverse proxy, Cloudflare) | the header named by `CLIENT_IP_HEADER`, last entry (the hop the ingress added) | `CLIENT_IP_HEADER`, e.g. `x-forwarded-for` behind an ingress that appends to it, `cf-connecting-ip` behind Cloudflare | Unit tests (`automationCredentialRules.test.ts`, "WID-H08"). The operator must make the ingress the only way in: the app's own port is not reachable directly, or a caller could set that header. |
+| Anything else (no `CLIENT_IP_HEADER`, not Vercel), including `next start` on its own | nothing: the address is unknown | none | A credential with address limits is refused; the E2E spec checks this against its local server. |
+
+Credentials without address limits are unaffected by the address.

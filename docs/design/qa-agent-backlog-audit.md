@@ -1839,3 +1839,15 @@ Each remaining failure was looked at; they are not session losses.
 
 The scheduled nightly on Vercel (21:30 UTC) is the check of record. It
 seeds and prunes first; its result is recorded in the next entry.
+
+### 2026-10-12 — the nightly checks the production edge (WID-H08)
+
+- `scripts/e2e-on-vercel.sh` now sets `E2E_INGRESS_URL=https://id.wonderapps.biz`.
+- With it, `automation-credentials.spec.ts` "WID-H08" also calls production
+  through Vercel's edge with spoofed address headers, and expects a refusal.
+- The positive control (the rate limit) uses only that credential, in the
+  E2E organization. It sends three API reads to production per night.
+- Without the variable, as in a plain local run, the test checks only the
+  local server's fail-closed refusal.
+
+Run by hand: 13 passed.

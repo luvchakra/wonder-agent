@@ -3126,3 +3126,26 @@ Verified:
 ### 2026-10-12 — WID-H07, identifiers only
 
 WID-H07 identifiers only (audit side). `AuditEvent.typedText` now also takes an outside system's value that may identify a person; it is fingerprinted the same way. The module audits that wrote personal data are listed in the Access, Integration, Identity and Platform logs and in the tracker. Verified: `npx vitest run lib modules` 1360 passed, typecheck and eslint clean.
+
+### 2026-10-12 — WID-H08 tested end to end at the production edge; deployments documented
+
+- `tests/e2e/automation-credentials.spec.ts`, new test "WID-H08". It limits
+  the approved credential to 203.0.113.0/24, then calls the API with that
+  address in six headers (`x-forwarded-for`, `x-vercel-forwarded-for`,
+  `x-real-ip`, `forwarded`, `true-client-ip`, `x-client-ip`):
+  - the local server: refused, 403 `ADDRESS_NOT_ALLOWED` (fails closed);
+  - production through Vercel's edge (`E2E_INGRESS_URL`): refused, 403
+    `ADDRESS_NOT_ALLOWED`;
+  - positive control: with every address allowed, the calls pass the
+    address check and reach the rate limit (429).
+- `scripts/e2e-on-vercel.sh` sets `E2E_INGRESS_URL` to production, so the
+  nightly re-checks the edge.
+- `docs/security/SECURITY-CONTROLS.md` §5: where the address comes from on
+  each supported deployment, and what an operator must do when
+  self-hosting.
+
+Verified: the spec, run locally with `E2E_INGRESS_URL=https://id.wonderapps.biz`:
+13 passed. A first attempt used a 200 as the positive control and got 500.
+Production cannot decrypt a credential's backing secret created under the
+local server's encryption key (runtime log: "Unsupported state or unable to
+authenticate data"). Hence the rate-limit control, which needs no key.

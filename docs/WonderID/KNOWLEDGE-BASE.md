@@ -77,6 +77,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
 | 12 Oct 2026 | Audit records hold identifiers, not personal data: accounts, people and outside systems' ids are recorded by id or as a fingerprint, never as an email, name or login. |
 | 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
+| 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
 
 ---
 
@@ -393,6 +394,7 @@ An approved request is not access yet. It becomes access once the change is made
 - Your own tools, such as pipelines or ticketing systems, can call WonderID's API with their own credential instead of a person's login.
 - **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it. Giving it another role pauses it until a different administrator approves the change.
 - **Limits:** it expires within a year (the database refuses anything longer), can be limited to certain network addresses, and is rate-limited.
+  The address is the one the platform's edge reports, never one the caller sends. This is tested every night at the production edge.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
 - **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions.
 - **Audit:** every call it is allowed to make is audited. Refused calls are audited too, whether the credential is pending, revoked or expired, the address is not allowed, or it is over its rate limit. To keep the record readable, each reason is recorded at most once a minute per credential.

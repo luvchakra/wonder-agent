@@ -40,7 +40,7 @@ met, with evidence), or Waiting on the owner.
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P2 | Fixed | Retention defaults (0143), typed text out of audit records, identifiers only in audit records, and erasure of accounts, source values and connector write targets done |
-| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
+| WID-H08 Automation address allow-list | P1 | Fixed | Spoofing tested end to end at the production edge (nightly from now on); each deployment documented. For the register to assess |
 
 ## Owner decisions
 
@@ -701,7 +701,7 @@ the erasure uses were checked read-only against the live API.
 **Still open (decision to come):** per-person encryption keys, if a
 customer or regulator requires crypto-erasure.
 
-### WID-H08: automation credential address allow-list (P1, partly fixed)
+### WID-H08: automation credential address allow-list (P1, fixed)
 
 **Done:** the caller's address now comes only from a header the
 platform's edge sets (`trustedClientIp` in `automationCredentialRules.ts`):
@@ -716,8 +716,36 @@ platform's edge sets (`trustedClientIp` in `automationCredentialRules.ts`):
 A caller's own `x-forwarded-for` is never trusted. Test:
 `automationCredentialRules.test.ts`, "WID-H08".
 
-**Next:**
-- Verify at the deployed ingress (Vercel production) that spoofed headers
-  cannot change the address.
-- Document the setting in the self-hosting kit.
+**Done (12 Oct): tested end to end at the deployed ingress.**
+`automation-credentials.spec.ts` ("WID-H08") limits an approved credential
+to 203.0.113.0/24 (TEST-NET-3), then calls the API with that address in six
+headers: `x-forwarded-for`, `x-vercel-forwarded-for`, `x-real-ip`,
+`forwarded`, `true-client-ip` and `x-client-ip`.
+- **Local server** (no trusted edge): refused, 403 `ADDRESS_NOT_ALLOWED`.
+  The address is unknown, so it fails closed.
+- **Production, through Vercel's edge** (`E2E_INGRESS_URL`): refused, 403
+  `ADDRESS_NOT_ALLOWED`.
+- **Positive control:** with every address allowed, the same calls pass
+  the address check. They reach the rate limit (429), which is checked
+  after the address. So the edge supplied a real address, and the refusal
+  above was the address, not a missing one.
+
+Run by hand against `https://id.wonderapps.biz` on 12 October: 13 passed.
+The nightly now sets `E2E_INGRESS_URL` to production
+(`scripts/e2e-on-vercel.sh`), so the edge is re-checked every night.
+
+**Done: each supported deployment documented.**
+`docs/security/SECURITY-CONTROLS.md` §5 covers:
+- Vercel;
+- self-hosted behind an ingress (`CLIENT_IP_HEADER`, last hop; the
+  ingress must be the only way in);
+- anything else (unknown address, refused).
+
+The demo-org kit (`demo-org/`) is a simulated customer's systems, not a
+WonderID deployment, so it needs no setting.
+
+Found on the way: production cannot decrypt a credential created by a
+server with another `SECRET_ENCRYPTION_KEY`, and answers 500. This only
+happens with a test credential created locally; it is not a path users
+reach.
 
