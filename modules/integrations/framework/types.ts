@@ -186,7 +186,8 @@ export type Pagination =
   | { type: "scim"; size: number };
 
 export type HttpRequestSpec = {
-  method?: "GET" | "POST";
+  /** Reads and the test use GET or POST; writes (`write`) may also use PUT, PATCH and DELETE. */
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   path: string;
   /** A list repeats the parameter (role[]=admin&role[]=agent). */
   query?: Record<string, string | string[]>;
@@ -277,6 +278,24 @@ export type ResourceSpec = {
   maxRecords?: number;
 };
 
+/**
+ * INTEGRATION-P0-11 / P0-13 (decision D3, 2026-10-12): the writes a
+ * definition can make. Reversible ones come first: removing an
+ * entitlement from an account and disabling an account.
+ */
+export const DEFINITION_WRITE_OPERATIONS = ["revoke_access", "disable_account"] as const;
+export type DefinitionWriteOperation = (typeof DEFINITION_WRITE_OPERATIONS)[number];
+
+/**
+ * One write (http driver): a request whose path, query, headers and body
+ * strings may use `{settings.…}` and the target, `{target.account}` (the
+ * account's id in the system) and, for revoke_access,
+ * `{target.entitlement}` (the entitlement's id there). A connection
+ * declares what its definition supports but writes only once an
+ * administrator turns writes on for it.
+ */
+export type WriteSpec = { request: HttpRequestSpec };
+
 export type FileSourceSpec = {
   /** `{settings.<url setting>}`: the HTTPS address of the CSV. Empty means "read uploaded files". */
   url?: string;
@@ -312,6 +331,8 @@ export type ConnectorDefinition = {
   resources: Partial<Record<ResourceKind, ResourceSpec | ResourceSpec[]>>;
   /** What the organization's systems may send WonderID (see ReceiveSpec). */
   receive?: ReceiveSpec;
+  /** What this connector can change in the system (see WriteSpec). Absent: read-only. */
+  write?: Partial<Record<DefinitionWriteOperation, WriteSpec>>;
   /** Requests per second (default 10). */
   rateLimitPerSecond?: number;
   /** Where an integrator can read about this product's API. */

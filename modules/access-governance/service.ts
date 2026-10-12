@@ -23,6 +23,7 @@ export { LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerSource, type Ledge
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
 export { grantsForRequest, requestProgressFor } from "./pendingGrants";
 export { listFulfilmentTasks, actOnFulfilmentTask, remindOverdueFulfilmentTasks, type FulfilmentTask } from "./fulfilmentTasks";
+export { releaseLostConnectorRuns } from "./connectorFulfilment";
 export { sweepAccessExpiry, remindExpiringAccess } from "./accessExpiry";
 export { requestFulfilment, requestProgress, type FulfilmentState } from "./pendingGrantRules";
 export {

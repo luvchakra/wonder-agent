@@ -12,9 +12,14 @@ export async function fulfilmentTaskAction(taskId: string, _prev: TaskFormState,
   const action = formData.get("action");
   const note = formData.get("note");
   try {
-    await actOnFulfilmentTask(ctx.tenantId!, { userId: ctx.userId, canApprove: ctx.permissions.includes("access.approve") }, taskId, action, note);
+    const task = await actOnFulfilmentTask(ctx.tenantId!, { userId: ctx.userId, canApprove: ctx.permissions.includes("access.approve") }, taskId, action, note);
     revalidatePath("/access/fulfilment");
     revalidatePath("/access/requests");
+    if (action === "retry_connector") {
+      return task.connectorStatus === "succeeded"
+        ? { status: "saved", message: "The connector made the change. It is verified when the next sync finds it on the target." }
+        : { status: "error", message: `The connector could not make the change: ${task.connectorError ?? "no reason given"}` };
+    }
     return { status: "saved", message: action === "claim" ? "Claimed: it is yours to do." : action === "complete" ? "Done. It is verified when the next sync finds it on the target." : "Recorded as failed." };
   } catch (err) {
     const e = err as { message?: string; code?: string };

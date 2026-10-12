@@ -11,7 +11,7 @@ const INPUT = "h-8 w-44 rounded-md border border-input bg-background px-2 text-x
  * ACCESS-P0-29 — one task's next step: Claim; once it is yours, Done (with
  * an optional note), and a problem reported from the folded row.
  */
-export function TaskActions({ taskId, status, mine, label }: { taskId: string; status: string; mine: boolean; label: string }) {
+export function TaskActions({ taskId, status, mine, label, connectorStatus = null }: { taskId: string; status: string; mine: boolean; label: string; connectorStatus?: string | null }) {
   const [state, action, pending] = useActionState(fulfilmentTaskAction.bind(null, taskId), IDLE);
   const outcome =
     state.status === "idle" ? null : (
@@ -19,14 +19,28 @@ export function TaskActions({ taskId, status, mine, label }: { taskId: string; s
         {state.message}
       </p>
     );
+  // INTEGRATION-P0-13: nobody touches the target while the connector is changing it.
+  if (connectorStatus === "running" && status === "open") return outcome;
   if (status === "open" || status === "failed") {
     return (
-      <form action={action} className="flex flex-col items-end gap-1">
-        <Button type="submit" name="action" value="claim" size="sm" variant="secondary" disabled={pending} aria-label={`Claim: ${label}`}>
-          Claim
-        </Button>
+      <div className="flex flex-col items-end gap-1">
+        <form action={action}>
+          <Button type="submit" name="action" value="claim" size="sm" variant="secondary" disabled={pending} aria-label={`Claim: ${label}`}>
+            Claim
+          </Button>
+        </form>
+        {connectorStatus === "failed" && status === "open" ? (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground">Connector</summary>
+            <form action={action} className="mt-1">
+              <Button type="submit" name="action" value="retry_connector" size="sm" variant="outline" disabled={pending} aria-label={`Try the connector again: ${label}`}>
+                {pending ? "Trying…" : "Try again"}
+              </Button>
+            </form>
+          </details>
+        ) : null}
         {outcome}
-      </form>
+      </div>
     );
   }
   if (status !== "claimed" || !mine) return outcome;

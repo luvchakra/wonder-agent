@@ -72,6 +72,8 @@ export type ConnectorWriteResult = {
   replayed: boolean;
   externalId: string | null;
   error: string | null;
+  /** INTEGRATION-P0-13: a failed write that may succeed if tried again (network, 429, 5xx). */
+  retryable?: boolean;
 };
 
 export type IntegrationStatus = "configured" | "connected" | "error" | "disabled";
@@ -92,7 +94,8 @@ export type Integration = {
 
 export type AuthType = "oauth2" | "api_key" | "basic" | "bearer" | "mtls";
 
-export type SyncJobTrigger = "manual" | "scheduled";
+/** `verification`: read again after a connector write (INTEGRATION-P0-13). */
+export type SyncJobTrigger = "manual" | "scheduled" | "verification";
 export type SyncJobStatus = "queued" | "running" | "succeeded" | "failed" | "partial";
 /** INTEGRATION-P0-18: only a full run may mark staged objects missing at the source. */
 export type SyncJobMode = "full" | "incremental" | "partial";

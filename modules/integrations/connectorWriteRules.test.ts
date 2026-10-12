@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { decideWrite, requestFingerprint, validateDeclaredCapabilities, validateWriteRequest } from "./connectorWriteRules";
+import { capabilitiesWithWrites, decideWrite, requestFingerprint, retryableWriteFailure, validateDeclaredCapabilities, validateWriteRequest, writesEnabled } from "./connectorWriteRules";
 
 const err = (fn: () => unknown) => {
   try {
@@ -60,5 +60,36 @@ describe("decideWrite", () => {
     expect(decideWrite("revoke_access", readOnly, "connected")).toMatchObject({ run: false, status: "blocked", reason: expect.stringMatching(/read-only/) });
     expect(decideWrite("revoke_access", { revokeAccess: true }, "disabled")).toMatchObject({ run: false, reason: expect.stringMatching(/disabled/) });
     expect(decideWrite("revoke_access", { revokeAccess: true }, "connected")).toEqual({ run: true });
+  });
+});
+
+describe("writes per connection (INTEGRATION-P0-13)", () => {
+  const supported = { revokeAccess: true, disableAccount: true, deprovision: true };
+  const reads = { importAccounts: true, importAccess: true };
+
+  it("turning on declares exactly what the definition supports; off declares no write", () => {
+    const on = capabilitiesWithWrites(reads, supported, true);
+    expect(on).toMatchObject({ importAccounts: true, importAccess: true, revokeAccess: true, disableAccount: true, deprovision: true, grantAccess: false, createAccount: false, provision: false });
+    expect(writesEnabled(on)).toBe(true);
+    const off = capabilitiesWithWrites(on, supported, false);
+    expect(off).toMatchObject({ importAccounts: true, revokeAccess: false, disableAccount: false, deprovision: false });
+    expect(writesEnabled(off)).toBe(false);
+    // Never more than supported, whatever was stored before.
+    expect(capabilitiesWithWrites({ ...reads, grantAccess: true }, { revokeAccess: true }, true)).toMatchObject({ grantAccess: false, revokeAccess: true, disableAccount: false });
+  });
+
+  it("a declared write runs only while its capability is declared", () => {
+    expect(decideWrite("revoke_access", capabilitiesWithWrites(reads, supported, true), "connected")).toEqual({ run: true });
+    expect(decideWrite("revoke_access", capabilitiesWithWrites(reads, supported, false), "connected").run).toBe(false);
+    expect(decideWrite("revoke_access", capabilitiesWithWrites(reads, supported, true), "disabled").run).toBe(false);
+  });
+
+  it("retries only network failures, rate limits and server errors", () => {
+    expect(retryableWriteFailure(undefined, "network")).toBe(true);
+    expect(retryableWriteFailure(429, "http")).toBe(true);
+    expect(retryableWriteFailure(503, "http")).toBe(true);
+    expect(retryableWriteFailure(404, "http")).toBe(false);
+    expect(retryableWriteFailure(403, "http")).toBe(false);
+    expect(retryableWriteFailure(undefined, "other")).toBe(false);
   });
 });

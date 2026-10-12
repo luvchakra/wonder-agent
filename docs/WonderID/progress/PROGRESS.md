@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | Last updated | 2026-10-12 |
-| Current phase | F1 and F2 done (FOUNDATION-P0-31 2026-10-12). D2, D3, D11 and D12 approved 2026-10-12: F3 next |
-| Next story | F3 Provisioning (D3 approved): INTEGRATION-P0-11 finish, then INTEGRATION-P0-13 |
+| Current phase | F3 started 2026-10-12: connectors remove access and disable accounts (INTEGRATION-P0-11, P0-13 first slice) |
+| Next story | F3: INTEGRATION-P0-13 grants and account creation; RISK-P0-13 remediation through the connector (exit test) |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -21,7 +21,7 @@ passed. This file is hand-maintained; the generated programme rollup
 |---|---|---|---|---|
 | F1 Import and reconciliation | 9 | 9 | 0 | Done; exit test passed (seeded staging) |
 | F2 Access requests | 8 | 8 | 0 | Done; exit test passed (seeded test organization) |
-| F3 Provisioning | 10 | 0 | 0 | Not started; D3 approved |
+| F3 Provisioning | 10 | 1 | 1 | Started: removal and disabling through connectors, verified by reconciliation |
 | F4 Lifecycle and certification | 10 | 0 | 0 | Not started; D12 approved |
 | F5 Roles, SoD, delegation | 5 | 0 | 0 | Not started |
 | F6 Agent ID | 11 | 0 | 0 | Not started; D2 approved |
@@ -94,8 +94,8 @@ Exit test: not run.
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| INTEGRATION-P0-11 (finish) Write interface with a caller | Integration | | Partial | Backlog: Partial; interface built, no caller |
-| INTEGRATION-P0-13 Provisioning pipeline | Integration | | Not started | Backlog: Not Started |
+| INTEGRATION-P0-11 (finish) Write interface with a caller | Integration | | Done | 2026-10-12. Definitions declare writes (`write`: revoke_access, disable_account; http driver); a connection writes only after an administrator turns writes on (Connection → Changes in the system; audited); retryable failures marked |
+| INTEGRATION-P0-13 Provisioning pipeline | Integration + Access | | In progress | Slice 1 (2026-10-12, migrations 0128–0129): remove-access and disable-account tasks done by the connector (claim, idempotent attempts, two retries, verification sync, reconciliation verifies); failures back to the owner with the reason, Try again, lost-run sweep. Next: grants and account creation (D3's second step) |
 | INTEGRATION-P0-21 Definition extensions | Integration | #69 | Not started | |
 | INTEGRATION-P0-22 † SCIM client; LDAP and http writes | Integration | | Not started | |
 | INTEGRATION-P0-23 † WonderID Relay | Integration | | Not started | Needs D7 |

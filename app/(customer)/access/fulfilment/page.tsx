@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { listFulfilmentTasks } from "@/modules/access-governance/service";
+import { listFulfilmentTasks, type FulfilmentTask } from "@/modules/access-governance/service";
 import { Badge, type BadgeTone, Card, CardBody, EmptyState } from "@/modules/ui";
 import { TaskActions } from "./TaskActions";
 import { TASK_STATUS, accountLabel, taskLabel } from "./labels";
@@ -12,6 +12,13 @@ import { TASK_STATUS, accountLabel, taskLabel } from "./labels";
 // closes itself when reconciliation finds the access.
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+
+// INTEGRATION-P0-13: what the connector did with the task, if it tried.
+const CONNECTOR: Record<NonNullable<FulfilmentTask["connectorStatus"]>, { label: string; tone: BadgeTone }> = {
+  running: { label: "Connector working", tone: "info" },
+  succeeded: { label: "Done by connector", tone: "success" },
+  failed: { label: "Connector failed", tone: "danger" },
+};
 
 export default async function FulfilmentTasksPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   let ctx;
@@ -62,13 +69,15 @@ export default async function FulfilmentTasksPage({ searchParams }: { searchPara
                       <p className="text-xs text-muted-foreground">
                         Account {accountLabel(t.accountName)} · {t.assigneeName ? `owner ${t.assigneeName}` : "no owner: access managers"} · due {day(t.dueAt)}
                         {t.failureReason && t.status === "failed" ? ` · ${t.failureReason}` : ""}
+                        {t.connectorError && t.connectorStatus === "failed" && t.status === "open" ? ` · Connector: ${t.connectorError}` : ""}
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         <Badge tone={status.tone}>{status.label}</Badge>
                         {t.overdue ? <Badge tone="danger">Overdue</Badge> : null}
+                        {t.connectorStatus ? <Badge tone={CONNECTOR[t.connectorStatus].tone}>{CONNECTOR[t.connectorStatus].label}</Badge> : null}
                       </div>
                     </div>
-                    <TaskActions taskId={t.id} status={t.status} mine={t.claimedBy === ctx.userId} label={label} />
+                    <TaskActions taskId={t.id} status={t.status} mine={t.claimedBy === ctx.userId} label={label} connectorStatus={t.connectorStatus} />
                   </li>
                 );
               })}

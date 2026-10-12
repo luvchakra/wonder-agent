@@ -1,4 +1,5 @@
 import type { ConnectorAdapter, ConnectorConfig, ImportedRecord } from "../connector";
+import type { ConnectorWriteOperation } from "@/lib/shared/types/integrations";
 import type {
   ConnectorCapabilities,
   NormalizedAccessGrant,
@@ -7,7 +8,15 @@ import type {
   NormalizedEntitlement,
   NormalizedIdentity,
 } from "@/lib/shared/types/integrations";
-import { RESOURCE_KINDS, type ConnectorDefinition, type ConnectorIntegrationConfig, type ResourceKind, type ResourceSpec } from "./types";
+import {
+  RESOURCE_KINDS,
+  type ConnectorDefinition,
+  type ConnectorIntegrationConfig,
+  type DefinitionWriteOperation,
+  type HttpRequestSpec,
+  type ResourceKind,
+  type ResourceSpec,
+} from "./types";
 import { fillTemplate, mapRecord, matchesFilters, readPath, type TemplateScope } from "./mapping";
 import { validateDefinition, validateSettings } from "./validate";
 import { BUILTIN_DEFINITIONS } from "./definitions";
@@ -38,6 +47,8 @@ export interface ConnectorDriverSession {
   test(): Promise<void>;
   /** `kind` is the canonical kind the resource produces (the file driver reads that kind's uploads). */
   fetch(resource: ResourceSpec, scope: TemplateScope, maxRecords: number, kind: ResourceKind, report?: FetchReport): Promise<unknown[]>;
+  /** INTEGRATION-P0-13: one write request (http driver). Throws on a failed response. */
+  send?(request: HttpRequestSpec, scope: TemplateScope): Promise<unknown>;
   close?(): Promise<void>;
 }
 
@@ -66,6 +77,9 @@ export function httpDriver(fetchImpl: FetchLike): DriverFactory {
       fetch(resource, scope, maxRecords, _kind, report) {
         if (!resource.request) throw new Error("This resource has no request");
         return session.fetchAll(resource.request, resource.records, resource.pagination, scope, maxRecords, resource.recordsKeyed, report);
+      },
+      async send(request, scope) {
+        return (await session.send(request, scope)).json;
       },
     };
   };
@@ -100,6 +114,24 @@ export function capabilitiesOf(def: ConnectorDefinition): ConnectorCapabilities 
     provision: false,
     deprovision: false,
   };
+}
+
+/**
+ * INTEGRATION-P0-13: the write capabilities a definition supports. A
+ * connection declares them (and so may write) only once an administrator
+ * turns writes on for it; capabilitiesOf() never includes them.
+ */
+export function writeCapabilitiesOf(def: ConnectorDefinition): ConnectorCapabilities {
+  const w = def.write ?? {};
+  return { revokeAccess: Boolean(w.revoke_access), disableAccount: Boolean(w.disable_account), deprovision: Boolean(w.revoke_access || w.disable_account) };
+}
+
+/** Fills every string in a write body from the scope (settings and target). */
+function fillBody(value: unknown, scope: TemplateScope): unknown {
+  if (typeof value === "string") return fillTemplate(value, scope);
+  if (Array.isArray(value)) return value.map((v) => fillBody(v, scope));
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fillBody(v, scope)]));
+  return value;
 }
 
 /** The driver a stored connection uses, without validating it (its copy, or the built-in it names). */
@@ -309,6 +341,27 @@ export class DefinitionConnector implements ConnectorAdapter {
   }
   importApplications() {
     return this.importKind("application") as unknown as Promise<ImportedRecord<NormalizedApplication>[]>;
+  }
+
+  /**
+   * INTEGRATION-P0-13: one declared write. connectorWrites.ts calls it only
+   * after the connection declares the operation's capability and the
+   * idempotency record exists; the key goes to the system as
+   * `Idempotency-Key`, which systems that support it honour.
+   */
+  async write(operation: ConnectorWriteOperation, target: Record<string, string>, idempotencyKey: string): Promise<{ externalId?: string }> {
+    const spec = this.def.write?.[operation as DefinitionWriteOperation];
+    if (!spec) throw new Error(`This connector cannot ${operation.replace("_", " ")}`);
+    const session = await this.open();
+    if (!session.send) throw new Error(`The ${this.def.driver} driver cannot write`);
+    const scope: TemplateScope = { settings: this.settings, target };
+    const request: HttpRequestSpec = {
+      ...spec.request,
+      headers: { ...(spec.request.headers ?? {}), "Idempotency-Key": idempotencyKey },
+      ...(spec.request.body !== undefined ? { body: fillBody(spec.request.body, scope) } : {}),
+    };
+    await session.send(request, scope);
+    return {};
   }
 
   async close() {
