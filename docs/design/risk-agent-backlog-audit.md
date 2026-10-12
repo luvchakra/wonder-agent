@@ -1078,6 +1078,8 @@ account.
   4. The verification sync and reconciliation mark the request verified.
   5. The finding resolves as `verified_fixed`, and a second ask is refused
      with 409.
+- `f1-reconciliation`, `risk` and `investigations` 29/29 (local, one
+  worker), as these specs read the rogue-access findings.
 
 **Left out.**
 - Remediation actions other than removal: authorize, package, legacy,
