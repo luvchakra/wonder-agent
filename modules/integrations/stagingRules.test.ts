@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { heldKinds, kindCompleteness, missingStatusOf, type KindRun } from "./stagingRules";
+import { heldKinds, kindCompleteness, missingStatusOf, runStatus, type KindRun } from "./stagingRules";
 import { chooseRunMode } from "./stagingRules";
 
 const clean: KindRun = { failed: false, storeFailures: 0, unmapped: 0, truncated: false, unread: false };
@@ -75,5 +75,19 @@ describe("chooseRunMode (INTEGRATION-P0-21)", () => {
     expect(chooseRunMode({ ...base, trigger: "manual" })).toEqual({ mode: "full", since: null });
     expect(chooseRunMode({ ...base, trigger: "verification" })).toEqual({ mode: "full", since: null });
     expect(chooseRunMode({ ...base, requested: "partial" })).toEqual({ mode: "partial", since: null });
+  });
+});
+
+describe("runStatus (WID-H03)", () => {
+  const run = (over: Partial<KindRun> = {}): KindRun => ({ failed: false, storeFailures: 0, unmapped: 0, truncated: false, unread: false, ...over });
+  it("is succeeded only when every kind was read to the end with no errors", () => {
+    expect(runStatus(0, 10, [run(), run({ unread: true })])).toBe("succeeded");
+  });
+  it("is partial when a kind's read stopped at a limit, so the cursor and the daily full read do not move", () => {
+    expect(runStatus(0, 500, [run(), run({ truncated: true })])).toBe("partial");
+  });
+  it("keeps the error rules: partial when something was stored, failed when nothing was", () => {
+    expect(runStatus(2, 10, [run()])).toBe("partial");
+    expect(runStatus(2, 0, [run({ truncated: true })])).toBe("failed");
   });
 });

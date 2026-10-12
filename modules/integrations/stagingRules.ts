@@ -39,6 +39,19 @@ export function kindCompleteness(mode: SyncMode, run: KindRun): KindDecision {
   return { complete: true };
 }
 
+/**
+ * WID-H03: a run's status. Any error makes it partial (or failed when
+ * nothing was stored). A run in which a kind's read stopped at a limit is
+ * partial too, even without errors: only a succeeded run is a base for the
+ * next incremental read (its cursor) and for the daily full read, so a
+ * cut-short run must never move either.
+ */
+export function runStatus(errorCount: number, recordsProcessed: number, kindRuns: Iterable<KindRun>): "succeeded" | "partial" | "failed" {
+  if (errorCount > 0) return recordsProcessed > 0 ? "partial" : "failed";
+  for (const run of kindRuns) if (run.truncated) return "partial";
+  return "succeeded";
+}
+
 /** One kind's outcome, as stored in integration_sync_jobs.missing_summary. */
 export type KindMissing =
   | { status: "marked"; marked: number; candidates: number; presentBefore: number }
