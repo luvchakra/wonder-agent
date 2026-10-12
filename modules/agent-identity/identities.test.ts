@@ -35,8 +35,9 @@ describe("linkAgentIdentity (IDENTITY-P0-14, codebase-map D3)", () => {
         action: "agent.identity_linked",
         objectType: "agent_identity",
         objectId: "link-1",
-        metadata: expect.objectContaining({ confidence: "probable", externalReference: "svc-finance" }),
-        typedText: { basis: "Matched by owner email" },
+        metadata: expect.objectContaining({ confidence: "probable" }),
+        // WID-H07, identifiers only: the reference stays on the link; the audit gets its fingerprint.
+        typedText: { basis: "Matched by owner email", externalReference: "svc-finance" },
       }),
     ]);
   });

@@ -143,8 +143,17 @@ export async function executeConnectorWrite(tenantId: string, actorId: string | 
       objectId: integrationId,
       outcome: status === "succeeded" ? "success" : "failure",
       correlationId: claimed.id as string,
-      // Identifiers only: target fields were validated to carry no secrets.
-      metadata: { operation: request.operation, idempotencyKey: request.idempotencyKey, systemKey: sentKey, target: request.target, error, ...(uncertain ? { uncertain } : {}) },
+      // WID-H07, identifiers only: the target (an account's login, a new
+      // account's email and name) stays on the write operation (correlationId);
+      // the audit names its fields.
+      metadata: {
+        operation: request.operation,
+        idempotencyKey: request.idempotencyKey,
+        systemKey: sentKey,
+        targetFields: Object.keys(request.target ?? {}).sort(),
+        error,
+        ...(uncertain ? { uncertain } : {}),
+      },
     });
     return { ...toResult(data, false), retryable, uncertain };
   };

@@ -273,7 +273,8 @@ async function receiveWebhook(conn: Connection, rawBody: string, headers: Header
     objectType: "integration",
     objectId: conn.id,
     outcome: "success",
-    metadata: { externalId },
+    // WID-H07, identifiers only: the payload's id may be an email.
+    typedText: { externalId: externalId ?? null },
   });
   return { status: 202, body: { ok: true, data: null } };
 }

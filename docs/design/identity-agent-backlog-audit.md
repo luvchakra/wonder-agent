@@ -1755,3 +1755,7 @@ nightly. Verified:
 ### 2026-10-12 — WID-H07 (owner decision)
 
 Typed text out of audit records: agent lifecycle reasons (kept on `agent_lifecycle_events`), the identity link basis (now kept in `agent_identities.link_basis`, migration 0150) and contract updates (the audit now names version ids and numbers, not the contract text). See the Foundation entry for the mechanism.
+
+### 2026-10-12 — WID-H07, identifiers only
+
+WID-H07 identifiers only: `agent.identity_linked` fingerprints `externalReference` (a delegate's login, say), which is kept on the link. `identity.source_changes_undone` fingerprints the source record's `externalId`.

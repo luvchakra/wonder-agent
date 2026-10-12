@@ -958,3 +958,7 @@ years on Max, 7 years on Enterprise.
 Verified:
 - a live insert with 30 days is refused by the new constraint;
 - `npm run typecheck` and eslint on the changed file: clean.
+
+### 2026-10-12 — WID-H07, identifiers only
+
+WID-H07 identifiers only: `platform.admin_granted` records the user's id, no longer their email.

@@ -481,7 +481,18 @@ async function reconcileAccounts(
       not_in_source: c.notInSource,
       relink_held: c.relinkHeld,
     });
-    await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: { runId: run.id, ...c, relinkHeldAccounts: plan.relinkHeld.slice(0, 100) } });
+    await writeAudit({ tenantId, actorId, actorType, action: "account.reconciled", objectType: "application", objectId: applicationId, outcome: "success", metadata: {
+        runId: run.id,
+        ...c,
+        // WID-H07, identifiers only: the account by its id, never its login.
+        relinkHeldAccounts: plan.relinkHeld.slice(0, 100).map((h) => ({
+          accountId: existing.find((a) => a.externalAccountRef === h.ref)?.id ?? null,
+          keptIdentityId: h.keptIdentityId,
+          matchedIdentityId: h.matchedIdentityId,
+          matched: h.matched,
+        })),
+      },
+    });
     // ACCESS-P0-25: the first reconciliation is the baseline; what it found is legacy, anything later without approval is rogue.
     await ensureAccessBaseline(tenantId, applicationId, "accounts", run.id);
     // The ledger looks for the approval behind each account (ACCESS-P0-24); the daily sweep catches up if this fails.

@@ -3122,3 +3122,7 @@ Verified:
   - in parallel they read data other specs were changing (a manager
     link, and the organization's connection list between two reads).
     That is a QA follow-up, not this change.
+
+### 2026-10-12 — WID-H07, identifiers only
+
+WID-H07 identifiers only (audit side). `AuditEvent.typedText` now also takes an outside system's value that may identify a person; it is fingerprinted the same way. The module audits that wrote personal data are listed in the Access, Integration, Identity and Platform logs and in the tracker. Verified: `npx vitest run lib modules` 1360 passed, typecheck and eslint clean.

@@ -3094,3 +3094,7 @@ Verified:
 ### 2026-10-12 — WID-H07 (owner decision)
 
 Typed text out of audit records: approval comments, fulfilment notes (a claim note is now kept on the task), onboarding decision notes, application lifecycle reasons (now kept in `applications.lifecycle_note`, migration 0150), and package justifications, item details and revocation reasons. Each is passed as `typedText` and stored only as a fingerprint. See the Foundation entry for the mechanism.
+
+### 2026-10-12 — WID-H07, identifiers only
+
+WID-H07 identifiers only: `account.reconciled` lists held accounts by `accountId`, not by their external login (`ref`).

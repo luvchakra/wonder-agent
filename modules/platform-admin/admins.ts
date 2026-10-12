@@ -28,7 +28,8 @@ export async function grantPlatformAdmin(actorId: string, targetUserId: string):
   await writePlatformAudit({
     actorId,
     action: "platform.admin_granted",
-    newValue: { targetUserId, email: targetUser.email },
+    // WID-H07, identifiers only: the user by id, never their email.
+    newValue: { targetUserId },
     result: "success",
   });
 }
