@@ -102,3 +102,16 @@ export function uncertainReason(error: string | null): string {
 export function retryWaitsForRead(uncertainAt: string | null, readFinished: boolean): boolean {
   return uncertainAt !== null && !readFinished;
 }
+
+/**
+ * WID-C02 (owner decision 2026-10-12): a leaver's accounts a connector may
+ * disable at once. Only a real account the system knows (an id on the
+ * system and the connection it came from), not already disabled and not a
+ * placeholder. Whether that connection has changes turned on and supports
+ * disabling is checked per connection by the caller.
+ */
+export type LeaverAccount = { id: string; applicationId: string; status: string | null; externalRef: string | null; integrationId: string | null };
+
+export function accountsToDisableOnLeave(accounts: LeaverAccount[]): (LeaverAccount & { integrationId: string })[] {
+  return accounts.filter((a): a is LeaverAccount & { integrationId: string } => Boolean(a.externalRef && a.integrationId) && a.status !== "disabled" && a.status !== "pending");
+}

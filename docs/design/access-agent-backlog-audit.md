@@ -3027,3 +3027,30 @@ account created whose access was not added.
 
 Verified: `npx vitest run modules/access-governance/connectorFulfilment.test.ts`
 5/5; eslint and `tsc --noEmit` clean. No product code changed.
+
+### 2026-10-12 — Disable a leaver's account through its connection (WID-C02, owner decision)
+
+The owner chose, in the findings decision sheet: the connector disables a
+leaver's account at once; removing each access stays a person's task.
+- `openLeaverRemovals` (`leaverRemovals.ts`) now also calls
+  `disableOnLeave`. For each of the person's accounts that
+  `accountsToDisableOnLeave` keeps (an id on the system and its
+  connection, not disabled, not a placeholder), if `connectionCanWrite(...,
+  "disable_account")`, it opens a `disable_account` task with reason
+  `leaver`. That task is not manual, so `openFulfilmentTask` plans it and the
+  connector runs it at once: mass-change guard, one key per change,
+  verification sync, failure to the application's owner.
+- The leaver audit event lists `disablingAccountIds`; the function returns
+  `disabling`.
+- This is the approved automation path under non-negotiable #15.
+
+Verified:
+- `npx vitest run modules/access-governance modules/agent-identity`: 356
+  passed, including `accountsToDisableOnLeave`.
+- `npm run typecheck`, eslint on the changed files and `npm run build`:
+  clean.
+- E2E, local against the production build: `connector-provisioning` and
+  `leaver-removals`, 24 passed (9.0 min). In "WID-C02 leaver", eve leaves
+  with changes on: exactly one write (`PATCH /users/u-eve`), the disable
+  task succeeds with reason `leaver`, and her access removal stays a
+  person's task through the outage and the unconfirmed removal.

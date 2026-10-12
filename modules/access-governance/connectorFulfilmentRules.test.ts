@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attemptKey, connectorOperation, connectorTarget, newAccountTarget, retryDelayMs, retryWaitsForRead, runIsLost, shouldRetry, taskKey, uncertainReason, MAX_ATTEMPTS_PER_RUN, MAX_ATTEMPTS_TOTAL } from "./connectorFulfilmentRules";
+import { accountsToDisableOnLeave, attemptKey, connectorOperation, connectorTarget, newAccountTarget, retryDelayMs, retryWaitsForRead, runIsLost, shouldRetry, taskKey, uncertainReason, MAX_ATTEMPTS_PER_RUN, MAX_ATTEMPTS_TOTAL } from "./connectorFulfilmentRules";
 
 describe("connector fulfilment rules (INTEGRATION-P0-13)", () => {
   it("maps each task kind to its write (D3)", () => {
@@ -77,5 +77,15 @@ describe("WID-H02: one task, unclear outcomes", () => {
     expect(reason).toContain("HTTP 503");
     expect(reason).toMatch(/closes by itself/);
     expect(uncertainReason(null)).toContain("no answer");
+  });
+});
+
+describe("accountsToDisableOnLeave (WID-C02)", () => {
+  const acct = (over: Partial<Parameters<typeof accountsToDisableOnLeave>[0][number]>) => ({ id: "a", applicationId: "app", status: "active", externalRef: "u-1", integrationId: "c1", ...over });
+  it("takes real, live accounts that came from a connection", () => {
+    expect(accountsToDisableOnLeave([acct({}), acct({ id: "b", status: null })]).map((a) => a.id)).toEqual(["a", "b"]);
+  });
+  it("skips accounts already disabled, placeholders, and accounts no connection can name", () => {
+    expect(accountsToDisableOnLeave([acct({ status: "disabled" }), acct({ status: "pending" }), acct({ externalRef: null }), acct({ integrationId: null })])).toEqual([]);
   });
 });

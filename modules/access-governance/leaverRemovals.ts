@@ -4,6 +4,9 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { queueRemoval, withdrawGrants } from "./pendingGrants";
+import { openFulfilmentTask } from "./fulfilmentTasks";
+import { accountsToDisableOnLeave } from "./connectorFulfilmentRules";
+import { connectionCanWrite } from "@/modules/integrations/service";
 
 /**
  * WID-C02 — when a person leaves, everything they hold becomes removal
@@ -13,6 +16,14 @@ import { queueRemoval, withdrawGrants } from "./pendingGrants";
  * fulfilled are withdrawn. A person does each removal: a connector never
  * takes a leaver's access away on its own (#15, IDENTITY-P0-18), and the
  * removal counts only when a later read of the system no longer finds it.
+ *
+ * Owner decision 2026-10-12 (WID-C02): each account a connector can
+ * disable (its connection has changes turned on and supports disabling)
+ * gets a disable task that the connector carries out at once, the
+ * approved automation path under #15. It goes through the usual write path
+ * (mass-change guard, idempotency, verification by the next read); a
+ * failure stays with the account's owner. Accounts no connector can disable
+ * get no extra task: removing each access already covers them.
  *
  * Called by the Identity Agent's lifecycle when a person becomes
  * disabled, terminated or archived. Service role: every read and write is
@@ -26,13 +37,29 @@ export async function openLeaverRemovals(
   tenantId: string,
   identityId: string,
   meta: { actorId: string | null; eventId: string | null },
-): Promise<{ removals: number; withdrawn: number }> {
+): Promise<{ removals: number; withdrawn: number; disabling: number }> {
   try {
     const admin = supabaseServiceRole();
-    const { data: accounts, error } = await admin.from("accounts").select("id, tenant_id, application_id").eq("tenant_id", tenantId).eq("identity_id", identityId).limit(500);
+    const { data: accounts, error } = await admin
+      .from("accounts")
+      .select("id, tenant_id, application_id, status, external_account_ref, source_integration_id")
+      .eq("tenant_id", tenantId)
+      .eq("identity_id", identityId)
+      .limit(500);
     if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-    const appOf = new Map(((accounts ?? []) as Row[]).filter((a) => a.tenant_id === tenantId).map((a) => [a.id as string, a.application_id as string]));
-    if (!appOf.size) return { removals: 0, withdrawn: 0 };
+    const own = ((accounts ?? []) as Row[]).filter((a) => a.tenant_id === tenantId);
+    const appOf = new Map(own.map((a) => [a.id as string, a.application_id as string]));
+    if (!appOf.size) return { removals: 0, withdrawn: 0, disabling: 0 };
+    const disabling = await disableOnLeave(
+      tenantId,
+      own.map((a) => ({
+        id: a.id as string,
+        applicationId: a.application_id as string,
+        status: (a.status as string | null) ?? null,
+        externalRef: (a.external_account_ref as string | null) ?? null,
+        integrationId: (a.source_integration_id as string | null) ?? null,
+      })),
+    );
     const { data: grants, error: grantError } = await admin
       .from("access_grants")
       .select("id, tenant_id, account_id, fulfilment_status, removal_status")
@@ -49,7 +76,7 @@ export async function openLeaverRemovals(
       live.filter((g) => g.fulfilment_status !== "pending_fulfilment" && g.removal_status === null).map((g) => ({ grantId: g.id as string, applicationId: appOf.get(g.account_id as string)! })),
       { reason: "leaver", manual: true },
     );
-    if (marked.length || unfulfilled.length) {
+    if (marked.length || unfulfilled.length || disabling.length) {
       await writeAudit({
         tenantId,
         actorId: meta.actorId,
@@ -58,10 +85,10 @@ export async function openLeaverRemovals(
         objectType: "identity",
         objectId: identityId,
         outcome: "success",
-        metadata: { eventId: meta.eventId, removalGrantIds: marked, withdrawnGrantIds: unfulfilled },
+        metadata: { eventId: meta.eventId, removalGrantIds: marked, withdrawnGrantIds: unfulfilled, disablingAccountIds: disabling },
       });
     }
-    return { removals: marked.length, withdrawn: unfulfilled.length };
+    return { removals: marked.length, withdrawn: unfulfilled.length, disabling: disabling.length };
   } catch (err) {
     await writeAudit({
       tenantId,
@@ -73,6 +100,16 @@ export async function openLeaverRemovals(
       outcome: "failure",
       metadata: { eventId: meta.eventId, error: err instanceof ApiError ? err.code : "UNEXPECTED" },
     });
-    return { removals: 0, withdrawn: 0 };
+    return { removals: 0, withdrawn: 0, disabling: 0 };
   }
+}
+
+/** Opens a disable task, carried out by the connector, for each account a connection can disable. Returns those account ids. */
+async function disableOnLeave(tenantId: string, accounts: Parameters<typeof accountsToDisableOnLeave>[0]): Promise<string[]> {
+  const candidates = accountsToDisableOnLeave(accounts);
+  const canDisable = new Map<string, boolean>();
+  for (const id of new Set(candidates.map((a) => a.integrationId))) canDisable.set(id, await connectionCanWrite(tenantId, id, "disable_account").catch(() => false));
+  const chosen = candidates.filter((a) => canDisable.get(a.integrationId));
+  for (const a of chosen) await openFulfilmentTask(tenantId, { kind: "disable_account", accountId: a.id, requestId: null, applicationId: a.applicationId, reason: "leaver" });
+  return chosen.map((a) => a.id);
 }

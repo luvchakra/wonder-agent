@@ -68,6 +68,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A connection's change sends the system one key however often it is tried; a change that may already have been made is checked by reading the system before it is sent again. |
 | 12 Oct 2026 | A sync that reads fewer records than the system says it holds counts as partial and marks nothing missing. |
 | 12 Oct 2026 | Audit records are kept at least a year on every plan: 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. |
+| 12 Oct 2026 | When someone leaves, a connection that can disable accounts (with changes turned on) disables their account at once; people still remove each access. |
 
 ---
 
@@ -141,6 +142,7 @@ The everyday cycle looks like this:
 - When someone joins, changes role or leaves, WonderID creates the work that follows: tasks to hand over ownership and remove access. People do this work.
 - When someone actually stops working (disabled, terminated or archived), each access they hold gets its own removal task on Fulfilment Tasks, marked "Person left" and due within a day. Access approved but never set up is withdrawn. Serving notice does not start this.
 - A person makes each of these removals, even where a connection could; it counts as removed only when a later read of the system no longer finds it.
+- Where a connection can disable accounts and has changes turned on, it disables the person's account there at once. The next read confirms it. If it fails, the application's owner gets the task with the reason.
 - When a person leaves, what they owned is transferred to someone else, never left without an owner.
 
 **Identity sources**
