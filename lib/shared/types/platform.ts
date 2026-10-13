@@ -8,8 +8,8 @@
  */
 
 export type TenantEnvironment = "production" | "development" | "test" | "staging" | "sandbox";
-/** Owner request 2026-10-13: the environments a production organization can add (migration 0156). */
-export type AddableEnvironment = "development" | "test" | "staging";
+/** Owner request 2026-10-13: the environments an organization can add (migration 0156; production since 0165, for an organization set up as another environment). */
+export type AddableEnvironment = "production" | "development" | "test" | "staging";
 
 export type PlatformTenant = {
   tenantId: string;
