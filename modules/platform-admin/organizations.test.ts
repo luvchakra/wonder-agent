@@ -16,4 +16,11 @@ describe("groupOrganizations (owner request 2026-10-13)", () => {
     const orgs = groupOrganizations([t("a", "acme", "production"), t("b", "acme-staging", "staging"), t("c", "solo-dev", "development")]);
     expect(orgs.map((o) => o.environments.map((e) => e.slug))).toEqual([["acme", "acme-staging"], ["solo-dev"]]);
   });
+
+  it("an organization set up as development is the organization of the environments it adds (owner feedback 2026-10-13)", () => {
+    const orgs = groupOrganizations([t("test", "planet-express-test", "test", "dev"), t("dev", "planet-express", "development")]);
+    expect(orgs).toHaveLength(1);
+    expect(orgs[0].id).toBe("dev");
+    expect(orgs[0].environments.map((e) => e.tenantId)).toEqual(["dev", "test"]);
+  });
 });

@@ -25,7 +25,11 @@ export function groupOrganizations(tenants: PlatformTenant[]): Organization[] {
     return i < 0 ? ORDER.length : i;
   };
   return [...groups.values()].map((list) => {
-    const environments = [...list].sort((a, b) => rank(a.environment) - rank(b.environment));
+    // The organization is the tenant its environments link to, whatever its own
+    // environment (one set up as development holds its test and staging, 0161);
+    // without links, the production one first.
+    const root = list.find((t) => !t.parentTenantId && list.some((o) => o.parentTenantId === t.tenantId));
+    const environments = [...list].sort((a, b) => (a === root ? -1 : b === root ? 1 : rank(a.environment) - rank(b.environment)));
     const primary = environments[0];
     return { id: primary.tenantId, name: primary.name ?? primary.tenantId, primary, environments };
   });
