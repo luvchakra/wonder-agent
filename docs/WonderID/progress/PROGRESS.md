@@ -2,9 +2,9 @@
 
 | | |
 |---|---|
-| Last updated | 2026-10-12 |
+| Last updated | 2026-10-13 |
 | Current phase | F3 in progress. The exit scenario runs end to end against a stub system (2026-10-12): rogue access removed through the connector after a reviewer asks, verified, finding resolved |
-| Next story | F3: INTEGRATION-P0-21 definition extensions, then INTEGRATION-P0-22 (SCIM; LDAP and http writes); the relay and named connectors wait on D7 and D9 |
+| Next story | F3: finish INTEGRATION-P0-22 (SCIM groups, RFC 9967 events) and RISK-P0-13, then INTEGRATION-P0-26 (ServiceNow); the relay and named connectors wait on D7 and D9. Up next and blocked lists: `../ROADMAP-STORIES.md` |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -97,7 +97,7 @@ Exit test: not run.
 | INTEGRATION-P0-11 (finish) Write interface with a caller | Integration | | Done | 2026-10-12. Definitions declare writes (`write`: revoke_access, disable_account, grant_access, create_account; http driver); a connection writes only after an administrator turns writes on (Connection → Changes in the system; audited); retryable failures marked |
 | INTEGRATION-P0-13 Provisioning pipeline | Integration + Access | | Done | 2026-10-12. Slice 1 (migrations 0128–0129): remove-access and disable-account tasks done by the connector (claim, idempotent attempts, two retries, verification sync, reconciliation verifies); failures back to the owner with the reason, Try again, lost-run sweep. Slice 2 (no migration): approved access added and accounts created by the connector; access for someone with no account waits while the connector creates it, then is added once the account is read back. Ticketed fulfilment is INTEGRATION-P0-26 |
 | INTEGRATION-P0-21 Definition extensions | Integration | #69 | Done | Slice 1 (2026-10-12): transforms `regex`, `replace`, `coalesce`, `dateAdd`; API key in the request body. Slice 2: incremental `changes` resources for scheduled syncs (full read at least daily; incremental runs mark nothing missing). Part 3a: private-key sign-in (`private_key_jwt`, `jwt_bearer`) and client certificates (mutual TLS). Part 3b: OAuth authorization code with PKCE. Part 4: export/import and connection upgrade with a preview |
-| INTEGRATION-P0-22 † SCIM client; LDAP and http writes | Integration | | Not started | |
+| INTEGRATION-P0-22 † SCIM client; LDAP and http writes | Integration | | Partial | Backlog: Partial. SCIM 2.0 connection type and LDAP writes (#107); inbound SCIM receiver for users (#112, migration 0136). SCIM groups and RFC 9967 events follow |
 | INTEGRATION-P0-23 † WonderID Relay | Integration | | Not started | Needs D7 |
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
@@ -203,3 +203,4 @@ Exit test: not run.
 - 2026-10-11: ACCESS-P0-25 done (migration 0120, PR #82).
 - 2026-10-11: IDENTITY-P0-20 done (no migration, PR #83).
 - 2026-10-11: EXPERIENCE-P0-28 done.
+- 2026-10-13: `ROADMAP-STORIES.md` added, generated from this file, the backlogs, the run order and git history (`npm run roadmap`); INTEGRATION-P0-22 row brought in line with its backlog (Partial).
