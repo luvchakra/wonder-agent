@@ -3,10 +3,12 @@ import { Check } from "lucide-react";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
-import { createTenantAction, selectTenantAction } from "@/app/actions/tenant";
+import { selectTenantAction } from "@/app/actions/tenant";
+import { baseAppHost } from "@/lib/tenant/host";
+import { OrganizationSetupForm } from "./OrganizationSetupForm";
 import { acceptInvitationAction } from "@/app/actions/users";
 import { listMyInvitations } from "@/lib/users/users";
-import { Card, CardHeader, CardBody, Button, WonderIDLogo, TextField } from "@/modules/ui";
+import { Card, CardHeader, CardBody, Button, WonderIDLogo } from "@/modules/ui";
 
 export default async function OnboardingPage() {
   const supabase = await supabaseServer();
@@ -103,10 +105,7 @@ export default async function OnboardingPage() {
       <Card>
         <CardHeader title="Create a new organization" description="Sets up a fresh, isolated organization you'll own as its Tenant Administrator." />
         <CardBody>
-          <form action={createTenantAction} className="space-y-3">
-            <TextField label="Organization name" name="name" required placeholder="Acme Corp" />
-            <Button type="submit">Create organization</Button>
-          </form>
+          <OrganizationSetupForm base={baseAppHost()} />
         </CardBody>
       </Card>
     </div>

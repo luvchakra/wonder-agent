@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { firstOrganizationName, newTenantSlug, slugify } from "./organizationName";
+import { PREFIX_MAX, environmentSlug, firstOrganizationName, isOrganizationEnvironment, newTenantSlug, slugify, suggestedPrefix } from "./organizationName";
 
 describe("firstOrganizationName", () => {
   it("names a company address after the company", () => {
@@ -29,5 +29,29 @@ describe("firstOrganizationName", () => {
     expect(slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
     expect(slug.length).toBeLessThanOrEqual(40);
     expect(slugify("Ava's organization")).toBe("ava-s-organization");
+  });
+});
+
+describe("address prefix and environment (owner request 2026-10-13)", () => {
+  it("production is the prefix itself; other environments add a suffix", () => {
+    expect(environmentSlug("acme", "production")).toBe("acme");
+    expect(environmentSlug("acme", "development")).toBe("acme-dev");
+    expect(environmentSlug(" Acme ", "test")).toBe("acme-test");
+    expect(environmentSlug("acme", "staging")).toBe("acme-staging");
+  });
+
+  it("the longest prefix with the longest suffix fits the 40-character slug", () => {
+    expect(environmentSlug("a".repeat(PREFIX_MAX), "staging")).toHaveLength(40);
+  });
+
+  it("suggests a prefix from the name, padded when too short", () => {
+    expect(suggestedPrefix("Acme Corp")).toBe("acme-corp");
+    expect(suggestedPrefix("X")).toMatch(/^x-[a-z0-9]{1,4}$/);
+    expect(suggestedPrefix("A very long organization name that goes on and on").length).toBeLessThanOrEqual(PREFIX_MAX);
+  });
+
+  it("recognises only the four environments", () => {
+    expect(isOrganizationEnvironment("development")).toBe(true);
+    expect(isOrganizationEnvironment("sandbox")).toBe(false);
   });
 });

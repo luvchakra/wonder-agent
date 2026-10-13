@@ -6,6 +6,7 @@ import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import type { AddableEnvironment, PlatformTenant, TenantEnvironment } from "@/lib/shared/types/platform";
 import { toPlatformTenant } from "./mappers";
 import { writePlatformAudit } from "./auditLog";
+import { slugProblem } from "@/lib/tenant/host";
 
 export type CreateTenantInput = {
   name: string;
@@ -76,6 +77,44 @@ export async function createTenantEnvironment(actorId: string, parentTenantId: s
   const tenantId = data as string;
   await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_created", newValue: { parentTenantId, environment }, result: "success" });
   return { tenantId };
+}
+
+/**
+ * Owner request (2026-10-13): a platform administrator changes an
+ * organization's address prefix (its slug) at any time. One transaction in
+ * the database (rename_tenant_slug, migration 0157): the slug and the
+ * platform subdomain move together, and the old address stops resolving.
+ * The uuid, the security identity, never changes. Audited.
+ */
+export async function renameTenantSlug(actorId: string, tenantId: string, slug: string): Promise<{ from: string; to: string }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) throw new ApiError(404, "TENANT_NOT_FOUND");
+  const to = slug.trim().toLowerCase();
+  const problem = slugProblem(to);
+  if (problem) throw new ApiError(400, "INVALID_INPUT", `Address: ${problem}`);
+  const { data, error } = await supabaseServiceRole().rpc("rename_tenant_slug", { p_tenant: tenantId, p_slug: to });
+  if (error) {
+    await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_address_changed", newValue: { to }, result: "failure" });
+    if (error.code === "23505") throw new ApiError(409, "ADDRESS_TAKEN", `${to} is already taken`);
+    if (error.code === "P0002") throw new ApiError(404, "TENANT_NOT_FOUND");
+    if (error.code === "22023") throw new ApiError(400, "INVALID_INPUT", "Not a valid address prefix");
+    throw new ApiError(500, "UPDATE_FAILED", "The address could not be changed");
+  }
+  const from = data as string;
+  if (from !== to) await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_address_changed", oldValue: { slug: from }, newValue: { slug: to }, result: "success" });
+  return { from, to };
+}
+
+/** Owner request (2026-10-13): a platform administrator changes an organization's environment later (set_tenant_environment, migration 0157). Audited. */
+export async function setTenantEnvironment(actorId: string, tenantId: string, environment: string): Promise<void> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) throw new ApiError(404, "TENANT_NOT_FOUND");
+  if (!["production", "development", "test", "staging", "sandbox"].includes(environment)) throw new ApiError(400, "INVALID_INPUT", "environment: production, development, test, staging or sandbox");
+  const before = await getTenant(tenantId);
+  const { error } = await supabaseServiceRole().rpc("set_tenant_environment", { p_tenant: tenantId, p_environment: environment });
+  if (error) {
+    await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_changed", newValue: { environment }, result: "failure" });
+    throw new ApiError(error.code === "P0002" ? 404 : 500, "UPDATE_FAILED", "The environment could not be changed");
+  }
+  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_changed", oldValue: { environment: before?.environment ?? "production" }, newValue: { environment }, result: "success" });
 }
 
 export async function listTenants(): Promise<PlatformTenant[]> {

@@ -1,5 +1,7 @@
 "use server";
 
+import { ApiError } from "@/lib/shared/types/foundation";
+
 import { revalidatePath } from "next/cache";
 import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import {
@@ -8,6 +10,8 @@ import {
   createSubscription,
   createTenant,
   createTenantEnvironment,
+  renameTenantSlug,
+  setTenantEnvironment,
   decommissionTenant,
   grantPlatformAdmin,
   rollbackConfigVersion,
@@ -29,6 +33,34 @@ export async function createTenantAction(formData: FormData) {
     environment: (formData.get("environment") as TenantEnvironment) || "production",
   });
   revalidatePath("/platform-admin/tenants");
+}
+
+export type TenantSettingState = { ok: boolean; message: string | null };
+
+const settingError = (err: unknown): TenantSettingState => ({ ok: false, message: err instanceof ApiError ? err.message : "Something went wrong. Try again." });
+
+/** Owner request 2026-10-13: change an organization's address prefix (platform administrators only). */
+export async function renameTenantSlugAction(tenantId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    const { to } = await renameTenantSlug(userId, tenantId, String(formData.get("slug") ?? ""));
+    revalidatePath("/platform-admin/tenants");
+    return { ok: true, message: `Address changed to ${to}.` };
+  } catch (err) {
+    return settingError(err);
+  }
+}
+
+/** Owner request 2026-10-13: change an organization's environment (platform administrators only). */
+export async function setTenantEnvironmentAction(tenantId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    await setTenantEnvironment(userId, tenantId, String(formData.get("environment") ?? ""));
+    revalidatePath("/platform-admin/tenants");
+    return { ok: true, message: "Environment saved." };
+  } catch (err) {
+    return settingError(err);
+  }
 }
 
 /** Owner request 2026-10-13: a dev, test or staging environment of a production organization. */

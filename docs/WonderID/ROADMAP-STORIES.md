@@ -12,7 +12,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 
 ## Completed recently
 
-- ✅ **PLATFORM-P0-16** Organization addresses and environments (owner request 2026-10-13) · this change
+- ✅ **PLATFORM-P0-16** Organization addresses and environments (owner request 2026-10-13) · [#144](https://github.com/luvchakra/wonder-agent/pull/144)
 - ✅ **IDENTITY-P0-18** Human lifecycle: joiner, mover, leaver, rehire, ownership transfer · [#135](https://github.com/luvchakra/wonder-agent/pull/135)
 - ✅ **INTEGRATION-P0-21** Definition extensions for integrators (F3, #69) · [#106](https://github.com/luvchakra/wonder-agent/pull/106)
 - ✅ **QA-P0-26** Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification (F3) · [#100](https://github.com/luvchakra/wonder-agent/pull/100)

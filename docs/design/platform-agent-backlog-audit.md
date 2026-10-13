@@ -1103,3 +1103,61 @@ While building it, the live phase doc's INTEGRATION-P0-22 row was found stale ("
 - Promoting configuration between environments (the configuration bundles of PLATFORM-P0-13).
 - Self-service environments.
 - Plan limits on environments.
+
+## 2026-10-13 — Choose the prefix and environment; platform admins change them; colours; switching (owner requests)
+
+**Owner requests, all on 2026-10-13.**
+1. The organization setup chooses the address prefix and the environment.
+   - The owner then said not to build a new wizard and to add the options to the existing "Create a new organization" card on `/onboarding`.
+   - The automatic first organization at sign-up is unchanged.
+2. A platform administrator changes the environment later.
+3. A platform administrator changes the prefix at any time.
+4. Each environment has a designated colour, the same for every organization.
+5. There is an easier way to switch between an organization's environments.
+
+**Built.**
+- **Migration 0157.**
+  - The slug guard of 0095 now allows a change only inside `rename_tenant_slug()`, through a transaction-local flag. That function, service role only, moves the slug and the platform subdomain together; the old address stops resolving.
+  - `set_tenant_environment()`, service role only.
+  - Three-argument `create_tenant_with_owner` and `create_first_tenant_for_current_user`, which record the chosen environment. The two-argument versions are kept.
+  - `tenant_slug_available()` answers only true or false.
+- **Migration 0158.** `my_tenant_environments()`.
+- **Migration 0159.** `my_organization_environments()`: environment plus the linked production organization, for the caller's own active memberships only. It was added because changing 0158's return type needed a drop, which waits on an approval that times out.
+- **Create card.** The prefix follows the name until edited, the address preview follows the prefix and environment, and the environment is one of four coloured choices. A taken or invalid prefix is refused in words (`setUpOrganizationAction`, audited `tenant.created` with environment and slug).
+- **Console.**
+  - New `/platform-admin/tenants/[id]` page: change the address, change the environment, add environments, and links to the organization's environments.
+  - `renameTenantSlug` and `setTenantEnvironment` are audited (`platform.tenant_address_changed`, `platform.tenant_environment_changed`, success or failure, with old and new values).
+  - The Tenants list links each name to that page and shows the environment as its coloured badge.
+- **Colours.** `modules/ui/environment.tsx`, theme tokens only, always with the name next to the colour:
+
+  | Environment | Colour |
+  |---|---|
+  | Production | green |
+  | Development | blue |
+  | Test | amber |
+  | Staging | violet |
+  | Sandbox | grey |
+
+  The organization switcher shows a coloured dot and badge for the current organization and a badge per organization in its menu.
+- **Switching.** Under the organization's name, coloured chips (Production · Dev · Test · …) switch between the person's environments of that organization in one click. They are grouped by the platform's link, or by a shared address prefix (`environmentSiblings`, pure). Switching uses the existing `selectTenantAction`, which goes to the other organization's own address when on one.
+
+**Verified.**
+- `tests/foundation/org-prefix-environment.sql` (live, rolled back), 17 checks:
+  - prefix availability before and after creation, and a reserved word;
+  - the first organization created only once;
+  - an unknown environment refused;
+  - a member cannot change the slug, call the rename, or set the environment (42501);
+  - the rename moves the slug and subdomain, and the old address no longer resolves;
+  - an invalid prefix (22023), a taken prefix (23505) and a direct slug update (23514) are refused;
+  - the environment change.
+- Vitest: `lib/tenant` and `modules/platform-admin` 49 passed; `environmentFamily` 3 passed.
+- Typecheck, eslint and `next build` clean.
+- Local E2E (`BASE_APP_HOST=localhost`): first-organization, platform-admin, tenant-address and shell, 37 passed. The new test covers:
+  - a chosen prefix and the Test environment;
+  - a taken prefix refused;
+  - the same prefix in Production, then switching in one click;
+  - a platform administrator changing the address and environment, checked in the database.
+
+**Left out.**
+- Renaming an organization does not rename its environments (each has its own address). A platform administrator renames them one by one.
+- Configuration promotion between environments (PLATFORM-P0-13).

@@ -73,6 +73,68 @@ test("a new account lands in its own organization, once, and can rename it", asy
   await ctx.close();
 });
 
+test("owner request 2026-10-13: another organization with a chosen prefix and environment; a platform admin changes both", async ({ browser }) => {
+  test.skip(!userId, "needs the account from the first test");
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  await page.goto("/sign-in");
+  await page.getByRole("textbox", { name: "Email" }).fill(email);
+  await page.locator("#password").fill(E2E_PASSWORD);
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/$/);
+
+  const prefix = `e2e-env-${stamp}`;
+  await page.goto("/onboarding");
+  await page.getByLabel("Organization name").fill(`Env Org ${stamp}`);
+  // The prefix follows the name until edited.
+  await expect(page.getByLabel("Address prefix")).toHaveValue(`env-org-${stamp}`);
+  await page.getByLabel("Address prefix").fill(prefix);
+  await page.getByText("Test", { exact: true }).click();
+  await expect(page.getByText(`https://${prefix}-test.`)).toBeVisible();
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  // The designated colour and name of the environment, in the switcher.
+  await expect(page.getByRole("button", { name: "Switch organization" })).toContainText("Test");
+
+  const { data: tenant } = await db().from("tenants").select("id, slug").eq("slug", `${prefix}-test`).single();
+  expect(tenant).toBeTruthy();
+  expect((await db().from("platform_tenants").select("environment").eq("tenant_id", tenant!.id).single()).data?.environment).toBe("test");
+  // A taken prefix is refused in words.
+  await page.goto("/onboarding");
+  await page.getByLabel("Organization name").fill("Duplicate");
+  await page.getByLabel("Address prefix").fill(prefix);
+  await page.getByText("Test", { exact: true }).click();
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "already taken" })).toBeVisible();
+
+  // The same prefix in Production: the two are environments of one organization, switched in one click.
+  await page.goto("/onboarding");
+  await page.getByLabel("Organization name").fill(`Env Org ${stamp}`);
+  await page.getByLabel("Address prefix").fill(prefix);
+  await page.getByRole("button", { name: "Create organization" }).click();
+  await expect(page).toHaveURL(/\/$/);
+  const envSwitch = page.getByRole("group", { name: "Environment" }).first();
+  await expect(envSwitch.getByRole("button", { name: "Production" })).toHaveAttribute("aria-pressed", "true");
+  await envSwitch.getByRole("button", { name: "Test" }).click();
+  await expect(envSwitch.getByRole("button", { name: "Test" })).toHaveAttribute("aria-pressed", "true");
+  await ctx.close();
+
+  // The platform administrator changes the address and the environment.
+  const admin = await browser.newContext({ storageState: authFile("platformAdmin") });
+  const ap = await admin.newPage();
+  await ap.goto(`/platform-admin/tenants/${tenant!.id}`);
+  await ap.getByLabel("Address prefix").fill(`${prefix}-renamed`);
+  await ap.getByRole("button", { name: "Change address" }).click();
+  await expect(ap.getByRole("status").filter({ hasText: `Address changed to ${prefix}-renamed` })).toBeVisible();
+  await ap.getByLabel("Environment", { exact: true }).selectOption("staging");
+  await ap.getByRole("button", { name: "Save" }).click();
+  await expect(ap.getByRole("status").filter({ hasText: "Environment saved." })).toBeVisible();
+  expect((await db().from("tenants").select("slug").eq("id", tenant!.id).single()).data?.slug).toBe(`${prefix}-renamed`);
+  expect((await db().from("platform_tenants").select("environment").eq("tenant_id", tenant!.id).single()).data?.environment).toBe("staging");
+  expect((await db().from("tenant_domains").select("hostname").eq("tenant_id", tenant!.id)).data?.map((d) => d.hostname)).toEqual([`${prefix}-renamed`]);
+  await admin.close();
+});
+
 test("a read-only member sees the organization name but cannot rename it", async ({ browser }) => {
   const ctx = await browser.newContext({ storageState: authFile("readOnly") });
   const page = await ctx.newPage();
