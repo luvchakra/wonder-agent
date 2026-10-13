@@ -7,7 +7,9 @@ import { Card, CardHeader, CardBody, Button, TextField, SelectField, ObjectActio
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CampaignsList, type CampaignRow } from "./CampaignsList";
 
-export default async function CampaignsPage() {
+export default async function CampaignsPage({ searchParams }: { searchParams: Promise<{ launch?: string }> }) {
+  // Access Reviews › Create Campaigns (owner's navigation, 2026-10-13): the launch form first, focused.
+  const launching = (await searchParams).launch === "1";
   let ctx;
   try {
     ctx = await requirePermission("compliance.read");
@@ -41,35 +43,66 @@ export default async function CampaignsPage() {
         <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["campaigns"])} />
       </div>
 
+      {launching ? (
+        <Card>
+          <CardHeader title="Launch a new campaign" />
+          <CardBody>
+            <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <TextField label="Campaign name" name="name" required autoFocus={launching} />
+              </div>
+              <SelectField label="Scope type" name="scopeType" defaultValue="agent">
+                <option value="agent">agent</option>
+                <option value="application">application</option>
+                <option value="entitlement">entitlement</option>
+                <option value="privileged_access">privileged_access</option>
+                <option value="high_risk_agent">high_risk_agent</option>
+              </SelectField>
+              <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
+              <SelectField label="Cadence" name="cadence" defaultValue="one_time">
+                <option value="one_time">one_time</option>
+                <option value="periodic">periodic</option>
+                <option value="event_driven">event_driven</option>
+              </SelectField>
+              <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+              <div className="sm:col-span-2">
+                <Button type="submit">Launch</Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      ) : null}
       <CampaignsList campaigns={rows} />
 
-      <Card>
-        <CardHeader title="Launch a new campaign" />
-        <CardBody>
-          <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <TextField label="Campaign name" name="name" required />
-            </div>
-            <SelectField label="Scope type" name="scopeType" defaultValue="agent">
-              <option value="agent">agent</option>
-              <option value="application">application</option>
-              <option value="entitlement">entitlement</option>
-              <option value="privileged_access">privileged_access</option>
-              <option value="high_risk_agent">high_risk_agent</option>
-            </SelectField>
-            <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
-            <SelectField label="Cadence" name="cadence" defaultValue="one_time">
-              <option value="one_time">one_time</option>
-              <option value="periodic">periodic</option>
-              <option value="event_driven">event_driven</option>
-            </SelectField>
-            <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
-            <div className="sm:col-span-2">
-              <Button type="submit">Launch</Button>
-            </div>
-          </form>
-        </CardBody>
-      </Card>
+      {launching ? null : (
+        <Card>
+          <CardHeader title="Launch a new campaign" />
+          <CardBody>
+            <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <TextField label="Campaign name" name="name" required autoFocus={launching} />
+              </div>
+              <SelectField label="Scope type" name="scopeType" defaultValue="agent">
+                <option value="agent">agent</option>
+                <option value="application">application</option>
+                <option value="entitlement">entitlement</option>
+                <option value="privileged_access">privileged_access</option>
+                <option value="high_risk_agent">high_risk_agent</option>
+              </SelectField>
+              <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
+              <SelectField label="Cadence" name="cadence" defaultValue="one_time">
+                <option value="one_time">one_time</option>
+                <option value="periodic">periodic</option>
+                <option value="event_driven">event_driven</option>
+              </SelectField>
+              <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+              <div className="sm:col-span-2">
+                <Button type="submit">Launch</Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

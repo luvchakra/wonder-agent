@@ -17,9 +17,14 @@ import { validateApplicationInput, type ApplicationInput } from "./applicationCa
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/** Applications still being onboarded: started, not yet live (Administration › Applications › Onboarding Reviews). */
+export const ONBOARDING_IN_PROGRESS: ApplicationOnboardingStatus[] = ["DISCOVERED", "CONFIGURING", "CONNECTED", "VALIDATING", "SIMULATION_FAILED", "READY_FOR_APPROVAL", "APPROVED"];
+
 export type CatalogFilter = {
   q?: string;
   status?: ApplicationOnboardingStatus;
+  /** Every status of ONBOARDING_IN_PROGRESS. */
+  onboarding?: boolean;
   appType?: ApplicationType;
   riskLevel?: CatalogLevel;
   missingOwner?: boolean;
@@ -53,6 +58,7 @@ export async function listApplicationCatalog(tenantId: string, filter: CatalogFi
   const supabase = await supabaseServer();
   let query = supabase.from("applications").select("*, accounts(count), entitlements(count)", { count: "exact" }).eq("tenant_id", tenantId);
   if (filter.status) query = query.eq("onboarding_status", filter.status);
+  else if (filter.onboarding) query = query.in("onboarding_status", ONBOARDING_IN_PROGRESS);
   if (filter.appType) query = query.eq("app_type", filter.appType);
   if (filter.riskLevel) query = query.eq("risk_level", filter.riskLevel);
   if (filter.missingOwner) query = query.or("business_owner_identity_id.is.null,technical_owner_identity_id.is.null");
@@ -75,7 +81,7 @@ export async function getCatalogSummary(tenantId: string) {
   const [all, active, onboarding, missingOwner, highRisk] = await Promise.all([
     head(),
     head().eq("onboarding_status", "ACTIVE"),
-    head().in("onboarding_status", ["DISCOVERED", "CONFIGURING", "CONNECTED", "VALIDATING", "SIMULATION_FAILED", "READY_FOR_APPROVAL", "APPROVED"]),
+    head().in("onboarding_status", ONBOARDING_IN_PROGRESS),
     head().not("onboarding_status", "eq", "RETIRED").or("business_owner_identity_id.is.null,technical_owner_identity_id.is.null"),
     head().in("risk_level", ["high", "critical"]),
   ]);

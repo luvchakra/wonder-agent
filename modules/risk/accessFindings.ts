@@ -86,6 +86,23 @@ export async function listAccessFindings(tenantId: string, filter: { accountId?:
   return findings;
 }
 
+/** §15: one page of open rogue-access findings, newest first, paged in the database, with the total. */
+export async function listOpenAccessFindingsPage(tenantId: string, opts: { page?: number; pageSize?: number } = {}): Promise<{ rows: AccessFinding[]; total: number }> {
+  const pageSize = Math.min(Math.max(Math.trunc(opts.pageSize ?? 50) || 50, 1), 200);
+  const page = Math.max(Math.trunc(opts.page ?? 1) || 1, 1);
+  const { data, error, count } = await supabaseServiceRole()
+    .from("risk_findings")
+    .select(`*, ${TICKET}`, { count: "exact" })
+    .eq("tenant_id", tenantId)
+    .eq("category", "rogue_access")
+    .in("status", OPEN)
+    .order("created_at", { ascending: false })
+    .order("id")
+    .range((page - 1) * pageSize, page * pageSize - 1);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return { rows: ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map(toAccessFinding), total: count ?? 0 };
+}
+
 /**
  * How many rogue-access findings are open, for the Intelligence badge: a
  * count only, read as the member under RLS and filtered on the tenant.

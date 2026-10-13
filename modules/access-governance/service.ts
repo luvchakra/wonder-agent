@@ -105,6 +105,7 @@ export {
   submitAccessRequest,
   cancelAccessRequest,
   listRequests,
+  countPendingAccessRequests,
   withinContract,
   type CatalogItem,
   type CatalogEntitlement,

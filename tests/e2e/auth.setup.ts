@@ -54,7 +54,7 @@ function signInAndSaveState(key: TestUserKey) {
       // Overview. multiOrg has two; it lands on Overview in whichever one
       // resolves first, and its spec switches explicitly.
       await expect(page).toHaveURL("/");
-      await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Security Overview" })).toBeVisible();
     }
 
     // The saved state is shared by every spec, in contexts opened at any

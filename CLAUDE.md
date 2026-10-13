@@ -653,20 +653,23 @@ light mode, a dark surface in dark mode, active items in Electric Blue on a soft
 blue tint. Brand assets, colours and the logo come only from `modules/ui/brand.ts`
 and `public/brand/` (the user's brand sheet). Content surfaces, tokens and both
 themes are unchanged, and a sidebar item appears only when its route and
-capability exist. Since 2026-10-10 (owner decisions, after a study of how
-Saviynt arranges its menu; arrangement only, nothing copied) the sidebar is a
-list of **areas**: Home, Intelligence, Onboarding, Control Center, SOD,
-Certifications, AI Agents, and Admin always last. Admin opens with Accounts,
-Entitlements, Roles and User Groups, then Identities, Applications, Policies
-and the administration groups. Opening an area, even one with a single page, shows
+capability exist. Since 2026-10-13 (owner decision, from the owner's sheet
+"WonderID: proposed navigation", taken as final) the main sidebar is a list of
+**areas**: Home (the dashboard), My Workspace, Access (Request Access first),
+AI Agents, Access Reviews, Risk & Detection, Self Service, and Administration
+always last. Administration opens the Admin sidebar: Identities, Applications,
+Policies & Controls, Reports & Audit, Users & Roles, Integrations, Organization
+Settings, Privacy & Audit. Two menu items may be views of one page (My Requests
+and Approvals are `?view=` of the requests page); the current item is the one
+whose route and view match (`matchScore`). Opening an area, even one with a single page, shows
 that area's menu, with a back arrow to the area list. Each of the menu's
 pages and groups has its own icon, at the size of an area row; pages inside a
 group are listed under it without icons. A hamburger-style toggle at the
 sidebar's top right collapses it to an icon rail: the toggle, a search icon
 that reopens the sidebar into its search box, the area icons, and the W mark
 at its foot. The owner's working copy of the menu is the Google Sheet
-"WonderID sidebar menus" (created 2026-10-10 from `shell-nav.ts`); when the
-owner updates it, read it and apply the changes to `shell-nav.ts`. The
+"WonderID: proposed navigation" (tabs "Proposed navigation" and "Mapping");
+when the owner updates it, read it and apply the changes to `shell-nav.ts`. The
 sidebar has a search box that matches menu items only (never data), and a
 footer with the product version and commit. Each area lists only the pages the
 viewer's permissions open (`modules/ui/shell-nav.ts`).
@@ -1292,6 +1295,9 @@ beats exhaustive pre-push verification.
 - **Notify the owner when a task is done** (merged, or blocked on something only
   they can do), with a one-line outcome. Send one notification per finished task,
   not one per step.
+  - **Every completed merge sends a push notification** (owner rule, 2026-10-13).
+    It starts with a clear headline, "Merged #<n>: <what changed>", then one
+    line on the user-facing effect, and the IST time.
 - **Still required**, because they're cheap and protect trust:
   - the rules above;
   - a unit test for any change to the permission gate, to any workflow that

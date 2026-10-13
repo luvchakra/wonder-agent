@@ -3977,3 +3977,53 @@ Fix:
 The page has no fewer controls and no more. Verified:
 - E2E `design-review` at 1024px and 1280px (parts 1 and 2): passed;
 - a screenshot at 1024px.
+
+### 2026-10-13 — New navigation from the owner's sheet; platform-wide dashboard
+
+**Navigation** (owner decision, the sheet "WonderID: proposed navigation", taken
+as final; Request Access kept first under Access on the owner's later
+instruction). `modules/ui/shell-nav.ts`:
+- **Main sidebar:** Home (Dashboard), My Workspace, Access, AI Agents, Access
+  Reviews, Risk & Detection, Self Service, then Administration.
+- **Admin sidebar:** Identities, Applications, Policies & Controls, Reports &
+  Audit, Users & Roles, Integrations, Organization Settings, Privacy & Audit.
+- Industry-standard names throughout: Workforce, Non-Human Identities,
+  Identity Matching, Orphaned Identities, Connector Library, Authoritative
+  Sources, API Clients, Governance Settings and so on.
+- **Views as menu items:** My Requests (`?view=mine`), Approvals
+  (`?view=waiting`), Provisioning Tasks (`?view=all`), Onboarding Reviews
+  (`/access?status=onboarding`) and Create Campaigns (`?launch=1`).
+  `matchScore` makes the current item the one whose route and query both
+  match, the first on a tie. The sidebar reads the query with
+  `useSearchParams`.
+- **New pages and views:**
+  - `/risk/rogue-accounts`: open rogue-access findings, paged in the
+    database (`listOpenAccessFindingsPage`);
+  - the catalog's "Being onboarded" filter (`ONBOARDING_IN_PROGRESS`);
+  - the launch form first and focused for Create Campaigns.
+
+**Dashboard** (owner request): "Security Overview", with a platform summary
+above the AI-agent section (`app/(customer)/PlatformSummary.tsx`):
+- the cards are identities by type, lifecycle work, live and onboarding
+  applications, orphaned accounts, requests waiting, rogue accounts, and
+  open and overdue review items;
+- each card is a head count or one aggregate, read under RLS, and shown only
+  with the area's read permission;
+- an unreadable count says "Unavailable";
+- it streams under its own Suspense boundary with a skeleton.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest 738/738 (`modules/ui`, `access-governance`, `risk`,
+  `certification-compliance`, `lib`). The new nav tests cover views, ties
+  and areas.
+- `next build`.
+- Local E2E: `shell`, `navigation-smoke`, `welcome`, `compliance`,
+  `application-catalog` and `access` 89/89; `auth` 36/36. `shell.spec.ts`
+  is rewritten for the new menus and adds a test that My Requests and
+  Approvals highlight separately.
+
+Not changed:
+- the mobile tab bar (Home, Agents, Discover, Risk);
+- the help guide (not updated unless asked).
+

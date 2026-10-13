@@ -472,3 +472,11 @@ async function assertSomethingToChange(tenantId: string, subjectId: string, appl
     throw new ApiError(409, "NOTHING_TO_CHANGE", requestType === "extend" ? "There is no access from a request to extend" : "This access is not held (or its removal is already under way)");
   }
 }
+
+/** The dashboard's platform summary: access requests still waiting for a decision (a count only, under RLS, filtered on the tenant). */
+export async function countPendingAccessRequests(tenantId: string): Promise<number> {
+  const supabase = await supabaseServer();
+  const { count, error } = await supabase.from("access_requests").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("status", "pending");
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return count ?? 0;
+}

@@ -74,13 +74,13 @@ test.describe("landing page (signed in)", () => {
 
   test('"/" still serves the authenticated Overview', async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Overview" })).toBeVisible();
     await expect(page.getByRole("heading", { name: /Govern every identity/i })).toHaveCount(0);
   });
 
   test("/welcome redirects a signed-in user into the app", async ({ page }) => {
     await page.goto("/welcome");
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Overview" })).toBeVisible();
   });
 });

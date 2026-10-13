@@ -31,7 +31,7 @@ test.describe("unauthenticated", () => {
     await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.adminOne.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Overview" })).toBeVisible();
   });
 
   test("session-expired query param shows the expected notice", async ({ page }) => {
@@ -242,11 +242,11 @@ test.describe("unauthenticated", () => {
     await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.adminOne.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Overview" })).toBeVisible();
 
     await page.reload();
     await expect(page).toHaveURL("/");
-    await expect(page.getByRole("heading", { name: "AI Agent Security Overview" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Security Overview" })).toBeVisible();
   });
 
   test("sign-up with a fresh, valid email does not error and leaves the sign-up page", async ({ page }) => {

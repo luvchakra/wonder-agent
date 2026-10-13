@@ -9,7 +9,7 @@ import { authFile } from "./support/testUsers";
  * shallow half of coverage; each module spec below is the deep half.
  */
 const ROUTES = [
-  { path: "/", heading: "AI Agent Security Overview" },
+  { path: "/", heading: "Security Overview" },
   { path: "/agents", heading: "AI Agents" },
   { path: "/agents/new", heading: "Register an AI Agent" },
   { path: "/agents/discovery", heading: null },
@@ -24,6 +24,7 @@ const ROUTES = [
   { path: "/controls", heading: "Control Center" },
   { path: "/sod", heading: "SoD Rules" },
   { path: "/sod/conflicts", heading: "SoD Conflicts" },
+  { path: "/risk/rogue-accounts", heading: "Rogue Accounts" },
   { path: "/access/entitlements", heading: "Entitlements" },
   { path: "/runtime", heading: "Runtime activity" },
   { path: "/risk", heading: "Risks & alerts" },
