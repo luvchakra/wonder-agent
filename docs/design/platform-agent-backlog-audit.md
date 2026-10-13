@@ -1305,3 +1305,24 @@ The Organizations list no longer shows each organization's address under its nam
 Announcements now has **End now** on every notice still running. It sets the notice's end to the current time; the record stays, and the row then reads "Ended". This is `endAnnouncement()`, audited as `platform.announcement_ended`; a notice that has already ended is left as it is.
 
 **Verified.** Typecheck and eslint clean. Local E2E platform-admin, including a new test that publishes a notice scoped to E2E Tenant One and ends it. That run and first-organization and users came to 30/30.
+
+## 2026-10-13 — Production can be added as an environment (owner feedback; migration 0165 approved by the owner)
+
+**Problem.** Planet Express is set up as development and had added test and staging. There was then nothing left to add, so neither the console nor Manage organizations showed Add environment. Production was never addable.
+
+**Change.**
+- Migration 0165 (the owner approved the schema change) drops `platform_tenants_production_has_no_parent`: it held only while every organization was its production tenant.
+- It widens `environment_orders`' environment check to include production.
+- `create_tenant_environment` now creates production at the organization's bare prefix (`planet-express`, from `planet-express-dev`).
+- `ADDABLE_ENVIRONMENTS` and `ENVIRONMENT_KINDS` include production, so both pages offer it whenever the organization lacks it.
+
+**Verified.**
+- Live SQL (`tests/platform/production-environment.sql`, rolls back):
+  - production is created at the bare prefix, linked, with the owner as a member;
+  - a second production is refused;
+  - an organization that is production can't add production;
+  - a production environment order is accepted.
+- Vitest 106/106; typecheck, eslint and `next build` clean.
+- Local E2E platform-admin and manage-organizations 20/20.
+
+**Noted, not changed.** Changing an environment's type to production in the console (`set_tenant_environment`, 0157) still clears its link to the organization. That is now unnecessary; it's left for a follow-up if wanted.

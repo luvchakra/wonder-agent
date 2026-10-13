@@ -45,7 +45,7 @@ describe("createTenantEnvironment (owner request 2026-10-13)", () => {
   });
 
   it("refuses an unknown kind or a malformed organization id before touching the database", async () => {
-    await expect(createTenantEnvironment("admin-1", PARENT, "production")).rejects.toMatchObject({ status: 400 });
+    await expect(createTenantEnvironment("admin-1", PARENT, "sandbox")).rejects.toMatchObject({ status: 400 });
     await expect(createTenantEnvironment("admin-1", "not-a-uuid", "test")).rejects.toMatchObject({ status: 404 });
     expect(rpc).not.toHaveBeenCalled();
   });

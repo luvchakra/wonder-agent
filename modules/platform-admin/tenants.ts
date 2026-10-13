@@ -63,11 +63,12 @@ export async function createTenant(actorId: string, input: CreateTenantInput): P
  * Platform administrators only (owner decision); one transaction in the
  * database (create_tenant_environment, migration 0156); audited.
  */
-export const ADDABLE_ENVIRONMENTS: AddableEnvironment[] = ["development", "test", "staging"];
+// Production too (owner approval 2026-10-13, migration 0165): an organization set up as development adds it at its bare prefix.
+export const ADDABLE_ENVIRONMENTS: AddableEnvironment[] = ["production", "development", "test", "staging"];
 
 export async function createTenantEnvironment(actorId: string, parentTenantId: string, environment: string): Promise<{ tenantId: string }> {
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parentTenantId)) throw new ApiError(404, "TENANT_NOT_FOUND");
-  if (!ADDABLE_ENVIRONMENTS.includes(environment as AddableEnvironment)) throw new ApiError(400, "INVALID_INPUT", "environment: development, test or staging");
+  if (!ADDABLE_ENVIRONMENTS.includes(environment as AddableEnvironment)) throw new ApiError(400, "INVALID_INPUT", "environment: production, development, test or staging");
   const { data, error } = await supabaseServiceRole().rpc("create_tenant_environment", { p_parent: parentTenantId, p_environment: environment });
   if (error) {
     const reason =

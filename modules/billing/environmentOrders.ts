@@ -21,7 +21,8 @@ import { defaultCurrencyFor } from "./rules";
  * environment checkout through the provider is the recorded follow-up.
  * BILLING_TEST_PAYMENTS=false turns test payments off earlier.
  */
-export const ENVIRONMENT_KINDS = ["development", "test", "staging"] as const;
+// Production too (owner approval 2026-10-13, migration 0165), for an organization set up as another environment.
+export const ENVIRONMENT_KINDS = ["production", "development", "test", "staging"] as const;
 export type EnvironmentKind = (typeof ENVIRONMENT_KINDS)[number];
 
 export function testPaymentsAvailable(env: Record<string, string | undefined> = process.env, providers = configuredProviders()): boolean {
@@ -68,7 +69,7 @@ export async function environmentPrices(organizationId: string): Promise<Billing
  * a failure is recorded on the order and reported, never shown as success.
  */
 export async function orderEnvironment(actorId: string, organizationId: string, environment: string, priceId: string): Promise<{ environmentTenantId: string; slug: string }> {
-  if (!ENVIRONMENT_KINDS.includes(environment as EnvironmentKind)) throw new ApiError(400, "INVALID_INPUT", "Choose development, test or staging");
+  if (!ENVIRONMENT_KINDS.includes(environment as EnvironmentKind)) throw new ApiError(400, "INVALID_INPUT", "Choose production, development, test or staging");
   const org = await ownedOrganization(organizationId);
   if (org.environment === environment) throw new ApiError(409, "ENVIRONMENT_EXISTS", "The organization itself is that environment");
   if (!testPaymentsAvailable()) throw new ApiError(503, "PAYMENTS_UNAVAILABLE", "Online payment for environments is not available yet. Contact support to add one.");

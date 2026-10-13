@@ -98,7 +98,7 @@ describe("orderEnvironment", () => {
 
   it("refuses a disabled organization, its own kind, an unknown kind or a price in another currency", async () => {
     await expect(orderEnvironment("user-1", ORG, "development", "pro_month_usd")).rejects.toMatchObject({ status: 409 });
-    await expect(orderEnvironment("user-1", ORG, "production", "pro_month_usd")).rejects.toMatchObject({ status: 400 });
+    await expect(orderEnvironment("user-1", ORG, "sandbox", "pro_month_usd")).rejects.toMatchObject({ status: 400 });
     await expect(orderEnvironment("user-1", ORG, "test", "pro_month_inr")).rejects.toMatchObject({ status: 400 });
     managed = [{ ...managed[0], status: "suspended" }];
     await expect(orderEnvironment("user-1", ORG, "test", "pro_month_usd")).rejects.toMatchObject({ status: 409, message: "Enable the organization first" });
