@@ -177,6 +177,25 @@ describe("the Connector Gateway, outbound", () => {
     expect(JSON.stringify(rows)).not.toMatch(/SECRET|sslpassword/);
   });
 
+  it("WID-H05: applies the allowed hosts to a driver that opens its own connection, and refuses an address with no host", async () => {
+    const sqlFactory = vi.fn<DriverFactory>(async () => ({ test: async () => undefined, fetch: async () => [], close: async () => undefined }));
+    const pg = (url: string) => ({ definition: { key: postgresql.key, version: postgresql.version, origin: "builtin" as const }, manifest: postgresql, settings: { url } });
+    const run = async (allowedHosts: string[], url: string) => {
+      const gateway = openGateway({ tenantId: "t", integrationId: "i", status: "connected" }, { socketDrivers: { sql: sqlFactory }, sleep: async () => undefined, allowedHosts });
+      const connector = new DefinitionConnector(gateway.drivers);
+      await connector.authenticate(pg(url), JSON.stringify({ username: "u", password: "p" }));
+      return connector.testConnection();
+    };
+    expect(await run(["other.example.com"], "postgres://db.example.com:5432/app")).toMatchObject({ ok: false });
+    expect(sqlFactory).not.toHaveBeenCalled();
+    // Settings validation refuses an address without a host before the Gateway; the Gateway refuses it too.
+    const direct = openGateway({ tenantId: "t", integrationId: "i", status: "connected" }, { socketDrivers: { sql: sqlFactory }, sleep: async () => undefined, allowedHosts: ["db.example.com"] });
+    await expect(direct.drivers.sql!(postgresql, { url: "not an address" }, {} as never, undefined as never)).rejects.toThrow(/no host/);
+    expect(sqlFactory).not.toHaveBeenCalled();
+    expect(await run(["db.example.com"], "postgres://db.example.com:5432/app")).toEqual({ ok: true });
+    expect(sqlFactory).toHaveBeenCalledTimes(1);
+  });
+
   it("records nothing and writes nothing when no traffic passed", async () => {
     const gateway = openGateway({ tenantId: "t", integrationId: "i", status: "connected" });
     await gateway.flush();

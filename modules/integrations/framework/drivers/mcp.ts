@@ -3,6 +3,7 @@ import type { ConnectorDriverSession, DriverFactory } from "../engine";
 import { ConnectorRequestError, type FetchLike } from "../http";
 import { fillTemplate } from "../mapping";
 import type { ConnectorDefinition } from "../types";
+import { addressKey } from "../address";
 
 /**
  * The mcp driver: reads what an MCP server declares over the Streamable
@@ -64,7 +65,7 @@ export function parseRpcReply(contentType: string, text: string, id: number): { 
 
 export function mcpDriver(fetchImpl: FetchLike): DriverFactory {
   return async (def: ConnectorDefinition, settings, secrets): Promise<ConnectorDriverSession> => {
-    const urlKey = def.settings.find((s) => s.key === "baseUrl" && s.type === "url")?.key ?? def.settings.find((s) => s.type === "url")!.key;
+    const urlKey = addressKey(def)!;
     const endpoint = new URL(String(settings[urlKey]));
     const scope = { settings, secret: secrets };
     let nextId = 1;

@@ -2890,3 +2890,28 @@ Verified:
   for redirects, unreadable list) and `outboundPolicy.test.ts`;
 - typecheck and eslint;
 - every test file the threat model cites exists.
+
+### 2026-10-13 — Allowed hosts: the checked address is the connected one (WID-H05 residual)
+
+The register's 11:08 IST audit found two gaps in the allow-list:
+- For LDAP and SQL, the Gateway checked the `baseUrl` setting if present,
+  but the drivers connected to the first url setting. A definition with
+  two url settings could pass the check on a listed host and connect to
+  an unlisted one. Private addresses were still refused, so this was an
+  allow-list bypass, not SSRF.
+- An address with no readable host skipped the list.
+
+Fixed:
+- `framework/address.ts` (`addressKey`, `addressOf`) is the one rule:
+  `baseUrl`, else the first url setting. The Gateway, `ldapDriver`,
+  `sqlDriver` and `mcpDriver` all use it.
+- `GatewaySession.admit` refuses an address with no host when a list is
+  set.
+- `CONNECTOR-THREAT-MODEL.md` T4 updated.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest `modules/integrations`: 388/388, including the new
+  `address.test.ts` and the gateway case for a socket driver (unlisted
+  host refused, hostless address refused, listed host admitted).- Local E2E (production build): `outbound-guard`, `mcp-bridge`,
+  `mcp-inventory` and `connector-provisioning` specs, 32/32.
