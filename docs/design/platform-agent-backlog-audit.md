@@ -1264,3 +1264,9 @@ Owner feedback the same day: an organization set up as development, with no prod
 **Fix.** `groupOrganizations()` now takes as the organization the tenant its environments link to, whatever its own environment. Without links it still takes the production one first.
 
 **Verified.** `organizations.test.ts` 3/3. The new case fails without the fix. Typecheck and eslint clean.
+
+## 2026-10-13 — Organizations list trimmed (owner request)
+
+The Organizations list no longer shows each organization's address under its name, or the Environments column. Both stay on the organization's own page (its Environments table). The list keeps name, owner, plan, status and Manage, which is one control fewer per row (§19.5).
+
+**Verified.** Typecheck and eslint clean. The platform-admin E2E only uses the organization's own page for environments, which is unchanged.

@@ -2,9 +2,8 @@ import Link from "next/link";
 import { listTenants, getSubscription, testTenantIds, organizationOwners } from "@/modules/platform-admin/service";
 import { groupOrganizations, type Organization } from "@/modules/platform-admin/organizations";
 import { createTenantAction } from "@/app/actions/platform";
-import { baseAppHost, tenantUrl } from "@/lib/tenant/host";
 import type { Subscription } from "@/lib/shared/types/platform";
-import { Badge, Button, Card, CardBody, EnvironmentBadge, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, CardBody, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "../PageHeading";
 
@@ -24,14 +23,13 @@ type Row = { org: Organization; owners: { email: string; name: string | null }[]
  * environments; its owners; its plan and status. Manage opens the
  * organization, where each environment is managed, added or removed.
  */
-function OrganizationTable({ rows, base, label }: { rows: Row[]; base: string | null; label: string }) {
+function OrganizationTable({ rows, label }: { rows: Row[]; label: string }) {
   return (
     <TableContainer label={label} bare>
       <Thead>
         <tr>
           <Th>Organization</Th>
           <Th hideBelow="lg">Owner</Th>
-          <Th>Environments</Th>
           <Th hideBelow="xl">Plan</Th>
           <Th>Status</Th>
           <Th className="text-right">
@@ -42,16 +40,12 @@ function OrganizationTable({ rows, base, label }: { rows: Row[]; base: string | 
       <tbody>
         {rows.map(({ org, owners, subscription }) => {
           const status = STATUS[org.primary.status ?? "active"];
-          const url = base && org.primary.slug && org.primary.status !== "deprovisioned" ? tenantUrl(org.primary.slug, base) : null;
           return (
             <Tr key={org.id}>
               <Td>
-                <div className="min-w-0">
-                  <Link href={`/platform-admin/tenants/${org.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
-                    {org.name}
-                  </Link>
-                  <p className="truncate font-mono text-xs text-muted-foreground">{url ? url.replace(/^https?:\/\//, "") : org.primary.slug}</p>
-                </div>
+                <Link href={`/platform-admin/tenants/${org.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
+                  {org.name}
+                </Link>
               </Td>
               <Td hideBelow="lg">
                 {owners.length ? (
@@ -62,15 +56,6 @@ function OrganizationTable({ rows, base, label }: { rows: Row[]; base: string | 
                 ) : (
                   <span className="text-xs text-muted-foreground">No owner</span>
                 )}
-              </Td>
-              <Td>
-                <div className="flex flex-wrap gap-1">
-                  {org.environments.map((e) => (
-                    <Link key={e.tenantId} href={`/platform-admin/tenants/${e.tenantId}`} title={e.slug}>
-                      <EnvironmentBadge environment={e.environment} className={cn(e.status !== "active" && "opacity-50")} />
-                    </Link>
-                  ))}
-                </div>
               </Td>
               <Td hideBelow="xl">{subscription?.plan ? <Badge tone="info" className="capitalize">{subscription.plan}</Badge> : <span className="text-xs text-muted-foreground">None</span>}</Td>
               <Td>
@@ -98,7 +83,6 @@ export default async function PlatformOrganizationsPage({ searchParams }: { sear
   // Organizations the E2E suite and SQL fixtures create, kept apart from real ones.
   const real = rows.filter((r) => !testIds.has(r.org.id));
   const test = rows.filter((r) => testIds.has(r.org.id));
-  const base = baseAppHost();
 
   return (
     <>
@@ -108,13 +92,13 @@ export default async function PlatformOrganizationsPage({ searchParams }: { sear
         </Link>
       </PageHeading>
 
-      <Card>{real.length === 0 ? <p className="px-4 py-3 text-sm text-muted-foreground">No organizations yet.</p> : <OrganizationTable rows={real} base={base} label="Organizations" />}</Card>
+      <Card>{real.length === 0 ? <p className="px-4 py-3 text-sm text-muted-foreground">No organizations yet.</p> : <OrganizationTable rows={real} label="Organizations" />}</Card>
 
       {test.length ? (
         <details className="group rounded-xl border border-border/60 bg-card">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-card-foreground">Test organizations ({test.length})</summary>
           <div className="border-t border-border">
-            <OrganizationTable rows={test} base={base} label="Test organizations" />
+            <OrganizationTable rows={test} label="Test organizations" />
           </div>
         </details>
       ) : null}
