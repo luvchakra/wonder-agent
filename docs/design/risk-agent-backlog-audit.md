@@ -1381,3 +1381,29 @@ scoped to the page.
 - Remediation actions beyond removal, exception and false positive: authorize, package, legacy recognition, owner, escalate and quarantine.
 - A finding detail page.
 - Showing the reasons on the account page. They are stored on the finding and its evidence.
+
+## 2026-10-13 — RISK-P0-13: finding page; approve afterwards, legacy, owner, escalate
+
+**What was built.**
+- **A page for each rogue-access finding** (`/risk/rogue-accounts/<id>`, linked from the list): ticket, title, severity, status and owner; why it is rogue, with the severity's own reasons and score; the evidence (an approving request links to it); the outcome once closed.
+  - The main action stays "Remove access" or "Disable account".
+  - "Work on it" holds assigning an owner, escalating, and the other outcomes.
+- **Approve afterwards, or recognize as legacy**, optionally until a date (`POST /api/v1/findings/<id>/authorize`, `authorizeRogueFinding`):
+  - Access records the approval through its new published contract `recordApprovedAfterwards()`, as an access request (grant, fulfilled, decided by the approver, with an end date) attached to the grant (`access_grants.request_id`).
+  - Nothing is provisioned and the ledger needs no new rule: an approved or fulfilled request is evidence, so the next refresh counts the access as VALID.
+  - With an end date, the existing expiry sweep (ACCESS-P0-32) removes the access then.
+  - The finding closes as `approved_afterwards`, with an `access_request` evidence row. The account's owner can't approve their own access.
+  - Validation is pure and tested (`validateRogueAuthorization`): a reason is required; the date is optional, in the future, and at most ten years away.
+- **Assign** (`POST …/owner`, `assignRogueFinding`; the existing `…/assign` for every finding is unchanged): an active member of the organization, or nobody; an open finding becomes `assigned`.
+- **Escalate** (`POST …/escalate`, `escalateRogueFinding`): opens an investigation (RISK-P0-11) holding the finding; the finding becomes `investigating`.
+- **Account page:** "Other outcomes" now also offers approve afterwards and recognize as legacy.
+- **Quarantine** is the existing "Disable account" request, which goes through the application's approval rules.
+- **Not built:** adding the access to an access package.
+
+**Verified.**
+- Vitest: risk and access-governance 390/390, including 4 new rules tests.
+- Typecheck, eslint and `next build` clean.
+- Local E2E, connector-provisioning: the rest of the spec 15/15 in a full run; the new test, with setup, 9/9. The new test:
+  - rogue access is assigned, escalated, refused without a reason or beyond ten years, then approved afterwards from the page for 30 days;
+  - a fulfilled grant request with that end date is attached to the grant, and nothing is written to the system;
+  - the next read raises no new finding, and a second approval is refused.

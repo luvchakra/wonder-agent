@@ -435,6 +435,7 @@ test.describe.serial("connector provisioning", () => {
     await page.goto(`/access/accounts/${ana!.id}`);
     const row = page.getByRole("listitem").filter({ hasText: "Finance" });
     await row.getByText("Other outcomes").click();
+    await row.getByLabel("Outcome").selectOption("exception");
     await row.getByLabel("Until (90 days at most)").fill(until);
     await row.getByLabel("Reason").fill("Covering month-end close");
     await row.getByRole("button", { name: "Save" }).click();
@@ -454,6 +455,67 @@ test.describe.serial("connector provisioning", () => {
 
     const { data: audit } = await db.from("audit_logs").select("metadata").eq("tenant_id", tenantId).eq("object_id", finding.id).eq("action", "risk.access_finding_decided");
     expect((audit ?? []).map((a) => (a.metadata as { outcome: string }).outcome).sort()).toEqual(["exception", "false_positive"]);
+  });
+
+  test("RISK-P0-13: rogue access is given an owner, escalated, then approved afterwards until a date; it is approved from then on", async ({ request, page }) => {
+    test.setTimeout(180_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const writesBefore = system.writes.length;
+    // Bob is put in Operations directly on the system: rogue.
+    system.members["g-ops"].push("u-bob");
+    await syncAndWait(request);
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    const { data: bob } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-bob").single();
+    const findingOf = async () =>
+      (await db.from("risk_findings").select("id, status, assigned_to, resolution_type, access_grant_id").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", bob!.id).eq("entitlement_id", ops).order("created_at", { ascending: false }).limit(1)).data?.[0];
+    await expect.poll(async () => (await findingOf())?.status, { timeout: 60_000 }).toBe("open");
+    const finding = (await findingOf())!;
+
+    // Its own page: owner, then escalate into an investigation.
+    const { data: me } = await db.from("users").select("id").eq("email", "e2e-admin-1@e2e.wonderagent.test").single();
+    await page.goto(`/risk/rogue-accounts/${finding.id}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // Chosen once the page is interactive (a choice made before hydration is not seen).
+    await expect(async () => {
+      await page.getByLabel("Owner").selectOption(me!.id);
+      await expect(page.getByRole("button", { name: "Assign" })).toBeEnabled({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    await page.getByRole("button", { name: "Assign" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Assigned." })).toBeVisible();
+    expect(await findingOf()).toMatchObject({ status: "assigned", assigned_to: me!.id });
+    await page.getByRole("button", { name: "Escalate" }).click();
+    await expect(page.getByRole("status").filter({ hasText: /Escalated to investigation INV-/ })).toBeVisible();
+    expect((await findingOf())!.status).toBe("investigating");
+
+    // Approving afterwards needs a reason; a date ten years out is refused.
+    expect((await request.post(`/api/v1/findings/${finding.id}/authorize`, { data: { reason: " " } })).status()).toBe(400);
+    expect((await request.post(`/api/v1/findings/${finding.id}/authorize`, { data: { reason: "x", until: "2040-01-01" } })).status()).toBe(400);
+
+    // Approved afterwards from the page, for 30 days.
+    const until = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+    await page.getByText("Other outcomes").click();
+    await page.getByLabel("Outcome").selectOption("authorize");
+    await page.getByLabel("Until (optional; removed then)").fill(until);
+    await page.getByLabel("Reason").fill("Bob covers Operations during the migration");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Approved afterwards", { exact: true })).toBeVisible({ timeout: 30_000 });
+    expect(await findingOf()).toMatchObject({ status: "resolved", resolution_type: "approved_afterwards" });
+
+    // Recorded as an approval: a fulfilled grant request with its end date, attached to the access.
+    const { data: grant } = await db.from("access_grants").select("request_id").eq("tenant_id", tenantId).eq("id", finding.access_grant_id!).single();
+    const { data: req } = await db.from("access_requests").select("status, request_type, requested_expiry, justification, decided_by").eq("tenant_id", tenantId).eq("id", grant!.request_id!).single();
+    expect(req).toMatchObject({ status: "fulfilled", request_type: "grant", decided_by: me!.id });
+    expect(req!.requested_expiry!.slice(0, 10)).toBe(until);
+    expect(req!.justification).toContain("Approved afterwards");
+    // Nothing was written to the system: the access already exists.
+    expect(system.writes.slice(writesBefore)).toEqual([]);
+
+    // The next read keeps it approved: no new rogue finding.
+    await syncAndWait(request);
+    const { data: open } = await db.from("risk_findings").select("id").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", bob!.id).eq("entitlement_id", ops).in("status", ["open", "assigned", "investigating"]);
+    expect(open).toEqual([]);
+    // A second approval is refused: the finding is closed.
+    expect((await request.post(`/api/v1/findings/${finding.id}/authorize`, { data: { reason: "again" } })).status()).toBe(409);
   });
 
   test("slice 2: approved access is added by the connector and verified", async ({ request }) => {

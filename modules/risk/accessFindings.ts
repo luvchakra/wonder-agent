@@ -4,7 +4,19 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessFinding, FindingStatus, ResolutionType, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
-import { decidesOwnAccess, exceptionEnded, rogueResolution, rogueTrend, validateRogueDecision, type RogueDecisionInput, type RogueResolution, type RogueTrendWeek } from "./accessFindingRules";
+import {
+  authorizationJustification,
+  decidesOwnAccess,
+  exceptionEnded,
+  rogueResolution,
+  rogueTrend,
+  validateRogueAuthorization,
+  validateRogueDecision,
+  type RogueAuthorizationInput,
+  type RogueDecisionInput,
+  type RogueResolution,
+  type RogueTrendWeek,
+} from "./accessFindingRules";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
 import { rogueSeverity, type RogueFacts, type RogueSeverity } from "./rogueSeverity";
 
@@ -434,6 +446,171 @@ export async function decideRogueFinding(tenantId: string, actorId: string, find
     typedText: { reason: decision.reason },
   });
   return toAccessFinding(updated as Row);
+}
+
+/** One open rogue-access finding of this organization, or a refusal in words. */
+async function loadOpenRogueFinding(tenantId: string, findingId: string): Promise<Row> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(findingId)) throw new ApiError(404, "FINDING_NOT_FOUND");
+  const { data: finding, error } = await supabaseServiceRole()
+    .from("risk_findings")
+    .select(`*, ${TICKET}`)
+    .eq("tenant_id", tenantId)
+    .eq("id", findingId)
+    .eq("category", "rogue_access")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!finding || finding.tenant_id !== tenantId) throw new ApiError(404, "FINDING_NOT_FOUND");
+  if (!OPEN.includes(finding.status as FindingStatus) || finding.status === "exception") throw new ApiError(409, "FINDING_CLOSED", "This finding is already closed or excepted");
+  return finding as Row;
+}
+
+/**
+ * RISK-P0-13 — approve rogue access afterwards, as it stands, or recognize
+ * it as legacy access; optionally until a date (time-bound). The approval
+ * is recorded by Access as a request (recordApprovedAfterwards), so the
+ * ledger counts the access as approved from now on, and the finding closes
+ * as approved afterwards with that request as its evidence. Someone other
+ * than the account's owner decides (risk.manage, checked by the caller).
+ */
+export async function authorizeRogueFinding(tenantId: string, actorId: string, findingId: string, input: RogueAuthorizationInput, now = new Date()): Promise<AccessFinding> {
+  const authorization = validateRogueAuthorization(input, now);
+  if ("error" in authorization) throw new ApiError(400, "VALIDATION_FAILED", authorization.error);
+  const finding = await loadOpenRogueFinding(tenantId, findingId);
+  const identityId = (finding.identity_id as string | null) ?? null;
+  const applicationId = (finding.application_id as string | null) ?? null;
+  if (!applicationId) throw new ApiError(409, "NO_APPLICATION", "This access is not tied to an application WonderID manages");
+  if (!identityId) throw new ApiError(409, "ACCOUNT_UNLINKED", "Link the account to its identity first; an approval is given to someone");
+  const decider = await getIdentityForUser(tenantId, actorId);
+  if (decidesOwnAccess(decider?.id ?? null, identityId)) throw new ApiError(403, "SELF_DECISION", "Someone other than the account's owner approves its access");
+
+  const ticketNumber = ((finding.ticket as Row | null)?.ticket_number as string | undefined) ?? null;
+  const { recordApprovedAfterwards } = await import("@/modules/access-governance/service");
+  const { requestId } = await recordApprovedAfterwards(
+    tenantId,
+    actorId,
+    {
+      subjectIdentityId: identityId,
+      applicationId,
+      entitlementId: (finding.entitlement_id as string | null) ?? null,
+      accessGrantId: (finding.access_grant_id as string | null) ?? null,
+      justification: authorizationJustification(authorization, ticketNumber),
+      expiresAt: authorization.until,
+    },
+    now,
+  );
+
+  const admin = supabaseServiceRole();
+  const decidedAt = now.toISOString();
+  const reason = authorization.kind === "legacy" ? `Recognized as legacy access: ${authorization.reason}` : `Approved afterwards: ${authorization.reason}`;
+  const { data: updated, error: updateError } = await admin
+    .from("risk_findings")
+    .update({
+      status: "resolved",
+      resolution_type: "approved_afterwards",
+      resolution_reason: reason.slice(0, 1000),
+      resolved_at: decidedAt,
+      decision_reason: authorization.reason,
+      decided_by: actorId,
+      decided_at: decidedAt,
+      exception_until: null,
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", findingId)
+    .eq("status", finding.status as string)
+    .select(`*, ${TICKET}`)
+    .maybeSingle();
+  if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  // The approval stands either way; the next ledger refresh closes a finding that changed meanwhile.
+  if (!updated) throw new ApiError(409, "CONFLICT", "The approval was recorded, but the finding changed meanwhile; reload");
+  await admin.from("risk_evidence").insert({ finding_id: findingId, evidence_type: "access_request", reference_id: requestId, summary: authorization.kind === "legacy" ? "Recognized as legacy access" : "Approved afterwards" });
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "risk.access_finding_authorized",
+    objectType: "risk_finding",
+    objectId: findingId,
+    outcome: "success",
+    metadata: { kind: authorization.kind, until: authorization.until, requestId, fromStatus: finding.status },
+    typedText: { reason: authorization.reason },
+  });
+  return toAccessFinding(updated as Row);
+}
+
+/** RISK-P0-13 — give a rogue-access finding an owner: an active member of the organization, or nobody. */
+export async function assignRogueFinding(tenantId: string, actorId: string, findingId: string, assigneeId: string | null): Promise<AccessFinding> {
+  const finding = await loadOpenRogueFinding(tenantId, findingId);
+  const admin = supabaseServiceRole();
+  if (assigneeId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(assigneeId)) throw new ApiError(400, "VALIDATION_FAILED", "assigneeId: a member");
+    const { data: member, error } = await admin.from("tenant_memberships").select("tenant_id").eq("tenant_id", tenantId).eq("user_id", assigneeId).eq("status", "active").maybeSingle();
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    if (!member || member.tenant_id !== tenantId) throw new ApiError(404, "ASSIGNEE_NOT_FOUND", "That person is not a member of this organization");
+  }
+  const status = assigneeId && ["open", "acknowledged"].includes(finding.status as string) ? "assigned" : (finding.status as string);
+  const { data: updated, error: updateError } = await admin
+    .from("risk_findings")
+    .update({ assigned_to: assigneeId, status })
+    .eq("tenant_id", tenantId)
+    .eq("id", findingId)
+    .eq("status", finding.status as string)
+    .select(`*, ${TICKET}`)
+    .maybeSingle();
+  if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  if (!updated) throw new ApiError(409, "CONFLICT", "The finding changed meanwhile; reload");
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "risk.finding_assigned", objectType: "risk_finding", objectId: findingId, outcome: "success", metadata: { assigneeId, fromStatus: finding.status } });
+  return toAccessFinding(updated as Row);
+}
+
+/**
+ * RISK-P0-13 — escalate a rogue-access finding: it opens an investigation
+ * (RISK-P0-11) holding the finding, at a priority from its severity, and
+ * the finding moves to investigating. Returns the investigation.
+ */
+export async function escalateRogueFinding(tenantId: string, actorId: string, findingId: string): Promise<{ investigationId: string; reference: string }> {
+  const finding = await loadOpenRogueFinding(tenantId, findingId);
+  const { createInvestigation } = await import("./investigations");
+  const ticket = ((finding.ticket as Row | null)?.ticket_number as string | undefined) ?? null;
+  const investigation = await createInvestigation(tenantId, actorId, {
+    title: `${ticket ? `${ticket}: ` : ""}${finding.title as string}`.slice(0, 200),
+    summary: `Escalated from a rogue-access finding. ${finding.explanation as string}`.slice(0, 2000),
+    findingIds: [findingId],
+  });
+  const { error } = await supabaseServiceRole()
+    .from("risk_findings")
+    .update({ status: "investigating" })
+    .eq("tenant_id", tenantId)
+    .eq("id", findingId)
+    .in("status", ["open", "acknowledged", "assigned"]);
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "risk.access_finding_escalated", objectType: "risk_finding", objectId: findingId, outcome: "success", metadata: { investigationId: investigation.id, reference: investigation.reference } });
+  return { investigationId: investigation.id, reference: investigation.reference };
+}
+
+/** RISK-P0-13 — one rogue-access finding with its evidence, for its own page. */
+export async function getRogueFinding(tenantId: string, findingId: string): Promise<(AccessFinding & { reasons: string[]; riskScore: number | null; assignedTo: string | null; evidence: { type: string; referenceId: string | null; summary: string | null; createdAt: string }[] }) | null> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(findingId)) return null;
+  // The member's own client: RLS scopes it to their organizations as well (§14).
+  const supabase = await supabaseServer();
+  const [{ data, error }, { data: evidence }] = await Promise.all([
+    supabase.from("risk_findings").select(`*, ${TICKET}`).eq("tenant_id", tenantId).eq("id", findingId).eq("category", "rogue_access").maybeSingle(),
+    supabase.from("risk_evidence").select("evidence_type, reference_id, summary, created_at").eq("finding_id", findingId).order("created_at", { ascending: true }).limit(50),
+  ]);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!data || data.tenant_id !== tenantId) return null;
+  let requestStatus: string | null = null;
+  if (data.remediation_request_id) {
+    const { data: req } = await supabase.from("access_requests").select("status").eq("tenant_id", tenantId).eq("id", data.remediation_request_id).maybeSingle();
+    requestStatus = (req?.status as string | undefined) ?? null;
+  }
+  return {
+    ...toAccessFinding(data as Row),
+    remediationRequestStatus: requestStatus,
+    reasons: Array.isArray(data.reasons) ? (data.reasons as string[]) : [],
+    riskScore: (data.risk_score as number | null) ?? null,
+    assignedTo: (data.assigned_to as string | null) ?? null,
+    evidence: ((evidence ?? []) as Row[]).map((e) => ({ type: e.evidence_type as string, referenceId: (e.reference_id as string | null) ?? null, summary: (e.summary as string | null) ?? null, createdAt: e.created_at as string })),
+  };
 }
 
 /** WID-H04: accepted exceptions whose end has passed are open again. Returns how many. */
