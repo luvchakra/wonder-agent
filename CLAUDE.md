@@ -316,6 +316,14 @@ describe code nobody is running. After syncing, re-read anything you intend to
 change — it may have moved. Fetch again immediately before every push, and
 never force-push over commits you have not seen.
 
+**Start each run from the high-risk register (owner decision, 2026-10-13).**
+Right after syncing, read `docs/WonderID/HIGH-RISK-FINDINGS.md` on `main`.
+Every finding there that is not FIXED (OPEN, CHANGED or REOPENED) goes on
+this run's task list, ahead of backlog stories. Work it, or say why it is
+waiting (on the register's own audit, or on an owner decision), tracked in
+`docs/WonderID/FINDINGS-REMEDIATION.md`. Never edit the register itself:
+another agent maintains it, with the owner's authorization.
+
 **Record before you stop.** Whenever a major piece of work is complete — a
 backlog story, but equally a performance pass, a design review, a
 cross-module fix, a deployment or configuration change, an investigation that

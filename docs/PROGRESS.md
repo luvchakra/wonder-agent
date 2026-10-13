@@ -8,13 +8,13 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-10-12 from 11 module backlogs.
+Generated 2026-10-13 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**222 of 271 tracked stories complete — 82%**
+**223 of 271 tracked stories complete — 82%**
 
 ```
 █████████████████████████████████░░░░░░░  82%
@@ -22,8 +22,8 @@ Generated 2026-10-12 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 222 |
-| Partial | 29 |
+| Done | 223 |
+| Partial | 28 |
 | Deferred | 1 |
 | Not Started | 19 |
 | **Total tracked** | **271** |
@@ -39,7 +39,7 @@ and are deliberately excluded from the counts above.
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 2 | 45 | `████████████████░░` 89% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 18 | 2 | 0 | 1 | 21 | `███████████████░░░` 86% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 19 | 1 | 0 | 1 | 21 | `████████████████░░` 90% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 26 | 3 | 0 | 0 | 29 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
@@ -112,7 +112,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 18 done · 2 partial · 0 deferred · 1 not started (21 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 19 done · 1 partial · 0 deferred · 1 not started (21 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -134,7 +134,7 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Done — 2026-09-26, migrations 0077–0079 |
 | IDENTITY-P0-16 | Identity attributes and relationships | Done — 2026-09-26 |
 | IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
-| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Partial — 2026-09-26: events, governed tasks, transitions, ownership transfer done (0084/0085); automatic birthright grants and deprovisioning wait on ACCESS-P0-20 and INTEGRATION-P0-13 |
+| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Done — 2026-09-26: events, governed tasks, transitions, ownership transfer (0084/0085). 2026-10-12: leavers' access becomes removal work and connectors disable their accounts (WID-C02). 2026-10-13: birthright packages assigned automatically to active joiners, rehires and movers (owner decision; 0151) |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 | IDENTITY-P0-20 | Non-human identities from accounts; owner from source or an unowned queue; agent accounts by identifier (F1, #46) | Done — 2026-10-11: no migration; reconciliation creates or finds the identity, owner from the source, Onboarding › Unowned Identities, requests refuse unowned subjects |
 
@@ -204,7 +204,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Done — 2026-09-26, migration 0089 |
 | ACCESS-P0-18 | Self-service request catalog and request policies | Done — 2026-09-26, migration 0092 (packages with ACCESS-P0-20) |
 | ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Done — 2026-09-26, migration 0093 (named groups deferred) |
-| ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later) |
+| ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later). 2026-10-13: birthright, turned on by two administrators (0151) |
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |

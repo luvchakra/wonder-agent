@@ -14,7 +14,7 @@ import type {
   LifecycleTaskStatus,
   LifecycleTaskType,
 } from "@/lib/shared/types/agent-identity";
-import { HUMAN_TRANSITIONS, opensAccessRemoval, statusForState, tasksForEvent, type DetectedEvent } from "./humanLifecycle";
+import { HUMAN_TRANSITIONS, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, type DetectedEvent } from "./humanLifecycle";
 import { assignOwner, removeOwner } from "./owners";
 
 /**
@@ -139,6 +139,26 @@ export async function recordLifecycleEvents(
     if (opensAccessRemoval(d)) {
       const { openLeaverRemovals } = await import("@/modules/access-governance/service");
       await openLeaverRemovals(tenantId, subject.id, { actorId: meta.actorId, eventId: event.id });
+    }
+
+    // IDENTITY-P0-18 (owner decision, 13 Oct): the birthright packages an active joiner, rehire or mover
+    // is eligible for are assigned now. A failure leaves the manager's baseline-access task as the way
+    // in, and is audited; it does not undo the event.
+    if (opensBirthright(d)) {
+      const { assignBirthrightPackages } = await import("@/modules/access-governance/service");
+      try {
+        await assignBirthrightPackages(tenantId, subject.id, { eventId: event.id, eventType: d.eventType });
+      } catch (err) {
+        await writeAudit({
+          tenantId,
+          actorType: "system",
+          action: "access.package_birthright_assigned",
+          objectType: "identity",
+          objectId: subject.id,
+          outcome: "failure",
+          metadata: { eventId: event.id, eventType: d.eventType, error: err instanceof Error ? err.message.slice(0, 200) : "unknown" },
+        });
+      }
     }
 
     await writeAudit({

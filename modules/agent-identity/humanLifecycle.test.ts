@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedTransitions, detectLifecycleEvents, opensAccessRemoval, statusForState, tasksForEvent } from "./humanLifecycle";
+import { allowedTransitions, detectLifecycleEvents, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent } from "./humanLifecycle";
 
 describe("human lifecycle transitions", () => {
   it("allows the governed path and rehire, never skipping to terminated from active", () => {
@@ -77,5 +77,17 @@ describe("opensAccessRemoval (WID-C02)", () => {
     expect(opensAccessRemoval({ fromState: "DISABLED", toState: "TERMINATED" })).toBe(false);
     expect(opensAccessRemoval({ fromState: "TERMINATED", toState: "ARCHIVED" })).toBe(false);
     expect(opensAccessRemoval({ fromState: "DISABLED", toState: "ACTIVE" })).toBe(false);
+  });
+});
+
+describe("opensBirthright (owner decision, 13 October 2026)", () => {
+  it("assigns birthright to an active joiner, rehire or mover only", () => {
+    expect(opensBirthright({ eventType: "joiner", toState: "ACTIVE" })).toBe(true);
+    expect(opensBirthright({ eventType: "rehire", toState: "ACTIVE" })).toBe(true);
+    expect(opensBirthright({ eventType: "mover", toState: "ACTIVE" })).toBe(true);
+    // Before the start date: it comes with the joiner event when they become active.
+    expect(opensBirthright({ eventType: "joiner", toState: "PRE_JOIN" })).toBe(false);
+    expect(opensBirthright({ eventType: "mover", toState: "LEAVE_PENDING" })).toBe(false);
+    expect(opensBirthright({ eventType: "leaver", toState: "LEAVE_PENDING" })).toBe(false);
   });
 });

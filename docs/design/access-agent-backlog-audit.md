@@ -3098,3 +3098,50 @@ Typed text out of audit records: approval comments, fulfilment notes (a claim no
 ### 2026-10-12 — WID-H07, identifiers only
 
 WID-H07 identifiers only: `account.reconciled` lists held accounts by `accountId`, not by their external login (`ref`).
+
+### 2026-10-13 — Birthright packages (ACCESS-P0-20, for IDENTITY-P0-18; owner decision)
+
+Owner decision: birthright is pre-approved. Marking a package birthright
+takes two administrators, and that is the approval (non-negotiable #15's
+explicitly approved automation path).
+
+- **Migration 0151 (applied):**
+  - `access_packages.birthright_status` (off / pending / on), with
+    `birthright_requested_by`, `birthright_approved_by` and
+    `birthright_approved_at`;
+  - check `access_packages_birthright_four_eyes`: 'on' needs an approver
+    other than the requester;
+  - `access_package_assignments.source` gains 'birthright'.
+- **Rules (`packageRules.ts`):**
+  - `birthrightTransition`: request, approve (four-eyes), off;
+  - `birthrightNeedsReapproval`: contents or eligibility changed while on;
+  - `birthrightApplies`.
+- **Service (`packages.ts`):**
+  - `setPackageBirthright`: audited, conditional on the state read. Approval
+    needs the package active and non-empty.
+  - Adding or removing a resource, or changing eligibility, while on sends
+    it back to pending (`birthrightBackToPending`). The person who changed
+    it becomes the requester, so they cannot approve it.
+  - `assignBirthrightPackages`: assigns each eligible package, skipping
+    ones already held (the live-assignment key is the lock), with source
+    'birthright' and no request. Pending grants follow as for any
+    assignment. Audited as the system.
+- **API:** `POST /api/v1/access/packages/{id}/birthright`
+  `{action: request | approve | off}`. Needs access.manage; an automation
+  credential cannot approve (WID-H06).
+- **UI:** a folded "Birthright" row on the package page, one action per
+  state; the approver also gets "Withdraw".
+
+Verified:
+- typecheck and eslint;
+- `npx vitest run modules/access-governance modules/agent-identity`:
+  364 passed;
+- E2E locally:
+  - new `birthright.spec.ts`: 3/3 — two administrators, the eligible
+    joiner assigned with no request, a pending grant, someone else not, a
+    change back to pending, nobody new assigned while pending;
+  - `access-packages.spec.ts` and `human-lifecycle.spec.ts`: 22/22.
+- Screen at 1280px and 390px: no overflow.
+
+Not done: removing birthright packages that a mover is no longer eligible
+for. The mover's access-review task covers it, as before.

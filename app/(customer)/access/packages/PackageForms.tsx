@@ -10,6 +10,7 @@ import {
   requestPackageAction,
   revokeAssignmentAction,
   savePackageAction,
+  setBirthrightAction,
   setPackageStatusAction,
   type PackageFormState,
 } from "@/app/actions/packages";
@@ -160,6 +161,35 @@ export function StatusButtons({ packageId, status }: { packageId: string; status
         ) : null}
       </div>
       <Outcome state={state} />
+    </div>
+  );
+}
+
+/**
+ * Birthright (owner decision 13 Oct): one action for the state it is in.
+ * The person who asked cannot approve; the server refuses and says so.
+ */
+export function BirthrightButton({ packageId, status }: { packageId: string; status: "off" | "pending" | "on" }) {
+  const action = status === "off" ? "request" : status === "pending" ? "approve" : "off";
+  const [state, run, pending] = useActionState(setBirthrightAction.bind(null, packageId, action), IDLE);
+  const [offState, turnOff, turningOff] = useActionState(setBirthrightAction.bind(null, packageId, "off"), IDLE);
+  return (
+    <div className="space-y-1">
+      <div className="flex flex-wrap gap-2">
+        <form action={run}>
+          <Submit pending={pending} size="sm" variant={action === "off" ? "outline" : undefined}>
+            {action === "request" ? "Make birthright" : action === "approve" ? "Approve birthright" : "Turn off"}
+          </Submit>
+        </form>
+        {status === "pending" ? (
+          <form action={turnOff}>
+            <Submit pending={turningOff} size="sm" variant="ghost">
+              Withdraw
+            </Submit>
+          </form>
+        ) : null}
+      </div>
+      <Outcome state={offState.status !== "idle" ? offState : state} />
     </div>
   );
 }

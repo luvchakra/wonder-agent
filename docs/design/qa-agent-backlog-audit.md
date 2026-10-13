@@ -1925,3 +1925,18 @@ explained.**
   pre-fix commit. It would have repeated the known 404 failure and held this
   run behind it for about 90 minutes, so I cancelled it: the workflow run and
   its two Vercel builds.
+
+### 2026-10-13 — Follow-ups looked at, and left as they are
+
+- **`/service-unavailable` on Vercel (200, not 503):** left as is, on
+  purpose.
+  - API callers already get a direct 503 with `Retry-After` from the proxy.
+  - Only the browser page goes through the rewrite whose status Vercel
+    drops.
+  - Next.js has no `notFound()` equivalent for 503. A correct status would
+    need hand-written HTML outside the design system (§13).
+  - The page says what happened and grants nothing (§17.5 holds).
+- **approval-engine and automation-credentials clashing under parallel
+  runs (seen locally on 12 October):** not reproduced. Both passed in the
+  13 October full run on Vercel, which also runs two workers. Left until it
+  recurs, with the failing output.

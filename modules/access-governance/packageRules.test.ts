@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { assignmentExpiry, assignmentStatus, checkEligibility, contentsDigest, itemOnEnd, packageRisk, validatePackageInput } from "./packageRules";
+import { assignmentExpiry, assignmentStatus, birthrightApplies, birthrightNeedsReapproval, birthrightTransition, checkEligibility, contentsDigest, itemOnEnd, packageRisk, validatePackageInput } from "./packageRules";
 
 describe("checkEligibility", () => {
   const pkg = { eligibleIdentityTypes: ["HUMAN"], eligibleDepartments: ["Finance"] };
@@ -71,5 +71,37 @@ describe("contentsDigest", () => {
     expect(contentsDigest([a, b])).toBe(contentsDigest([b, a]));
     expect(contentsDigest([a])).not.toBe(contentsDigest([a, b]));
     expect(contentsDigest([a])).not.toBe(contentsDigest([{ ...a, privilegeLevel: "admin" }]));
+  });
+});
+
+describe("birthright (owner decision, 13 October 2026)", () => {
+  it("takes two administrators: one asks, someone else approves", () => {
+    expect(birthrightTransition({ status: "off", requestedBy: null }, "request", "u1")).toEqual({ ok: true, next: "pending" });
+    expect(birthrightTransition({ status: "pending", requestedBy: "u1" }, "approve", "u1")).toMatchObject({ ok: false, code: "FOUR_EYES" });
+    expect(birthrightTransition({ status: "pending", requestedBy: "u1" }, "approve", "u2")).toEqual({ ok: true, next: "on" });
+  });
+  it("refuses steps out of order, and one person may turn it off", () => {
+    expect(birthrightTransition({ status: "off", requestedBy: null }, "approve", "u2")).toMatchObject({ ok: false, code: "INVALID_TRANSITION" });
+    expect(birthrightTransition({ status: "on", requestedBy: "u1" }, "request", "u2")).toMatchObject({ ok: false, code: "INVALID_TRANSITION" });
+    expect(birthrightTransition({ status: "pending", requestedBy: "u1" }, "request", "u2")).toMatchObject({ ok: false, code: "INVALID_TRANSITION" });
+    expect(birthrightTransition({ status: "on", requestedBy: "u1" }, "off", "u1")).toEqual({ ok: true, next: "off" });
+    expect(birthrightTransition({ status: "off", requestedBy: null }, "off", "u1")).toMatchObject({ ok: false });
+  });
+  it("needs approval again when what it includes or who is eligible changes, only while on", () => {
+    expect(birthrightNeedsReapproval("on", { resources: true })).toBe(true);
+    expect(birthrightNeedsReapproval("on", { fields: ["eligible_departments"] })).toBe(true);
+    expect(birthrightNeedsReapproval("on", { fields: ["eligible_identity_types"] })).toBe(true);
+    expect(birthrightNeedsReapproval("on", { fields: ["description", "name"] })).toBe(false);
+    expect(birthrightNeedsReapproval("pending", { resources: true })).toBe(false);
+    expect(birthrightNeedsReapproval("off", { fields: ["eligible_departments"] })).toBe(false);
+  });
+  it("goes only to eligible, active people, from an active package that is on", () => {
+    const pkg = { eligibleIdentityTypes: ["HUMAN"], eligibleDepartments: ["Finance"], status: "active", birthrightStatus: "on" as const };
+    const ana = { identityType: "HUMAN", department: "Finance", status: "active" };
+    expect(birthrightApplies(pkg, ana)).toBe(true);
+    expect(birthrightApplies(pkg, { ...ana, department: "Sales" })).toBe(false);
+    expect(birthrightApplies(pkg, { ...ana, status: "inactive" })).toBe(false);
+    expect(birthrightApplies({ ...pkg, birthrightStatus: "pending" }, ana)).toBe(false);
+    expect(birthrightApplies({ ...pkg, status: "retired" }, ana)).toBe(false);
   });
 });
