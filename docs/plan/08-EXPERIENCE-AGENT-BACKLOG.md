@@ -52,6 +52,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
 | EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Done — 2026-10-11: built across INTEGRATION-P0-18/19 and ACCESS-P0-27/25 pages; this story adds what each run marked missing, the last access reconciliation and last seen at source per access row |
 | EXPERIENCE-P0-29 | Request tracking per line; one inbox for approvals and tasks; subject picker (F2, #55) | Done — 2026-10-11: each line's real state; tasks in "Waiting for you"; For lists people you manage and what you own |
+| EXPERIENCE-P0-32 | Language picker in the header (owner request 2026-10-13) | Not started |
 
 ---
 
@@ -766,3 +767,18 @@ this backlog. Their goals, order, dependencies and exit tests are in
 the design in [`docs/WonderID/design/DESIGN.md`](../WonderID/design/DESIGN.md),
 and each story's acceptance criteria in its GitHub issue (number in the
 tracker row). Live status: [`docs/WonderID/progress/PROGRESS.md`](../WonderID/progress/PROGRESS.md).
+
+### EXPERIENCE-P0-32 — Language picker in the header (owner request 2026-10-13; Medium)
+
+A dropdown in the top bar, beside notifications and help, to change the language WonderID is shown in.
+
+Acceptance criteria:
+- The dropdown lists the supported languages, each in its own name, and marks the current one.
+- The choice is saved for the person (their profile, not the browser only), applies on every page at once, and survives signing in again on another device.
+- The first language is the person's browser language when supported, else English.
+- Interface text comes from translation files. Records, names and customer data are never translated.
+- Dates and numbers follow the language's locale.
+- Accessible: a labelled button, keyboard operable; `lang` on `<html>` follows the choice.
+- Light and dark mode, all widths (§13).
+
+Open question for the owner: which languages ship first.

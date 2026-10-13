@@ -4039,3 +4039,11 @@ The Light, Dark and System text buttons overflowed the account menu.
 
 The help and welcome pages use the same control. Checked by screenshot of
 the menu at 1280px.
+
+## 2026-10-13 — WonderID AI moved to the account menu; switcher shows the name only; language picker story (owner requests)
+
+- **WonderID AI** is now an item in the top-right account (avatar) menu, above Get Help. It opens the assistant's question box on `/help`. The sidebar entry is gone.
+- **The organization switcher button** shows the organization's name only. The environment badge and address line are gone; the coloured dot and environment chips stay.
+- **New story EXPERIENCE-P0-32** (Medium, owner request): a language picker in the header, beside notifications and help. Open question for the owner: which languages ship first.
+
+**Verified.** Typecheck and eslint clean. Local E2E: help, navigation-smoke and shell 84/84, plus first-organization and tenant-address in the 34/34 run recorded in the Platform audit log.

@@ -47,14 +47,50 @@ test.describe("Platform-admin console", () => {
     await page.getByRole("button", { name: "Add environment" }).click();
     await expect(envs.getByText(`${TENANT_ONE.slug}-dev.`)).toBeVisible();
     // Manage the new environment, then come back to its organization.
-    await envs.getByRole("row").filter({ hasText: `${TENANT_ONE.slug}-dev.` }).getByRole("link", { name: "Manage" }).click();
+    await envs
+      .getByRole("row")
+      .filter({ hasText: `${TENANT_ONE.slug}-dev.` })
+      .getByRole("link", { name: "Manage" })
+      .click();
     await expect(page.getByRole("heading", { name: `${TENANT_ONE.name} · Development` })).toBeVisible();
+    // It says it is an environment, and what is in it.
+    await expect(page.getByText("Environment", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("region", { name: "In this environment" }).getByText("Users")).toBeVisible();
     await page.getByRole("link", { name: `← ${TENANT_ONE.name}` }).click();
     // Remove it: decommissioned, address freed, gone from the organization.
-    await envs.getByRole("row").filter({ hasText: `${TENANT_ONE.slug}-dev.` }).getByText("Remove…").click();
+    await envs
+      .getByRole("row")
+      .filter({ hasText: `${TENANT_ONE.slug}-dev.` })
+      .getByText("Remove…")
+      .click();
     await page.getByRole("button", { name: "Remove Development" }).click();
     await expect(page.getByRole("heading", { name: TENANT_ONE.name, exact: true })).toBeVisible();
     await expect(envs.getByText(`${TENANT_ONE.slug}-dev.`)).toHaveCount(0);
+  });
+
+  test("owner request 2026-10-13: the organization's details are saved; its own environment is managed on its own page", async ({ page }) => {
+    await page.goto("/platform-admin/tenants");
+    await page.getByText(/^Test organizations/).click();
+    await page.getByRole("link", { name: TENANT_ONE.name, exact: true }).click();
+    await page.locator("#p-contactEmail").fill("contact@localhost");
+    await page.getByRole("button", { name: "Save details" }).click();
+    await expect(page.getByRole("alert").filter({ hasText: "contact email" })).toBeVisible();
+    await page.locator("#p-contactName").fill("E2E Contact");
+    await page.locator("#p-contactEmail").fill("contact@e2e.wonderagent.test");
+    await page.locator("#p-userBaseSize").selectOption("51-200");
+    await page.getByRole("button", { name: "Save details" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Details saved." })).toBeVisible();
+    await page.reload();
+    await expect(page.locator("#p-contactName")).toHaveValue("E2E Contact");
+    // Settings live on the environment's own page, not on the organization's.
+    await expect(page.getByLabel("Address prefix")).toHaveCount(0);
+    const own = page
+      .getByRole("region", { name: "Environments" })
+      .getByRole("row")
+      .filter({ hasText: `${TENANT_ONE.slug}.` });
+    await own.getByRole("link", { name: "Manage" }).click();
+    await expect(page.getByLabel("Address prefix")).toHaveValue(TENANT_ONE.slug);
+    await expect(page.getByRole("heading", { name: "Features" })).toBeVisible();
   });
 
   for (const path of ["/platform-admin/features", "/platform-admin/branding", "/platform-admin/announcements", "/platform-admin/health", "/platform-admin/admins"]) {

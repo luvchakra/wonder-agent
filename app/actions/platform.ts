@@ -19,6 +19,11 @@ import {
   grantPlatformAdmin,
   rollbackConfigVersion,
   setFeatureFlag,
+  setTenantNotes,
+  setOrganizationPlan,
+  removeOrganization,
+  saveOrganizationProfile,
+  renameOrganization,
   setWonderappsDashboardAccess,
   suspendTenant,
   updateBranding,
@@ -121,6 +126,7 @@ export async function setFeatureFlagAction(tenantId: string, formData: FormData)
   const { userId } = await requirePlatformAdmin();
   await setFeatureFlag(userId, tenantId, String(formData.get("flagKey") ?? ""), formData.get("enabled") === "true");
   revalidatePath("/platform-admin/features");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export async function updateBrandingAction(formData: FormData) {
@@ -171,4 +177,60 @@ export async function setWonderappsAccessAction(formData: FormData) {
   const { userId } = await requirePlatformAdmin();
   await setWonderappsDashboardAccess(userId, formData.get("enabled") === "true");
   revalidatePath("/platform-admin/health");
+}
+
+/** Owner request 2026-10-13: rename an organization from the console; its environments follow. */
+export async function renameOrganizationAction(tenantId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    await renameOrganization(userId, tenantId, String(formData.get("name") ?? ""));
+    revalidatePath("/platform-admin/tenants", "layout");
+    return { ok: true, message: "Name saved." };
+  } catch (err) {
+    return settingError(err);
+  }
+}
+
+/** Owner request 2026-10-13: an organization's description, contacts and company details. */
+export async function saveOrganizationProfileAction(tenantId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    await saveOrganizationProfile(userId, tenantId, Object.fromEntries(formData.entries()));
+    revalidatePath("/platform-admin/tenants", "layout");
+    return { ok: true, message: "Details saved." };
+  } catch (err) {
+    return settingError(err);
+  }
+}
+
+/** Owner request 2026-10-13: a platform administrator's notes on an environment. */
+export async function setTenantNotesAction(tenantId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    await setTenantNotes(userId, tenantId, String(formData.get("notes") ?? ""));
+    revalidatePath("/platform-admin/tenants", "layout");
+    return { ok: true, message: "Notes saved." };
+  } catch (err) {
+    return settingError(err);
+  }
+}
+
+/** Owner decision 2026-10-13: one plan per organization, set for every environment at once. */
+export async function setOrganizationPlanAction(organizationId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    const { changed } = await setOrganizationPlan(userId, organizationId, formData.get("plan") as SubscriptionPlan);
+    revalidatePath("/platform-admin/tenants", "layout");
+    return { ok: true, message: `Plan set for ${changed === 1 ? "the organization" : `all ${changed} environments`}.` };
+  } catch (err) {
+    return settingError(err);
+  }
+}
+
+/** Owner request 2026-10-13: remove a whole organization (it and its environments are decommissioned, data kept). */
+export async function removeOrganizationAction(organizationId: string) {
+  const { userId } = await requirePlatformAdmin();
+  await removeOrganization(userId, organizationId);
+  revalidatePath("/platform-admin/tenants", "layout");
+  redirect("/platform-admin/tenants");
 }

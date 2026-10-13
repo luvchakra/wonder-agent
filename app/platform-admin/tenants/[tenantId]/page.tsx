@@ -1,14 +1,27 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ADDABLE_ENVIRONMENTS, getSubscription, getTenant, listTenants, organizationOwners } from "@/modules/platform-admin/service";
+import {
+  ADDABLE_ENVIRONMENTS,
+  INDUSTRIES,
+  USER_BASE_SIZES,
+  getEnvironmentStats,
+  getOrganizationProfile,
+  getSubscription,
+  getTenant,
+  listFlagCatalog,
+  listTenantFlagOverrides,
+  listTenants,
+  organizationOwners,
+} from "@/modules/platform-admin/service";
+import { BILLING_COUNTRIES } from "@/modules/billing/countries";
 import { groupOrganizations } from "@/modules/platform-admin/organizations";
-import { activateTenantAction, createTenantEnvironmentAction, decommissionTenantAction, removeTenantEnvironmentAction, suspendTenantAction } from "@/app/actions/platform";
+import { activateTenantAction, createTenantEnvironmentAction, removeOrganizationAction, removeTenantEnvironmentAction, setFeatureFlagAction, suspendTenantAction } from "@/app/actions/platform";
 import { baseAppHost, tenantUrl } from "@/lib/tenant/host";
 import type { PlatformTenant } from "@/lib/shared/types/platform";
-import { Badge, Button, Card, CardBody, CardHeader, EnvironmentBadge, ENVIRONMENT_COLOR, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass } from "@/modules/ui";
+import { Badge, Button, Card, CardBody, CardHeader, EnvironmentBadge, ENVIRONMENT_COLOR, StatCard, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "../../PageHeading";
-import { AddressForm, EnvironmentForm, PlanForm } from "./TenantSettingsForms";
+import { AddressForm, EnvironmentForm, NotesForm, OrganizationNameForm, OrganizationProfileForm, PlanForm } from "./TenantSettingsForms";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";
@@ -19,12 +32,85 @@ const STATUS = {
   deprovisioned: { tone: "neutral", label: "Decommissioned" },
 } as const;
 
-/** One environment's own settings: address, environment, plan, status. */
-async function EnvironmentSettings({ tenant, base }: { tenant: PlatformTenant; base: string | null }) {
-  const subscription = await getSubscription(tenant.tenantId);
-  const url = tenant.slug ? tenantUrl(tenant.slug, base) : null;
+const envLabel = (e: string) => ENVIRONMENT_COLOR[e as keyof typeof ENVIRONMENT_COLOR]?.label ?? e;
+const fmt = (n: number | null) => (n === null ? "Unavailable" : n.toLocaleString("en-US"));
+
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{children}</p>;
+}
+
+function RemoveMenu({ label, text, action }: { label: string; text: string; action: () => Promise<void> }) {
+  return (
+    <details className="relative">
+      <summary className="cursor-pointer list-none whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-destructive hover:bg-accent">Remove…</summary>
+      <form action={action} className="absolute right-0 z-10 mt-1 w-72 space-y-2 rounded-md border border-border bg-popover p-3 text-left shadow-lg">
+        <p className="text-xs text-muted-foreground">{text}</p>
+        <Button type="submit" size="sm" variant="destructive">
+          {label}
+        </Button>
+      </form>
+    </details>
+  );
+}
+
+/**
+ * Owner request (2026-10-13): one environment's page. Says plainly that it
+ * is an environment, shows what is in it and how busy it is (counts only,
+ * scoped to this tenant), then what can be configured for it: address,
+ * environment type, features, notes and status. The plan is the
+ * organization's, the same in every environment (owner decision).
+ */
+async function EnvironmentPage({ tenant, organization, base }: { tenant: PlatformTenant; organization: { id: string; name: string; envCount: number }; base: string | null }) {
+  const [stats, orgSub, flags, overrides] = await Promise.all([getEnvironmentStats(tenant.tenantId), getSubscription(organization.id), listFlagCatalog(), listTenantFlagOverrides(tenant.tenantId)]);
+  const url = tenant.slug && tenant.status !== "deprovisioned" ? tenantUrl(tenant.slug, base) : null;
+  const isOrganization = tenant.tenantId === organization.id;
+  const status = STATUS[tenant.status ?? "active"];
+  const lastActivity = stats.lastActivityAt ? new Date(stats.lastActivityAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }) + " IST" : "None recorded";
   return (
     <>
+      <Link href={`/platform-admin/tenants/${organization.id}`} className="text-sm font-medium text-primary hover:underline">
+        ← {organization.name}
+      </Link>
+      <div className="space-y-1">
+        <Eyebrow>Environment</Eyebrow>
+        <PageHeading title={`${organization.name} · ${envLabel(tenant.environment)}`} description={url ? url.replace(/^https?:\/\//, "") : (tenant.slug ?? undefined)}>
+          <div className="flex items-center gap-2">
+            <EnvironmentBadge environment={tenant.environment} />
+            <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+          </div>
+        </PageHeading>
+      </div>
+
+      <section aria-label="In this environment" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Users" value={fmt(stats.users)} />
+        <StatCard label="Identities" value={fmt(stats.identities)} />
+        <StatCard label="Applications" value={fmt(stats.applications)} />
+        <StatCard label="Accounts" value={fmt(stats.accounts)} />
+        <StatCard label="AI agents" value={fmt(stats.agents)} />
+        <StatCard label="Connections" value={fmt(stats.connections)} />
+        <StatCard label="Access requests" value={fmt(stats.accessRequests)} />
+        <StatCard label="Risk findings" value={fmt(stats.findings)} />
+      </section>
+      <Card>
+        <CardHeader title="Load" description="Runtime activity reaching this environment." />
+        <CardBody className="flex flex-wrap items-center justify-between gap-4">
+          <dl className="flex flex-wrap gap-x-10 gap-y-2 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Runtime events, last 30 days</dt>
+              <dd className="text-lg font-semibold text-foreground">{fmt(stats.runtimeEvents30d)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Last activity</dt>
+              <dd className="text-lg font-semibold text-foreground">{lastActivity}</dd>
+            </div>
+          </dl>
+          <Link href={`/platform-admin/tenants/${tenant.tenantId}/usage`} className="text-sm font-medium text-primary hover:underline">
+            Usage against plan limits →
+          </Link>
+        </CardBody>
+      </Card>
+
+      <h2 className="pt-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Configuration</h2>
       <Card>
         <CardHeader title="Address" description={url ?? undefined} />
         <CardBody>
@@ -32,36 +118,90 @@ async function EnvironmentSettings({ tenant, base }: { tenant: PlatformTenant; b
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Environment" />
+        <CardHeader title="Environment type" />
         <CardBody>
           <EnvironmentForm tenantId={tenant.tenantId} environment={tenant.environment} />
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Plan" description={subscription ? `${subscription.plan} · ${subscription.provider === "manual" || !subscription.provider ? "assigned by the platform" : `billed through ${subscription.provider}`}` : "No plan yet"} />
-        <CardBody className="flex flex-wrap items-center justify-between gap-3">
-          <PlanForm tenantId={tenant.tenantId} plan={subscription?.plan ?? null} />
-          <Link href={`/platform-admin/tenants/${tenant.tenantId}/usage`} className="text-sm font-medium text-primary hover:underline">
-            Usage →
+        <CardHeader title="Plan" description="The organization's plan applies to every environment." />
+        <CardBody className="flex flex-wrap items-center gap-3 text-sm">
+          {orgSub ? (
+            <Badge tone="info" className="capitalize">
+              {orgSub.plan}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground">No plan yet</span>
+          )}
+          <Link href={`/platform-admin/tenants/${organization.id}#plan`} className="font-medium text-primary hover:underline">
+            Change on the organization
           </Link>
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Status" description={tenant.status === "deprovisioned" ? "Decommissioned." : tenant.status === "suspended" ? "Suspended: nobody can sign in." : "Active."} />
+        <CardHeader title="Features" description="On or off for this environment; unset follows the platform default." />
+        {flags.length ? (
+          <ul className="divide-y divide-border">
+            {flags.map((f) => {
+              const override = overrides[f.key];
+              const on = override ?? f.defaultEnabled;
+              return (
+                <li key={f.key} className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5">
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium text-foreground">{f.displayName}</span>
+                    <span className="block text-xs text-muted-foreground">{override === undefined ? `Platform default (${f.defaultEnabled ? "on" : "off"})` : "Set for this environment"}</span>
+                  </span>
+                  <form action={setFeatureFlagAction.bind(null, tenant.tenantId)}>
+                    <input type="hidden" name="flagKey" value={f.key} />
+                    <input type="hidden" name="enabled" value={on ? "false" : "true"} />
+                    <Button type="submit" size="sm" variant={on ? "outline" : "default"} aria-label={`${on ? "Turn off" : "Turn on"} ${f.displayName}`}>
+                      {on ? "On · turn off" : "Off · turn on"}
+                    </Button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="px-4 py-3 text-sm text-muted-foreground">No features in the catalogue.</p>
+        )}
+      </Card>
+      <Card>
+        <CardHeader title="Notes" description="For platform administrators only; the customer never sees them." />
+        <CardBody>
+          <NotesForm tenantId={tenant.tenantId} notes={tenant.notes} />
+        </CardBody>
+      </Card>
+      <Card>
+        <CardHeader title="Status" description={tenant.status === "deprovisioned" ? "Removed." : tenant.status === "suspended" ? "Suspended: nobody can sign in." : "Active."} />
         {tenant.status !== "deprovisioned" ? (
-          <CardBody className="flex flex-wrap gap-2">
+          <CardBody className="flex flex-wrap items-center gap-2">
             {tenant.status === "suspended" ? (
               <form action={activateTenantAction.bind(null, tenant.tenantId)}>
-                <Button type="submit" size="sm" variant="outline">Activate</Button>
+                <Button type="submit" size="sm" variant="outline">
+                  Activate
+                </Button>
               </form>
             ) : (
               <form action={suspendTenantAction.bind(null, tenant.tenantId)}>
-                <Button type="submit" size="sm" variant="outline">Suspend</Button>
+                <Button type="submit" size="sm" variant="outline">
+                  Suspend
+                </Button>
               </form>
             )}
-            <form action={decommissionTenantAction.bind(null, tenant.tenantId)}>
-              <Button type="submit" size="sm" variant="ghost" className="text-destructive hover:text-destructive">Decommission</Button>
-            </form>
+            {isOrganization ? (
+              <RemoveMenu
+                label="Remove organization"
+                text={`This is the organization's own environment. Removing it decommissions the whole organization and its ${organization.envCount} environment${organization.envCount === 1 ? "" : "s"}; their data is kept and nobody can sign in.`}
+                action={removeOrganizationAction.bind(null, organization.id)}
+              />
+            ) : (
+              <RemoveMenu
+                label={`Remove ${envLabel(tenant.environment)}`}
+                text="Decommissions this environment (its data is kept, nobody can sign in) and frees its address."
+                action={removeTenantEnvironmentAction.bind(null, tenant.tenantId, organization.id)}
+              />
+            )}
           </CardBody>
         ) : null}
       </Card>
@@ -70,38 +210,25 @@ async function EnvironmentSettings({ tenant, base }: { tenant: PlatformTenant; b
 }
 
 /**
- * Owner request (2026-10-13): an organization holds its environments. On
- * the organization (its production tenant): its owners, every environment
- * with Manage and Remove, Add environment, then its own settings. On an
- * environment: a way back to its organization, then that environment's
- * settings.
+ * Owner request (2026-10-13): the organization's page shows the
+ * organization only: its owners, its environments (each with Manage and
+ * Remove), its plan (one for every environment) and its details. Each
+ * environment's settings are on that environment's page.
  */
-export default async function PlatformTenantPage({ params }: { params: Promise<{ tenantId: string }> }) {
-  const { tenantId } = await params;
+export default async function PlatformTenantPage({ params, searchParams }: { params: Promise<{ tenantId: string }>; searchParams: Promise<{ view?: string }> }) {
+  const [{ tenantId }, { view }] = await Promise.all([params, searchParams]);
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) notFound();
   const [tenant, all] = await Promise.all([getTenant(tenantId), listTenants({ includeDecommissioned: true })]);
   if (!tenant) notFound();
   const base = baseAppHost();
-  // Decommissioned environments are not part of an organization's current set.
+  // Removed environments are not part of an organization's current set.
   const orgs = groupOrganizations(all.filter((t) => t.status !== "deprovisioned" || t.tenantId === tenantId));
   const org = orgs.find((o) => o.environments.some((e) => e.tenantId === tenantId))!;
-  const isOrganization = org.primary.tenantId === tenantId;
+  const organization = { id: org.id, name: org.name, envCount: org.environments.length };
 
-  if (!isOrganization) {
-    return (
-      <>
-        <Link href={`/platform-admin/tenants/${org.id}`} className="text-sm font-medium text-primary hover:underline">
-          ← {org.name}
-        </Link>
-        <PageHeading title={`${org.name} · ${ENVIRONMENT_COLOR[tenant.environment as keyof typeof ENVIRONMENT_COLOR]?.label ?? tenant.environment}`} description={tenant.name}>
-          <EnvironmentBadge environment={tenant.environment} />
-        </PageHeading>
-        <EnvironmentSettings tenant={tenant} base={base} />
-      </>
-    );
-  }
+  if (org.primary.tenantId !== tenantId || view === "environment") return <EnvironmentPage tenant={tenant} organization={organization} base={base} />;
 
-  const [owners, subscriptions] = await Promise.all([organizationOwners([tenantId]), Promise.all(org.environments.map((e) => getSubscription(e.tenantId)))]);
+  const [owners, subscription, profile] = await Promise.all([organizationOwners([tenantId]), getSubscription(tenantId), getOrganizationProfile(tenantId)]);
   const ownerList = owners.get(tenantId) ?? [];
   const missing = tenant.status === "active" ? ADDABLE_ENVIRONMENTS.filter((k) => !org.environments.some((e) => e.environment === k && e.status !== "deprovisioned")) : [];
 
@@ -110,25 +237,10 @@ export default async function PlatformTenantPage({ params }: { params: Promise<{
       <Link href="/platform-admin/tenants" className="text-sm font-medium text-primary hover:underline">
         ← Organizations
       </Link>
-      <PageHeading title={org.name} description={`${org.environments.length} environment${org.environments.length === 1 ? "" : "s"}`} />
-
-      <Card>
-        <CardHeader title="Owners" description="The organization's administrators." />
-        {ownerList.length ? (
-          <ul className="divide-y divide-border">
-            {ownerList.map((o) => (
-              <li key={o.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
-                <span className="text-sm font-medium text-foreground">{o.name || o.email}</span>
-                <a href={`mailto:${o.email}`} className="text-sm text-primary hover:underline">
-                  {o.email}
-                </a>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="px-4 py-3 text-sm text-muted-foreground">No active administrator.</p>
-        )}
-      </Card>
+      <div className="space-y-1">
+        <Eyebrow>Organization</Eyebrow>
+        <PageHeading title={org.name} description={profile?.description ?? `${org.environments.length} environment${org.environments.length === 1 ? "" : "s"}`} />
+      </div>
 
       <Card>
         <CardHeader title="Environments" description="Each is separate, with its own data, users and address." />
@@ -137,7 +249,6 @@ export default async function PlatformTenantPage({ params }: { params: Promise<{
             <tr>
               <Th>Environment</Th>
               <Th>Address</Th>
-              <Th hideBelow="lg">Plan</Th>
               <Th>Status</Th>
               <Th className="text-right">
                 <span className="sr-only">Actions</span>
@@ -145,10 +256,10 @@ export default async function PlatformTenantPage({ params }: { params: Promise<{
             </tr>
           </Thead>
           <tbody>
-            {org.environments.map((e, i) => {
+            {org.environments.map((e) => {
               const url = e.slug && e.status !== "deprovisioned" ? tenantUrl(e.slug, base) : null;
               const status = STATUS[e.status ?? "active"];
-              const removable = e.tenantId !== tenantId && Boolean(e.parentTenantId) && e.status !== "deprovisioned";
+              const isRoot = e.tenantId === tenantId;
               return (
                 <Tr key={e.tenantId}>
                   <Td>
@@ -163,25 +274,31 @@ export default async function PlatformTenantPage({ params }: { params: Promise<{
                       e.slug
                     )}
                   </Td>
-                  <Td hideBelow="lg">{subscriptions[i]?.plan ? <Badge tone="info" className="capitalize">{subscriptions[i]!.plan}</Badge> : <span className="text-xs text-muted-foreground">None</span>}</Td>
                   <Td>
                     <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                   </Td>
                   <Td>
                     <div className="flex items-center justify-end gap-1">
-                      <Link href={e.tenantId === tenantId ? "#settings" : `/platform-admin/tenants/${e.tenantId}`} className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent">
+                      <Link
+                        href={isRoot ? `/platform-admin/tenants/${e.tenantId}?view=environment` : `/platform-admin/tenants/${e.tenantId}`}
+                        className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent"
+                      >
                         Manage
                       </Link>
-                      {removable ? (
-                        <details className="relative">
-                          <summary className="cursor-pointer list-none rounded-md px-2 py-1 text-sm font-medium text-destructive hover:bg-accent">Remove…</summary>
-                          <form action={removeTenantEnvironmentAction.bind(null, e.tenantId, tenantId)} className="absolute right-0 z-10 mt-1 w-64 space-y-2 rounded-md border border-border bg-popover p-3 text-left shadow-lg">
-                            <p className="text-xs text-muted-foreground">Decommissions this environment (its data is kept, nobody can sign in) and frees its address.</p>
-                            <Button type="submit" size="sm" variant="destructive">
-                              Remove {ENVIRONMENT_COLOR[e.environment as keyof typeof ENVIRONMENT_COLOR]?.label ?? e.environment}
-                            </Button>
-                          </form>
-                        </details>
+                      {e.status !== "deprovisioned" ? (
+                        isRoot ? (
+                          <RemoveMenu
+                            label="Remove organization"
+                            text={`This is the organization's own environment. Removing it decommissions the whole organization and its ${org.environments.length} environment${org.environments.length === 1 ? "" : "s"}; their data is kept and nobody can sign in.`}
+                            action={removeOrganizationAction.bind(null, tenantId)}
+                          />
+                        ) : (
+                          <RemoveMenu
+                            label={`Remove ${envLabel(e.environment)}`}
+                            text="Decommissions this environment (its data is kept, nobody can sign in) and frees its address."
+                            action={removeTenantEnvironmentAction.bind(null, e.tenantId, tenantId)}
+                          />
+                        )
                       ) : null}
                     </div>
                   </Td>
@@ -208,10 +325,46 @@ export default async function PlatformTenantPage({ params }: { params: Promise<{
         ) : null}
       </Card>
 
-      <h2 id="settings" className="scroll-mt-6 pt-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-        {ENVIRONMENT_COLOR[tenant.environment as keyof typeof ENVIRONMENT_COLOR]?.label ?? tenant.environment} settings
-      </h2>
-      <EnvironmentSettings tenant={tenant} base={base} />
+      <Card>
+        <CardHeader title="Owners" description="The organization's administrators." />
+        {ownerList.length ? (
+          <ul className="divide-y divide-border">
+            {ownerList.map((o) => (
+              <li key={o.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
+                <span className="text-sm font-medium text-foreground">{o.name || o.email}</span>
+                <a href={`mailto:${o.email}`} className="text-sm text-primary hover:underline">
+                  {o.email}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="px-4 py-3 text-sm text-muted-foreground">No active administrator.</p>
+        )}
+      </Card>
+
+      <Card>
+        <div id="plan" className="scroll-mt-6" />
+        <CardHeader
+          title="Plan"
+          description={
+            subscription
+              ? `${subscription.plan} in every environment · ${subscription.provider === "manual" || !subscription.provider ? "assigned by the platform" : `billed through ${subscription.provider}`}`
+              : "No plan yet"
+          }
+        />
+        <CardBody>
+          <PlanForm tenantId={tenantId} plan={subscription?.plan ?? null} organization />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader title="Organization details" description="Name, description, contacts and company details. Seen only in the platform console." />
+        <CardBody className="space-y-6">
+          <OrganizationNameForm tenantId={tenantId} name={org.name} />
+          <OrganizationProfileForm tenantId={tenantId} profile={profile} industries={INDUSTRIES} sizes={USER_BASE_SIZES} countries={BILLING_COUNTRIES} />
+        </CardBody>
+      </Card>
     </>
   );
 }

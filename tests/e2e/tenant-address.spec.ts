@@ -81,7 +81,7 @@ test.describe("tenant addresses", () => {
   test("a member signs in on the address and lands in that organization", async ({ browser }) => {
     const page = await signIn(browser, TENANT_ONE.slug, "adminOne");
     await expect(page).toHaveURL(at(TENANT_ONE.slug, "/"));
-    await expect(page.getByRole("button", { name: "Switch organization" })).toContainText(`${TENANT_ONE.slug}.localhost`);
+    await expect(page.getByRole("button", { name: "Switch organization" })).toContainText(TENANT_ONE.name);
     // Its API serves this organization only.
     const me = await page.evaluate(async () => (await fetch("/api/v1/agents")).status);
     expect(me).toBe(200);

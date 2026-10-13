@@ -1270,3 +1270,32 @@ Owner feedback the same day: an organization set up as development, with no prod
 The Organizations list no longer shows each organization's address under its name, or the Environments column. Both stay on the organization's own page (its Environments table). The list keeps name, owner, plan, status and Manage, which is one control fewer per row (§19.5).
 
 **Verified.** Typecheck and eslint clean. The platform-admin E2E only uses the organization's own page for environments, which is unchanged.
+
+## 2026-10-13 — Organization and environment pages; one plan per organization (owner requests)
+
+**What changed.**
+- **The organization's page** shows the organization only:
+  - its environments, each with Manage and Remove. On the organization's own environment, Remove takes away the whole organization (`removeOrganization`: every environment is decommissioned, data kept), with a confirm;
+  - its owners;
+  - its plan;
+  - **Organization details**: name (renaming it renames its environments, through `platform_rename_organization`), description, contact person (name, email, phone), company (name, email, phone), industry, user base size, country and website (`platform_organization_profiles`, migration 0162; vendor-only, no client policies).
+- **Each environment's page**, reached from Manage, including the organization's own environment (`?view=environment`):
+  - says it is an environment and shows its badge and status;
+  - shows counts of users, identities, applications, accounts, AI agents, connections, access requests and risk findings;
+  - shows load: runtime events in the last 30 days and last activity. These are counts only, scoped to that tenant, and "Unavailable" when a count can't be read (`getEnvironmentStats`);
+  - its configuration: address, environment type, the organization's plan (read-only), features (per-environment flags), platform notes, and status (suspend, activate, remove).
+- **One plan per organization** (owner decision):
+  - `setOrganizationPlan` sets it on the organization and every environment;
+  - a new environment inherits it (`inheritOrganizationPlan`);
+  - customers buying an environment buy it on the organization's plan;
+  - migration 0163 gave existing environments without a plan their organization's (insert only).
+  - A plan billed through a payment provider is never overwritten; that is reported instead.
+- **Environment addresses** no longer stack suffixes. An organization at `planet-express-dev` now adds `planet-express-staging`, not `planet-express-dev-staging` (migration 0164). Existing addresses are unchanged.
+- **The onboarding list** groups environments under their organization: each organization once, its environments below it.
+- **The switcher button** shows the organization's name only. The badge and address line are gone; the coloured dot and environment chips stay.
+
+**Verified.**
+- Live SQL (`tests/platform/organization-profiles.sql`, rolls back): a bad email or size is refused; the new environment's address has no stacked suffix; renaming the organization renames its environments, and an environment can't be renamed on its own; a member can't read the details or call the rename.
+- Vitest: profile rules 3/3, organization plan 4/4, environment orders 8/8, platform-admin 42 overall.
+- Typecheck, eslint and `next build` pass.
+- Local E2E 34/34: platform-admin (new test for saving details and managing the organization's own environment), first-organization, manage-organizations, tenant-address and multi-org-isolation.

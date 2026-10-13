@@ -5,22 +5,13 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ArrowLeft, ChevronRight, ListIndentDecrease, ListIndentIncrease, Menu, Search, Sparkles, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, ListIndentDecrease, ListIndentIncrease, Menu, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NavIcon } from "./NavIcon";
 import { WonderIDLogo } from "./Logo";
 import type { TenantOption } from "./AccountPanel";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
-import {
-  NAV_COOKIE,
-  activeArea,
-  activeChildHref,
-  isNavItemActive,
-  searchNav,
-  type ShellBadgeCounts,
-  type ShellNavEntry,
-  type ShellNavItem,
-} from "./shell-nav";
+import { NAV_COOKIE, activeArea, activeChildHref, isNavItemActive, searchNav, type ShellBadgeCounts, type ShellNavEntry, type ShellNavItem } from "./shell-nav";
 
 /**
  * The WonderID navigation (EXPERIENCE-P0-18, 2026-09-26; user decision to
@@ -147,9 +138,7 @@ const areaRowClass = (active: boolean) =>
   cn(
     "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13.5px] transition-colors",
     focusRing,
-    active
-      ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm"
-      : "font-medium text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
+    active ? "bg-sidebar-primary font-semibold text-sidebar-primary-foreground shadow-sm" : "font-medium text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
   );
 
 /**
@@ -235,7 +224,11 @@ function SearchResults({ nav, query, onNavigate }: { nav: ShellNavItem[]; query:
     <ul aria-label="Matching pages" className="space-y-0.5">
       {matches.map((m) => (
         <li key={m.href}>
-          <Link href={m.href} onClick={onNavigate} className={cn("block rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}>
+          <Link
+            href={m.href}
+            onClick={onNavigate}
+            className={cn("block rounded-md px-3 py-1.5 text-[13px] text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}
+          >
             <span className="block truncate font-medium text-sidebar-foreground">{m.label}</span>
             {m.trail.length ? <span className="block truncate text-[11px]">{m.trail.join(" › ")}</span> : null}
           </Link>
@@ -293,10 +286,7 @@ function ExpandedNav({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search menu"
-          className={cn(
-            "h-9 w-full rounded-md border border-sidebar-border bg-transparent pl-8 pr-2 text-[13px] text-sidebar-foreground placeholder:text-sidebar-muted-foreground",
-            focusRing,
-          )}
+          className={cn("h-9 w-full rounded-md border border-sidebar-border bg-transparent pl-8 pr-2 text-[13px] text-sidebar-foreground placeholder:text-sidebar-muted-foreground", focusRing)}
         />
       </label>
       {trimmed ? (
@@ -316,8 +306,7 @@ function ExpandedNav({
 
 // ---------------------------------------------------------------- collapsed
 
-const flyoutPanel =
-  "z-[60] min-w-56 rounded-lg border border-sidebar-border bg-sidebar p-1.5 text-sidebar-foreground shadow-2xl";
+const flyoutPanel = "z-[60] min-w-56 rounded-lg border border-sidebar-border bg-sidebar p-1.5 text-sidebar-foreground shadow-2xl";
 const flyoutItem = cn(
   "flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-[13px] outline-none transition-colors",
   "text-sidebar-muted-foreground data-[highlighted]:bg-sidebar-accent data-[highlighted]:text-sidebar-foreground",
@@ -340,9 +329,12 @@ function CollapsedSection({ item, active, badges, pathname, search }: { item: Sh
     if (closeTimer.current) clearTimeout(closeTimer.current);
     closeTimer.current = setTimeout(() => setOpen(false), 180);
   };
-  useEffect(() => () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (closeTimer.current) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   const iconClass = cn(
     "relative flex size-11 items-center justify-center rounded-lg transition-colors",
@@ -385,14 +377,7 @@ function CollapsedSection({ item, active, badges, pathname, search }: { item: Sh
           {dot}
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            side="right"
-            align="start"
-            sideOffset={10}
-            className={flyoutPanel}
-            onPointerEnter={hoverOpen}
-            onPointerLeave={hoverClose}
-          >
+          <DropdownMenu.Content side="right" align="start" sideOffset={10} className={flyoutPanel} onPointerEnter={hoverOpen} onPointerLeave={hoverClose}>
             <DropdownMenu.Label className="px-3 pb-1.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-sidebar-muted-foreground">{item.label}</DropdownMenu.Label>
             {item.children.map((entry) =>
               entry.kind === "link" ? (
@@ -434,10 +419,7 @@ function CollapsedSection({ item, active, badges, pathname, search }: { item: Sh
 
 // ---------------------------------------------------------------- body
 
-const toggleClass = cn(
-  "flex size-9 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground",
-  focusRing,
-);
+const toggleClass = cn("flex size-9 shrink-0 items-center justify-center rounded-md text-sidebar-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing);
 
 function Brand({ collapsed, onToggle }: { collapsed: boolean; onToggle?: () => void }) {
   // Collapsed, the top of the rail is the expand toggle (the W mark moves
@@ -471,33 +453,6 @@ function RailMark() {
   return (
     <Link href="/" aria-label="WonderID home" title="WonderID" className={cn("mx-auto flex size-11 items-center justify-center rounded-md transition-colors hover:bg-sidebar-accent", focusRing)}>
       <WonderIDLogo showWordmark={false} size={24} alt="" />
-    </Link>
-  );
-}
-
-function AiEntry({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  // The assistant today answers questions from the product documentation
-  // (/help). The spec's full WonderID AI is EXPERIENCE-P0-20; this entry
-  // promises only what exists.
-  return (
-    <Link
-      href="/help"
-      onClick={onNavigate}
-      aria-label={collapsed ? "WonderID AI" : undefined}
-      title={collapsed ? "WonderID AI" : undefined}
-      className={cn(
-        "flex items-center gap-3 rounded-lg transition-colors hover:bg-sidebar-accent",
-        focusRing,
-        collapsed ? "mx-auto size-11 justify-center" : "px-3 py-2.5",
-      )}
-    >
-      <Sparkles className="size-5 shrink-0 text-sidebar-ring" aria-hidden="true" />
-      {collapsed ? null : (
-        <span className="min-w-0">
-          <span className="block truncate text-[13.5px] font-semibold text-sidebar-foreground">WonderID AI</span>
-          <span className="block truncate text-xs text-sidebar-muted-foreground">Ask a question</span>
-        </span>
-      )}
     </Link>
   );
 }
@@ -546,7 +501,6 @@ function SidebarBody({
       </nav>
       <div className={cn("shrink-0 space-y-1 border-t border-sidebar-border py-2", collapsed ? "px-2" : "px-3")}>
         {collapsed ? <RailMark /> : null}
-        <AiEntry collapsed={collapsed} onNavigate={onNavigate} />
         <WorkspaceSwitcher tenants={tenants} onSelectTenant={onSelectTenant} compact={collapsed} />
         {collapsed ? null : (
           <p className="truncate px-3 pt-1 text-[11px] text-sidebar-muted-foreground" title={`WonderID ${version}`}>
@@ -616,10 +570,7 @@ export function MobileNavDrawer(props: SidebarProps) {
           <Dialog.Title className="sr-only">Main navigation</Dialog.Title>
           <Dialog.Close
             aria-label="Close navigation"
-            className={cn(
-              "absolute right-3 top-4 flex size-8 items-center justify-center rounded-md text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground",
-              focusRing,
-            )}
+            className={cn("absolute right-3 top-4 flex size-8 items-center justify-center rounded-md text-sidebar-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground", focusRing)}
           >
             <X className="size-4" aria-hidden="true" />
           </Dialog.Close>

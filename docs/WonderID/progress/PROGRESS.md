@@ -56,6 +56,7 @@ Every story's priority on `../ROADMAP-STORIES.md` comes from this table (owner r
 
 | Applies to | Priority | Why |
 |---|---|---|
+| EXPERIENCE-P0-32 | Medium | Owner request 2026-10-13: language picker in the header |
 | QA-P0-02.1, QA-P0-02.2, QA-P0-06 | High | Tenant-isolation, RBAC and sign-in coverage (CLAUDE.md §17.8, P0) |
 | INTEGRATION-* (unfinished) | Low | Owner decision 2026-10-13: integration stories are implemented later |
 | F10 | High | Release gate |
