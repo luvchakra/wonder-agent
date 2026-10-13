@@ -11,6 +11,7 @@ import {
   createTenant,
   createTenantEnvironment,
   renameTenantSlug,
+  changePlan,
   setTenantEnvironment,
   decommissionTenant,
   grantPlatformAdmin,
@@ -32,7 +33,7 @@ export async function createTenantAction(formData: FormData) {
     slug: String(formData.get("slug") ?? ""),
     environment: (formData.get("environment") as TenantEnvironment) || "production",
   });
-  revalidatePath("/platform-admin/tenants");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export type TenantSettingState = { ok: boolean; message: string | null };
@@ -44,7 +45,7 @@ export async function renameTenantSlugAction(tenantId: string, _prev: TenantSett
   const { userId } = await requirePlatformAdmin();
   try {
     const { to } = await renameTenantSlug(userId, tenantId, String(formData.get("slug") ?? ""));
-    revalidatePath("/platform-admin/tenants");
+    revalidatePath("/platform-admin/tenants", "layout");
     return { ok: true, message: `Address changed to ${to}.` };
   } catch (err) {
     return settingError(err);
@@ -56,8 +57,20 @@ export async function setTenantEnvironmentAction(tenantId: string, _prev: Tenant
   const { userId } = await requirePlatformAdmin();
   try {
     await setTenantEnvironment(userId, tenantId, String(formData.get("environment") ?? ""));
-    revalidatePath("/platform-admin/tenants");
+    revalidatePath("/platform-admin/tenants", "layout");
     return { ok: true, message: "Environment saved." };
+  } catch (err) {
+    return settingError(err);
+  }
+}
+
+/** Owner request 2026-10-13: change an organization's plan after it was assigned. */
+export async function changePlanAction(tenantId: string, _prev: TenantSettingState, formData: FormData): Promise<TenantSettingState> {
+  const { userId } = await requirePlatformAdmin();
+  try {
+    const sub = await changePlan(userId, tenantId, formData.get("plan") as SubscriptionPlan);
+    revalidatePath("/platform-admin/tenants", "layout");
+    return { ok: true, message: `Plan: ${sub.plan}.` };
   } catch (err) {
     return settingError(err);
   }
@@ -67,31 +80,31 @@ export async function setTenantEnvironmentAction(tenantId: string, _prev: Tenant
 export async function createTenantEnvironmentAction(parentTenantId: string, formData: FormData) {
   const { userId } = await requirePlatformAdmin();
   await createTenantEnvironment(userId, parentTenantId, String(formData.get("environment") ?? ""));
-  revalidatePath("/platform-admin/tenants");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export async function suspendTenantAction(tenantId: string) {
   const { userId } = await requirePlatformAdmin();
   await suspendTenant(userId, tenantId);
-  revalidatePath("/platform-admin/tenants");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export async function activateTenantAction(tenantId: string) {
   const { userId } = await requirePlatformAdmin();
   await activateTenant(userId, tenantId);
-  revalidatePath("/platform-admin/tenants");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export async function decommissionTenantAction(tenantId: string) {
   const { userId } = await requirePlatformAdmin();
   await decommissionTenant(userId, tenantId);
-  revalidatePath("/platform-admin/tenants");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export async function createSubscriptionAction(tenantId: string, formData: FormData) {
   const { userId } = await requirePlatformAdmin();
   await createSubscription(userId, tenantId, formData.get("plan") as SubscriptionPlan);
-  revalidatePath("/platform-admin/tenants");
+  revalidatePath("/platform-admin/tenants", "layout");
 }
 
 export async function setFeatureFlagAction(tenantId: string, formData: FormData) {

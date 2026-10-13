@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 let rpcResult: { data: unknown; error: { code: string; message: string } | null } = { data: "env-1", error: null };
 const rpc = vi.fn(async () => rpcResult);
-const tenantRow = { tenant_id: "aaaaaaaa-1560-4000-8000-000000000001", environment: "development", notes: null, created_at: "2026-10-13", tenants: { name: "Acme", slug: "acme", status: "active" } };
+const tenantRow = { id: "aaaaaaaa-1560-4000-8000-000000000001", name: "Acme", slug: "acme", status: "active", created_at: "2026-10-13", platform: { environment: "development", notes: null, created_at: "2026-10-13", parent_tenant_id: null } };
 const from = () => {
   const b = { select: () => b, eq: () => b, maybeSingle: async () => ({ data: tenantRow, error: null }) };
   return b;
