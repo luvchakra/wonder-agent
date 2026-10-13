@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, LifeBuoy, LogOut, Shield, SunMoon, User, ShieldCheck } from "lucide-react";
+import { ChevronDown, LifeBuoy, LogOut, Shield, Sparkles, SunMoon, User, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "./theme";
 import { Avatar } from "./Avatar";
 
@@ -47,87 +47,85 @@ export function AccountPanel({
 
   return (
     <DropdownMenu.Root>
-        <DropdownMenu.Trigger asChild>
-          <button
-            type="button"
-            aria-label={`Account menu for ${name}`}
-            className="flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-foreground transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+      <DropdownMenu.Trigger asChild>
+        <button
+          type="button"
+          aria-label={`Account menu for ${name}`}
+          className="flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1 text-left text-foreground transition-colors hover:bg-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
+        >
+          <Avatar name={displayName} email={email} size="sm" />
+          <span className="hidden min-w-0 max-w-[12rem] md:block">
+            <span className="block truncate text-[13px] font-semibold leading-tight">{name}</span>
+            {subtitle ? <span className="block truncate text-[11px] leading-tight text-muted-foreground">{subtitle}</span> : null}
+          </span>
+          <ChevronDown className="hidden size-4 shrink-0 text-muted-foreground md:block" aria-hidden="true" />
+        </button>
+      </DropdownMenu.Trigger>
+
+      <DropdownMenu.Portal>
+        <DropdownMenu.Content side="bottom" align="end" sideOffset={4} className="z-[60] w-64 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg">
+          <div className="px-3 py-2">
+            <p className="truncate text-sm font-medium">{name}</p>
+            <p className="truncate text-xs text-muted-foreground">{email}</p>
+          </div>
+
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+
+          <DropdownMenu.Item asChild>
+            <Link href="/settings" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+              <User className="size-4 text-muted-foreground" aria-hidden="true" />
+              Settings
+            </Link>
+          </DropdownMenu.Item>
+
+          <DropdownMenu.Item asChild>
+            <Link href="/my-privacy" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+              <ShieldCheck className="size-4 text-muted-foreground" aria-hidden="true" />
+              My privacy
+            </Link>
+          </DropdownMenu.Item>
+
+          {/* Owner request 2026-10-13: WonderID AI lives here, not in the sidebar. It answers from the product guide. */}
+          <DropdownMenu.Item asChild>
+            <Link href="/help#help-question" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+              <Sparkles className="size-4 text-primary" aria-hidden="true" />
+              WonderID AI
+            </Link>
+          </DropdownMenu.Item>
+
+          <DropdownMenu.Item asChild>
+            <Link href="/help" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+              <LifeBuoy className="size-4 text-muted-foreground" aria-hidden="true" />
+              Get Help
+            </Link>
+          </DropdownMenu.Item>
+
+          <div className="flex items-center gap-2 px-3 py-2">
+            <SunMoon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span className="flex-1 text-sm">Appearance</span>
+            <ThemeToggle />
+          </div>
+
+          {isPlatformAdmin && (
+            <DropdownMenu.Item asChild>
+              <Link href="/platform-admin" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+                <Shield className="size-4 text-muted-foreground" aria-hidden="true" />
+                Admin console
+              </Link>
+            </DropdownMenu.Item>
+          )}
+
+          <DropdownMenu.Separator className="my-1 h-px bg-border" />
+
+          <DropdownMenu.Item
+            onSelect={() => startTransition(() => void onSignOut(new FormData()))}
+            className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent"
           >
-            <Avatar name={displayName} email={email} size="sm" />
-            <span className="hidden min-w-0 max-w-[12rem] md:block">
-              <span className="block truncate text-[13px] font-semibold leading-tight">{name}</span>
-              {subtitle ? (
-                <span className="block truncate text-[11px] leading-tight text-muted-foreground">{subtitle}</span>
-              ) : null}
-            </span>
-            <ChevronDown className="hidden size-4 shrink-0 text-muted-foreground md:block" aria-hidden="true" />
-          </button>
-        </DropdownMenu.Trigger>
-
-        <DropdownMenu.Portal>
-          <DropdownMenu.Content
-            side="bottom"
-            align="end"
-            sideOffset={4}
-            className="z-[60] w-64 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg"
-          >
-            <div className="px-3 py-2">
-              <p className="truncate text-sm font-medium">{name}</p>
-              <p className="truncate text-xs text-muted-foreground">{email}</p>
-            </div>
-
-            <DropdownMenu.Separator className="my-1 h-px bg-border" />
-
-            <DropdownMenu.Item asChild>
-              <Link href="/settings" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
-                <User className="size-4 text-muted-foreground" aria-hidden="true" />
-                Settings
-              </Link>
-            </DropdownMenu.Item>
-
-            <DropdownMenu.Item asChild>
-              <Link href="/my-privacy" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
-                <ShieldCheck className="size-4 text-muted-foreground" aria-hidden="true" />
-                My privacy
-              </Link>
-            </DropdownMenu.Item>
-
-            <DropdownMenu.Item asChild>
-              <Link href="/help" className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
-                <LifeBuoy className="size-4 text-muted-foreground" aria-hidden="true" />
-                Get Help
-              </Link>
-            </DropdownMenu.Item>
-
-            <div className="flex items-center gap-2 px-3 py-2">
-              <SunMoon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span className="flex-1 text-sm">Appearance</span>
-              <ThemeToggle />
-            </div>
-
-            {isPlatformAdmin && (
-              <DropdownMenu.Item asChild>
-                <Link
-                  href="/platform-admin"
-                  className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent"
-                >
-                  <Shield className="size-4 text-muted-foreground" aria-hidden="true" />
-                  Admin console
-                </Link>
-              </DropdownMenu.Item>
-            )}
-
-            <DropdownMenu.Separator className="my-1 h-px bg-border" />
-
-            <DropdownMenu.Item
-              onSelect={() => startTransition(() => void onSignOut(new FormData()))}
-              className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent"
-            >
-              <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
-              Log Out
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu.Portal>
-      </DropdownMenu.Root>
+            <LogOut className="size-4 text-muted-foreground" aria-hidden="true" />
+            Log Out
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu.Portal>
+    </DropdownMenu.Root>
   );
 }

@@ -3358,3 +3358,7 @@ Owner feedback the same day: an organization set up as development, with no prod
 - Local E2E: manage-organizations (new), first-organization and platform-admin, 21/21. The new test: rename, buy Test, disable and enable it. It caught a UI bug, a confirm step that survived Enable, which is fixed.
 
 **Left out.** Real checkout for environments through Stripe or Razorpay: once keys are set, test payments stop and the page says online payment isn't available yet. That checkout is the follow-up. The address prefix stays the platform console's to change.
+
+## 2026-10-13 — Onboarding lists organizations with their environments (owner request)
+
+"Select an organization" on `/onboarding` now lists each organization once with its environments under it, using the same grouping as the switcher (the person's own memberships only). The switcher button shows the organization's name only. The environment is its coloured dot and the chips below it. Verified by local E2E: first-organization and tenant-address, part of the 34/34 run recorded in the Platform audit log.

@@ -8,7 +8,24 @@ import "server-only";
  * one function every other module is expected to call.
  */
 
-export { createTenant, createTenantEnvironment, testTenantIds, removeTenantEnvironment, organizationOwners, renameTenantSlug, setTenantEnvironment, ADDABLE_ENVIRONMENTS, listTenants, getTenant, suspendTenant, activateTenant, decommissionTenant, type CreateTenantInput } from "./tenants";
+export {
+  createTenant,
+  createTenantEnvironment,
+  testTenantIds,
+  removeTenantEnvironment,
+  organizationOwners,
+  setTenantNotes,
+  removeOrganization,
+  renameTenantSlug,
+  setTenantEnvironment,
+  ADDABLE_ENVIRONMENTS,
+  listTenants,
+  getTenant,
+  suspendTenant,
+  activateTenant,
+  decommissionTenant,
+  type CreateTenantInput,
+} from "./tenants";
 export { createSubscription, changePlan, getSubscription, updateSubscriptionStatus, PLAN_DEFAULTS } from "./subscriptions";
 export { isFeatureEnabled, getFeatureFlags, requireFeature, resolveFlags, listFlagCatalog, listTenantFlagOverrides, setFeatureFlag } from "./featureFlags";
 export { grantPlatformAdmin, revokePlatformAdmin, listPlatformAdmins } from "./admins";
@@ -18,18 +35,9 @@ export { getWonderappsDashboardAccess, setWonderappsDashboardAccess } from "./wo
 export { checkUsageLimit, getUsageSummary, classifyUsage, type UsageResource, type UsageCheck } from "./usage";
 export { updateFeatureFlagDefault } from "./featureFlags";
 export { listConfigVersions, rollbackConfigVersion, type ConfigType, type ConfigVersion } from "./configRollback";
-export {
-  createAnnouncement,
-  listAnnouncements,
-  getActiveAnnouncements,
-  type CreateAnnouncementInput,
-  type PlatformAnnouncement,
-  type AnnouncementScope,
-  type AnnouncementType,
-} from "./announcements";
-export {
-  getAiProviderConfig,
-  setAiProviderConfig,
-  resolveAiProviderKey,
-  type SetAiProviderConfigInput,
-} from "./aiProviderConfig";
+export { createAnnouncement, listAnnouncements, getActiveAnnouncements, type CreateAnnouncementInput, type PlatformAnnouncement, type AnnouncementScope, type AnnouncementType } from "./announcements";
+export { getAiProviderConfig, setAiProviderConfig, resolveAiProviderKey, type SetAiProviderConfigInput } from "./aiProviderConfig";
+export { getOrganizationProfile, saveOrganizationProfile, renameOrganization } from "./organizationProfile";
+export { USER_BASE_SIZES, INDUSTRIES, type OrganizationProfile } from "./organizationProfileRules";
+export { getEnvironmentStats, type EnvironmentStats } from "./environmentStats";
+export { setOrganizationPlan, inheritOrganizationPlan, organizationTenantIds } from "./organizationPlan";

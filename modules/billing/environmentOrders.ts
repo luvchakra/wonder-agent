@@ -4,7 +4,7 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { BillingPrice } from "@/lib/shared/types/platform";
-import { PLAN_DEFAULTS } from "@/modules/platform-admin/service";
+import { PLAN_DEFAULTS, getSubscription } from "@/modules/platform-admin/service";
 import { configuredProviders } from "./config";
 import { toPrice } from "./mappers";
 import { defaultCurrencyFor } from "./rules";
@@ -48,13 +48,17 @@ async function ownedOrganization(organizationId: string): Promise<{ tenantId: st
 export async function environmentPrices(organizationId: string): Promise<BillingPrice[]> {
   const org = await ownedOrganization(organizationId);
   const supabase = supabaseServiceRole();
-  const [{ data: profile }, { data: prices, error }] = await Promise.all([
+  const [orgSub, { data: profile }, { data: prices, error }] = await Promise.all([
+    getSubscription(org.tenantId),
     supabase.from("billing_profiles").select("country").eq("tenant_id", org.tenantId).maybeSingle(),
     supabase.from("billing_prices").select("id, plan, billing_interval, currency, unit_amount, tax_behavior, active").eq("active", true).order("plan").order("billing_interval"),
   ]);
   if (error) throw new ApiError(500, "QUERY_FAILED", "Prices could not be read");
   const currency = profile?.country ? defaultCurrencyFor(profile.country as string) : "USD";
-  return (prices ?? []).map(toPrice).filter((p) => p.currency === currency);
+  // Owner decision 2026-10-13: one plan per organization, the same in every
+  // environment. An organization on Pro or Max buys environments on that plan.
+  const plan = orgSub?.plan === "pro" || orgSub?.plan === "max" ? orgSub.plan : null;
+  return (prices ?? []).map(toPrice).filter((p) => p.currency === currency && (!plan || p.plan === plan));
 }
 
 /**

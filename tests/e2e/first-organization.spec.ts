@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { createClient } from "@supabase/supabase-js";
 import { authFile, E2E_PASSWORD } from "./support/testUsers";
 
@@ -13,6 +13,9 @@ import { authFile, E2E_PASSWORD } from "./support/testUsers";
  * The throwaway account is deleted afterwards and its organization
  * deprovisioned (audit rows are append-only, so the tenant row stays).
  */
+
+/** The "Create a new organization" form (the organization list above it also shows environment names). */
+const createForm = (page: Page) => page.locator("form").filter({ has: page.getByLabel("Address prefix") });
 
 const db = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
 const stamp = Date.now().toString(36);
@@ -89,12 +92,12 @@ test("owner request 2026-10-13: another organization with a chosen prefix and en
   // The prefix follows the name until edited.
   await expect(page.getByLabel("Address prefix")).toHaveValue(`env-org-${stamp}`);
   await page.getByLabel("Address prefix").fill(prefix);
-  await page.getByText("Test", { exact: true }).click();
+  await createForm(page).getByText("Test", { exact: true }).click();
   await expect(page.getByText(`https://${prefix}-test.`)).toBeVisible();
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page).toHaveURL(/\/$/);
-  // The designated colour and name of the environment, in the switcher.
-  await expect(page.getByRole("button", { name: "Switch organization" })).toContainText("Test");
+  // The switcher shows the organization's name (the environment is its coloured dot).
+  await expect(page.getByRole("button", { name: "Switch organization" })).toContainText(`Env Org ${stamp}`);
 
   const { data: tenant } = await db().from("tenants").select("id, slug").eq("slug", `${prefix}-test`).single();
   expect(tenant).toBeTruthy();
@@ -103,7 +106,7 @@ test("owner request 2026-10-13: another organization with a chosen prefix and en
   await page.goto("/onboarding");
   await page.getByLabel("Organization name").fill("Duplicate");
   await page.getByLabel("Address prefix").fill(prefix);
-  await page.getByText("Test", { exact: true }).click();
+  await createForm(page).getByText("Test", { exact: true }).click();
   await page.getByRole("button", { name: "Create organization" }).click();
   await expect(page.getByRole("alert").filter({ hasText: "already taken" })).toBeVisible();
 
@@ -122,13 +125,13 @@ test("owner request 2026-10-13: another organization with a chosen prefix and en
   // The platform administrator changes the address and the environment.
   const admin = await browser.newContext({ storageState: authFile("platformAdmin") });
   const ap = await admin.newPage();
-  await ap.goto(`/platform-admin/tenants/${tenant!.id}`);
+  await ap.goto(`/platform-admin/tenants/${tenant!.id}?view=environment`);
   await ap.getByLabel("Address prefix").fill(`${prefix}-renamed`);
   await ap.getByRole("button", { name: "Change address" }).click();
   // Renamed out of its prefix group, it re-renders as an organization of its own (the address check below is the database's).
   await expect(ap.getByText(`https://${prefix}-renamed.`).first()).toBeVisible();
   await ap.getByLabel("Environment", { exact: true }).selectOption("staging");
-  await ap.getByRole("button", { name: "Save" }).click();
+  await ap.getByRole("button", { name: "Save", exact: true }).click();
   await expect(ap.getByRole("status").filter({ hasText: "Environment saved." })).toBeVisible();
   expect((await db().from("tenants").select("slug").eq("id", tenant!.id).single()).data?.slug).toBe(`${prefix}-renamed`);
   expect((await db().from("platform_tenants").select("environment").eq("tenant_id", tenant!.id).single()).data?.environment).toBe("staging");

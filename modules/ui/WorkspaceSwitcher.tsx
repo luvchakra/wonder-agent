@@ -87,11 +87,8 @@ export function WorkspaceSwitcher({
               ) : null}
             </span>
             <span className={cn("min-w-0 flex-1", compact && "sr-only")}>
+              {/* Owner request 2026-10-13: the name only; the environment is the coloured dot and the chips below. */}
               <span className="block truncate text-sm font-medium">{current?.name ?? "Select organization"}</span>
-              {current?.environment ? <EnvironmentBadge environment={current.environment} className="mt-0.5 mb-0.5 px-1.5 py-0 text-[10px]" /> : null}
-              <span className="block truncate text-xs text-sidebar-muted-foreground">
-                {current?.url ? current.url.replace(/^https?:\/\//, "") : current?.slug ? `Organization: ${current.slug}` : "No organization selected"}
-              </span>
             </span>
             {compact ? null : <ChevronDown className="size-4 shrink-0 text-sidebar-muted-foreground" aria-hidden="true" />}
           </button>

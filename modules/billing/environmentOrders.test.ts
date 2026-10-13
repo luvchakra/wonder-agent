@@ -48,7 +48,9 @@ const audits: Record<string, unknown>[] = [];
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: vi.fn(async (e: Record<string, unknown>) => void audits.push(e)) }));
 let providers = { stripe: false, razorpay: false };
 vi.mock("./config", () => ({ configuredProviders: () => providers }));
+let orgPlan: string | null = null;
 vi.mock("@/modules/platform-admin/service", () => ({
+  getSubscription: async () => (orgPlan ? { plan: orgPlan } : null),
   PLAN_DEFAULTS: { pro: { maxUsers: 25, maxAgents: 50, maxIntegrations: 5, maxRuntimeEventsPerMonth: 250_000, auditRetentionDays: 365 } },
 }));
 
@@ -61,6 +63,7 @@ beforeEach(() => {
   orderInsert = { data: { id: "order-1" }, error: null };
   createResult = { data: ENV, error: null };
   providers = { stripe: false, razorpay: false };
+  orgPlan = null;
   serviceRpc.mockClear();
 });
 
@@ -119,5 +122,11 @@ describe("orderEnvironment", () => {
     await expect(orderEnvironment("user-1", ORG, "test", "pro_month_usd")).rejects.toMatchObject({ status: 409 });
     expect(writes.at(-1)).toMatchObject({ table: "environment_orders", op: "update", values: { status: "failed" } });
     expect(audits.at(-1)).toMatchObject({ action: "billing.environment_setup", outcome: "failure" });
+  });
+
+  it("an organization on Max buys environments only on Max (one plan per organization)", async () => {
+    orgPlan = "max";
+    await expect(orderEnvironment("user-1", ORG, "test", "pro_month_usd")).rejects.toMatchObject({ status: 400, message: "Choose a plan" });
+    expect(writes).toEqual([]);
   });
 });

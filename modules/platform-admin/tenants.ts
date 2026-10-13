@@ -7,6 +7,7 @@ import type { AddableEnvironment, PlatformTenant, TenantEnvironment } from "@/li
 import { toPlatformTenant } from "./mappers";
 import { writePlatformAudit } from "./auditLog";
 import { slugProblem } from "@/lib/tenant/host";
+import { inheritOrganizationPlan, organizationTenantIds } from "./organizationPlan";
 
 export type CreateTenantInput = {
   name: string;
@@ -76,7 +77,9 @@ export async function createTenantEnvironment(actorId: string, parentTenantId: s
     throw new ApiError(500, "CREATE_FAILED", "The environment could not be created");
   }
   const tenantId = data as string;
-  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_created", newValue: { parentTenantId, environment }, result: "success" });
+  // Owner decision 2026-10-13: one plan per organization, the same in every environment.
+  const plan = await inheritOrganizationPlan(actorId, parentTenantId, tenantId);
+  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_created", newValue: { parentTenantId, environment, plan }, result: "success" });
   return { tenantId };
 }
 
@@ -298,4 +301,37 @@ export async function organizationOwners(tenantIds: string[]): Promise<Map<strin
     out.set(p.tenant_id, [...(out.get(p.tenant_id) ?? []), { userId: u.id, email: u.email, name: u.display_name }]);
   }
   return out;
+}
+
+/**
+ * Owner request (2026-10-13): a platform administrator's own notes on an
+ * environment (vendor-only, never shown to the customer). Audited.
+ */
+export async function setTenantNotes(actorId: string, tenantId: string, notes: string): Promise<void> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) throw new ApiError(404, "TENANT_NOT_FOUND");
+  const clean = notes.trim();
+  if (clean.length > 2000) throw new ApiError(400, "INVALID_INPUT", "Notes can be at most 2000 characters");
+  const { error } = await supabaseServiceRole()
+    .from("platform_tenants")
+    .upsert({ tenant_id: tenantId, notes: clean || null }, { onConflict: "tenant_id", ignoreDuplicates: false });
+  if (error) {
+    await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_notes_updated", result: "failure" });
+    throw new ApiError(500, "UPDATE_FAILED", "The notes could not be saved");
+  }
+  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_notes_updated", newValue: { length: clean.length }, result: "success" });
+}
+
+/**
+ * Owner request (2026-10-13): remove a whole organization from the console:
+ * it and every environment are decommissioned (data kept, nobody signs in),
+ * each audited. Its own environments are removed with removeTenantEnvironment.
+ */
+export async function removeOrganization(actorId: string, organizationId: string): Promise<number> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId)) throw new ApiError(404, "TENANT_NOT_FOUND");
+  const { data: link } = await supabaseServiceRole().from("platform_tenants").select("parent_tenant_id").eq("tenant_id", organizationId).maybeSingle();
+  if (link?.parent_tenant_id) throw new ApiError(400, "INVALID_INPUT", "That is an environment; remove it from its organization");
+  const ids = await organizationTenantIds(organizationId);
+  // Environments first, the organization last.
+  for (const id of [...ids.slice(1), ids[0]]) await decommissionTenant(actorId, id);
+  return ids.length;
 }

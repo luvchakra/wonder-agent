@@ -4,7 +4,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 let rpcResult: { data: unknown; error: { code: string; message: string } | null } = { data: "env-1", error: null };
 const rpc = vi.fn(async () => rpcResult);
-const tenantRow = { id: "aaaaaaaa-1560-4000-8000-000000000001", name: "Acme", slug: "acme", status: "active", created_at: "2026-10-13", platform: { environment: "development", notes: null, created_at: "2026-10-13", parent_tenant_id: null } };
+const tenantRow = {
+  id: "aaaaaaaa-1560-4000-8000-000000000001",
+  name: "Acme",
+  slug: "acme",
+  status: "active",
+  created_at: "2026-10-13",
+  platform: { environment: "development", notes: null, created_at: "2026-10-13", parent_tenant_id: null },
+};
 const from = () => {
   const b = { select: () => b, eq: () => b, maybeSingle: async () => ({ data: tenantRow, error: null }) };
   return b;
@@ -12,6 +19,9 @@ const from = () => {
 vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ rpc, from }) }));
 const audits: Record<string, unknown>[] = [];
 vi.mock("./auditLog", () => ({ writePlatformAudit: vi.fn(async (e: Record<string, unknown>) => void audits.push(e)) }));
+
+const { inheritOrganizationPlan } = vi.hoisted(() => ({ inheritOrganizationPlan: vi.fn(async () => "max") }));
+vi.mock("./organizationPlan", () => ({ inheritOrganizationPlan, organizationTenantIds: vi.fn() }));
 
 import { createTenantEnvironment, renameTenantSlug, setTenantEnvironment } from "./tenants";
 
@@ -27,7 +37,11 @@ describe("createTenantEnvironment (owner request 2026-10-13)", () => {
   it("creates the environment in the database and audits it", async () => {
     await expect(createTenantEnvironment("admin-1", PARENT, "development")).resolves.toEqual({ tenantId: "env-1" });
     expect(rpc).toHaveBeenCalledWith("create_tenant_environment", { p_parent: PARENT, p_environment: "development" });
-    expect(audits).toEqual([expect.objectContaining({ action: "platform.tenant_environment_created", tenantId: "env-1", result: "success", newValue: { parentTenantId: PARENT, environment: "development" } })]);
+    // Owner decision 2026-10-13: the new environment takes the organization's plan.
+    expect(inheritOrganizationPlan).toHaveBeenCalledWith("admin-1", PARENT, "env-1");
+    expect(audits).toEqual([
+      expect.objectContaining({ action: "platform.tenant_environment_created", tenantId: "env-1", result: "success", newValue: { parentTenantId: PARENT, environment: "development", plan: "max" } }),
+    ]);
   });
 
   it("refuses an unknown kind or a malformed organization id before touching the database", async () => {
@@ -69,7 +83,9 @@ describe("renameTenantSlug and setTenantEnvironment (owner request 2026-10-13)",
     rpcResult = { data: null, error: null };
     await setTenantEnvironment("admin-1", PARENT, "test");
     expect(rpc).toHaveBeenCalledWith("set_tenant_environment", { p_tenant: PARENT, p_environment: "test" });
-    expect(audits).toEqual([expect.objectContaining({ action: "platform.tenant_environment_changed", oldValue: { environment: "development" }, newValue: { environment: "test" }, result: "success" })]);
+    expect(audits).toEqual([
+      expect.objectContaining({ action: "platform.tenant_environment_changed", oldValue: { environment: "development" }, newValue: { environment: "test" }, result: "success" }),
+    ]);
     await expect(setTenantEnvironment("admin-1", PARENT, "qa")).rejects.toMatchObject({ status: 400 });
   });
 });
