@@ -3169,3 +3169,23 @@ Verified locally:
 - `tenant-address.spec.ts` 12/12; `auth.spec.ts` 41/41.
 
 Follow-up: `/service-unavailable` (503) relies on the same rewrite status.
+
+### 2026-10-13 — Global Configuration takes a host list (WID-H05)
+
+`lib/config/registry.ts`:
+- a third setting type, `hosts` (`HostsSetting`);
+- the first such setting, `integration.allowedHosts` (security
+  permission, up to 50 entries, default empty);
+- `acceptHosts` validates host names, lower-cased, sorted, without
+  repeats; a scheme, port or path is refused;
+- `TenantConfig` is typed per key, so numeric settings stay numbers;
+- changes compare by value and are shown with `formatConfigValue`.
+
+`lib/config/tenantConfig.ts`: `readTenantConfigStrict` throws when the
+store cannot be read. The Gateway needs this so a restriction never falls
+back to "no restriction".
+
+UI: the Global Configuration page shows a textarea for a host list.
+
+Tests: `registry.test.ts` (new "the allowed hosts" cases; the defaults
+test lists the new key).

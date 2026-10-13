@@ -11,6 +11,7 @@ import {
   revokeAssignment,
   setAssignmentItemStatus,
   updatePackage,
+  setPackageBirthright,
 } from "@/modules/access-governance/service";
 
 /**
@@ -70,6 +71,22 @@ export async function setPackageStatusAction(packageId: string, status: string, 
     await updatePackage(ctx.tenantId!, ctx.userId, packageId, { status });
     refresh(packageId);
     return { status: "saved", message: status === "active" ? "Active: eligible people can find and request it." : status === "retired" ? "Retired: it can no longer be requested or assigned." : "Back to draft." };
+  } catch (err) {
+    return formError(err);
+  }
+}
+
+/** Birthright (owner decision 13 Oct): one administrator asks, someone else approves; anyone may turn it off. */
+export async function setBirthrightAction(packageId: string, action: "request" | "approve" | "off", _prev: PackageFormState): Promise<PackageFormState> {
+  void _prev;
+  const ctx = await requirePermission("access.manage");
+  try {
+    await setPackageBirthright(ctx.tenantId!, ctx.userId, packageId, action);
+    refresh(packageId);
+    return {
+      status: "saved",
+      message: action === "request" ? "Waiting for another administrator to approve." : action === "approve" ? "On: eligible joiners, rehires and movers get it from now on." : "Off: nobody gets it automatically.",
+    };
   } catch (err) {
     return formError(err);
   }

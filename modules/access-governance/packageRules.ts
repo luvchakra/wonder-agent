@@ -139,3 +139,51 @@ export function contentsDigest(resources: { applicationId: string; entitlementId
     .sort()
     .join("|");
 }
+
+// ------------------------------------------------------------ birthright
+
+/**
+ * IDENTITY-P0-18 / ACCESS-P0-20 (owner decision, 13 October 2026): a
+ * birthright package is assigned automatically to people who join, are
+ * rehired or move and are eligible. Marking it birthright is the approval,
+ * so it takes two administrators: one asks, someone else approves.
+ * Turning it off takes one. The database refuses 'on' without a different
+ * approver as well (migration 0151).
+ */
+export const BIRTHRIGHT_STATUSES = ["off", "pending", "on"] as const;
+export type BirthrightStatus = (typeof BIRTHRIGHT_STATUSES)[number];
+export type BirthrightAction = "request" | "approve" | "off";
+
+export type BirthrightState = { status: BirthrightStatus; requestedBy: string | null };
+
+export function birthrightTransition(
+  current: BirthrightState,
+  action: BirthrightAction,
+  actorId: string,
+): { ok: true; next: BirthrightStatus } | { ok: false; code: string; message: string } {
+  if (action === "off") return current.status === "off" ? { ok: false, code: "INVALID_TRANSITION", message: "Birthright is already off" } : { ok: true, next: "off" };
+  if (action === "request") {
+    if (current.status !== "off") return { ok: false, code: "INVALID_TRANSITION", message: current.status === "on" ? "Birthright is already on" : "Birthright is already waiting for approval" };
+    return { ok: true, next: "pending" };
+  }
+  if (current.status !== "pending") return { ok: false, code: "INVALID_TRANSITION", message: "Nothing is waiting for approval" };
+  if (current.requestedBy === actorId) return { ok: false, code: "FOUR_EYES", message: "Someone other than the person who asked must approve birthright" };
+  return { ok: true, next: "on" };
+}
+
+/** Package fields whose change sends birthright back for approval: who gets it. */
+export const BIRTHRIGHT_SCOPE_FIELDS = ["eligible_identity_types", "eligible_departments"] as const;
+
+/** Whether a change to a package (its fields, or a resource added or removed) needs birthright approved again. */
+export function birthrightNeedsReapproval(status: BirthrightStatus, change: { fields?: string[]; resources?: boolean }): boolean {
+  if (status !== "on") return false;
+  return Boolean(change.resources) || (change.fields ?? []).some((f) => (BIRTHRIGHT_SCOPE_FIELDS as readonly string[]).includes(f));
+}
+
+/** Whether a birthright package goes to this person now: on, active, and they are eligible. */
+export function birthrightApplies(
+  pkg: PackageEligibility & { status: string; birthrightStatus: BirthrightStatus },
+  subject: EligibilitySubject,
+): boolean {
+  return pkg.birthrightStatus === "on" && pkg.status === "active" && checkEligibility(pkg, subject).eligible;
+}

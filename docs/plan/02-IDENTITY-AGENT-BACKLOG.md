@@ -35,7 +35,7 @@ for every non-"Done" row is in `docs/design/identity-agent-backlog-audit.md`.
 | IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Done — 2026-09-26, migrations 0077–0079 |
 | IDENTITY-P0-16 | Identity attributes and relationships | Done — 2026-09-26 |
 | IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
-| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Partial — 2026-09-26: events, governed tasks, transitions, ownership transfer done (0084/0085); automatic birthright grants and deprovisioning wait on ACCESS-P0-20 and INTEGRATION-P0-13 |
+| IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Done — 2026-09-26: events, governed tasks, transitions, ownership transfer (0084/0085). 2026-10-12: leavers' access becomes removal work and connectors disable their accounts (WID-C02). 2026-10-13: birthright packages assigned automatically to active joiners, rehires and movers (owner decision; 0151) |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 | IDENTITY-P0-20 | Non-human identities from accounts; owner from source or an unowned queue; agent accounts by identifier (F1, #46) | Done — 2026-10-11: no migration; reconciliation creates or finds the identity, owner from the source, Onboarding › Unowned Identities, requests refuse unowned subjects |
 

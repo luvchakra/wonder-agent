@@ -2,6 +2,8 @@ import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { DEFAULT_MAX_BYTES, DEFAULT_TIMEOUT_MS, guardedFetch, type GuardedInit } from "../outboundFetch";
+import { hostAllowed, outboundPolicyFromEnv } from "../outboundPolicy";
+import { readTenantConfigStrict } from "@/lib/config/tenantConfig";
 import { httpDriver, type ConnectorDriverSession, type DriverFactories, type DriverFactory } from "../framework/engine";
 import { LIMITS, type FetchLike } from "../framework/http";
 import { ldapDriver } from "../framework/drivers/ldap";
@@ -72,6 +74,8 @@ export type GatewayOptions = {
   fileStore?: FileStoreFactory;
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
+  /** WID-H05: the organization's allowed hosts (production: read from its Global Configuration once per session). */
+  allowedHosts?: readonly string[] | (() => Promise<readonly string[]>);
 };
 
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
@@ -99,6 +103,7 @@ export class GatewaySession {
   private readonly ledger = new TrafficLedger();
   private readonly budget: RequestBudget;
   private bucket: TokenBucket | null = null;
+  private allowList: Promise<readonly string[] | null> | null = null;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
 
@@ -152,10 +157,33 @@ export class GatewaySession {
     this.ledger.record({ ...e, at: this.now() });
   }
 
-  /** The connection's policies, in order: not disabled, budget left, then wait for the rate limit. */
+  /**
+   * WID-H05: the organization's list of hosts its connections may reach, read
+   * once per session. Null when it cannot be read: the session then refuses
+   * every request, since the defaults would lift a restriction.
+   */
+  private allowedHosts(): Promise<readonly string[] | null> {
+    const source = this.opts.allowedHosts;
+    this.allowList ??= (
+      Array.isArray(source)
+        ? Promise.resolve(source)
+        : typeof source === "function"
+          ? source()
+          : readTenantConfigStrict(this.connection.tenantId).then((c) => c["integration.allowedHosts"])
+    ).catch((err) => {
+      console.error("allowed hosts unreadable; connection traffic refused", { tenantId: this.connection.tenantId, error: err instanceof Error ? err.message : "unknown" });
+      return null;
+    });
+    return this.allowList;
+  }
+
+  /** The connection's policies, in order: not disabled, budget left, host allowed, then wait for the rate limit. */
   private async admit(operation: string, host: string | null): Promise<void> {
     let refusal: GatewayRefusedError | null = null;
+    const allowed = await this.allowedHosts();
     if (!this.admits()) refusal = new GatewayRefusedError("disabled", "This connection is disabled");
+    else if (allowed === null) refusal = new GatewayRefusedError("host", "The organization's list of allowed hosts could not be read; nothing was sent");
+    else if (host && !hostAllowed(host, allowed)) refusal = new GatewayRefusedError("host", `${host} is not on this organization's list of hosts connections may reach`);
     else if (!this.budget.take()) refusal = new GatewayRefusedError("budget", `Stopped after ${this.budget.max} requests in one run`);
     if (refusal) {
       this.record({ direction: "outbound", operation, host, outcome: "blocked", errorCategory: refusal.reason });
@@ -175,7 +203,9 @@ export class GatewaySession {
       const started = this.now();
       const bytesOut = init.body ? Buffer.byteLength(init.body, "utf8") : 0;
       try {
-        const res = await transport(url, { ...init, timeoutMs: this.opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, maxBytes: this.opts.maxBytes ?? DEFAULT_MAX_BYTES });
+        // The list also applies to every redirect (checkOutboundUrl on each hop).
+        const allowedHosts = (await this.allowedHosts()) ?? [];
+        const res = await transport(url, { ...init, policy: { ...outboundPolicyFromEnv(), allowedHosts }, timeoutMs: this.opts.timeoutMs ?? DEFAULT_TIMEOUT_MS, maxBytes: this.opts.maxBytes ?? DEFAULT_MAX_BYTES });
         const body = await res.arrayBuffer();
         this.record({
           direction: "outbound",

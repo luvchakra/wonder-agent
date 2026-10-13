@@ -14,7 +14,7 @@ import {
 import { getIdentityForUser, listAccountableHumans, listIdentities } from "@/modules/agent-identity/service";
 import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, Button } from "@/modules/ui";
 import { APPROVAL, ASSIGNMENT, ITEM, RISK_TONE, STATUS_TONE } from "../labels";
-import { AssignForm, ItemActions, PackageForm, PackageRequestForm, RemoveResource, ResourceForm, RevokeForm, StatusButtons } from "../PackageForms";
+import { AssignForm, BirthrightButton, ItemActions, PackageForm, PackageRequestForm, RemoveResource, ResourceForm, RevokeForm, StatusButtons } from "../PackageForms";
 
 // ACCESS-P0-20 — one access package (spec §12.2): what it includes and how
 // risky that is; whether you are eligible and why; who will approve and
@@ -191,6 +191,22 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
                 <StatusButtons packageId={pkg.id} status={pkg.status} />
               </CardBody>
             </Card>
+            {pkg.status !== "retired" ? (
+              <Card>
+                <details className="group p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-foreground">
+                    Birthright{" "}
+                    <Badge tone={pkg.birthrightStatus === "on" ? "success" : pkg.birthrightStatus === "pending" ? "warning" : "neutral"}>{pkg.birthrightStatus === "on" ? "On" : pkg.birthrightStatus === "pending" ? "Waiting for approval" : "Off"}</Badge>
+                  </summary>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Assigned automatically to eligible people who join, are rehired or move. Two administrators turn it on; any change to what it includes or who is eligible needs approval again.
+                  </p>
+                  <div className="mt-3">
+                    <BirthrightButton packageId={pkg.id} status={pkg.birthrightStatus} />
+                  </div>
+                </details>
+              </Card>
+            ) : null}
             {pkg.status !== "retired" ? (
               <Card>
                 <CardHeader title="Add to the package" />

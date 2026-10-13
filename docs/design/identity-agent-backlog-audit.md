@@ -1759,3 +1759,21 @@ Typed text out of audit records: agent lifecycle reasons (kept on `agent_lifecyc
 ### 2026-10-12 — WID-H07, identifiers only
 
 WID-H07 identifiers only: `agent.identity_linked` fingerprints `externalReference` (a delegate's login, say), which is kept on the link. `identity.source_changes_undone` fingerprints the source record's `externalId`.
+
+### 2026-10-13 — IDENTITY-P0-18 done: birthright on join, rehire and move
+
+`recordLifecycleEvents` calls Access's `assignBirthrightPackages` when
+`opensBirthright(event)` holds. That is a joiner, rehire or mover whose
+state after the event is ACTIVE. A joiner before their start date gets the
+packages with the PRE_JOIN → ACTIVE joiner event.
+
+A failure is audited (`access.package_birthright_assigned`, failure). The
+event and the manager's baseline-access task stay, as the way in.
+
+With the leaver work of 12 October (removal tasks, connector disable),
+the story's last parts are built; the tracker row is Done.
+
+Tests:
+- `humanLifecycle.test.ts`, "opensBirthright";
+- E2E `birthright.spec.ts` and `human-lifecycle.spec.ts`.
+See the Access log for the rest.

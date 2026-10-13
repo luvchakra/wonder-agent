@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { OutboundBlockedError, checkOutboundUrl, isBlockedAddress, isPrivateAddress, outboundPolicyFromEnv } from "./outboundPolicy";
+import { OutboundBlockedError, checkOutboundUrl, hostAllowed, isBlockedAddress, isPrivateAddress, outboundPolicyFromEnv } from "./outboundPolicy";
 
 const strict = { allowPrivateNetworks: false };
 const dev = { allowPrivateNetworks: true };
@@ -94,5 +94,26 @@ describe("connect-time checks and the platform switch", () => {
     expect(outboundPolicyFromEnv({})).toEqual({ allowPrivateNetworks: false });
     expect(outboundPolicyFromEnv({ OUTBOUND_ALLOW_PRIVATE_NETWORKS: "1" })).toEqual({ allowPrivateNetworks: false });
     expect(outboundPolicyFromEnv({ OUTBOUND_ALLOW_PRIVATE_NETWORKS: "true" })).toEqual({ allowPrivateNetworks: true });
+  });
+});
+
+describe("the organization's allowed hosts (WID-H05)", () => {
+  it("matches exact names and subdomains of a wildcard entry, never its apex or a look-alike", () => {
+    const list = ["api.example.com", "*.corp.example.com"];
+    expect(hostAllowed("api.example.com", list)).toBe(true);
+    expect(hostAllowed("API.example.com.", list)).toBe(true);
+    expect(hostAllowed("hr.corp.example.com", list)).toBe(true);
+    expect(hostAllowed("a.b.corp.example.com", list)).toBe(true);
+    expect(hostAllowed("corp.example.com", list)).toBe(false);
+    expect(hostAllowed("evilcorp.example.com", list)).toBe(false);
+    expect(hostAllowed("api.example.com.evil.test", list)).toBe(false);
+    expect(hostAllowed("anything.test", [])).toBe(true);
+  });
+  it("is checked on the address (so on every redirect hop), on top of the private-address rules", () => {
+    const policy = { allowPrivateNetworks: false, allowedHosts: ["api.example.com"] };
+    expect(checkOutboundUrl("https://api.example.com/x", policy).hostname).toBe("api.example.com");
+    expect(() => checkOutboundUrl("https://other.example.com/x", policy)).toThrow(OutboundBlockedError);
+    // A listed private address is still refused.
+    expect(() => checkOutboundUrl("https://10.0.0.5/", { allowPrivateNetworks: false, allowedHosts: ["10.0.0.5"] })).toThrow(OutboundBlockedError);
   });
 });

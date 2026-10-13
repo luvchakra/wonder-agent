@@ -119,3 +119,13 @@ export function tasksForEvent(eventType: LifecycleEventType, ctx: { hasSignIn: b
       return [];
   }
 }
+
+/**
+ * IDENTITY-P0-18 (owner decision, 13 October 2026): a joiner, rehire or
+ * mover who is active gets the birthright packages they are eligible for.
+ * A joiner still before their start date gets them when they become active
+ * (that is a joiner event too).
+ */
+export function opensBirthright(d: Pick<DetectedEvent, "eventType" | "toState">): boolean {
+  return (d.eventType === "joiner" || d.eventType === "rehire" || d.eventType === "mover") && d.toState === "ACTIVE";
+}

@@ -113,3 +113,12 @@ set. When the address is unknown, such a credential is refused.
 | Anything else (no `CLIENT_IP_HEADER`, not Vercel), including `next start` on its own | nothing: the address is unknown | none | A credential with address limits is refused; the E2E spec checks this against its local server. |
 
 Credentials without address limits are unaffected by the address.
+
+## 6. Connections (WID-H05)
+
+The threat model for connections, with each control and its tests, is
+`docs/security/CONNECTOR-THREAT-MODEL.md`. An organization can limit the
+hosts its connections reach (Global Configuration → Connections, "Connections
+may reach only these hosts"). The Connector Gateway enforces the list for
+every driver and redirect, and refuses all traffic when the list cannot be
+read.

@@ -2864,3 +2864,29 @@ WID-H07 identifiers only: `integration.write_*` records `targetFields` and no lo
   move it, and the daily full read resets it.
 
 The tracker now says: for the register to assess. No code change.
+
+### 2026-10-13 — WID-H05: an organization's allowed hosts, and the connector threat model
+
+The register's remaining items for WID-H05 were an egress allow-list per
+organization, sandboxing and a holistic threat model.
+
+- **Gateway (`gateway.ts`):**
+  - `admit` refuses a host that is not on the organization's list
+    (refusal "host"). This covers HTTP, MCP, files, and the LDAP and SQL
+    connects.
+  - The list is read once per session, with `readTenantConfigStrict`.
+  - An unreadable list refuses everything.
+  - Each HTTP request hands the list to `guardedFetch` as
+    `policy.allowedHosts`, so every redirect hop is checked too
+    (`checkOutboundUrl`).
+- **Outbound policy (`outboundPolicy.ts`):** `hostAllowed` matches exact
+  names, or the subdomains of `*.` entries (never the apex or a
+  look-alike). It narrows the address checks and never widens them.
+- **Threat model:** `docs/security/CONNECTOR-THREAT-MODEL.md`.
+
+Verified:
+- `npx vitest run modules/integrations lib/config`: 397 passed, including
+  new "WID-H05" tests in `gateway.test.ts` (refused host, list passed on
+  for redirects, unreadable list) and `outboundPolicy.test.ts`;
+- typecheck and eslint;
+- every test file the threat model cites exists.

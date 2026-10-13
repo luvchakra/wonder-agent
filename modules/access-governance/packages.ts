@@ -11,12 +11,17 @@ import { assessRisk, isUnownedNonHuman, UNOWNED_MESSAGE, type RequestPolicy, typ
 import {
   assignmentExpiry,
   assignmentStatus,
+  birthrightApplies,
+  birthrightNeedsReapproval,
+  birthrightTransition,
   checkEligibility,
   contentsDigest,
   itemOnEnd,
   packageRisk,
   validatePackageInput,
   type AssignmentStatus,
+  type BirthrightAction,
+  type BirthrightStatus,
   type ItemStatus,
 } from "./packageRules";
 import { markGrantsFulfilled, pendAssignment, queueRemoval, withdrawPendingGrants } from "./pendingGrants";
@@ -57,6 +62,11 @@ export type AccessPackage = {
   defaultDurationDays: number | null;
   extensionAllowed: boolean;
   certificationFrequency: string;
+  /** Birthright (owner decision 13 Oct): off, waiting for a second administrator, or on. */
+  birthrightStatus: BirthrightStatus;
+  birthrightRequestedBy: string | null;
+  birthrightApprovedBy: string | null;
+  birthrightApprovedAt: string | null;
   updatedAt: string;
 };
 
@@ -91,6 +101,10 @@ function toPackage(r: Record<string, unknown>): Omit<AccessPackage, "ownerName">
     defaultDurationDays: (r.default_duration_days as number | null) ?? null,
     extensionAllowed: Boolean(r.extension_allowed),
     certificationFrequency: r.certification_frequency as string,
+    birthrightStatus: ((r.birthright_status as BirthrightStatus | undefined) ?? "off"),
+    birthrightRequestedBy: (r.birthright_requested_by as string | null) ?? null,
+    birthrightApprovedBy: (r.birthright_approved_by as string | null) ?? null,
+    birthrightApprovedAt: (r.birthright_approved_at as string | null) ?? null,
     updatedAt: r.updated_at as string,
   };
 }
@@ -262,8 +276,121 @@ export async function updatePackage(tenantId: string, actorId: string, packageId
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
   if (!data) throw new ApiError(404, "NOT_FOUND", "No such package");
   await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_updated", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { fields: Object.keys(fields) } });
+  const reset = birthrightNeedsReapproval(toPackage(data).birthrightStatus, { fields: Object.keys(fields) }) ? await birthrightBackToPending(tenantId, actorId, packageId, "eligibility") : null;
+  const [p] = await withOwners(tenantId, [reset ?? toPackage(data)]);
+  return p;
+}
+
+/**
+ * A birthright package whose contents or eligibility changed goes back to
+ * waiting for approval: what reaches new joiners was approved by two
+ * people as it is now. The person who changed it counts as the one who
+ * asked, so someone else approves. Conditional on it being on.
+ */
+async function birthrightBackToPending(tenantId: string, actorId: string, packageId: string, reason: "contents" | "eligibility"): Promise<Omit<AccessPackage, "ownerName"> | null> {
+  const { data, error } = await supabaseServiceRole()
+    .from("access_packages")
+    .update({ birthright_status: "pending", birthright_requested_by: actorId, birthright_approved_by: null, birthright_approved_at: null })
+    .eq("tenant_id", tenantId)
+    .eq("id", packageId)
+    .eq("birthright_status", "on")
+    .select()
+    .maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data) return null;
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_birthright_reapproval", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { reason } });
+  return toPackage(data);
+}
+
+/**
+ * Birthright on or off for a package: "request" (one administrator asks),
+ * "approve" (someone else; the package must be active with something in it
+ * and an owner), "off" (anyone with access.manage). Audited; conditional on
+ * the state read, so two people acting at once cannot both win.
+ */
+export async function setPackageBirthright(tenantId: string, actorId: string, packageId: string, action: unknown): Promise<AccessPackage> {
+  if (action !== "request" && action !== "approve" && action !== "off") throw new ApiError(400, "VALIDATION_FAILED", "action: request, approve or off");
+  if (!UUID_RE.test(packageId)) throw new ApiError(404, "NOT_FOUND", "No such package");
+  const current = await getPackage(tenantId, packageId);
+  if (!current) throw new ApiError(404, "NOT_FOUND", "No such package");
+  const decision = birthrightTransition({ status: current.birthrightStatus, requestedBy: current.birthrightRequestedBy }, action as BirthrightAction, actorId);
+  if (!decision.ok) {
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_birthright_refused", objectType: "access_package", objectId: packageId, outcome: "failure", metadata: { action, code: decision.code } });
+    throw new ApiError(decision.code === "FOUR_EYES" ? 403 : 409, decision.code, decision.message);
+  }
+  if (action === "approve") {
+    if (current.status !== "active") throw new ApiError(409, "PACKAGE_NOT_ACTIVE", "Activate the package before turning birthright on");
+    if (!current.resources.length) throw new ApiError(409, "PACKAGE_EMPTY", "The package includes nothing to assign");
+  }
+  const now = new Date().toISOString();
+  const patch =
+    action === "request"
+      ? { birthright_status: "pending", birthright_requested_by: actorId, birthright_approved_by: null, birthright_approved_at: null }
+      : action === "approve"
+        ? { birthright_status: "on", birthright_approved_by: actorId, birthright_approved_at: now }
+        : { birthright_status: "off", birthright_approved_by: null, birthright_approved_at: null };
+  const { data, error } = await supabaseServiceRole()
+    .from("access_packages")
+    .update({ ...patch, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("id", packageId)
+    .eq("birthright_status", current.birthrightStatus)
+    .select()
+    .maybeSingle();
+  if (error?.code === "23514") throw new ApiError(403, "FOUR_EYES", "Someone other than the person who asked must approve birthright");
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data) throw new ApiError(409, "CONFLICT", "The package changed meanwhile; reload");
+  await writeAudit({ tenantId, actorId, actorType: "user", action: `access.package_birthright_${action === "request" ? "requested" : action === "approve" ? "approved" : "off"}`, objectType: "access_package", objectId: packageId, outcome: "success", metadata: { from: current.birthrightStatus, to: decision.next } });
   const [p] = await withOwners(tenantId, [toPackage(data)]);
   return p;
+}
+
+/**
+ * IDENTITY-P0-18 (owner decision, 13 October 2026): assigns the birthright
+ * packages a person is eligible for, called when they join, are rehired or
+ * move and are active. Each assignment is provisioned and verified like any
+ * other (pending grants, connector or fulfilment task, reconciliation).
+ * One that is held already is skipped (the live-assignment key is the
+ * lock). Service role, explicit tenant filter; audited as the system.
+ */
+export async function assignBirthrightPackages(
+  tenantId: string,
+  identityId: string,
+  meta: { eventId: string; eventType: string },
+): Promise<{ assigned: string[]; skipped: number }> {
+  const admin = supabaseServiceRole();
+  const [{ data: pkgs, error }, subject] = await Promise.all([
+    admin.from("access_packages").select().eq("tenant_id", tenantId).eq("birthright_status", "on").eq("status", "active").limit(200),
+    getIdentity(tenantId, identityId),
+  ]);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!subject) return { assigned: [], skipped: 0 };
+  const assigned: string[] = [];
+  let skipped = 0;
+  for (const row of pkgs ?? []) {
+    const pkg = toPackage(row);
+    if (!birthrightApplies(pkg, { identityType: subject.identityType, department: subject.department, status: subject.status })) continue;
+    const { data: held, error: heldError } = await admin.from("access_package_assignments").select("id").eq("tenant_id", tenantId).eq("identity_id", identityId).eq("package_id", pkg.id).in("status", LIVE).limit(1).maybeSingle();
+    if (heldError) throw new ApiError(500, "QUERY_FAILED", heldError.message);
+    if (held) {
+      skipped++;
+      continue;
+    }
+    const expiry = assignmentExpiry(new Date(), null, pkg);
+    let assignmentId: string;
+    try {
+      assignmentId = await createAssignment(tenantId, null, { packageId: pkg.id, identityId, requestId: null, source: "birthright", justification: `Birthright: ${meta.eventType}`, expiresAt: expiry.expiresAt });
+    } catch (err) {
+      if (err instanceof ApiError && (err.code === "ALREADY_ASSIGNED" || err.code === "PACKAGE_EMPTY")) {
+        skipped++;
+        continue;
+      }
+      throw err;
+    }
+    assigned.push(assignmentId);
+    await writeAudit({ tenantId, actorType: "system", action: "access.package_birthright_assigned", objectType: "access_package_assignment", objectId: assignmentId, outcome: "success", metadata: { packageId: pkg.id, identityId, eventId: meta.eventId, eventType: meta.eventType, approvedBy: pkg.birthrightApprovedBy } });
+  }
+  return { assigned, skipped };
 }
 
 /** Adds an application's access, or one of its entitlements, to a package. Only live applications. */
@@ -293,6 +420,7 @@ export async function addPackageResource(tenantId: string, actorId: string, pack
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Could not add it");
   await admin.from("access_packages").update({ updated_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("id", packageId);
   await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_resource_added", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { applicationId, entitlementId } });
+  await birthrightBackToPending(tenantId, actorId, packageId, "contents");
   return toResource(data as unknown as ResourceRow);
 }
 
@@ -304,6 +432,7 @@ export async function removePackageResource(tenantId: string, actorId: string, p
   if (!data) throw new ApiError(404, "NOT_FOUND", "No such resource in this package");
   await admin.from("access_packages").update({ updated_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("id", packageId);
   await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_resource_removed", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { applicationId: data.application_id, entitlementId: data.entitlement_id } });
+  await birthrightBackToPending(tenantId, actorId, packageId, "contents");
 }
 
 // ------------------------------------------------------------ requests
@@ -431,7 +560,7 @@ export type PackageAssignment = {
   identityId: string;
   identityName: string | null;
   requestId: string | null;
-  source: "request" | "direct";
+  source: "request" | "direct" | "birthright";
   status: AssignmentStatus;
   justification: string | null;
   startsAt: string;
@@ -445,7 +574,7 @@ export type PackageAssignment = {
 async function createAssignment(
   tenantId: string,
   actorId: string | null,
-  input: { packageId: string; identityId: string; requestId: string | null; justification: string | null; expiresAt: string | null },
+  input: { packageId: string; identityId: string; requestId: string | null; justification: string | null; expiresAt: string | null; source?: "birthright" },
 ): Promise<string> {
   const admin = supabaseServiceRole();
   const resources = (await resourcesOf(tenantId, [input.packageId], "service")).get(input.packageId) ?? [];
@@ -457,7 +586,7 @@ async function createAssignment(
       package_id: input.packageId,
       identity_id: input.identityId,
       request_id: input.requestId,
-      source: input.requestId ? "request" : "direct",
+      source: input.source ?? (input.requestId ? "request" : "direct"),
       status: "provisioning",
       justification: input.justification,
       expires_at: input.expiresAt,

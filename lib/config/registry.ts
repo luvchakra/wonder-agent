@@ -40,7 +40,9 @@ type Base = {
 };
 export type IntSetting = Base & { type: "int"; min: number; max: number; default: number; unit: string };
 export type ChoiceSetting = Base & { type: "choice"; options: readonly number[]; default: number; unit: string };
-export type ConfigSetting = IntSetting | ChoiceSetting;
+/** WID-H05: a list of host names; an entry "*.example.com" also admits its subdomains. Empty: no limit. */
+export type HostsSetting = Base & { type: "hosts"; default: readonly string[]; maxEntries: number; unit: string };
+export type ConfigSetting = IntSetting | ChoiceSetting | HostsSetting;
 
 const SECURITY = ["tenant.security.manage"];
 const SETTINGS = ["tenant.settings"];
@@ -224,6 +226,18 @@ export const CONFIG_SETTINGS = [
     unit: "changes",
   },
   {
+    // WID-H05: read by the Connector Gateway (modules/integrations/gateway/gateway.ts), for every driver and redirect.
+    key: "integration.allowedHosts",
+    section: "imports",
+    label: "Connections may reach only these hosts",
+    help: "One host per line; *.example.com covers its subdomains. Empty: any public host. Private and internal addresses are always refused.",
+    permission: SECURITY,
+    type: "hosts",
+    default: [] as readonly string[],
+    maxEntries: 50,
+    unit: "",
+  },
+  {
     key: "sod.conflictWindowDays",
     section: "sod",
     label: "Count SoD conflicts from the last",
@@ -238,15 +252,42 @@ export const CONFIG_SETTINGS = [
 ] as const satisfies readonly ConfigSetting[];
 
 export type ConfigKey = (typeof CONFIG_SETTINGS)[number]["key"];
-export type TenantConfig = Record<ConfigKey, number>;
+type ValueOf<S> = S extends { type: "hosts" } ? readonly string[] : number;
+export type TenantConfig = { [S in (typeof CONFIG_SETTINGS)[number] as S["key"]]: ValueOf<S> };
+export type ConfigValue = number | readonly string[];
 
 const BY_KEY = new Map<string, ConfigSetting>(CONFIG_SETTINGS.map((s) => [s.key, s]));
 export const settingFor = (key: string): ConfigSetting | undefined => BY_KEY.get(key);
 
 export const DEFAULT_CONFIG = Object.fromEntries(CONFIG_SETTINGS.map((s) => [s.key, s.default])) as TenantConfig;
 
-/** A value the setting accepts, or null. Integers only; choices from the list. */
-export function acceptValue(setting: ConfigSetting, raw: unknown): number | null {
+const HOST_PATTERN = /^(\*\.)?(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+
+/**
+ * WID-H05: host names from a list or from text (one per line, or separated
+ * by commas or spaces): lower-cased, without a trailing dot, sorted and
+ * without repeats. Null when one is not a host name, or when there are too
+ * many. A port, scheme or path is not accepted: the list names hosts only.
+ */
+export function acceptHosts(raw: unknown, maxEntries: number): string[] | null {
+  const parts = Array.isArray(raw) ? raw : typeof raw === "string" ? raw.split(/[\s,]+/) : null;
+  if (!parts) return null;
+  const hosts = new Set<string>();
+  for (const p of parts) {
+    if (typeof p !== "string") return null;
+    const h = p.trim().toLowerCase().replace(/\.$/, "");
+    if (!h) continue;
+    if (!HOST_PATTERN.test(h)) return null;
+    hosts.add(h);
+  }
+  return hosts.size > maxEntries ? null : [...hosts].sort();
+}
+
+const sameValue = (a: ConfigValue, b: ConfigValue) => JSON.stringify(a) === JSON.stringify(b);
+
+/** A value the setting accepts, or null. Integers only; choices from the list; host names for a host list. */
+export function acceptValue(setting: ConfigSetting, raw: unknown): ConfigValue | null {
+  if (setting.type === "hosts") return acceptHosts(raw, setting.maxEntries);
   const n = typeof raw === "number" ? raw : typeof raw === "string" && /^\s*\d{1,6}\s*$/.test(raw) ? Number(raw.trim()) : NaN;
   if (!Number.isInteger(n)) return null;
   if (setting.type === "choice") return (setting.options as readonly number[]).includes(n) ? n : null;
@@ -259,15 +300,21 @@ export function resolveConfig(stored: unknown): TenantConfig {
   if (!stored || typeof stored !== "object" || Array.isArray(stored)) return out;
   for (const s of CONFIG_SETTINGS) {
     const v = acceptValue(s, (stored as Record<string, unknown>)[s.key]);
-    if (v !== null) out[s.key] = v;
+    if (v !== null) (out as Record<string, ConfigValue>)[s.key] = v;
   }
   return out;
 }
 
-export type ConfigChange = { key: ConfigKey; from: number; to: number };
+export type ConfigChange = { key: ConfigKey; from: ConfigValue; to: ConfigValue };
+
+/** A value as people read it: a host list joined, "any public host" when empty. */
+export function formatConfigValue(v: ConfigValue): string {
+  return Array.isArray(v) ? (v.length ? v.join(", ") : "any public host") : String(v);
+}
 export type PlanResult = { ok: true; next: TenantConfig; changes: ConfigChange[] } | { ok: false; errors: Record<string, string> };
 
-const describe = (s: ConfigSetting) => (s.type === "choice" ? `one of ${s.options.join(", ")} ${s.unit}` : `a whole number from ${s.min} to ${s.max}`);
+const describe = (s: ConfigSetting) =>
+  s.type === "choice" ? `one of ${s.options.join(", ")} ${s.unit}` : s.type === "hosts" ? `host names (at most ${s.maxEntries}), such as api.example.com or *.example.com` : `a whole number from ${s.min} to ${s.max}`;
 
 /**
  * Checks a submitted change against the current values: every value must be
@@ -290,12 +337,12 @@ export function planConfigChange(current: TenantConfig, input: Record<string, un
       continue;
     }
     const k = s.key as ConfigKey;
-    if (v === current[k]) continue;
+    if (sameValue(v, current[k])) continue;
     if (!s.permission.some((p) => permissions.includes(p))) {
       errors[key] = "You can't change this setting.";
       continue;
     }
-    next[k] = v;
+    (next as Record<string, ConfigValue>)[k] = v;
     changes.push({ key: k, from: current[k], to: v });
   }
   return Object.keys(errors).length ? { ok: false, errors } : { ok: true, next, changes };

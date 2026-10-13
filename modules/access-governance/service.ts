@@ -133,6 +133,8 @@ export {
   removePackageResource,
   requestPackage,
   assignPackageDirect,
+  setPackageBirthright,
+  assignBirthrightPackages,
   listAssignments,
   getAssignment,
   setAssignmentItemStatus,

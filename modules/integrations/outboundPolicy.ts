@@ -125,7 +125,24 @@ export function isPrivateAddress(ip: string): boolean {
   return false;
 }
 
-export type OutboundPolicy = { allowPrivateNetworks: boolean };
+/**
+ * `allowedHosts` (WID-H05): the organization's list of hosts its connections
+ * may reach (Global Configuration, integration.allowedHosts). Empty or
+ * absent: any public host. It narrows; it never widens what the address
+ * checks below allow.
+ */
+export type OutboundPolicy = { allowPrivateNetworks: boolean; allowedHosts?: readonly string[] };
+
+/**
+ * Whether a host is on the list: an exact name, or under a "*.example.com"
+ * entry (a subdomain, not example.com itself). An empty list allows every
+ * host; the other checks still apply.
+ */
+export function hostAllowed(host: string, allowedHosts: readonly string[] | undefined): boolean {
+  if (!allowedHosts || allowedHosts.length === 0) return true;
+  const h = host.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+  return allowedHosts.some((entry) => (entry.startsWith("*.") ? h.endsWith(entry.slice(1)) && h.length > entry.length - 1 : h === entry));
+}
 
 export function outboundPolicyFromEnv(env: Record<string, string | undefined> = process.env): OutboundPolicy {
   return { allowPrivateNetworks: env.OUTBOUND_ALLOW_PRIVATE_NETWORKS === "true" };
@@ -151,6 +168,7 @@ export function checkOutboundUrl(raw: string | URL, policy: OutboundPolicy): URL
   const host = url.hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
   if (!host) throw new OutboundBlockedError("The address has no host");
   if (METADATA_HOSTS.has(host) || isMetadataAddress(host)) throw new OutboundBlockedError(`${host} is a cloud metadata endpoint`);
+  if (!hostAllowed(host, policy.allowedHosts)) throw new OutboundBlockedError(`${host} is not on this organization's list of hosts connections may reach`);
   if (!policy.allowPrivateNetworks) {
     if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa")) {
       throw new OutboundBlockedError(`${host} is not a public address`);

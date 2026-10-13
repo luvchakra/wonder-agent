@@ -79,6 +79,8 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
 | 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
 | 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
+| 13 Oct 2026 | Birthright packages: people who join, are rehired or move get the packages meant for them automatically. Two administrators turn birthright on, and a change to the package needs approval again. |
+| 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
 
 ---
 
@@ -150,6 +152,7 @@ The everyday cycle looks like this:
 
 **Joiners, movers and leavers**
 - When someone joins, changes role or leaves, WonderID creates the work that follows: tasks to hand over ownership and remove access. People do this work.
+- When someone joins (on their start date), is rehired or moves, they get the birthright packages they are eligible for at once (see Access packages).
 - When someone actually stops working (disabled, terminated or archived), each access they hold gets its own removal task on Fulfilment Tasks, marked "Person left" and due within a day. Access approved but never set up is withdrawn. Serving notice does not start this.
 - A person makes each of these removals, even where a connection could; it counts as removed only when a later read of the system no longer finds it.
 - Where a connection can disable accounts and has changes turned on, it disables the person's account there at once. The next read confirms it. If it fails, the application's owner gets the task with the reason.
@@ -266,6 +269,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 **The Connector Gateway**
 - Every call to or from your systems passes through one gateway.
 - It blocks calls to internal or unexpected addresses, for every organization, and limits the request rate. A connection's credentials are not sent when a system redirects elsewhere.
+- **Allowed hosts (optional):** an administrator with the security permission can list the hosts connections may reach (Administration → Global Configuration → Connections). Anything else is refused, including redirects. Empty means any public host.
 - It also counts usage.
 
 ---
@@ -338,6 +342,10 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 
 **Access packages**
 - Bundles of access that are commonly needed together, requested in one go.
+- **Birthright:** a package can be given automatically to the people it is for (by type and department) when they join, are rehired or move. They get it without a request; it is set up and verified like any other access.
+  - Two administrators turn birthright on: one asks, someone else approves.
+  - Any change to what the package includes, or to who it is for, needs approval again; until then nobody new gets it.
+  - One administrator can turn it off.
 
 **Time-bound access**
 - Access can have an end date.
@@ -602,4 +610,4 @@ These pages are for the WonderID service operator only, never for customers:
 - **Groups pushed over SCIM**, and standard security events (RFC 9967) from identity providers.
 - **A relay** to reach systems inside your own network without opening it up.
 - **Ready-made connections** for Microsoft Entra ID, an HR system (Workday or SuccessFactors) and ServiceNow ticketing.
-- **Joiner, mover and leaver automation** with default ("birthright") access, and reviews for every identity type.
+- **Reviews for every identity type** on joiner, mover and leaver events.
