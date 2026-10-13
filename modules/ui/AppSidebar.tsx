@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
@@ -186,8 +186,8 @@ function AreaRow({ item, active, badges, onOpen, onNavigate }: { item: ShellNavI
 }
 
 /** An area's menu: its name with a back arrow to the area list, then its pages and groups. */
-function AreaMenu({ item, active, pathname, onBack, onNavigate }: { item: ShellNavItem; active: boolean; pathname: string; onBack: () => void; onNavigate?: () => void }) {
-  const currentHref = active ? activeChildHref(item, pathname) : null;
+function AreaMenu({ item, active, pathname, search, onBack, onNavigate }: { item: ShellNavItem; active: boolean; pathname: string; search: string; onBack: () => void; onNavigate?: () => void }) {
+  const currentHref = active ? activeChildHref(item, pathname, search) : null;
   const listId = `nav-area-${item.label.replace(/\W+/g, "-").toLowerCase()}`;
   return (
     <>
@@ -254,16 +254,18 @@ function ExpandedNav({
   nav,
   badges,
   pathname,
+  search,
   onNavigate,
   focusSearch,
 }: {
   nav: ShellNavItem[];
   badges: ShellBadgeCounts;
   pathname: string;
+  search: string;
   onNavigate?: () => void;
   focusSearch?: boolean;
 }) {
-  const current = activeArea(nav, pathname);
+  const current = activeArea(nav, pathname, search);
   // The front door ("/") shows the area list; any other page opens its
   // area's menu with the page marked current.
   const auto = current && pathname !== "/" ? current.label : null;
@@ -300,7 +302,7 @@ function ExpandedNav({
       {trimmed ? (
         <SearchResults nav={nav} query={trimmed} onNavigate={onNavigate} />
       ) : openIsMenu && open ? (
-        <AreaMenu item={open} active={current?.label === open.label} pathname={pathname} onBack={() => setOpenLabel(null)} onNavigate={onNavigate} />
+        <AreaMenu item={open} active={current?.label === open.label} pathname={pathname} search={search} onBack={() => setOpenLabel(null)} onNavigate={onNavigate} />
       ) : (
         <ul className="space-y-1">
           {nav.map((item) => (
@@ -326,7 +328,7 @@ const flyoutItem = cn(
  * menu, and on hover for a pointer: entering the icon opens it, and it
  * closes shortly after the pointer has left both the icon and the panel.
  */
-function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavItem; active: boolean; badges: ShellBadgeCounts; pathname: string }) {
+function CollapsedSection({ item, active, badges, pathname, search }: { item: ShellNavItem; active: boolean; badges: ShellBadgeCounts; pathname: string; search: string }) {
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const count = item.badge ? badges[item.badge] : undefined;
@@ -360,7 +362,7 @@ function CollapsedSection({ item, active, badges, pathname }: { item: ShellNavIt
     );
   }
 
-  const currentHref = active ? activeChildHref(item, pathname) : null;
+  const currentHref = active ? activeChildHref(item, pathname, search) : null;
   return (
     <li className="flex justify-center" onPointerEnter={(e) => e.pointerType === "mouse" && hoverOpen()} onPointerLeave={(e) => e.pointerType === "mouse" && hoverClose()}>
       <DropdownMenu.Root open={open} onOpenChange={setOpen} modal={false}>
@@ -513,6 +515,8 @@ function SidebarBody({
   onNavigate,
 }: SidebarProps & { collapsed: boolean; onToggle?: () => void; onSearch?: () => void; focusSearch?: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
+  // A page's view (e.g. My Requests vs Approvals) is in the query (shell-nav matchScore).
+  const search = useSearchParams()?.toString() ?? "";
   return (
     <>
       <Brand collapsed={collapsed} onToggle={onToggle} />
@@ -533,11 +537,11 @@ function SidebarBody({
               </li>
             ) : null}
             {nav.map((item) => (
-              <CollapsedSection key={item.href} item={item} active={isNavItemActive(item, pathname, nav)} badges={badges} pathname={pathname} />
+              <CollapsedSection key={item.href} item={item} active={isNavItemActive(item, pathname, nav, search)} badges={badges} pathname={pathname} search={search} />
             ))}
           </ul>
         ) : (
-          <ExpandedNav nav={nav} badges={badges} pathname={pathname} onNavigate={onNavigate} focusSearch={focusSearch} />
+          <ExpandedNav nav={nav} badges={badges} pathname={pathname} search={search} onNavigate={onNavigate} focusSearch={focusSearch} />
         )}
       </nav>
       <div className={cn("shrink-0 space-y-1 border-t border-sidebar-border py-2", collapsed ? "px-2" : "px-3")}>

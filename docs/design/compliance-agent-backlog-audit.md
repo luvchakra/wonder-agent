@@ -1176,3 +1176,46 @@ Verified:
 - `npx vitest run modules/privacy`: 17 passed (new `subjectData.test.ts`: every statement carries the tenant filter, only HUMAN and EXTERNAL identities, account references kept, write targets pseudonymised);
 - the `target->>email` and `target->>username` filters, read-only against
   the live API.
+
+### 2026-10-13 — Campaigns are built in the background; counts and items paged in the database (§15)
+
+QA's 2026-10-12 full run noted that a launch took 5.5 s at 80 agents, and
+that a large organization needs the campaign filled in the background.
+
+Built:
+- **Migration `0154_compliance_campaign_build.sql`** (applied):
+  - on `certification_campaigns`: `build_status` (building, ready or
+    failed; existing campaigns are ready), `build_error`, `items_total`
+    and `built_at`;
+  - `campaign_item_counts(p_tenant, p_campaign)`, security invoker, which
+    counts total, pending, decided, overdue and escalated items per
+    campaign in one query.
+- **`launchCampaign`** validates, creates the campaign as building, and
+  returns. `after()` then builds the items: everything is read first and
+  written last, then the campaign is marked ready with its count.
+  - On failure, the undecided items it wrote are removed and the campaign
+    is marked failed with a safe reason. Decided items are evidence and
+    stay.
+  - Either way it is audited (`compliance.campaign_built`).
+- **`failStaleCampaignBuilds`** (compliance cron) fails a build still
+  running after 15 minutes.
+- **Counts:**
+  - `getCampaignMetrics` and the campaigns list count in the database. The
+    list used to read every item of every campaign.
+  - The detail page reads one page of items: paged, sorted (known columns
+    only) and filtered (a known word or an agent id; typed text never
+    reaches a query string) in the database. It used to read every item
+    twice.
+- **UI:** the campaign page says when it is building or failed; the list
+  shows "building" / "failed".
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest `modules/certification-compliance`: 59/59, including the new
+  background-build cases (returns building, builds, marks ready; failure
+  marked with a safe reason and audited).
+
+Left out:
+- the evidence export and the operations report still read every item.
+  They need the complete set by design.
+

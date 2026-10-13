@@ -1,5 +1,7 @@
 import "server-only";
 
+import { after } from "next/server";
+
 import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
@@ -68,7 +70,7 @@ async function populateCertificationItems(
   agents: { id: string }[],
   input: LaunchCampaignInput,
   grantFilter?: (grant: Awaited<ReturnType<typeof getEffectiveAccess>>[number]) => boolean,
-): Promise<void> {
+): Promise<number> {
   const svc = supabaseServiceRole();
   // Agents are read AGENT_BATCH at a time and the items written in bulk:
   // one agent after another made a launch take about half a second per
@@ -112,10 +114,92 @@ async function populateCertificationItems(
     );
     for (const items of batch) rows.push(...items);
   }
+  // Everything is read first and written last, so a failed read writes nothing.
   for (let i = 0; i < rows.length; i += 500) {
     const { error: itemError } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
     if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
   }
+  return rows.length;
+}
+
+type ScopeTargets = { agents: { id: string }[]; grantFilter?: Parameters<typeof populateCertificationItems>[4] };
+
+/** The agents (and, for some scopes, the grants) a campaign covers. */
+async function scopeTargets(tenantId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<ScopeTargets> {
+  if (input.scopeType === "agent") {
+    const criticalities = Array.isArray(input.scope?.criticality) ? (input.scope!.criticality as string[]) : null;
+    const agents = await listAgents(tenantId);
+    return { agents: criticalities ? agents.filter((a) => criticalities.includes(a.criticality)) : agents };
+  }
+  if (input.scopeType === "application") return { agents: await listAgents(tenantId), grantFilter: (grant) => grant.applicationId === ids.applicationId };
+  if (input.scopeType === "entitlement") return { agents: await listAgents(tenantId), grantFilter: (grant) => grant.entitlementId === ids.entitlementId };
+  if (input.scopeType === "privileged_access") return { agents: await listAgents(tenantId), grantFilter: (grant) => grant.privilegeLevel === "elevated" || grant.privilegeLevel === "admin" };
+  if (input.scopeType === "high_risk_agent") {
+    // The campaign's own threshold, else the organization's (Global Configuration), else HIGH_RISK_SCORE_THRESHOLD.
+    const threshold =
+      typeof input.scope?.minRiskScore === "number"
+        ? (input.scope.minRiskScore as number)
+        : ((await getTenantConfig(tenantId))["certification.highRiskScore"] ?? HIGH_RISK_SCORE_THRESHOLD);
+    return { agents: (await listAgents(tenantId)).filter((a) => a.riskScore !== null && a.riskScore >= threshold) };
+  }
+  return { agents: [] };
+}
+
+/** A build error as it may be shown and stored: short, and never a stack or a secret. */
+function buildErrorText(err: unknown): string {
+  return err instanceof ApiError ? err.message.slice(0, 300) : "The items could not be built. Launch the campaign again.";
+}
+
+/**
+ * §15: builds a launched campaign's items after the response has gone, then
+ * marks it ready with its count. On failure it removes any undecided items
+ * it wrote and marks the campaign failed with the reason, so a reviewer
+ * never works from a half-built campaign. Service role for the status and
+ * clean-up, pinned to the tenant (§14). Audited either way (#11).
+ */
+async function buildCampaign(tenantId: string, actorId: string, campaignId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<void> {
+  const svc = supabaseServiceRole();
+  try {
+    const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
+    const total = await populateCertificationItems(tenantId, campaignId, agents, input, grantFilter);
+    const { error } = await svc
+      .from("certification_campaigns")
+      .update({ build_status: "ready", items_total: total, built_at: new Date().toISOString(), build_error: null })
+      .eq("tenant_id", tenantId)
+      .eq("id", campaignId)
+      .eq("build_status", "building");
+    if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "compliance.campaign_built", objectType: "certification_campaign", objectId: campaignId, outcome: "success", metadata: { items: total } });
+  } catch (err) {
+    const message = buildErrorText(err);
+    await failCampaignBuild(tenantId, campaignId, message);
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "compliance.campaign_built", objectType: "certification_campaign", objectId: campaignId, outcome: "failure", metadata: { error: message } });
+  }
+}
+
+/** Marks a build failed and removes the undecided items it wrote (decided ones are evidence and stay). */
+async function failCampaignBuild(tenantId: string, campaignId: string, message: string): Promise<void> {
+  const svc = supabaseServiceRole();
+  await svc.from("certification_items").delete().eq("tenant_id", tenantId).eq("campaign_id", campaignId).eq("status", "pending");
+  await svc.from("certification_campaigns").update({ build_status: "failed", build_error: message.slice(0, 500) }).eq("tenant_id", tenantId).eq("id", campaignId).eq("build_status", "building");
+}
+
+/**
+ * §15: a build that never finished (the process ended, say) is failed after
+ * BUILD_TIMEOUT_MINUTES, so the campaign does not say "building" forever.
+ * For the compliance cron; each write is pinned to the row's own tenant.
+ */
+export const BUILD_TIMEOUT_MINUTES = 15;
+export async function failStaleCampaignBuilds(now = new Date()): Promise<number> {
+  const svc = supabaseServiceRole();
+  const cutoff = new Date(now.getTime() - BUILD_TIMEOUT_MINUTES * 60_000).toISOString();
+  const { data, error } = await svc.from("certification_campaigns").select("id, tenant_id").eq("build_status", "building").lt("created_at", cutoff).limit(200);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  for (const c of data ?? []) {
+    await failCampaignBuild(c.tenant_id as string, c.id as string, "The build was interrupted. Launch the campaign again.");
+    await writeAudit({ tenantId: c.tenant_id as string, actorType: "system", action: "compliance.campaign_built", objectType: "certification_campaign", objectId: c.id as string, outcome: "failure", metadata: { error: "interrupted" } });
+  }
+  return data?.length ?? 0;
 }
 
 /**
@@ -160,6 +244,7 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
       status: "active",
       due_date: input.dueDate ?? null,
       created_by: actorId,
+      build_status: "building",
     })
     .select()
     .single();
@@ -167,29 +252,8 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
 
   const campaign = toCertificationCampaign(campaignRow);
 
-  if (input.scopeType === "agent") {
-    const criticalities = Array.isArray(input.scope?.criticality) ? (input.scope!.criticality as string[]) : null;
-    const agents = await listAgents(tenantId);
-    const matching = criticalities ? agents.filter((a) => criticalities.includes(a.criticality)) : agents;
-    await populateCertificationItems(tenantId, campaign.id, matching, input);
-  } else if (input.scopeType === "application") {
-    const agents = await listAgents(tenantId);
-    await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.applicationId === applicationId);
-  } else if (input.scopeType === "entitlement") {
-    const agents = await listAgents(tenantId);
-    await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.entitlementId === entitlementId);
-  } else if (input.scopeType === "privileged_access") {
-    const agents = await listAgents(tenantId);
-    await populateCertificationItems(tenantId, campaign.id, agents, input, (grant) => grant.privilegeLevel === "elevated" || grant.privilegeLevel === "admin");
-  } else if (input.scopeType === "high_risk_agent") {
-    // The campaign's own threshold, else the organization's (Global Configuration), else HIGH_RISK_SCORE_THRESHOLD.
-    const threshold =
-      typeof input.scope?.minRiskScore === "number"
-        ? (input.scope.minRiskScore as number)
-        : ((await getTenantConfig(tenantId))["certification.highRiskScore"] ?? HIGH_RISK_SCORE_THRESHOLD);
-    const agents = (await listAgents(tenantId)).filter((a) => a.riskScore !== null && a.riskScore >= threshold);
-    await populateCertificationItems(tenantId, campaign.id, agents, input);
-  }
+  // §15: the items are built after the response, so a large organization's launch returns at once.
+  after(() => buildCampaign(tenantId, actorId, campaign.id, input, { applicationId, entitlementId }));
 
   await writeAudit({
     tenantId,
@@ -203,6 +267,14 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
   });
 
   return campaign;
+}
+
+/** One campaign of the tenant, or null. */
+export async function getCampaign(tenantId: string, campaignId: string): Promise<CertificationCampaign | null> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("certification_campaigns").select().eq("tenant_id", tenantId).eq("id", campaignId).maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return data ? toCertificationCampaign(data) : null;
 }
 
 export async function listCampaigns(tenantId: string): Promise<CertificationCampaign[]> {
@@ -241,16 +313,56 @@ export async function listCampaignItems(tenantId: string, campaignId: string): P
  * escalated items." `overdueItems` counts every still-pending item whose
  * due_date has passed, whether or not it has been escalated yet;
  * `escalatedItems` counts items `escalateOverdueItems()` (escalation.ts)
- * has already processed.
+ * has already processed. Counted in the database (campaign_item_counts,
+ * migration 0154), never by reading every item (§15).
  */
 export async function getCampaignMetrics(tenantId: string, campaignId: string): Promise<CampaignMetrics> {
-  const items = await listCampaignItems(tenantId, campaignId);
-  const now = Date.now();
-  return {
-    totalItems: items.length,
-    pendingItems: items.filter((i) => i.status === "pending").length,
-    decidedItems: items.filter((i) => i.status === "decided").length,
-    overdueItems: items.filter((i) => i.status === "pending" && i.dueDate && new Date(i.dueDate).getTime() < now).length,
-    escalatedItems: items.filter((i) => i.escalatedAt !== null).length,
-  };
+  const counts = await campaignItemCounts(tenantId, campaignId);
+  return counts.get(campaignId) ?? { totalItems: 0, pendingItems: 0, decidedItems: 0, overdueItems: 0, escalatedItems: 0 };
+}
+
+/** §15: item counts for one campaign or every campaign of the tenant, in one query. */
+export async function campaignItemCounts(tenantId: string, campaignId?: string): Promise<Map<string, CampaignMetrics>> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.rpc("campaign_item_counts", { p_tenant: tenantId, p_campaign: campaignId ?? null });
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const out = new Map<string, CampaignMetrics>();
+  for (const r of (data ?? []) as { campaign_id: string; total: number; pending: number; decided: number; overdue: number; escalated: number }[]) {
+    out.set(r.campaign_id, { totalItems: Number(r.total), pendingItems: Number(r.pending), decidedItems: Number(r.decided), overdueItems: Number(r.overdue), escalatedItems: Number(r.escalated) });
+  }
+  return out;
+}
+
+const ITEM_SORTS = { status: "status", riskAtReview: "risk_at_review", recommendation: "recommendation", agentId: "agent_id" } as const;
+const ITEM_WORDS = ["pending", "decided", "keep", "review", "remove", "used", "never", "unknown"] as const;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * §15: one page of a campaign's items, paged, sorted and filtered in the
+ * database. Sorting only by known columns; the filter matches a known word
+ * (a status, recommendation or usage) or an agent id, so typed text never
+ * reaches a query string (§18.3 #8).
+ */
+export async function listCampaignItemsPage(
+  tenantId: string,
+  campaignId: string,
+  opts: { page?: number; pageSize?: number; sortKey?: string | null; sortDir?: "asc" | "desc"; q?: string },
+): Promise<{ rows: CertificationItem[]; total: number }> {
+  const pageSize = Math.min(Math.max(Math.trunc(opts.pageSize ?? 25) || 25, 1), 200);
+  const page = Math.max(Math.trunc(opts.page ?? 1) || 1, 1);
+  const supabase = await supabaseServer();
+  let query = supabase.from("certification_items").select("*", { count: "exact" }).eq("tenant_id", tenantId).eq("campaign_id", campaignId);
+  const q = (opts.q ?? "").trim().toLowerCase();
+  if (q) {
+    if (UUID_RE.test(q)) query = query.eq("agent_id", q);
+    else if ((ITEM_WORDS as readonly string[]).includes(q)) query = q === "pending" || q === "decided" ? query.eq("status", q) : ["used", "never", "unknown"].includes(q) ? query.eq("usage_at_review", q) : query.eq("recommendation", q);
+    else return { rows: [], total: 0 };
+  }
+  const sortColumn = opts.sortKey && opts.sortKey in ITEM_SORTS ? ITEM_SORTS[opts.sortKey as keyof typeof ITEM_SORTS] : "status";
+  const { data, error, count } = await query
+    .order(sortColumn, { ascending: (opts.sortDir ?? "asc") === "asc" })
+    .order("id")
+    .range((page - 1) * pageSize, page * pageSize - 1);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return { rows: (data ?? []).map(toCertificationItem), total: count ?? 0 };
 }

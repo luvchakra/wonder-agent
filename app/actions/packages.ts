@@ -9,6 +9,7 @@ import {
   removePackageResource,
   requestPackage,
   revokeAssignment,
+  keepAssignment,
   setAssignmentItemStatus,
   updatePackage,
   setPackageBirthright,
@@ -152,6 +153,19 @@ export async function itemStatusAction(packageId: string, itemId: string, _prev:
     await setAssignmentItemStatus(ctx.tenantId!, ctx.userId, itemId, status, str(formData, "detail"));
     refresh(packageId);
     return { status: "saved", message: status === "failed" ? "Recorded as failed." : status === "revoked" ? "Recorded as removed." : status === "pending" ? "Back to pending." : "Recorded as done." };
+  } catch (err) {
+    return formError(err);
+  }
+}
+
+/** WID-H09: keeps a mover's birthright package under review. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- useActionState passes the previous state first
+export async function keepAssignmentAction(packageId: string, assignmentId: string, _prev: PackageFormState): Promise<PackageFormState> {
+  const ctx = await requirePermission("access.manage");
+  try {
+    await keepAssignment(ctx.tenantId!, ctx.userId, assignmentId);
+    refresh(packageId);
+    return { status: "saved", message: "Kept. It will not be removed." };
   } catch (err) {
     return formError(err);
   }

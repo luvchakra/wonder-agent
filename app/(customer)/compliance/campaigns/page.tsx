@@ -1,13 +1,15 @@
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listCampaigns, listCampaignItems } from "@/modules/certification-compliance/service";
+import { campaignItemCounts, listCampaigns } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { launchCampaignAction } from "@/app/actions/compliance";
 import { Card, CardHeader, CardBody, Button, TextField, SelectField, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CampaignsList, type CampaignRow } from "./CampaignsList";
 
-export default async function CampaignsPage() {
+export default async function CampaignsPage({ searchParams }: { searchParams: Promise<{ launch?: string }> }) {
+  // Access Reviews › Create Campaigns (owner's navigation, 2026-10-13): the launch form first, focused.
+  const launching = (await searchParams).launch === "1";
   let ctx;
   try {
     ctx = await requirePermission("compliance.read");
@@ -16,24 +18,18 @@ export default async function CampaignsPage() {
     throw err;
   }
 
-  const campaigns = await listCampaigns(ctx.tenantId!);
-
   // Outstanding/overdue counts per campaign, so the list leads with what
-  // still needs a human decision rather than just a status word. Fanned out
-  // in parallel (CLAUDE.md §15) over Compliance's own published contract.
-  const nowIso = new Date().toISOString();
-  const itemLists = await Promise.all(campaigns.map((c) => listCampaignItems(ctx.tenantId!, c.id)));
-  const rows: CampaignRow[] = campaigns.map((c, i) => {
-    const pendingItems = itemLists[i].filter((item) => item.status === "pending");
-    return {
-      id: c.id,
-      name: c.name,
-      scopeType: c.scopeType,
-      status: c.status,
-      pending: pendingItems.length,
-      overdue: pendingItems.filter((item) => item.dueDate && item.dueDate < nowIso).length,
-    };
-  });
+  // still needs a human decision rather than just a status word. Counted in
+  // the database in one query (§15), never by reading every item.
+  const [campaigns, counts] = await Promise.all([listCampaigns(ctx.tenantId!), campaignItemCounts(ctx.tenantId!)]);
+  const rows: CampaignRow[] = campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    scopeType: c.scopeType,
+    status: c.buildStatus === "building" ? "building" : c.buildStatus === "failed" ? "failed" : c.status,
+    pending: counts.get(c.id)?.pendingItems ?? 0,
+    overdue: counts.get(c.id)?.overdueItems ?? 0,
+  }));
 
   return (
     <div className="space-y-5">
@@ -47,35 +43,66 @@ export default async function CampaignsPage() {
         <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["campaigns"])} />
       </div>
 
+      {launching ? (
+        <Card>
+          <CardHeader title="Launch a new campaign" />
+          <CardBody>
+            <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <TextField label="Campaign name" name="name" required autoFocus={launching} />
+              </div>
+              <SelectField label="Scope type" name="scopeType" defaultValue="agent">
+                <option value="agent">agent</option>
+                <option value="application">application</option>
+                <option value="entitlement">entitlement</option>
+                <option value="privileged_access">privileged_access</option>
+                <option value="high_risk_agent">high_risk_agent</option>
+              </SelectField>
+              <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
+              <SelectField label="Cadence" name="cadence" defaultValue="one_time">
+                <option value="one_time">one_time</option>
+                <option value="periodic">periodic</option>
+                <option value="event_driven">event_driven</option>
+              </SelectField>
+              <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+              <div className="sm:col-span-2">
+                <Button type="submit">Launch</Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      ) : null}
       <CampaignsList campaigns={rows} />
 
-      <Card>
-        <CardHeader title="Launch a new campaign" />
-        <CardBody>
-          <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <TextField label="Campaign name" name="name" required />
-            </div>
-            <SelectField label="Scope type" name="scopeType" defaultValue="agent">
-              <option value="agent">agent</option>
-              <option value="application">application</option>
-              <option value="entitlement">entitlement</option>
-              <option value="privileged_access">privileged_access</option>
-              <option value="high_risk_agent">high_risk_agent</option>
-            </SelectField>
-            <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
-            <SelectField label="Cadence" name="cadence" defaultValue="one_time">
-              <option value="one_time">one_time</option>
-              <option value="periodic">periodic</option>
-              <option value="event_driven">event_driven</option>
-            </SelectField>
-            <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
-            <div className="sm:col-span-2">
-              <Button type="submit">Launch</Button>
-            </div>
-          </form>
-        </CardBody>
-      </Card>
+      {launching ? null : (
+        <Card>
+          <CardHeader title="Launch a new campaign" />
+          <CardBody>
+            <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <TextField label="Campaign name" name="name" required autoFocus={launching} />
+              </div>
+              <SelectField label="Scope type" name="scopeType" defaultValue="agent">
+                <option value="agent">agent</option>
+                <option value="application">application</option>
+                <option value="entitlement">entitlement</option>
+                <option value="privileged_access">privileged_access</option>
+                <option value="high_risk_agent">high_risk_agent</option>
+              </SelectField>
+              <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
+              <SelectField label="Cadence" name="cadence" defaultValue="one_time">
+                <option value="one_time">one_time</option>
+                <option value="periodic">periodic</option>
+                <option value="event_driven">event_driven</option>
+              </SelectField>
+              <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+              <div className="sm:col-span-2">
+                <Button type="submit">Launch</Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+      )}
     </div>
   );
 }

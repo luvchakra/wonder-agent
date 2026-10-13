@@ -23,7 +23,7 @@
 
 [Revision history](#revision-history) is below.
 
-**Last updated:** 12 October 2026
+**Last updated:** 13 October 2026
 
 A plain-language guide to what WonderID does, how its parts fit together and where to find each feature. It is kept current as the product changes.
 
@@ -83,6 +83,10 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
 | 13 Oct 2026 | Separation of duties described as it is: it covers the same person performing two actions for an AI agent; rules on combinations of access are not provided yet. |
 | 13 Oct 2026 | An organization can require two-step verification. Members then verify with an authenticator app, or set one up, before they see anything; automation credentials are exempt. |
+| 13 Oct 2026 | When someone moves and no longer qualifies for a birthright package, their manager has 14 days to keep it; otherwise it is removed. |
+| 13 Oct 2026 | New navigation: Home, My Workspace, Access, AI Agents, Access Reviews, Risk & Detection, Self Service, then Administration with its own sidebar. New pages: Rogue Accounts, Onboarding Reviews. The dashboard now summarizes the whole platform. |
+| 13 Oct 2026 | Reporting: how to create reports today (ready-made reports, exports of every list for spreadsheets and BI tools) and the planned report builder. |
+| 13 Oct 2026 | Access review campaigns are built in the background, so launching one never makes you wait. |
 
 ---
 
@@ -129,8 +133,23 @@ The everyday cycle looks like this:
 - Each organization can have its own web address and logo.
 
 **Navigation**
-- **Main menu:** starts at Home, then My Access and the areas you work in.
-- **Admin menu:** organization administration has its own menu. Open it with **Admin** at the bottom of the main menu, and use the back button to return to Home.
+- **Main menu:**
+  - Home: the dashboard, a summary of the whole platform;
+  - My Workspace: my requests, approvals waiting on me, my tasks, my privacy, sign-in security;
+  - Access: request access, requests, provisioning, packages, entitlements, request policies;
+  - AI Agents;
+  - Access Reviews;
+  - Risk & Detection: rogue accounts, rogue agents, SoD violations, investigations;
+  - Self Service: onboard an application, register an agent.
+- **Administration menu:** organization administration has its own sidebar. Open it with **Administration** at the bottom of the main menu, and use the back button to return. It holds:
+  - Identities;
+  - Applications;
+  - Policies & Controls;
+  - Reports & Audit;
+  - Users & Roles;
+  - Integrations;
+  - Organization Settings;
+  - Privacy & Audit.
 - **What you see:** each menu lists only the pages your permissions allow.
 
 **Everywhere**
@@ -514,6 +533,53 @@ Findings are raised for:
 **Reports and exports**
 - Ready-made governance reports, exported as files.
 
+### Creating reports
+
+What an administrator can use today, and what is planned. Everything
+runs inside your organization and respects the viewer's permissions.
+
+**Today: ready-made reports** (Administration › Reports & Audit › Reports, permission `report.read`)
+- Eight reports, computed live when you open them:
+  - agent inventory;
+  - ownership;
+  - access certification;
+  - rogue agents;
+  - access violations;
+  - risk;
+  - audit evidence;
+  - policy compliance.
+- Each one downloads as CSV, or is read as JSON through the API:
+  - `GET /api/v1/reports/{type}`;
+  - `GET /api/v1/reports/{type}/export?format=csv`.
+- A report can be saved under a name with its filters (`POST /api/v1/reports`), so a team reuses the same view.
+
+**Today: export any list, then build the report where you like**
+- Every main list has an **Actions → Export** menu that downloads it as CSV. The list includes identities, accounts, applications, entitlements, access grants, requests, packages, findings, investigations, campaigns, runtime events, audit events and jobs.
+- Exports carry names, not just ids (the owner's name, the application's name), so they open cleanly in a spreadsheet or a BI tool.
+- The same exports are available to scripts: `GET /api/v1/exports/{object}`. An automation credential with read-only roles can pull them on a schedule into Power BI, Tableau, Looker or a data warehouse. That is the quickest way to build any report WonderID does not have yet.
+
+**Planned: your own reports in WonderID** (not built yet; on the Operations backlog as the custom report builder)
+- **A report builder, not raw SQL.** You pick a dataset, then choose:
+  - its columns;
+  - filters, such as "application is SAP and privilege is admin";
+  - grouping and counts, such as accounts by application;
+  - sorting.
+
+  You save it with a name and share it with roles.
+- **Datasets** are governed, read-only views of identities, accounts, access grants, entitlements, requests, findings, reviews, agents and audit events. Each view already joins the names you need.
+- **Optional SQL mode** for analysts:
+  - a single `SELECT` over those datasets only, never over the underlying tables;
+  - run read-only, with a time limit and a row cap;
+  - limited to your organization by the database's row-level security.
+
+  Other organizations' data and secrets are never reachable, and a query cannot change anything.
+- **Scheduling:** a saved report can be emailed or exported on a schedule, under the same permissions as the person who owns it.
+- **Why not plain SQL on the database?**
+  - WonderID holds many organizations in one database. Every query must stay inside yours.
+  - Some columns hold personal data or credentials that only certain roles may see.
+
+  The governed datasets enforce both, so a report can never show more than its viewer may see.
+
 **Notifications**
 - In the app and by email.
 - Choose which ones you receive.
@@ -614,3 +680,4 @@ These pages are for the WonderID service operator only, never for customers:
 - **A relay** to reach systems inside your own network without opening it up.
 - **Ready-made connections** for Microsoft Entra ID, an HR system (Workday or SuccessFactors) and ServiceNow ticketing.
 - **Reviews for every identity type** on joiner, mover and leaver events.
+- **Your own reports:** a report builder over governed datasets, with an optional read-only SQL mode (see [Creating reports](#creating-reports)).

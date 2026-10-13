@@ -37,19 +37,22 @@ export default async function ApplicationInventoryPage({
   const sp = await searchParams;
   const q = (sp.q ?? "").slice(0, 100);
   const status = (APPLICATION_ONBOARDING_STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as ApplicationOnboardingStatus) : undefined;
+  // Administration › Applications › Onboarding Reviews: every application still being onboarded.
+  const onboarding = sp.status === "onboarding";
   const appType = (APPLICATION_TYPES as readonly string[]).includes(sp.type ?? "") ? (sp.type as ApplicationType) : undefined;
   const riskLevel = (CATALOG_LEVELS as readonly string[]).includes(sp.risk ?? "") ? (sp.risk as CatalogLevel) : undefined;
   const missingOwner = sp.owner === "missing";
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   const [summary, { rows, total }] = await Promise.all([
     getCatalogSummary(tenantId),
-    listApplicationCatalog(tenantId, { q, status, appType, riskLevel, missingOwner, page, pageSize: PAGE_SIZE }),
+    listApplicationCatalog(tenantId, { q, status, onboarding, appType, riskLevel, missingOwner, page, pageSize: PAGE_SIZE }),
   ]);
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const href = (p: number) => {
     const u = new URLSearchParams();
     if (q) u.set("q", q);
     if (status) u.set("status", status);
+    else if (onboarding) u.set("status", "onboarding");
     if (appType) u.set("type", appType);
     if (riskLevel) u.set("risk", riskLevel);
     if (missingOwner) u.set("owner", "missing");
@@ -58,13 +61,13 @@ export default async function ApplicationInventoryPage({
     return `/access${s ? `?${s}` : ""}`;
   };
   const canManage = ctx.permissions.includes("access.manage");
-  const filtered = Boolean(q || status || appType || riskLevel || missingOwner);
+  const filtered = Boolean(q || status || onboarding || appType || riskLevel || missingOwner);
 
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Applications</h1>
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{onboarding ? "Onboarding Reviews" : "Applications"}</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
             Every application this organization governs access to: who owns it, how sensitive it is, and where it is in onboarding.
           </p>
@@ -98,8 +101,9 @@ export default async function ApplicationInventoryPage({
             </label>
             <input id="q" name="q" type="search" defaultValue={q} placeholder="Name, vendor or category" className={fieldInputClass} />
           </div>
-          <SelectField label="Status" name="status" defaultValue={status ?? ""}>
+          <SelectField label="Status" name="status" defaultValue={status ?? (onboarding ? "onboarding" : "")}>
             <option value="">Any status</option>
+            <option value="onboarding">Being onboarded</option>
             {APPLICATION_ONBOARDING_STATUSES.map((s) => (
               <option key={s} value={s}>
                 {ONBOARDING_LABEL[s].label}

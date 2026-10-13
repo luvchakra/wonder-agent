@@ -38,14 +38,29 @@ vi.mock("@/modules/runtime-assurance/service", () => ({
   getDid: (...a: unknown[]) => mockGetDid(...a),
 }));
 
+// §15: the items are built after the response (next/server after()); the tests await that work.
+const background: Promise<unknown>[] = [];
+vi.mock("next/server", () => ({ after: (work: () => Promise<unknown>) => void background.push(Promise.resolve().then(work)) }));
+const built = async <T>(p: Promise<T>): Promise<T> => {
+  const out = await p;
+  await Promise.all(background.splice(0));
+  return out;
+};
+
 const writeAudit = vi.fn();
 vi.mock("@/lib/audit/writeAudit", () => ({ writeAudit: (event: unknown) => writeAudit(event) }));
 
 const insertedItems: Record<string, unknown>[] = [];
 const campaignInsert = vi.fn();
+const campaignUpdate = vi.fn();
 
 function campaignsTable() {
+  const chain = { eq: () => chain, then: (resolve: (v: { error: null }) => void) => resolve({ error: null }) };
   return {
+    update: (patch: Record<string, unknown>) => {
+      campaignUpdate(patch);
+      return chain;
+    },
     insert: (row: Record<string, unknown>) => ({
       select: () => ({
         single: async () => {
@@ -58,7 +73,9 @@ function campaignsTable() {
 }
 
 function itemsTable() {
+  const chain = { eq: () => chain, then: (resolve: (v: { error: null }) => void) => resolve({ error: null }) };
   return {
+    delete: () => chain,
     // Items are written in bulk (an array), like the real client accepts.
     insert: (rows: Record<string, unknown> | Record<string, unknown>[]) => {
       insertedItems.push(...(Array.isArray(rows) ? rows : [rows]));
@@ -119,7 +136,7 @@ describe("launchCampaign — COMPLIANCE-P0-01.2's 4 previously-unimplemented sco
       agentId === "agent-1" ? [GRANT_SENDGRID, GRANT_DB_ADMIN] : [GRANT_DB_ADMIN],
     );
 
-    await launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "application", scope: { applicationId: "app-sendgrid" }, cadence: "one_time", reviewerId: "reviewer-1" });
+    await built(launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "application", scope: { applicationId: "app-sendgrid" }, cadence: "one_time", reviewerId: "reviewer-1" }));
 
     expect(insertedItems).toHaveLength(1);
     expect(insertedItems[0]).toMatchObject({ agent_id: "agent-1", access_grant_id: "grant-1" });
@@ -130,7 +147,7 @@ describe("launchCampaign — COMPLIANCE-P0-01.2's 4 previously-unimplemented sco
     mockListAgents.mockResolvedValue([AGENT_1, AGENT_2]);
     mockGetEffectiveAccess.mockResolvedValue([GRANT_SENDGRID, GRANT_DB_ADMIN]);
 
-    await launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "entitlement", scope: { entitlementId: "ent-db-admin" }, cadence: "one_time", reviewerId: "reviewer-1" });
+    await built(launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "entitlement", scope: { entitlementId: "ent-db-admin" }, cadence: "one_time", reviewerId: "reviewer-1" }));
 
     expect(insertedItems).toHaveLength(2); // one per agent, both hold GRANT_DB_ADMIN
     expect(insertedItems.every((i) => i.access_grant_id === "grant-2")).toBe(true);
@@ -140,7 +157,7 @@ describe("launchCampaign — COMPLIANCE-P0-01.2's 4 previously-unimplemented sco
     mockListAgents.mockResolvedValue([AGENT_1]);
     mockGetEffectiveAccess.mockResolvedValue([GRANT_SENDGRID, GRANT_DB_ADMIN]);
 
-    await launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "privileged_access", scope: {}, cadence: "one_time", reviewerId: "reviewer-1" });
+    await built(launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "privileged_access", scope: {}, cadence: "one_time", reviewerId: "reviewer-1" }));
 
     expect(insertedItems).toHaveLength(1);
     expect(insertedItems[0]).toMatchObject({ access_grant_id: "grant-2" });
@@ -150,7 +167,7 @@ describe("launchCampaign — COMPLIANCE-P0-01.2's 4 previously-unimplemented sco
     mockListAgents.mockResolvedValue([AGENT_1, AGENT_2]); // riskScore 20 and 80
     mockGetEffectiveAccess.mockResolvedValue([GRANT_SENDGRID]);
 
-    await launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "high_risk_agent", scope: {}, cadence: "one_time", reviewerId: "reviewer-1" });
+    await built(launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "high_risk_agent", scope: {}, cadence: "one_time", reviewerId: "reviewer-1" }));
 
     expect(insertedItems).toHaveLength(1);
     expect(insertedItems[0]).toMatchObject({ agent_id: "agent-2" });
@@ -160,8 +177,30 @@ describe("launchCampaign — COMPLIANCE-P0-01.2's 4 previously-unimplemented sco
     mockListAgents.mockResolvedValue([AGENT_1, AGENT_2]);
     mockGetEffectiveAccess.mockResolvedValue([GRANT_SENDGRID]);
 
-    await launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "high_risk_agent", scope: { minRiskScore: 10 }, cadence: "one_time", reviewerId: "reviewer-1" });
+    await built(launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "high_risk_agent", scope: { minRiskScore: 10 }, cadence: "one_time", reviewerId: "reviewer-1" }));
 
     expect(insertedItems).toHaveLength(2); // both agents now qualify
+  });
+});
+
+describe("launchCampaign — §15: items are built after the launch returns", () => {
+  it("returns the campaign marked building, then builds the items and marks it ready with the count", async () => {
+    mockListAgents.mockResolvedValue([AGENT_1]);
+    mockGetEffectiveAccess.mockResolvedValue([GRANT_SENDGRID]);
+    const campaign = await launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "agent", scope: {}, cadence: "one_time", reviewerId: "reviewer-1" });
+    expect(campaignInsert.mock.calls[0][0]).toMatchObject({ build_status: "building" });
+    expect(insertedItems).toHaveLength(0); // nothing built yet when the launch returns
+    expect(campaign.id).toBe("campaign-1");
+    await Promise.all(background.splice(0));
+    expect(insertedItems).toHaveLength(1);
+    expect(campaignUpdate).toHaveBeenCalledWith(expect.objectContaining({ build_status: "ready", items_total: 1 }));
+    expect(writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.campaign_built", outcome: "success" }));
+  });
+
+  it("marks a failed build failed with a safe reason, and audits it", async () => {
+    mockListAgents.mockRejectedValue(new Error("connection reset by peer at 10.0.0.1"));
+    await built(launchCampaign("tenant-a", "actor-1", { name: "Q1", scopeType: "agent", scope: {}, cadence: "one_time", reviewerId: "reviewer-1" }));
+    expect(campaignUpdate).toHaveBeenCalledWith(expect.objectContaining({ build_status: "failed", build_error: "The items could not be built. Launch the campaign again." }));
+    expect(writeAudit).toHaveBeenCalledWith(expect.objectContaining({ action: "compliance.campaign_built", outcome: "failure" }));
   });
 });

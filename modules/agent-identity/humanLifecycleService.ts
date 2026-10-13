@@ -161,6 +161,35 @@ export async function recordLifecycleEvents(
       }
     }
 
+    // WID-H09 (owner decision, 13 Oct): birthright packages a mover no longer qualifies for go to a
+    // dated review; the manager's access review lists them, and the expiry sweep removes any not kept.
+    let moverReview: { packageName: string; dueAt: string }[] = [];
+    if (d.eventType === "mover") {
+      const { reviewBirthrightAfterMove } = await import("@/modules/access-governance/service");
+      try {
+        moverReview = await reviewBirthrightAfterMove(tenantId, subject.id, { eventId: event.id });
+      } catch (err) {
+        await writeAudit({
+          tenantId,
+          actorType: "system",
+          action: "access.package_mover_review_opened",
+          objectType: "identity",
+          objectId: subject.id,
+          outcome: "failure",
+          metadata: { eventId: event.id, error: err instanceof Error ? err.message.slice(0, 200) : "unknown" },
+        });
+      }
+      if (moverReview.length) {
+        const { error: detailError } = await client
+          .from("identity_lifecycle_tasks")
+          .update({ detail: { changedFields: d.changedFields, birthrightReview: moverReview } })
+          .eq("tenant_id", tenantId)
+          .eq("event_id", event.id)
+          .eq("task_type", "review_access");
+        if (detailError) throw new Error(`recording the birthright review: ${detailError.message}`);
+      }
+    }
+
     await writeAudit({
       tenantId,
       actorId: meta.actorId,
@@ -181,7 +210,11 @@ export async function recordLifecycleEvents(
           userId: manager.user_id as string,
           type: "lifecycle_task",
           title: `${EVENT_LABEL[d.eventType]}: ${subject.displayName}`,
-          body: `${subject.displayName} needs lifecycle work: ${taskTypes.map((t) => t.replace(/_/g, " ")).join(", ")}.`,
+          body:
+            `${subject.displayName} needs lifecycle work: ${taskTypes.map((t) => t.replace(/_/g, " ")).join(", ")}.` +
+            (moverReview.length
+              ? ` ${moverReview.length === 1 ? "1 birthright package they no longer qualify for is" : `${moverReview.length} birthright packages they no longer qualify for are`} removed on ${moverReview[0].dueAt.slice(0, 10)} unless you keep ${moverReview.length === 1 ? "it" : "them"}: ${moverReview.map((r) => r.packageName).join(", ")}.`
+              : ""),
           referenceType: "identity",
           referenceId: subject.id,
         });

@@ -28,7 +28,7 @@ Generated 2026-10-13 from 11 module backlogs.
 | Not Started | 19 |
 | **Total tracked** | **271** |
 
-Beyond these, the backlogs list **52 P1** and **32 P2** forward-looking items.
+Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
 and are deliberately excluded from the counts above.
 
@@ -180,7 +180,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 30 done · 0 partial · 0 deferred · 3 not started (33 tracked) · 3 P1 / 3 P2 ahead
+**Stories:** 30 done · 0 partial · 0 deferred · 3 not started (33 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -204,7 +204,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-17 | Account inventory: correlation, orphan and dormant accounts | Done — 2026-09-26, migration 0089 |
 | ACCESS-P0-18 | Self-service request catalog and request policies | Done — 2026-09-26, migration 0092 (packages with ACCESS-P0-20) |
 | ACCESS-P0-19 | Approval engine: multi-stage chains, approver scope, no self-approval | Done — 2026-09-26, migration 0093 (named groups deferred) |
-| ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later). 2026-10-13: birthright, turned on by two administrators (0151) |
+| ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later). 2026-10-13: birthright, turned on by two administrators (0151); a mover's birthright packages they no longer qualify for go to a 14-day review, then are removed unless kept (0153, WID-H09) |
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |

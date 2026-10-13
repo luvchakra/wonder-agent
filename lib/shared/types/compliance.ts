@@ -27,6 +27,10 @@ export type CertificationCampaign = {
   dueDate: string | null;
   createdBy: string;
   createdAt: string;
+  /** §15: the items are built after the launch returns; "building" until they are all there. */
+  buildStatus?: "building" | "ready" | "failed";
+  buildError?: string | null;
+  itemsTotal?: number | null;
 };
 
 export type UsageAtReview = "used" | "never" | "unknown";

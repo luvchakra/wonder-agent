@@ -3,33 +3,30 @@
  * layout can filter it by the viewer's permissions and compute badge counts,
  * then hand it to the client sidebar / tab bar / drawer.
  *
- * Arranged in areas (owner decision, 2026-10-10, after the way Saviynt
- * Identity Cloud arranges its menu; only the arrangement was taken, every
- * menu and name is WonderID's own):
- * - **The area list** is the sidebar's first level: Home, then the
- *   governance work areas, and "Admin" always last. Each area opens its own
- *   menu in the sidebar; an area with a single page opens that page.
- * - **An area's menu** shows the area's name at the top with a back arrow
- *   to the area list, then its pages. A page is a plain row; a group of
- *   pages folds open in place. Which area shows follows the page, so a link
- *   into an admin page shows the Admin menu.
- * - **Home** holds a member's day-to-day work: the dashboard, their own
- *   access (requests, privacy, sign-in security) and access governance.
- * - **Admin** holds everything that administers the organization, as
- *   groups (foundation design §8): identity repository, applications,
- *   policies, integrations, users and permissions, settings, compliance.
+ * Arrangement (owner decision, 2026-10-13, from the owner's sheet
+ * "WonderID: proposed navigation", industry-standard names instead of the
+ * 10-10 arrangement):
+ * - **The main sidebar:** Home, My Workspace (what waits on me, my own
+ *   settings), Access, AI Agents, Access Reviews, Risk & Detection, Self
+ *   Service (what anyone can start), then Administration last.
+ * - **The Admin sidebar** (opened from Administration): Identities,
+ *   Applications, Policies & Controls, Reports & Audit, Users & Roles,
+ *   Integrations, Organization Settings, Privacy & Audit.
+ * - An area opens its own menu in the sidebar; an area with a single page
+ *   opens that page. Which area shows follows the page, so a link into an
+ *   admin page shows the Admin menu.
  *
  * Every entry names the permission its page requires (any of a list), and
  * the layout shows only what the viewer may open; an area appears only when
- * at least one of its pages does, so Admin is absent for a member without
- * administration rights. Pages still check permissions themselves: this
- * only decides what is listed.
+ * at least one of its pages does, so Administration is absent for a member
+ * without administration rights. Pages still check permissions themselves:
+ * this only decides what is listed.
  *
  * Three levels: area → page, or area → group → page. Only pages that exist
- * are listed (spec, "Do not expose menu items whose underlying
- * route/capability is not implemented"). Every route appears once, so
- * exactly one page and one area can be current. `badge` names a counter
- * the layout supplies.
+ * are listed. A page's href is unique; two pages may share a route and
+ * differ by a view in the query (My Requests and Approvals are views of the
+ * requests page), and the current page is the one whose route and query
+ * both match (`matchScore`). `badge` names a counter the layout supplies.
  */
 export type ShellNavLink = {
   label: string;
@@ -72,163 +69,153 @@ const link = (label: string, href: string, icon: string, ...permission: string[]
 const page = (label: string, href: string, ...permission: string[]): ShellNavLink => ({ label, href, ...(permission.length ? { permission } : {}) });
 const group = (label: string, children: ShellNavLink[], icon?: string): ShellNavEntry => ({ kind: "group", label, icon, children });
 
-/**
- * The Admin area: administering the organization, always the last area.
- * Its groups follow §8 of the WonderID foundation design (owner decision,
- * 2026-10-11, replacing the 10-10 arrangement with four object lists on
- * top): the identity repository, applications, policies, integrations,
- * users and permissions (WonderID's own roles and sign-in), settings and
- * compliance.
- */
+/** The Admin sidebar (owner decision, 2026-10-13): administering the organization, opened from Administration. */
 export const ADMIN_AREA: ShellNavItem = {
-  label: "Admin",
+  label: "Administration",
   href: "/identities",
   icon: "Settings",
   children: [
     group(
-      "Identity Repository",
+      "Identities",
       [
-        page("Overview", "/identities", "identity.read"),
+        page("Identity Overview", "/identities", "identity.read"),
         page("All Identities", "/identities/all", "identity.read"),
-        page("People", "/identities/humans", "identity.read"),
+        page("Workforce", "/identities/humans", "identity.read"),
         page("External Identities", "/identities/external", "identity.read"),
-        page("Machine Identities", "/identities/machines", "identity.read"),
+        page("Non-Human Identities", "/identities/machines", "identity.read"),
         page("Accounts", "/access/accounts", "access.read"),
-        page("Entitlements", "/access/entitlements", "access.read"),
-        page("User Groups", "/settings/groups", "groups.view"),
-        page("Lifecycle Work", "/identities/lifecycle", "identity.read"),
-        page("Identity Attributes", "/identities/attributes", "identity.manage"),
+        page("Groups", "/settings/groups", "groups.view"),
+        page("Joiner-Mover-Leaver", "/identities/lifecycle", "identity.read"),
+        page("Identity Matching", "/integrations/correlations", "integration.read"),
+        page("Orphaned Identities", "/identities/unowned", "identity.read"),
       ],
-      "UserRound",
+      "IdCard",
     ),
-    group("Applications", [page("Application Inventory", "/access", "access.read"), page("Data Sources", "/access/data-sources", "access.read")], "Box"),
     group(
-      "Policies",
+      "Applications",
       [
-        page("Policies", "/policies", "policy.read"),
-        page("Request Policies", "/access/request-policies", "access.manage"),
-        page("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
+        page("Application Catalog", "/access", "access.read"),
+        page("Onboarding Reviews", "/access?status=onboarding", "access.read"),
+        page("Discovered Applications", "/integrations/discovery", "integration.read"),
+        page("Data Sources", "/access/data-sources", "access.read"),
       ],
+      "Box",
+    ),
+    group(
+      "Policies & Controls",
+      [page("Governance Policies", "/policies", "policy.read"), page("Separation of Duties Rules", "/sod", "policy.read"), page("Controls Dashboard", "/controls", "policy.read")],
       "Scale",
+    ),
+    group("Reports & Audit", [page("Reports", "/reports", "report.read"), page("Audit Log", "/audit", "audit.read")], "FileBarChart"),
+    group(
+      "Users & Roles",
+      [
+        page("Users", "/settings/users", "users.view"),
+        page("Roles", "/settings/roles", "roles.view", "role.manage"),
+        page("Permissions", "/settings/permissions", "permissions.view"),
+        page("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
+        page("Single Sign-On", "/settings/sso", "sso.manage"),
+        page("API Clients", "/settings/automation", "automation.manage"),
+      ],
+      "UserCog",
     ),
     group(
       "Integrations",
       [
         page("Connections", "/integrations", "integration.read"),
-        page("Connection Types", "/integrations/types", "integration.read"),
-        page("Identity Sources", "/integrations/sources", "integration.read"),
+        page("Connector Library", "/integrations/types", "integration.read"),
+        page("Authoritative Sources", "/integrations/sources", "integration.read"),
         page("Sync Jobs", "/integrations/jobs", "integration.read"),
-        page("Gateway", "/integrations/gateway", "integration.read"),
+        page("Connector Gateway", "/integrations/gateway", "integration.read"),
         page("MCP Servers", "/integrations/mcp", "integration.read"),
       ],
       "Link2",
     ),
     group(
-      "Users & Permissions",
+      "Organization Settings",
       [
-        page("Users", "/settings/users", "users.view"),
-        page("Roles", "/settings/roles", "roles.view", "role.manage"),
-        page("Permission Catalog", "/settings/permissions", "permissions.view"),
-        page("Single Sign-On", "/settings/sso", "sso.manage"),
-        page("Automation Credentials", "/settings/automation", "automation.manage"),
-      ],
-      "UserCog",
-    ),
-    group(
-      "Settings",
-      [
-        page("Organization", "/settings", "tenant.settings"),
-        page("Global Configuration", "/settings/configuration", "tenant.settings", "tenant.security.manage"),
+        page("Organization Profile", "/settings", "tenant.settings"),
+        page("Governance Settings", "/settings/configuration", "tenant.settings", "tenant.security.manage"),
+        page("Identity Attributes", "/identities/attributes", "identity.manage"),
         page("Notifications", "/settings/notifications", "notification.manage"),
         page("AI Assistance", "/settings/ai", "ai.manage"),
-        page("Billing", "/settings/billing", "billing.view"),
+        page("Billing & Subscription", "/settings/billing", "billing.view"),
       ],
       "SlidersHorizontal",
     ),
-    group(
-      "Compliance",
-      [page("Privacy & Data Protection", "/settings/privacy", "privacy.view"), page("Audit Integrity", "/audit/integrity", "audit.read")],
-      "FileText",
-    ),
+    group("Privacy & Audit", [page("Privacy & Data Protection", "/settings/privacy", "privacy.view"), page("Audit Integrity", "/audit/integrity", "audit.read")], "FileText"),
   ],
 };
 
-/**
- * The area list (owner decisions, 2026-10-10): Home first, then
- * Intelligence, Onboarding, Control Center, SOD and Certifications, AI
- * Agents, and Admin last. Every area opens its own menu.
- */
+/** The main sidebar (owner decision, 2026-10-13): Home first, Administration last. */
 export const SHELL_NAV: ShellNavItem[] = [
+  { label: "Home", href: "/", icon: "Home", children: [link("Dashboard", "/", "LayoutDashboard")] },
   {
-    label: "Home",
-    href: "/",
-    icon: "Home",
+    label: "My Workspace",
+    href: "/access/requests?view=mine",
+    icon: "UserRound",
     children: [
-      link("Home", "/", "Home"),
-      group("My Access", [page("Request Access", "/access/catalog", "access.read"), page("My Privacy", "/my-privacy"), page("Sign-in Security", "/settings/security")], "UserRound"),
-      group(
-        "Access Governance",
-        [page("Access Requests", "/access/requests", "access.read"), page("Fulfilment Tasks", "/access/fulfilment", "access.read"), page("Access Packages", "/access/packages", "access.read")],
-        "KeyRound",
-      ),
+      link("My Requests", "/access/requests?view=mine", "ClipboardList", "access.read"),
+      link("Approvals", "/access/requests?view=waiting", "ClipboardCheck", "access.read"),
+      link("My Tasks", "/access/fulfilment", "Clock", "access.read"),
+      link("My Privacy", "/my-privacy", "Fingerprint"),
+      link("Sign-in Security", "/settings/security", "KeyRound"),
     ],
   },
   {
-    label: "Intelligence",
-    href: "/risk",
-    icon: "BarChart3",
-    badge: "risk",
+    label: "Access",
+    href: "/access/catalog",
+    icon: "KeyRound",
     children: [
-      link("Risk Overview", "/risk", "ShieldAlert", "risk.read"),
-      link("Investigations", "/risk/investigations", "FileSearch", "risk.read"),
-      link("Rogue Agents", "/risk/rogue", "Siren", "risk.read"),
-      link("Reports", "/reports", "FileBarChart", "report.read"),
-      link("Audit Trail", "/audit", "ScrollText", "audit.read"),
+      link("Request Access", "/access/catalog", "UserSearch", "access.read"),
+      link("Access Requests", "/access/requests", "ClipboardList", "access.read"),
+      link("Provisioning Tasks", "/access/fulfilment?view=all", "Clock", "access.read"),
+      link("Access Packages", "/access/packages", "Box", "access.read"),
+      link("Entitlements", "/access/entitlements", "KeyRound", "access.read"),
+      link("Request Policies", "/access/request-policies", "Scale", "access.manage"),
     ],
-  },
-  {
-    label: "Onboarding",
-    href: "/access/applications/new",
-    icon: "Plug",
-    badge: "discovery",
-    children: [
-      link("New Application", "/access/applications/new", "Box", "access.manage"),
-      link("Application Discovery", "/integrations/discovery", "Radar", "integration.read"),
-      link("Register Agent", "/agents/new", "UserPlus", "agent.create"),
-      link("Agent Discovery", "/agents/discovery", "Search", "agent.read"),
-      link("Duplicate Review", "/agents/duplicates", "Network", "agent.create"),
-      link("Pending Matches", "/integrations/correlations", "Link2", "integration.read"),
-      link("Unowned Identities", "/identities/unowned", "UserX", "identity.read"),
-    ],
-  },
-  {
-    label: "Control Center",
-    href: "/controls",
-    icon: "Gauge",
-    children: [link("Overview", "/controls", "LayoutDashboard", "policy.read")],
-  },
-  {
-    label: "SOD",
-    href: "/sod",
-    icon: "Ban",
-    children: [link("SoD Rules", "/sod", "Scale", "policy.read"), link("SoD Conflicts", "/sod/conflicts", "TriangleAlert", "audit.read")],
-  },
-  {
-    label: "Certifications",
-    href: "/compliance/campaigns",
-    icon: "ShieldCheck",
-    match: ["/compliance"],
-    children: [link("Certification Campaigns", "/compliance/campaigns", "ClipboardCheck", "compliance.read")],
   },
   {
     label: "AI Agents",
     href: "/agents",
     icon: "Bot",
+    badge: "discovery",
     children: [
-      link("All Agents", "/agents", "Bot", "agent.read"),
-      link("Non-human Identities", "/agents/identities", "Server", "agent.read"),
-      link("Runtime Activity", "/runtime", "Activity", "runtime.read"),
+      link("Agent Inventory", "/agents", "Bot", "agent.read"),
+      link("Agent Discovery", "/agents/discovery", "Radar", "agent.read"),
+      link("Duplicate Review", "/agents/duplicates", "Network", "agent.create"),
+      link("Agent Identities", "/agents/identities", "Server", "agent.read"),
+      link("Agent Activity", "/runtime", "Activity", "runtime.read"),
     ],
+  },
+  {
+    label: "Access Reviews",
+    href: "/compliance/campaigns",
+    icon: "ShieldCheck",
+    match: ["/compliance"],
+    children: [
+      link("Create Campaigns", "/compliance/campaigns?launch=1", "ClipboardList", "compliance.manage"),
+      link("Review Campaigns", "/compliance/campaigns", "ClipboardCheck", "compliance.read"),
+    ],
+  },
+  {
+    label: "Risk & Detection",
+    href: "/risk",
+    icon: "ShieldAlert",
+    badge: "risk",
+    children: [
+      link("Risk Dashboard", "/risk", "ShieldAlert", "risk.read"),
+      link("Rogue Accounts", "/risk/rogue-accounts", "UserX", "risk.read"),
+      link("Rogue Agents", "/risk/rogue", "Siren", "risk.read"),
+      link("SoD Violations", "/sod/conflicts", "TriangleAlert", "audit.read"),
+      link("Investigations", "/risk/investigations", "FileSearch", "risk.read"),
+    ],
+  },
+  {
+    label: "Self Service",
+    href: "/access/applications/new",
+    icon: "UserPlus",
+    children: [link("Onboard Application", "/access/applications/new", "Box", "access.manage"), link("Register Agent", "/agents/new", "UserPlus", "agent.create")],
   },
   ADMIN_AREA,
 ];
@@ -265,14 +252,14 @@ export function navFor(nav: ShellNavItem[], permissions: readonly string[]): She
   return out;
 }
 
-/** The area a page belongs to: the one owning the longest prefix of the path, if any. */
-export function activeArea(nav: ShellNavItem[], pathname: string): ShellNavItem | null {
+/** The area a page belongs to: the one whose page matches best (route, then view), first in order on a tie. */
+export function activeArea(nav: ShellNavItem[], pathname: string, search?: string): ShellNavItem | null {
   let best: ShellNavItem | null = null;
-  let bestLen = -1;
+  let bestScore = -1;
   for (const item of nav) {
-    const len = bestPrefix(sectionPrefixes(item), pathname);
-    if (len > bestLen) {
-      bestLen = len;
+    const score = sectionScore(item, pathname, search);
+    if (score > bestScore) {
+      bestScore = score;
       best = item;
     }
   }
@@ -340,35 +327,50 @@ function prefixMatches(prefix: string, pathname: string): boolean {
   return pathname === prefix || pathname.startsWith(`${prefix}/`);
 }
 
-/** Length of the longest of `prefixes` that contains `pathname`, or -1. */
-function bestPrefix(prefixes: string[], pathname: string): number {
-  let best = -1;
-  for (const p of prefixes) if (prefixMatches(p, pathname) && p.length > best) best = p.length;
-  return best;
+/**
+ * How well a nav href matches the current page, or -1. Its route must be a
+ * prefix of the path; a query in the href (a view such as `?view=mine`)
+ * must be present in the current query too. A longer route wins; on the
+ * same route, a matching view wins over none.
+ */
+export function matchScore(href: string, pathname: string, search = ""): number {
+  const q = href.indexOf("?");
+  const path = q < 0 ? href : href.slice(0, q);
+  if (!prefixMatches(path, pathname)) return -1;
+  if (q < 0) return path.length * 2;
+  const want = new URLSearchParams(href.slice(q + 1));
+  const have = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+  for (const [k, v] of want) if (have.get(k) !== v) return -1;
+  return path.length * 2 + 1;
 }
 
-/** The prefixes a section owns: its own href, its pages and its extra matches. */
-function sectionPrefixes(item: ShellNavItem): string[] {
-  return [item.href, ...sectionPages(item).map((p) => p.href), ...(item.match ?? [])];
+/** The best match among a section's own href, its pages and its extra prefixes. */
+function sectionScore(item: ShellNavItem, pathname: string, search?: string): number {
+  let best = -1;
+  for (const h of [item.href, ...sectionPages(item).map((p) => p.href), ...(item.match ?? [])]) best = Math.max(best, matchScore(h, pathname, search));
+  return best;
 }
 
 /**
  * Active-state rule, shared so the sidebar, the tab bar and the drawer
  * can never disagree about which item is current: of all `candidates`,
- * the one owning the longest prefix of the path wins. "/" only matches
- * exactly.
+ * the one matching best (`matchScore`) wins, the first on a tie. "/" only
+ * matches exactly.
  */
-export function isNavItemActive(item: ShellNavItem, pathname: string, candidates: ShellNavItem[]): boolean {
-  const mine = bestPrefix(sectionPrefixes(item), pathname);
-  if (mine < 0) return false;
-  return !candidates.some((other) => other !== item && bestPrefix(sectionPrefixes(other), pathname) > mine);
+export function isNavItemActive(item: ShellNavItem, pathname: string, candidates: ShellNavItem[], search?: string): boolean {
+  return activeArea(candidates, pathname, search) === item;
 }
 
-/** Which page of a section is current (longest href match), if any. */
-export function activeChildHref(item: ShellNavItem, pathname: string): string | null {
-  let best: ShellNavLink | null = null;
+/** Which page of a section is current (best match, the first on a tie), if any. */
+export function activeChildHref(item: ShellNavItem, pathname: string, search?: string): string | null {
+  let best: string | null = null;
+  let bestScore = -1;
   for (const page of sectionPages(item)) {
-    if (prefixMatches(page.href, pathname) && (!best || page.href.length > best.href.length)) best = page;
+    const score = matchScore(page.href, pathname, search);
+    if (score > bestScore) {
+      bestScore = score;
+      best = page.href;
+    }
   }
-  return best?.href ?? null;
+  return best;
 }

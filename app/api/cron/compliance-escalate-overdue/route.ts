@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { timingSafeEqual } from "node:crypto";
-import { escalateOverdueItemsForAllTenants } from "@/modules/certification-compliance/service";
+import { escalateOverdueItemsForAllTenants, failStaleCampaignBuilds } from "@/modules/certification-compliance/service";
 
 /**
  * COMPLIANCE-P0-05's scheduler. Wired to Vercel Cron via `vercel.json`
@@ -36,12 +36,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ ok: false, error: { code: "UNAUTHORIZED" } }, { status: 401 });
   }
 
-  const results = await escalateOverdueItemsForAllTenants();
+  // §15: a campaign build that never finished is marked failed, so it does not say "building" forever.
+  const [results, staleBuilds] = await Promise.all([escalateOverdueItemsForAllTenants(), failStaleCampaignBuilds()]);
   const totalEscalated = results.reduce((sum, r) => sum + r.escalatedCount, 0);
   const failedTenants = results.filter((r) => r.error);
 
   return NextResponse.json({
     ok: true,
-    data: { totalEscalated, tenantsSwept: results.length, failedTenants },
+    data: { totalEscalated, tenantsSwept: results.length, failedTenants, staleBuilds },
   });
 }

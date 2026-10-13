@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { PlatformSummary, PlatformSummarySkeleton } from "./PlatformSummary";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { listAgents } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
@@ -175,11 +177,18 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">AI Agent Security Overview</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Discover. Understand. Govern. Protect. Assure.</p>
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Security Overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Every identity, account, application and agent in one view.</p>
         </div>
         <PeriodSelect options={RANGES} value={String(rangeDays)} label="Reporting period" />
       </div>
+
+      {/* Owner request (2026-10-13): a summary of the whole platform, not just agents. */}
+      <Suspense fallback={<PlatformSummarySkeleton />}>
+        <PlatformSummary tenantId={tenantId} permissions={ctx.permissions} />
+      </Suspense>
+
+      <h2 className="pt-1 text-base font-semibold text-foreground">AI agents</h2>
 
       <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-5">
         <KpiCard

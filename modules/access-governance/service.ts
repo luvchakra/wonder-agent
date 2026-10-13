@@ -105,6 +105,7 @@ export {
   submitAccessRequest,
   cancelAccessRequest,
   listRequests,
+  countPendingAccessRequests,
   withinContract,
   type CatalogItem,
   type CatalogEntitlement,
@@ -139,6 +140,8 @@ export {
   getAssignment,
   setAssignmentItemStatus,
   revokeAssignment,
+  reviewBirthrightAfterMove,
+  keepAssignment,
   sweepPackageExpiry,
   listLiveApplications,
   type AccessPackage,
@@ -147,6 +150,7 @@ export {
   type PackageResource,
   type PackageAssignment,
   type AssignmentItem,
+  type MoverReview,
 } from "./packages";
 export { checkEligibility as checkPackageEligibility, PACKAGE_IDENTITY_TYPES, CERTIFICATION_FREQUENCIES } from "./packageRules";
 // 2026-10-10 — CSV imports from the object pages (preview, then additive apply).

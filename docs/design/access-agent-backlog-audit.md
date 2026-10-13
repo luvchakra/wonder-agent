@@ -3145,3 +3145,57 @@ Verified:
 
 Not done: removing birthright packages that a mover is no longer eligible
 for. The mover's access-review task covers it, as before.
+
+### 2026-10-13 — A mover's birthright packages: review, then removal (WID-H09)
+
+Owner decision (13 Oct): when a person moves and no longer qualifies for a
+birthright package they hold, their manager gets a dated review. Whatever
+is not kept by the date is removed.
+
+Built:
+- **Migration `0153_access_birthright_mover_review.sql`** (applied) adds to
+  `access_package_assignments`:
+  - `review_due_at`, allowed only on birthright assignments;
+  - `review_kept_by` and `review_kept_at`;
+  - an index on live assignments under review.
+- **`packageRules.ts`:**
+  - `MOVER_REVIEW_DAYS` (14);
+  - `moverReviewAction`: review when the person no longer qualifies by
+    identity type or department; clear when they qualify again. Their
+    status is ignored, because leaving has its own removals.
+  - `moverReviewDue`.
+- **`packages.ts`:**
+  - `reviewBirthrightAfterMove` runs on every mover event and is audited
+    (`access.package_mover_review_opened` / `_cleared`);
+  - `keepAssignment` (`access.manage`) clears the review, records who
+    kept it, and is audited (`_kept`);
+  - `sweepPackageExpiry` also ends assignments past their review date as
+    revoked, through `endAssignment`. Pending grants are withdrawn and
+    held access becomes removal work, confirmed by reconciliation. It is
+    audited (`_lapsed`), and runs in the existing cron and on package
+    views.
+- **Lifecycle** (`humanLifecycleService`): a mover event lists the packages
+  under review on the manager's `review_access` task
+  (`detail.birthrightReview`), and the manager's notification names them
+  and the date.
+- **API:** `POST /api/v1/access/package-assignments/{id}/keep`.
+- **UI:** on the package page, an assignment under review shows "Moved:
+  removed <date> unless kept" and a Keep button beside Revoke.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest `packageRules.test.ts` and `modules/agent-identity`: 100/100,
+  including the new WID-H09 cases.
+- Local E2E `birthright.spec.ts`: 11/11. The new test covers:
+  - a move out opens a 14-day review listed on the manager's task;
+  - read-only cannot keep it, an administrator can, and keeping twice is a
+    409;
+  - moving back and away again reopens the review;
+  - past the date, the sweep revokes it with the reason and the full audit
+    trail.
+
+Left out:
+- access-combination SoD (ACCESS-P1-05, owner decision "build later");
+- a reminder before the review date (the manager's notification at the
+  move names the date).
+

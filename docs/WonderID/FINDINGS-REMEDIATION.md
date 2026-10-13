@@ -25,7 +25,7 @@ request as each fix.
 **Status:** Not started, In progress, Partly fixed, Fixed (closure criteria
 met, with evidence), or Waiting on the owner.
 
-**Last updated:** 13 October 2026, 12:35 IST (statuses from the register's 11:08 IST audit; WID-H05 residual fixed; WID-H09 in progress)
+**Last updated:** 13 October 2026, 13:50 IST (statuses from the register's 11:08 IST audit; WID-H05 residual and WID-H09 done, for the register to assess)
 
 ## Summary
 
@@ -42,7 +42,7 @@ met, with evidence), or Waiting on the owner.
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H08 Automation address allow-list | P1 | Fixed | None: the register confirmed it fixed, edge spoofing tested end to end (13 Oct, 09:06 IST) |
-| WID-H09 Access SoD and birthright | P1 (register: High) | In progress | Done (13 Oct): knowledge base corrected (owner decision: docs now, build later). Next: a mover's birthright packages they no longer qualify for go to a dated review, then are removed. Access-combination SoD is on the access backlog |
+| WID-H09 Access SoD and birthright | P1 (register: High) | Fixed, pending the register | Done (13 Oct): knowledge base corrected (owner decision: docs now, build later); a mover's birthright packages they no longer qualify for go to a 14-day review, then are removed unless kept (0153). Access-combination SoD is on the access backlog (ACCESS-P1-05). For the register to assess |
 
 ## Owner decisions
 
@@ -54,7 +54,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 
 | Date | Finding | Question | Decision | What it means for the work |
 |---|---|---|---|---|
-| 13 Oct 2026 | WID-H09 | What happens to birthright packages a mover no longer qualifies for? | **A dated review, then automatic removal.** The person's manager gets a task to keep or remove each one; whatever is not kept by the deadline is removed. | Next PR: the mover event opens the review with a due date; at the deadline the remaining packages end and their access is removed through the normal removal path. |
+| 13 Oct 2026 | WID-H09 | What happens to birthright packages a mover no longer qualifies for? | **A dated review, then automatic removal.** The person's manager gets a task to keep or remove each one; whatever is not kept by the deadline is removed. | Done: migration 0153; the mover event opens a 14-day review listed on the manager's task; Keep (`access.manage`) stops it; at the date the expiry sweep revokes the assignment through the normal removal path. E2E `birthright.spec.ts` "WID-H09". |
 | 13 Oct 2026 | WID-H09 | Access-combination SoD: correct the docs or build it? | **Docs now, build later.** | Done: the knowledge base describes the process SoD that exists and says access-combination SoD is not provided yet. Building it is a backlog story (ACCESS-P1). |
 | 13 Oct 2026 | Non-negotiable #15 (IDENTITY-P0-18) | How does a joiner or mover get birthright access? | **Pre-approved: assigned automatically.** Marking a package birthright takes two administrators (four-eyes), and that is the approval. | Done: migration 0151 (applied), `setPackageBirthright` / `assignBirthrightPackages`; a change to contents or eligibility needs approval again. |
 | 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
@@ -798,7 +798,7 @@ server with another `SECRET_ENCRYPTION_KEY`, and answers 500. This only
 happens with a test credential created locally; it is not a path users
 reach.
 
-### WID-H09: access-combination SoD and birthright (P1, in progress)
+### WID-H09: access-combination SoD and birthright (P1, fixed pending the register)
 
 Raised by the register's 11:08 IST audit (new, OPEN). What exists is
 process SoD: the same person may not both request and approve for the same
@@ -815,4 +815,12 @@ Owner decisions (13 Oct):
   reported over current holdings) is a backlog story on the access
   backlog.
 - **A mover's birthright packages they no longer qualify for: a dated
-  review, then automatic removal.** Next.
+  review, then automatic removal.** Done (migration 0153):
+  - `reviewBirthrightAfterMove` opens a 14-day review on each such package
+    and lists it on the manager's access-review task;
+  - Keep (`access.manage`) stops the review;
+  - at the date, the expiry sweep revokes the assignment, and held access
+    becomes removal work confirmed by reconciliation;
+  - every step is audited.
+
+  Tests: `packageRules.test.ts`, and E2E `birthright.spec.ts` "WID-H09".
