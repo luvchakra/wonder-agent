@@ -1187,3 +1187,40 @@ While building it, the live phase doc's INTEGRATION-P0-22 row was found stale ("
   - platform-admin 16 passed; the spec now opens the Test organizations section to find E2E Tenant One;
   - first-organization and the platform navigation smoke passed in the earlier run (26).
 - Screenshots of Tenants and of a Manage page checked.
+
+## 2026-10-13 — The console is organized by organization, each holding its environments (owner request)
+
+**Request.** "One organization should have multiple environments; this should reflect in platform console. See one organization, its owner details etc., option to manage each env of that org, option to add or remove each env."
+
+**Built.**
+- **Organizations list** (nav item renamed from "Tenants"). There is one row per organization, from the pure `groupOrganizations()`, which reuses the shell's grouping rule: the platform link, or a shared address prefix. Each row shows:
+  - name and address;
+  - owner, meaning the first active administrator, with "+n" for more and all of them in the tooltip;
+  - its environments as coloured chips, each linking to that environment;
+  - plan and status;
+  - Manage.
+
+  Test organizations stay in their collapsed section. "Create an organization" now creates the production environment; Dev, Test and Staging are added from the organization.
+- **Organization page.** This is the production environment's page:
+  - **Owners:** the active TENANT_SUPER_ADMINs, each name with a mailto link (`organizationOwners()`, service role, those tenants only).
+  - **Environments:** a table with each environment's address, plan and status, Manage, and "Remove…". Remove shows an inline confirmation and is offered for linked non-production environments only.
+  - **Add environment**, offering only the kinds missing.
+  - **Production settings:** address, environment, plan and status.
+- **Environment page.** "← <Organization>", the heading "<Organization> · <Environment>", and that environment's own settings.
+- **Migration 0160, `remove_tenant_environment()`.** Service role only, one transaction:
+  - decommissions the environment, keeping its data;
+  - moves its address and subdomain to `<slug>-removed-<6>`, so the address is free again;
+  - moves its link into notes, so the same kind can be added again.
+  - It refuses production and anything not linked. `removeTenantEnvironment()` audits `platform.tenant_environment_removed`.
+
+**Verified.**
+- `tests/platform/remove-environment.sql` (live, rolled back), 8 checks:
+  - after removal the slug is `<slug>-removed-…`, the environment is decommissioned and unlinked, and its old address no longer resolves;
+  - the same environment can be added again at the same address;
+  - removing production is refused (22023);
+  - a member cannot call the function (42501).
+- Vitest: `groupOrganizations` 2/2.
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E:
+  - platform-admin and first-organization 20/20. The new test opens E2E Tenant One, sees its owner, adds Dev, manages it, goes back, and removes it.
+  - One onboarding assertion changed. A rename that takes an unlinked environment out of its prefix group re-renders the page as that organization's own, so the spec checks the saved address rather than the transient message.

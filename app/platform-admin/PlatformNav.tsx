@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/platform-admin", label: "Platform Overview" },
-  { href: "/platform-admin/tenants", label: "Tenants" },
+  { href: "/platform-admin/tenants", label: "Organizations" },
   { href: "/platform-admin/billing", label: "Billing" },
   { href: "/platform-admin/features", label: "Feature Flags" },
   { href: "/platform-admin/branding", label: "Global Configuration" },

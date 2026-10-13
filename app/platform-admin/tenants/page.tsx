@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { listTenants, getSubscription, testTenantIds } from "@/modules/platform-admin/service";
+import { listTenants, getSubscription, testTenantIds, organizationOwners } from "@/modules/platform-admin/service";
+import { groupOrganizations, type Organization } from "@/modules/platform-admin/organizations";
 import { createTenantAction } from "@/app/actions/platform";
 import { baseAppHost, tenantUrl } from "@/lib/tenant/host";
-import type { PlatformTenant, Subscription } from "@/lib/shared/types/platform";
+import type { Subscription } from "@/lib/shared/types/platform";
 import { Badge, Button, Card, CardBody, EnvironmentBadge, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "../PageHeading";
@@ -16,59 +17,67 @@ const STATUS = {
   deprovisioned: { tone: "neutral", label: "Decommissioned" },
 } as const;
 
-type Row = { tenant: PlatformTenant; subscription: Subscription | null };
+type Row = { org: Organization; owners: { email: string; name: string | null }[]; subscription: Subscription | null };
 
 /**
- * One row per organization: its name and address, environment, status and
- * plan. Everything you change about it (address, environment, plan, status,
- * environments, usage) is on its Manage page (owner request 2026-10-13: the
- * table was too crowded and a plan could not be changed).
+ * Owner request (2026-10-13): one row per organization, holding its
+ * environments; its owners; its plan and status. Manage opens the
+ * organization, where each environment is managed, added or removed.
  */
-function TenantTable({ rows, base, label }: { rows: Row[]; base: string | null; label: string }) {
+function OrganizationTable({ rows, base, label }: { rows: Row[]; base: string | null; label: string }) {
   return (
     <TableContainer label={label} bare>
       <Thead>
         <tr>
           <Th>Organization</Th>
-          <Th>Environment</Th>
+          <Th hideBelow="lg">Owner</Th>
+          <Th>Environments</Th>
+          <Th hideBelow="xl">Plan</Th>
           <Th>Status</Th>
-          <Th hideBelow="lg">Plan</Th>
           <Th className="text-right">
             <span className="sr-only">Actions</span>
           </Th>
         </tr>
       </Thead>
       <tbody>
-        {rows.map(({ tenant, subscription }) => {
-          const status = STATUS[tenant.status ?? "active"];
-          const url = base && tenant.slug && tenant.status !== "deprovisioned" ? tenantUrl(tenant.slug, base) : null;
+        {rows.map(({ org, owners, subscription }) => {
+          const status = STATUS[org.primary.status ?? "active"];
+          const url = base && org.primary.slug && org.primary.status !== "deprovisioned" ? tenantUrl(org.primary.slug, base) : null;
           return (
-            <Tr key={tenant.tenantId}>
-              <Td className={cn(tenant.parentTenantId && "md:pl-8")}>
+            <Tr key={org.id}>
+              <Td>
                 <div className="min-w-0">
-                  <Link href={`/platform-admin/tenants/${tenant.tenantId}`} className="font-medium text-foreground hover:text-primary hover:underline">
-                    {tenant.name}
+                  <Link href={`/platform-admin/tenants/${org.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
+                    {org.name}
                   </Link>
-                  <p className="truncate font-mono text-xs text-muted-foreground">
-                    {url ? (
-                      <a href={url} target="_blank" rel="noreferrer" className="hover:text-primary hover:underline">
-                        {url.replace(/^https?:\/\//, "")}
-                      </a>
-                    ) : (
-                      tenant.slug
-                    )}
-                  </p>
+                  <p className="truncate font-mono text-xs text-muted-foreground">{url ? url.replace(/^https?:\/\//, "") : org.primary.slug}</p>
                 </div>
               </Td>
-              <Td>
-                <EnvironmentBadge environment={tenant.environment} />
+              <Td hideBelow="lg">
+                {owners.length ? (
+                  <span className="text-sm text-foreground" title={owners.map((o) => o.email).join(", ")}>
+                    {owners[0].name || owners[0].email}
+                    {owners.length > 1 ? <span className="text-muted-foreground"> +{owners.length - 1}</span> : null}
+                  </span>
+                ) : (
+                  <span className="text-xs text-muted-foreground">No owner</span>
+                )}
               </Td>
+              <Td>
+                <div className="flex flex-wrap gap-1">
+                  {org.environments.map((e) => (
+                    <Link key={e.tenantId} href={`/platform-admin/tenants/${e.tenantId}`} title={e.slug}>
+                      <EnvironmentBadge environment={e.environment} className={cn(e.status !== "active" && "opacity-50")} />
+                    </Link>
+                  ))}
+                </div>
+              </Td>
+              <Td hideBelow="xl">{subscription?.plan ? <Badge tone="info" className="capitalize">{subscription.plan}</Badge> : <span className="text-xs text-muted-foreground">None</span>}</Td>
               <Td>
                 <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
               </Td>
-              <Td hideBelow="lg">{subscription?.plan ? <Badge tone="info" className="capitalize">{subscription.plan}</Badge> : <span className="text-xs text-muted-foreground">None</span>}</Td>
               <Td className="md:text-right">
-                <Link href={`/platform-admin/tenants/${tenant.tenantId}`} className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent">
+                <Link href={`/platform-admin/tenants/${org.id}`} className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent">
                   Manage
                 </Link>
               </Td>
@@ -80,35 +89,32 @@ function TenantTable({ rows, base, label }: { rows: Row[]; base: string | null; 
   );
 }
 
-export default async function PlatformTenantsPage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
+export default async function PlatformOrganizationsPage({ searchParams }: { searchParams: Promise<{ all?: string }> }) {
   const showAll = (await searchParams).all === "1";
-  const listed = await listTenants({ includeDecommissioned: showAll });
-  // Each production organization followed by its environments (migration 0156).
-  const childrenOf = (id: string) => listed.filter((t) => t.parentTenantId === id);
-  const ordered = listed.filter((t) => !t.parentTenantId || !listed.some((p) => p.tenantId === t.parentTenantId)).flatMap((t) => [t, ...childrenOf(t.tenantId)]);
-  const [subscriptions, testIds] = await Promise.all([Promise.all(ordered.map((t) => getSubscription(t.tenantId))), testTenantIds(ordered)]);
-  // Organizations the E2E suite and SQL fixtures create, kept apart from real ones (owner request 2026-10-13).
-  const isTestOrganization = (t: PlatformTenant) => testIds.has(t.tenantId);
-  const rows: Row[] = ordered.map((tenant, i) => ({ tenant, subscription: subscriptions[i] }));
-  const real = rows.filter((r) => !isTestOrganization(r.tenant));
-  const test = rows.filter((r) => isTestOrganization(r.tenant));
+  const tenants = await listTenants({ includeDecommissioned: showAll });
+  const orgs = groupOrganizations(tenants);
+  const [subscriptions, testIds, owners] = await Promise.all([Promise.all(orgs.map((o) => getSubscription(o.id))), testTenantIds(orgs.map((o) => o.primary)), organizationOwners(orgs.map((o) => o.id))]);
+  const rows: Row[] = orgs.map((org, i) => ({ org, owners: owners.get(org.id) ?? [], subscription: subscriptions[i] }));
+  // Organizations the E2E suite and SQL fixtures create, kept apart from real ones.
+  const real = rows.filter((r) => !testIds.has(r.org.id));
+  const test = rows.filter((r) => testIds.has(r.org.id));
   const base = baseAppHost();
 
   return (
     <>
-      <PageHeading title="Tenants" description={`${real.length} organization${real.length === 1 ? "" : "s"}${showAll ? "" : ", decommissioned ones hidden"}.`}>
+      <PageHeading title="Organizations" description={`${real.length} organization${real.length === 1 ? "" : "s"}, each with its environments${showAll ? "" : "; decommissioned ones hidden"}.`}>
         <Link href={showAll ? "/platform-admin/tenants" : "/platform-admin/tenants?all=1"} className="text-sm font-medium text-primary hover:underline">
           {showAll ? "Hide decommissioned" : "Show decommissioned"}
         </Link>
       </PageHeading>
 
-      <Card>{real.length === 0 ? <p className="px-4 py-3 text-sm text-muted-foreground">No organizations yet.</p> : <TenantTable rows={real} base={base} label="Organizations" />}</Card>
+      <Card>{real.length === 0 ? <p className="px-4 py-3 text-sm text-muted-foreground">No organizations yet.</p> : <OrganizationTable rows={real} base={base} label="Organizations" />}</Card>
 
       {test.length ? (
         <details className="group rounded-xl border border-border/60 bg-card">
           <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-card-foreground">Test organizations ({test.length})</summary>
           <div className="border-t border-border">
-            <TenantTable rows={test} base={base} label="Test organizations" />
+            <OrganizationTable rows={test} base={base} label="Test organizations" />
           </div>
         </details>
       ) : null}
@@ -116,7 +122,7 @@ export default async function PlatformTenantsPage({ searchParams }: { searchPara
       <details className="group rounded-xl border border-border/60 bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-card-foreground">Create an organization</summary>
         <CardBody className="border-t border-border">
-          <form action={createTenantAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_10rem_auto] sm:items-end">
+          <form action={createTenantAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
             <div>
               <label htmlFor="tenant-name" className={fieldLabelClass}>Name</label>
               <input id="tenant-name" name="name" placeholder="Acme Corp" required className={fieldInputClass} />
@@ -125,15 +131,10 @@ export default async function PlatformTenantsPage({ searchParams }: { searchPara
               <label htmlFor="tenant-slug" className={fieldLabelClass}>Address prefix</label>
               <input id="tenant-slug" name="slug" placeholder="acme-corp" required className={cn(fieldInputClass, "font-mono")} />
             </div>
-            <div>
-              <label htmlFor="tenant-environment" className={fieldLabelClass}>Environment</label>
-              <select id="tenant-environment" name="environment" defaultValue="production" className={fieldInputClass}>
-                <option value="production">Production</option>
-                <option value="sandbox">Sandbox</option>
-              </select>
-            </div>
+            <input type="hidden" name="environment" value="production" />
             <Button type="submit">Create</Button>
           </form>
+          <p className="mt-2 text-xs text-muted-foreground">Created as the production environment; add Dev, Test or Staging from the organization.</p>
         </CardBody>
       </details>
     </>
