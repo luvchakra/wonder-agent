@@ -1907,3 +1907,21 @@ explained.**
   reports the connection's latest sync jobs (trigger, mode, status,
   pipeline status, times and errors). A run of the two specs on Vercel
   follows this merge.
+
+### 2026-10-13 — Targeted run after #132: both failing specs pass on Vercel
+
+- Run 38338640100, started by hand at 08:18 IST on `main` `4198c52` (#132),
+  Vercel `dpl_9ZYgzy5M7fueaHnxpEfDrow7JiZV`:
+  `tenant-address.spec.ts` and `connector-provisioning.spec.ts`, **28 passed,
+  0 failed, 0 flaky** in 12 min.
+- The unknown-address 404 now holds on the Vercel builder.
+- The mass-change guard test passed in about 57 s. Its verification arrived
+  this time, so the new diagnostics did not fire.
+- The full-suite cause (verification never finishing while the design-review
+  spec ran in parallel) is not reproduced. It stays open:
+  - if it recurs, the test now names the connection's sync jobs;
+  - the next nightly is the check.
+- GitHub fired the missed 12 October schedule late, at 08:08 IST, on the
+  pre-fix commit. It would have repeated the known 404 failure and held this
+  run behind it for about 90 minutes, so I cancelled it: the workflow run and
+  its two Vercel builds.
