@@ -83,6 +83,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
 | 13 Oct 2026 | Separation of duties described as it is: it covers the same person performing two actions for an AI agent; rules on combinations of access are not provided yet. |
 | 13 Oct 2026 | An organization can require two-step verification. Members then verify with an authenticator app, or set one up, before they see anything; automation credentials are exempt. |
+| 13 Oct 2026 | When someone moves and no longer qualifies for a birthright package, their manager has 14 days to keep it; otherwise it is removed. |
 
 ---
 

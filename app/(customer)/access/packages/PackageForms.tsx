@@ -9,6 +9,7 @@ import {
   removeResourceAction,
   requestPackageAction,
   revokeAssignmentAction,
+  keepAssignmentAction,
   savePackageAction,
   setBirthrightAction,
   setPackageStatusAction,
@@ -354,6 +355,19 @@ export function ItemActions({ packageId, itemId, status, label }: { packageId: s
       <div className="w-full text-right">
         <Outcome state={state} />
       </div>
+    </form>
+  );
+}
+
+/** WID-H09: keeps a mover's birthright package that would otherwise be removed at its review date. */
+export function KeepForm({ packageId, assignmentId }: { packageId: string; assignmentId: string }) {
+  const [state, action, pending] = useActionState(keepAssignmentAction.bind(null, packageId, assignmentId), IDLE);
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <Submit pending={pending} size="sm">
+        Keep
+      </Submit>
+      <Outcome state={state} />
     </form>
   );
 }

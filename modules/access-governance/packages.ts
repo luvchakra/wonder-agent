@@ -17,6 +17,8 @@ import {
   checkEligibility,
   contentsDigest,
   itemOnEnd,
+  moverReviewAction,
+  moverReviewDue,
   packageRisk,
   validatePackageInput,
   type AssignmentStatus,
@@ -393,6 +395,89 @@ export async function assignBirthrightPackages(
   return { assigned, skipped };
 }
 
+export type MoverReview = { assignmentId: string; packageId: string; packageName: string; dueAt: string };
+
+/**
+ * WID-H09 (owner decision, 13 Oct): after a move, each birthright package
+ * the person no longer qualifies for goes to a dated review
+ * (MOVER_REVIEW_DAYS). Kept by someone, it stays; otherwise the expiry sweep
+ * removes it when the date passes. One already under review that the person
+ * qualifies for again leaves review. Service role, explicit tenant filter;
+ * audited as the system. Returns what went to review, for the manager's task.
+ */
+export async function reviewBirthrightAfterMove(tenantId: string, identityId: string, meta: { eventId: string }, now = new Date()): Promise<MoverReview[]> {
+  const admin = supabaseServiceRole();
+  const [{ data: rows, error }, subject] = await Promise.all([
+    admin
+      .from("access_package_assignments")
+      .select("id, tenant_id, package_id, source, status, review_due_at, access_packages(name, eligible_identity_types, eligible_departments)")
+      .eq("tenant_id", tenantId)
+      .eq("identity_id", identityId)
+      .eq("source", "birthright")
+      .in("status", LIVE)
+      .limit(200),
+    getIdentity(tenantId, identityId),
+  ]);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!subject) return [];
+  const due = moverReviewDue(now);
+  const reviewed: MoverReview[] = [];
+  for (const r of rows ?? []) {
+    if (r.tenant_id !== tenantId) continue;
+    const pkg = r.access_packages as unknown as { name: string; eligible_identity_types: string[]; eligible_departments: string[] } | null;
+    if (!pkg) continue;
+    const action = moverReviewAction(
+      { source: r.source as string, status: r.status as string, reviewDueAt: (r.review_due_at as string | null) ?? null },
+      { eligibleIdentityTypes: pkg.eligible_identity_types ?? [], eligibleDepartments: pkg.eligible_departments ?? [] },
+      { identityType: subject.identityType, department: subject.department, status: subject.status },
+    );
+    if (!action) continue;
+    const { data: updated, error: updateError } = await admin
+      .from("access_package_assignments")
+      .update({ review_due_at: action === "review" ? due : null, updated_at: now.toISOString() })
+      .eq("tenant_id", tenantId)
+      .eq("id", r.id as string)
+      .in("status", LIVE)
+      .select("id")
+      .maybeSingle();
+    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+    if (!updated) continue;
+    await writeAudit({
+      tenantId,
+      actorType: "system",
+      action: action === "review" ? "access.package_mover_review_opened" : "access.package_mover_review_cleared",
+      objectType: "access_package_assignment",
+      objectId: r.id as string,
+      outcome: "success",
+      metadata: { packageId: r.package_id, identityId, eventId: meta.eventId, ...(action === "review" ? { dueAt: due } : {}) },
+    });
+    if (action === "review") reviewed.push({ assignmentId: r.id as string, packageId: r.package_id as string, packageName: pkg.name, dueAt: due });
+  }
+  return reviewed;
+}
+
+/** WID-H09: keeps a mover's birthright package that is under review, so it is not removed. */
+export async function keepAssignment(tenantId: string, actorId: string, assignmentId: string): Promise<PackageAssignment> {
+  if (!UUID_RE.test(assignmentId)) throw new ApiError(404, "NOT_FOUND", "No such assignment");
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("access_package_assignments")
+    .update({ review_due_at: null, review_kept_by: actorId, review_kept_at: now, updated_at: now })
+    .eq("tenant_id", tenantId)
+    .eq("id", assignmentId)
+    .in("status", LIVE)
+    .not("review_due_at", "is", null)
+    .select("id, package_id, identity_id")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data) {
+    if (!(await getAssignment(tenantId, assignmentId))) throw new ApiError(404, "NOT_FOUND", "No such assignment");
+    throw new ApiError(409, "NOT_UNDER_REVIEW", "This assignment is not waiting for a review");
+  }
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_mover_review_kept", objectType: "access_package_assignment", objectId: assignmentId, outcome: "success", metadata: { packageId: data.package_id, identityId: data.identity_id } });
+  return (await getAssignment(tenantId, assignmentId))!;
+}
+
 /** Adds an application's access, or one of its entitlements, to a package. Only live applications. */
 export async function addPackageResource(tenantId: string, actorId: string, packageId: string, input: { applicationId?: unknown; entitlementId?: unknown }): Promise<PackageResource> {
   const applicationId = typeof input.applicationId === "string" ? input.applicationId : "";
@@ -567,6 +652,8 @@ export type PackageAssignment = {
   expiresAt: string | null;
   endedAt: string | null;
   endReason: string | null;
+  /** WID-H09: a mover's birthright package under review ends on this date unless kept. */
+  reviewDueAt: string | null;
   items: AssignmentItem[];
 };
 
@@ -676,6 +763,7 @@ async function toAssignments(tenantId: string, rows: AssignmentRow[]): Promise<P
     expiresAt: (r.expires_at as string | null) ?? null,
     endedAt: (r.ended_at as string | null) ?? null,
     endReason: (r.end_reason as string | null) ?? null,
+    reviewDueAt: (r.review_due_at as string | null) ?? null,
     items: (r.access_package_assignment_items ?? [])
       .map((i) => {
         const app = i.applications as { name: string; display_name: string | null } | null;
@@ -818,11 +906,12 @@ export async function revokeAssignment(tenantId: string, actorId: string, assign
 
 /**
  * Assignments past their end: expired, and their fulfilled access turned
- * into revocation work (spec §12.3). For one tenant (signed-in package
+ * into revocation work (spec §12.3). Also a mover's birthright packages
+ * not kept by their review date (WID-H09), removed the same way. For one tenant (signed-in package
  * views) or all (the cron job); every write is filtered by the row's own
  * tenant.
  */
-export async function sweepPackageExpiry(tenantId: string | null, now = new Date()): Promise<{ expired: number }> {
+export async function sweepPackageExpiry(tenantId: string | null, now = new Date()): Promise<{ expired: number; removed: number }> {
   const admin = supabaseServiceRole();
   let query = admin.from("access_package_assignments").select("id, tenant_id, package_id, identity_id").in("status", LIVE).lt("expires_at", now.toISOString()).order("expires_at").limit(200);
   if (tenantId) query = query.eq("tenant_id", tenantId);
@@ -835,7 +924,19 @@ export async function sweepPackageExpiry(tenantId: string | null, now = new Date
       await writeAudit({ tenantId: a.tenant_id as string, actorId: null, actorType: "system", action: "access.package_expired", objectType: "access_package_assignment", objectId: a.id as string, outcome: "success", metadata: { packageId: a.package_id, identityId: a.identity_id } });
     }
   }
-  return { expired };
+  // WID-H09: a mover's birthright package nobody kept by its review date is removed.
+  let lapsed = admin.from("access_package_assignments").select("id, tenant_id, package_id, identity_id").in("status", LIVE).lt("review_due_at", now.toISOString()).order("review_due_at").limit(200);
+  if (tenantId) lapsed = lapsed.eq("tenant_id", tenantId);
+  const { data: overdue, error: overdueError } = await lapsed;
+  if (overdueError) throw new ApiError(500, "QUERY_FAILED", overdueError.message);
+  let removed = 0;
+  for (const a of overdue ?? []) {
+    if (await endAssignment(a.tenant_id as string, null, a.id as string, "revoked", "Not kept after the person moved: they no longer qualify for this birthright package")) {
+      removed += 1;
+      await writeAudit({ tenantId: a.tenant_id as string, actorId: null, actorType: "system", action: "access.package_mover_review_lapsed", objectType: "access_package_assignment", objectId: a.id as string, outcome: "success", metadata: { packageId: a.package_id, identityId: a.identity_id } });
+    }
+  }
+  return { expired, removed };
 }
 
 /** Live applications, for choosing what a package includes. */

@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { assignmentExpiry, assignmentStatus, birthrightApplies, birthrightNeedsReapproval, birthrightTransition, checkEligibility, contentsDigest, itemOnEnd, packageRisk, validatePackageInput } from "./packageRules";
+import { assignmentExpiry, assignmentStatus, birthrightApplies, birthrightNeedsReapproval, birthrightTransition, checkEligibility, contentsDigest, itemOnEnd, MOVER_REVIEW_DAYS, moverReviewAction, moverReviewDue, packageRisk, validatePackageInput } from "./packageRules";
 
 describe("checkEligibility", () => {
   const pkg = { eligibleIdentityTypes: ["HUMAN"], eligibleDepartments: ["Finance"] };
@@ -103,5 +103,30 @@ describe("birthright (owner decision, 13 October 2026)", () => {
     expect(birthrightApplies(pkg, { ...ana, status: "inactive" })).toBe(false);
     expect(birthrightApplies({ ...pkg, birthrightStatus: "pending" }, ana)).toBe(false);
     expect(birthrightApplies({ ...pkg, status: "retired" }, ana)).toBe(false);
+  });
+});
+
+describe("WID-H09: a mover's birthright packages (owner decision, 13 October 2026)", () => {
+  const finance = { eligibleIdentityTypes: ["HUMAN"], eligibleDepartments: ["Finance"] };
+  const held = { source: "birthright", status: "active", reviewDueAt: null };
+  const person = (department: string, status = "active") => ({ identityType: "HUMAN", department, status });
+  it("sends one they no longer qualify for to review, and leaves one they still qualify for", () => {
+    expect(moverReviewAction(held, finance, person("Sales"))).toBe("review");
+    expect(moverReviewAction(held, finance, person("Finance"))).toBeNull();
+  });
+  it("ends the review when they qualify again, and does not open a second one", () => {
+    const underReview = { ...held, reviewDueAt: "2026-10-27T00:00:00Z" };
+    expect(moverReviewAction(underReview, finance, person("Finance"))).toBe("clear");
+    expect(moverReviewAction(underReview, finance, person("Sales"))).toBeNull();
+  });
+  it("only touches live birthright assignments, and ignores the person's status (leaving has its own removals)", () => {
+    expect(moverReviewAction({ ...held, source: "request" }, finance, person("Sales"))).toBeNull();
+    expect(moverReviewAction({ ...held, source: "direct" }, finance, person("Sales"))).toBeNull();
+    expect(moverReviewAction({ ...held, status: "revoked" }, finance, person("Sales"))).toBeNull();
+    expect(moverReviewAction(held, finance, person("Finance", "suspended"))).toBeNull();
+  });
+  it("is due MOVER_REVIEW_DAYS (14) days later", () => {
+    expect(MOVER_REVIEW_DAYS).toBe(14);
+    expect(moverReviewDue(new Date("2026-10-13T08:00:00Z"))).toBe("2026-10-27T08:00:00.000Z");
   });
 });

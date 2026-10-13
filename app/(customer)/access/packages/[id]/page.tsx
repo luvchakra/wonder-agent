@@ -14,7 +14,7 @@ import {
 import { getIdentityForUser, listAccountableHumans, listIdentities } from "@/modules/agent-identity/service";
 import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, Button } from "@/modules/ui";
 import { APPROVAL, ASSIGNMENT, ITEM, RISK_TONE, STATUS_TONE } from "../labels";
-import { AssignForm, BirthrightButton, ItemActions, PackageForm, PackageRequestForm, RemoveResource, ResourceForm, RevokeForm, StatusButtons } from "../PackageForms";
+import { AssignForm, BirthrightButton, ItemActions, KeepForm, PackageForm, PackageRequestForm, RemoveResource, ResourceForm, RevokeForm, StatusButtons } from "../PackageForms";
 
 // ACCESS-P0-20 — one access package (spec §12.2): what it includes and how
 // risky that is; whether you are eligible and why; who will approve and
@@ -266,7 +266,10 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
                       </Badge>
                       {a.endReason ? <span className="mt-0.5 block max-w-[14rem] text-xs text-muted-foreground">{a.endReason}</span> : null}
                     </Td>
-                    <Td hideBelow="lg">{a.endedAt ? `Ended ${when(a.endedAt)}` : a.expiresAt ? when(a.expiresAt) : "No end date"}</Td>
+                    <Td hideBelow="lg">
+                      {a.endedAt ? `Ended ${when(a.endedAt)}` : a.expiresAt ? when(a.expiresAt) : "No end date"}
+                      {a.reviewDueAt && !a.endedAt ? <span className="mt-0.5 block text-xs text-warning">Moved: removed {when(a.reviewDueAt)} unless kept</span> : null}
+                    </Td>
                     <Td>
                       <ul className="space-y-2">
                         {a.items.map((i) => (
@@ -288,7 +291,8 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
                         ))}
                       </ul>
                       {canManage && ["provisioning", "active", "partially_failed"].includes(a.status) ? (
-                        <div className="mt-2 border-t border-border pt-2">
+                        <div className="mt-2 space-y-2 border-t border-border pt-2">
+                          {a.reviewDueAt ? <KeepForm packageId={pkg.id} assignmentId={a.id} /> : null}
                           <RevokeForm packageId={pkg.id} assignmentId={a.id} />
                         </div>
                       ) : null}

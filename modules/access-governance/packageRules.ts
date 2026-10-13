@@ -187,3 +187,31 @@ export function birthrightApplies(
 ): boolean {
   return pkg.birthrightStatus === "on" && pkg.status === "active" && checkEligibility(pkg, subject).eligible;
 }
+
+/** WID-H09 (owner decision, 13 Oct): how long a mover's manager has to keep a birthright package they no longer qualify for. */
+export const MOVER_REVIEW_DAYS = 14;
+
+/**
+ * WID-H09: what a move means for one birthright assignment the person holds.
+ * - "review": they no longer qualify (identity type or department), so it
+ *   goes to a dated review and is removed unless someone keeps it;
+ * - "clear": it was under review and they qualify again, so the review ends;
+ * - null: nothing to do (not birthright, not live, or unchanged).
+ * The person's status is not part of this: leaving has its own removals.
+ */
+export function moverReviewAction(
+  a: { source: string; status: string; reviewDueAt: string | null },
+  pkg: PackageEligibility,
+  subject: EligibilitySubject,
+): "review" | "clear" | null {
+  if (a.source !== "birthright" || !["provisioning", "active", "partially_failed"].includes(a.status)) return null;
+  const qualifies = checkEligibility(pkg, { ...subject, status: "active" }).eligible;
+  if (!qualifies && !a.reviewDueAt) return "review";
+  if (qualifies && a.reviewDueAt) return "clear";
+  return null;
+}
+
+/** The date a mover review ends: MOVER_REVIEW_DAYS from now. */
+export function moverReviewDue(now: Date): string {
+  return new Date(now.getTime() + MOVER_REVIEW_DAYS * 86_400_000).toISOString();
+}

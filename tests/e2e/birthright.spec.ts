@@ -12,7 +12,10 @@ import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
  *   assigned at once, with no request; one who is not eligible does not;
  * - changing what the package includes sends it back for approval, and the
  *   person who changed it cannot approve it either;
- * - a read-only member can do none of it.
+ * - a read-only member can do none of it;
+ * - WID-H09 (owner decision, 13 October 2026): a mover who no longer
+ *   qualifies keeps the package for a 14-day review, listed on the
+ *   manager's task; someone keeps it, or it is removed at the date.
  * The department is unique to this run, so no other spec's joiners match.
  */
 
@@ -168,5 +171,41 @@ test.describe.serial("birthright packages", () => {
     expect(none ?? []).toHaveLength(0);
     // One person may turn it off.
     expect((await birthright(request, "off")).status()).toBe(200);
+  });
+
+  test("WID-H09: a mover who no longer qualifies has it reviewed: kept, or removed at the date", async ({ request }) => {
+    const joiner = await personId(mail("joiner"));
+    const assignment = async () =>
+      (await db().from("access_package_assignments").select("id, status, review_due_at, review_kept_by, end_reason").eq("tenant_id", tenantId).eq("package_id", ids.pkg).eq("identity_id", joiner).order("created_at").limit(1).single()).data!;
+    const move = async (department: string) => importPeople(request, [["B1", `E2E Birth Joiner ${stamp}`, mail("joiner"), department]]);
+
+    // Moves out: the package goes to review, due in 14 days, and the manager's review task lists it.
+    await move("Elsewhere");
+    await expect.poll(async () => (await assignment()).review_due_at, { timeout: 20_000 }).not.toBeNull();
+    const due = new Date((await assignment()).review_due_at as string).getTime();
+    expect(Math.round((due - Date.now()) / 86_400_000)).toBe(14);
+    const { data: tasks } = await db().from("identity_lifecycle_tasks").select("detail").eq("tenant_id", tenantId).eq("identity_id", joiner).eq("task_type", "review_access").order("created_at", { ascending: false }).limit(1);
+    expect((tasks?.[0]?.detail as { birthrightReview?: { packageName: string }[] })?.birthrightReview?.map((r) => r.packageName)).toEqual([`E2E Birthright Pkg ${stamp}`]);
+
+    // A read-only member cannot keep it; an administrator can, and it is no longer under review.
+    const id = (await assignment()).id as string;
+    expect((await ro.post(`/api/v1/access/package-assignments/${id}/keep`)).status()).toBe(403);
+    const kept = await request.post(`/api/v1/access/package-assignments/${id}/keep`);
+    expect(kept.status(), await kept.text()).toBe(200);
+    expect((await kept.json()).data.reviewDueAt).toBeNull();
+    expect((await assignment()).review_kept_by).not.toBeNull();
+    expect((await request.post(`/api/v1/access/package-assignments/${id}/keep`)).status()).toBe(409);
+
+    // Moves back (qualifies, nothing to review), then away again: under review once more.
+    await move(dept);
+    await move("Elsewhere Again");
+    await expect.poll(async () => (await assignment()).review_due_at, { timeout: 20_000 }).not.toBeNull();
+
+    // Nobody keeps it: once the date has passed, the next sweep removes it through the normal path.
+    await db().from("access_package_assignments").update({ review_due_at: new Date(Date.now() - 60_000).toISOString() }).eq("tenant_id", tenantId).eq("id", id);
+    expect((await request.get(`/api/v1/access/packages/${ids.pkg}/assignments`)).status()).toBe(200);
+    expect(await assignment()).toMatchObject({ status: "revoked", end_reason: expect.stringContaining("Not kept after the person moved") });
+    const { data: audit } = await db().from("audit_logs").select("action").eq("tenant_id", tenantId).eq("object_id", id).like("action", "access.package_mover_review_%");
+    expect((audit ?? []).map((a) => a.action)).toEqual(expect.arrayContaining(["access.package_mover_review_opened", "access.package_mover_review_kept", "access.package_mover_review_lapsed"]));
   });
 });
