@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { baseAppHost, parseTenantHost, slugProblem, tenantUrl } from "./host";
+import { baseAppHost, mainAddressRedirect, orgAddressRequired, parseTenantHost, slugProblem, tenantUrl } from "./host";
 
 describe("baseAppHost", () => {
   it("normalizes the configured base host, or none", () => {
@@ -50,5 +50,26 @@ describe("tenantUrl", () => {
     expect(tenantUrl("acme", "wonderid.example")).toBe("https://acme.wonderid.example");
     expect(tenantUrl("acme", "localhost", "http", "3100")).toBe("http://acme.localhost:3100");
     expect(tenantUrl("acme", null)).toBeNull();
+  });
+});
+
+describe("organization addresses required (owner request 2026-10-13)", () => {
+  it("is on only with the flag and a base host", () => {
+    expect(orgAddressRequired({ ORG_ADDRESS_REQUIRED: "true", BASE_APP_HOST: "id.example.com" })).toBe(true);
+    expect(orgAddressRequired({ ORG_ADDRESS_REQUIRED: "true" })).toBe(false);
+    expect(orgAddressRequired({ BASE_APP_HOST: "id.example.com" })).toBe(false);
+  });
+
+  it("the main address keeps the landing page, sign-in, the vendor console and the API; product pages go to the organization list", () => {
+    expect(mainAddressRedirect("/", false)).toBeNull();
+    expect(mainAddressRedirect("/", true)).toBe("/organizations");
+    for (const p of ["/welcome", "/sign-in", "/sign-up", "/auth/callback", "/platform-admin/tenants", "/organizations", "/onboarding/start", "/api/v1/identities", "/api/connect/v1/x/events"]) {
+      expect(mainAddressRedirect(p, true)).toBeNull();
+    }
+    expect(mainAddressRedirect("/identities", true)).toBe("/organizations");
+    expect(mainAddressRedirect("/identities", false)).toBe("/sign-in");
+    // A prefix match is a whole path segment, never a look-alike.
+    expect(mainAddressRedirect("/sign-inx", true)).toBe("/organizations");
+    expect(mainAddressRedirect("/platform-administration", true)).toBe("/organizations");
   });
 });

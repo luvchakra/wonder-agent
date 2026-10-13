@@ -68,3 +68,44 @@ export function tenantUrl(slug: string, base: string | null, protocol = "https",
   if (!base || !slug) return null;
   return `${protocol}://${slug}.${base}${port ? `:${port}` : ""}`;
 }
+
+/**
+ * Owner request (2026-10-13): the main address (`BASE_APP_HOST` itself) is
+ * the landing page, and the product opens only on an organization's own
+ * address (`<prefix>[-env].<BASE_APP_HOST>`). Switched on by
+ * `ORG_ADDRESS_REQUIRED=true` (production), so local and preview runs keep
+ * using the main address.
+ */
+export function orgAddressRequired(env: Record<string, string | undefined> = process.env): boolean {
+  return env.ORG_ADDRESS_REQUIRED?.trim().toLowerCase() === "true" && baseAppHost(env) !== null;
+}
+
+/**
+ * What the main address still serves when the product is on organization
+ * addresses: the landing page, signing in and up, password recovery, help,
+ * the vendor console, the organization list and creation, the error pages.
+ * (The API is never affected: connector receivers, webhooks and cron run on
+ * the main address.)
+ */
+export const MAIN_ADDRESS_PATHS = [
+  "/welcome",
+  "/sign-in",
+  "/sign-up",
+  "/auth/",
+  "/forgot-password",
+  "/update-password",
+  "/help",
+  "/platform-admin",
+  "/organizations",
+  "/onboarding",
+  "/no-access",
+  "/service-unavailable",
+  "/tenant-not-found",
+];
+
+/** Where a request on the main address goes when the product requires an organization's address; null when it is served there. */
+export function mainAddressRedirect(pathname: string, signedIn: boolean): string | null {
+  if (pathname.startsWith("/api/") || MAIN_ADDRESS_PATHS.some((p) => pathname === p || pathname.startsWith(p.endsWith("/") ? p : `${p}/`))) return null;
+  if (pathname === "/") return signedIn ? "/organizations" : null;
+  return signedIn ? "/organizations" : "/sign-in";
+}

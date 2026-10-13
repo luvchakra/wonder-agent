@@ -11,7 +11,7 @@ import {
   type SessionLimits,
 } from "@/lib/tenant/sessionSecurity";
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
-import { baseAppHost, parseTenantHost } from "@/lib/tenant/host";
+import { baseAppHost, mainAddressRedirect, orgAddressRequired, parseTenantHost } from "@/lib/tenant/host";
 import { isCrossSiteApiWrite } from "@/lib/security/origin";
 
 /**
@@ -215,6 +215,18 @@ export async function proxy(request: NextRequest) {
     }
     if (!pathname.startsWith("/tenant-not-found") && !pathname.startsWith("/service-unavailable")) {
       return NextResponse.rewrite(new URL(unavailable ? "/service-unavailable" : "/tenant-not-found", request.url), { status: unavailable ? 503 : 404 });
+    }
+  }
+
+  // Owner request (2026-10-13), with ORG_ADDRESS_REQUIRED: the main address
+  // is the landing page and the product opens only on an organization's own
+  // address. Signed-in people on the main address go to their organization
+  // list (/organizations); the landing page, signing in, the vendor console
+  // and the API stay here. The address still never authorizes anything.
+  if (hostTarget.kind === "base" && orgAddressRequired()) {
+    const to = mainAddressRedirect(pathname, Boolean(user));
+    if (to && to !== pathname) {
+      return NextResponse.redirect(new URL(to, request.url));
     }
   }
 
