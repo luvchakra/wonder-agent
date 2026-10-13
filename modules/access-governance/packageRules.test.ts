@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { assignmentExpiry, assignmentStatus, birthrightApplies, birthrightNeedsReapproval, birthrightTransition, checkEligibility, contentsDigest, itemOnEnd, MOVER_REVIEW_DAYS, moverReviewAction, moverReviewDue, packageRisk, validatePackageInput } from "./packageRules";
+import { assignmentExpiry, assignmentStatus, birthrightApplies, birthrightNeedsReapproval, birthrightTransition, checkEligibility, contentsDigest, itemOnEnd, keepRefusal, MOVER_REVIEW_DAYS, moverReviewAction, moverReviewDue, packageRisk, validatePackageInput } from "./packageRules";
 
 describe("checkEligibility", () => {
   const pkg = { eligibleIdentityTypes: ["HUMAN"], eligibleDepartments: ["Finance"] };
@@ -128,5 +128,14 @@ describe("WID-H09: a mover's birthright packages (owner decision, 13 October 202
   it("is due MOVER_REVIEW_DAYS (14) days later", () => {
     expect(MOVER_REVIEW_DAYS).toBe(14);
     expect(moverReviewDue(new Date("2026-10-13T08:00:00Z"))).toBe("2026-10-27T08:00:00.000Z");
+  });
+});
+
+describe("WID-H09: a mover review is decided by someone else (register, 13 Oct)", () => {
+  it("refuses the person whose access is under review, and allows anyone else", () => {
+    expect(keepRefusal("person-1", "person-1")).toBe("SELF_KEEP");
+    expect(keepRefusal("manager-1", "person-1")).toBeNull();
+    // An administrator with no linked identity is not the person under review.
+    expect(keepRefusal(null, "person-1")).toBeNull();
   });
 });

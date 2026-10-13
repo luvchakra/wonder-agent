@@ -3199,3 +3199,11 @@ Left out:
 - a reminder before the review date (the manager's notification at the
   move names the date).
 
+### 2026-10-13 — A mover review is decided by someone else (WID-H09, register 13:07 IST)
+
+`keepAssignment` refused nobody: a mover holding `access.manage` could
+keep their own old birthright access. It now refuses the person whose
+access is under review: 403 `SELF_KEEP` (`keepRefusal`, pure, in
+`packageRules.ts`), and the refused attempt is audited. Verified with
+`packageRules.test.ts` 18/18, including the new case, and the typecheck.
+
