@@ -14,6 +14,7 @@ export { isFeatureEnabled, getFeatureFlags, requireFeature, resolveFlags, listFl
 export { grantPlatformAdmin, revokePlatformAdmin, listPlatformAdmins } from "./admins";
 export { getBranding, updateBranding, type UpdateBrandingInput } from "./branding";
 export { getPlatformHealth } from "./health";
+export { getWonderappsDashboardAccess, setWonderappsDashboardAccess } from "./wonderappsAccess";
 export { checkUsageLimit, getUsageSummary, classifyUsage, type UsageResource, type UsageCheck } from "./usage";
 export { updateFeatureFlagDefault } from "./featureFlags";
 export { listConfigVersions, rollbackConfigVersion, type ConfigType, type ConfigVersion } from "./configRollback";

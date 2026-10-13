@@ -1315,3 +1315,12 @@ Verified:
 ### 2026-10-12 — WID-H07 (owner decision)
 
 Typed text out of audit records: the rogue-access decision reason is passed as `typedText` (kept on `risk_findings.decision_reason`); `accessFindings.test.ts` asserts the audit metadata no longer holds it. See the Foundation entry for the mechanism.
+
+### 2026-10-13 — The sidebar's risk badge counts instead of reading (§15)
+
+The customer layout read every open agent finding on every page, only to
+count them for the badge. It now uses `countOpenAgentFindings`, a head
+count under RLS, filtered on the tenant. An unreadable count is 0, so the
+shell never fails on it. This came from the 13 Oct pagination audit. The
+other full reads of `getFindings` (agents, investigations, risk overview,
+rogue agents and the dashboard) are next.

@@ -6,7 +6,7 @@ import "server-only";
  * file only — never query risk_findings/risk_evidence directly.
  */
 
-export { getFindings, getFinding, getFindingAsOfDetection, assignFinding, remediateFinding, resolveFinding, transitionFindingStatus } from "./findings";
+export { getFindings, countOpenAgentFindings, getFinding, getFindingAsOfDetection, assignFinding, remediateFinding, resolveFinding, transitionFindingStatus } from "./findings";
 export { evaluateAgentRisk } from "./rules";
 // ACCESS-P0-25: findings about access on an account, for any identity type.
 export { syncRogueAccessFindings, listAccessFindings, listOpenAccessFindingsPage, countOpenAccessFindings, accessSubjectKey, decideRogueFinding, reopenEndedExceptions } from "./accessFindings";

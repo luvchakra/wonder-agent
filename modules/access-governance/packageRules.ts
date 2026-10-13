@@ -215,3 +215,12 @@ export function moverReviewAction(
 export function moverReviewDue(now: Date): string {
   return new Date(now.getTime() + MOVER_REVIEW_DAYS * 86_400_000).toISOString();
 }
+
+/**
+ * WID-H09 (register, 13 Oct 13:07 IST): a mover review is decided by
+ * someone else. The person whose access is under review may not keep it,
+ * the same rule as deciding one's own request (WID-C01, SELF_APPROVAL).
+ */
+export function keepRefusal(actorIdentityId: string | null, assignmentIdentityId: string): "SELF_KEEP" | null {
+  return actorIdentityId !== null && actorIdentityId === assignmentIdentityId ? "SELF_KEEP" : null;
+}

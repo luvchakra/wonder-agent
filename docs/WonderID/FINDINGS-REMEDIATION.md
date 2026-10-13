@@ -25,7 +25,7 @@ request as each fix.
 **Status:** Not started, In progress, Partly fixed, Fixed (closure criteria
 met, with evidence), or Waiting on the owner.
 
-**Last updated:** 13 October 2026, 13:50 IST (statuses from the register's 11:08 IST audit; WID-H05 residual and WID-H09 done, for the register to assess)
+**Last updated:** 13 October 2026, 17:55 IST (statuses from the register's 13:07 IST audit; WID-H09 self-keep fixed, for the register to assess)
 
 ## Summary
 
@@ -38,11 +38,11 @@ met, with evidence), or Waiting on the owner.
 | WID-H02 Idempotency and retries | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H03 Incomplete syncs | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST); checksums wait for a system that offers one |
 | WID-H04 Rogue access provenance | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
-| WID-H05 Connector security | P3 (register: High) | Partly fixed (register: CHANGED) | Done (13 Oct, 12:35 IST): the register's 11:08 residual. LDAP, SQL and MCP connect to the same address the allow-list checks, and an address without a host is refused when a list is set. For the register to assess |
+| WID-H05 Connector security | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 13:07 IST) |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H08 Automation address allow-list | P1 | Fixed | None: the register confirmed it fixed, edge spoofing tested end to end (13 Oct, 09:06 IST) |
-| WID-H09 Access SoD and birthright | P1 (register: High) | Fixed, pending the register | Done (13 Oct): knowledge base corrected (owner decision: docs now, build later); a mover's birthright packages they no longer qualify for go to a 14-day review, then are removed unless kept (0153). Access-combination SoD is on the access backlog (ACCESS-P1-05). For the register to assess |
+| WID-H09 Access SoD and birthright | P1 (register: High) | Fixed, pending the register (register: CHANGED) | Done (13 Oct, 17:55 IST): the register's self-keep bypass. The person whose access is under review can no longer keep it (`SELF_KEEP`, `keepRefusal`); refused attempts are audited. For the register to assess |
 
 ## Owner decisions
 
@@ -543,7 +543,7 @@ Tests:
 
 **Next:** none of ours.
 
-### WID-H05: connector security (P3, partly fixed)
+### WID-H05: connector security (P2, fixed)
 
 **Done:**
 - Custom credential headers and request bodies no longer follow a redirect
@@ -824,3 +824,13 @@ Owner decisions (13 Oct):
   - every step is audited.
 
   Tests: `packageRules.test.ts`, and E2E `birthright.spec.ts` "WID-H09".
+
+**Done (13 Oct, 17:55 IST), the register's 13:07 IST point (self-keep
+bypass):** `keepAssignment` refuses a keep by the person whose access is
+under review (403 `SELF_KEEP`, rule `keepRefusal` in `packageRules.ts`),
+the same rule as deciding one's own request (WID-C01). A refused attempt
+is audited (`access.package_mover_review_kept`, failure). An administrator
+with no linked identity is not the person under review. Test:
+`packageRules.test.ts` "a mover review is decided by someone else".
+Not done (optional in the register): a failed mover review becomes a task
+as well as an audit row.

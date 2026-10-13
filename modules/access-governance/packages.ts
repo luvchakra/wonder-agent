@@ -18,6 +18,7 @@ import {
   contentsDigest,
   itemOnEnd,
   moverReviewAction,
+  keepRefusal,
   moverReviewDue,
   packageRisk,
   validatePackageInput,
@@ -459,6 +460,13 @@ export async function reviewBirthrightAfterMove(tenantId: string, identityId: st
 /** WID-H09: keeps a mover's birthright package that is under review, so it is not removed. */
 export async function keepAssignment(tenantId: string, actorId: string, assignmentId: string): Promise<PackageAssignment> {
   if (!UUID_RE.test(assignmentId)) throw new ApiError(404, "NOT_FOUND", "No such assignment");
+  // WID-H09: never by the person whose access is under review.
+  const [current, actor] = await Promise.all([getAssignment(tenantId, assignmentId), getIdentityForUser(tenantId, actorId)]);
+  if (!current) throw new ApiError(404, "NOT_FOUND", "No such assignment");
+  if (keepRefusal(actor?.id ?? null, current.identityId)) {
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_mover_review_kept", objectType: "access_package_assignment", objectId: assignmentId, outcome: "failure", metadata: { reason: "SELF_KEEP", identityId: current.identityId } });
+    throw new ApiError(403, "SELF_KEEP", "You can't keep your own access after a move; someone else must decide");
+  }
   const now = new Date().toISOString();
   const { data, error } = await supabaseServiceRole()
     .from("access_package_assignments")

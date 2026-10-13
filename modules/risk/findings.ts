@@ -81,6 +81,18 @@ export async function getFindings(tenantId: string, filter: FindingFilter = {}):
   return (data ?? []).map(toRiskFinding);
 }
 
+/**
+ * §15: how many agent findings are open, for the sidebar's risk badge on
+ * every page: a head count under RLS, filtered on the tenant, instead of
+ * reading every open finding to count it. Unreadable counts as 0 so the
+ * shell never fails on it.
+ */
+export async function countOpenAgentFindings(tenantId: string): Promise<number> {
+  const supabase = await supabaseServer();
+  const { count, error } = await supabase.from("risk_findings").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).not("agent_id", "is", null).eq("status", "open");
+  return error ? 0 : (count ?? 0);
+}
+
 export async function getFinding(tenantId: string, findingId: string): Promise<RiskFinding | null> {
   const supabase = await supabaseServer();
   const { data, error } = await supabase.from("risk_findings").select().eq("tenant_id", tenantId).eq("id", findingId).not("agent_id", "is", null).maybeSingle();
