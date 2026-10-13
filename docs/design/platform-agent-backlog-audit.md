@@ -1256,3 +1256,11 @@ Owner feedback the same day: an organization set up as development, with no prod
 - Local E2E: manage-organizations (new), first-organization and platform-admin, 21/21. The new test: rename, buy Test, disable and enable it. It caught a UI bug, a confirm step that survived Enable, which is fixed.
 
 **Left out.** Real checkout for environments through Stripe or Razorpay: once keys are set, test payments stop and the page says online payment isn't available yet. That checkout is the follow-up. The address prefix stays the platform console's to change.
+
+## 2026-10-13 — Organization shown wrongly after adding Test to a development organization (owner feedback)
+
+**What was wrong.** Kunal's organization is set up as development, with no production organization above it. After a Test environment was added to it, the console grouped the two correctly but picked the organization by environment rank (production, staging, test, development). So it showed "Kunal's organization (Test)" as the organization, and the original development organization as one of its environments.
+
+**Fix.** `groupOrganizations()` now takes as the organization the tenant its environments link to, whatever its own environment. Without links it still takes the production one first.
+
+**Verified.** `organizations.test.ts` 3/3. The new case fails without the fix. Typecheck and eslint clean.
