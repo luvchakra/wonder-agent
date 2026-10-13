@@ -107,6 +107,29 @@ test.describe("tenant addresses", () => {
     await one.context().close();
   });
 
+  test("owner request 2026-10-13: social sign-in on an organization's address returns to that same address", async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    // Which providers are on is read on the server from the real project; whichever button is enabled must start its flow back to this address.
+    let authorizeUrl: string | null = null;
+    await page.route("**/auth/v1/authorize**", async (route) => {
+      authorizeUrl = route.request().url();
+      await route.fulfill({ status: 200, contentType: "text/html", body: "<p>authorize stub</p>" });
+    });
+    await page.goto(at(TENANT_ONE.slug, "/sign-in"));
+    const google = page.getByRole("button", { name: /^Sign in with Google/ });
+    await expect(google).toBeVisible();
+    if (await google.isEnabled()) {
+      await google.click();
+      await page.waitForURL(/\/auth\/v1\/authorize/, { timeout: 10_000 });
+      expect(new URL(authorizeUrl!).searchParams.get("redirect_to")).toBe(at(TENANT_ONE.slug, "/auth/callback"));
+    }
+    // A suspended organization offers no social sign-in either.
+    await page.goto(at(SUSPENDED_SLUG, "/sign-in"));
+    await expect(page.getByRole("button", { name: /^Sign in with Google/ })).toHaveCount(0);
+    await ctx.close();
+  });
+
   test("a suspended organization cannot be signed in to, and says so", async ({ browser }) => {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();

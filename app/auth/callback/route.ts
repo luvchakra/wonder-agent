@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { User } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
+import { getHostTenant } from "@/lib/tenant/hostTenant";
+import { refuseNonMemberOnTenantAddress } from "@/lib/auth/tenantAddressGate";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getFullActiveSsoConnectionByDomain, provisionSsoMembership } from "@/lib/auth/sso";
 import { TENANT_COOKIE_NAME, getTenantContext } from "@/lib/tenant/getTenantContext";
@@ -85,6 +87,17 @@ export async function GET(request: NextRequest) {
     const signIn = new URL("/sign-in", request.url);
     const reason = signInFailureReason(providerError, exchangeFailed);
     if (reason) signIn.searchParams.set("reason", reason);
+    return NextResponse.redirect(signIn);
+  }
+
+  // FOUNDATION-P0-22 (owner request 2026-10-13: social sign-in on an
+  // organization's own address) — the same refusal as the password path: a
+  // non-member's new session ends at once and they are told why.
+  const host = await getHostTenant();
+  const refused = await refuseNonMemberOnTenantAddress(supabase, host, user.id);
+  if (refused) {
+    const signIn = new URL("/sign-in", request.url);
+    signIn.searchParams.set("reason", host.tenant && host.tenant.status === "active" ? "not_member" : "unavailable");
     return NextResponse.redirect(signIn);
   }
 
