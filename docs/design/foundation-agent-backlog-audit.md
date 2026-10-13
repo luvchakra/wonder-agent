@@ -3312,3 +3312,17 @@ because deleting from the platform boundary needs the owner.
 - The shared sign-in setup cannot run against a server with the flag, because it expects the product on the main address, so the flag spec runs with `--no-deps`. This is recorded in the spec.
 
 **Left out.** Google, Microsoft and LinkedIn sign-in on organization addresses. Their buttons show only once the owner adds `https://*.id.wonderapps.biz/**` to Supabase's redirect URLs.
+
+### 2026-10-13 — Google, Microsoft and LinkedIn sign-in on organization addresses
+
+**Owner action done.** `https://*.id.wonderapps.biz/**` was added to Supabase's redirect URLs.
+
+**Built.**
+- **Buttons.** The social sign-in buttons now show on an organization's own sign-in page, except for a suspended organization. They return to that address's `/auth/callback`, since the return address is built from the page's own origin.
+- **The same membership check on both paths.** `/auth/callback` now applies the refusal the password path already had: someone who is not an active (or invited) member of the addressed organization has the new session ended and lands on sign-in with a fixed notice ("not an active member" or "cannot be signed in to right now").
+- **One shared function.** The check moved into `lib/auth/tenantAddressGate.ts` (`refuseNonMemberOnTenantAddress`, audited `auth.sign_in_refused`), so both paths use it rather than two inline copies.
+
+**Verified.**
+- Vitest: the gate 3/3, and `app/actions` with `app/auth` 26/26.
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E: tenant-address and auth, 42 passed. The new test checks that Google sign-in on an organization's address asks Supabase to return to that same address's callback, and that a suspended organization shows no social sign-in.

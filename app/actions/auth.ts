@@ -1,9 +1,9 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
-import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
-import { writeAudit } from "@/lib/audit/writeAudit";
+import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
+import { refuseNonMemberOnTenantAddress } from "@/lib/auth/tenantAddressGate";
 import { checkAndRecordAttempt, isDistinguishingClientIp, type RateLimitResult } from "@/lib/security/rateLimiter";
 import { SESSION_STARTED_COOKIE, SESSION_LAST_SEEN_COOKIE } from "@/lib/tenant/sessionSecurity";
 
@@ -72,31 +72,8 @@ export async function signInAction(email: string, password: string): Promise<Aut
   if (error) return { ok: false, error: error.message };
 
   if (onTenantAddress && data.user) {
-    // The person just authenticated, reading their own membership in the
-    // addressed organization. Service role: a membership that is not yet
-    // active (an invitation) is outside their RLS view.
-    const { data: membership } = await supabaseServiceRole()
-      .from("tenant_memberships")
-      .select("status")
-      .eq("tenant_id", host.tenant!.tenantId)
-      .eq("user_id", data.user.id)
-      .maybeSingle();
-    // An invitation lets them in far enough to accept it (FOUNDATION-P0-23).
-    if (membership?.status !== "active" && membership?.status !== "invited") {
-      // Only this new session ends; the account's other sessions are not touched.
-      await supabase.auth.signOut({ scope: "local" });
-      await writeAudit({
-        tenantId: host.tenant!.tenantId,
-        actorId: data.user.id,
-        actorType: "user",
-        action: "auth.sign_in_refused",
-        objectType: "tenant",
-        objectId: host.tenant!.tenantId,
-        outcome: "failure",
-        metadata: { reason: membership ? `membership ${membership.status}` : "not a member" },
-      });
-      return { ok: false, error: `This account is not an active member of ${host.tenant!.name}.` };
-    }
+    const refused = await refuseNonMemberOnTenantAddress(supabase, host, data.user.id);
+    if (refused) return { ok: false, error: refused };
   }
   await stampSessionCookies();
   return { ok: true };

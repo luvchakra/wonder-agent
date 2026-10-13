@@ -32,7 +32,11 @@ function SignInForm({ tenant, providers }: { tenant: SignInTenant; providers: Au
       ? "Sign-in was cancelled. Try again, or use your email and password."
       : reason === "oauth_failed"
         ? "Sign-in did not complete. Try again, or use your email and password."
-        : null;
+        : reason === "not_member"
+          ? `This account is not an active member of ${tenant?.name ?? "this organization"}.`
+          : reason === "unavailable"
+            ? "This organization cannot be signed in to right now."
+            : null;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -169,8 +173,8 @@ function SignInForm({ tenant, providers }: { tenant: SignInTenant; providers: Au
       </div>
 
       <div className="space-y-2">
-        {/* On an organization's address, only its own sign-in methods: the social providers' redirect allowlists do not include tenant addresses. */}
-        {tenant ? null : <SocialAuthButtons verb="Sign in" status={providers} />}
+        {/* On an organization's address too since 2026-10-13: Supabase's redirect allow-list holds https://*.<BASE_APP_HOST>/** (owner). Never for a suspended organization. */}
+        {tenant?.suspended ? null : <SocialAuthButtons verb="Sign in" status={providers} />}
         <Button
           type="button"
           variant="outline"
