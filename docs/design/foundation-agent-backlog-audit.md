@@ -3122,3 +3122,24 @@ Verified:
   - in parallel they read data other specs were changing (a manager
     link, and the organization's connection list between two reads).
     That is a QA follow-up, not this change.
+
+### 2026-10-13 — An unknown organization address answers 404 on Vercel too (FOUNDATION-P0-22)
+
+The proxy rewrites an address that names no organization to
+`/tenant-not-found` with status 404. Vercel's build served that page with
+200: the rewrite's status was lost (E2E `tenant-address.spec.ts:54`, Vercel
+builder only).
+
+The page now calls `notFound()`, so the 404 comes from the page itself:
+- `not-found.tsx` beside it renders the same message;
+- a `layout.tsx` sets the title ("Organization not found").
+
+The proxy is unchanged, and nothing about which organizations exist is
+revealed.
+
+Verified locally:
+- `curl` returns 404 for unknown and reserved addresses, with the right
+  title;
+- `tenant-address.spec.ts` 12/12; `auth.spec.ts` 41/41.
+
+Follow-up: `/service-unavailable` (503) relies on the same rewrite status.
