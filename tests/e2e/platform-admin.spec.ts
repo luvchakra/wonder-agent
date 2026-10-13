@@ -31,7 +31,9 @@ test.describe("Platform-admin console", () => {
   test("Tenants page lists the seeded E2E tenants", async ({ page }) => {
     await page.goto("/platform-admin/tenants");
     await expect(page.getByRole("heading", { name: "Tenants", exact: true })).toBeVisible();
-    await expect(page.getByText(TENANT_ONE.name)).toBeVisible();
+    // E2E organizations are listed apart from real ones (owner request 2026-10-13).
+    await page.getByText(/^Test organizations/).click();
+    await expect(page.getByRole("link", { name: TENANT_ONE.name, exact: true })).toBeVisible();
   });
 
   for (const path of ["/platform-admin/features", "/platform-admin/branding", "/platform-admin/announcements", "/platform-admin/health", "/platform-admin/admins"]) {

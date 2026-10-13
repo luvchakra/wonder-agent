@@ -24,7 +24,7 @@ export function environmentColor(kind: string | null | undefined) {
 export function EnvironmentBadge({ environment, className }: { environment: string | null | undefined; className?: string }) {
   const c = environmentColor(environment);
   return (
-    <span className={cn("inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium", c.badge, className)}>
+    <span className={cn("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium", c.badge, className)}>
       <span aria-hidden className={cn("size-1.5 rounded-full", c.dot)} />
       {c.label}
     </span>

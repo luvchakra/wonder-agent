@@ -1161,3 +1161,29 @@ While building it, the live phase doc's INTEGRATION-P0-22 row was found stale ("
 **Left out.**
 - Renaming an organization does not rename its environments (each has its own address). A platform administrator renames them one by one.
 - Configuration promotion between environments (PLATFORM-P0-13).
+
+## 2026-10-13 — Tenants: every organization, a simpler table, plan changes, test organizations apart (owner reports)
+
+**Reports.**
+- "I don't see any URL having this name": self-service organizations were missing from Tenants, because the list read only `platform_tenants`.
+- "I don't see rename option": the name was a link, but nothing showed it.
+- "Once a plan is assigned there is no option to change it, also table layout is not great."
+- "If you create any environment, keep it separate": read as keeping test organizations apart from real ones, to be confirmed with the owner.
+
+**Built.**
+- **Every organization.** `listTenants()` and `getTenant()` now read `tenants`, with the platform record embedded (no record counts as production). Decommissioned organizations are hidden unless "Show decommissioned" is chosen.
+- **The table.**
+  - Columns are now: Organization (name, with the address under it as a link), Environment (coloured), Status, Plan, and one "Manage" link per row.
+  - Address, environment, plan, status, adding environments and usage all moved to the organization's Manage page.
+  - Badges and buttons no longer wrap: `whitespace-nowrap` added in Badge, EnvironmentBadge and the shared Button.
+  - "Create an organization" is folded at the bottom.
+- **Plan changes.** `changePlan()` changes a plan the platform assigned by hand (or assigns one) with that plan's limits, audited `platform.subscription_plan_changed` with from and to. A plan billed through Stripe or Razorpay is refused with the way to do it: a Billing plan override that a second administrator approves (§18.2.6).
+- **Test organizations apart.** `testTenantIds()` marks an organization as a test one when its slug starts `e2e-` or `fixture-`, or when all its members are test accounts (`@e2e.wonderagent.test`, `@example.test`). Two leftover "Wonderagent" organizations from interrupted E2E runs fall into this group. Test organizations are listed in a collapsed "Test organizations" section. This is for display only, never for access.
+
+**Verified.**
+- Vitest: `subscriptions.test.ts` 3/3; `modules/platform-admin` 28 passed.
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E:
+  - platform-admin 16 passed; the spec now opens the Test organizations section to find E2E Tenant One;
+  - first-organization and the platform navigation smoke passed in the earlier run (26).
+- Screenshots of Tenants and of a Manage page checked.

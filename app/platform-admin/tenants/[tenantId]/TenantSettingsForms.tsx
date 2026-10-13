@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { renameTenantSlugAction, setTenantEnvironmentAction, type TenantSettingState } from "@/app/actions/platform";
+import { changePlanAction, renameTenantSlugAction, setTenantEnvironmentAction, type TenantSettingState } from "@/app/actions/platform";
 import { Button, fieldInputClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 
@@ -55,6 +55,27 @@ export function EnvironmentForm({ tenantId, environment }: { tenantId: string; e
         </select>
         <Button type="submit" size="sm" variant="outline" disabled={pending}>
           {pending ? "Saving…" : "Save"}
+        </Button>
+      </div>
+      <Result state={state} />
+    </form>
+  );
+}
+
+/** Owner request 2026-10-13: change the plan after it was assigned. */
+export function PlanForm({ tenantId, plan }: { tenantId: string; plan: string | null }) {
+  const [state, action, pending] = useActionState<TenantSettingState, FormData>(changePlanAction.bind(null, tenantId), { ok: false, message: null });
+  return (
+    <form action={action} className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <select name="plan" aria-label="Plan" defaultValue={plan ?? "free"} className={cn(fieldInputClass, "w-44")}>
+          <option value="free">Free</option>
+          <option value="pro">Pro</option>
+          <option value="max">Max</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+        <Button type="submit" size="sm" variant="outline" disabled={pending}>
+          {pending ? "Saving…" : plan ? "Change plan" : "Assign plan"}
         </Button>
       </div>
       <Result state={state} />

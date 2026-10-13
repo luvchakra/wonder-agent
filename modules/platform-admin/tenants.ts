@@ -117,22 +117,42 @@ export async function setTenantEnvironment(actorId: string, tenantId: string, en
   await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_changed", oldValue: { environment: before?.environment ?? "production" }, newValue: { environment }, result: "success" });
 }
 
-export async function listTenants(): Promise<PlatformTenant[]> {
-  const supabase = supabaseServiceRole();
-  const { data, error } = await supabase
-    .from("platform_tenants")
-    .select("*, tenants!platform_tenants_tenant_id_fkey(name, slug, status)")
-    .order("created_at", { ascending: false })
-    .limit(DEFAULT_LIST_LIMIT);
+/**
+ * Every organization, from `tenants` itself: one created by self-service
+ * sign-up has no platform record yet and counts as production (owner
+ * report 2026-10-13: such organizations were missing from Tenants).
+ * Decommissioned ones only when asked for.
+ */
+const TENANT_COLUMNS = "id, name, slug, status, created_at, platform:platform_tenants!platform_tenants_tenant_id_fkey(environment, notes, created_at, parent_tenant_id)";
+
+type TenantRow = { id: string; name: string; slug: string; status: PlatformTenant["status"]; created_at: string; platform: Record<string, unknown> | Record<string, unknown>[] | null };
+
+function fromTenantRow(r: TenantRow): PlatformTenant {
+  const p = (Array.isArray(r.platform) ? r.platform[0] : r.platform) ?? null;
+  return {
+    tenantId: r.id,
+    environment: ((p?.environment as TenantEnvironment | undefined) ?? "production") as TenantEnvironment,
+    parentTenantId: (p?.parent_tenant_id as string | null | undefined) ?? null,
+    notes: (p?.notes as string | null | undefined) ?? null,
+    createdAt: (p?.created_at as string | undefined) ?? r.created_at,
+    name: r.name,
+    slug: r.slug,
+    status: r.status,
+  };
+}
+
+export async function listTenants(opts: { includeDecommissioned?: boolean } = {}): Promise<PlatformTenant[]> {
+  let q = supabaseServiceRole().from("tenants").select(TENANT_COLUMNS);
+  if (!opts.includeDecommissioned) q = q.neq("status", "deprovisioned");
+  const { data, error } = await q.order("created_at", { ascending: false }).limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  return (data ?? []).map(toPlatformTenant);
+  return ((data ?? []) as unknown as TenantRow[]).map(fromTenantRow);
 }
 
 export async function getTenant(tenantId: string): Promise<PlatformTenant | null> {
-  const supabase = supabaseServiceRole();
-  const { data, error } = await supabase.from("platform_tenants").select("*, tenants!platform_tenants_tenant_id_fkey(name, slug, status)").eq("tenant_id", tenantId).maybeSingle();
+  const { data, error } = await supabaseServiceRole().from("tenants").select(TENANT_COLUMNS).eq("id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  return data ? toPlatformTenant(data) : null;
+  return data ? fromTenantRow(data as unknown as TenantRow) : null;
 }
 
 type TenantStatus = "active" | "suspended" | "deprovisioned";
@@ -188,4 +208,28 @@ export async function activateTenant(actorId: string, tenantId: string): Promise
  */
 export async function decommissionTenant(actorId: string, tenantId: string): Promise<void> {
   await setTenantStatus(actorId, tenantId, "deprovisioned", "platform.tenant_decommissioned");
+}
+
+/** Email domains the E2E suite and SQL fixtures use (tests/e2e/support/testUsers.ts, tests/**.sql). */
+const TEST_EMAIL = /@(e2e\.wonderagent\.test|example\.test)$/i;
+
+/**
+ * Owner request (2026-10-13): keep test organizations apart from real ones
+ * in the console. A test organization has a test slug (`e2e-`, `fixture-`)
+ * or members who are all test accounts. Read with the service role, the
+ * ids given only; used for display, never for access.
+ */
+export async function testTenantIds(tenants: { tenantId: string; slug?: string }[]): Promise<Set<string>> {
+  const out = new Set(tenants.filter((t) => /^(e2e-|fixture-)/.test(t.slug ?? "")).map((t) => t.tenantId));
+  const rest = tenants.filter((t) => !out.has(t.tenantId)).map((t) => t.tenantId);
+  if (!rest.length) return out;
+  const { data, error } = await supabaseServiceRole().from("tenant_memberships").select("tenant_id, users!tenant_memberships_user_id_fkey(email)").in("tenant_id", rest).limit(5000);
+  if (error) return out;
+  const emails = new Map<string, string[]>();
+  for (const r of (data ?? []) as unknown as { tenant_id: string; users: { email: string } | { email: string }[] | null }[]) {
+    const u = Array.isArray(r.users) ? r.users[0] : r.users;
+    emails.set(r.tenant_id, [...(emails.get(r.tenant_id) ?? []), u?.email ?? ""]);
+  }
+  for (const [id, list] of emails) if (list.length && list.every((e) => TEST_EMAIL.test(e))) out.add(id);
+  return out;
 }

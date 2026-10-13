@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
  * severity model (CLAUDE.md §9), not a shadcn concept. "danger" maps to
  * the new `destructive` token internally.
  */
-export const badgeVariants = cva("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium", {
+export const badgeVariants = cva("inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium", {
   variants: {
     tone: {
       neutral: "bg-muted text-muted-foreground border-border",
