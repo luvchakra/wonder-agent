@@ -75,8 +75,12 @@ When it finishes:
 1. Add one DNS record: `*.demo.example.com A <the printed IP>`. Caddy obtains
    the certificates once the record resolves.
 2. Read the connection details over SSH (the script prints the command).
-3. In WonderID, go to **Integrations → Connect a system**, pick each connector
-   and paste in its settings and secret.
+3. Sign in to WonderID at your organization's own address, for example
+   `https://planet-express-dev.id.wonderapps.biz` (the main address,
+   `id.wonderapps.biz`, only lists your organizations). Connect each
+   environment separately: each has its own connections. Go to
+   **Integrations → Connector Library**, pick each connector and paste in its
+   settings and secret.
 
 ### On any Linux machine with Docker
 

@@ -1299,3 +1299,9 @@ The Organizations list no longer shows each organization's address under its nam
 - Vitest: profile rules 3/3, organization plan 4/4, environment orders 8/8, platform-admin 42 overall.
 - Typecheck, eslint and `next build` pass.
 - Local E2E 34/34: platform-admin (new test for saving details and managing the organization's own environment), first-organization, manage-organizations, tenant-address and multi-org-isolation.
+
+## 2026-10-13 — End a notice by hand (owner request)
+
+Announcements now has **End now** on every notice still running. It sets the notice's end to the current time; the record stays, and the row then reads "Ended". This is `endAnnouncement()`, audited as `platform.announcement_ended`; a notice that has already ended is left as it is.
+
+**Verified.** Typecheck and eslint clean. Local E2E platform-admin, including a new test that publishes a notice scoped to E2E Tenant One and ends it. That run and first-organization and users came to 30/30.

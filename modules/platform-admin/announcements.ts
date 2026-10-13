@@ -87,6 +87,27 @@ export async function createAnnouncement(actorId: string, input: CreateAnnouncem
   return toAnnouncement(data);
 }
 
+/**
+ * Owner request (2026-10-13): end a notice now, by hand. Sets its end to
+ * the current time (the record is kept, so the history stays); a notice
+ * that has already ended is left as it is. Audited.
+ */
+export async function endAnnouncement(actorId: string, announcementId: string): Promise<boolean> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(announcementId)) throw new ApiError(404, "NOT_FOUND");
+  const nowIso = new Date().toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("platform_announcements")
+    .update({ ends_at: nowIso })
+    .eq("id", announcementId)
+    .or(`ends_at.is.null,ends_at.gt.${nowIso}`)
+    .select("id, tenant_id, title")
+    .maybeSingle();
+  if (error) throw new ApiError(500, "UPDATE_FAILED", "The notice could not be ended");
+  if (!data) return false;
+  await writePlatformAudit({ actorId, tenantId: (data.tenant_id as string | null) ?? null, action: "platform.announcement_ended", newValue: { id: announcementId, title: data.title, endsAt: nowIso }, result: "success" });
+  return true;
+}
+
 /** Platform-admin UI surface: every announcement, most recent first. */
 export async function listAnnouncements(): Promise<PlatformAnnouncement[]> {
   const supabase = supabaseServiceRole();
