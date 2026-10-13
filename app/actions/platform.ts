@@ -7,6 +7,7 @@ import {
   createAnnouncement,
   createSubscription,
   createTenant,
+  createTenantEnvironment,
   decommissionTenant,
   grantPlatformAdmin,
   rollbackConfigVersion,
@@ -27,6 +28,13 @@ export async function createTenantAction(formData: FormData) {
     slug: String(formData.get("slug") ?? ""),
     environment: (formData.get("environment") as TenantEnvironment) || "production",
   });
+  revalidatePath("/platform-admin/tenants");
+}
+
+/** Owner request 2026-10-13: a dev, test or staging environment of a production organization. */
+export async function createTenantEnvironmentAction(parentTenantId: string, formData: FormData) {
+  const { userId } = await requirePlatformAdmin();
+  await createTenantEnvironment(userId, parentTenantId, String(formData.get("environment") ?? ""));
   revalidatePath("/platform-admin/tenants");
 }
 

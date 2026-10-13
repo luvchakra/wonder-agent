@@ -8,7 +8,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 | # | Phase | Progress |
 |---|---|---|
-| 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `████████░░` 83% |
+| 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `████████░░` 85% |
 | 2 | [Applications, accounts and connections](#2-applications-accounts-and-connections) | `██████████` 100% |
 | 3 | [Access requests](#3-access-requests) | `██████████` 100% |
 | 4 | [Provisioning](#4-provisioning) | `████░░░░░░` 45% |
@@ -22,10 +22,11 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 12 | [Intelligence and experience](#12-intelligence-and-experience) | `█░░░░░░░░░` 6% |
 | 13 | [Release readiness](#13-release-readiness) | `░░░░░░░░░░` 0% |
 
-## 1. Foundation, sign-in and identity — 83%
+## 1. Foundation, sign-in and identity — 85%
 
 - ✅ Organizations, own web addresses and branding
 - ✅ Vendor platform console: organizations, plans, flags, billing, health
+- ✅ Organization addresses and environments (dev, test, staging)
 - ✅ Sign-in: password, Google, Microsoft, LinkedIn
 - 🔶 Single sign-on (SAML / OIDC)
 - ✅ Two-step verification, and requiring it for everyone

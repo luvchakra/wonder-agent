@@ -67,3 +67,30 @@ export function decidesOwnAccess(deciderIdentityId: string | null, accountIdenti
 export function exceptionEnded(until: string | null, now: Date): boolean {
   return Boolean(until) && Date.parse(until!) <= now.getTime();
 }
+
+/**
+ * RISK-P0-13 — the rogue-access trend: per week (Monday, UTC) for the last
+ * `weeks` weeks, how many findings were found, how many were resolved, and
+ * how many were still open at the week's end. Pure (#9).
+ */
+export type RogueTrendRow = { createdAt: string; resolvedAt: string | null };
+export type RogueTrendWeek = { label: string; found: number; resolved: number; open: number };
+
+export function rogueTrend(rows: RogueTrendRow[], now: Date, weeks = 8): RogueTrendWeek[] {
+  const DAY = 86_400_000;
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const monday = today - ((new Date(today).getUTCDay() + 6) % 7) * DAY;
+  const out: RogueTrendWeek[] = [];
+  for (let i = weeks - 1; i >= 0; i--) {
+    const start = monday - i * 7 * DAY;
+    const end = start + 7 * DAY;
+    const at = (iso: string | null) => (iso ? Date.parse(iso) : NaN);
+    out.push({
+      label: new Date(start).toISOString().slice(5, 10),
+      found: rows.filter((r) => at(r.createdAt) >= start && at(r.createdAt) < end).length,
+      resolved: rows.filter((r) => at(r.resolvedAt) >= start && at(r.resolvedAt) < end).length,
+      open: rows.filter((r) => at(r.createdAt) < end && !(at(r.resolvedAt) < end)).length,
+    });
+  }
+  return out;
+}

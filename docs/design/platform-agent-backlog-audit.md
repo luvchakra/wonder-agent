@@ -1056,3 +1056,50 @@ While building it, the live phase doc's INTEGRATION-P0-22 row was found stale ("
 **Verified.** `npm run roadmap` regenerates both pages; eslint is clean.
 
 **2026-10-13, restored.** A concurrent commit on main (a0145a4, the findings-register audit) was made from a base older than #142 and reverted this change: the Priorities table, the script, the CLAUDE.md note and this entry. All four were restored from #142 and the page regenerated.
+
+## 2026-10-13 — PLATFORM-P0-16: organization addresses and environments (owner request)
+
+**Owner decisions (asked directly).**
+- Each environment is its own organization (tenant) with its own data, users and connections, linked to the production one.
+- Only platform administrators create environments.
+- Vercel manages the DNS for wonderapps.biz, so the owner said to configure everything.
+
+**Built.**
+- **Addresses.** `*.id.wonderapps.biz` was added to the Vercel project (verified at once, since Vercel holds the wonderapps.biz nameservers), and `BASE_APP_HOST=id.wonderapps.biz` was set for production.
+  - The FOUNDATION-P0-22 routing that was already built (`lib/tenant/host.ts`, `proxy.ts`, `resolve_tenant_host`) now serves `https://<slug>.id.wonderapps.biz` from the next production deploy.
+  - On an organization's address, only that organization is reachable, and still only through an active membership: the host narrows, it never grants.
+- **Migration 0156.**
+  - `platform_tenants.environment` gains development, test and staging.
+  - New column `parent_tenant_id`, with checks: not self, and production has no parent.
+  - One environment of each kind per organization (unique index).
+- **`create_tenant_environment(parent, kind)`.** Security definer, service role only, one transaction:
+  - creates the tenant `<slug>-dev` (or `-test`, `-staging`), named "<Org> (Dev)";
+  - creates its settings and platform record;
+  - its platform subdomain comes from the 0095 trigger;
+  - copies the production organization's active administrators (TENANT_SUPER_ADMIN) as its administrators.
+  - It refuses an inactive organization, an environment of an environment, an unknown kind and a second environment of the same kind.
+- **Console.**
+  - `createTenantEnvironment()` (audited `platform.tenant_environment_created`, success or failure), with an action behind `requirePlatformAdmin()`.
+  - Tenants shows each organization's address as a link, and its environments under it.
+  - "Add" offers only the missing Dev, Test or Staging for an active production organization.
+- **Incident, fixed.** As first written, the migration put a foreign key on `parent_tenant_id`. Applied to the shared database, that made PostgREST's `tenants(...)` embed from `platform_tenants` ambiguous, and the vendor console returned 500 in production.
+  - Found by the local E2E run minutes after applying.
+  - The constraint was dropped at once; the migration file now has no foreign key and says why.
+  - The console's embeds now name `tenants!platform_tenants_tenant_id_fkey`, so a later key cannot break them.
+
+**Verified.**
+- `tests/platform/tenant-environments.sql` (live, rolled back), 9 checks:
+  - slug `<org>-dev`, name, platform record (development and parent) and subdomain;
+  - only the active administrator is copied;
+  - a second dev environment (23505), an environment of an environment (22023) and an unknown kind (22023) are refused;
+  - a member cannot call the function (42501) or see the new organization (0 rows).
+- Vitest `tenantEnvironments.test.ts` 4/4 (`modules/platform-admin` 22/22).
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E, with `BASE_APP_HOST=localhost`: platform-admin, tenant-address, risk and the platform navigation smoke, 34 passed.
+
+**Owner action.** For Google, Microsoft and LinkedIn sign-in on an organization's address, add `https://*.id.wonderapps.biz/**` under Supabase → Authentication → URL Configuration → Redirect URLs. Until then those sign-ins return to id.wonderapps.biz. Password sign-in works on every address.
+
+**Left out.**
+- Promoting configuration between environments (the configuration bundles of PLATFORM-P0-13).
+- Self-service environments.
+- Plan limits on environments.

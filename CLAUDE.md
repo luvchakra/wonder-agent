@@ -200,6 +200,11 @@ WonderAgent Platform
 - Every customer-owned record carries `tenant_id` and is protected by RLS.
 - Tenant context is resolved server-side from the authenticated user's membership/JWT
   claims — never trusted from the client.
+- Every organization is reached at `https://<slug>.id.wonderapps.biz` (`BASE_APP_HOST`,
+  wildcard domain on Vercel). An organization's environments (Dev, Test, Staging) are
+  separate tenants with their own data at `<slug>-dev`, `<slug>-test`, `<slug>-staging`,
+  linked to the production one in `platform_tenants.parent_tenant_id`; only platform
+  administrators create them (owner decisions, 2026-10-13; migration 0156).
 - Platform Administration (`/platform-admin`) is a wholly separate authorization
   boundary, reachable only by WonderAgent platform-owner identities, never by any
   customer role.
