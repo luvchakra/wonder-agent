@@ -75,6 +75,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A source record matched to the wrong person can be unlinked from the person's page: the details it changed are restored (unless they changed since), and it is never matched to that person again without someone deciding. |
 | 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
 | 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
+| 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
 
 ---
 

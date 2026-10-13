@@ -547,7 +547,20 @@ test.describe.serial("connector provisioning", () => {
       const retried = await request.post(`/api/v1/access/fulfilment-tasks/${held.id}`, { data: { action: "retry_connector" } });
       expect(retried.status(), await retried.text()).toBe(200);
       expect(system.members["g-ops"]).not.toContain("u-ana");
-      await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 60_000 }).toBe("verified");
+      try {
+        await expect.poll(async () => (await viewOf(request, req.id)).fulfilment, { timeout: 60_000 }).toBe("verified");
+      } catch (err) {
+        // On the Vercel builder (13 October) the read that verifies this change never finished. Say what the
+        // connection's syncs were doing, so the next failure names the cause.
+        const { data: jobs } = await db
+          .from("integration_sync_jobs")
+          .select("trigger, mode, status, pipeline_status, created_at, started_at, ended_at, errors")
+          .eq("tenant_id", tenantId)
+          .eq("integration_id", integrationId)
+          .order("created_at", { ascending: false })
+          .limit(4);
+        throw new Error(`${(err as Error).message}\nLatest syncs of the connection: ${JSON.stringify(jobs)}`);
+      }
     } finally {
       await setLimit(original);
     }
