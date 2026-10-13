@@ -204,7 +204,12 @@ WonderAgent Platform
   wildcard domain on Vercel). An organization's environments (Dev, Test, Staging) are
   separate tenants with their own data at `<slug>-dev`, `<slug>-test`, `<slug>-staging`,
   linked to the production one in `platform_tenants.parent_tenant_id`; only platform
-  administrators create them (owner decisions, 2026-10-13; migration 0156).
+  administrators create them (owner decisions, 2026-10-13; migration 0156). A person
+  creating an organization chooses its address prefix and environment; a platform
+  administrator can change an organization's prefix (the slug, no longer immutable)
+  and environment at any time (0157). Each environment has one designated colour,
+  the same for every organization (`modules/ui/environment.tsx`), and the shell switches
+  between an organization's environments in one click (0158–0159).
 - Platform Administration (`/platform-admin`) is a wholly separate authorization
   boundary, reachable only by WonderAgent platform-owner identities, never by any
   customer role.

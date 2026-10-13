@@ -1,3 +1,4 @@
+import { getMyTenantEnvironments } from "@/lib/tenant/environments";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
@@ -68,7 +69,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     redirect(host.target.kind === "subdomain" || host.target.kind === "invalid" ? "/no-access" : "/onboarding/start");
   }
 
-  const [profile, memberships, isAdmin, announcements, openFindings, cookieStore, openAccessFindings] = await Promise.all([
+  const [profile, memberships, isAdmin, announcements, openFindings, cookieStore, openAccessFindings, environments] = await Promise.all([
     getProfile(),
     // Already resolved by getTenantContext() above — the cache hands back
     // the same promise, so this costs nothing.
@@ -92,6 +93,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     cookies(),
     // ACCESS-P0-25: rogue access is listed in Risk Overview too, so the badge counts it (one count query).
     countOpenAccessFindings(ctx.tenantId),
+    // Owner request 2026-10-13: each organization's environment, for its colour.
+    getMyTenantEnvironments(),
   ]);
 
   // FOUNDATION-P0-22 — each organization's own address, so the rail always shows where you are.
@@ -102,6 +105,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     slug: m.slug,
     current: m.tenantId === ctx.tenantId,
     url: tenantUrls[i],
+    environment: environments.get(m.tenantId)?.environment ?? null,
+    parentTenantId: environments.get(m.tenantId)?.parentTenantId ?? null,
   }));
 
   const badges: ShellBadgeCounts = { risk: openFindings + openAccessFindings };

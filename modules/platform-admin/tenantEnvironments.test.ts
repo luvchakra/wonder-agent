@@ -4,11 +4,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 let rpcResult: { data: unknown; error: { code: string; message: string } | null } = { data: "env-1", error: null };
 const rpc = vi.fn(async () => rpcResult);
-vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ rpc }) }));
+const tenantRow = { tenant_id: "aaaaaaaa-1560-4000-8000-000000000001", environment: "development", notes: null, created_at: "2026-10-13", tenants: { name: "Acme", slug: "acme", status: "active" } };
+const from = () => {
+  const b = { select: () => b, eq: () => b, maybeSingle: async () => ({ data: tenantRow, error: null }) };
+  return b;
+};
+vi.mock("@/lib/db/supabaseServer", () => ({ supabaseServiceRole: () => ({ rpc, from }) }));
 const audits: Record<string, unknown>[] = [];
 vi.mock("./auditLog", () => ({ writePlatformAudit: vi.fn(async (e: Record<string, unknown>) => void audits.push(e)) }));
 
-import { createTenantEnvironment } from "./tenants";
+import { createTenantEnvironment, renameTenantSlug, setTenantEnvironment } from "./tenants";
 
 const PARENT = "aaaaaaaa-1560-4000-8000-000000000001";
 
@@ -40,5 +45,31 @@ describe("createTenantEnvironment (owner request 2026-10-13)", () => {
   it("does not echo an unexpected database error", async () => {
     rpcResult = { data: null, error: { code: "XX000", message: "internal detail" } };
     await expect(createTenantEnvironment("admin-1", PARENT, "staging")).rejects.toMatchObject({ status: 500, message: "The environment could not be created" });
+  });
+});
+
+describe("renameTenantSlug and setTenantEnvironment (owner request 2026-10-13)", () => {
+  it("renames the address in the database and audits from and to", async () => {
+    rpcResult = { data: "acme", error: null };
+    await expect(renameTenantSlug("admin-1", PARENT, " Acme-Corp ")).resolves.toEqual({ from: "acme", to: "acme-corp" });
+    expect(rpc).toHaveBeenCalledWith("rename_tenant_slug", { p_tenant: PARENT, p_slug: "acme-corp" });
+    expect(audits).toEqual([expect.objectContaining({ action: "platform.tenant_address_changed", oldValue: { slug: "acme" }, newValue: { slug: "acme-corp" }, result: "success" })]);
+  });
+
+  it("refuses a reserved or malformed prefix before the database, and reports a taken one", async () => {
+    await expect(renameTenantSlug("admin-1", PARENT, "admin")).rejects.toMatchObject({ status: 400 });
+    await expect(renameTenantSlug("admin-1", PARENT, "a b")).rejects.toMatchObject({ status: 400 });
+    expect(rpc).not.toHaveBeenCalled();
+    rpcResult = { data: null, error: { code: "23505", message: "dup" } };
+    await expect(renameTenantSlug("admin-1", PARENT, "northwind")).rejects.toMatchObject({ status: 409, message: "northwind is already taken" });
+    expect(audits.at(-1)).toMatchObject({ result: "failure" });
+  });
+
+  it("changes the environment, audited with the previous one; refuses an unknown one", async () => {
+    rpcResult = { data: null, error: null };
+    await setTenantEnvironment("admin-1", PARENT, "test");
+    expect(rpc).toHaveBeenCalledWith("set_tenant_environment", { p_tenant: PARENT, p_environment: "test" });
+    expect(audits).toEqual([expect.objectContaining({ action: "platform.tenant_environment_changed", oldValue: { environment: "development" }, newValue: { environment: "test" }, result: "success" })]);
+    await expect(setTenantEnvironment("admin-1", PARENT, "qa")).rejects.toMatchObject({ status: 400 });
   });
 });

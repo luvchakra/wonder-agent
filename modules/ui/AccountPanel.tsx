@@ -8,7 +8,7 @@ import { ThemeToggle } from "./theme";
 import { Avatar } from "./Avatar";
 
 /** `url`: the organization's own WonderID address, when tenant addresses are configured (FOUNDATION-P0-22). */
-export type TenantOption = { id: string; name: string; slug: string; current: boolean; url?: string | null };
+export type TenantOption = { id: string; name: string; slug: string; current: boolean; url?: string | null; environment?: string | null; parentTenantId?: string | null };
 
 /**
  * Account menu in the page header, top right (moved from the foot of the

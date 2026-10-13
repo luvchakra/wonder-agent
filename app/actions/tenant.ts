@@ -7,49 +7,54 @@ import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
 import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantContext";
 import { getSessionUser } from "@/lib/tenant/session";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
-import { ORGANIZATION_NAME_MAX, newTenantSlug } from "@/lib/tenant/organizationName";
+import { ORGANIZATION_NAME_MAX, PREFIX_MAX, environmentSlug, isOrganizationEnvironment } from "@/lib/tenant/organizationName";
+import { slugProblem } from "@/lib/tenant/host";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { renameOrganization } from "@/lib/tenant/organization";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { revalidatePath } from "next/cache";
 
+export type SetUpOrganizationState = { ok: boolean; error: string | null; name?: string };
+
 /**
- * FOUNDATION-P0-03.2 — self-service tenant creation. Delegates the actual
- * write to the create_tenant_with_owner() security-definer RPC
- * (supabase/migrations/0008_foundation_create_tenant_rpc.sql) rather than
- * inserting into tenants/tenant_memberships directly, since neither table
- * grants an authenticated client an INSERT policy.
+ * FOUNDATION-P0-03.2, owner request 2026-10-13 — "Create a new
+ * organization" on /onboarding: a person names their organization and chooses its address prefix and
+ * environment (production `<prefix>`, or `<prefix>-dev`, `-test`,
+ * `-staging`). Delegates the write to create_tenant_with_owner (migration
+ * 0157; no client INSERT policy on tenants or memberships).
+ * Returns what went wrong in words; never reports success for a failure.
  */
-export async function createTenantAction(formData: FormData) {
+export async function setUpOrganizationAction(_prev: SetUpOrganizationState, formData: FormData): Promise<SetUpOrganizationState> {
   const name = String(formData.get("name") ?? "").trim();
-  if (!name) {
-    throw new Error("Organization name is required");
-  }
-  if (name.length > ORGANIZATION_NAME_MAX) {
-    throw new Error(`Organization name must be at most ${ORGANIZATION_NAME_MAX} characters`);
-  }
+  const prefix = String(formData.get("prefix") ?? "").trim().toLowerCase();
+  const environment = String(formData.get("environment") ?? "production");
+  if (name.length < 2) return { ok: false, error: "Give the organization a name (at least 2 characters)." };
+  if (name.length > ORGANIZATION_NAME_MAX) return { ok: false, error: `The name can be at most ${ORGANIZATION_NAME_MAX} characters.` };
+  if (!isOrganizationEnvironment(environment)) return { ok: false, error: "Choose an environment." };
+  if (prefix.length > PREFIX_MAX) return { ok: false, error: `The address prefix can be at most ${PREFIX_MAX} characters.` };
+  const slug = environmentSlug(prefix, environment);
+  const problem = slugProblem(slug);
+  if (problem) return { ok: false, error: `Address: ${problem}.` };
 
   // FOUNDATION-P0-22 — organizations are created from the WonderID address, never from inside another organization's.
   const host = await getHostTenant();
-  if (host.target.kind !== "none" && host.target.kind !== "base") {
-    throw new Error("Organizations are created from the main WonderID address, not from an organization's own address");
-  }
+  if (host.target.kind !== "none" && host.target.kind !== "base") return { ok: false, error: "Create organizations from the main WonderID address." };
 
   const supabase = await supabaseServer();
-  const slug = newTenantSlug(name);
+  const { data: available } = await supabase.rpc("tenant_slug_available", { p_slug: slug });
+  if (available === false) return { ok: false, error: `${slug} is already taken. Choose another prefix.` };
 
   const { data: tenantId, error } = await supabase.rpc("create_tenant_with_owner", {
     tenant_name: name,
     tenant_slug: slug,
+    p_environment: environment,
   });
-
-  if (error || !tenantId) {
-    throw new Error(error?.message ?? "Failed to create tenant");
-  }
+  if (error) return { ok: false, error: error.code === "23505" ? `${slug} is already taken. Choose another prefix.` : "The organization could not be created. Try again." };
+  if (typeof tenantId !== "string") return { ok: false, error: "The organization could not be created. Try again." };
 
   const user = await getSessionUser();
-  await writeAudit({ tenantId, actorId: user?.id ?? null, actorType: "user", action: "tenant.created", objectType: "tenant", objectId: tenantId, outcome: "success", metadata: { automatic: false } });
+  await writeAudit({ tenantId, actorId: user?.id ?? null, actorType: "user", action: "tenant.created", objectType: "tenant", objectId: tenantId, outcome: "success", metadata: { automatic: false, environment, slug } });
 
   const cookieStore = await cookies();
   cookieStore.set(TENANT_COOKIE_NAME, tenantId, {
@@ -58,8 +63,7 @@ export async function createTenantAction(formData: FormData) {
     secure: process.env.NODE_ENV === "production",
     path: "/",
   });
-
-  redirect("/");
+  return { ok: true, error: null, name };
 }
 
 /**

@@ -98,3 +98,32 @@ export function firstOrganizationName(email: string | null | undefined, fullName
   const first = (fullName ?? "").trim().split(/\s+/)[0] || titleCase([local.split(/[._+\-0-9]+/).filter(Boolean)[0] ?? ""]);
   return first ? `${first.slice(0, 60)}'s organization` : "My organization";
 }
+
+/**
+ * Owner request (2026-10-13): a person chooses their organization's address
+ * prefix and environment. Production is reached at `<prefix>`, the others at
+ * `<prefix>-dev`, `<prefix>-test` or `<prefix>-staging` (the same scheme the
+ * platform console uses for environments, migration 0156).
+ */
+export const ORGANIZATION_ENVIRONMENTS = ["production", "development", "test", "staging"] as const;
+export type OrganizationEnvironment = (typeof ORGANIZATION_ENVIRONMENTS)[number];
+export const ENVIRONMENT_LABEL: Record<OrganizationEnvironment, string> = { production: "Production", development: "Development", test: "Test", staging: "Staging" };
+const ENVIRONMENT_SUFFIX: Record<OrganizationEnvironment, string> = { production: "", development: "-dev", test: "-test", staging: "-staging" };
+
+/** The longest prefix that still fits the 40-character slug with the longest suffix ("-staging"). */
+export const PREFIX_MAX = 32;
+
+/** The address label (slug) for a prefix in an environment. */
+export function environmentSlug(prefix: string, environment: OrganizationEnvironment): string {
+  return `${prefix.trim().toLowerCase()}${ENVIRONMENT_SUFFIX[environment]}`;
+}
+
+/** A first suggestion for the prefix, from the organization's name. */
+export function suggestedPrefix(name: string): string {
+  const s = slugify(name).slice(0, PREFIX_MAX).replace(/-+$/, "");
+  return s.length >= 3 ? s : `${s || "org"}-${Math.random().toString(36).slice(2, 6)}`;
+}
+
+export function isOrganizationEnvironment(value: unknown): value is OrganizationEnvironment {
+  return typeof value === "string" && (ORGANIZATION_ENVIRONMENTS as readonly string[]).includes(value);
+}
