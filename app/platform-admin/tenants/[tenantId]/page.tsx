@@ -103,7 +103,7 @@ export default async function PlatformTenantPage({ params }: { params: Promise<{
 
   const [owners, subscriptions] = await Promise.all([organizationOwners([tenantId]), Promise.all(org.environments.map((e) => getSubscription(e.tenantId)))]);
   const ownerList = owners.get(tenantId) ?? [];
-  const missing = tenant.environment === "production" && tenant.status === "active" ? ADDABLE_ENVIRONMENTS.filter((k) => !org.environments.some((e) => e.environment === k && e.status !== "deprovisioned")) : [];
+  const missing = tenant.status === "active" ? ADDABLE_ENVIRONMENTS.filter((k) => !org.environments.some((e) => e.environment === k && e.status !== "deprovisioned")) : [];
 
   return (
     <>

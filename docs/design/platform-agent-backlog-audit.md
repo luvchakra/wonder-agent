@@ -1224,3 +1224,35 @@ While building it, the live phase doc's INTEGRATION-P0-22 row was found stale ("
 - Local E2E:
   - platform-admin and first-organization 20/20. The new test opens E2E Tenant One, sees its owner, adds Dev, manages it, goes back, and removes it.
   - One onboarding assertion changed. A rename that takes an unlinked environment out of its prefix group re-renders the page as that organization's own, so the spec checks the saved address rather than the transient message.
+
+## 2026-10-13 — Manage organizations (owner request)
+
+**What changed.** The organization switcher's "Create new organization" is now "Manage organizations" (`/organizations/manage`). An organization's owner (TENANT_SUPER_ADMIN of the organization) can:
+- rename the organization; its environments follow ("<name> (Test)");
+- disable or enable the organization, which takes its environments with it, or disable or enable one environment;
+- add a development, test or staging environment, which is paid for. Owner decisions: organizations stay free, environments are paid at a plan's price, and until Stripe or Razorpay keys are set, payment is a test payment (no money moves, recorded as `payment_mode = 'test'`).
+
+Owner feedback the same day: an organization set up as development, with no production organization above it, could not add environments. Any top-level organization can now, both here and in the platform console; its own kind can't be added twice.
+
+**Database (migration 0161).**
+- `tenants.disabled_by_owner` tells an owner's disable from a platform suspension. Only an owner's disable can be lifted by an owner. A platform suspension clears the flag (`setTenantStatus`).
+- `is_organization_owner()`, `my_managed_organizations()`, `owner_rename_organization()` and `owner_set_organization_disabled()`: SECURITY DEFINER, run as the caller, and the ownership check is in the database.
+- `environment_orders` (Platform): RLS on, read by `billing.view` holders, written only by the service role. It holds one open order per organization and environment.
+- `create_tenant_environment()` now accepts any top-level organization.
+
+**Security.** Disabling is the existing suspension, which `current_tenant_ids()` already refuses (0152), so a disabled organization's data is unreachable to every member. The page sits outside the product shell, so an owner can still enable an organization they disabled. The no-access page links to it. Each change is audited (`tenant.renamed`, `tenant.disabled_by_owner`, `tenant.enabled_by_owner`, `billing.environment_ordered`, `billing.environment_setup`). The order is written before set-up; a failure marks it failed and is reported, never shown as success.
+
+**Verified.**
+- Live SQL (`tests/foundation/manage-organizations.sql`, rolls back), every expected result:
+  - another organization's owner sees none of it, can't rename or disable it, and can't read its orders;
+  - a client insert of an order is refused;
+  - the owner renames it, and its environments follow;
+  - a disabled organization is unreachable but still listed for its owner;
+  - an environment can't be enabled while its organization is disabled;
+  - a platform suspension can't be lifted by the owner;
+  - a development organization adds Test, but not Development, and an environment can't have environments.
+- Vitest: `environmentOrders` 7/7 (test mode only without a provider, ownership, disabled organization, wrong currency, double click, failed set-up recorded), `manage` grouping 2/2, platform-admin 30/30.
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E: manage-organizations (new), first-organization and platform-admin, 21/21. The new test: rename, buy Test, disable and enable it. It caught a UI bug, a confirm step that survived Enable, which is fixed.
+
+**Left out.** Real checkout for environments through Stripe or Razorpay: once keys are set, test payments stop and the page says online payment isn't available yet. That checkout is the follow-up. The address prefix stays the platform console's to change.
