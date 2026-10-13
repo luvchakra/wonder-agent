@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidesOwnAccess, exceptionEnded, rogueResolution, validateRogueDecision } from "./accessFindingRules";
+import { decidesOwnAccess, exceptionEnded, rogueResolution, rogueTrend, validateRogueDecision } from "./accessFindingRules";
 
 const live = { revokedAt: null, missingFromSourceAt: null, requestId: null, packageItemId: null };
 
@@ -39,5 +39,31 @@ describe("rogue-access decisions (WID-H04)", () => {
     expect(exceptionEnded("2026-10-12T09:59:59Z", now)).toBe(true);
     expect(exceptionEnded("2026-10-12T10:00:01Z", now)).toBe(false);
     expect(exceptionEnded(null, now)).toBe(false);
+  });
+});
+
+describe("rogueTrend", () => {
+  const now = new Date("2026-10-14T10:00:00Z"); // a Wednesday; its week starts Monday 10-12
+  it("counts found, resolved and open per week, oldest first, ending with this week", () => {
+    const weeks = rogueTrend(
+      [
+        { createdAt: "2026-10-01T00:00:00Z", resolvedAt: "2026-10-13T00:00:00Z" },
+        { createdAt: "2026-10-06T09:00:00Z", resolvedAt: null },
+        { createdAt: "2026-10-12T00:00:00Z", resolvedAt: null },
+      ],
+      now,
+      3,
+    );
+    expect(weeks.map((w) => w.label)).toEqual(["09-28", "10-05", "10-12"]);
+    expect(weeks[0]).toEqual({ label: "09-28", found: 1, resolved: 0, open: 1 });
+    expect(weeks[1]).toEqual({ label: "10-05", found: 1, resolved: 0, open: 2 });
+    expect(weeks[2]).toEqual({ label: "10-12", found: 1, resolved: 1, open: 2 });
+  });
+
+  it("an empty history is zero every week", () => {
+    expect(rogueTrend([], now, 2)).toEqual([
+      { label: "10-05", found: 0, resolved: 0, open: 0 },
+      { label: "10-12", found: 0, resolved: 0, open: 0 },
+    ]);
   });
 });

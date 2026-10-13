@@ -72,13 +72,15 @@ beforeEach(() => {
 });
 
 describe("syncRogueAccessFindings", () => {
-  it("opens one high finding per rogue grant, with the grant as evidence, for a person's account", async () => {
+  it("opens one finding per rogue grant, with the grant as evidence, for a person's account (plain rogue access is medium)", async () => {
+    db.identities = [{ id: "person-1", tenant_id: T, identity_type: "HUMAN", status: "active" }];
     const out = await syncRogueAccessFindings(T, [rogue()]);
     expect(out).toEqual({ created: 1, resolved: 0, failed: 0 });
     expect(db.risk_findings[0]).toMatchObject({
       tenant_id: T,
       category: "rogue_access",
-      severity: "high",
+      severity: "medium",
+      risk_score: 50,
       agent_id: null,
       identity_id: "person-1",
       account_id: "acct-1",
@@ -87,6 +89,29 @@ describe("syncRogueAccessFindings", () => {
     });
     expect(db.risk_evidence[0]).toMatchObject({ evidence_type: "access_grant", reference_id: "grant-1" });
     expect(audits[0]).toMatchObject({ action: "risk.access_findings_synced", actorType: "system", tenantId: T });
+  });
+
+  it("RISK-P0-13: severity comes from the facts (admin entitlement held by a leaver is critical), never from another tenant's rows", async () => {
+    db.entitlements = [
+      { id: "ent-1", tenant_id: T, privilege_level: "admin", data_classification: null },
+      { id: "ent-1", tenant_id: "other", privilege_level: "standard", data_classification: null },
+    ];
+    db.identities = [{ id: "person-1", tenant_id: T, identity_type: "HUMAN", status: "terminated" }];
+    await syncRogueAccessFindings(T, [rogue()]);
+    expect(db.risk_findings[0]).toMatchObject({ severity: "critical", risk_score: 100 });
+    expect(db.risk_findings[0].reasons).toEqual(expect.arrayContaining(["Administrative privilege", "Held by an identity that is terminated"]));
+  });
+
+  it("RISK-P0-13: an open finding is re-scored when its facts change, and the change is audited", async () => {
+    db.identities = [{ id: "person-1", tenant_id: T, identity_type: "HUMAN", status: "active" }];
+    await syncRogueAccessFindings(T, [rogue()]);
+    expect(db.risk_findings[0].severity).toBe("medium");
+    db.identities[0].status = "terminated";
+    audits.length = 0;
+    const out = await syncRogueAccessFindings(T, [rogue()]);
+    expect(out).toEqual({ created: 0, resolved: 0, failed: 0 });
+    expect(db.risk_findings[0]).toMatchObject({ severity: "high", risk_score: 75 });
+    expect(audits[0]).toMatchObject({ action: "risk.access_findings_synced", metadata: expect.objectContaining({ rescored: [db.risk_findings[0].id] }) });
   });
 
   it("is idempotent: the same rogue set again opens nothing new", async () => {

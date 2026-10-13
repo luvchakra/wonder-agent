@@ -1344,3 +1344,40 @@ eslint and local E2E (`agents`, `investigations`, `risk`,
 was the agents spec clicking an ambiguous "Duplicate review" link (the
 sidebar has the same item since the new navigation); the spec is now
 scoped to the page.
+
+### 2026-10-13 — RISK-P0-13: severity from facts, re-scoring, and the trend
+
+**Built (no migration).**
+- **Severity from facts.** `rogueSeverity.ts` is pure (#9). Every rogue finding starts at 50 (medium) and gains points for named factors:
+
+  | Factor | Points |
+  |---|---|
+  | Administrative privilege | +25 |
+  | Elevated privilege | +15 |
+  | Privileged or shared account | +10 |
+  | Sensitive data classification (restricted, confidential, PII, PHI, PCI, financial, …) | +15 |
+  | Held by an inactive, disabled, terminated or archived identity | +25 |
+  | Held by an external person | +10 |
+  | Account linked to no identity | +10 |
+  | Two or more other pieces of rogue access on the account | +10 |
+
+  The score is capped at 100. It maps to critical at 85, high at 65, medium at 40, and low below that. Each factor is written as a reason on the finding, so the severity always shows its provenance.
+- **Where it applies.** `syncRogueAccessFindings` scores new findings with it, replacing the flat "high, 70".
+- **Re-scoring.** An open finding is re-scored when its facts change, for example when the holder leaves. The change is listed as `rescored` in the `risk.access_findings_synced` audit.
+- **Facts are read safely.** The entitlements, accounts and identities are read with the service role, each statement filtered on the tenant.
+- **Trend.** `rogueTrend()` is pure. `getRogueAccessTrend()` reads it bounded and tenant-filtered. Rogue Accounts shows, for the last 8 weeks, how much was found and resolved each week and how much was open at the week's end. The read runs in parallel with the page's list (§15).
+
+**Verified.**
+- `npx vitest run modules/risk`: 100 passed. The new tests cover:
+  - the severity rules;
+  - a leaver holding admin access, which is critical;
+  - another organization's entitlement row, which is never read;
+  - re-scoring when an identity leaves, which is audited;
+  - the trend: weeks, counts, and an empty history.
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E: `connector-provisioning`, `f1-reconciliation` and `risk`, 39 passed.
+
+**Left out.**
+- Remediation actions beyond removal, exception and false positive: authorize, package, legacy recognition, owner, escalate and quarantine.
+- A finding detail page.
+- Showing the reasons on the account page. They are stored on the finding and its evidence.

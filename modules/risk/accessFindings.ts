@@ -4,8 +4,9 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessFinding, FindingStatus, ResolutionType, RiskSeverity, RogueAccess } from "@/lib/shared/types/risk";
-import { decidesOwnAccess, exceptionEnded, rogueResolution, validateRogueDecision, type RogueDecisionInput, type RogueResolution } from "./accessFindingRules";
+import { decidesOwnAccess, exceptionEnded, rogueResolution, rogueTrend, validateRogueDecision, type RogueDecisionInput, type RogueResolution, type RogueTrendWeek } from "./accessFindingRules";
 import { getIdentityForUser } from "@/modules/agent-identity/service";
+import { rogueSeverity, type RogueFacts, type RogueSeverity } from "./rogueSeverity";
 
 /**
  * ACCESS-P0-25 — findings about access on an application account (a
@@ -119,6 +120,25 @@ export async function countOpenAccessFindings(tenantId: string): Promise<number>
   return error ? 0 : (count ?? 0);
 }
 
+/**
+ * RISK-P0-13: the rogue-access trend for the last `weeks` weeks. Reads only
+ * findings that could count (still open, or resolved inside the window), the
+ * two dates of each, filtered on the tenant; bounded.
+ */
+export async function getRogueAccessTrend(tenantId: string, weeks = 8, now = new Date()): Promise<RogueTrendWeek[]> {
+  const since = new Date(now.getTime() - (weeks * 7 + 7) * 86_400_000).toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("risk_findings")
+    .select("tenant_id, created_at, resolved_at")
+    .eq("tenant_id", tenantId)
+    .eq("category", "rogue_access")
+    .or(`resolved_at.is.null,resolved_at.gte.${since}`)
+    .limit(5000);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => ({ createdAt: r.created_at as string, resolvedAt: (r.resolved_at as string | null) ?? null }));
+  return rogueTrend(rows, now, weeks);
+}
+
 /** How each finding ended, from its grant now. A grant that cannot be read counts as gone only when it is truly absent. */
 async function resolutionsFor(tenantId: string, findingIds: string[]): Promise<Map<string, RogueResolution>> {
   const out = new Map<string, RogueResolution>();
@@ -160,6 +180,47 @@ async function resolutionsFor(tenantId: string, findingIds: string[]): Promise<M
 }
 
 /**
+ * RISK-P0-13: the facts each piece of rogue access is scored on (entitlement
+ * privilege and data, account type, the identity holding it, other rogue
+ * access on the account), read with the service role and filtered on the
+ * tenant (§14). A fact that cannot be read leaves the base severity.
+ */
+async function severitiesFor(tenantId: string, rogue: RogueAccess[]): Promise<Map<string, RogueSeverity>> {
+  const admin = supabaseServiceRole();
+  const read = async (table: string, columns: string, ids: string[]) => {
+    const out = new Map<string, Row>();
+    const unique = [...new Set(ids)];
+    for (let i = 0; i < unique.length; i += 200) {
+      const { data } = await admin.from(table).select(`id, tenant_id, ${columns}`).eq("tenant_id", tenantId).in("id", unique.slice(i, i + 200));
+      for (const r of (data ?? []) as unknown as Row[]) if (r.tenant_id === tenantId) out.set(r.id as string, r);
+    }
+    return out;
+  };
+  const [entitlements, accounts, identities] = await Promise.all([
+    read("entitlements", "privilege_level, data_classification", rogue.map((r) => r.entitlementId).filter((x): x is string => !!x)),
+    read("accounts", "account_type", rogue.map((r) => r.accountId)),
+    read("identities", "identity_type, status", rogue.map((r) => r.identityId).filter((x): x is string => !!x)),
+  ]);
+  const perAccount = new Map<string, number>();
+  for (const r of rogue) perAccount.set(r.accountId, (perAccount.get(r.accountId) ?? 0) + 1);
+  const out = new Map<string, RogueSeverity>();
+  for (const r of rogue) {
+    const e = r.entitlementId ? entitlements.get(r.entitlementId) : undefined;
+    const who = r.identityId ? identities.get(r.identityId) : undefined;
+    const facts: RogueFacts = {
+      privilegeLevel: (e?.privilege_level as RogueFacts["privilegeLevel"] | undefined) ?? null,
+      accountType: (accounts.get(r.accountId)?.account_type as RogueFacts["accountType"] | undefined) ?? null,
+      dataClassification: (e?.data_classification as string | null | undefined) ?? null,
+      identityType: r.identityId ? ((who?.identity_type as string | undefined) ?? "UNKNOWN") : null,
+      identityStatus: (who?.status as string | undefined) ?? null,
+      otherRogueOnAccount: (perAccount.get(r.accountId) ?? 1) - 1,
+    };
+    out.set(accessSubjectKey(r.accountId, r.entitlementId), rogueSeverity(facts));
+  }
+  return out;
+}
+
+/**
  * Brings the organization's open rogue-access findings in line with
  * `rogue`, the complete set Access found rogue just now. Returns what
  * changed. Never throws for one bad row: a finding that cannot be written is
@@ -184,21 +245,28 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
     for (const r of (data ?? []) as Row[]) if (r.tenant_id === tenantId) falsePositive.add(`${r.subject_key}|${r.access_grant_id}`);
   }
   const open = new Map<string, string>();
+  const openScore = new Map<string, number | null>();
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await admin
       .from("risk_findings")
-      .select("id, tenant_id, subject_key")
+      .select("id, tenant_id, subject_key, risk_score")
       .eq("tenant_id", tenantId)
       .eq("category", "rogue_access")
       .in("status", OPEN)
       .order("id")
       .range(from, from + PAGE - 1);
     if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-    for (const r of (data ?? []) as Row[]) if (r.tenant_id === tenantId && r.subject_key) open.set(r.subject_key as string, r.id as string);
+    for (const r of (data ?? []) as Row[]) {
+      if (r.tenant_id !== tenantId || !r.subject_key) continue;
+      open.set(r.subject_key as string, r.id as string);
+      openScore.set(r.id as string, (r.risk_score as number | null) ?? null);
+    }
     if (!data || data.length < PAGE) break;
   }
 
   const wanted = new Map(rogue.map((r) => [accessSubjectKey(r.accountId, r.entitlementId), r]));
+  const severities = await severitiesFor(tenantId, rogue);
+  const rescored: string[] = [];
   const result = { created: 0, resolved: 0, failed: 0 };
   const createdIds: string[] = [];
   const resolvedIds: string[] = [];
@@ -206,7 +274,22 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
   const resolvedTickets: string[] = [];
 
   for (const [key, r] of wanted) {
-    if (open.has(key)) continue;
+    const sev = severities.get(key) ?? rogueSeverity({ privilegeLevel: null, accountType: null, dataClassification: null, identityType: "UNKNOWN", identityStatus: null, otherRogueOnAccount: 0 });
+    const openId = open.get(key);
+    if (openId) {
+      // RISK-P0-13: an open finding follows its facts (a person leaving, a privilege added).
+      if (openScore.get(openId) !== sev.score) {
+        const { error } = await admin
+          .from("risk_findings")
+          .update({ severity: sev.severity, risk_score: sev.score, reasons: sev.reasons, updated_at: new Date().toISOString() })
+          .eq("tenant_id", tenantId)
+          .eq("id", openId)
+          .in("status", OPEN);
+        if (error) result.failed++;
+        else rescored.push(openId);
+      }
+      continue;
+    }
     if (r.accessGrantId && falsePositive.has(`${key}|${r.accessGrantId}`)) continue;
     const { data, error } = await admin
       .from("risk_findings")
@@ -220,9 +303,9 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
         application_id: r.applicationId,
         subject_key: key,
         category: "rogue_access",
-        severity: "high",
-        risk_score: 70,
-        reasons: ["Appeared after the application's baseline", "No WonderID approval found"],
+        severity: sev.severity,
+        risk_score: sev.score,
+        reasons: sev.reasons,
         title: `Rogue access: ${r.label}`.slice(0, 300),
         explanation: `This access was first seen on ${r.firstSeenAt.slice(0, 10)}, after WonderID's baseline for the application (${r.baselineAt.slice(0, 10)}), and no request, access package or administrator grant in WonderID covers it.`,
         recommendation: "Find out who granted it. Request it through WonderID if it is needed, or have it removed on the target.",
@@ -274,7 +357,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
     if (t?.status === "resolved" && t.ticket_number) resolvedTickets.push(t.ticket_number as string);
   }
 
-  if (createdIds.length || resolvedIds.length) {
+  if (createdIds.length || resolvedIds.length || rescored.length) {
     await writeAudit({
       tenantId,
       actorType: "system",
@@ -286,6 +369,7 @@ export async function syncRogueAccessFindings(tenantId: string, rogue: RogueAcce
         created: createdIds.slice(0, 500),
         resolved: resolvedIds.slice(0, 500),
         approvedAfterwards: approvedAfterwards.slice(0, 500),
+        rescored: rescored.slice(0, 500),
         tickets: [...new Set(createdTickets)].slice(0, 500),
         ticketsResolved: [...new Set(resolvedTickets)].slice(0, 500),
         failed: result.failed,
