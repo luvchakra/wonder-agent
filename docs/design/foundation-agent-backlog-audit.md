@@ -3362,3 +3362,7 @@ Owner feedback the same day: an organization set up as development, with no prod
 ## 2026-10-13 — Onboarding lists organizations with their environments (owner request)
 
 "Select an organization" on `/onboarding` now lists each organization once with its environments under it, using the same grouping as the switcher (the person's own memberships only). The switcher button shows the organization's name only. The environment is its coloured dot and the chips below it. Verified by local E2E: first-organization and tenant-address, part of the 34/34 run recorded in the Platform audit log.
+
+## 2026-10-13 — Onboarding is for creating an organization only (owner request)
+
+`/onboarding` no longer lists your organizations; that list is `/organizations`. It keeps invitations and the create form, with **← Back** at the top and **Cancel** beside **Create organization**, both to `/organizations`. Verified with local E2E first-organization (part of a 30/30 run).

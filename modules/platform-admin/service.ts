@@ -35,7 +35,7 @@ export { getWonderappsDashboardAccess, setWonderappsDashboardAccess } from "./wo
 export { checkUsageLimit, getUsageSummary, classifyUsage, type UsageResource, type UsageCheck } from "./usage";
 export { updateFeatureFlagDefault } from "./featureFlags";
 export { listConfigVersions, rollbackConfigVersion, type ConfigType, type ConfigVersion } from "./configRollback";
-export { createAnnouncement, listAnnouncements, getActiveAnnouncements, type CreateAnnouncementInput, type PlatformAnnouncement, type AnnouncementScope, type AnnouncementType } from "./announcements";
+export { createAnnouncement, endAnnouncement, listAnnouncements, getActiveAnnouncements, type CreateAnnouncementInput, type PlatformAnnouncement, type AnnouncementScope, type AnnouncementType } from "./announcements";
 export { getAiProviderConfig, setAiProviderConfig, resolveAiProviderKey, type SetAiProviderConfigInput } from "./aiProviderConfig";
 export { getOrganizationProfile, saveOrganizationProfile, renameOrganization } from "./organizationProfile";
 export { USER_BASE_SIZES, INDUSTRIES, type OrganizationProfile } from "./organizationProfileRules";

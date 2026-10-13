@@ -1,15 +1,21 @@
 import { listAnnouncements, listTenants } from "@/modules/platform-admin/service";
-import { createAnnouncementAction } from "@/app/actions/platform";
+import { createAnnouncementAction, endAnnouncementAction } from "@/app/actions/platform";
 import { Badge, Button, Card, CardBody, CardHeader, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { PageHeading } from "../PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";
 
+/** The notices whose end has passed, read once per request. */
+function endedIds(list: { id: string; endsAt: string | null }[], now = new Date()): Set<string> {
+  return new Set(list.filter((a) => a.endsAt && new Date(a.endsAt) <= now).map((a) => a.id));
+}
+
 /** PLATFORM-P0-05.4 — Maintenance Mode & Platform Announcements (Platform-admin side). */
 export default async function PlatformAnnouncementsPage() {
   const [announcements, tenants] = await Promise.all([listAnnouncements(), listTenants()]);
   const tenantName = new Map(tenants.map((t) => [t.tenantId, t.name ?? t.tenantId]));
+  const ended = endedIds(announcements);
 
   return (
     <>
@@ -87,6 +93,9 @@ export default async function PlatformAnnouncementsPage() {
                 <Th>Scope</Th>
                 <Th hideBelow="lg">Starts</Th>
                 <Th hideBelow="lg">Ends</Th>
+                <Th className="text-right">
+                  <span className="sr-only">Actions</span>
+                </Th>
               </tr>
             </Thead>
             <tbody>
@@ -104,6 +113,18 @@ export default async function PlatformAnnouncementsPage() {
                   </Td>
                   <Td hideBelow="lg" className="text-muted-foreground">
                     {a.endsAt ? new Date(a.endsAt).toLocaleString() : "Open-ended"}
+                  </Td>
+                  <Td className="text-right">
+                    {/* Owner request 2026-10-13: end a notice by hand. */}
+                    {!ended.has(a.id) ? (
+                      <form action={endAnnouncementAction.bind(null, a.id)}>
+                        <Button type="submit" size="sm" variant="outline" aria-label={`End ${a.title} now`}>
+                          End now
+                        </Button>
+                      </form>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Ended</span>
+                    )}
                   </Td>
                 </Tr>
               ))}

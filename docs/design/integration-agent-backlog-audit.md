@@ -2915,3 +2915,7 @@ Verified:
   `address.test.ts` and the gateway case for a socket driver (unlisted
   host refused, hostless address refused, listed host admitted).- Local E2E (production build): `outbound-guard`, `mcp-bridge`,
   `mcp-inventory` and `connector-provisioning` specs, 32/32.
+
+## 2026-10-13 — Demo kit instructions follow organization addresses (owner question)
+
+The Planet Express kit (`demo-org/`) needed one change. Its machines, systems and connection details call nothing in WonderID, so they are unaffected by today's address and environment work. Its README told people to open WonderID and pick **Integrations → Connect a system**. It now says to sign in at the organization's own address (`<org>[-env].id.wonderapps.biz`; the main address only lists organizations), that each environment holds its own connections, and that connectors are picked from **Integrations → Connector Library**.

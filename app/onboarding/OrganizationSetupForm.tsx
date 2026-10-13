@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
+import Link from "next/link";
 import { setUpOrganizationAction, type SetUpOrganizationState } from "@/app/actions/tenant";
 import { ENVIRONMENT_LABEL, ORGANIZATION_ENVIRONMENTS, PREFIX_MAX, environmentSlug, slugify, type OrganizationEnvironment } from "@/lib/tenant/organizationName";
 import { Button, environmentColor, fieldInputClass, fieldLabelClass } from "@/modules/ui";
@@ -91,9 +92,14 @@ export function OrganizationSetupForm({ base }: { base: string | null }) {
           {state.error}
         </p>
       ) : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? "Creating…" : "Create organization"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Creating…" : "Create organization"}
+        </Button>
+        <Link href="/organizations" className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-foreground">
+          Cancel
+        </Link>
+      </div>
     </form>
   );
 }

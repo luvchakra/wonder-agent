@@ -93,6 +93,20 @@ test.describe("Platform-admin console", () => {
     await expect(page.getByRole("heading", { name: "Features" })).toBeVisible();
   });
 
+  test("owner request 2026-10-13: a notice can be ended by hand", async ({ page }) => {
+    const title = `E2E notice ${Date.now().toString(36)}`;
+    await page.goto("/platform-admin/announcements");
+    // Scoped to the test organization, so no real customer sees it.
+    await page.locator("#scope").selectOption("tenant");
+    await page.locator("#tenantId").selectOption({ label: TENANT_ONE.name });
+    await page.locator("#title").fill(title);
+    await page.locator("#body").fill("Shown to E2E Tenant One only.");
+    await page.getByRole("button", { name: "Publish" }).click();
+    const row = page.getByRole("row").filter({ hasText: title });
+    await row.getByRole("button", { name: `End ${title} now` }).click();
+    await expect(row.getByText("Ended", { exact: true })).toBeVisible();
+  });
+
   for (const path of ["/platform-admin/features", "/platform-admin/branding", "/platform-admin/announcements", "/platform-admin/health", "/platform-admin/admins"]) {
     test(`${path} loads without the app's error boundary`, async ({ page }) => {
       const response = await page.goto(path);

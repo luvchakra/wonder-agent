@@ -8,6 +8,7 @@ import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import {
   activateTenant,
   createAnnouncement,
+  endAnnouncement,
   createSubscription,
   createTenant,
   createTenantEnvironment,
@@ -169,6 +170,13 @@ export async function createAnnouncementAction(formData: FormData) {
     body: String(formData.get("body") ?? ""),
     endsAt: String(formData.get("endsAt") ?? "") || undefined,
   });
+  revalidatePath("/platform-admin/announcements");
+}
+
+/** Owner request 2026-10-13: end a notice now. */
+export async function endAnnouncementAction(announcementId: string) {
+  const { userId } = await requirePlatformAdmin();
+  await endAnnouncement(userId, announcementId);
   revalidatePath("/platform-admin/announcements");
 }
 
