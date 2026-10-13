@@ -13,7 +13,7 @@
     "test:e2e:report": "playwright show-report",
     "test": "vitest run",
     "progress": "node scripts/build-progress-tracker.mjs",
-    "roadmap": "node scripts/roadmap-progress.mjs",
+    "roadmap": "node scripts/roadmap-progress.mjs && node scripts/roadmap-stories.mjs",
     "seed:demo": "node scripts/seed-demo-data.mjs"
   },
   "dependencies": {

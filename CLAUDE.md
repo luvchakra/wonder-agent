@@ -1303,6 +1303,12 @@ beats exhaustive pre-push verification.
     moved (✅ done, 🔶 partly done, ⬜ not started), add an item for a shipped
     capability the roadmap lacks, then run `npm run roadmap` to recompute the
     percentages. Never hand-edit the percentages.
+  - **The same `npm run roadmap` regenerates `docs/WonderID/ROADMAP-STORIES.md`**
+    (owner rule, 2026-10-13): every story with its progress, and at the top what
+    was completed recently, what is next and what is blocked. It is built from
+    the module Progress Trackers, `run-order/RUN-ORDER.md`, the live phase doc
+    (`progress/PROGRESS.md`) and git history, so keep those current and never
+    edit the generated file by hand.
 - **Still required**, because they're cheap and protect trust:
   - the rules above;
   - a unit test for any change to the permission gate, to any workflow that
