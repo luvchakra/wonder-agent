@@ -365,8 +365,8 @@ Each agent works one story at a time from its own backlog doc:
    - squash-merge only when the owner's message says **"merge now"**, and CI
      is green (§19.9, rule 0);
    - confirm the production deploy is ready;
-   - read the high-risk findings register (never edit it) and plan what the
-     next pull request can fix (§19.12).
+   - read the high-risk findings register and plan what the next pull
+     request can fix (§19.12).
 
    Never push directly to `main`.
 8. Move to the next unfinished story automatically. Never restart or duplicate
@@ -1499,18 +1499,29 @@ columns and are out of scope.
 
 `docs/WonderID/HIGH-RISK-FINDINGS.md` lists the Critical and High findings
 of the hourly audit of the knowledge base (owner decision, 2026-10-12). The
-owner has authorised ChatGPT to maintain it: its updates, including direct
-commits to `main`, are expected and must never be blocked, reverted or
-"corrected" (owner decision, 2026-10-12).
+owner has authorised ChatGPT and, since 2026-10-13, the Claude Code hourly
+audit routine to maintain it. Their updates, including direct commits of the
+register to `main`, are expected and must never be blocked, reverted or
+"corrected" (owner decisions, 2026-10-12 and 2026-10-13).
 
 1. **After every merge to `main`**, read the register on the latest `main`.
    Check every finding marked `OPEN`, `CHANGED` or `REOPENED`, not only new
    ones.
-2. **Claude Code never edits the register (owner decision, 2026-10-12).**
-   Read it; do not change, reformat or "update" it, in any pull request.
-   This rule binds Claude Code sessions only. The register's maintainer
-   (ChatGPT, authorised by the owner) edits it freely. Claude Code adds no
-   hook, check, CODEOWNERS entry or other guard that stops it.
+2. **Who edits the register (owner decision, 2026-10-13, replacing the
+   2026-10-12 rule that Claude Code never edits it).**
+   - The hourly audit edits it: ChatGPT, or a Claude Code session running
+     the scheduled audit routine. It may commit only the register directly
+     to `main`, after re-fetching its blob SHA. Commit only when a status,
+     finding or piece of evidence changed: each commit is a deployment
+     (§19.9).
+   - Keep the audit independent. A session that fixes findings records its
+     work in the tracker (rule 4), not the register, and never marks its own
+     fix `FIXED` there.
+   - Nobody adds a hook, check, CODEOWNERS entry or other guard that stops
+     the register's maintainers.
+   - The audit's notification and summary start with
+     `Routine Name: <name> | Overall Status: <2-3 words> | Notification Time: <HH:MM IST> | Summary: …`
+     (owner request, 2026-10-13).
 3. **Work through the findings without asking (owner decision,
    2026-10-12).** Give each open finding a priority, then fix it
    step by step:

@@ -710,3 +710,20 @@ edited. Remediation priorities and status live in
 `docs/WonderID/FINDINGS-REMEDIATION.md`, which Claude keeps current and
 works through without asking (CLAUDE.md §19.12).
 
+## 2026-10-13 — Claude Code runs the hourly findings audit
+
+Owner decision: the Claude Code hourly audit routine may now maintain the
+high-risk findings register, alongside ChatGPT (CLAUDE.md §19.12, rule 2,
+replacing the 2026-10-12 rule that Claude Code never edits it). The audit
+commits only the register to `main`, and only when something changed. A
+session that fixes findings records its work in
+`docs/WonderID/FINDINGS-REMEDIATION.md`, never marks its own fix `FIXED` in
+the register, and adds no guard against the register's maintainers.
+
+First audit run, 09:06 IST, `main` @ `376473b`:
+- 21 unit-test files, 338 tests passed;
+- C02, C03, H01, H02, H03, H04, H07 and H08 moved to `FIXED` at
+  committed-evidence level;
+- C01 `ACCEPTED` on the owner's risk acceptance;
+- H05 stays `CHANGED`; H06 stays `FIXED`;
+- the full nightly suite has not been green since #119–#132.
