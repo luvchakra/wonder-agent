@@ -7,11 +7,15 @@
  * feature_flags directly.
  */
 
-export type TenantEnvironment = "production" | "sandbox";
+export type TenantEnvironment = "production" | "development" | "test" | "staging" | "sandbox";
+/** Owner request 2026-10-13: the environments a production organization can add (migration 0156). */
+export type AddableEnvironment = "development" | "test" | "staging";
 
 export type PlatformTenant = {
   tenantId: string;
   environment: TenantEnvironment;
+  /** For a development, test or staging environment: the production organization it belongs to. */
+  parentTenantId?: string | null;
   notes: string | null;
   createdAt: string;
   // Denormalized for convenience (joined at read time, never persisted here):

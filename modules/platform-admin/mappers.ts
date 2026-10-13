@@ -8,6 +8,7 @@ export function toPlatformTenant(row: any): PlatformTenant {
   return {
     tenantId: row.tenant_id,
     environment: row.environment,
+    parentTenantId: row.parent_tenant_id ?? null,
     notes: row.notes,
     createdAt: row.created_at,
     name: row.tenants?.name,

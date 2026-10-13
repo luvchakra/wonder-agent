@@ -3,7 +3,7 @@ import "server-only";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
-import type { PlatformTenant, TenantEnvironment } from "@/lib/shared/types/platform";
+import type { AddableEnvironment, PlatformTenant, TenantEnvironment } from "@/lib/shared/types/platform";
 import { toPlatformTenant } from "./mappers";
 import { writePlatformAudit } from "./auditLog";
 
@@ -53,11 +53,36 @@ export async function createTenant(actorId: string, input: CreateTenantInput): P
   return { ...toPlatformTenant(platformTenant), name: tenant.name, slug: tenant.slug, status: tenant.status };
 }
 
+/**
+ * Owner request (2026-10-13): a development, test or staging environment of
+ * a production organization. It is its own organization with its own data,
+ * at `<slug>-dev` (or -test, -staging), so `<slug>-dev.<BASE_APP_HOST>`; the
+ * production organization's active administrators become its administrators.
+ * Platform administrators only (owner decision); one transaction in the
+ * database (create_tenant_environment, migration 0156); audited.
+ */
+export const ADDABLE_ENVIRONMENTS: AddableEnvironment[] = ["development", "test", "staging"];
+
+export async function createTenantEnvironment(actorId: string, parentTenantId: string, environment: string): Promise<{ tenantId: string }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(parentTenantId)) throw new ApiError(404, "TENANT_NOT_FOUND");
+  if (!ADDABLE_ENVIRONMENTS.includes(environment as AddableEnvironment)) throw new ApiError(400, "INVALID_INPUT", "environment: development, test or staging");
+  const { data, error } = await supabaseServiceRole().rpc("create_tenant_environment", { p_parent: parentTenantId, p_environment: environment });
+  if (error) {
+    const reason = error.code === "23505" ? "That environment already exists" : error.code === "P0002" ? "Organization not found" : error.code === "22023" || error.code === "23514" ? error.message : null;
+    await writePlatformAudit({ actorId, tenantId: parentTenantId, action: "platform.tenant_environment_created", newValue: { environment }, result: "failure" });
+    if (reason) throw new ApiError(error.code === "P0002" ? 404 : 409, "ENVIRONMENT_REFUSED", reason);
+    throw new ApiError(500, "CREATE_FAILED", "The environment could not be created");
+  }
+  const tenantId = data as string;
+  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_created", newValue: { parentTenantId, environment }, result: "success" });
+  return { tenantId };
+}
+
 export async function listTenants(): Promise<PlatformTenant[]> {
   const supabase = supabaseServiceRole();
   const { data, error } = await supabase
     .from("platform_tenants")
-    .select("*, tenants(name, slug, status)")
+    .select("*, tenants!platform_tenants_tenant_id_fkey(name, slug, status)")
     .order("created_at", { ascending: false })
     .limit(DEFAULT_LIST_LIMIT);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -66,7 +91,7 @@ export async function listTenants(): Promise<PlatformTenant[]> {
 
 export async function getTenant(tenantId: string): Promise<PlatformTenant | null> {
   const supabase = supabaseServiceRole();
-  const { data, error } = await supabase.from("platform_tenants").select("*, tenants(name, slug, status)").eq("tenant_id", tenantId).maybeSingle();
+  const { data, error } = await supabase.from("platform_tenants").select("*, tenants!platform_tenants_tenant_id_fkey(name, slug, status)").eq("tenant_id", tenantId).maybeSingle();
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return data ? toPlatformTenant(data) : null;
 }

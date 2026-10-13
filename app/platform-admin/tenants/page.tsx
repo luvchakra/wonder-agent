@@ -1,6 +1,7 @@
 import Link from "next/link";
-import { listTenants, getSubscription } from "@/modules/platform-admin/service";
-import { createTenantAction, suspendTenantAction, activateTenantAction, decommissionTenantAction, createSubscriptionAction } from "@/app/actions/platform";
+import { ADDABLE_ENVIRONMENTS, listTenants, getSubscription } from "@/modules/platform-admin/service";
+import { baseAppHost, tenantUrl } from "@/lib/tenant/host";
+import { createTenantAction, createTenantEnvironmentAction, suspendTenantAction, activateTenantAction, decommissionTenantAction, createSubscriptionAction } from "@/app/actions/platform";
 import { Badge, Button, Card, CardBody, CardHeader, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "../PageHeading";
@@ -14,8 +15,14 @@ const STATUS = {
   deprovisioned: { tone: "neutral", label: "Decommissioned" },
 } as const;
 
+const ENV_LABEL: Record<string, string> = { production: "Production", development: "Dev", test: "Test", staging: "Staging", sandbox: "Sandbox" };
+
 export default async function PlatformTenantsPage() {
-  const tenants = await listTenants();
+  const listed = await listTenants();
+  // Each production organization followed by its environments (migration 0156).
+  const childrenOf = (id: string) => listed.filter((t) => t.parentTenantId === id);
+  const tenants = [...listed.filter((t) => !t.parentTenantId || !listed.some((p) => p.tenantId === t.parentTenantId)).flatMap((t) => [t, ...childrenOf(t.tenantId)])];
+  const base = baseAppHost();
   const withSubscriptions = await Promise.all(
     tenants.map(async (t) => ({
       tenant: t,
@@ -65,7 +72,7 @@ export default async function PlatformTenantsPage() {
             <Thead>
               <tr>
                 <Th>Name</Th>
-                <Th hideBelow="lg">Slug</Th>
+                <Th hideBelow="lg">Address</Th>
                 <Th>Status</Th>
                 <Th hideBelow="xl">Environment</Th>
                 <Th>Plan</Th>
@@ -77,15 +84,41 @@ export default async function PlatformTenantsPage() {
                 const status = STATUS[tenant.status ?? "active"];
                 return (
                   <Tr key={tenant.tenantId}>
-                    <Td className="font-medium">{tenant.name}</Td>
+                    <Td className={cn("font-medium", tenant.parentTenantId && "md:pl-8")}>{tenant.name}</Td>
                     <Td hideBelow="lg" className="font-mono text-xs text-muted-foreground">
-                      {tenant.slug}
+                      {base && tenant.slug && tenant.status !== "deprovisioned" ? (
+                        <a href={tenantUrl(tenant.slug, base) ?? undefined} className="hover:text-primary hover:underline" target="_blank" rel="noreferrer">
+                          {tenant.slug}.{base}
+                        </a>
+                      ) : (
+                        tenant.slug
+                      )}
                     </Td>
                     <Td>
                       <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
                     </Td>
-                    <Td hideBelow="xl" className="capitalize">
-                      {tenant.environment}
+                    <Td hideBelow="xl">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge tone={tenant.environment === "production" ? "success" : "neutral"}>{ENV_LABEL[tenant.environment] ?? tenant.environment}</Badge>
+                        {(() => {
+                          // Owner request 2026-10-13: add dev, test or staging to an active production organization.
+                          const missing = tenant.environment === "production" && tenant.status === "active" ? ADDABLE_ENVIRONMENTS.filter((e) => !childrenOf(tenant.tenantId).some((c) => c.environment === e)) : [];
+                          return missing.length ? (
+                            <form action={createTenantEnvironmentAction.bind(null, tenant.tenantId)} className="flex items-center gap-1">
+                              <select name="environment" aria-label={`Environment to add to ${tenant.name}`} className={cn(fieldInputClass, "w-auto py-0.5 text-xs")}>
+                                {missing.map((e) => (
+                                  <option key={e} value={e}>
+                                    {ENV_LABEL[e]}
+                                  </option>
+                                ))}
+                              </select>
+                              <Button type="submit" size="sm" variant="ghost">
+                                Add
+                              </Button>
+                            </form>
+                          ) : null;
+                        })()}
+                      </div>
                     </Td>
                     <Td>
                       {subscription?.plan ? (
