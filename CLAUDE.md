@@ -1310,6 +1310,10 @@ beats exhaustive pre-push verification.
   Supabase outage) gets one pull request comment saying so; it isn't fixed in
   code.
 - **Merge conflicts in tracker docs:** keep both sides' rows.
+- **Timestamp every message (owner decision, 2026-10-13):** end every message
+  to the owner with the current time in IST, short, on its own last line
+  (e.g. `08:21 IST`). Read it from the clock (`TZ=Asia/Kolkata date`), never
+  estimate it.
 
 ### 19.8 Repository layout
 
