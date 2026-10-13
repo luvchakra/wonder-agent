@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Monitor, Moon, Sun } from "lucide-react";
 
 type ThemeChoice = "light" | "dark" | "system";
 
@@ -44,6 +45,12 @@ function readStoredChoice(): ThemeChoice {
   }
 }
 
+const OPTIONS = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "System", Icon: Monitor },
+] as const;
+
 export function ThemeToggle() {
   const [choice, setChoice] = useState<ThemeChoice>(readStoredChoice);
 
@@ -52,19 +59,24 @@ export function ThemeToggle() {
     applyTheme(next);
   }
 
+  // A compact segmented control (owner, 2026-10-13: the text buttons overflowed the account menu):
+  // icons with names for screen readers and tooltips, the current choice raised on a muted track.
   return (
-    <div className="flex items-center gap-1 rounded-md border border-border p-0.5 text-xs">
-      {(["light", "dark", "system"] as const).map((opt) => (
+    <div role="radiogroup" aria-label="Theme" className="inline-flex shrink-0 items-center gap-0.5 rounded-lg bg-muted p-0.5">
+      {OPTIONS.map(({ value, label, Icon }) => (
         <button
-          key={opt}
+          key={value}
           type="button"
-          onClick={() => handleChange(opt)}
-          aria-pressed={choice === opt}
-          className={`rounded px-2 py-1 capitalize transition-colors ${
-            choice === opt ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+          role="radio"
+          aria-checked={choice === value}
+          aria-label={label}
+          title={label}
+          onClick={() => handleChange(value)}
+          className={`flex size-7 items-center justify-center rounded-md transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring ${
+            choice === value ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
           }`}
         >
-          {opt}
+          <Icon className="size-3.5" aria-hidden="true" />
         </button>
       ))}
     </div>

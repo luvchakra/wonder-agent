@@ -3259,3 +3259,24 @@ Left out:
   to do under this story.
 - `/settings/security` still only adds factors; verifying an existing one
   happens on `/verify-mfa`.
+
+### 2026-10-13 — Platform administrators can also be listed in `PLATFORM_ADMIN_EMAILS` (owner request)
+
+`isPlatformAdmin()` now also admits a signed-in account whose email is in
+the `PLATFORM_ADMIN_EMAILS` environment variable (comma-separated), in
+addition to the `platform_admins` table.
+- The email must be confirmed in Supabase Auth: it is read with the
+  service role (`auth.admin.getUserById`), never from the request, so a
+  typed or unconfirmed address never opens the console.
+- Removing an address and redeploying removes the access.
+- The rule is pure and tested in `platformAdminEmails.ts`
+  (`platformAdminEmails.test.ts`, with `lib/rbac` 39/39).
+
+Set in Vercel (production and preview, encrypted) to
+aitoolshubsaas@gmail.com, the account the owner uses; documented in
+`.env.local.example`.
+
+Separately, found in `platform_admins`: `fixture-pa107@example.test`, a
+leftover from a database test. It has no password and has never signed
+in. The owner was given the SQL to remove it; it is not removed here,
+because deleting from the platform boundary needs the owner.

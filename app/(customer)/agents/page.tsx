@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAgents, listOwnersForTenant } from "@/modules/agent-identity/service";
-import { getFindings } from "@/modules/risk/service";
+import { listFindingSummaries } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, KpiCard, LinkButton, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
@@ -30,7 +30,8 @@ export default async function AgentsPage() {
   const tenantId = ctx.tenantId!;
   const [agents, findings, owners] = await Promise.all([
     listAgents(tenantId),
-    getFindings(tenantId),
+    // §15: only the open findings, and only their summary columns.
+    listFindingSummaries(tenantId, { openOnly: true }),
     listOwnersForTenant(tenantId),
   ]);
 

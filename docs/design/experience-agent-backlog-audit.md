@@ -4028,3 +4028,14 @@ Not changed:
 - the help guide (not updated unless asked).
 
 - **2026-10-13 (owner):** "Access Requests" in the Access menu is now "All Requests", so it no longer reads like "Request Access" above it.
+
+### 2026-10-13 — Appearance switch fits the account menu (owner)
+
+The Light, Dark and System text buttons overflowed the account menu.
+`ThemeToggle` is now a compact segmented control:
+- sun, moon and monitor icons, each with an accessible name and a tooltip;
+- `role="radiogroup"`;
+- the current choice raised on a muted track.
+
+The help and welcome pages use the same control. Checked by screenshot of
+the menu at 1280px.
