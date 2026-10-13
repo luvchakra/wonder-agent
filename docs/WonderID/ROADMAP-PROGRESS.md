@@ -4,11 +4,11 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 ✅ done · 🔶 partly done · ⬜ not started · progress counts partly done as half
 
-**Overall: 45%** `████░░░░░░`
+**Overall: 46%** `█████░░░░░`
 
 | # | Phase | Progress |
 |---|---|---|
-| 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `████████░░` 82% |
+| 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `████████░░` 83% |
 | 2 | [Applications, accounts and connections](#2-applications-accounts-and-connections) | `██████████` 100% |
 | 3 | [Access requests](#3-access-requests) | `██████████` 100% |
 | 4 | [Provisioning](#4-provisioning) | `████░░░░░░` 45% |
@@ -22,9 +22,10 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 12 | [Intelligence and experience](#12-intelligence-and-experience) | `█░░░░░░░░░` 6% |
 | 13 | [Release readiness](#13-release-readiness) | `░░░░░░░░░░` 0% |
 
-## 1. Foundation, sign-in and identity — 82%
+## 1. Foundation, sign-in and identity — 83%
 
 - ✅ Organizations, own web addresses and branding
+- ✅ Vendor platform console: organizations, plans, flags, billing, health
 - ✅ Sign-in: password, Google, Microsoft, LinkedIn
 - 🔶 Single sign-on (SAML / OIDC)
 - ✅ Two-step verification, and requiring it for everyone
@@ -171,4 +172,4 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ⬜ Brownfield customer rehearsal
 
 ---
-Updated with the work: when an item ships, its mark changes here in the same pull request.
+Updated with every merge: change an item's mark, run `npm run roadmap` to recompute the percentages, and commit both in the same pull request.

@@ -1,5 +1,7 @@
 import { getBranding, listConfigVersions } from "@/modules/platform-admin/service";
 import { updateBrandingAction, rollbackConfigVersionAction } from "@/app/actions/platform";
+import { Button, Card, CardBody, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { PageHeading } from "../PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";
@@ -9,42 +11,70 @@ export default async function PlatformBrandingPage() {
   const rollbackWithPath = rollbackConfigVersionAction.bind(null, "/platform-admin/branding");
 
   return (
-    <main>
-      <h1>Global Configuration</h1>
-      <form action={updateBrandingAction}>
-        <p>
-          Product name: <input name="productName" defaultValue={branding.productName} />
-        </p>
-        <p>
-          Support URL: <input name="supportUrl" defaultValue={branding.supportUrl ?? ""} />
-        </p>
-        <p>
-          Docs URL: <input name="docsUrl" defaultValue={branding.docsUrl ?? ""} />
-        </p>
-        <p>
-          Default theme:{" "}
-          <select name="defaultTheme" defaultValue={branding.defaultTheme}>
-            <option value="light">light</option>
-            <option value="dark">dark</option>
-            <option value="system">system</option>
-          </select>
-        </p>
-        <button type="submit">Save</button>
-      </form>
+    <>
+      <PageHeading title="Global Configuration" description="Product-wide settings for every organization." />
+      <Card>
+        <CardBody>
+          <form action={updateBrandingAction} className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="productName" className={fieldLabelClass}>
+                Product name
+              </label>
+              <input id="productName" name="productName" defaultValue={branding.productName} className={fieldInputClass} />
+            </div>
+            <div>
+              <label htmlFor="defaultTheme" className={fieldLabelClass}>
+                Default theme
+              </label>
+              <select id="defaultTheme" name="defaultTheme" defaultValue={branding.defaultTheme} className={fieldInputClass}>
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+                <option value="system">System</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="supportUrl" className={fieldLabelClass}>
+                Support URL
+              </label>
+              <input id="supportUrl" name="supportUrl" type="url" defaultValue={branding.supportUrl ?? ""} className={fieldInputClass} />
+            </div>
+            <div>
+              <label htmlFor="docsUrl" className={fieldLabelClass}>
+                Docs URL
+              </label>
+              <input id="docsUrl" name="docsUrl" type="url" defaultValue={branding.docsUrl ?? ""} className={fieldInputClass} />
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit">Save</Button>
+            </div>
+          </form>
+        </CardBody>
+      </Card>
 
-      <h2>Version history (PLATFORM-P0-05.3)</h2>
-      {versions.length === 0 && <p>No changes recorded yet.</p>}
-      <ul>
-        {versions.map((v) => (
-          <li key={v.id} style={{ marginBottom: "0.5rem" }}>
-            {v.createdAt} — <code>{JSON.stringify(v.newValue)}</code>
-            <form action={rollbackWithPath} style={{ display: "inline", marginLeft: "0.5rem" }}>
-              <input type="hidden" name="versionId" value={v.id} />
-              <button type="submit">Roll back to before this change</button>
-            </form>
-          </li>
-        ))}
-      </ul>
-    </main>
+      {/* PLATFORM-P0-05.3 — versioned, with rollback. */}
+      <details className="group rounded-xl border border-border/60 bg-card">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-card-foreground">Version history ({versions.length})</summary>
+        {versions.length === 0 ? (
+          <p className="border-t border-border px-4 py-3 text-sm text-muted-foreground">No changes recorded yet.</p>
+        ) : (
+          <ul className="divide-y divide-border border-t border-border">
+            {versions.map((v) => (
+              <li key={v.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground">{new Date(v.createdAt).toLocaleString()}</p>
+                  <code className="block truncate text-xs text-foreground">{JSON.stringify(v.newValue)}</code>
+                </div>
+                <form action={rollbackWithPath}>
+                  <input type="hidden" name="versionId" value={v.id} />
+                  <Button type="submit" size="sm" variant="outline">
+                    Roll back to before this change
+                  </Button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </details>
+    </>
   );
 }

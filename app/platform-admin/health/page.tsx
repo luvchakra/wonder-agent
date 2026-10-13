@@ -1,5 +1,7 @@
 import { getPlatformHealth, getWonderappsDashboardAccess } from "@/modules/platform-admin/service";
 import { setWonderappsAccessAction } from "@/app/actions/platform";
+import { Card, CardBody, CardHeader, PendingSubmitButton, StatusBadge } from "@/modules/ui";
+import { HealthSignals, PageHeading } from "../PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";
@@ -8,34 +10,38 @@ export default async function PlatformHealthPage() {
   const [health, wonderapps] = await Promise.all([getPlatformHealth(), getWonderappsDashboardAccess()]);
 
   return (
-    <main>
-      <h1>Platform Health</h1>
-      <ul>
-        {health.signals.map((s) => (
-          <li key={s.name}>
-            [{s.status}] {s.name}
-            {s.detail ? ` — ${s.detail}` : ""}
-          </li>
-        ))}
-      </ul>
-      <p style={{ color: "#666" }}>Checked at {health.checkedAt}</p>
+    <>
+      <PageHeading title="Platform Health" />
+      <Card>
+        <CardHeader title="Signals" />
+        <HealthSignals health={health} />
+      </Card>
 
       {/* Owner decision (2026-10-13): WonderApps reads across organizations only while this is on. */}
-      <h2>WonderApps dashboard access</h2>
-      <p>
-        {wonderapps === null
-          ? "Unavailable: the current state could not be read."
-          : wonderapps
-            ? "On: the WonderApps dashboard can read WonderID data across all organizations (never the AI provider keys)."
-            : "Off: the WonderApps dashboard cannot read any WonderID data."}
-      </p>
-      {wonderapps === null ? null : (
-        <form action={setWonderappsAccessAction}>
-          <input type="hidden" name="enabled" value={wonderapps ? "false" : "true"} />
-          <button type="submit">{wonderapps ? "Turn off WonderApps access" : "Turn on WonderApps access"}</button>
-        </form>
-      )}
-      <p style={{ color: "#666" }}>Every change is recorded in the platform audit log.</p>
-    </main>
+      <Card>
+        <CardHeader
+          title="WonderApps dashboard access"
+          description="Every change is recorded in the platform audit log."
+          actions={wonderapps === null ? <StatusBadge tone="warning">Unavailable</StatusBadge> : <StatusBadge tone={wonderapps ? "success" : "neutral"}>{wonderapps ? "On" : "Off"}</StatusBadge>}
+        />
+        <CardBody className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-muted-foreground">
+            {wonderapps === null
+              ? "The current state could not be read."
+              : wonderapps
+                ? "The WonderApps dashboard can read WonderID data across all organizations (never the AI provider keys)."
+                : "The WonderApps dashboard cannot read any WonderID data."}
+          </p>
+          {wonderapps === null ? null : (
+            <form action={setWonderappsAccessAction}>
+              <input type="hidden" name="enabled" value={wonderapps ? "false" : "true"} />
+              <PendingSubmitButton variant={wonderapps ? "outline" : "default"} size="sm" pendingLabel="Saving…">
+                {wonderapps ? "Turn off WonderApps access" : "Turn on WonderApps access"}
+              </PendingSubmitButton>
+            </form>
+          )}
+        </CardBody>
+      </Card>
+    </>
   );
 }

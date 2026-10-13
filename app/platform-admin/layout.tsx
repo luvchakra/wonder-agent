@@ -1,17 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
-
-const NAV = [
-  { href: "/platform-admin", label: "Platform Overview" },
-  { href: "/platform-admin/tenants", label: "Tenants" },
-  { href: "/platform-admin/billing", label: "Billing" },
-  { href: "/platform-admin/features", label: "Feature Flags" },
-  { href: "/platform-admin/branding", label: "Global Configuration" },
-  { href: "/platform-admin/announcements", label: "Announcements" },
-  { href: "/platform-admin/health", label: "Platform Health" },
-  { href: "/platform-admin/admins", label: "Platform Admins" },
-];
+import { WonderIDLogo } from "@/modules/ui";
+import { PlatformNav } from "./PlatformNav";
 
 // Wholly separate authorization boundary from the customer-facing shell —
 // CLAUDE.md non-negotiable #3. This layout never extends or imports
@@ -29,18 +19,19 @@ export default async function PlatformAdminLayout({ children }: { children: Reac
     notFound();
   }
   return (
-    <div style={{ display: "flex", fontFamily: "sans-serif", minHeight: "100vh" }}>
-      <nav style={{ width: 220, borderRight: "1px solid #ccc", padding: "1rem" }}>
-        <p style={{ fontWeight: "bold" }}>WonderID Platform</p>
-        <ul style={{ listStyle: "none", padding: 0 }}>
-          {NAV.map((item) => (
-            <li key={item.href} style={{ margin: "0.5rem 0" }}>
-              <Link href={item.href}>{item.label}</Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
-      <main style={{ flex: 1, padding: "1.5rem" }}>{children}</main>
+    <div className="min-h-screen bg-background text-foreground lg:flex">
+      <aside className="border-b border-sidebar-border bg-sidebar lg:w-60 lg:shrink-0 lg:border-r lg:border-b-0">
+        <nav aria-label="Platform" className="px-4 py-3 lg:sticky lg:top-0 lg:py-5">
+          <div className="mb-3 flex items-center gap-2 px-1 lg:mb-6">
+            <WonderIDLogo size={26} />
+            <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Platform</span>
+          </div>
+          <PlatformNav />
+        </nav>
+      </aside>
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-6xl space-y-6">{children}</div>
+      </main>
     </div>
   );
 }

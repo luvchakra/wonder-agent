@@ -1005,3 +1005,20 @@ Verified:
 
 Recorded in `docs/WonderID/progress/PROGRESS.md` (the open owner action
 is closed).
+
+## 2026-10-13 — The platform console gets the product's design system (owner report: "looks weird")
+
+**What changed.** Every `/platform-admin` page was bare HTML (inline styles, `border={1}` tables, unlabelled inputs). Now:
+- the layout has its own light/dark sidebar (`app/platform-admin/PlatformNav.tsx`, active page highlighted, a scrolling row on phones) with the WonderID logo and a "Platform" tag; still never the customer shell (non-negotiable #3), and still a bare 404 for anyone else;
+- every page uses the shared primitives (`Card`, `TableContainer`/`Th`/`Td`/`Tr`, `Button`, `StatusBadge`, `fieldInputClass`) and one heading (`app/platform-admin/PageHeading.tsx`, which also renders the health signals as labelled badges);
+- Tenants: labelled create form; status as a badge; only the applicable action shows (Suspend or Activate, Decommission unless decommissioned) instead of three buttons with two disabled;
+- Feature Flags: one table of defaults; per-organization overrides show only the flags actually overridden, with one compact "Set" form; the per-flag and per-tenant reads now run in parallel (§15);
+- Billing: approvals queue and price catalogue in cards; the adjustment request form, recent adjustments and webhook intake folded into disclosures (§19.5);
+- Platform Admins also lists the addresses from `PLATFORM_ADMIN_EMAILS` (marked as such);
+- Global Configuration, Announcements, Health and Usage restyled; version history folded.
+
+No action, form field name or authorization changed.
+
+**Roadmap.** `docs/WonderID/ROADMAP-PROGRESS.md` gains "Vendor platform console" (done); `npm run roadmap` (`scripts/roadmap-progress.mjs`) now recomputes its percentages from the marks, and CLAUDE.md §19.6 requires updating it on every merge (owner rule, 2026-10-13).
+
+**Verified.** `npm run typecheck`; eslint on `app/platform-admin`; `next build`; local E2E `platform-admin.spec.ts` + the platform part of `navigation-smoke.spec.ts`: 23 passed. Screenshots checked at 1440 px light and dark and at 390 px.

@@ -1298,6 +1298,11 @@ beats exhaustive pre-push verification.
   - **Every completed merge sends a push notification** (owner rule, 2026-10-13).
     It starts with a clear headline, "Merged #<n>: <what changed>", then one
     line on the user-facing effect, and the IST time.
+  - **Every merge updates `docs/WonderID/ROADMAP-PROGRESS.md`** (owner rule,
+    2026-10-13), in the same pull request: set the marks of the items the work
+    moved (✅ done, 🔶 partly done, ⬜ not started), add an item for a shipped
+    capability the roadmap lacks, then run `npm run roadmap` to recompute the
+    percentages. Never hand-edit the percentages.
 - **Still required**, because they're cheap and protect trust:
   - the rules above;
   - a unit test for any change to the permission gate, to any workflow that
