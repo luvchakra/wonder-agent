@@ -4,7 +4,7 @@
 |---|---|
 | Last updated | 2026-10-13 |
 | Current phase | F3 in progress. The exit scenario runs end to end against a stub system (2026-10-12): rogue access removed through the connector after a reviewer asks, verified, finding resolved |
-| Next story | By priority (owner, 2026-10-13): finish RISK-P0-13, then F4 (lifecycle rules, rule runtime, attribute rules, entitlement types, certification for every identity type) and the High QA sweeps. INTEGRATION stories are Low, implemented later. Up next and blocked lists: `../ROADMAP-STORIES.md` |
+| Next story | F3: finish INTEGRATION-P0-22 (SCIM groups, RFC 9967 events) and RISK-P0-13, then INTEGRATION-P0-26 (ServiceNow); the relay and named connectors wait on D7 and D9. Up next and blocked lists: `../ROADMAP-STORIES.md` |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
 
 **How to update this file.** In the same pull request as the work (CLAUDE.md
@@ -49,21 +49,6 @@ status is shown per row below.
 | D10 | Import frequency on the free plan | Open (recommendation: daily plus run now) |
 | D11 | Automation credentials | Approved 2026-10-12 (owner): yes, with the §8.2 controls (hashed, expiring at most a year, role-scoped, four-eyes, audited, rate-limited, never for sign-in) |
 | D12 | Shared rule runtime | Approved 2026-10-12 (owner): one shared runtime published by Operations; rule tables stay with their owners |
-
-## Priorities
-
-Every story's priority on `../ROADMAP-STORIES.md` comes from this table (owner request, 2026-10-13). The rows are read top to bottom and the first row that matches a story wins, so a row naming one story overrides the general rules under it. `Applies to` takes story IDs, a module prefix such as `INTEGRATION-*` (add `(unfinished)` to leave finished stories alone), phases `F1`–`F10`, `Deferred`, or `Product base`. After a change, run `npm run roadmap`.
-
-| Applies to | Priority | Why |
-|---|---|---|
-| QA-P0-02.1, QA-P0-02.2, QA-P0-06 | High | Tenant-isolation, RBAC and sign-in coverage (CLAUDE.md §17.8, P0) |
-| INTEGRATION-* (unfinished) | Low | Owner decision 2026-10-13: integration stories are implemented later |
-| F10 | High | Release gate |
-| F1, F2, F3, F4 | High | Current and next phases |
-| F5, F6, F7 | Medium | Follow lifecycle and certification |
-| F8, F9 | Low | Advanced governance and intelligence come last |
-| Deferred | Low | Deferred in its backlog |
-| Product base | Medium | Finishing the product base |
 
 ## Owner actions outside the plan
 
@@ -219,4 +204,3 @@ Exit test: not run.
 - 2026-10-11: IDENTITY-P0-20 done (no migration, PR #83).
 - 2026-10-11: EXPERIENCE-P0-28 done.
 - 2026-10-13: `ROADMAP-STORIES.md` added, generated from this file, the backlogs, the run order and git history (`npm run roadmap`); INTEGRATION-P0-22 row brought in line with its backlog (Partial).
-- 2026-10-13: Priorities table added (owner request); unfinished INTEGRATION stories set to Low, for later implementation.

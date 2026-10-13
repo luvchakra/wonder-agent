@@ -28,7 +28,7 @@ const LIVE = join(ROOT, "docs", "WonderID", "progress", "PROGRESS.md");
 const OUT = join(ROOT, "docs", "WonderID", "ROADMAP-STORIES.md");
 const REPO = "https://github.com/luvchakra/wonder-agent";
 const RECENT = 10;
-const UPCOMING = 10;
+const UPCOMING = 8;
 
 const ID_RE = /^([A-Z]+-P\d-\d+(?:\.\d+)?)/;
 const cells = (line) => line.trim().split("|").slice(1, -1).map((c) => c.trim());
@@ -77,7 +77,6 @@ const liveLines = readFileSync(LIVE, "utf8").split("\n");
 const live = new Map();
 const decisions = new Map();
 const ownerActions = [];
-const priorityRules = [];
 {
   let header = null;
   let section = "";
@@ -98,7 +97,6 @@ const priorityRules = [];
       continue;
     }
     if (section === "Decisions") decisions.set(c[0], c[2] ?? "");
-    else if (section === "Priorities") priorityRules.push({ tokens: c[0].split(",").map((t) => t.replace(/`/g, "").trim()), priority: c[1], why: c[2] ?? "" });
     else if (section.startsWith("Owner actions")) {
       if (!/^done/i.test(c[1] ?? "")) ownerActions.push(c[0]);
     } else {
@@ -109,23 +107,6 @@ const priorityRules = [];
       if (id && si >= 0) live.set(id + qualifier, { status: normalize(c[si] ?? ""), notes: ni >= 0 ? (c[ni] ?? "") : "" });
     }
   }
-}
-const PRIORITY_RANK = { High: 0, Medium: 1, Low: 2 };
-for (const r of priorityRules) if (!(r.priority in PRIORITY_RANK)) throw new Error(`progress/PROGRESS.md Priorities: unknown priority "${r.priority}"`);
-
-/** The first Priorities row that matches the story (id, phase key or null for the product base, status). */
-function priorityOf(story) {
-  const matches = (token) => {
-    const unfinished = /\(unfinished\)$/.test(token);
-    const t = token.replace(/\s*\(unfinished\)$/, "");
-    if (unfinished && story.status === "Done") return false;
-    if (/^F\d+$/.test(t)) return story.phase === t;
-    if (t === "Deferred") return story.status === "Deferred";
-    if (t === "Product base") return story.phase === null;
-    if (t.endsWith("-*")) return !!story.id && story.id.startsWith(t.slice(0, -1));
-    return story.id === t;
-  };
-  return priorityRules.find((r) => r.tokens.some(matches))?.priority ?? "Medium";
 }
 const openDecision = (d) => decisions.has(d) && !/^approved/i.test(decisions.get(d));
 
@@ -194,7 +175,6 @@ for (const p of phases) {
     if (s.id && !s.qualifier) phaseIds.add(s.id);
   }
   p.progress = Math.round(p.stories.reduce((n, s) => n + PROGRESS[s.status], 0) / p.stories.length);
-  for (const s of p.stories) s.priority = priorityOf({ id: s.id, phase: p.key, status: s.status });
 }
 
 // --- Recently completed: tracker rows that became Done -------------------------
@@ -235,7 +215,7 @@ function recentDone() {
 
 // --- Write ---------------------------------------------------------------------
 const allPhase = phases.flatMap((p) => p.stories);
-const others = modules.map((m) => ({ ...m, stories: m.stories.filter((s) => !phaseIds.has(s.id)).map((s) => ({ ...s, priority: priorityOf({ id: s.id, phase: null, status: s.status }) })) }));
+const others = modules.map((m) => ({ ...m, stories: m.stories.filter((s) => !phaseIds.has(s.id)) }));
 const allStories = [...allPhase, ...others.flatMap((m) => m.stories)];
 const overall = Math.round(allStories.reduce((n, s) => n + PROGRESS[s.status], 0) / allStories.length);
 const count = (list, st) => list.filter((s) => s.status === st).length;
@@ -243,31 +223,28 @@ const bar = (p, w = 10) => "█".repeat(Math.round((p / 100) * w)) + "░".repea
 const cell = (t) => t.replace(/\|/g, "\\|");
 
 const recent = recentDone();
-// Unfinished, not blocked: higher priority first, then work already under way, then plan order (phases, then the product base).
-const ordered = [
-  ...phases.flatMap((p) => p.stories.map((st) => ({ ...st, where: p.key }))),
-  ...others.flatMap((m) => m.stories.map((st) => ({ ...st, label: st.id, where: m.agent.replace(/ Agent$/, "") }))),
-].map((st, i) => ({ ...st, order: i }));
-const open = ordered.filter((st) => st.status !== "Done" && st.status !== "Blocked" && st.status !== "Deferred");
-const started = (st) => (st.status === "Not started" ? 1 : 0);
-const upcoming = [...open].sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || started(a) - started(b) || a.order - b.order).slice(0, UPCOMING);
-const lowLater = ordered.filter((st) => st.status !== "Done" && st.priority === "Low");
+const upcoming = [];
+for (const p of phases) {
+  const open = p.stories.filter((s) => s.status !== "Done" && s.status !== "Blocked" && s.status !== "Deferred");
+  // Work already under way first, then the rest in plan order.
+  for (const s of [...open.filter((s) => s.status !== "Not started"), ...open.filter((s) => s.status === "Not started")]) {
+    if (upcoming.length < UPCOMING) upcoming.push({ ...s, phase: p.key });
+  }
+}
 const blocked = [
-  ...allPhase.filter((s) => s.block).map((s) => ({ label: s.label, title: s.title, why: `${s.block} · ${s.priority}` })),
+  ...allPhase.filter((s) => s.block).map((s) => ({ label: s.label, title: s.title, why: s.block })),
   ...modules.flatMap((m) =>
     m.stories
       .filter((s) => s.status === "Deferred" || /\(blocked:/i.test(s.raw))
-      .map((s) => ({ label: s.id, title: s.title, why: `${s.status === "Deferred" ? "deferred in its backlog" : `partly blocked: ${/\(blocked:\s*([^)]*)\)/i.exec(s.raw)?.[1] ?? ""}`} · ${priorityOf({ id: s.id, phase: phaseIds.has(s.id) ? "F" : null, status: s.status })}` })),
+      .map((s) => ({ label: s.id, title: s.title, why: s.status === "Deferred" ? "deferred in its backlog" : `partly blocked: ${/\(blocked:\s*([^)]*)\)/i.exec(s.raw)?.[1] ?? ""}` })),
   ),
 ];
 
 const o = [];
 o.push("# WonderID roadmap stories", "");
 o.push("Every roadmap story and how far along it is. **Generated by `npm run roadmap`; never edit by hand.** It reads the module backlogs (`docs/plan/`), the [phase plan](run-order/RUN-ORDER.md), the [live phase status](progress/PROGRESS.md) and git history, and is regenerated in every merge. The short version is [ROADMAP-PROGRESS.md](ROADMAP-PROGRESS.md).", "");
-o.push(`✅ done 100% · 🔶 partly done or in progress 50% · ⬜ not started 0% · ⛔ blocked · ⏸️ deferred · priority High, Medium or Low`, "");
+o.push(`✅ done 100% · 🔶 partly done or in progress 50% · ⬜ not started 0% · ⛔ blocked · ⏸️ deferred`, "");
 o.push(`**Overall: ${overall}%** \`${bar(overall)}\` · ${count(allStories, "Done")} of ${allStories.length} stories done, ${count(allStories, "Partial") + count(allStories, "In progress")} partly done`, "");
-const openAll = allStories.filter((st) => st.status !== "Done");
-o.push(`Unfinished by priority: **High ${openAll.filter((st) => st.priority === "High").length}** · Medium ${openAll.filter((st) => st.priority === "Medium").length} · Low ${openAll.filter((st) => st.priority === "Low").length}. Priorities come from the [priorities table](progress/PROGRESS.md#priorities).`, "");
 o.push("Every story counts equally here, so the many finished product-base stories weigh heavily; [ROADMAP-PROGRESS.md](ROADMAP-PROGRESS.md) counts capabilities instead.", "");
 
 o.push("## Completed recently", "");
@@ -280,10 +257,8 @@ else {
 
 o.push("## Up next", "");
 if (upcoming.length === 0) o.push("Nothing left that is not blocked.", "");
-for (const s of upcoming) o.push(`- ${ICON[s.status]} **${s.label}** ${s.title} · ${s.priority} · ${s.where}${s.status !== "Not started" ? ` · ${s.status.toLowerCase()}` : ""}`);
+for (const s of upcoming) o.push(`- ${ICON[s.status]} **${s.label}** ${s.title} · ${s.phase}${s.status !== "Not started" ? ` · ${s.status.toLowerCase()}` : ""}`);
 o.push("");
-const unfinishedIntegration = lowLater.filter((st) => st.id?.startsWith("INTEGRATION-")).length;
-o.push(`Later: ${lowLater.length} unfinished stories are low priority${unfinishedIntegration ? `, including all ${unfinishedIntegration} unfinished INTEGRATION stories (implemented later, owner decision)` : ""}.`, "");
 
 o.push("## Blocked", "");
 if (blocked.length === 0 && ownerActions.length === 0) o.push("Nothing blocked.", "");
@@ -301,8 +276,8 @@ o.push(`| [Product base, by module](#product-base-by-module) | ${baseDone.length
 for (const p of phases) {
   o.push(`### ${p.key} ${p.name}`, "");
   o.push(`${p.progress}% · ${count(p.stories, "Done")} of ${p.stories.length} done`, "");
-  o.push("| | Story | Title | Module | Priority | Progress |", "|---|---|---|---|---|---|");
-  for (const s of p.stories) o.push(`| ${ICON[s.status]} | ${cell(s.label)} | ${cell(s.title)}${s.block ? ` (${s.block})` : ""} | ${cell(s.module)} | ${s.priority} | ${PROGRESS[s.status]}% |`);
+  o.push("| | Story | Title | Module | Progress |", "|---|---|---|---|---|");
+  for (const s of p.stories) o.push(`| ${ICON[s.status]} | ${cell(s.label)} | ${cell(s.title)}${s.block ? ` (${s.block})` : ""} | ${cell(s.module)} | ${PROGRESS[s.status]}% |`);
   o.push("");
 }
 
@@ -312,8 +287,8 @@ for (const m of others) {
   if (m.stories.length === 0) continue;
   const p = Math.round(m.stories.reduce((n, s) => n + PROGRESS[s.status], 0) / m.stories.length);
   o.push(`<details><summary><b>${m.agent}</b> · ${p}% · ${count(m.stories, "Done")} of ${m.stories.length} done</summary>`, "");
-  o.push("| | Story | Title | Priority | Progress |", "|---|---|---|---|---|");
-  for (const s of m.stories) o.push(`| ${ICON[s.status]} | ${s.id} | ${cell(s.title)} | ${s.priority} | ${PROGRESS[s.status]}% |`);
+  o.push("| | Story | Title | Progress |", "|---|---|---|---|");
+  for (const s of m.stories) o.push(`| ${ICON[s.status]} | ${s.id} | ${cell(s.title)} | ${PROGRESS[s.status]}% |`);
   o.push("", "</details>", "");
 }
 

@@ -1308,10 +1308,7 @@ beats exhaustive pre-push verification.
     was completed recently, what is next and what is blocked. It is built from
     the module Progress Trackers, `run-order/RUN-ORDER.md`, the live phase doc
     (`progress/PROGRESS.md`) and git history, so keep those current and never
-    edit the generated file by hand. Each story's priority (High, Medium, Low)
-    comes from the Priorities table in `progress/PROGRESS.md`; pick the next
-    story by it. Unfinished INTEGRATION stories are Low (owner decision,
-    2026-10-13).
+    edit the generated file by hand.
 - **Still required**, because they're cheap and protect trust:
   - the rules above;
   - a unit test for any change to the permission gate, to any workflow that
