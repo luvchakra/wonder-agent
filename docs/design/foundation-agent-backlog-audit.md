@@ -3366,3 +3366,13 @@ Owner feedback the same day: an organization set up as development, with no prod
 ## 2026-10-13 — Onboarding is for creating an organization only (owner request)
 
 `/onboarding` no longer lists your organizations; that list is `/organizations`. It keeps invitations and the create form, with **← Back** at the top and **Cancel** beside **Create organization**, both to `/organizations`. Verified with local E2E first-organization (part of a 30/30 run).
+
+## 2026-10-13 — No organization list on the main address (owner request)
+
+`/organizations` no longer lists anything. A signed-in person on the main address is sent straight to their organization's own address, at its sign-in page because sessions are per address: the organization they last used, else their first.
+- With no organization, they go to `/onboarding`; a platform administrator with none goes to the platform console.
+- Without organization addresses (local runs), they go to `/`.
+- Only their own active memberships are considered.
+- `/organizations/manage` is unchanged.
+
+**Verified.** Typecheck and eslint clean. Local E2E: org-address-required (a server with the flag on) 1/1; first-organization and tenant-address 16/16.
