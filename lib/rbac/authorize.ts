@@ -4,6 +4,7 @@ import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError, type TenantContext } from "@/lib/shared/types/foundation";
 import { authorize as evaluate, type AuthorizationResult, type ResourceRef } from "./authorizeCore";
+import { MFA_STEP_UP_MESSAGE } from "@/lib/tenant/mfaRequired";
 
 /**
  * FOUNDATION-P0-19 — the authorization engine for a request: the current
@@ -46,6 +47,15 @@ export function refusalError(result: AuthorizationResult): ApiError {
 }
 
 /**
+ * No tenant to act in. FOUNDATION-P0-27: when the organization requires MFA
+ * and the session has not passed it, say so (403 MFA_REQUIRED), so a caller
+ * knows to verify rather than to pick an organization.
+ */
+export function noTenantError(ctx: TenantContext): ApiError {
+  return ctx.mfaStepUp ? new ApiError(403, "MFA_REQUIRED", MFA_STEP_UP_MESSAGE) : new ApiError(401, "NO_TENANT", "No active tenant membership");
+}
+
+/**
  * Like requirePermission(), for an action on one resource. `load` resolves
  * the resource's scope attributes inside the caller's tenant (null when it
  * does not exist there; the check then counts tenant-wide grants only and
@@ -53,7 +63,7 @@ export function refusalError(result: AuthorizationResult): ApiError {
  */
 export async function requirePermissionFor(permission: string, load: (tenantId: string) => Promise<ResourceRef | null>): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) throw new ApiError(401, "NO_TENANT", "No active tenant membership");
+  if (!ctx.tenantId) throw noTenantError(ctx);
   const resource = await load(ctx.tenantId);
   const result = authorizeContext(ctx, permission, resource);
   if (result.decision !== "ALLOW") {
@@ -92,7 +102,7 @@ export async function auditRefusal(ctx: TenantContext, result: AuthorizationResu
 /** Like requireAnyPermission(), for an action on one resource: any one of `permissions` allowed there. */
 export async function requireAnyPermissionFor(permissions: string[], load: (tenantId: string) => Promise<ResourceRef | null>): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) throw new ApiError(401, "NO_TENANT", "No active tenant membership");
+  if (!ctx.tenantId) throw noTenantError(ctx);
   const resource = await load(ctx.tenantId);
   const results = permissions.map((p) => authorizeContext(ctx, p, resource));
   if (results.some((r) => r.decision === "ALLOW")) return ctx;

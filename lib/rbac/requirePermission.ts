@@ -2,7 +2,7 @@ import "server-only";
 
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { ApiError, type TenantContext } from "@/lib/shared/types/foundation";
-import { auditRefusal, authorizeContext, refusalError } from "./authorize";
+import { auditRefusal, authorizeContext, noTenantError, refusalError } from "./authorize";
 
 /**
  * Every /api/v1/* route handler in every module calls this (or
@@ -17,9 +17,7 @@ import { auditRefusal, authorizeContext, refusalError } from "./authorize";
  */
 export async function requirePermission(permission: string): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) {
-    throw new ApiError(401, "NO_TENANT", "No active tenant membership");
-  }
+  if (!ctx.tenantId) throw noTenantError(ctx);
   const result = authorizeContext(ctx, permission);
   if (result.decision !== "ALLOW") {
     await auditRefusal(ctx, result);
@@ -36,9 +34,7 @@ export async function requirePermission(permission: string): Promise<TenantConte
  */
 export async function requireAnyPermission(permissions: string[]): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) {
-    throw new ApiError(401, "NO_TENANT", "No active tenant membership");
-  }
+  if (!ctx.tenantId) throw noTenantError(ctx);
   if (!permissions.some((p) => ctx.permissions.includes(p))) {
     throw new ApiError(403, "FORBIDDEN", `Missing one of: ${permissions.join(", ")}`);
   }

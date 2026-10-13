@@ -19,7 +19,7 @@
 export type ConfigSection = "sessions" | "members" | "access" | "imports" | "agents" | "risk" | "certifications" | "sod";
 
 export const SECTIONS: { key: ConfigSection; title: string; description: string }[] = [
-  { key: "sessions", title: "Sessions", description: "How long a signed-in session lasts. Applies to every member, on their next page." },
+  { key: "sessions", title: "Sign-in and sessions", description: "How members sign in and how long a session lasts. Applies to every member, on their next page." },
   { key: "members", title: "Members", description: "Invitations to join the organization." },
   { key: "access", title: "Access", description: "How accounts are judged." },
   { key: "imports", title: "Connections", description: "How a connection's sync treats records gone from the source, and how many changes it may make." },
@@ -39,7 +39,8 @@ type Base = {
   permission: string[];
 };
 export type IntSetting = Base & { type: "int"; min: number; max: number; default: number; unit: string };
-export type ChoiceSetting = Base & { type: "choice"; options: readonly number[]; default: number; unit: string };
+/** `labels` names each option where a number alone would not say what it means (an on/off choice). */
+export type ChoiceSetting = Base & { type: "choice"; options: readonly number[]; labels?: Readonly<Record<number, string>>; default: number; unit: string };
 /** WID-H05: a list of host names; an entry "*.example.com" also admits its subdomains. Empty: no limit. */
 export type HostsSetting = Base & { type: "hosts"; default: readonly string[]; maxEntries: number; unit: string };
 export type ConfigSetting = IntSetting | ChoiceSetting | HostsSetting;
@@ -75,6 +76,21 @@ export const CONFIG_SETTINGS = [
     max: GLOBAL_SESSION_HOURS,
     default: GLOBAL_SESSION_HOURS,
     unit: "hours",
+  },
+  {
+    // FOUNDATION-P0-27: read by getTenantContext() (lib/tenant/mfaRequired.ts) and, in the
+    // database, by current_tenant_ids() (migration 0152). Turning it on needs an MFA session
+    // (planConfigChange), so the administrator who does it can still get in.
+    key: "security.mfaRequired",
+    section: "sessions",
+    label: "Multi-factor authentication",
+    help: "When required, every member verifies with an authenticator app before seeing anything. Automation credentials are exempt.",
+    permission: SECURITY,
+    type: "choice",
+    options: [0, 1],
+    labels: { 0: "Not required", 1: "Required" },
+    default: 0,
+    unit: "",
   },
   {
     key: "access.dormantDays",
@@ -307,21 +323,30 @@ export function resolveConfig(stored: unknown): TenantConfig {
 
 export type ConfigChange = { key: ConfigKey; from: ConfigValue; to: ConfigValue };
 
-/** A value as people read it: a host list joined, "any public host" when empty. */
-export function formatConfigValue(v: ConfigValue): string {
-  return Array.isArray(v) ? (v.length ? v.join(", ") : "any public host") : String(v);
+/** A value as people read it: a host list joined, "any public host" when empty; a choice by its label when it has one. */
+export function formatConfigValue(v: ConfigValue, key?: string): string {
+  if (Array.isArray(v)) return v.length ? v.join(", ") : "any public host";
+  const s = key ? settingFor(key) : undefined;
+  return (s?.type === "choice" && s.labels?.[v as number]) || String(v);
 }
+
+/** The label of a choice's option, or the number itself. */
+export const optionLabel = (s: ConfigSetting, v: number): string => (s.type === "choice" && s.labels?.[v]) || String(v);
 export type PlanResult = { ok: true; next: TenantConfig; changes: ConfigChange[] } | { ok: false; errors: Record<string, string> };
 
 const describe = (s: ConfigSetting) =>
-  s.type === "choice" ? `one of ${s.options.join(", ")} ${s.unit}` : s.type === "hosts" ? `host names (at most ${s.maxEntries}), such as api.example.com or *.example.com` : `a whole number from ${s.min} to ${s.max}`;
+  s.type === "choice" ? `one of ${s.options.map((o) => optionLabel(s, o)).join(", ")} ${s.unit}`.trim() : s.type === "hosts" ? `host names (at most ${s.maxEntries}), such as api.example.com or *.example.com` : `a whole number from ${s.min} to ${s.max}`;
+
+/** FOUNDATION-P0-27: the refusal when MFA would be required from a session that has not used it. */
+export const MFA_ENABLE_NEEDS_AAL2 = "Verify this session with your authenticator app first (open /verify-mfa), then save again. That way you can still get in once it is required.";
 
 /**
  * Checks a submitted change against the current values: every value must be
  * valid, and every changed setting must be one the member may change. Fields
  * left out keep their value. Nothing is partly applied: any error refuses all.
+ * Requiring MFA needs the saving session itself to be an MFA (aal2) session.
  */
-export function planConfigChange(current: TenantConfig, input: Record<string, unknown>, permissions: readonly string[]): PlanResult {
+export function planConfigChange(current: TenantConfig, input: Record<string, unknown>, permissions: readonly string[], actor: { aal?: "aal1" | "aal2" | null } = {}): PlanResult {
   const errors: Record<string, string> = {};
   const next = { ...current };
   const changes: ConfigChange[] = [];
@@ -340,6 +365,10 @@ export function planConfigChange(current: TenantConfig, input: Record<string, un
     if (sameValue(v, current[k])) continue;
     if (!s.permission.some((p) => permissions.includes(p))) {
       errors[key] = "You can't change this setting.";
+      continue;
+    }
+    if (k === "security.mfaRequired" && v === 1 && actor.aal !== "aal2") {
+      errors[key] = MFA_ENABLE_NEEDS_AAL2;
       continue;
     }
     (next as Record<string, ConfigValue>)[k] = v;

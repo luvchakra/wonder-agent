@@ -81,6 +81,8 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
 | 13 Oct 2026 | Birthright packages: people who join, are rehired or move get the packages meant for them automatically. Two administrators turn birthright on, and a change to the package needs approval again. |
 | 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
+| 13 Oct 2026 | Separation of duties described as it is: it covers the same person performing two actions for an AI agent; rules on combinations of access are not provided yet. |
+| 13 Oct 2026 | An organization can require two-step verification. Members then verify with an authenticator app, or set one up, before they see anything; automation credentials are exempt. |
 
 ---
 
@@ -117,7 +119,7 @@ The everyday cycle looks like this:
 
 **Signing in**
 - **Ways to sign in:** email and password, Google, Microsoft, LinkedIn, or your organization's single sign-on (SSO).
-- **Two-step verification:** add an authenticator app in Settings → Security.
+- **Two-step verification:** add an authenticator app in Settings → Security. An administrator can require it for everyone (Global Configuration → Sign-in and sessions); turning it on needs a session that has itself used it.
 - **Forgotten password:** use "Forgot password" on the sign-in page.
 - **Methods not set up:** a sign-in method your organization hasn't set up shows as unavailable.
 
@@ -462,9 +464,10 @@ Findings are raised for:
 - They move from **draft** to **published**, and every version is kept.
 
 **Separation of duties**
-- Define combinations of access that one identity must not hold.
-- **Preventive:** conflicts can block requests.
-- **Detective:** the Control Center reports conflicts that already exist.
+- Define pairs of actions one person must not both perform for the same AI agent, for example requesting access and then approving it.
+- **Preventive:** a policy set to block stops the second action on agent requests and grants; otherwise it is flagged.
+- **Detective:** the Control Center reports people who performed both actions in a recent period.
+- **Not yet provided:** rules on combinations of access one identity must not hold (for example create vendor and approve payment). Requests, direct assignments and birthright packages are not checked against what a person already holds.
 
 **Compliance**
 - **Control frameworks:** controls are mapped to SOX ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF, CERT-In, GDPR and DPDP.

@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { restoreConfigAction, saveConfigAction, type ConfigFormState } from "@/app/actions/config";
 import { Card, CardBody, CardHeader, PendingSubmitButton, fieldInputClass, fieldLabelClass } from "@/modules/ui";
-import { CONFIG_SETTINGS, SECTIONS, type TenantConfig } from "@/lib/config/registry";
+import { CONFIG_SETTINGS, SECTIONS, optionLabel, type TenantConfig } from "@/lib/config/registry";
 import { cn } from "@/lib/utils";
 
 const initial: ConfigFormState = { ok: false, message: null };
@@ -63,7 +63,7 @@ export function ConfigForm({ config, permissions }: { config: TenantConfig; perm
                         <select id={id} name={s.key} defaultValue={String(value)} disabled={!editable} aria-invalid={error ? true : undefined} className={cn(fieldInputClass, "max-w-[10rem]")}>
                           {s.options.map((o) => (
                             <option key={o} value={o}>
-                              {o}
+                              {optionLabel(s, o)}
                             </option>
                           ))}
                         </select>
@@ -88,7 +88,7 @@ export function ConfigForm({ config, permissions }: { config: TenantConfig; perm
                     </div>
                     <p id={`${id}-help`} className="mt-1 text-xs text-muted-foreground">
                       {s.help}
-                      {s.type === "hosts" ? "" : ` Default ${s.default}.`}
+                      {s.type === "hosts" ? "" : ` Default ${optionLabel(s, s.default)}.`}
                       {editable ? "" : " You can view this but not change it."}
                     </p>
                     {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}

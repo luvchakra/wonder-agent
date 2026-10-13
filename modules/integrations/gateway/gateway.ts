@@ -12,6 +12,7 @@ import { mcpDriver } from "../framework/drivers/mcp";
 import { fileDriver, type FileStoreFactory } from "../framework/drivers/file";
 import { connectorFileStore } from "../framework/files";
 import type { ConnectorDefinition } from "../framework/types";
+import { addressOf } from "../framework/address";
 import {
   GatewayRefusedError,
   RequestBudget,
@@ -79,13 +80,6 @@ export type GatewayOptions = {
 };
 
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304]);
-
-/** The connection's address: its `baseUrl` setting, else its first url setting. */
-function addressOf(def: ConnectorDefinition, settings: Record<string, unknown>): string | null {
-  const urls = def.settings.filter((s) => s.type === "url").map((s) => s.key);
-  const value = settings[urls.includes("baseUrl") ? "baseUrl" : urls[0]];
-  return typeof value === "string" ? value : null;
-}
 
 /** The JSON-RPC method of an MCP request body, for its operation label. */
 function rpcMethod(body: string | undefined): string {
@@ -183,6 +177,8 @@ export class GatewaySession {
     const allowed = await this.allowedHosts();
     if (!this.admits()) refusal = new GatewayRefusedError("disabled", "This connection is disabled");
     else if (allowed === null) refusal = new GatewayRefusedError("host", "The organization's list of allowed hosts could not be read; nothing was sent");
+    // With a list, an address whose host cannot be read is refused too (WID-H05: never fail open).
+    else if (allowed.length > 0 && !host) refusal = new GatewayRefusedError("host", "The connection's address has no host this organization's list of allowed hosts could match; nothing was sent");
     else if (host && !hostAllowed(host, allowed)) refusal = new GatewayRefusedError("host", `${host} is not on this organization's list of hosts connections may reach`);
     else if (!this.budget.take()) refusal = new GatewayRefusedError("budget", `Stopped after ${this.budget.max} requests in one run`);
     if (refusal) {

@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getSessionUser } from "@/lib/tenant/session";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
+import { mfaStepUpNeeded } from "@/lib/tenant/mfaRequired";
 import type { TenantContext } from "@/lib/shared/types/foundation";
 import { grantActive, tenantWidePermissions, type AuthorizationPolicy, type Grant, type ScopeType } from "@/lib/rbac/authorizeCore";
 
@@ -14,12 +15,13 @@ export type Membership = {
   tenantId: string;
   name: string;
   slug: string;
+  /** FOUNDATION-P0-31: an automation credential's backing member. */
+  automation?: boolean;
+  /** FOUNDATION-P0-27: the organization requires MFA (Global Configuration `security.mfaRequired`). */
+  mfaRequired?: boolean;
 };
 
-type MembershipRow = {
-  tenant_id: string;
-  tenants: { name: string; slug: string } | null;
-};
+type MembershipRow = { tenant_id: string; name: string; slug: string; account_type: string; mfa_required: boolean };
 
 type RoleOf = { id: string; name: string; display_name: string; status: string; role_permissions: { permissions: { key: string } | null }[] } | null;
 
@@ -36,25 +38,23 @@ const TERMS_SELECT = "scope_type, scope_values, starts_at, expires_at, requires_
  * customer shell's organization switcher lists these too; it used to run
  * its own copy of the same query.
  *
- * `user_id` is filtered explicitly, not left to RLS: the tenant_memberships
- * policy is tenant-scoped (every member of a tenant can read that tenant's
- * membership rows), so without this the list is every colleague's
- * membership, not this user's own.
+ * Read through my_memberships() (migration 0152), which returns only the
+ * caller's own active memberships of active organizations. It also returns
+ * organizations whose data the session cannot reach yet because they
+ * require MFA (RLS hides those rows from tenant_memberships), so the
+ * person is asked for MFA rather than treated as having no organization.
  */
 export const getMyMemberships = cache(async (): Promise<Membership[]> => {
   const user = await getSessionUser();
   if (!user) return [];
   const supabase = await supabaseServer();
-  const { data } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id, tenants(name, slug)")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .returns<MembershipRow[]>();
-  return (data ?? []).map((m) => ({
+  const { data } = await supabase.rpc("my_memberships");
+  return ((data ?? []) as MembershipRow[]).map((m) => ({
     tenantId: m.tenant_id,
-    name: m.tenants?.name ?? m.tenant_id,
-    slug: m.tenants?.slug ?? "",
+    name: m.name ?? m.tenant_id,
+    slug: m.slug ?? "",
+    automation: m.account_type === "automation",
+    mfaRequired: m.mfa_required === true,
   }));
 });
 
@@ -199,6 +199,14 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
 
   if (!activeMembership) {
     return { userId: user.id, tenantId: null, tenantSlug: null, roles: [], permissions: [] };
+  }
+
+  // FOUNDATION-P0-27 — the organization requires MFA and this session has
+  // not passed it: no tenant, no permissions, only the step-up flag. The
+  // database agrees (current_tenant_ids(), migration 0152), so nothing is
+  // readable either way. Automation members are exempt (they cannot do MFA).
+  if (mfaStepUpNeeded(activeMembership, user.aal)) {
+    return { userId: user.id, tenantId: null, tenantSlug: null, roles: [], permissions: [], aal: user.aal, mfaStepUp: { tenantId: activeMembership.tenantId, name: activeMembership.name } };
   }
 
   const tenantId = activeMembership.tenantId;

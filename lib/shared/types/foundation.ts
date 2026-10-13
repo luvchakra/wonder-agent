@@ -21,6 +21,12 @@ export type TenantContext = {
   grants?: import("@/lib/rbac/authorizeCore").Grant[];
   policies?: import("@/lib/rbac/authorizeCore").AuthorizationPolicy[];
   aal?: "aal1" | "aal2" | null;
+  /**
+   * FOUNDATION-P0-27 — set when the chosen organization requires MFA and the
+   * session has not passed it. `tenantId` is then null and nothing is
+   * permitted until the person verifies a second factor.
+   */
+  mfaStepUp?: { tenantId: string; name: string };
 };
 
 export type Role = {

@@ -10,10 +10,10 @@ export type ConfigFormState = { ok: boolean; message: string | null; errors?: Re
 
 const VIEW = ["tenant.settings", "tenant.security.manage"];
 
-async function context(): Promise<{ ok: true; tenantId: string; userId: string; permissions: string[] } | { ok: false; message: string }> {
+async function context(): Promise<{ ok: true; tenantId: string; userId: string; permissions: string[]; aal: "aal1" | "aal2" | null } | { ok: false; message: string }> {
   try {
     const ctx = await requireAnyPermission(VIEW);
-    return { ok: true, tenantId: ctx.tenantId!, userId: ctx.userId, permissions: ctx.permissions };
+    return { ok: true, tenantId: ctx.tenantId!, userId: ctx.userId, permissions: ctx.permissions, aal: ctx.aal ?? null };
   } catch (err) {
     if (err instanceof ApiError) return { ok: false, message: err.status === 403 ? "You don't have permission to change the configuration." : err.message };
     throw err;
@@ -33,7 +33,7 @@ export async function saveConfigAction(_prev: ConfigFormState, formData: FormDat
     const v = formData.get(s.key);
     if (v !== null) input[s.key] = v;
   }
-  const result = await updateTenantConfig(ctx.tenantId, ctx.userId, ctx.permissions, input);
+  const result = await updateTenantConfig(ctx.tenantId, ctx, input);
   if (!result.ok) return { ok: false, message: result.message, errors: result.errors };
   revalidatePath("/", "layout");
   if (result.changes.length === 0) return { ok: true, message: "Nothing changed." };
@@ -44,8 +44,8 @@ export async function saveConfigAction(_prev: ConfigFormState, formData: FormDat
 export async function restoreConfigAction(_prev: ConfigFormState, formData: FormData): Promise<ConfigFormState> {
   const ctx = await context();
   if (!ctx.ok) return { ok: false, message: ctx.message };
-  const result = await restoreTenantConfigVersion(ctx.tenantId, ctx.userId, ctx.permissions, Number(formData.get("version")));
-  if (!result.ok) return { ok: false, message: result.errors ? "You can't restore this version: it changes a setting you can't change." : result.message };
+  const result = await restoreTenantConfigVersion(ctx.tenantId, ctx, Number(formData.get("version")));
+  if (!result.ok) return { ok: false, message: result.errors ? `You can't restore this version: ${Object.values(result.errors)[0]}` : result.message };
   revalidatePath("/", "layout");
   return { ok: true, message: result.changes.length ? `Restored as version ${result.version}.` : "That version matches the current settings." };
 }

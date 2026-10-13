@@ -25,7 +25,7 @@ export async function PATCH(request: Request) {
     const ctx = await requireAnyPermission(VIEW);
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ ok: false, error: { code: "VALIDATION", message: "Send an object of setting keys and values" } }, { status: 400 });
-    const result = await updateTenantConfig(ctx.tenantId!, ctx.userId, ctx.permissions, body as Record<string, unknown>);
+    const result = await updateTenantConfig(ctx.tenantId!, { userId: ctx.userId, permissions: ctx.permissions, aal: ctx.aal }, body as Record<string, unknown>);
     if (!result.ok) return NextResponse.json({ ok: false, error: { code: "VALIDATION", message: result.message, fields: result.errors } }, { status: result.errors ? 400 : 409 });
     return NextResponse.json({ ok: true, data: { version: result.version, changes: result.changes } });
   } catch (err) {

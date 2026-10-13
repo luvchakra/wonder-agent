@@ -25,7 +25,7 @@ request as each fix.
 **Status:** Not started, In progress, Partly fixed, Fixed (closure criteria
 met, with evidence), or Waiting on the owner.
 
-**Last updated:** 13 October 2026, 10:40 IST (statuses from the register's 09:06 IST audit; WID-H05 in progress)
+**Last updated:** 13 October 2026, 12:35 IST (statuses from the register's 11:08 IST audit; WID-H05 residual fixed; WID-H09 in progress)
 
 ## Summary
 
@@ -38,10 +38,11 @@ met, with evidence), or Waiting on the owner.
 | WID-H02 Idempotency and retries | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H03 Incomplete syncs | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST); checksums wait for a system that offers one |
 | WID-H04 Rogue access provenance | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
-| WID-H05 Connector security | P3 (register: High) | Partly fixed (register: CHANGED) | Done (13 Oct): an organization's outbound host allow-list and a written threat model covering sandboxing. For the register to assess |
+| WID-H05 Connector security | P3 (register: High) | Partly fixed (register: CHANGED) | Done (13 Oct, 12:35 IST): the register's 11:08 residual. LDAP, SQL and MCP connect to the same address the allow-list checks, and an address without a host is refused when a list is set. For the register to assess |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
 | WID-H07 Audit and erasure | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H08 Automation address allow-list | P1 | Fixed | None: the register confirmed it fixed, edge spoofing tested end to end (13 Oct, 09:06 IST) |
+| WID-H09 Access SoD and birthright | P1 (register: High) | In progress | Done (13 Oct): knowledge base corrected (owner decision: docs now, build later). Next: a mover's birthright packages they no longer qualify for go to a dated review, then are removed. Access-combination SoD is on the access backlog |
 
 ## Owner decisions
 
@@ -53,6 +54,8 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 
 | Date | Finding | Question | Decision | What it means for the work |
 |---|---|---|---|---|
+| 13 Oct 2026 | WID-H09 | What happens to birthright packages a mover no longer qualifies for? | **A dated review, then automatic removal.** The person's manager gets a task to keep or remove each one; whatever is not kept by the deadline is removed. | Next PR: the mover event opens the review with a due date; at the deadline the remaining packages end and their access is removed through the normal removal path. |
+| 13 Oct 2026 | WID-H09 | Access-combination SoD: correct the docs or build it? | **Docs now, build later.** | Done: the knowledge base describes the process SoD that exists and says access-combination SoD is not provided yet. Building it is a backlog story (ACCESS-P1). |
 | 13 Oct 2026 | Non-negotiable #15 (IDENTITY-P0-18) | How does a joiner or mover get birthright access? | **Pre-approved: assigned automatically.** Marking a package birthright takes two administrators (four-eyes), and that is the approval. | Done: migration 0151 (applied), `setPackageBirthright` / `assignBirthrightPackages`; a change to contents or eligibility needs approval again. |
 | 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
 | 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Done: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
@@ -585,6 +588,19 @@ redirect-to-metadata test covers that path.
     when that would change;
   - database roles, tenant context and residual risks.
 
+**Done (13 Oct, 12:35 IST), the register's 11:08 IST residual:**
+- One rule names a connection's address: its `baseUrl` url setting, else
+  its first url setting (`framework/address.ts`, `addressOf`). The Gateway
+  checks that address against the allowed hosts, and the LDAP, SQL and MCP
+  drivers connect to that same one. Before, LDAP and SQL connected to the
+  first url setting while the Gateway checked `baseUrl`, so a definition
+  with both could pass the check on one host and connect to another.
+- With a list set, an address whose host cannot be read is refused (it
+  used to skip the list).
+- Tests: `address.test.ts`; `gateway.test.ts` "WID-H05: applies the
+  allowed hosts to a driver that opens its own connection" (SQL driver:
+  unlisted host refused, hostless address refused, listed host admitted).
+
 ### WID-H06: automation credential scope (P2, fixed)
 
 The register marked it FIXED on 12 October (12:40 IST), from the code and
@@ -782,3 +798,21 @@ server with another `SECRET_ENCRYPTION_KEY`, and answers 500. This only
 happens with a test credential created locally; it is not a path users
 reach.
 
+### WID-H09: access-combination SoD and birthright (P1, in progress)
+
+Raised by the register's 11:08 IST audit (new, OPEN). What exists is
+process SoD: the same person may not both request and approve for the same
+AI agent (`modules/access-governance/sod.ts`). There is no rule against
+holding two conflicting pieces of access ("toxic combinations"), and
+birthright assignment checks none. A mover keeps the earlier department's
+birthright packages until the manual access review.
+
+Owner decisions (13 Oct):
+- **Docs now, build later.** Done: the knowledge base §10 now describes
+  the process SoD that exists and says rules on combinations of access are
+  not provided yet. Building them (rules over entitlement and package
+  pairs, checked on requests, direct and birthright assignments, and
+  reported over current holdings) is a backlog story on the access
+  backlog.
+- **A mover's birthright packages they no longer qualify for: a dated
+  review, then automatic removal.** Next.

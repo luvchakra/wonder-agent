@@ -62,7 +62,7 @@ export default async function GlobalConfigurationPage() {
                           const s = settingFor(c.key);
                           return (
                             <li key={c.key}>
-                              {s?.label ?? c.key}: {formatConfigValue(c.from)} → {formatConfigValue(c.to)} {s?.unit ?? ""}
+                              {s?.label ?? c.key}: {formatConfigValue(c.from, c.key)} → {formatConfigValue(c.to, c.key)} {s?.unit ?? ""}
                             </li>
                           );
                         })}

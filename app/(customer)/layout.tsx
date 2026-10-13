@@ -59,6 +59,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   if (!user) redirect("/sign-in");
 
   const ctx = await getTenantContext();
+  // FOUNDATION-P0-27 — the organization requires MFA and this session has not passed it.
+  if (ctx.mfaStepUp) redirect("/verify-mfa");
   if (!ctx.tenantId) {
     // FOUNDATION-P0-22 — on an organization's own address there is nothing
     // to create or pick: the user either belongs there or has no access.

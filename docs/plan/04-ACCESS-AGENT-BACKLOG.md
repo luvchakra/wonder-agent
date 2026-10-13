@@ -504,6 +504,16 @@ Added from the 2026-09-14 requirements refresh (not already represented above):
   revocation workflow around `policy_exceptions`, with evidence — P0 only supports
   minimal read-only/manually-approved exceptions (ACCESS-P0-02.1).
 
+Added 2026-10-13 (WID-H09, owner decision "docs now, build later"):
+
+- **Access-combination SoD** (`ACCESS-P1-05`): rules naming pairs of
+  entitlements or access packages one identity must not hold together.
+  Checked before a request is approved and before a direct or birthright
+  assignment (block or flag, per rule); a detective report over current
+  holdings in the Control Center; exceptions through the existing
+  governed exception path. Until it is built, the knowledge base says
+  access-combination SoD is not provided.
+
 ## P2 (strategic, after P0/P1 proven)
 
 Added from the 2026-09-14 requirements refresh:

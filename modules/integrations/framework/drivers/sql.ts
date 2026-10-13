@@ -4,6 +4,7 @@ import { Client } from "pg";
 import type { DriverFactory } from "../engine";
 import { fillTemplate } from "../mapping";
 import { resolveSafeHost } from "./net";
+import { addressOf } from "../address";
 
 /**
  * The sql driver (PostgreSQL): TLS with certificate verification always
@@ -12,8 +13,8 @@ import { resolveSafeHost } from "./net";
  * already refused anything but a single SELECT/WITH with no templates.
  */
 export const sqlDriver: DriverFactory = async (def, settings, secrets) => {
-  const urlKey = def.settings.find((s) => s.type === "url")!.key;
-  const url = new URL(String(settings[urlKey]));
+  // The address the Gateway checked against the allowed hosts (WID-H05).
+  const url = new URL(String(addressOf(def, settings)));
   const address = await resolveSafeHost(url.hostname);
   const servername = /^[\d.]+$|:/.test(url.hostname) ? undefined : url.hostname;
   const ca = typeof settings.caCertificate === "string" && settings.caCertificate.includes("BEGIN CERTIFICATE") ? settings.caCertificate : undefined;

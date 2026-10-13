@@ -3189,3 +3189,73 @@ UI: the Global Configuration page shows a textarea for a host list.
 
 Tests: `registry.test.ts` (new "the allowed hosts" cases; the defaults
 test lists the new key).
+
+### 2026-10-13 — An organization can require MFA (FOUNDATION-P0-27)
+
+New Global Configuration setting `security.mfaRequired` (security
+permission, default not required), in the renamed section "Sign-in and
+sessions". When it is on, a member's session reaches the organization only
+after MFA (aal2). Automation members are exempt: they cannot do MFA, and
+their credentials have their own four-eyes approval, address list and
+expiry.
+
+Enforced in two places:
+- **Database** (migration `0152_foundation_mfa_required.sql`, applied):
+  `current_tenant_ids()` leaves the organization out for a session that is
+  not aal2, so every RLS policy hides its rows and a direct PostgREST call
+  gets nothing. Only the stored value 1 means required, matching
+  `resolveConfig()`.
+- **Application:** `getTenantContext()` returns no tenant and no
+  permissions, only `mfaStepUp`. `requirePermission*` answer 403
+  `MFA_REQUIRED` (`noTenantError`). The customer layout sends the person to
+  `/verify-mfa`.
+
+`/verify-mfa` verifies an authenticator app already set up, or sets one
+up, with Supabase Auth's own TOTP. It also offers the person's other
+organizations that don't require MFA, and sign out. A member whose
+organization doesn't require it may verify there voluntarily.
+
+Lock-out guard: `planConfigChange` refuses to turn the setting on unless
+the saving session is aal2 (`MFA_ENABLE_NEEDS_AAL2`), from the page, the
+API or a version restore. Turning it off needs no MFA: an aal1 session in
+such an organization has no permissions anyway.
+
+Memberships are now read through `my_memberships()` (security definer, the
+caller's own active memberships of active organizations, with the MFA
+flag). RLS hides an MFA organization's membership rows from an aal1
+session, and without this the person would look as if they had no
+organization. `selectTenantAction` uses the same list. Choice settings can
+now carry labels ("Not required" / "Required"), also in the version
+history.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest `lib/config lib/tenant lib/rbac`: 75/75, including the new
+  "requiring MFA" cases and `mfaRequired.test.ts`.
+- `tests/foundation/mfa-required.sql` on the dev project: 10/10. The checks:
+  - an aal1 session reaches only the organization that doesn't require
+    MFA, and sees 0 rows of the one that does;
+  - an aal2 session reaches both;
+  - a session with no aal claim is refused;
+  - an automation member is exempt;
+  - a stored value other than 1 means not required;
+  - `my_memberships()` lists only the caller's own memberships, never a
+    suspended organization;
+  - anon is denied.
+- Supabase security advisors: only the expected note that signed-in users
+  can call `my_memberships()`, the same as for `my_session_policy()`.
+- Local E2E (production build):
+  - new `mfa-required.spec.ts`: 3/3;
+  - regression: `auth`, `first-organization`, `multi-org-isolation`,
+    `global-configuration`, `automation-credentials`, `tenant-address` and
+    `authorization` specs, 63/65 on the first run. The 1 failure was
+    `global-configuration` looking for the old section title, now
+    updated, and it passed 10/10 on rerun. The other test did not run
+    after that failure.
+
+Left out:
+- SSO required is blocked: the free Supabase plan has no SAML.
+- Certification interval, AI-agent defaults and audit retention are still
+  to do under this story.
+- `/settings/security` still only adds factors; verifying an existing one
+  happens on `/verify-mfa`.
