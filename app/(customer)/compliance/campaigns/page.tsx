@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listCampaigns, listCampaignItems } from "@/modules/certification-compliance/service";
+import { campaignItemCounts, listCampaigns } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { launchCampaignAction } from "@/app/actions/compliance";
 import { Card, CardHeader, CardBody, Button, TextField, SelectField, ObjectActionsMenu } from "@/modules/ui";
@@ -16,24 +16,18 @@ export default async function CampaignsPage() {
     throw err;
   }
 
-  const campaigns = await listCampaigns(ctx.tenantId!);
-
   // Outstanding/overdue counts per campaign, so the list leads with what
-  // still needs a human decision rather than just a status word. Fanned out
-  // in parallel (CLAUDE.md §15) over Compliance's own published contract.
-  const nowIso = new Date().toISOString();
-  const itemLists = await Promise.all(campaigns.map((c) => listCampaignItems(ctx.tenantId!, c.id)));
-  const rows: CampaignRow[] = campaigns.map((c, i) => {
-    const pendingItems = itemLists[i].filter((item) => item.status === "pending");
-    return {
-      id: c.id,
-      name: c.name,
-      scopeType: c.scopeType,
-      status: c.status,
-      pending: pendingItems.length,
-      overdue: pendingItems.filter((item) => item.dueDate && item.dueDate < nowIso).length,
-    };
-  });
+  // still needs a human decision rather than just a status word. Counted in
+  // the database in one query (§15), never by reading every item.
+  const [campaigns, counts] = await Promise.all([listCampaigns(ctx.tenantId!), campaignItemCounts(ctx.tenantId!)]);
+  const rows: CampaignRow[] = campaigns.map((c) => ({
+    id: c.id,
+    name: c.name,
+    scopeType: c.scopeType,
+    status: c.buildStatus === "building" ? "building" : c.buildStatus === "failed" ? "failed" : c.status,
+    pending: counts.get(c.id)?.pendingItems ?? 0,
+    overdue: counts.get(c.id)?.overdueItems ?? 0,
+  }));
 
   return (
     <div className="space-y-5">

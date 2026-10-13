@@ -25,6 +25,9 @@ export function toCertificationCampaign(row: any): CertificationCampaign {
     dueDate: row.due_date,
     createdBy: row.created_by,
     createdAt: row.created_at,
+    buildStatus: row.build_status ?? "ready",
+    buildError: row.build_error ?? null,
+    itemsTotal: row.items_total ?? null,
   };
 }
 

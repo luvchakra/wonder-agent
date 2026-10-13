@@ -7,7 +7,7 @@ import "server-only";
  * control_mappings/etc. directly.
  */
 
-export { launchCampaign, listCampaigns, listCampaignItems, getCampaignMetrics, type LaunchCampaignInput } from "./campaigns";
+export { launchCampaign, getCampaign, listCampaigns, listCampaignItems, listCampaignItemsPage, getCampaignMetrics, campaignItemCounts, failStaleCampaignBuilds, type LaunchCampaignInput } from "./campaigns";
 export {
   recordDecision,
   listDecisionsForItem,
