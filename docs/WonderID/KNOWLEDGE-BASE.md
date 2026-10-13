@@ -78,6 +78,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | Audit records hold identifiers, not personal data: accounts, people and outside systems' ids are recorded by id or as a fingerprint, never as an email, name or login. |
 | 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
 | 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
+| 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
 
 ---
 

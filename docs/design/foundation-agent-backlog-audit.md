@@ -3149,3 +3149,23 @@ Verified: the spec, run locally with `E2E_INGRESS_URL=https://id.wonderapps.biz`
 Production cannot decrypt a credential's backing secret created under the
 local server's encryption key (runtime log: "Unsupported state or unable to
 authenticate data"). Hence the rate-limit control, which needs no key.
+### 2026-10-13 — An unknown organization address answers 404 on Vercel too (FOUNDATION-P0-22)
+
+The proxy rewrites an address that names no organization to
+`/tenant-not-found` with status 404. Vercel's build served that page with
+200: the rewrite's status was lost (E2E `tenant-address.spec.ts:54`, Vercel
+builder only).
+
+The page now calls `notFound()`, so the 404 comes from the page itself:
+- `not-found.tsx` beside it renders the same message;
+- a `layout.tsx` sets the title ("Organization not found").
+
+The proxy is unchanged, and nothing about which organizations exist is
+revealed.
+
+Verified locally:
+- `curl` returns 404 for unknown and reserved addresses, with the right
+  title;
+- `tenant-address.spec.ts` 12/12; `auth.spec.ts` 41/41.
+
+Follow-up: `/service-unavailable` (503) relies on the same rewrite status.

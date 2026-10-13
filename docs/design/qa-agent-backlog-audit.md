@@ -1851,3 +1851,59 @@ seeds and prunes first; its result is recorded in the next entry.
   local server's fail-closed refusal.
 
 Run by hand: 13 passed.
+### 2026-10-13 — E2E run started by hand: 2 failures, both looked into
+
+GitHub never fired the 12 October 21:30 UTC schedule (no run was created;
+the workflow is active). I started the full suite by hand at 01:32 UTC on
+`main` (`cd75238`, which includes #129 and #130); run 38332589533.
+
+| Half | Result |
+|---|---|
+| 1 (`dpl_7yqBCct7KZFWhxHc61Qr6PAUETKx`) | 171 passed, 1 failed, 56 not run; hit the 35-minute limit |
+| 2 (`dpl_Cpi6VxCARecu5bMngmqijiMuuuob`) | 226 passed, 1 failed, 1 flaky |
+
+#129's fix held: the 12 October run had 13 failures and 66 tests not run.
+
+**`tenant-address.spec.ts:54` — fixed.**
+- The diagnostics added on 10 October showed the cause:
+  - the unknown address was rewritten to "Organization not found", with no
+    redirect;
+  - so the proxy correctly found no organization;
+  - but Vercel's build served the rewritten page with 200, ignoring the
+    rewrite's status (404).
+- Locally the status survives, which is why only the Vercel builder failed.
+- Fix:
+  - `app/tenant-not-found/page.tsx` calls `notFound()`, so the page answers
+    404 itself;
+  - `not-found.tsx` renders the same message;
+  - `layout.tsx` sets the title, because a page's metadata is not applied
+    once it calls `notFound()`.
+- Locally: 404 for unknown and reserved addresses, title "WonderID ·
+  Organization not found". `tenant-address.spec.ts` 12/12 and
+  `auth.spec.ts` 41/41 (with tenant-address).
+- `/service-unavailable` (503) uses the same rewrite, so Vercel may serve it
+  with 200 too. No test covers it. Recorded as a follow-up.
+
+**`connector-provisioning.spec.ts:515` (mass-change guard) — not yet
+explained.**
+- It timed out at 120 s on both attempts. The serial group re-ran, and the
+  half ran out of time.
+- The audit trail shows:
+  - the guard blocked twice;
+  - the limit was raised;
+  - the connector made the change at 02:00:21;
+  - the verifying read never completed before the test gave up at 02:01:47.
+- Every other connector change in the run was followed by its verifying
+  read within 6–10 s.
+- Locally the file passes 28/28; this test takes 47 s.
+- Ruled out:
+  - no lock or unique index stops a second sync job;
+  - verification reads always run in full;
+  - the tenant configuration is cached per request only;
+  - a configuration update starts no background work.
+- The connection and its sync jobs were deleted by the spec's clean-up, so
+  the job's own state is gone.
+- **Change (test only):** when verification does not arrive, the test now
+  reports the connection's latest sync jobs (trigger, mode, status,
+  pipeline status, times and errors). A run of the two specs on Vercel
+  follows this merge.
