@@ -1528,6 +1528,11 @@ register to `main`, are expected and must never be blocked, reverted or
      to `main`, after re-fetching its blob SHA. Commit only when a status,
      finding or piece of evidence changed: each commit is a deployment
      (§19.9).
+   - When the audit's register update goes through a pull request instead
+     (a session that cannot push to `main`), it squash-merges that pull
+     request itself once CI is green, without waiting for "merge now"
+     (owner decision, 2026-10-13; an exception to §19.9 rule 0 for
+     register-only pull requests from this routine).
    - Keep the audit independent. A session that fixes findings records its
      work in the tracker (rule 4), not the register, and never marks its own
      fix `FIXED` there.
