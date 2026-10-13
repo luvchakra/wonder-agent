@@ -3207,3 +3207,11 @@ access is under review: 403 `SELF_KEEP` (`keepRefusal`, pure, in
 `packageRules.ts`), and the refused attempt is audited. Verified with
 `packageRules.test.ts` 18/18, including the new case, and the typecheck.
 
+
+## 2026-10-13 — Approving access afterwards (contract for RISK-P0-13)
+
+`recordApprovedAfterwards()` is published from `modules/access-governance/service.ts`. Existing access found with no approval is approved as it stands. It is recorded as an access request (`grant`, `fulfilled`, decided by the approver, with an optional `requested_expiry`) and attached to the grant (`access_grants.request_id`).
+- No new ledger rule is needed: an approved or fulfilled request is evidence, so the access is VALID with source WONDERID_REQUEST from the next refresh.
+- Nothing is provisioned. An end date makes the daily expiry sweep remove the access then.
+- Service role, every statement filtered on the tenant, audited as `access.request_approved_afterwards`. Risk calls it after its own checks (`risk.manage`, never the account's owner).
+- Verified through the RISK-P0-13 E2E (see the Risk audit log).

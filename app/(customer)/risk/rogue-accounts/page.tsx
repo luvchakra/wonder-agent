@@ -72,7 +72,7 @@ export default async function RogueAccountsPage({ searchParams }: { searchParams
                   <Tr key={f.id}>
                     <Td className="whitespace-nowrap font-mono text-xs">{f.ticketNumber ?? "—"}</Td>
                     <Td>
-                      <Link href={`/access/accounts/${f.accountId}`} className="text-primary hover:underline">
+                      <Link href={`/risk/rogue-accounts/${f.id}`} className="text-primary hover:underline">
                         {f.title}
                       </Link>
                     </Td>

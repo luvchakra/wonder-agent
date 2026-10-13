@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidesOwnAccess, exceptionEnded, rogueResolution, rogueTrend, validateRogueDecision } from "./accessFindingRules";
+import { authorizationJustification, decidesOwnAccess, exceptionEnded, rogueResolution, rogueTrend, validateRogueAuthorization, validateRogueDecision } from "./accessFindingRules";
 
 const live = { revokedAt: null, missingFromSourceAt: null, requestId: null, packageItemId: null };
 
@@ -65,5 +65,29 @@ describe("rogueTrend", () => {
       { label: "10-05", found: 0, resolved: 0, open: 0 },
       { label: "10-12", found: 0, resolved: 0, open: 0 },
     ]);
+  });
+});
+
+describe("validateRogueAuthorization (RISK-P0-13)", () => {
+  const now = new Date("2026-10-13T10:00:00Z");
+
+  it("authorizes by default, open-ended, with a trimmed reason", () => {
+    expect(validateRogueAuthorization({ reason: "  Needed for month-end close " }, now)).toEqual({ kind: "authorize", reason: "Needed for month-end close", until: null });
+  });
+
+  it("is time-bound with a date (end of that day) and recognizes legacy access", () => {
+    expect(validateRogueAuthorization({ kind: "legacy", reason: "Predates WonderID", until: "2026-12-31" }, now)).toEqual({ kind: "legacy", reason: "Predates WonderID", until: "2026-12-31T23:59:59.000Z" });
+  });
+
+  it("refuses a missing reason, an unknown kind, a past date and more than ten years", () => {
+    expect(validateRogueAuthorization({ reason: " " }, now)).toEqual({ error: "reason: say why this access is approved" });
+    expect(validateRogueAuthorization({ kind: "approve", reason: "x" }, now)).toEqual({ error: "kind: authorize or legacy" });
+    expect(validateRogueAuthorization({ reason: "x", until: "2026-10-01" }, now)).toEqual({ error: "until: a date in the future" });
+    expect(validateRogueAuthorization({ reason: "x", until: "2037-01-01" }, now)).toEqual({ error: "until: at most ten years from today" });
+  });
+
+  it("writes what was decided into the request's justification, with the ticket", () => {
+    expect(authorizationJustification({ kind: "authorize", reason: "Needed", until: null }, "RA-000007")).toBe("Approved afterwards (RA-000007): Needed");
+    expect(authorizationJustification({ kind: "legacy", reason: "Old", until: null }, null)).toBe("Recognized as legacy access: Old");
   });
 });

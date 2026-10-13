@@ -58,6 +58,37 @@ export function validateRogueDecision(input: RogueDecisionInput, now: Date): Rog
   return { outcome, reason, until: until.toISOString() };
 }
 
+/**
+ * RISK-P0-13 — authorizing rogue access afterwards: a person approves the
+ * access as it stands (`authorize`) or recognizes it as legacy access that
+ * predates WonderID (`legacy`), with a reason and, optionally, an end date
+ * (time-bound: the access is removed then, ACCESS-P0-32). At most ten years,
+ * the longest a request may run. Pure (#9).
+ */
+export const ROGUE_AUTHORIZATION_MAX_DAYS = 3650;
+export type RogueAuthorizationInput = { kind?: unknown; reason?: unknown; until?: unknown };
+export type RogueAuthorization = { kind: "authorize" | "legacy"; reason: string; until: string | null };
+
+export function validateRogueAuthorization(input: RogueAuthorizationInput, now: Date): RogueAuthorization | { error: string } {
+  const kind = input.kind ?? "authorize";
+  if (kind !== "authorize" && kind !== "legacy") return { error: "kind: authorize or legacy" };
+  const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+  if (!reason) return { error: "reason: say why this access is approved" };
+  if (reason.length > 1000) return { error: "reason: at most 1000 characters" };
+  if (input.until === undefined || input.until === null || input.until === "") return { kind, reason, until: null };
+  if (typeof input.until !== "string") return { error: "until: a date" };
+  const until = new Date(/^\d{4}-\d{2}-\d{2}$/.test(input.until) ? `${input.until}T23:59:59Z` : input.until);
+  if (Number.isNaN(until.getTime()) || until.getTime() <= now.getTime()) return { error: "until: a date in the future" };
+  if (until.getTime() > now.getTime() + ROGUE_AUTHORIZATION_MAX_DAYS * 86_400_000) return { error: "until: at most ten years from today" };
+  return { kind, reason, until: until.toISOString() };
+}
+
+/** The request's justification for an approval given afterwards: what it was, and why. */
+export function authorizationJustification(a: RogueAuthorization, ticketNumber: string | null): string {
+  const what = a.kind === "legacy" ? "Recognized as legacy access" : "Approved afterwards";
+  return `${what}${ticketNumber ? ` (${ticketNumber})` : ""}: ${a.reason}`.slice(0, 2000);
+}
+
 /** Whether the person deciding is the account's owner (not allowed). */
 export function decidesOwnAccess(deciderIdentityId: string | null, accountIdentityId: string | null): boolean {
   return Boolean(deciderIdentityId && accountIdentityId && deciderIdentityId === accountIdentityId);

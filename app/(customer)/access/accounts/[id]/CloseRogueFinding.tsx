@@ -9,12 +9,15 @@ import { Button } from "@/modules/ui/Button";
  * WID-H04 (owner decision 2026-10-12): closes a rogue-access finding
  * without removing the access, folded under the row's main action. An
  * accepted exception ends on a date at most 90 days away and the finding
- * reopens then; a false positive closes it. Both need a reason; the server
- * refuses the account's owner and shows its own result.
+ * reopens then; a false positive closes it. RISK-P0-13 adds approving the
+ * access afterwards, or recognizing it as legacy access, optionally until a
+ * date (it is removed then). Each needs a reason; the server refuses the
+ * account's owner and shows its own result.
  */
 export function CloseRogueFinding({ findingId }: { findingId: string }) {
   const router = useRouter();
-  const [outcome, setOutcome] = useState<"exception" | "false_positive">("exception");
+  const [outcome, setOutcome] = useState<"authorize" | "legacy" | "exception" | "false_positive">("authorize");
+  const approving = outcome === "authorize" || outcome === "legacy";
   const [reason, setReason] = useState("");
   const [until, setUntil] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -29,11 +32,17 @@ export function CloseRogueFinding({ findingId }: { findingId: string }) {
         onSubmit={(e) => {
           e.preventDefault();
           start(async () => {
-            const res = await fetch(`/api/v1/findings/${findingId}/decision`, {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify({ outcome, reason, until: outcome === "exception" ? until : undefined }),
-            });
+            const res = approving
+              ? await fetch(`/api/v1/findings/${findingId}/authorize`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ kind: outcome, reason, until: until || undefined }),
+                })
+              : await fetch(`/api/v1/findings/${findingId}/decision`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  body: JSON.stringify({ outcome, reason, until: outcome === "exception" ? until : undefined }),
+                });
             const body = await res.json().catch(() => ({}));
             if (!res.ok || !body.ok) {
               setError(body.error?.message ?? "It could not be saved");
@@ -47,6 +56,8 @@ export function CloseRogueFinding({ findingId }: { findingId: string }) {
         <label>
           <span className="block text-xs font-medium text-muted-foreground">Outcome</span>
           <select value={outcome} onChange={(e) => setOutcome(e.target.value as typeof outcome)} className={field}>
+            <option value="authorize">Approve it afterwards</option>
+            <option value="legacy">Recognize as legacy access</option>
             <option value="exception">Accept as an exception</option>
             <option value="false_positive">Not rogue (false positive)</option>
           </select>
@@ -55,6 +66,11 @@ export function CloseRogueFinding({ findingId }: { findingId: string }) {
           <label>
             <span className="block text-xs font-medium text-muted-foreground">Until (90 days at most)</span>
             <input type="date" required value={until} onChange={(e) => setUntil(e.target.value)} className={field} />
+          </label>
+        ) : approving ? (
+          <label>
+            <span className="block text-xs font-medium text-muted-foreground">Until (optional; removed then)</span>
+            <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={field} />
           </label>
         ) : null}
         <label className="min-w-[14rem] flex-1">
