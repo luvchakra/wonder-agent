@@ -4,6 +4,7 @@ import { cache } from "react";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { getSessionUser } from "@/lib/tenant/session";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { isListedPlatformAdmin, parsePlatformAdminEmails } from "./platformAdminEmails";
 
 /**
  * Separate authorization boundary from customer RBAC — see CLAUDE.md
@@ -29,7 +30,16 @@ export const isPlatformAdmin = cache(async (): Promise<boolean> => {
     .maybeSingle();
 
   if (error) return false;
-  return data !== null;
+  if (data !== null) return true;
+
+  // Owner request (2026-10-13): or listed in PLATFORM_ADMIN_EMAILS, for an
+  // account whose email Supabase Auth has confirmed (read from Auth, never
+  // from the request).
+  const list = parsePlatformAdminEmails(process.env.PLATFORM_ADMIN_EMAILS);
+  if (list.size === 0 || !user.email || !list.has(user.email.trim().toLowerCase())) return false;
+  const { data: account, error: accountError } = await admin.auth.admin.getUserById(user.id);
+  if (accountError || !account?.user) return false;
+  return isListedPlatformAdmin(list, { email: account.user.email, emailConfirmedAt: account.user.email_confirmed_at });
 });
 
 export async function requirePlatformAdmin(): Promise<{ userId: string }> {

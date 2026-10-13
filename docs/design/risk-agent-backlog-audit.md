@@ -1324,3 +1324,23 @@ count under RLS, filtered on the tenant. An unreadable count is 0, so the
 shell never fails on it. This came from the 13 Oct pagination audit. The
 other full reads of `getFindings` (agents, investigations, risk overview,
 rogue agents and the dashboard) are next.
+
+### 2026-10-13 — Agents, investigations and the dashboard read finding summaries, not every finding (§15)
+
+`listFindingSummaries(tenantId, { openOnly, since, limit })` returns only
+the summary columns (id, agent, severity, status, category, title,
+created), filtered in the database, newest first, at most 5,000. It
+replaces `getFindings(tenantId)`, which read every finding of every
+status in full:
+- the agents list counts open findings per agent;
+- the investigations picker lists open findings (200 at most, 50 shown);
+- the dashboard reads open findings, plus those detected in the period
+  for its trend.
+
+The risk overview and rogue-agents pages still read open findings in full
+to list them. They are next, with paging. Verified with the typecheck,
+eslint and local E2E (`agents`, `investigations`, `risk`,
+`navigation-smoke`): 69 passed and 1 failed on the first run. The failure
+was the agents spec clicking an ambiguous "Duplicate review" link (the
+sidebar has the same item since the new navigation); the spec is now
+scoped to the page.

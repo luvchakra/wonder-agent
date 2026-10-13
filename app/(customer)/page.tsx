@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { PlatformSummary, PlatformSummarySkeleton } from "./PlatformSummary";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import { listAgents } from "@/modules/agent-identity/service";
-import { getFindings } from "@/modules/risk/service";
+import { listFindingSummaries } from "@/modules/risk/service";
 import { countRuntimeEvents, listRuntimeEvents } from "@/modules/runtime-assurance/service";
 import type { Agent, AgentLifecycleState } from "@/lib/shared/types/agent-identity";
 import {
@@ -43,8 +43,7 @@ const RANGES = [
 const DEFAULT_RANGE = 30;
 const DAY_MS = 86_400_000;
 
-/** Findings that still need someone: everything short of a closing status. */
-const CLOSED_FINDING_STATUSES = new Set(["resolved", "false_positive", "exception", "mitigated"]);
+
 const APPROVED_STATES = new Set<AgentLifecycleState>(["APPROVED", "PROVISIONED", "ACTIVE", "CERTIFICATION_DUE"]);
 
 /** The mockup's lifecycle ring, over the ten real lifecycle states. */
@@ -119,15 +118,16 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
   const from = new Date(nowMs - rangeDays * DAY_MS).toISOString();
   const previousFrom = new Date(nowMs - 2 * rangeDays * DAY_MS).toISOString();
 
-  const [agents, findings, recent, failed, failedBefore] = await Promise.all([
+  // §15: summary columns only, filtered in the database: what still needs action, and what was detected in the period.
+  const [agents, unresolved, findings, recent, failed, failedBefore] = await Promise.all([
     listAgents(tenantId),
-    getFindings(tenantId),
+    listFindingSummaries(tenantId, { openOnly: true }),
+    listFindingSummaries(tenantId, { since: from }),
     listRuntimeEvents(tenantId, { limit: 6 }),
     countRuntimeEvents(tenantId, { from, success: false }),
     countRuntimeEvents(tenantId, { from: previousFrom, to: from, success: false }),
   ]);
 
-  const unresolved = findings.filter((f) => !CLOSED_FINDING_STATUSES.has(f.status));
   const agentById = new Map(agents.map((a) => [a.id, a]));
 
   // --- Headline metrics ---------------------------------------------------

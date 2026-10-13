@@ -85,11 +85,12 @@ test.describe("Identity module — agents", () => {
 
   test("discovery inbox and duplicate-review pages are reachable from the list page", async ({ page }) => {
     await page.goto("/agents");
-    await page.getByRole("link", { name: "Discovery inbox" }).click();
+    await page.getByRole("main").getByRole("link", { name: "Discovery inbox" }).click();
     await expect(page).toHaveURL(/\/agents\/discovery/);
 
     await page.goto("/agents");
-    await page.getByRole("link", { name: "Duplicate review" }).click();
+    // The page's own button (the sidebar has a "Duplicate Review" item too since the 13 Oct navigation).
+    await page.getByRole("main").getByRole("link", { name: "Duplicate review" }).click();
     await expect(page).toHaveURL(/\/agents\/duplicates/);
   });
 });

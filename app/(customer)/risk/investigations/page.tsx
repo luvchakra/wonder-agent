@@ -3,14 +3,13 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { listAgents } from "@/modules/agent-identity/service";
-import { getFindings, listInvestigations } from "@/modules/risk/service";
+import { listFindingSummaries, listInvestigations } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { InvestigationStatus } from "@/lib/shared/types/risk";
 import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, SeverityBadge, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CreateInvestigationForm } from "./InvestigationForms";
 import { STATUS_BADGE } from "./labels";
-import { isFindingOpen } from "@/modules/risk/investigationRules";
 
 // RISK-P0-11 (master P0-37) — investigations: findings grouped into one
 // tracked piece of work. Views are URL-driven so a filtered list is
@@ -41,7 +40,8 @@ export default async function InvestigationsPage({ searchParams }: { searchParam
   const [investigations, openFindings, agents, members] = await Promise.all([
     listInvestigations(tenantId),
     // Every finding still needing action, not only status "open".
-    canManage ? getFindings(tenantId).then((all) => all.filter((f) => isFindingOpen(f.status))) : Promise.resolve([]),
+    // §15: open findings only, summary columns, filtered in the database (the picker shows 50).
+    canManage ? listFindingSummaries(tenantId, { openOnly: true, limit: 200 }) : Promise.resolve([]),
     canManage ? listAgents(tenantId) : Promise.resolve([]),
     listTenantMembersWithRoles(tenantId),
   ]);

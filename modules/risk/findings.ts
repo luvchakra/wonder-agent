@@ -81,6 +81,43 @@ export async function getFindings(tenantId: string, filter: FindingFilter = {}):
   return (data ?? []).map(toRiskFinding);
 }
 
+/** A finding with only what lists and counts need (§15: never the whole row when a page only counts). */
+export type FindingSummary = Pick<RiskFinding, "id" | "agentId" | "severity" | "status" | "category" | "title" | "createdAt">;
+
+const CLOSED_STATUSES = ["resolved", "false_positive", "exception", "mitigated"];
+
+/**
+ * §15: agent findings with only their summary columns, filtered in the
+ * database: still needing action (`openOnly`, every status short of
+ * closed), detected since a date, newest first, at most `limit` (default
+ * 5000). For pages that count or list a few, instead of `getFindings()`'s
+ * whole rows. Read under RLS and filtered on the tenant.
+ */
+export async function listFindingSummaries(tenantId: string, opts: { openOnly?: boolean; since?: string; limit?: number } = {}): Promise<FindingSummary[]> {
+  const supabase = await supabaseServer();
+  // Filters as values (a sentinel when unused), so the query is one chain.
+  const { data, error } = await supabase
+    .from("risk_findings")
+    .select("id, agent_id, severity, status, category, title, created_at")
+    .eq("tenant_id", tenantId)
+    .not("agent_id", "is", null)
+    .not("status", "in", `(${opts.openOnly ? CLOSED_STATUSES.join(",") : "__none__"})`)
+    .gte("created_at", opts.since ?? "1970-01-01T00:00:00Z")
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Math.max(opts.limit ?? 5000, 1), 5000))
+    .returns<{ id: string; agent_id: string; severity: string; status: string; category: string; title: string; created_at: string }[]>();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    agentId: r.agent_id as string,
+    severity: r.severity as RiskFinding["severity"],
+    status: r.status as FindingStatus,
+    category: r.category as RiskFinding["category"],
+    title: r.title as string,
+    createdAt: r.created_at as string,
+  }));
+}
+
 /**
  * §15: how many agent findings are open, for the sidebar's risk badge on
  * every page: a head count under RLS, filtered on the tenant, instead of
