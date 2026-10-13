@@ -50,9 +50,11 @@ export type AuditEvent = {
   outcome: AuditOutcome;
   metadata?: Record<string, unknown>;
   /**
-   * WID-H07: text a person typed (a reason, a note). Never stored in the
-   * audit row: each value becomes a fingerprint under `metadata.typedText`;
-   * the words stay on the record the event is about.
+   * WID-H07: text a person typed (a reason, a note), or an outside
+   * system's value that may identify a person (a source record's id, an
+   * email-shaped login). Never stored in the audit row: each value becomes
+   * a fingerprint under `metadata.typedText`; the value stays on the record
+   * the event is about.
    */
   typedText?: Record<string, string | null | undefined>;
   correlationId?: string;

@@ -180,6 +180,51 @@ test.describe.serial("automation credentials", () => {
     await api.dispose();
   });
 
+  test("WID-H08: an address limit uses only the edge's address; spoofed headers never satisfy it", async ({ baseURL }) => {
+    // Addresses from TEST-NET-3 (RFC 5737): no real caller has one.
+    const SPOOFED = "203.0.113.7";
+    const spoofHeaders = {
+      "x-forwarded-for": SPOOFED,
+      "x-vercel-forwarded-for": SPOOFED,
+      "x-real-ip": SPOOFED,
+      forwarded: `for=${SPOOFED}`,
+      "true-client-ip": SPOOFED,
+      "x-client-ip": SPOOFED,
+    };
+    const limitTo = async (cidrs: string[]) => expect((await db().from("automation_credentials").update({ allowed_cidrs: cidrs }).eq("id", credentialId)).error).toBeNull();
+    const call = async (url: string | undefined) => {
+      const ctx = await playwrightRequest.newContext({ baseURL: url, extraHTTPHeaders: { Authorization: `Bearer ${secret}`, ...spoofHeaders } });
+      const res = await ctx.get("/api/v1/integrations");
+      const out = { status: res.status(), code: res.ok() ? null : ((await res.json().catch(() => ({}))) as { error?: { code?: string } }).error?.code };
+      await ctx.dispose();
+      return out;
+    };
+    try {
+      await limitTo(["203.0.113.0/24"]);
+      // This server is not behind a trusted edge (no CLIENT_IP_HEADER, not Vercel): the address is unknown, so it fails closed.
+      expect(await call(baseURL)).toEqual({ status: 403, code: "ADDRESS_NOT_ALLOWED" });
+
+      // The deployed edge (E2E_INGRESS_URL; the nightly sets it to production): the spoofed headers do not get the call in...
+      const ingress = process.env.E2E_INGRESS_URL;
+      if (ingress) {
+        expect(await call(ingress)).toEqual({ status: 403, code: "ADDRESS_NOT_ALLOWED" });
+        // ...and with every address allowed, the same calls pass the address check: the refusal was the
+        // address, not a missing one. The rate limit (checked after the address, before anything that
+        // needs the deployment's own keys) shows it: one call a minute, so a later call is 429.
+        await limitTo(["0.0.0.0/0", "::/0"]);
+        await db().from("automation_credentials").update({ rate_limit_per_minute: 1 }).eq("id", credentialId);
+        await db().from("automation_credential_usage").delete().eq("credential_id", credentialId);
+        const results = [await call(ingress), await call(ingress), await call(ingress)];
+        expect(results.map((r) => r.code)).not.toContain("ADDRESS_NOT_ALLOWED");
+        expect(results.map((r) => r.status)).toContain(429);
+      }
+    } finally {
+      await limitTo([]);
+      await db().from("automation_credentials").update({ rate_limit_per_minute: 120 }).eq("id", credentialId);
+      await db().from("automation_credential_usage").delete().eq("credential_id", credentialId);
+    }
+  });
+
   test("rate limit, expiry, rotation and revocation stop it", async ({ page, baseURL }) => {
     const api = await bearer(baseURL);
     await db().from("automation_credentials").update({ rate_limit_per_minute: 1 }).eq("id", credentialId);

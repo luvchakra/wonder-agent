@@ -75,6 +75,9 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | A source record matched to the wrong person can be unlinked from the person's page: the details it changed are restored (unless they changed since), and it is never matched to that person again without someone deciding. |
 | 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
 | 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
+| 12 Oct 2026 | Audit records hold identifiers, not personal data: accounts, people and outside systems' ids are recorded by id or as a fingerprint, never as an email, name or login. |
+| 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
+| 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
 | 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
 
 ---
@@ -392,6 +395,7 @@ An approved request is not access yet. It becomes access once the change is made
 - Your own tools, such as pipelines or ticketing systems, can call WonderID's API with their own credential instead of a person's login.
 - **Ownership and approval:** each credential belongs to an application identity and needs a second administrator to approve it. Giving it another role pauses it until a different administrator approves the change.
 - **Limits:** it expires within a year (the database refuses anything longer), can be limited to certain network addresses, and is rate-limited.
+  The address is the one the platform's edge reports, never one the caller sends. This is tested every night at the production edge.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
 - **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions.
 - **Audit:** every call it is allowed to make is audited. Refused calls are audited too, whether the credential is pending, revoked or expired, the address is not allowed, or it is over its rate limit. To keep the record readable, each reason is recorded at most once a minute per credential.
@@ -492,6 +496,7 @@ Findings are raised for:
 - Every security-relevant action is recorded: who, what, when, the outcome and related records.
 - **Tamper-evident:** records can't be edited, and each one is chained to the one before. They are deleted only by your audit retention policy: oldest first, never the last 365 days, never under a legal hold.
 - **How long by default:** 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. Never less than a year.
+- **Identifiers, not people:** audit records name people and accounts by their ids, never by email, name or login; values from outside systems that may identify someone are kept as fingerprints.
 - **What people type stays out of it:** reasons, comments, notes and justifications are kept on the request, task or finding they belong to, where privacy erasure can reach them. The audit record keeps a fingerprint, which proves what was written without revealing it.
 - **Integrity check:** Audit → Integrity proves the chain is intact.
 
@@ -518,6 +523,7 @@ Findings are raised for:
 **For administrators:** the privacy centre (Settings → Privacy) handles:
 - **Requests:** access and erasure requests, with the legal deadlines built in (GDPR, UK GDPR, DPDP, CCPA).
 - **Erasure:** needs two people, and never touches the audit trail.
+  It pseudonymises the person, their account names, the values sources sent about them, and the email, login and name in connector changes. An account's reference in its system stays while the account exists there, so its access is still governed. The result lists what a source or system still holds: erase it there, or the next import brings it back.
 - **Consent:** records of who agreed to what, with the notice version they saw.
 - **Retention:** applied daily. Legal holds always win.
 - **Breaches:** records with their notification deadlines.

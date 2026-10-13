@@ -841,7 +841,9 @@ export async function resolvePendingCorrelation(tenantId: string, actorId: strin
     objectType: "identity_source",
     objectId: source.id,
     outcome: "success",
-    metadata: { pendingId, externalId: pending.externalId, decision: decision.action, identityId },
+    metadata: { pendingId, decision: decision.action, identityId },
+    // WID-H07, identifiers only: a source's record id may be an email.
+    typedText: { externalId: pending.externalId },
   });
   return { ...pending, status: claimedStatus, resolvedIdentityId: identityId };
 }
@@ -944,7 +946,9 @@ export async function unlinkSourceRecord(
     objectType: "identity",
     objectId: identityId,
     outcome: "success",
-    metadata: { sourceId, externalId, restored: undo.restored, kept: undo.kept, accountsToRematch, ...(rematchError ? { rematchError } : {}) },
+    metadata: { sourceId, restored: undo.restored, kept: undo.kept, accountsToRematch, ...(rematchError ? { rematchError } : {}) },
+    // WID-H07, identifiers only: a source's record id may be an email.
+    typedText: { externalId },
   });
   return { identityId, ...undo, accountsToRematch, ...(rematchError ? { rematchError } : {}) };
 }

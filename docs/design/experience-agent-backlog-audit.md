@@ -3960,3 +3960,20 @@ Access Requests screen does the work.
 
   `request-catalog` and `approval-engine` passed, 34 in all with the
   above.
+
+### 2026-10-12 — Non-human identities fits at 1024px
+
+`design-review.spec.ts:149` (1024px, part 1) failed: `/agents/identities`
+scrolled sideways (a 722px table in 670px). Two causes:
+- the external reference under each name is long monospace text, and
+  `truncate` cannot shorten it inside a table cell without a width limit;
+- "Agent likelihood" showed from `lg`.
+
+Fix:
+- the reference is capped at 14rem and truncated, with the full value in
+  its title;
+- "Agent likelihood" now shows from `xl`, with Source and Owner.
+
+The page has no fewer controls and no more. Verified:
+- E2E `design-review` at 1024px and 1280px (parts 1 and 2): passed;
+- a screenshot at 1024px.

@@ -95,7 +95,10 @@ done
 # Playwright is interrupted (SIGINT), so it still writes its report.
 REPORT=/tmp/e2e-report.json
 touch "$REPORT.start"
-E2E_BASE_URL="http://localhost:$PORT" E2E_SLOW_MACHINE=1 \
+# WID-H08: automation-credentials.spec.ts also calls production through Vercel's
+# edge with spoofed address headers, to prove the edge sets the address.
+E2E_INGRESS_URL="${E2E_INGRESS_URL:-https://id.wonderapps.biz}" \
+  E2E_BASE_URL="http://localhost:$PORT" E2E_SLOW_MACHINE=1 \
   PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT" PLAYWRIGHT_JSON_OUTPUT_NAME="$REPORT" \
   timeout -s INT -k 60 2100 npx playwright test $SPECS $SHARD $RECORD --reporter=line,json
 status=$?

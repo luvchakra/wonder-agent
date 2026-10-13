@@ -60,8 +60,9 @@ export async function linkAgentIdentity(
     objectType: "agent_identity",
     objectId: data.id,
     outcome: "success",
-    metadata: { agentId, identityType, sourceSystem, externalReference, confidence: provenance.confidence },
-    typedText: { basis: provenance.basis.slice(0, 500) || null },
+    // WID-H07, identifiers only: the reference (a delegate's login, say) stays on the link.
+    metadata: { agentId, identityType, sourceSystem, confidence: provenance.confidence },
+    typedText: { basis: provenance.basis.slice(0, 500) || null, externalReference },
   });
   return toAgentIdentityLink(data);
 }

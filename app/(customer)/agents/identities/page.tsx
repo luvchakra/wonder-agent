@@ -133,7 +133,7 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
                   <Th>Type</Th>
                   <Th>Status</Th>
                   <Th>Agent</Th>
-                  <Th hideBelow="lg">Agent likelihood</Th>
+                  <Th hideBelow="xl">Agent likelihood</Th>
                   <Th hideBelow="xl">Source</Th>
                   <Th hideBelow="xl">Owner</Th>
                 </tr>
@@ -146,7 +146,9 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
                         {e.displayName}
                       </Link>
                       {e.displayName !== e.externalReference ? (
-                        <span className="block truncate font-mono text-xs text-muted-foreground">{e.externalReference}</span>
+                        <span className="block max-w-[14rem] truncate font-mono text-xs text-muted-foreground" title={e.externalReference}>
+                          {e.externalReference}
+                        </span>
                       ) : null}
                     </Td>
                     <Td>
@@ -164,7 +166,7 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
                         <span className="text-muted-foreground">—</span>
                       )}
                     </Td>
-                    <Td hideBelow="lg">
+                    <Td hideBelow="xl">
                       {e.classification ? (
                         <span>
                           {CLASSIFICATION_LABEL[e.classification] ?? e.classification}

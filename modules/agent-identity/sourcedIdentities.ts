@@ -605,7 +605,9 @@ export async function revertSourceRecord(
     objectId: record.identityId,
     outcome: "success",
     // Field names only, never values (#10, §17.7).
-    metadata: { sourceId: record.sourceId, externalId: record.externalId, restored, kept: plan.kept },
+    metadata: { sourceId: record.sourceId, restored, kept: plan.kept },
+    // WID-H07, identifiers only: a source's record id may be an email.
+    typedText: { externalId: record.externalId },
   });
   return { restored, kept: plan.kept };
 }

@@ -35,12 +35,12 @@ met, with evidence), or Waiting on the owner.
 | WID-C03 Gateway bypass | P2 | Partly fixed | Done: a per-agent "gateway only" setting; a direct call is critical and suspends the agent at the gateway (owner decision 12 Oct). For the register to assess |
 | WID-H01 Identity correlation | P2 | Fixed (owner decisions 12 Oct) | Conflict list; unlink with undo for source records and accounts |
 | WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
-| WID-H03 Incomplete syncs | P2 | Partly fixed | Checksums where a system offers one |
+| WID-H03 Incomplete syncs | P2 | Partly fixed | Nothing open on our side (checksums wait for a system that offers one); for the register to assess |
 | WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
 | WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
-| WID-H07 Audit and erasure | P2 | Partly fixed | Retention defaults (0143) and typed text out of audit records done. Build: identifiers only (owner decisions 12 Oct) |
-| WID-H08 Automation address allow-list | P1 | Partly fixed | Test at the deployed ingress; document each supported deployment (the register moved it to CHANGED) |
+| WID-H07 Audit and erasure | P2 | Fixed | Retention defaults (0143), typed text out of audit records, identifiers only in audit records, and erasure of accounts, source values and connector write targets done |
+| WID-H08 Automation address allow-list | P1 | Fixed | Spoofing tested end to end at the production edge (nightly from now on); each deployment documented. For the register to assess |
 
 ## Owner decisions
 
@@ -60,7 +60,7 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 12 Oct 2026 | WID-H04 | How can a rogue-access finding on a person's account be closed? | **Accepted exception and false positive, both governed.** | Done: an accepted exception needs a reason, an end date at most 90 days away, and someone other than the account's owner; the finding reopens when it ends. A false positive needs a reason. Both are audited and kept in the finding's history. |
 | 12 Oct 2026 | WID-H07 | What is the default audit-log retention? | **1 year on Free and Pro, 3 years on Max, 7 years on Enterprise.** | Done: plan defaults changed (`PLAN_DEFAULTS`), existing subscriptions raised and less than a year refused (migration 0143). |
 | 12 Oct 2026 | WID-H07 | Should typed text stay in audit records? | **No: keep typed text out of audit records.** | Done: audit rows keep the record's id and a keyed fingerprint of the text (`metadata.typedText`); the words stay on the request, task or finding (migration 0150 gave the last two a home). |
-| 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Build, after the item above: audit records hold ids, never personal data; erasure pseudonymizes the records the ids point to. |
+| 12 Oct 2026 | WID-H07 | How is personal data in audit records erased? | **Identifiers only.** | Done: audit records hold ids, field names and fingerprints, never personal data, and erasure reaches what those ids point to (accounts, source values, connector write targets, guests and partners). |
 | 12 Oct 2026 | WID-H06 | May an automation credential approve or certify? | **Never.** | Done: `access.approve`, `agent.certify` and `automation.manage` are human-only, in three layers. |
 | 12 Oct 2026 | WID-C03 | Do emergency controls block in Observe mode? | **Yes, in every mode.** | Done: kill switch, tool, MCP server and session suspension, and an undecidable decision block in every mode. |
 | 12 Oct 2026 | WID-C01 | May anyone decide their own agent request? | **No, whatever the SoD policy.** | Done: `SELF_APPROVAL` refusal in `decideAccessRequest`. |
@@ -474,9 +474,19 @@ Tests:
 - E2E `sync-failed-page.spec.ts`, 4th case: a page that answers 200 with
   nothing while `X-Total-Count` says more.
 
-**Next:**
-- Checksums, where a system offers one (none of the built-in types does
-  today).
+**Checked (12 Oct), nothing to build now:**
+- **Checksums:** no built-in connection type offers one, so there is
+  nothing to check against. They are added when a connected system offers
+  one (no speculative build, CLAUDE.md §3); `total` is the proof used
+  until then.
+- **Expired cursors and replay:** an incremental read asks for changes
+  since the last succeeded run's start time. That is a timestamp WonderID
+  keeps, not a token the system can expire. A cut-short run does not move
+  it, and replaying a window only re-applies the same upserts. The daily
+  full read is the reset.
+
+Nothing is open on our side; the register's closure criteria are for its
+audit to judge.
 
 ### WID-H04: rogue access provenance (P2, partly fixed)
 
@@ -601,7 +611,7 @@ Tests:
   - cross-tenant: the credential reads only its own organization;
   - the refusal audit rows, and the database refusing 400 days.
 
-### WID-H07: audit and erasure (P2, partly fixed)
+### WID-H07: audit and erasure (P2, fixed)
 
 **Done:** a SQL test of the audit trail's rules
 (`tests/foundation/audit-trail-integrity.sql`), run against the live
@@ -651,10 +661,57 @@ database on 12 October and passing. It checks that:
 Tests: `lib/audit/typedText.test.ts` (3); assertions in
 `accessFindings.test.ts` and `identities.test.ts`.
 
-**Next (P2):** identifiers only. Audit records hold ids, never personal
-data, and erasure pseudonymizes the records the ids point to.
+**Done (owner decision, 12 Oct):** identifiers only, on the audit side. A
+survey of every `writeAudit` call found three places that wrote personal
+data, and four that wrote an outside system's id which may be personal. All
+now record ids, field names or fingerprints:
+- **connector writes (`integration.write_*`)**: `targetFields` instead of
+  the target, which held a new account's email and name or an existing
+  account's login. The target stays on `connector_write_operations` (the
+  event's `correlationId`);
+- **account reconciliation (`account.reconciled`)**: kept accounts by
+  `accountId`, not by their login;
+- **platform admin granted**: the user's id, not their email;
+- **fingerprinted (`typedText`)**:
+  - an agent identity link's `externalReference`;
+  - a source record's `externalId` on unlink and on a pending-match
+    decision;
+  - a webhook payload's `externalId`.
 
-### WID-H08: automation credential address allow-list (P1, partly fixed)
+Not changed:
+- object names that people type for applications, roles, groups,
+  policies and connections. They are not personal data.
+- error text returned by outside systems, kept for diagnosis. It may
+  quote an account name; it is cut to 200 to 1,000 characters.
+
+**Done (owner decision, 12 Oct):** identifiers only, on the erasure side
+(`modules/privacy/subjectData.ts`, `eraseLinkedRecords`). Erasure and the
+removed-member retention run now also:
+- cover EXTERNAL identities (guests, partners, contractors), not only HUMAN;
+- clear the identity's `source_native_id` and `correlation_key`;
+- set the person's accounts' `account_name` to the pseudonym;
+- delete the values sources sent about the person
+  (`identity_source_changes`, `identity_source_conflicts`), so a
+  source-match undo is no longer possible for them;
+- replace the email, login and name in connector write targets that named
+  the person (`pseudonymiseWriteTarget`). The outcome, the idempotency
+  record and the system's account and entitlement references stay.
+
+Kept, on purpose:
+- an account's `external_account_ref` and a source link's `external_id`.
+  The account or record still exists in its system, and its access must
+  stay governed (non-negotiable #7: the system is the record holder).
+- The erasure result reports `stillHeldAtSource` (source records still
+  present, accounts still active). The organization erases those at the
+  source; otherwise the next import brings the data back.
+
+Tests: `modules/privacy/rules.test.ts` and `subjectData.test.ts` (17 passed, 5 new; the latter checks every statement carries the tenant filter, against a stub client); the JSON-path filters
+the erasure uses were checked read-only against the live API.
+
+**Still open (decision to come):** per-person encryption keys, if a
+customer or regulator requires crypto-erasure.
+
+### WID-H08: automation credential address allow-list (P1, fixed)
 
 **Done:** the caller's address now comes only from a header the
 platform's edge sets (`trustedClientIp` in `automationCredentialRules.ts`):
@@ -669,8 +726,36 @@ platform's edge sets (`trustedClientIp` in `automationCredentialRules.ts`):
 A caller's own `x-forwarded-for` is never trusted. Test:
 `automationCredentialRules.test.ts`, "WID-H08".
 
-**Next:**
-- Verify at the deployed ingress (Vercel production) that spoofed headers
-  cannot change the address.
-- Document the setting in the self-hosting kit.
+**Done (12 Oct): tested end to end at the deployed ingress.**
+`automation-credentials.spec.ts` ("WID-H08") limits an approved credential
+to 203.0.113.0/24 (TEST-NET-3), then calls the API with that address in six
+headers: `x-forwarded-for`, `x-vercel-forwarded-for`, `x-real-ip`,
+`forwarded`, `true-client-ip` and `x-client-ip`.
+- **Local server** (no trusted edge): refused, 403 `ADDRESS_NOT_ALLOWED`.
+  The address is unknown, so it fails closed.
+- **Production, through Vercel's edge** (`E2E_INGRESS_URL`): refused, 403
+  `ADDRESS_NOT_ALLOWED`.
+- **Positive control:** with every address allowed, the same calls pass
+  the address check. They reach the rate limit (429), which is checked
+  after the address. So the edge supplied a real address, and the refusal
+  above was the address, not a missing one.
+
+Run by hand against `https://id.wonderapps.biz` on 12 October: 13 passed.
+The nightly now sets `E2E_INGRESS_URL` to production
+(`scripts/e2e-on-vercel.sh`), so the edge is re-checked every night.
+
+**Done: each supported deployment documented.**
+`docs/security/SECURITY-CONTROLS.md` §5 covers:
+- Vercel;
+- self-hosted behind an ingress (`CLIENT_IP_HEADER`, last hop; the
+  ingress must be the only way in);
+- anything else (unknown address, refused).
+
+The demo-org kit (`demo-org/`) is a simulated customer's systems, not a
+WonderID deployment, so it needs no setting.
+
+Found on the way: production cannot decrypt a credential created by a
+server with another `SECRET_ENCRYPTION_KEY`, and answers 500. This only
+happens with a test credential created locally; it is not a path users
+reach.
 

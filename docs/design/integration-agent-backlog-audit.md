@@ -2850,3 +2850,17 @@ reconciliation.
 ### 2026-10-12 — WID-H07 (owner decision)
 
 Typed text out of audit records: the discovery decision note is passed as `typedText` (kept on `application_discoveries.decision_note`). See the Foundation entry for the mechanism.
+
+### 2026-10-12 — WID-H07, identifiers only
+
+WID-H07 identifiers only: `integration.write_*` records `targetFields` and no longer the write target, which held logins, emails and names. The target stays on `connector_write_operations`. A source record's `externalId` (on unlink and on a pending-match decision) and a webhook payload's `externalId` are now fingerprints (`typedText`).
+
+### 2026-10-12 — WID-H03: nothing left to build on our side
+
+- Checksums: no built-in connection type offers one. They will be added when
+  a connected system does (no speculative build, CLAUDE.md §3).
+- Cursor expiry and replay: incremental reads use the start time of the
+  last succeeded run, a timestamp WonderID keeps. A cut-short run does not
+  move it, and the daily full read resets it.
+
+The tracker now says: for the register to assess. No code change.

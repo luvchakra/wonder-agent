@@ -5,7 +5,7 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { changeUserStatus } from "@/lib/users/users";
-import { pseudonymLabel } from "./rules";
+import { pseudonymiseWriteTarget, pseudonymLabel } from "./rules";
 
 /**
  * COMPLIANCE-P0-12 — what WonderID holds about one person in ONE tenant
@@ -120,6 +120,83 @@ export async function buildSubjectExport(tenantId: string, subject: SubjectRef):
   };
 }
 
+/** The identity types that are a person: staff, and guests, partners or contractors. */
+const PERSON_TYPES = ["HUMAN", "EXTERNAL"];
+
+/**
+ * WID-H07 (owner decision "identifiers only", 12 October 2026): the records
+ * outside the identity that name the person.
+ * - Account names become the pseudonym. Each account's reference in its
+ *   system stays: the account still exists there, and its access stays
+ *   governed until the system removes it.
+ * - The values sources sent about the person (change history,
+ *   disagreements) are deleted; undo is not possible after erasure.
+ * - Connector writes keep their outcome; the email, login and name they
+ *   were sent become the pseudonym.
+ * A source or system that still holds the person sends them again at its
+ * next import, so the summary counts what is still held there: the
+ * organization erases it at the source (the source is the system of record,
+ * non-negotiable #7).
+ */
+async function eraseLinkedRecords(
+  tenantId: string,
+  identityIds: string[],
+  emails: string[],
+  usernames: string[],
+  label: string,
+): Promise<Record<string, unknown>> {
+  const supabase = db();
+  const ids = identityIds.length ? identityIds : ["00000000-0000-0000-0000-000000000000"];
+  const fail = (what: string, message: string) => new ApiError(500, "ERASURE_FAILED", `${what} could not be erased: ${message}`);
+
+  const [accounts, changes, conflicts] = await Promise.all([
+    supabase.from("accounts").update({ account_name: label, updated_at: new Date().toISOString() }).eq("tenant_id", tenantId).in("identity_id", ids).select("id, status, missing_from_source_at"),
+    supabase.from("identity_source_changes").delete({ count: "exact" }).eq("tenant_id", tenantId).in("identity_id", ids),
+    supabase.from("identity_source_conflicts").delete({ count: "exact" }).eq("tenant_id", tenantId).in("identity_id", ids),
+  ]);
+  if (accounts.error) throw fail("Accounts", accounts.error.message);
+  if (changes.error) throw fail("Source change history", changes.error.message);
+  if (conflicts.error) throw fail("Source disagreements", conflicts.error.message);
+
+  // Connector writes that named the person (a new account's email or login).
+  const lookups = [
+    ...emails.map((e) => supabase.from("connector_write_operations").select("id, target").eq("tenant_id", tenantId).ilike("target->>email", escapeLike(e))),
+    ...(usernames.length ? [supabase.from("connector_write_operations").select("id, target").eq("tenant_id", tenantId).in("target->>username", usernames)] : []),
+  ];
+  const found = await Promise.all(lookups);
+  const writes = new Map<string, Record<string, unknown>>();
+  for (const r of found) {
+    if (r.error) throw fail("Connector writes", r.error.message);
+    for (const row of (r.data ?? []) as { id: string; target: Record<string, unknown> }[]) writes.set(row.id, row.target ?? {});
+  }
+  const updated = await Promise.all(
+    [...writes].map(([id, target]) =>
+      supabase.from("connector_write_operations").update({ target: pseudonymiseWriteTarget(target, label) }).eq("tenant_id", tenantId).eq("id", id),
+    ),
+  );
+  const writeError = updated.find((r) => r.error)?.error;
+  if (writeError) throw fail("Connector writes", writeError.message);
+
+  const { count: sourceRecords, error: linkError } = await supabase
+    .from("identity_source_links")
+    .select("identity_id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("present", true)
+    .in("identity_id", ids);
+  if (linkError) throw fail("Source records", linkError.message);
+
+  const accountRows = (accounts.data ?? []) as { status: string; missing_from_source_at: string | null }[];
+  return {
+    accountsPseudonymised: accountRows.length,
+    sourceValuesDeleted: (changes.count ?? 0) + (conflicts.count ?? 0),
+    connectorWritesPseudonymised: writes.size,
+    stillHeldAtSource: {
+      sourceRecords: sourceRecords ?? 0,
+      accounts: accountRows.filter((a) => a.status !== "disabled" && !a.missing_from_source_at).length,
+    },
+  };
+}
+
 /**
  * Erasure (GDPR Art. 17, DPDP s.12(3), CCPA §1798.105) inside one tenant.
  * Pseudonymises rather than hard-deletes where a record must survive for a
@@ -159,13 +236,25 @@ export async function eraseSubject(
 
   // 3. Identity records: personal attributes cleared, the governance record
   //    (that an identity held access, and its decisions) kept, pseudonymous.
-  const identityIds = await subjectRowIds("identities", tenantId, { userId: subject.userId, email });
+  //    People only: a staff member (HUMAN) or a guest, partner or contractor
+  //    (EXTERNAL). Their emails and logins are read first, to find the
+  //    connector writes that named them (step 3b).
+  const candidateIds = await subjectRowIds("identities", tenantId, { userId: subject.userId, email });
+  const { data: people, error: peopleError } = candidateIds.length
+    ? await supabase.from("identities").select("id, email, username").eq("tenant_id", tenantId).in("identity_type", PERSON_TYPES).in("id", candidateIds)
+    : { data: [] as { id: string; email: string | null; username: string | null }[], error: null };
+  if (peopleError) throw new ApiError(500, "ERASURE_FAILED", `Identity records could not be read: ${peopleError.message}`);
+  const identityIds = (people ?? []).map((p) => p.id);
+  const emails = [...new Set([email, ...(people ?? []).map((p) => p.email?.trim().toLowerCase()).filter((e): e is string => !!e)])];
+  const usernames = [...new Set((people ?? []).map((p) => p.username?.trim()).filter((u): u is string => !!u))];
   const { data: ids, error: idError } = await supabase
     .from("identities")
     .update({
       display_name: label,
       email: null,
       username: null,
+      source_native_id: null,
+      correlation_key: null,
       department: null,
       title: null,
       business_unit: null,
@@ -179,11 +268,14 @@ export async function eraseSubject(
       updated_at: new Date().toISOString(),
     })
     .eq("tenant_id", tenantId)
-    .eq("identity_type", "HUMAN")
+    .in("identity_type", PERSON_TYPES)
     .in("id", identityIds.length ? identityIds : ["00000000-0000-0000-0000-000000000000"])
     .select("id");
   if (idError) throw new ApiError(500, "ERASURE_FAILED", `Identity records could not be erased: ${idError.message}`);
   summary.identitiesPseudonymised = ids?.length ?? 0;
+
+  // 3b. WID-H07: the other records that name the person.
+  Object.assign(summary, await eraseLinkedRecords(tenantId, identityIds, emails, usernames, label));
 
   // 4. Consent and earlier request records: kept as proof, identifier pseudonymised.
   const consentIds = await subjectRowIds("privacy_consent_records", tenantId, { userId: subject.userId, email });
@@ -229,17 +321,32 @@ export async function eraseSubject(
   return summary;
 }
 
-/** Retention for removed members: the same pseudonymisation, without the membership step. */
+/**
+ * Retention for removed members: the same pseudonymisation, without the
+ * membership step. A member already pseudonymised is skipped, so the daily
+ * run does no work twice.
+ */
 export async function pseudonymiseRemovedMember(tenantId: string, userId: string): Promise<number> {
   const supabase = db();
   const label = pseudonymLabel(subjectHash(tenantId, userId));
-  const { data } = await supabase
+  const { data: people, error } = await supabase
     .from("identities")
-    .update({ display_name: label, email: null, username: null, attributes: {}, updated_at: new Date().toISOString() })
+    .select("id, email, username")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
-    .eq("identity_type", "HUMAN")
-    .neq("display_name", label)
+    .in("identity_type", PERSON_TYPES)
+    .neq("display_name", label);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!people?.length) return 0;
+  const identityIds = people.map((p) => p.id);
+  const { data } = await supabase
+    .from("identities")
+    .update({ display_name: label, email: null, username: null, source_native_id: null, correlation_key: null, attributes: {}, updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .in("id", identityIds)
     .select("id");
+  const emails = [...new Set(people.map((p) => p.email?.trim().toLowerCase()).filter((e): e is string => !!e))];
+  const usernames = [...new Set(people.map((p) => p.username?.trim()).filter((u): u is string => !!u))];
+  await eraseLinkedRecords(tenantId, identityIds, emails, usernames, label);
   return data?.length ?? 0;
 }
