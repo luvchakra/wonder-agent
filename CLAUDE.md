@@ -1313,7 +1313,8 @@ beats exhaustive pre-push verification.
 - **Timestamp every message (owner decision, 2026-10-13):** end every message
   to the owner with the current time in IST, short, on its own last line
   (e.g. `08:21 IST`). Read it from the clock (`TZ=Asia/Kolkata date`), never
-  estimate it.
+  estimate it. Every time given to the owner (schedules, run starts, ETAs)
+  is in IST, never UTC; convert tool output first.
 
 ### 19.8 Repository layout
 
