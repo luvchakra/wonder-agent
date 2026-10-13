@@ -3,8 +3,8 @@
 > **Purpose:** Living register for Critical and High-risk gaps found by the hourly audit of [WonderID Knowledge Base](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md), with follow-up verification against the repository where feasible. It is **not** a list of confirmed exploitable vulnerabilities.
 >
 > **Initial review:** 2026-10-12 (Asia/Kolkata)  
-> **Last check:** 2026-10-13 09:06 IST (hourly audit run by Claude Code, authorised by the owner 2026-10-13; main @ `376473b`)  
-> **Source knowledge-base blob SHA:** `45a1723ac9eb7c080146981a0a79d2dd86b2d55c` (remediation tracker blob `1481459bfb90821f3e7b7a4da7fd540d547702fc`)  
+> **Last check:** 2026-10-13 11:08 IST (hourly audit run by Claude Code, authorised by the owner 2026-10-13; main @ `0e1121f`)  
+> **Source knowledge-base blob SHA:** `725c3fc01495e1974f7548549cc1b25c35fe5b4b` (remediation tracker blob `0cf52ec5d3744ad11eaaa36e61a4de2a9577715d`)  
 > **Owner:** WonderID project team (triage/assignee TBD)  
 > **Audit scope:** Source document reviewed in full. **Code and tests:** first post-merge review 2026-10-12 (CLAUDE.md §19.12); each finding's evidence names the files and tests checked. Runtime behavior and deployed controls not verified.
 >
@@ -15,9 +15,9 @@
 | Severity | Open | Changed | Verified fixed | Accepted by owner |
 |---|---:|---:|---:|---:|
 | Critical (P0) | 0 | 0 | 2 | 1 |
-| High (P1) | 0 | 1 | 7 | 0 |
+| High (P1) | 1 | 1 | 7 | 0 |
 
-**Fixed caveat (2026-10-13):** the FIXED closures of 09:06 IST rest on code inspection, committed unit/E2E/SQL tests and a verified local unit run (21 files, 338 passed). E2E results are as recorded by the remediation tracker (local runs), not re-executed here. The full nightly Playwright run has not been green since these merges (#97 failed, #98 failed, #99 cancelled; #100 hand-started, chosen specs, green). A red nightly on any of the cited specs reopens the finding.
+**Fixed caveat (2026-10-13):** the FIXED closures of 09:06 IST rest on code inspection, committed unit/E2E/SQL tests and a verified local unit run (21 files, 338 passed). E2E results are as recorded by the remediation tracker (local runs), not re-executed here. The full nightly Playwright run has not been green since these merges (#97 failed, #98 failed, #99 cancelled; #100 hand-started, chosen specs, green). A red nightly on any of the cited specs reopens the finding. *11:08 IST:* no full nightly has run since (latest e2e.yml run is still #100); caveat stands.
 
 Priority reflects the potential harm *if the ambiguity or missing control translates into real behavior*, not an established production incident.
 
@@ -174,6 +174,12 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 
 - **2026-10-13 audit (09:06 IST):** status carried forward (CHANGED). New since 13:45: IPv6-embedded private ranges (6to4, IPv4-compatible, Teredo, local NAT64, 6to4 relay) refused in `isPrivateAddress`, and DNS-rebinding tests in `outboundFetch.test.ts` (run here: pass). **Still outstanding:** connector sandboxing, per-organization egress allow-lists and a holistic threat model. The tracker lowered this to P3; independent severity stays High.
 
+- **2026-10-13 audit (11:08 IST): status carried forward (CHANGED); evidence improved.** #135 (`0e1121f`) adds an organization outbound host allow-list (`integration.allowedHosts`, security permission; `hostAllowed`/`checkOutboundUrl` in [`outboundPolicy.ts`](https://github.com/luvchakra/wonder-agent/blob/main/modules/integrations/outboundPolicy.ts), checked in `GatewaySession.admit` and handed to every redirect hop, fails closed when unreadable via `readTenantConfigStrict`) and a written threat model ([`docs/security/CONNECTOR-THREAT-MODEL.md`](https://github.com/luvchakra/wonder-agent/blob/main/docs/security/CONNECTOR-THREAT-MODEL.md), T1–T10 with controls and tests; sandboxing reasoned as "no organization code runs"). Unit tests run here: `gateway.test.ts`, `outboundPolicy.test.ts`, `outboundFetch.test.ts`, `registry.test.ts` pass. **Why not FIXED — the threat model's T4 claim "every driver (HTTP, MCP, files, LDAP, SQL)" is not yet substantiated (code inspection; not exercised):**
+  - For LDAP/SQL the Gateway checks the host of `addressOf(def, settings)` (`gateway.ts:84-88`: the `baseUrl` url-setting if present, else the first), while the drivers connect to the **first** url-type setting (`drivers/ldap.ts:33-35`, `drivers/sql.ts:15-17`). A definition with two url settings (first = unlisted host, a later `baseUrl` = listed host) would be admitted on the listed host and connect to the unlisted one. Private/internal addresses are still refused by `resolveSafeHost`, so this is an allow-list bypass, not SSRF.
+  - `admit` skips the list when the host is `null` (`else if (host && !hostAllowed(...))`), i.e. fail-open on an unparseable address for the connection-oriented drivers.
+  - The WID-H05 gateway tests exercise only the HTTP driver; no test covers the allow-list for LDAP, SQL or a `null` host.
+  - **To close:** derive the checked host from the same setting the driver connects to (or refuse definitions with more than one url setting for ldap/sql), refuse a `null` host when a list is set, and add LDAP/SQL allow-list tests. Severity stays High (independent of the tracker's P3).
+
 ### WID-H06 — Automation credential privilege scoping
 - **Status:** FIXED (repository implementation and committed test evidence verified 2026-10-12 12:40 IST; production not independently exercised)
 - **First seen / last checked:** 2026-10-12 / 2026-10-12 (code)
@@ -225,6 +231,19 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 
 - **2026-10-13 audit (09:06 IST) — CHANGED → FIXED.** `automation-credentials.spec.ts` "WID-H08" sends a disallowed address in six forwarding headers: refused (403 `ADDRESS_NOT_ALLOWED`) locally (fail closed) and through the production Vercel edge, with a positive control proving the edge supplied a real address (13 passed by hand on 12 Oct, per the tracker). The nightly sets `E2E_INGRESS_URL` to production ([`scripts/e2e-on-vercel.sh`](https://github.com/luvchakra/wonder-agent/blob/main/scripts/e2e-on-vercel.sh#L100)), so the edge is re-checked nightly. Deployments documented in `docs/security/SECURITY-CONTROLS.md` §5. A self-hosted ingress that does not overwrite `CLIENT_IP_HEADER` remains the customer's configuration responsibility, documented.
 
+### WID-H09 — Access-combination SoD claimed but not implemented; birthright and mover access accumulate unchecked
+- **Status:** OPEN (new 2026-10-13 11:08 IST; code inspection, not exercised)
+- **First seen / last checked:** 2026-10-13 / 2026-10-13 (code)
+- **Evidence:**
+  - [Knowledge base §10, "Separation of duties"](https://github.com/luvchakra/wonder-agent/blob/main/docs/WonderID/KNOWLEDGE-BASE.md#10-reviews-policies-and-compliance) says: "Define combinations of access that one identity must not hold. Preventive: conflicts can block requests. Detective: the Control Center reports conflicts that already exist."
+  - The implementation is process SoD only: [`modules/access-governance/sod.ts`](https://github.com/luvchakra/wonder-agent/blob/main/modules/access-governance/sod.ts#L13-L34) `checkSoD(tenantId, userId, action, agentId)` checks whether the same **user performed two audit actions for the same AI agent** (e.g. requested then approved). It is called only from `requestCatalog.ts:293` (agent requests) and `grants.ts:232`. No entitlement/role-combination ("toxic access") rule exists for any identity type (no conflicting-entitlement condition anywhere in `modules/`, `lib/` or migrations). The in-app help (`modules/ui/help/content.ts:341`) describes it correctly; the knowledge base does not.
+  - New in #135 (`0e1121f`): birthright packages are assigned automatically to joiners, rehires **and movers** (`assignBirthrightPackages`, [`packages.ts`](https://github.com/luvchakra/wonder-agent/blob/main/modules/access-governance/packages.ts#L356); `opensBirthright`, `humanLifecycle.ts`). `createAssignment` performs no conflict or risk check against what the person already holds. A mover keeps the previous department's birthright packages: the mover event opens only a manual `review_access` task (`tasksForEvent`), nothing ends packages the person is no longer eligible for.
+  - Four-eyes on turning birthright on (migration `0151`, `birthrightTransition`) approves the package's **contents**, not its combination with a given person's existing access.
+- **Risk:** Users and auditors relying on the documented access SoD believe toxic combinations (e.g. create-vendor + approve-payment) are blocked or reported; none are. Birthright removes the human request/approval step for joiners and movers, so a mover between departments with birthright packages accumulates both sets automatically, with no preventive or detective conflict check. This is a SOX ITGC/SOD control gap, not a confirmed incident.
+- **Required action:** Either (a) correct the knowledge base to describe the process-SoD control that exists and disclose that access-combination SoD is not provided, or (b) implement access-combination rules (entitlement/package pairs) evaluated preventively on requests, direct and birthright assignments, and detectively over current holdings. For movers, decide whether birthright packages the person is no longer eligible for end (or go to a dated review) automatically.
+- **Closure criteria:** Knowledge base and implementation agree on what SoD covers; if access-combination SoD is claimed, tests show a conflicting birthright/direct/requested assignment blocked or flagged and an existing conflict reported; mover handling of ineligible birthright packages is defined and tested.
+- **Owner decision needed:** (a) documentation correction only, or (b) build access-combination SoD; and mover treatment of no-longer-eligible birthright packages.
+
 ## Hourly review protocol
 
 1. Fetch the latest `docs/WonderID/KNOWLEDGE-BASE.md`, this register and relevant implementation/tests/commit changes from `main`.
@@ -244,3 +263,4 @@ Priority reflects the potential harm *if the ambiguity or missing control transl
 | 2026-10-12 12:40 IST (manual retry) | `5734cded248edddf2594b7773b3627da203ddc80` | Reassessed all 11 P0/P1 findings and current remediation; WID-H06 verified FIXED at implementation/test-evidence level. WID-H08 improved but deployment not verified. Remaining: 3 P0 + 7 P1. | 0 new, 1 fixed, 1 status advanced OPEN→CHANGED, 0 reopened; update committed on main |
 | 2026-10-12 13:45 IST (manual continuation) | `286f7d58165ce00c577b281e2de48124d896ba9d` | Rechecked 11 findings against the latest knowledge base, remediation tracker and selected implementation/tests. Evidence improved for H01, H03, H04, H05 and H07; no closure criteria satisfied. | 0 NEW, 0 status CHANGED, 0 FIXED, 0 REOPENED; unresolved 3 P0 + 7 P1; H06 remains FIXED |
 | 2026-10-13 09:06 IST (Claude Code hourly audit) | `45a1723ac9eb7c080146981a0a79d2dd86b2d55c` | Reassessed all 11 against main @ `376473b` (14 merges, #119–#132), the tracker and the code; 21 unit-test files run (338 passed). Owner decisions applied. Full nightly not green since the merges. | 0 NEW; 8 FIXED (C02, C03, H01, H02, H03, H04, H07, H08); C01 ACCEPTED by owner; H05 CHANGED; H06 remains FIXED; 0 REOPENED |
+| 2026-10-13 11:08 IST (Claude Code hourly audit) | `725c3fc01495e1974f7548549cc1b25c35fe5b4b` | Reassessed all 11 against main @ `0e1121f` (#133–#135: register, CLAUDE.md, WID-H05 allow-list + threat model, birthright packages); 11 unit-test files run here (140 passed). No full nightly since the merges. | 1 NEW (WID-H09, High, OPEN); 0 status changes (H05 stays CHANGED, residual LDAP/SQL allow-list gap); 0 FIXED; 0 REOPENED; unresolved: 0 P0, 2 P1 |
