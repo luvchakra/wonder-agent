@@ -47,7 +47,19 @@ export function ConfigForm({ config, permissions }: { config: TenantConfig; perm
                       {s.label}
                     </label>
                     <div className="flex items-center gap-2">
-                      {s.type === "choice" ? (
+                      {s.type === "hosts" ? (
+                        <textarea
+                          id={id}
+                          name={s.key}
+                          rows={3}
+                          defaultValue={(value as readonly string[]).join("\n")}
+                          placeholder="api.example.com"
+                          disabled={!editable}
+                          aria-invalid={error ? true : undefined}
+                          aria-describedby={`${id}-help`}
+                          className={cn(fieldInputClass, "h-auto min-h-[4.5rem] py-2 font-mono text-xs")}
+                        />
+                      ) : s.type === "choice" ? (
                         <select id={id} name={s.key} defaultValue={String(value)} disabled={!editable} aria-invalid={error ? true : undefined} className={cn(fieldInputClass, "max-w-[10rem]")}>
                           {s.options.map((o) => (
                             <option key={o} value={o}>
@@ -65,7 +77,7 @@ export function ConfigForm({ config, permissions }: { config: TenantConfig; perm
                           max={s.max}
                           step={1}
                           required
-                          defaultValue={value}
+                          defaultValue={value as number}
                           disabled={!editable}
                           aria-invalid={error ? true : undefined}
                           aria-describedby={`${id}-help`}
@@ -75,7 +87,9 @@ export function ConfigForm({ config, permissions }: { config: TenantConfig; perm
                       <span className="text-sm text-muted-foreground">{s.unit}</span>
                     </div>
                     <p id={`${id}-help`} className="mt-1 text-xs text-muted-foreground">
-                      {s.help} Default {s.default}.{editable ? "" : " You can view this but not change it."}
+                      {s.help}
+                      {s.type === "hosts" ? "" : ` Default ${s.default}.`}
+                      {editable ? "" : " You can view this but not change it."}
                     </p>
                     {error ? <p className="mt-1 text-xs text-destructive">{error}</p> : null}
                   </div>

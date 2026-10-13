@@ -8,6 +8,8 @@ import { openGateway } from "./gateway";
 import { DefinitionConnector } from "../framework/engine";
 import type { FileStoreFactory } from "../framework/drivers/file";
 import type { GuardedInit } from "../outboundFetch";
+// WID-H05: the organization's allowed hosts; empty (any public host) unless a test says otherwise.
+vi.mock("@/lib/config/tenantConfig", () => ({ readTenantConfigStrict: async () => ({ "integration.allowedHosts": [] }) }));
 
 const config = (settings: Record<string, unknown> = {}) => ({ definition: { key: "csv-file", version: "1.0.0", origin: "builtin" }, settings });
 

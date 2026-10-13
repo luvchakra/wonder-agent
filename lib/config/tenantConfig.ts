@@ -37,6 +37,16 @@ export const getTenantConfig = cache(async (tenantId: string): Promise<TenantCon
   }
 });
 
+/**
+ * The organization's settings, or an error when the store cannot be read.
+ * For a setting that restricts something (WID-H05: the outbound host
+ * allow-list), falling back to the defaults would lift the restriction, so
+ * the caller refuses instead.
+ */
+export async function readTenantConfigStrict(tenantId: string): Promise<TenantConfig> {
+  return (await load(tenantId)).config;
+}
+
 export type ConfigVersion = {
   version: number;
   changes: ConfigChange[];

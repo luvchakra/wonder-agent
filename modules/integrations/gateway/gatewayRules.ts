@@ -44,7 +44,8 @@ export type TrafficRow = {
 };
 
 /** Refusals the gateway itself makes. */
-export type GatewayRefusal = "disabled" | "budget";
+/** "host" (WID-H05): not on the organization's list of hosts connections may reach, or the list could not be read. */
+export type GatewayRefusal = "disabled" | "budget" | "host";
 
 export class GatewayRefusedError extends Error {
   constructor(

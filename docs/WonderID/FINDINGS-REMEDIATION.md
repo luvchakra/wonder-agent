@@ -25,23 +25,23 @@ request as each fix.
 **Status:** Not started, In progress, Partly fixed, Fixed (closure criteria
 met, with evidence), or Waiting on the owner.
 
-**Last updated:** 12 October 2026 (owner decisions recorded)
+**Last updated:** 13 October 2026, 10:40 IST (statuses from the register's 09:06 IST audit; WID-H05 in progress)
 
 ## Summary
 
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
-| WID-C01 Approval policy | P3 | Risk accepted by the owner | None: one administrator may loosen a request policy, audited (owner decision 12 Oct). Revisit under "Decisions to come" |
-| WID-C02 Revocation and expiry | P2 | Partly fixed | Done: the connector disables a leaver's account at once (owner decision 12 Oct). For the register to assess |
-| WID-C03 Gateway bypass | P2 | Partly fixed | Done: a per-agent "gateway only" setting; a direct call is critical and suspends the agent at the gateway (owner decision 12 Oct). For the register to assess |
-| WID-H01 Identity correlation | P2 | Fixed (owner decisions 12 Oct) | Conflict list; unlink with undo for source records and accounts |
-| WID-H02 Idempotency and retries | P2 | Partly fixed | Nothing open on our side; for the register to assess |
-| WID-H03 Incomplete syncs | P2 | Partly fixed | Nothing open on our side (checksums wait for a system that offers one); for the register to assess |
-| WID-H04 Rogue access provenance | P2 | Partly fixed | Done: accepted exception (90 days at most, decided by someone else) and false positive (owner decision 12 Oct). For the register to assess |
-| WID-H05 Connector security | P3 | Partly fixed | Nothing left from the tracker's list; the register's closure criteria are for its audit to judge |
+| WID-C01 Approval policy | P3 | Risk accepted by the owner | None: the register recorded ACCEPTED, safeguards verified (13 Oct, 09:06 IST). Revisit under "Decisions to come" |
+| WID-C02 Revocation and expiry | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
+| WID-C03 Gateway bypass | P2 | Fixed | None: the register confirmed it fixed; the residual prevention gap is accepted by the owner (13 Oct, 09:06 IST) |
+| WID-H01 Identity correlation | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
+| WID-H02 Idempotency and retries | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
+| WID-H03 Incomplete syncs | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST); checksums wait for a system that offers one |
+| WID-H04 Rogue access provenance | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
+| WID-H05 Connector security | P3 (register: High) | Partly fixed (register: CHANGED) | Done (13 Oct): an organization's outbound host allow-list and a written threat model covering sandboxing. For the register to assess |
 | WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
-| WID-H07 Audit and erasure | P2 | Fixed | Retention defaults (0143), typed text out of audit records, identifiers only in audit records, and erasure of accounts, source values and connector write targets done |
-| WID-H08 Automation address allow-list | P1 | Fixed | Spoofing tested end to end at the production edge (nightly from now on); each deployment documented. For the register to assess |
+| WID-H07 Audit and erasure | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
+| WID-H08 Automation address allow-list | P1 | Fixed | None: the register confirmed it fixed, edge spoofing tested end to end (13 Oct, 09:06 IST) |
 
 ## Owner decisions
 
@@ -563,6 +563,27 @@ A redirect is checked hop by hop with the same check as the first
 request (`checkOutboundUrl`, then the connect-time lookup). Under the
 strict policy no local server can be the first hop, so the existing
 redirect-to-metadata test covers that path.
+
+**Done (13 Oct), for the register's remaining items:**
+- **An organization's outbound allow-list:** Global Configuration
+  `integration.allowedHosts`, changed with the security permission. It
+  holds host names; `*.example.com` covers that domain's subdomains, and
+  an empty list means any public host.
+  - When set, the Connector Gateway refuses any other host, for every
+    driver (HTTP, MCP, files, LDAP, SQL).
+  - It also applies to every redirect, through `checkOutboundUrl` on each
+    hop.
+  - If the list cannot be read, the Gateway refuses all traffic (fails
+    closed, `readTenantConfigStrict`).
+  - A listed private address is still refused.
+  - Tests: `gateway.test.ts`, `outboundPolicy.test.ts` and
+    `registry.test.ts`, "WID-H05".
+- **Threat model:** `docs/security/CONNECTOR-THREAT-MODEL.md` covers:
+  - assets, actors and trust boundaries;
+  - ten threats, each with its control and test evidence;
+  - sandboxing: no organization code runs, so nothing to sandbox; it says
+    when that would change;
+  - database roles, tenant context and residual risks.
 
 ### WID-H06: automation credential scope (P2, fixed)
 

@@ -323,6 +323,12 @@ this run's task list, ahead of backlog stories. Work it, or say why it is
 waiting (on the register's own audit, or on an owner decision), tracked in
 `docs/WonderID/FINDINGS-REMEDIATION.md`. Never edit the register itself:
 another agent maintains it, with the owner's authorization.
+Keep the tracker in step with the register (owner decision, 2026-10-13):
+whenever the register marks a finding FIXED, CHANGED, ACCEPTED or REOPENED,
+or work on a finding is fixed or changed, update
+`FINDINGS-REMEDIATION.md` (its summary row, the finding's section and the
+"Last updated" line) in the same pull request as the work, or in the next
+one when the register changed without any work of ours.
 
 **Record before you stop.** Whenever a major piece of work is complete — a
 backlog story, but equally a performance pass, a design review, a

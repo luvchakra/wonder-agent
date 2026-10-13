@@ -80,6 +80,7 @@ A plain-language guide to what WonderID does, how its parts fit together and whe
 | 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
 | 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
 | 13 Oct 2026 | Birthright packages: people who join, are rehired or move get the packages meant for them automatically. Two administrators turn birthright on, and a change to the package needs approval again. |
+| 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
 
 ---
 
@@ -268,6 +269,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 **The Connector Gateway**
 - Every call to or from your systems passes through one gateway.
 - It blocks calls to internal or unexpected addresses, for every organization, and limits the request rate. A connection's credentials are not sent when a system redirects elsewhere.
+- **Allowed hosts (optional):** an administrator with the security permission can list the hosts connections may reach (Administration → Global Configuration → Connections). Anything else is refused, including redirects. Empty means any public host.
 - It also counts usage.
 
 ---

@@ -10,6 +10,8 @@ import type { ConnectorDefinition } from "../framework/types";
 import type { GuardedInit } from "../outboundFetch";
 import { mcpServer } from "../framework/definitions/mcp-server";
 import { postgresql } from "../framework/definitions/postgresql";
+// WID-H05: the organization's allowed hosts; empty (any public host) unless a test says otherwise.
+vi.mock("@/lib/config/tenantConfig", () => ({ readTenantConfigStrict: async () => ({ "integration.allowedHosts": [] }) }));
 
 const httpDef: ConnectorDefinition = {
   schemaVersion: 1,
@@ -67,6 +69,35 @@ describe("the Connector Gateway, outbound", () => {
     expect(Number(p_rows[0].bytes_in)).toBeGreaterThan(0);
     // Nothing but labels: no path, query, header or secret.
     expect(JSON.stringify(p_rows)).not.toMatch(/SECRET|api\/people|key=q|Bearer/);
+  });
+
+  it("WID-H05: refuses a host not on the organization's list, and hands the list on for redirects", async () => {
+    const { transport, calls } = fakeTransport((url) => (url.includes("/api/me") ? json({ me: 1 }) : json({ data: [] })));
+    const other = openGateway({ tenantId: "tenant-a", integrationId: "int-1", status: "connected" }, { transport, sleep: async () => undefined, allowedHosts: ["*.corp.example.com"] });
+    const blocked = new DefinitionConnector(other.drivers);
+    await blocked.authenticate(config, JSON.stringify({ token: SECRET }));
+    expect(await blocked.testConnection()).toMatchObject({ ok: false });
+    expect(calls).toHaveLength(0);
+
+    const listed = openGateway({ tenantId: "tenant-a", integrationId: "int-1", status: "connected" }, { transport, sleep: async () => undefined, allowedHosts: ["hr.example.com"] });
+    const allowed = new DefinitionConnector(listed.drivers);
+    await allowed.authenticate(config, JSON.stringify({ token: SECRET }));
+    expect(await allowed.testConnection()).toEqual({ ok: true });
+    expect(calls[0].init.policy).toMatchObject({ allowedHosts: ["hr.example.com"] });
+  });
+
+  it("WID-H05: refuses every request when the organization's list cannot be read", async () => {
+    const { transport, calls } = fakeTransport(() => json({}));
+    const gateway = openGateway({ tenantId: "tenant-a", integrationId: "int-1", status: "connected" }, {
+      transport,
+      allowedHosts: async () => {
+        throw new Error("store unavailable");
+      },
+    });
+    const connector = new DefinitionConnector(gateway.drivers);
+    await connector.authenticate(config, JSON.stringify({ token: SECRET }));
+    expect(await connector.testConnection()).toMatchObject({ ok: false });
+    expect(calls).toHaveLength(0);
   });
 
   it("refuses every request of a disabled connection, and records it as blocked", async () => {

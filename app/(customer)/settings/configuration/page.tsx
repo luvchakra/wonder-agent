@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getTenantConfig, listTenantConfigVersions } from "@/lib/config/tenantConfig";
-import { settingFor } from "@/lib/config/registry";
+import { formatConfigValue, settingFor } from "@/lib/config/registry";
 import { Card, CardBody } from "@/modules/ui";
 import { ConfigForm, RestoreVersionButton } from "./ConfigForms";
 
@@ -62,7 +62,7 @@ export default async function GlobalConfigurationPage() {
                           const s = settingFor(c.key);
                           return (
                             <li key={c.key}>
-                              {s?.label ?? c.key}: {c.from} → {c.to} {s?.unit ?? ""}
+                              {s?.label ?? c.key}: {formatConfigValue(c.from)} → {formatConfigValue(c.to)} {s?.unit ?? ""}
                             </li>
                           );
                         })}

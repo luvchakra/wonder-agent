@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG_SETTINGS, DEFAULT_CONFIG, GLOBAL_IDLE_MINUTES, GLOBAL_SESSION_HOURS, acceptValue, canViewConfig, planConfigChange, resolveConfig, settingFor } from "./registry";
+import { CONFIG_SETTINGS, DEFAULT_CONFIG, GLOBAL_IDLE_MINUTES, GLOBAL_SESSION_HOURS, acceptHosts, acceptValue, canViewConfig, formatConfigValue, planConfigChange, resolveConfig, settingFor } from "./registry";
 import { ABSOLUTE_SESSION_MAX_MS, IDLE_TIMEOUT_MS } from "@/lib/tenant/sessionSecurity";
 
 const ADMIN = ["tenant.settings", "tenant.security.manage"];
@@ -22,6 +22,7 @@ describe("the settings", () => {
       "sod.conflictWindowDays": 30,
       "integration.massMissingPercent": 20,
       "integration.maxWritesPerHour": 100,
+      "integration.allowedHosts": [],
     });
   });
 
@@ -38,7 +39,7 @@ describe("the settings", () => {
   it("each have a section, a one-line help, a default within their bounds, and unique keys", () => {
     expect(new Set(CONFIG_SETTINGS.map((s) => s.key)).size).toBe(CONFIG_SETTINGS.length);
     for (const s of CONFIG_SETTINGS) {
-      expect(acceptValue(s, s.default), s.key).toBe(s.default);
+      expect(acceptValue(s, s.default), s.key).toEqual(s.default);
       expect(s.help.length, s.key).toBeLessThan(140);
     }
   });
@@ -94,5 +95,30 @@ describe("canViewConfig", () => {
     expect(canViewConfig(["tenant.settings"])).toBe(true);
     expect(canViewConfig(["tenant.security.manage"])).toBe(true);
     expect(canViewConfig(["access.read", "policy.read"])).toBe(false);
+  });
+});
+
+describe("the allowed hosts (WID-H05)", () => {
+  it("takes host names from text or a list: lower-cased, sorted, once each", () => {
+    expect(acceptHosts("API.example.com\n*.corp.example.com, api.example.com.", 50)).toEqual(["*.corp.example.com", "api.example.com"]);
+    expect(acceptHosts(["b.example.com", "a.example.com"], 50)).toEqual(["a.example.com", "b.example.com"]);
+    expect(acceptHosts("", 50)).toEqual([]);
+  });
+  it("refuses anything that is not a host name, and too many", () => {
+    for (const bad of ["https://api.example.com", "api.example.com:443", "api.example.com/path", "localhost", "*", "*.com", "api.example.com localhost"]) {
+      expect(acceptHosts(bad, 50), bad).toBeNull();
+    }
+    expect(acceptHosts(Array.from({ length: 51 }, (_, i) => `h${i}.example.com`), 50)).toBeNull();
+    expect(acceptHosts(42, 50)).toBeNull();
+  });
+  it("needs the security permission, and records a change readably", () => {
+    const plan = planConfigChange(DEFAULT_CONFIG, { "integration.allowedHosts": "api.example.com" }, ["tenant.settings"]);
+    expect(plan.ok).toBe(false);
+    const ok = planConfigChange(DEFAULT_CONFIG, { "integration.allowedHosts": "api.example.com" }, ADMIN);
+    expect(ok).toMatchObject({ ok: true, changes: [{ key: "integration.allowedHosts", from: [], to: ["api.example.com"] }] });
+    // Saving the same list again is no change.
+    expect(planConfigChange({ ...DEFAULT_CONFIG, "integration.allowedHosts": ["api.example.com"] }, { "integration.allowedHosts": "api.example.com" }, ADMIN)).toMatchObject({ ok: true, changes: [] });
+    expect(formatConfigValue([])).toBe("any public host");
+    expect(formatConfigValue(["a.example.com", "b.example.com"])).toBe("a.example.com, b.example.com");
   });
 });
