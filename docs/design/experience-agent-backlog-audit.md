@@ -4027,3 +4027,4 @@ Not changed:
 - the mobile tab bar (Home, Agents, Discover, Risk);
 - the help guide (not updated unless asked).
 
+- **2026-10-13 (owner):** "Access Requests" in the Access menu is now "All Requests", so it no longer reads like "Request Access" above it.

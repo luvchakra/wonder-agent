@@ -168,7 +168,7 @@ export const SHELL_NAV: ShellNavItem[] = [
     icon: "KeyRound",
     children: [
       link("Request Access", "/access/catalog", "UserSearch", "access.read"),
-      link("Access Requests", "/access/requests", "ClipboardList", "access.read"),
+      link("All Requests", "/access/requests", "ClipboardList", "access.read"),
       link("Provisioning Tasks", "/access/fulfilment?view=all", "Clock", "access.read"),
       link("Access Packages", "/access/packages", "Box", "access.read"),
       link("Entitlements", "/access/entitlements", "KeyRound", "access.read"),

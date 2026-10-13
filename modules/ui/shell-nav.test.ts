@@ -17,7 +17,7 @@ describe("the area list (owner decision, 2026-10-13, the owner's navigation shee
   });
 
   it("keeps Request Access first under Access, and Self Service for what anyone can start", () => {
-    expect(sectionPages(SHELL_NAV[2]).map((p) => p.label)).toEqual(["Request Access", "Access Requests", "Provisioning Tasks", "Access Packages", "Entitlements", "Request Policies"]);
+    expect(sectionPages(SHELL_NAV[2]).map((p) => p.label)).toEqual(["Request Access", "All Requests", "Provisioning Tasks", "Access Packages", "Entitlements", "Request Policies"]);
     expect(sectionPages(SHELL_NAV[6]).map((p) => p.label)).toEqual(["Onboard Application", "Register Agent"]);
   });
 
@@ -77,7 +77,7 @@ describe("navFor", () => {
   it("shows a member only the pages they may open, and drops empty areas", () => {
     const nav = navFor(SHELL_NAV, ["access.read"]);
     expect(nav.map((s) => s.label)).toEqual(["Home", "My Workspace", "Access", "Administration"]);
-    expect(sectionPages(nav[2]).map((p) => p.label)).toEqual(["Request Access", "Access Requests", "Provisioning Tasks", "Access Packages", "Entitlements"]);
+    expect(sectionPages(nav[2]).map((p) => p.label)).toEqual(["Request Access", "All Requests", "Provisioning Tasks", "Access Packages", "Entitlements"]);
     expect(sectionPages(nav[3]).map((p) => p.label)).toEqual(["Accounts", "Application Catalog", "Onboarding Reviews", "Data Sources"]);
     expect(nav[3].href).toBe("/access/accounts");
   });

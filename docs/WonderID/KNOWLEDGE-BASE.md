@@ -136,7 +136,7 @@ The everyday cycle looks like this:
 - **Main menu:**
   - Home: the dashboard, a summary of the whole platform;
   - My Workspace: my requests, approvals waiting on me, my tasks, my privacy, sign-in security;
-  - Access: request access, requests, provisioning, packages, entitlements, request policies;
+  - Access: request access, all requests, provisioning, packages, entitlements, request policies;
   - AI Agents;
   - Access Reviews;
   - Risk & Detection: rogue accounts, rogue agents, SoD violations, investigations;
