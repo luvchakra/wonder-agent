@@ -125,7 +125,8 @@ test("owner request 2026-10-13: another organization with a chosen prefix and en
   await ap.goto(`/platform-admin/tenants/${tenant!.id}`);
   await ap.getByLabel("Address prefix").fill(`${prefix}-renamed`);
   await ap.getByRole("button", { name: "Change address" }).click();
-  await expect(ap.getByRole("status").filter({ hasText: `Address changed to ${prefix}-renamed` })).toBeVisible();
+  // Renamed out of its prefix group, it re-renders as an organization of its own (the address check below is the database's).
+  await expect(ap.getByText(`https://${prefix}-renamed.`).first()).toBeVisible();
   await ap.getByLabel("Environment", { exact: true }).selectOption("staging");
   await ap.getByRole("button", { name: "Save" }).click();
   await expect(ap.getByRole("status").filter({ hasText: "Environment saved." })).toBeVisible();

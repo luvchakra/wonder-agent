@@ -3,6 +3,7 @@
 import { ApiError } from "@/lib/shared/types/foundation";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import {
   activateTenant,
@@ -11,6 +12,7 @@ import {
   createTenant,
   createTenantEnvironment,
   renameTenantSlug,
+  removeTenantEnvironment,
   changePlan,
   setTenantEnvironment,
   decommissionTenant,
@@ -74,6 +76,14 @@ export async function changePlanAction(tenantId: string, _prev: TenantSettingSta
   } catch (err) {
     return settingError(err);
   }
+}
+
+/** Owner request 2026-10-13: remove an environment from its organization (decommissioned, address freed). */
+export async function removeTenantEnvironmentAction(tenantId: string, organizationId: string) {
+  const { userId } = await requirePlatformAdmin();
+  await removeTenantEnvironment(userId, tenantId);
+  revalidatePath("/platform-admin/tenants", "layout");
+  redirect(`/platform-admin/tenants/${organizationId}`);
 }
 
 /** Owner request 2026-10-13: a dev, test or staging environment of a production organization. */

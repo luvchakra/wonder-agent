@@ -8,7 +8,7 @@ import "server-only";
  * one function every other module is expected to call.
  */
 
-export { createTenant, createTenantEnvironment, testTenantIds, renameTenantSlug, setTenantEnvironment, ADDABLE_ENVIRONMENTS, listTenants, getTenant, suspendTenant, activateTenant, decommissionTenant, type CreateTenantInput } from "./tenants";
+export { createTenant, createTenantEnvironment, testTenantIds, removeTenantEnvironment, organizationOwners, renameTenantSlug, setTenantEnvironment, ADDABLE_ENVIRONMENTS, listTenants, getTenant, suspendTenant, activateTenant, decommissionTenant, type CreateTenantInput } from "./tenants";
 export { createSubscription, changePlan, getSubscription, updateSubscriptionStatus, PLAN_DEFAULTS } from "./subscriptions";
 export { isFeatureEnabled, getFeatureFlags, requireFeature, resolveFlags, listFlagCatalog, listTenantFlagOverrides, setFeatureFlag } from "./featureFlags";
 export { grantPlatformAdmin, revokePlatformAdmin, listPlatformAdmins } from "./admins";

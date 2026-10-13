@@ -233,3 +233,50 @@ export async function testTenantIds(tenants: { tenantId: string; slug?: string }
   for (const [id, list] of emails) if (list.length && list.every((e) => TEST_EMAIL.test(e))) out.add(id);
   return out;
 }
+
+/**
+ * Owner request (2026-10-13): remove an environment from its organization.
+ * It is decommissioned (data kept, nobody signs in), and its address and
+ * slot are freed so the same environment can be added again
+ * (remove_tenant_environment, migration 0160). Never production. Audited.
+ */
+export async function removeTenantEnvironment(actorId: string, tenantId: string): Promise<{ address: string }> {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) throw new ApiError(404, "TENANT_NOT_FOUND");
+  const before = await getTenant(tenantId);
+  const { data, error } = await supabaseServiceRole().rpc("remove_tenant_environment", { p_tenant: tenantId });
+  if (error) {
+    await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_removed", result: "failure" });
+    if (error.code === "22023") throw new ApiError(409, "NOT_AN_ENVIRONMENT", "Only a development, test or staging environment of an organization can be removed");
+    throw new ApiError(500, "REMOVE_FAILED", "The environment could not be removed");
+  }
+  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_removed", oldValue: { slug: data, environment: before?.environment, parentTenantId: before?.parentTenantId }, newValue: { status: "deprovisioned" }, result: "success" });
+  return { address: data as string };
+}
+
+/**
+ * Owner request (2026-10-13): an organization's owners in the console: the
+ * active administrators (TENANT_SUPER_ADMIN) of each tenant given. Service
+ * role, the given tenants only; for display.
+ */
+export async function organizationOwners(tenantIds: string[]): Promise<Map<string, { userId: string; email: string; name: string | null }[]>> {
+  const out = new Map<string, { userId: string; email: string; name: string | null }[]>();
+  if (!tenantIds.length) return out;
+  const admin = supabaseServiceRole();
+  const { data: role } = await admin.from("roles").select("id").is("tenant_id", null).eq("name", "TENANT_SUPER_ADMIN").maybeSingle();
+  if (!role) return out;
+  const [{ data: grants }, { data: members }] = await Promise.all([
+    admin.from("user_roles").select("tenant_id, user_id").eq("role_id", role.id).in("tenant_id", tenantIds).limit(5000),
+    admin.from("tenant_memberships").select("tenant_id, user_id").eq("status", "active").in("tenant_id", tenantIds).limit(5000),
+  ]);
+  const active = new Set(((members ?? []) as { tenant_id: string; user_id: string }[]).map((m) => `${m.tenant_id}|${m.user_id}`));
+  const pairs = ((grants ?? []) as { tenant_id: string; user_id: string }[]).filter((g) => active.has(`${g.tenant_id}|${g.user_id}`));
+  const userIds = [...new Set(pairs.map((p) => p.user_id))];
+  const { data: users } = userIds.length ? await admin.from("users").select("id, email, display_name").in("id", userIds) : { data: [] };
+  const byId = new Map(((users ?? []) as { id: string; email: string; display_name: string | null }[]).map((u) => [u.id, u]));
+  for (const p of pairs) {
+    const u = byId.get(p.user_id);
+    if (!u) continue;
+    out.set(p.tenant_id, [...(out.get(p.tenant_id) ?? []), { userId: u.id, email: u.email, name: u.display_name }]);
+  }
+  return out;
+}

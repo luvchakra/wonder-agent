@@ -24,8 +24,8 @@ export default async function TenantUsagePage({ params }: { params: Promise<{ te
 
   return (
     <>
-      <Link href="/platform-admin/tenants" className="text-sm font-medium text-primary hover:underline">
-        ← Tenants
+      <Link href={`/platform-admin/tenants/${tenantId}`} className="text-sm font-medium text-primary hover:underline">
+        ← Organization
       </Link>
       <PageHeading title={`Usage — ${tenant.name}`} />
       <Card>
