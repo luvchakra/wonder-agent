@@ -3280,3 +3280,35 @@ Separately, found in `platform_admins`: `fixture-pa107@example.test`, a
 leftover from a database test. It has no password and has never signed
 in. The owner was given the SQL to remove it; it is not removed here,
 because deleting from the platform boundary needs the owner.
+
+### 2026-10-13 — The main address is the landing page; the product opens on an organization's address (owner request)
+
+**Request.** "id.wonderapps.biz should open landing page, to login to specific org, user must select specific org+env url."
+
+**Built.**
+- **The flag.** `ORG_ADDRESS_REQUIRED=true`, set on Vercel production only, so local, preview and nightly E2E runs keep using the main address. Setting it to false serves the product on the main address again.
+- **The rule.** With the flag on, the proxy applies `mainAddressRedirect()` on the main address. It is pure and tested in `lib/tenant/host.test.ts`:
+  - The landing page stays for visitors who are signed out.
+  - These stay on the main address: sign-in, sign-up, `/auth/`, password recovery, help, the vendor console, `/organizations`, `/onboarding`, the error pages, and every `/api/` route (connector receivers, webhooks, cron).
+  - Paths match whole path segments only, so a look-alike such as `/platform-administration` does not match.
+  - Any other page goes to `/sign-in` when signed out, or to `/organizations` when signed in.
+- **`/organizations` (new).** The person's own active organizations and environments, grouped by organization with production first and each with its colour.
+  - Each links to `https://<prefix>[-env].id.wonderapps.biz/sign-in`, where they sign in; sessions are per address.
+  - It also offers "Create or join an organization", the platform console for platform administrators, and sign-out.
+  - On an organization's address it redirects to `/`.
+- **The address still never authorizes anything.** Access comes from an active membership, as before.
+
+**Verified.**
+- Vitest `lib/tenant/host.test.ts` 8/8.
+- Typecheck and eslint clean; `next build` succeeds.
+- Local E2E with the flag (a second server with `ORG_ADDRESS_REQUIRED=true`): `org-address-required.spec.ts` 1/1. It covers:
+  - the landing page on the main address;
+  - a product page there sending a signed-out visitor to sign-in;
+  - sign-in landing on `/organizations`;
+  - product pages and `/` staying on `/organizations` once signed in;
+  - the API answering 200 on the main address;
+  - the organization link opening its own sign-in, then the product there.
+- Without the flag: tenant-address, first-organization, auth and platform-admin, 53 passed, with the flag spec skipped by design.
+- The shared sign-in setup cannot run against a server with the flag, because it expects the product on the main address, so the flag spec runs with `--no-deps`. This is recorded in the spec.
+
+**Left out.** Google, Microsoft and LinkedIn sign-in on organization addresses. Their buttons show only once the owner adds `https://*.id.wonderapps.biz/**` to Supabase's redirect URLs.

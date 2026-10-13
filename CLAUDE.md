@@ -210,6 +210,11 @@ WonderAgent Platform
   and environment at any time (0157). Each environment has one designated colour,
   the same for every organization (`modules/ui/environment.tsx`), and the shell switches
   between an organization's environments in one click (0158–0159).
+- With `ORG_ADDRESS_REQUIRED=true` (production, owner request 2026-10-13) the main address
+  `id.wonderapps.biz` is the landing page: the product opens only on an organization's own
+  address. Signed-in people on the main address land on `/organizations` (their organizations
+  and environments, each linking to its address). The vendor console, sign-in and sign-up,
+  onboarding and the whole API stay on the main address (`MAIN_ADDRESS_PATHS`).
 - Platform Administration (`/platform-admin`) is a wholly separate authorization
   boundary, reachable only by WonderAgent platform-owner identities, never by any
   customer role.
