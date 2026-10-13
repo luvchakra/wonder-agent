@@ -962,3 +962,46 @@ Verified:
 ### 2026-10-12 — WID-H07, identifiers only
 
 WID-H07 identifiers only: `platform.admin_granted` records the user's id, no longer their email.
+
+### 2026-10-13 — WonderApps dashboard access: an audited on/off switch (owner decision)
+
+**What was there.** The `wonderapps_dashboard` database role was noted on
+2026-10-11. It was created outside this repository and belongs to the
+WonderApps dashboard (the owner's company platform):
+- it can sign in;
+- it has `wonderapps_dashboard_read` policies (`USING (true)`) on 27 tables;
+- `pg_stat_statements` showed read-only, cross-organization aggregate
+  queries run under it (`BEGIN READ ONLY`, an 8 s statement timeout,
+  counts per tenant);
+- by today it held no table grants, so it read nothing.
+
+**Owner decision.** It is required. Keep it, with a switch to turn it off
+later.
+
+Built:
+- **Migration `0155_platform_wonderapps_dashboard_access.sql`** (applied):
+  - `wonderapps_dashboard_access()` reports the state;
+  - `set_wonderapps_dashboard_access(enabled)` grants SELECT on every
+    table that has the policy, or revokes it.
+  - On the AI provider settings table, only the non-secret columns are
+    granted, never `encrypted_api_key` (#10).
+  - Both functions are callable by the service role only.
+- **Service:** `modules/platform-admin/wonderappsAccess.ts`. Each change
+  is written to `platform_audit_logs` with the state before and after; a
+  failure is audited and never reported as done (§17.5).
+- **Console:** a section "WonderApps dashboard access" on
+  `/platform-admin/health` shows on, off or unavailable, with one button
+  to turn it on or off (`requirePlatformAdmin`).
+
+Not done by Claude: turning it on. The safety check refused a
+service-role grant of cross-organization read access, so the owner turns
+it on, in the console or in the SQL editor
+(`select set_wonderapps_dashboard_access(true)`).
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest `wonderappsAccess.test.ts` 3/3: reads the state; turns it off
+  and audits it; never claims a change the database did not confirm.
+
+Recorded in `docs/WonderID/progress/PROGRESS.md` (the open owner action
+is closed).

@@ -57,7 +57,7 @@ status is shown per row below.
 | Configure the Supabase SSO provider so SAML/OIDC sign-in works (FOUNDATION-P0-03.3) | Open |
 | Rotate the Saviynt training-tenant password shared in chat on 2026-10-11 | Done 2026-10-12 (owner) |
 | Disconnect the paused Vercel project `kunals-projects-9f64757f/wonder-id` from the repository | Done 2026-10-12 (owner) |
-| Review the `wonderapps_dashboard` database role: it can sign in and reads every row of about 24 customer tables in all organizations (`using (true)` policies). No migration in the repository creates it; found 2026-10-11 by the advisors | Open |
+| Review the `wonderapps_dashboard` database role: it can sign in and reads every row of about 24 customer tables in all organizations (`using (true)` policies). No migration in the repository creates it; found 2026-10-11 by the advisors | Done 2026-10-13 (owner decision): it belongs to the WonderApps dashboard and stays, under an on/off switch in Platform Health (migration 0155); audited; never the AI provider keys |
 
 ## F1: Import and reconciliation
 

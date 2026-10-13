@@ -11,6 +11,7 @@ import {
   grantPlatformAdmin,
   rollbackConfigVersion,
   setFeatureFlag,
+  setWonderappsDashboardAccess,
   suspendTenant,
   updateBranding,
   updateFeatureFlagDefault,
@@ -100,4 +101,11 @@ export async function createAnnouncementAction(formData: FormData) {
     endsAt: String(formData.get("endsAt") ?? "") || undefined,
   });
   revalidatePath("/platform-admin/announcements");
+}
+
+/** Owner decision (2026-10-13): turns the WonderApps dashboard's read access on or off (audited in the service). */
+export async function setWonderappsAccessAction(formData: FormData) {
+  const { userId } = await requirePlatformAdmin();
+  await setWonderappsDashboardAccess(userId, formData.get("enabled") === "true");
+  revalidatePath("/platform-admin/health");
 }

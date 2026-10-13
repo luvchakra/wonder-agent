@@ -8,7 +8,7 @@ import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContex
 import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
-import { countOpenAccessFindings, getFindings } from "@/modules/risk/service";
+import { countOpenAccessFindings, countOpenAgentFindings } from "@/modules/risk/service";
 import { AppSidebar, MobileNavDrawer, MobileNavTrigger } from "@/modules/ui/AppSidebar";
 import { MobileTabBar } from "@/modules/ui/MobileTabBar";
 import { AccountPanel } from "@/modules/ui/AccountPanel";
@@ -85,7 +85,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // and paying that on every page render would break CLAUDE.md §15. It
     // needs a cheap count contract from the Identity Agent first —
     // recorded in the Experience audit log rather than worked around.
-    getFindings(ctx.tenantId, { status: "open" }),
+    // §15: a head count, not every open finding (it runs on every page).
+    countOpenAgentFindings(ctx.tenantId),
     // EXPERIENCE-P0-18: the sidebar's collapsed/expanded choice, so the
     // server renders the width the user left it at.
     cookies(),
@@ -103,7 +104,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     url: tenantUrls[i],
   }));
 
-  const badges: ShellBadgeCounts = { risk: openFindings.length + openAccessFindings };
+  const badges: ShellBadgeCounts = { risk: openFindings + openAccessFindings };
   const sidebarUser = {
     email: user.email ?? "",
     displayName: profile?.displayName ?? null,
