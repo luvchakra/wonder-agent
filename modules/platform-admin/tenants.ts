@@ -69,7 +69,8 @@ export async function createTenantEnvironment(actorId: string, parentTenantId: s
   if (!ADDABLE_ENVIRONMENTS.includes(environment as AddableEnvironment)) throw new ApiError(400, "INVALID_INPUT", "environment: development, test or staging");
   const { data, error } = await supabaseServiceRole().rpc("create_tenant_environment", { p_parent: parentTenantId, p_environment: environment });
   if (error) {
-    const reason = error.code === "23505" ? "That environment already exists" : error.code === "P0002" ? "Organization not found" : error.code === "22023" || error.code === "23514" ? error.message : null;
+    const reason =
+      error.code === "23505" ? "That environment already exists" : error.code === "P0002" ? "Organization not found" : error.code === "22023" || error.code === "23514" ? error.message : null;
     await writePlatformAudit({ actorId, tenantId: parentTenantId, action: "platform.tenant_environment_created", newValue: { environment }, result: "failure" });
     if (reason) throw new ApiError(error.code === "P0002" ? 404 : 409, "ENVIRONMENT_REFUSED", reason);
     throw new ApiError(500, "CREATE_FAILED", "The environment could not be created");
@@ -114,7 +115,14 @@ export async function setTenantEnvironment(actorId: string, tenantId: string, en
     await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_changed", newValue: { environment }, result: "failure" });
     throw new ApiError(error.code === "P0002" ? 404 : 500, "UPDATE_FAILED", "The environment could not be changed");
   }
-  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_changed", oldValue: { environment: before?.environment ?? "production" }, newValue: { environment }, result: "success" });
+  await writePlatformAudit({
+    actorId,
+    tenantId,
+    action: "platform.tenant_environment_changed",
+    oldValue: { environment: before?.environment ?? "production" },
+    newValue: { environment },
+    result: "success",
+  });
 }
 
 /**
@@ -163,7 +171,11 @@ async function setTenantStatus(actorId: string, tenantId: string, status: Tenant
   if (fetchError) throw new ApiError(500, "QUERY_FAILED", fetchError.message);
   if (!previous) throw new ApiError(404, "TENANT_NOT_FOUND");
 
-  const { error } = await supabase.from("tenants").update({ status, updated_at: new Date().toISOString() }).eq("id", tenantId);
+  // A platform suspension is not the owner's to lift (migration 0161), even of an organization its owner had disabled.
+  const { error } = await supabase
+    .from("tenants")
+    .update({ status, updated_at: new Date().toISOString(), ...(status === "suspended" ? { disabled_by_owner: false } : {}) })
+    .eq("id", tenantId);
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
 
   await writePlatformAudit({
@@ -249,7 +261,14 @@ export async function removeTenantEnvironment(actorId: string, tenantId: string)
     if (error.code === "22023") throw new ApiError(409, "NOT_AN_ENVIRONMENT", "Only a development, test or staging environment of an organization can be removed");
     throw new ApiError(500, "REMOVE_FAILED", "The environment could not be removed");
   }
-  await writePlatformAudit({ actorId, tenantId, action: "platform.tenant_environment_removed", oldValue: { slug: data, environment: before?.environment, parentTenantId: before?.parentTenantId }, newValue: { status: "deprovisioned" }, result: "success" });
+  await writePlatformAudit({
+    actorId,
+    tenantId,
+    action: "platform.tenant_environment_removed",
+    oldValue: { slug: data, environment: before?.environment, parentTenantId: before?.parentTenantId },
+    newValue: { status: "deprovisioned" },
+    result: "success",
+  });
   return { address: data as string };
 }
 

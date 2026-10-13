@@ -127,6 +127,7 @@ excluded (list in the migration's header).
 | `notifications` | OA | In-app/email notification records |
 | `reports` | OA | Saved/scheduled report definitions |
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
+| `environment_orders` | PA | Paid environments an organization's owner bought (migration 0161; test-mode payments while no provider is configured) |
 | `platform_feature_flags` | PA | Global feature flag catalog |
 | `feature_flags` | PA | Per-tenant feature flag state |
 | `subscriptions` | PA | Per-tenant plan/subscription record. Since 0102 (PLATFORM-P1-04) also the billing provider link: provider, provider customer/subscription ids, price, interval, currency, period, cancel-at-period-end, `provider_state_at` (stale-event guard); status adds trialing/incomplete/paused |

@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { Building2, Check, ChevronDown, Plus } from "lucide-react";
+import { Building2, Check, ChevronDown, Settings2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { TenantOption } from "./AccountPanel";
 import { EnvironmentBadge, environmentColor } from "./environment";
@@ -20,13 +20,14 @@ import { environmentSiblings } from "@/lib/tenant/environmentFamily";
  * (packages/core/src/components/shell/business-switcher.tsx,
  * luvchakra/founder-collab): a DropdownMenu listing
  * every organization with a check mark on the current one, and a
- * "Create new" item always last, separated by a divider. Reuses the same
+ * "Manage organizations" item always last (owner request 2026-10-13),
+ * separated by a divider. Reuses the same
  * tenant-membership data/action AccountPanel's own tenant list wires up —
  * not a fabricated second data source; "tenant" is still the underlying
  * domain term (CLAUDE.md's locked tenancy model), "organization" is only
- * the user-facing label. "Create new" links to /onboarding (WonderAgent's
- * real tenant-creation flow) rather than inventing a modal WonderArk's
- * own onCreateBusiness callback has no WonderAgent equivalent for yet.
+ * the user-facing label. That item opens /organizations/manage, where an
+ * owner renames, disables and adds environments, and a new organization
+ * is started (it replaced "Create new organization").
  *
  * Items call `onSelectTenant` directly (via useTransition) instead of a
  * `<form action>` wrapped in DropdownMenu.Item asChild — that pattern
@@ -119,9 +120,9 @@ export function WorkspaceSwitcher({
             )}
             <DropdownMenu.Separator className="my-1 h-px bg-border" />
             <DropdownMenu.Item asChild>
-              <Link href="/onboarding" className="flex items-center gap-2 rounded-sm px-3 py-2 text-primary outline-none hover:bg-accent focus-visible:bg-accent">
-                <Plus className="size-4" aria-hidden="true" />
-                Create new organization
+              <Link href="/organizations/manage" className="flex items-center gap-2 rounded-sm px-3 py-2 text-primary outline-none hover:bg-accent focus-visible:bg-accent">
+                <Settings2 className="size-4" aria-hidden="true" />
+                Manage organizations
               </Link>
             </DropdownMenu.Item>
           </DropdownMenu.Content>

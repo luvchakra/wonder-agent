@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/tenant/session";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
@@ -57,11 +58,18 @@ export default async function NoAccessPage() {
       }
       footer={<>Signed in as {user.email ?? "your account"}.</>}
     >
-      <form action={signOutAction}>
-        <Button type="submit" variant="outline">
-          Sign out
-        </Button>
-      </form>
+      <div className="flex flex-wrap items-center gap-3">
+        {suspended ? (
+          <Link href="/organizations/manage" className="text-sm font-medium text-primary hover:underline">
+            Manage organizations
+          </Link>
+        ) : null}
+        <form action={signOutAction} className="ml-auto">
+          <Button type="submit" variant="outline">
+            Sign out
+          </Button>
+        </form>
+      </div>
     </AuthShell>
   );
 }

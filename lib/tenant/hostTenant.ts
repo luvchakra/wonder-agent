@@ -36,12 +36,25 @@ export const getHostTenant = cache(async (): Promise<HostResolution> => {
   return { target, tenant: row ? { tenantId: row.tenant_id, name: row.name, slug: row.slug, status: row.status } : null };
 });
 
-/** The URL to reach a tenant at, on the current scheme and port (local development keeps its port). */
-export async function urlForTenant(slug: string): Promise<string | null> {
+async function requestScheme(): Promise<{ protocol: string; port: string | null }> {
   const host = (await getRequestHost()) ?? "";
   const port = /:(\d+)$/.exec(host)?.[1] ?? null;
   // The request's own scheme: Vercel sets x-forwarded-proto; a local server on localhost is plain http.
   const forwarded = (await headers()).get("x-forwarded-proto")?.split(",")[0]?.trim();
   const protocol = forwarded === "http" || forwarded === "https" ? forwarded : /(^|\.)localhost(:\d+)?$/.test(host) ? "http" : "https";
+  return { protocol, port };
+}
+
+/** The URL to reach a tenant at, on the current scheme and port (local development keeps its port). */
+export async function urlForTenant(slug: string): Promise<string | null> {
+  const { protocol, port } = await requestScheme();
   return tenantUrl(slug, baseAppHost(), protocol, port);
+}
+
+/** The main WonderID address (where organizations are created); "" when tenant URLs are off, so links stay relative. */
+export async function mainAppUrl(): Promise<string> {
+  const base = baseAppHost();
+  if (!base) return "";
+  const { protocol, port } = await requestScheme();
+  return `${protocol}://${base}${port ? `:${port}` : ""}`;
 }
