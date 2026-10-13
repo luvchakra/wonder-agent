@@ -13,7 +13,7 @@ test.describe.serial("global configuration", () => {
   test("an administrator changes the dormant threshold and the Accounts page follows it; restoring puts it back", async ({ page }) => {
     await page.goto("/settings/configuration");
     await expect(page.getByRole("heading", { level: 1, name: "Global Configuration" })).toBeVisible();
-    for (const section of ["Sessions", "Access", "AI agents and runtime", "Risk", "Certifications", "Separation of duties"]) {
+    for (const section of ["Sign-in and sessions", "Access", "AI agents and runtime", "Risk", "Certifications", "Separation of duties"]) {
       await expect(page.getByText(section, { exact: true }).first()).toBeVisible();
     }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CONFIG_SETTINGS, DEFAULT_CONFIG, GLOBAL_IDLE_MINUTES, GLOBAL_SESSION_HOURS, acceptHosts, acceptValue, canViewConfig, formatConfigValue, planConfigChange, resolveConfig, settingFor } from "./registry";
+import { CONFIG_SETTINGS, DEFAULT_CONFIG, GLOBAL_IDLE_MINUTES, GLOBAL_SESSION_HOURS, MFA_ENABLE_NEEDS_AAL2, acceptHosts, acceptValue, canViewConfig, formatConfigValue, planConfigChange, resolveConfig, settingFor } from "./registry";
 import { ABSOLUTE_SESSION_MAX_MS, IDLE_TIMEOUT_MS } from "@/lib/tenant/sessionSecurity";
 
 const ADMIN = ["tenant.settings", "tenant.security.manage"];
@@ -23,6 +23,7 @@ describe("the settings", () => {
       "integration.massMissingPercent": 20,
       "integration.maxWritesPerHour": 100,
       "integration.allowedHosts": [],
+      "security.mfaRequired": 0,
     });
   });
 
@@ -120,5 +121,36 @@ describe("the allowed hosts (WID-H05)", () => {
     expect(planConfigChange({ ...DEFAULT_CONFIG, "integration.allowedHosts": ["api.example.com"] }, { "integration.allowedHosts": "api.example.com" }, ADMIN)).toMatchObject({ ok: true, changes: [] });
     expect(formatConfigValue([])).toBe("any public host");
     expect(formatConfigValue(["a.example.com", "b.example.com"])).toBe("a.example.com, b.example.com");
+  });
+});
+
+describe("FOUNDATION-P0-27: requiring MFA", () => {
+  const mfa = { "security.mfaRequired": "1" };
+  it("is off by default and needs the security permission", () => {
+    expect(DEFAULT_CONFIG["security.mfaRequired"]).toBe(0);
+    expect(planConfigChange(DEFAULT_CONFIG, mfa, ["tenant.settings"], { aal: "aal2" })).toMatchObject({ ok: false, errors: { "security.mfaRequired": "You can't change this setting." } });
+  });
+  it("can be turned on only from a session that used MFA, so the administrator can still get in", () => {
+    for (const aal of ["aal1", null, undefined] as const) {
+      expect(planConfigChange(DEFAULT_CONFIG, mfa, ADMIN, { aal }), String(aal)).toMatchObject({ ok: false, errors: { "security.mfaRequired": MFA_ENABLE_NEEDS_AAL2 } });
+    }
+    expect(planConfigChange(DEFAULT_CONFIG, mfa, ADMIN)).toMatchObject({ ok: false });
+    expect(planConfigChange(DEFAULT_CONFIG, mfa, ADMIN, { aal: "aal2" })).toMatchObject({ ok: true, changes: [{ key: "security.mfaRequired", from: 0, to: 1 }] });
+  });
+  it("refuses the whole save when it is refused, and allows turning it off from any session", () => {
+    const plan = planConfigChange(DEFAULT_CONFIG, { ...mfa, "access.dormantDays": "30" }, ADMIN, { aal: "aal1" });
+    expect(plan.ok).toBe(false);
+    expect(planConfigChange({ ...DEFAULT_CONFIG, "security.mfaRequired": 1 }, { "security.mfaRequired": "0" }, ADMIN, { aal: "aal1" })).toMatchObject({ ok: true });
+  });
+  it("accepts only 0 or 1, and anything else stored means not required", () => {
+    const s = settingFor("security.mfaRequired")!;
+    expect(acceptValue(s, "2")).toBeNull();
+    expect(resolveConfig({ "security.mfaRequired": "yes" })["security.mfaRequired"]).toBe(0);
+    expect(resolveConfig({ "security.mfaRequired": 1 })["security.mfaRequired"]).toBe(1);
+  });
+  it("reads as a label in the history", () => {
+    expect(formatConfigValue(1, "security.mfaRequired")).toBe("Required");
+    expect(formatConfigValue(0, "security.mfaRequired")).toBe("Not required");
+    expect(formatConfigValue(30, "access.dormantDays")).toBe("30");
   });
 });

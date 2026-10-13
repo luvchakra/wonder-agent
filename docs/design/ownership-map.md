@@ -364,6 +364,10 @@ module reads through `getTenantConfig()`); `/settings/configuration` is EA's pag
 over them. It is the first slice of PA's PLATFORM-P0-13 Configuration Studio,
 built on FA's `tenant_settings`; the vendor-only platform boundary is unchanged.
 
+2026-10-13 (FOUNDATION-P0-27, MFA required): `my_memberships()` (0152) and the
+redefined `current_tenant_ids()` are FA's; `/verify-mfa` is FA's functional
+page over EA's shared primitives.
+
 2026-10-10 additions: `/sod` and `/sod/conflicts` compose AA's
 `listSoDRules()` / `toSoDConflict()` (`modules/access-governance/sodRules.ts`)
 and OA's `listAuditLogs()`; `/access/entitlements` composes AA's

@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
-import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
+import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantContext";
 import { getSessionUser } from "@/lib/tenant/session";
 import { SESSION_LAST_SEEN_COOKIE, SESSION_STARTED_COOKIE } from "@/lib/tenant/sessionSecurity";
 import { ORGANIZATION_NAME_MAX, newTenantSlug } from "@/lib/tenant/organizationName";
@@ -71,20 +71,11 @@ export async function selectTenantAction(formData: FormData) {
   const tenantId = String(formData.get("tenantId") ?? "");
   const user = await getSessionUser();
   if (!user) redirect("/sign-in");
-  const supabase = await supabaseServer();
-
-  // QA-P0-17: the caller's OWN membership. The tenant_memberships policy
-  // lets every member read the tenant's membership rows, so without the
-  // user filter an organization with two or more members returned several
-  // rows, maybeSingle() gave no data, and switching failed as "Not a member".
-  const { data: membership } = await supabase
-    .from("tenant_memberships")
-    .select("tenant_id")
-    .eq("tenant_id", tenantId)
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .maybeSingle();
-
+  // The caller's OWN active membership (my_memberships(), migration 0152).
+  // It includes an organization that requires MFA the session has not
+  // passed yet (RLS hides that membership row), so switching there leads to
+  // the MFA step rather than failing as "Not a member".
+  const membership = (await getMyMemberships()).find((m) => m.tenantId === tenantId);
   if (!membership) {
     throw new Error("Not a member of the requested tenant");
   }
@@ -94,8 +85,7 @@ export async function selectTenantAction(formData: FormData) {
   // (where the user signs in; sessions are per address).
   const host = await getHostTenant();
   if (host.target.kind === "subdomain" || host.target.kind === "invalid") {
-    const { data: target } = await supabase.from("tenants").select("slug").eq("id", tenantId).maybeSingle();
-    const url = target?.slug ? await urlForTenant(target.slug as string) : null;
+    const url = membership.slug ? await urlForTenant(membership.slug) : null;
     if (url) redirect(url);
   }
 
