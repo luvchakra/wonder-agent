@@ -1,5 +1,7 @@
 import { listAnnouncements, listTenants } from "@/modules/platform-admin/service";
 import { createAnnouncementAction } from "@/app/actions/platform";
+import { Badge, Button, Card, CardBody, CardHeader, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { PageHeading } from "../PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";
@@ -7,77 +9,108 @@ export const dynamic = "force-dynamic";
 /** PLATFORM-P0-05.4 — Maintenance Mode & Platform Announcements (Platform-admin side). */
 export default async function PlatformAnnouncementsPage() {
   const [announcements, tenants] = await Promise.all([listAnnouncements(), listTenants()]);
+  const tenantName = new Map(tenants.map((t) => [t.tenantId, t.name ?? t.tenantId]));
 
   return (
-    <main>
-      <h1>Announcements & Maintenance Windows</h1>
+    <>
+      <PageHeading title="Announcements" description="Notices and maintenance windows shown to customers." />
 
-      <h2>Publish a new notice</h2>
-      <form action={createAnnouncementAction}>
-        <p>
-          Scope:{" "}
-          <select name="scope" defaultValue="global">
-            <option value="global">global</option>
-            <option value="tenant">tenant</option>
-          </select>
-          {" · "}
-          Tenant (if scoped):{" "}
-          <select name="tenantId">
-            <option value="">—</option>
-            {tenants.map((t) => (
-              <option key={t.tenantId} value={t.tenantId}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </p>
-        <p>
-          Type:{" "}
-          <select name="type" defaultValue="notice">
-            <option value="notice">notice</option>
-            <option value="maintenance">maintenance</option>
-          </select>
-        </p>
-        <p>
-          Title: <input name="title" required />
-        </p>
-        <p>
-          Body: <textarea name="body" required />
-        </p>
-        <p>
-          Ends at (optional, leave blank for open-ended): <input name="endsAt" type="datetime-local" />
-        </p>
-        <button type="submit">Publish</button>
-      </form>
+      <Card>
+        <CardHeader title="Publish a notice" />
+        <CardBody>
+          <form action={createAnnouncementAction} className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label htmlFor="scope" className={fieldLabelClass}>
+                Scope
+              </label>
+              <select id="scope" name="scope" defaultValue="global" className={fieldInputClass}>
+                <option value="global">Everyone</option>
+                <option value="tenant">One organization</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="tenantId" className={fieldLabelClass}>
+                Organization (one organization only)
+              </label>
+              <select id="tenantId" name="tenantId" className={fieldInputClass}>
+                <option value="">—</option>
+                {tenants.map((t) => (
+                  <option key={t.tenantId} value={t.tenantId}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="type" className={fieldLabelClass}>
+                Type
+              </label>
+              <select id="type" name="type" defaultValue="notice" className={fieldInputClass}>
+                <option value="notice">Notice</option>
+                <option value="maintenance">Maintenance</option>
+              </select>
+            </div>
+            <div className="sm:col-span-2">
+              <label htmlFor="title" className={fieldLabelClass}>
+                Title
+              </label>
+              <input id="title" name="title" required className={fieldInputClass} />
+            </div>
+            <div>
+              <label htmlFor="endsAt" className={fieldLabelClass}>
+                Ends (optional)
+              </label>
+              <input id="endsAt" name="endsAt" type="datetime-local" className={fieldInputClass} />
+            </div>
+            <div className="sm:col-span-3">
+              <label htmlFor="body" className={fieldLabelClass}>
+                Message
+              </label>
+              <textarea id="body" name="body" required rows={3} className={fieldInputClass} />
+            </div>
+            <div className="sm:col-span-3">
+              <Button type="submit">Publish</Button>
+            </div>
+          </form>
+        </CardBody>
+      </Card>
 
-      <h2>All announcements</h2>
-      <table border={1} cellPadding={6}>
-        <thead>
-          <tr>
-            <th>Scope</th>
-            <th>Type</th>
-            <th>Title</th>
-            <th>Starts</th>
-            <th>Ends</th>
-          </tr>
-        </thead>
-        <tbody>
-          {announcements.map((a) => (
-            <tr key={a.id}>
-              <td>{a.scope === "tenant" ? (tenants.find((t) => t.tenantId === a.tenantId)?.name ?? a.tenantId) : "global"}</td>
-              <td>{a.type}</td>
-              <td>{a.title}</td>
-              <td>{a.startsAt}</td>
-              <td>{a.endsAt ?? "open-ended"}</td>
-            </tr>
-          ))}
-          {announcements.length === 0 && (
-            <tr>
-              <td colSpan={5}>No announcements yet.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </main>
+      {announcements.length === 0 ? (
+        <p className="text-sm text-muted-foreground">No announcements yet.</p>
+      ) : (
+        <Card>
+          <TableContainer label="Announcements" bare>
+            <Thead>
+              <tr>
+                <Th>Title</Th>
+                <Th>Type</Th>
+                <Th>Scope</Th>
+                <Th hideBelow="lg">Starts</Th>
+                <Th hideBelow="lg">Ends</Th>
+              </tr>
+            </Thead>
+            <tbody>
+              {announcements.map((a) => (
+                <Tr key={a.id}>
+                  <Td className="font-medium">{a.title}</Td>
+                  <Td>
+                    <Badge tone={a.type === "maintenance" ? "warning" : "info"} className="capitalize">
+                      {a.type}
+                    </Badge>
+                  </Td>
+                  <Td>{a.scope === "tenant" ? (tenantName.get(a.tenantId ?? "") ?? a.tenantId) : "Everyone"}</Td>
+                  <Td hideBelow="lg" className="text-muted-foreground">
+                    {new Date(a.startsAt).toLocaleString()}
+                  </Td>
+                  <Td hideBelow="lg" className="text-muted-foreground">
+                    {a.endsAt ? new Date(a.endsAt).toLocaleString() : "Open-ended"}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </TableContainer>
+        </Card>
+      )}
+    </>
   );
 }

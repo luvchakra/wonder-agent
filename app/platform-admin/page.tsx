@@ -1,4 +1,7 @@
+import Link from "next/link";
 import { listTenants, getPlatformHealth } from "@/modules/platform-admin/service";
+import { Card, CardHeader, StatCard } from "@/modules/ui";
+import { HealthSignals, PageHeading } from "./PageHeading";
 
 // Not statically analyzable as dynamic (the requirePlatformAdmin() auth
 // check lives in the enclosing layout, not this page) — force it, or a
@@ -6,27 +9,29 @@ import { listTenants, getPlatformHealth } from "@/modules/platform-admin/service
 // fails outside of a request context.
 export const dynamic = "force-dynamic";
 
-// Bare functional screen — see docs/design/UI-UX-DESIGN-RULES.md; Platform
-// Agent owns this console's UI directly (no Experience Agent restyle for
-// platform-admin per CLAUDE.md §2/ownership map), but polish is not this
-// story's acceptance criterion.
 export default async function PlatformOverviewPage() {
   const [tenants, health] = await Promise.all([listTenants(), getPlatformHealth()]);
+  const count = (status: string) => tenants.filter((t) => (t.status ?? "active") === status).length;
 
   return (
-    <main>
-      <h1>Platform Overview</h1>
-      <p>{tenants.length} tenant(s) provisioned.</p>
-      <h2>Health</h2>
-      <ul>
-        {health.signals.map((s) => (
-          <li key={s.name}>
-            [{s.status}] {s.name}
-            {s.detail ? ` — ${s.detail}` : ""}
-          </li>
-        ))}
-      </ul>
-      <p style={{ color: "#666" }}>Checked at {health.checkedAt}</p>
-    </main>
+    <>
+      <PageHeading title="Platform Overview" description="Every organization on WonderID and how the platform is running." />
+      <div className="grid gap-4 sm:grid-cols-3">
+        <StatCard label="Organizations" value={tenants.length} href="/platform-admin/tenants" />
+        <StatCard label="Active" value={count("active")} />
+        <StatCard label="Suspended" value={count("suspended")} tone={count("suspended") > 0 ? "warning" : "neutral"} />
+      </div>
+      <Card>
+        <CardHeader
+          title="Health"
+          actions={
+            <Link href="/platform-admin/health" className="text-xs font-medium text-primary hover:underline">
+              Details
+            </Link>
+          }
+        />
+        <HealthSignals health={health} />
+      </Card>
+    </>
   );
 }
