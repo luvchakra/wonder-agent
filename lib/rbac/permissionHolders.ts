@@ -45,3 +45,23 @@ export async function listPermissionHolders(tenantId: string, permissionKey: str
   }
   return [...holders].filter((u) => active.has(u));
 }
+
+/**
+ * ACCESS-P0-35 (owner decision 2026-10-14): how many active members hold
+ * the Tenant Administrator role in this tenant, directly or through an
+ * active group. Governance changes need a second person from two upward.
+ */
+export async function countActiveTenantAdministrators(tenantId: string): Promise<number> {
+  const supabase = supabaseServiceRole();
+  const { data: role } = await supabase.from("roles").select("id").is("tenant_id", null).eq("name", "TENANT_SUPER_ADMIN").maybeSingle();
+  if (!role) return 0;
+  const [{ data: direct }, { data: viaGroups }, { data: members }] = await Promise.all([
+    supabase.from("user_roles").select("user_id").eq("tenant_id", tenantId).eq("role_id", role.id),
+    supabase.from("group_roles").select("groups!inner(status, group_members(user_id))").eq("tenant_id", tenantId).eq("groups.status", "active").eq("role_id", role.id),
+    supabase.from("tenant_memberships").select("user_id").eq("tenant_id", tenantId).eq("status", "active"),
+  ]);
+  const active = new Set((members ?? []).map((m) => m.user_id as string));
+  const admins = new Set((direct ?? []).map((r) => r.user_id as string));
+  for (const row of (viaGroups ?? []) as unknown as { groups: { group_members: { user_id: string }[] } | null }[]) for (const m of row.groups?.group_members ?? []) admins.add(m.user_id);
+  return [...admins].filter((u) => active.has(u)).length;
+}
