@@ -275,7 +275,7 @@ export async function OnboardingPanel({ app, ctx }: { app: CatalogRow; ctx: { te
 
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
             <Card>
-              <CardHeader title="Approve" description="Someone other than the person who submitted it approves the exact version that was simulated." />
+              <CardHeader title="Approve" description="Someone other than the person who submitted it approves the exact version that was simulated; an administrator may approve their own, with a note." />
               <CardBody>
                 {o.status === "WAITING_FOR_APPROVAL" ? (
                   canManage ? (

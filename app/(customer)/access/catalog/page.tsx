@@ -96,7 +96,7 @@ export default async function RequestCatalogPage({ searchParams }: { searchParam
                       Request
                     </LinkButton>
                   ) : (
-                    <Badge tone="neutral">Not requestable</Badge>
+                    <Badge tone="neutral">{item.policy || item.entitlements.some((e) => e.policy) ? "Not requestable" : "No request policy"}</Badge>
                   )
                 }
               />
@@ -114,7 +114,13 @@ export default async function RequestCatalogPage({ searchParams }: { searchParam
                           ) : (
                             <span className="text-muted-foreground">{e.name}</span>
                           )}
-                          <span className="block text-xs text-muted-foreground">{approvalPreview(e.approval, e.risk)}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            {e.notRequestableReason === "no_policy"
+                              ? "Not requestable yet: no request policy says who approves it"
+                              : e.notRequestableReason === "entitlement"
+                                ? "Marked not requestable"
+                                : approvalPreview(e.approval, e.risk)}
+                          </span>
                         </span>
                         <Badge tone={RISK_TONE[e.risk]} className="shrink-0 whitespace-nowrap">{e.risk} risk</Badge>
                       </li>

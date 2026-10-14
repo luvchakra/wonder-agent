@@ -1,5 +1,6 @@
 "use server";
 
+import { TENANT_ADMIN_ROLE } from "@/lib/rbac/delegatedRoleRules";
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
@@ -149,7 +150,8 @@ export async function onboardingStepAction(applicationId: string, _prev: Applica
       const o = await simulateOnboarding(tenantId, actorId, applicationId);
       message = o.status === "FAILED" ? "The simulation failed." : "The simulation passed and was submitted for approval.";
     } else if (step === "approve" || step === "reject") {
-      await decideOnboarding(tenantId, actorId, applicationId, { approve: step === "approve", note: formData.get("note") });
+      // Owner decision 2026-10-14: an administrator may approve their own submission (with a note).
+      await decideOnboarding(tenantId, actorId, applicationId, { approve: step === "approve", note: formData.get("note") }, ctx.roles.includes(TENANT_ADMIN_ROLE));
       message = step === "approve" ? "Approved." : "Rejected.";
     } else if (step === "promote") {
       await promoteOnboarding(tenantId, actorId, applicationId);
