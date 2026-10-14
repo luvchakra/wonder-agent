@@ -25,13 +25,13 @@ request as each fix.
 **Status:** Not started, In progress, Partly fixed, Fixed (closure criteria
 met, with evidence), or Waiting on the owner.
 
-**Last updated:** 13 October 2026, 17:55 IST (statuses from the register's 13:07 IST audit; WID-H09 self-keep fixed, for the register to assess)
+**Last updated:** 14 October 2026, 13:45 IST (register's 14 Oct 12:06 IST audit: WID-H06 reopened, now fixed again for the register to assess; WID-H10 fixed with the owner's decision to keep the listed-address path; WID-C01's accepted gap now built)
 
 ## Summary
 
 | Finding | Priority | Status | Next step |
 |---|---|---|---|
-| WID-C01 Approval policy | P3 | Risk accepted by the owner | None: the register recorded ACCEPTED, safeguards verified (13 Oct, 09:06 IST). Revisit under "Decisions to come" |
+| WID-C01 Approval policy | P3 | Risk accepted by the owner; the accepted gap is now closed | None. Since 14 Oct (#190, owner decision) a request policy change in an organization with two or more administrators waits for a second one |
 | WID-C02 Revocation and expiry | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-C03 Gateway bypass | P2 | Fixed | None: the register confirmed it fixed; the residual prevention gap is accepted by the owner (13 Oct, 09:06 IST) |
 | WID-H01 Identity correlation | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
@@ -39,10 +39,11 @@ met, with evidence), or Waiting on the owner.
 | WID-H03 Incomplete syncs | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST); checksums wait for a system that offers one |
 | WID-H04 Rogue access provenance | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H05 Connector security | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 13:07 IST) |
-| WID-H06 Automation credentials | P2 | Fixed | None: the register confirmed it fixed (12 Oct, 12:40 IST) |
+| WID-H06 Automation credentials | P1 | Fixed, pending the register (register: REOPENED 14 Oct, 12:06 IST) | Done (14 Oct): no delegation of any scope names an automation member, in the service (409 `AUTOMATION_MEMBER`) and the database (migration 0182); negative tests on the API and in SQL. For the register to assess |
 | WID-H07 Audit and erasure | P2 | Fixed | None: the register confirmed it fixed (13 Oct, 09:06 IST) |
 | WID-H08 Automation address allow-list | P1 | Fixed | None: the register confirmed it fixed, edge spoofing tested end to end (13 Oct, 09:06 IST) |
-| WID-H09 Access SoD and birthright | P1 (register: High) | Fixed, pending the register (register: CHANGED) | Done (13 Oct, 17:55 IST): the register's self-keep bypass. The person whose access is under review can no longer keep it (`SELF_KEEP`, `keepRefusal`); refused attempts are audited. For the register to assess |
+| WID-H09 Access SoD and birthright | P1 (register: High) | Fixed | None: the register confirmed it fixed (13 Oct, 14:08 IST) |
+| WID-H10 Vendor console by listed email | P1 | Fixed, pending the register (register: OPEN) | Done (14 Oct): the listed-email path refuses enterprise SSO and Microsoft-only accounts and needs a sign-in that proves the mailbox; its first use is platform-audited. Owner decision (14 Oct): keep the path with this binding. For the register to assess |
 
 ## Owner decisions
 
@@ -57,6 +58,8 @@ was chosen in the sheet "WonderID: decisions pending with the owner".
 | 13 Oct 2026 | WID-H09 | What happens to birthright packages a mover no longer qualifies for? | **A dated review, then automatic removal.** The person's manager gets a task to keep or remove each one; whatever is not kept by the deadline is removed. | Done: migration 0153; the mover event opens a 14-day review listed on the manager's task; Keep (`access.manage`) stops it; at the date the expiry sweep revokes the assignment through the normal removal path. E2E `birthright.spec.ts` "WID-H09". |
 | 13 Oct 2026 | WID-H09 | Access-combination SoD: correct the docs or build it? | **Docs now, build later.** | Done: the knowledge base describes the process SoD that exists and says access-combination SoD is not provided yet. Building it is a backlog story (ACCESS-P1). |
 | 13 Oct 2026 | Non-negotiable #15 (IDENTITY-P0-18) | How does a joiner or mover get birthright access? | **Pre-approved: assigned automatically.** Marking a package birthright takes two administrators (four-eyes), and that is the approval. | Done: migration 0151 (applied), `setPackageBirthright` / `assignBirthrightPackages`; a change to contents or eligibility needs approval again. |
+| 14 Oct 2026 | WID-H10 | Keep `PLATFORM_ADMIN_EMAILS`, or retire it for the audited `platform_admins` table? | **Keep it, with the binding.** | Done: the path admits only email, Google or LinkedIn sign-ins, never SSO or Microsoft-only; its first use per person is platform-audited. It still depends on Supabase's "Confirm email" setting staying on, and removal still needs a redeploy. |
+| 14 Oct 2026 | WID-C01 | Second-administrator approval for request policy changes? | **Yes, in organizations with two or more administrators.** | Done (#190, ACCESS-P0-35 part 1): such a change waits for someone else; every applied change is versioned. |
 | 12 Oct 2026 | WID-C01 | Should a second administrator approve changes that loosen a request policy? | **No; leave as it is.** One administrator may loosen a policy; the change is audited. | No maker/checker build. The risk is accepted; it is revisited under "Decisions to come". |
 | 12 Oct 2026 | WID-C02 | May a connection carry out a leaver's removals? | **The connector disables the leaver's account at once; removing each access stays a person's task.** | Done: when a person is disabled or terminated, each account on a connection that supports disabling, with changes turned on, is disabled by the connector. This is an approved automation path under non-negotiable #15. Failures become a person's task. The per-access removal tasks stay as today. |
 | 12 Oct 2026 | WID-C03 | Should the Runtime Gateway be the only path for agents? | **A per-agent "gateway only" setting.** | Done: when on, a detected direct call is a critical finding and the agent is suspended at the gateway automatically (`agent_suspension` control). The owner approved that automatic suspension under #15. |
@@ -79,7 +82,6 @@ stands. Claude raises each one with options when its trigger arrives.
 
 | Finding | Question | Trigger | Until then |
 |---|---|---|---|
-| WID-C01 | Add a second-administrator approval for loosening request policies after all? | An enterprise customer or a SOX/SOC 2 auditor asks for maker/checker on configuration. | One administrator may loosen a policy, audited. |
 | WID-C02 | Should connectors also carry out a leaver's access removals (not only disable the account)? | Once disable-on-leave has run in production and its failure rate is known. | People remove each access; the connector only disables the account. |
 | WID-C02 | Should disable-on-leave be a per-connection setting instead of following the connection's changes switch? | A customer wants changes on for approved requests but not for leavers. | It follows the changes switch and the connection type's support for disabling. |
 | WID-C03 | Should WonderID hold agents' target credentials so the gateway becomes real prevention? | A customer needs prevention rather than detection, or detection proves too late. | Detection plus automatic suspension for agents set to "gateway only". |
@@ -650,6 +652,24 @@ Tests:
   - cross-tenant: the credential reads only its own organization;
   - the refusal audit rows, and the database refusing 400 days.
 
+**Reopened and fixed again (14 October 2026).** The register reopened this
+at 12:06 IST: administration delegation (#189) could copy a person's roles
+to an automation credential's backing member, outside the escalation check
+and the four-eyes re-approval. Done:
+- `createDelegation` refuses an automation member as delegator or delegate,
+  for every scope (409 `AUTOMATION_MEMBER`; `delegationMemberRefusal`,
+  `delegationRules.ts`; `delegationRules.test.ts`, 4 cases);
+- migration 0182: triggers refuse such a delegation, and any `user_roles`
+  row with a `delegation_id` for an automation member, for every writer
+  including the service role. Live check `tests/access/delegations-no-automation.sql`:
+  5/5 (both refusals, two people still accepted, no delegated copy, the
+  credential's own role path still works);
+- E2E `automation-credentials.spec.ts` "WID-H06: no delegation, of any
+  scope, gives a credential roles or acts for one": the API refuses all
+  three scopes both ways and no row is written.
+So the only path that writes `user_roles` for an automation member is the
+credential's own page (`assignAutomationCredentialRole`).
+
 ### WID-H07: audit and erasure (P2, fixed)
 
 **Done:** a SQL test of the audit trail's rules
@@ -834,3 +854,30 @@ with no linked identity is not the person under review. Test:
 `packageRules.test.ts` "a mover review is decided by someone else".
 Not done (optional in the register): a failed mover review becomes a task
 as well as an audit row.
+
+### WID-H10: vendor console by listed email (P1, fixed pending the register)
+
+The register raised this on 13 October (14:08 IST): `PLATFORM_ADMIN_EMAILS`
+opened the vendor console for any confirmed account with a listed email,
+whatever signed it in, so an IdP-asserted email (enterprise SSO, or
+Microsoft, whose email claim is not verified) could reach it.
+
+**Done (14 October 2026):**
+- the listed-email path admits only an account that is not an SSO user,
+  has no `sso:` identity, and has at least one identity from a sign-in
+  that proves the mailbox: email, Google or LinkedIn
+  (`PROVEN_EMAIL_PROVIDERS`, `isListedPlatformAdmin`,
+  `lib/rbac/platformAdminEmails.ts`). A Microsoft-only account is refused;
+- the first console access through the variable writes a platform audit
+  record (`platform.admin_access_via_env`, `requirePlatformAdmin.ts`);
+- test `platformAdminEmails.test.ts` "WID-H10" (SSO, SSO with an email
+  identity, Microsoft-only and no identity refused; Google and email
+  admitted);
+- checked before the change: the owner's own account signs in with Google
+  and is still admitted.
+
+**Owner decision (14 October 2026): keep the variable, with this binding.**
+Accepted consequences: the path still depends on Supabase's "Confirm
+email" setting staying on, and removing an address still needs a
+redeploy. Grants through the `platform_admins` table remain the audited
+alternative.
