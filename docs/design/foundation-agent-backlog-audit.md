@@ -3413,5 +3413,7 @@ signed it in. Done, pending the owner's decision on keeping the path:
 
 Verified: typecheck; eslint; `platformAdminEmails.test.ts` 3/3 (1 new,
 "WID-H10"); local E2E `platform-admin.spec.ts` with the delegation and
-automation specs: 32/32. Left for the owner: keep the variable, or retire it for the
-table. Tracker: `docs/WonderID/FINDINGS-REMEDIATION.md`, WID-H10.
+automation specs: 32/32. Owner decision (14 Oct, 13:45 IST): keep the variable with this
+binding; it still relies on Supabase's "Confirm email" setting, and removal
+still needs a redeploy. Tracker: `docs/WonderID/FINDINGS-REMEDIATION.md`,
+WID-H10.
