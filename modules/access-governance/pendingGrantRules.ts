@@ -3,17 +3,25 @@
  * pending grant. The service (pendingGrants.ts) loads and writes.
  */
 
-export type SubjectAccount = { id: string; status: string };
+export type SubjectAccount = { id: string; status: string; accountType?: string };
 
 /**
  * Which account of the subject on the application holds the requested
  * grant: its one real account; else the placeholder a request already
  * made; else a new placeholder. Several real accounts are ambiguous: the
- * request does not pick one (§17.6), and nothing is created.
+ * request does not pick one (§17.6), and nothing is created, except that
+ * standard access goes to the one standard account when the others are
+ * privileged, service or shared accounts (a person's admin account is not
+ * where their everyday access belongs). Privileged access is never placed
+ * by that rule.
  */
-export function chooseAccount(accounts: SubjectAccount[]): { kind: "existing"; accountId: string } | { kind: "create" } | { kind: "ambiguous"; count: number } {
+export function chooseAccount(accounts: SubjectAccount[], opts: { privilegedEntitlement?: boolean } = {}): { kind: "existing"; accountId: string } | { kind: "create" } | { kind: "ambiguous"; count: number } {
   const real = accounts.filter((a) => a.status !== "pending");
-  if (real.length > 1) return { kind: "ambiguous", count: real.length };
+  if (real.length > 1) {
+    const standard = real.filter((a) => (a.accountType ?? "standard") === "standard");
+    if (!opts.privilegedEntitlement && standard.length === 1) return { kind: "existing", accountId: standard[0].id };
+    return { kind: "ambiguous", count: real.length };
+  }
   if (real.length === 1) return { kind: "existing", accountId: real[0].id };
   const placeholder = accounts.find((a) => a.status === "pending");
   return placeholder ? { kind: "existing", accountId: placeholder.id } : { kind: "create" };

@@ -3860,3 +3860,18 @@ Access managers can choose whose approvals.
     leftovers, and the second request uses its own entitlement.
 - Typecheck, eslint and `next build` are clean. Migration 0176 is applied
   to the dev project.
+
+## 2026-10-14 — Approved access lands on a person's one standard account (found by QA-P0-22)
+
+**Defect.** `chooseAccount` (ACCESS-P0-28) refused to pick between several real accounts, so a person with an everyday account and an admin account on the same application got no pending grant and no fulfilment task after approval. The request showed `untracked` and nobody was asked to act. This pairing is the common case in a brownfield estate.
+
+**Change.** `pendingGrantRules.chooseAccount` takes the accounts' `accountType`:
+- When several real accounts exist and exactly one is `standard`, standard access goes to that one.
+- An `elevated` or `admin` entitlement is never placed by this rule.
+- Neither is a subject with two standard accounts; both still stay unchosen (§17.6).
+
+`pendingGrants.accountFor` reads `account_type` and the entitlement's `privilege_level`, failing safe: an unreadable entitlement counts as privileged.
+
+**Verified.**
+- `pendingGrantRules.test.ts` 14/14, with a new case covering standard plus admin, privileged entitlements and two standard accounts.
+- `brownfield.spec.ts` 7/7 and `f1-reconciliation.spec.ts` 17/17 against a local production build.

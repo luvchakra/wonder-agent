@@ -28,13 +28,21 @@ type Row = Record<string, unknown>;
 type Subject = { identityId: string | null; agentId: string | null };
 type Line = { applicationId: string; entitlementId: string | null; requestId: string | null; itemId: string | null };
 
-async function accountFor(tenantId: string, applicationId: string, subject: Subject): Promise<string | null> {
+/** Whether the entitlement is elevated or admin access; unknown counts as privileged (fails safe). */
+async function isPrivilegedEntitlement(tenantId: string, entitlementId: string): Promise<boolean> {
+  const { data, error } = await supabaseServiceRole().from("entitlements").select("tenant_id, privilege_level").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle();
+  if (error || !data || data.tenant_id !== tenantId) return true;
+  return data.privilege_level !== "standard";
+}
+
+async function accountFor(tenantId: string, applicationId: string, subject: Subject, entitlementId: string | null = null): Promise<string | null> {
   const admin = supabaseServiceRole();
-  let q = admin.from("accounts").select("id, tenant_id, status").eq("tenant_id", tenantId).eq("application_id", applicationId).neq("status", "disabled");
+  let q = admin.from("accounts").select("id, tenant_id, status, account_type").eq("tenant_id", tenantId).eq("application_id", applicationId).neq("status", "disabled");
   q = subject.agentId ? q.eq("agent_id", subject.agentId) : q.eq("identity_id", subject.identityId!);
   const { data, error } = await q.limit(10);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  const choice = chooseAccount(((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => ({ id: r.id as string, status: r.status as string })));
+  const accounts = ((data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => ({ id: r.id as string, status: r.status as string, accountType: r.account_type as string }));
+  const choice = chooseAccount(accounts, { privilegedEntitlement: accounts.length > 1 && entitlementId ? await isPrivilegedEntitlement(tenantId, entitlementId) : false });
   if (choice.kind === "ambiguous") return null;
   if (choice.kind === "existing") return choice.accountId;
   const ref = placeholderRef(subject);
@@ -113,7 +121,7 @@ async function pendLines(tenantId: string, subject: Subject, lines: Line[], audi
   for (const line of lines) {
     // A line for an application alone asks for an account: that is ACCESS-P0-30, not tracked here yet.
     if (!line.entitlementId) continue;
-    const accountId = await accountFor(tenantId, line.applicationId, subject);
+    const accountId = await accountFor(tenantId, line.applicationId, subject, line.entitlementId);
     if (!accountId) {
       results.push({ applicationId: line.applicationId, entitlementId: line.entitlementId, accountId, grantId: null });
       continue;

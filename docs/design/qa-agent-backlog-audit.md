@@ -1959,3 +1959,30 @@ explained.**
 - Mutation check: a temporary ungated route and a temporary ungated action each failed the sweep, and the run passed again once they were removed.
 
 **Left.** QA-P0-06's real SAML/OIDC exchange, and the real-IdP part of QA-P0-02.2, need the SSO provider configured (owner action, FOUNDATION-P0-03.3).
+
+## 2026-10-14 — QA-P0-22: brownfield migration fixture (partial)
+
+**What was built.** `tests/e2e/brownfield.spec.ts` brings an organization that ran for years without WonderID under governance, through the app's own routes:
+- **People.** An HR CSV creates two people and holds a match that fits two existing identities for a person to decide. A lower-precedence directory disagrees on a department: the HR value stays and the disagreement is listed.
+- **Accounts.** One application's connector staging holds eight accounts, and each lands where it belongs:
+  - a person's everyday account and their admin account (`privileged`);
+  - a stale account, last used in 2024 (`dormant`);
+  - an orphan;
+  - an account whose address fits two people (`ambiguous`, nobody picked);
+  - a service account owned by the person the source names;
+  - an AI agent's account, by its declared client id;
+  - an external contractor's account, with a sponsor and an end date.
+- **Baseline.** Every grant without a request id is `LEGACY_EXCEPTION`, with no findings, and a re-run changes nothing.
+- **Request.** The person asks for more access, the application owner approves, and a fulfilment task is done. The source then shows the access: the request is verified and the ledger shows `VALID`.
+- **Removal.** Stale access is removed the same way and ends `REVOKED` and verified.
+- **Isolation.** Another organization sees none of the accounts, the request or the person.
+
+**Found and fixed (Access module, recorded in its audit log).** A person with a standard account and an admin account on the same application got no fulfilment task after approval. The request stayed `untracked`.
+
+**Verified.**
+- Local production build: `brownfield.spec.ts` 7/7, after a run that exposed the defect above.
+- `f1-reconciliation.spec.ts` 17/17 with the fix in place.
+- `pendingGrantRules.test.ts` 14/14.
+- Typecheck and eslint are clean.
+
+**Left.** The certification step needs campaigns over people's application access (COMPLIANCE-P0-10). Today's campaigns certify AI agents' access only. Once that story lands, the step goes into this spec and the story becomes Done.
