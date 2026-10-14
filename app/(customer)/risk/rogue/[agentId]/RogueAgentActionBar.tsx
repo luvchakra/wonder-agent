@@ -20,7 +20,7 @@ import { ConfirmActionDialog, type ConfirmActionResult, Button, LinkButton } fro
  * own story pass (CLAUDE.md non-negotiable #18). Recorded as a dependency
  * in the Experience Agent audit log rather than silently built around.
  */
-export function RogueAgentActionBar({ agentId, agentName }: { agentId: string; agentName: string }) {
+export function RogueAgentActionBar({ agentId, agentRef, agentName }: { agentId: string; agentRef: number | string; agentName: string }) {
   const router = useRouter();
 
   async function transition(toState: string, reason: string): Promise<ConfirmActionResult> {
@@ -66,7 +66,7 @@ export function RogueAgentActionBar({ agentId, agentName }: { agentId: string; a
         onDone={(result) => result.kind === "single" && result.success && router.refresh()}
       />
 
-      <LinkButton href={`/agents/${agentId}#owners`} variant="outline" size="sm">
+      <LinkButton href={`/agents/${agentRef}#owners`} variant="outline" size="sm">
         Assign owner
       </LinkButton>
 

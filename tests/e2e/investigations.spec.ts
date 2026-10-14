@@ -2,6 +2,7 @@ import { test, expect, type Page } from "@playwright/test";
 import { authFile, TENANT_ONE, TEST_USERS } from "./support/testUsers";
 import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
 import { markFindingsResolved, seedFindings } from "./support/seedFindings";
+import { agentIdOnPage } from "./support/objectRefs";
 
 /**
  * RISK-P0-11 — investigations, against the real app and database:
@@ -26,8 +27,8 @@ async function registerAgent(page: Page): Promise<string> {
   await page.getByLabel("Agent name").fill(`E2E Investigated Agent ${stamp}`);
   await page.getByLabel("Agent type").fill("automation");
   await page.getByRole("button", { name: "Register", exact: true }).click();
-  await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
-  return page.url().split("/agents/")[1];
+  await expect(page).toHaveURL(/\/agents\/\d+$/);
+  return agentIdOnPage(page);
 }
 
 test.describe.serial("investigations", () => {

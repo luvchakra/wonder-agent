@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getFindings } from "@/modules/risk/service";
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -17,7 +18,7 @@ const labelClass = "block text-sm font-medium text-muted-foreground";
  * layout). Risk Agent owns the finding lifecycle itself; Experience Agent
  * only composes and presents it — see EXPERIENCE-P0-03/04/06. */
 export default async function AgentRiskPage({ params }: { params: Promise<{ agentId: string }> }) {
-  const { agentId } = await params;
+  const { agentId: raw } = await params;
   let ctx;
   try {
     ctx = await requirePermission("risk.read");
@@ -26,6 +27,8 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
     throw err;
   }
 
+  // FOUNDATION-P0-34: the URL carries the agent's number; an old UUID link redirects.
+  const agentId = await pageRef(ctx.tenantId!, "agents", raw, (ref) => `/risk/agents/${ref}`);
   const agent = await getAgent(ctx.tenantId!, agentId);
   if (!agent) redirect("/agents");
 
@@ -42,7 +45,7 @@ export default async function AgentRiskPage({ params }: { params: Promise<{ agen
         </p>
       </div>
 
-      <AgentTabs agentId={agentId} active="risk" />
+      <AgentTabs agentRef={agent.ref ?? agentId} active="risk" />
 
       <Suspense fallback={null}>
         <FindingEvidenceDrawer />

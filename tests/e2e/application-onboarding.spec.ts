@@ -163,7 +163,8 @@ test.describe.serial("application onboarding", () => {
   test("the onboarding screen shows the steps, the checklist and the live version", async ({ page }) => {
     // Shown in the application's Onboarding tab; the old address lands there.
     await page.goto(`/access/applications/${appId}/onboarding`);
-    await expect(page).toHaveURL(new RegExp(`/access/applications/${appId}\\?tab=onboarding`));
+    // FOUNDATION-P0-34: an old UUID link lands on the application's number, keeping the tab.
+    await expect(page).toHaveURL(/\/access\/applications\/\d+\?tab=onboarding$/);
     await expect(page.getByRole("tab", { name: "Onboarding", selected: true })).toBeVisible();
     await expect(page.getByRole("list", { name: "Onboarding steps" })).toBeVisible();
     await expect(page.getByText("Identity/account schema validated")).toBeVisible();

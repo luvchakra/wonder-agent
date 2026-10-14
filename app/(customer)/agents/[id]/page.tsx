@@ -3,6 +3,8 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { authorizeContext, requirePermissionFor } from "@/lib/rbac/authorize";
 import { agentResource } from "@/app/_shared/agentScope";
+import { pageRef } from "@/lib/refs/objectRef";
+import { getTenantContext } from "@/lib/tenant/getTenantContext";
 import {
   getAgent,
   getAgentContract,
@@ -169,7 +171,11 @@ const labelClass = "block text-sm font-medium text-muted-foreground";
  * Risk tabs are their owning module's own routes, composed here only via
  * AgentTabs — see EXPERIENCE-P0-03. */
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  const raw = (await params).id;
+  // FOUNDATION-P0-34: the URL carries the agent's number; an old UUID link redirects.
+  // Without a tenant the permission check below refuses, as before.
+  const { tenantId } = await getTenantContext();
+  const id = tenantId ? await pageRef(tenantId, "agents", raw, (ref) => `/agents/${ref}`) : raw;
   // Scoped grants count here: this page names the agent (FOUNDATION-P0-19).
   const ctx = await requirePermissionFor("agent.read", agentResource(id));
 
@@ -288,11 +294,11 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             phone or tablet, instead of one unbreakable row pushing the page
             sideways; beside the title from xl. */}
         <div className="w-full xl:w-auto xl:max-w-[50%]">
-          <AgentPrimaryActionBar agentId={id} agentName={agent.agentName} />
+          <AgentPrimaryActionBar agentId={id} agentRef={agent.ref ?? id} agentName={agent.agentName} />
         </div>
       </div>
 
-      <AgentTabs agentId={id} active="overview" />
+      <AgentTabs agentRef={agent.ref ?? id} active="overview" />
 
       <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         {/* EXPERIENCE-P0-12 — PRD §35's worked layout header fields, now the
@@ -333,7 +339,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
             title="Key metrics"
             description={`${ACCESS_VIEW.can}, from connected IAM data`}
             actions={
-              <Link href={`/access/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
+              <Link href={`/access/agents/${agent.ref ?? id}`} className="text-xs font-medium text-primary hover:underline">
                 View access
               </Link>
             }
@@ -402,7 +408,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           <CardHeader
             title="Recent activity"
             actions={
-              <Link href={`/runtime/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
+              <Link href={`/runtime/agents/${agent.ref ?? id}`} className="text-xs font-medium text-primary hover:underline">
                 View all
               </Link>
             }
@@ -433,7 +439,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
           <CardHeader
             title="Risk summary"
             actions={
-              <Link href={`/risk/agents/${id}`} className="text-xs font-medium text-primary hover:underline">
+              <Link href={`/risk/agents/${agent.ref ?? id}`} className="text-xs font-medium text-primary hover:underline">
                 View findings
               </Link>
             }

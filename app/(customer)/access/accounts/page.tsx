@@ -67,7 +67,7 @@ export default async function AccountInventoryPage({
         <div className="min-w-0">
           {app ? (
             <nav aria-label="Breadcrumb" className="mb-1 text-xs text-muted-foreground">
-              <Link href={`/access/applications/${app.id}`} className="hover:text-foreground hover:underline">
+              <Link href={`/access/applications/${app.ref ?? app.id}`} className="hover:text-foreground hover:underline">
                 {app.displayName ?? app.name}
               </Link>
               <span aria-hidden> / </span>
@@ -149,7 +149,7 @@ export default async function AccountInventoryPage({
                 {rows.map((a) => (
                   <Tr key={a.id}>
                     <Td>
-                      <Link href={`/access/accounts/${a.id}`} className="font-medium text-primary hover:underline">
+                      <Link href={`/access/accounts/${a.ref ?? a.id}`} className="font-medium text-primary hover:underline">
                         {a.accountName ?? a.externalAccountRef}
                       </Link>
                       <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
@@ -161,7 +161,7 @@ export default async function AccountInventoryPage({
                     <Td>
                       {a.identityId ? (
                         <span className="text-sm">
-                          <Link href={a.agentId ? `/agents/${a.agentId}` : `/identities/${a.identityId}`} className="hover:underline">
+                          <Link href={a.agentId ? `/agents/${a.agentRef ?? a.agentId}` : `/identities/${a.identityId}`} className="hover:underline">
                             {a.identityName ?? "Unknown identity"}
                           </Link>
                           <span className="block text-xs text-muted-foreground">
@@ -175,7 +175,7 @@ export default async function AccountInventoryPage({
                     </Td>
                     {app ? null : (
                       <Td hideBelow="lg">
-                        <Link href={`/access/applications/${a.applicationId}`} className="hover:underline">
+                        <Link href={`/access/applications/${a.applicationRef ?? a.applicationId}`} className="hover:underline">
                           {a.applicationName}
                         </Link>
                       </Td>

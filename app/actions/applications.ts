@@ -56,7 +56,8 @@ export async function registerApplicationAction(_prev: ApplicationFormState, for
   const ctx = await requirePermission("access.manage");
   let id: string;
   try {
-    id = (await registerApplication(ctx.tenantId!, ctx.userId, fields(formData))).id;
+    const app = await registerApplication(ctx.tenantId!, ctx.userId, fields(formData));
+    id = String(app.ref ?? app.id);
   } catch (err) {
     return formError(err);
   }
@@ -71,7 +72,7 @@ export async function updateApplicationAction(applicationId: string, _prev: Appl
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/access/applications/${applicationId}`);
+  revalidatePath("/(customer)/access/applications/[id]", "page");
   revalidatePath("/access");
   return { status: "saved", message: "Saved." };
 }
@@ -90,9 +91,9 @@ const CONFIG_FIELDS = [
 ] as const;
 const CONFIG_FLAGS = ["createAccount", "updateAccount", "disableAccount", "deleteAccount", "grantAccess", "revokeAccess", "provenanceEnabled"] as const;
 
-function revalidateApplication(applicationId: string) {
-  revalidatePath(`/access/applications/${applicationId}/onboarding`);
-  revalidatePath(`/access/applications/${applicationId}`);
+// The page's URL carries the application's number (FOUNDATION-P0-34), so the route is revalidated.
+function revalidateApplication() {
+  revalidatePath("/(customer)/access/applications/[id]", "page");
   revalidatePath("/access");
 }
 
@@ -103,7 +104,7 @@ export async function startOnboardingAction(applicationId: string, _prev: Applic
   } catch (err) {
     return formError(err);
   }
-  revalidateApplication(applicationId);
+  revalidateApplication();
   return { status: "saved", message: "Onboarding started." };
 }
 
@@ -117,7 +118,7 @@ export async function answerOnboardingAction(applicationId: string, _prev: Appli
   } catch (err) {
     return formError(err);
   }
-  revalidateApplication(applicationId);
+  revalidateApplication();
   return { status: "saved", message: "Answers saved." };
 }
 
@@ -130,7 +131,7 @@ export async function configureOnboardingAction(applicationId: string, _prev: Ap
   try {
     const before = formData.get("configVersion");
     const after = await configureOnboarding(ctx.tenantId!, ctx.userId, applicationId, config);
-    revalidateApplication(applicationId);
+    revalidateApplication();
     return { status: "saved", message: String(after.configVersion) === before ? "No changes." : `Saved as version ${after.configVersion}.` };
   } catch (err) {
     return formError(err);
@@ -163,7 +164,7 @@ export async function onboardingStepAction(applicationId: string, _prev: Applica
   } catch (err) {
     return formError(err);
   }
-  revalidateApplication(applicationId);
+  revalidateApplication();
   return { status: "saved", message };
 }
 
@@ -171,7 +172,7 @@ export async function applicationLifecycleAction(applicationId: string, _prev: A
   const ctx = await requirePermission("access.manage");
   try {
     const to = await setApplicationLifecycle(ctx.tenantId!, ctx.userId, applicationId, formData.get("lifecycle"), formData.get("note"));
-    revalidateApplication(applicationId);
+    revalidateApplication();
     return { status: "saved", message: `The application is now ${to.toLowerCase()}.` };
   } catch (err) {
     return formError(err);

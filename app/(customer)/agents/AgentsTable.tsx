@@ -28,6 +28,8 @@ const ENVIRONMENTS = ["production", "staging", "development"];
 
 export type AgentRow = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs. */
+  ref: number | null;
   agentName: string;
   displayName: string | null;
   agentType: string;
@@ -98,7 +100,7 @@ function lastSeen(iso: string | null, nowMs: number): string {
 function AgentCell({ agent }: { agent: AgentRow }) {
   const name = nameOf(agent);
   return (
-    <Link href={`/agents/${agent.id}`} className="group flex min-w-0 max-w-[18rem] items-center gap-3">
+    <Link href={`/agents/${agent.ref ?? agent.id}`} className="group flex min-w-0 max-w-[18rem] items-center gap-3">
       <span
         aria-hidden="true"
         className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-[11px] font-semibold uppercase text-primary"
@@ -208,7 +210,7 @@ export function AgentsTable({ agents, nowMs }: { agents: AgentRow[]; nowMs: numb
       key: "chevron",
       header: "",
       render: (a) => (
-        <Link href={`/agents/${a.id}`} aria-label={`Open ${nameOf(a)}`} className="block text-muted-foreground hover:text-foreground">
+        <Link href={`/agents/${a.ref ?? a.id}`} aria-label={`Open ${nameOf(a)}`} className="block text-muted-foreground hover:text-foreground">
           <ChevronRight className="size-4" aria-hidden="true" />
         </Link>
       ),
@@ -259,7 +261,7 @@ export function AgentsTable({ agents, nowMs }: { agents: AgentRow[]; nowMs: numb
         // name, source, status, chevron — so supply it.
         renderCard={(a) => (
           <Link
-            href={`/agents/${a.id}`}
+            href={`/agents/${a.ref ?? a.id}`}
             className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
           >
             <span

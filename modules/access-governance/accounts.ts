@@ -44,6 +44,10 @@ export const ACCOUNT_VIEWS: AccountView[] = ["all", "orphan", "ambiguous", "dorm
 
 export type InventoryAccount = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs, and its application's and agent's. */
+  ref: number | null;
+  applicationRef: number | null;
+  agentRef: number | null;
   externalAccountRef: string;
   accountName: string | null;
   applicationId: string;
@@ -68,15 +72,18 @@ export type InventoryAccount = {
 export type AccountFilter = { view?: AccountView; applicationId?: string; q?: string; dormantDays?: number; page?: number; pageSize?: number };
 
 const COLUMNS =
-  "id, external_account_ref, account_name, application_id, agent_id, identity_id, correlation, account_type, status, source, source_integration_id, last_used_at, last_seen_at, missing_from_source_at, created_at, updated_at, applications(name, display_name)";
+  "id, external_account_ref, account_name, application_id, agent_id, identity_id, correlation, account_type, status, source, source_integration_id, last_used_at, last_seen_at, missing_from_source_at, created_at, updated_at, ref, applications(name, display_name, ref), agents(ref)";
 
-type Row = Record<string, unknown> & { applications: { name: string; display_name: string | null } | null };
+type Row = Record<string, unknown> & { applications: { name: string; display_name: string | null; ref: number | null } | null; agents: { ref: number | null } | null };
 
 function toAccount(r: Row, names: Map<string, { displayName: string; identityType: IdentityType }>, now: Date, days: number): InventoryAccount {
   const identityId = (r.identity_id as string | null) ?? null;
   const who = identityId ? names.get(identityId) : undefined;
   const a = {
     id: r.id as string,
+    ref: (r.ref as number | null) ?? null,
+    applicationRef: r.applications?.ref ?? null,
+    agentRef: r.agents?.ref ?? null,
     externalAccountRef: r.external_account_ref as string,
     // A request's placeholder from before account name formats reads "to be created", never its internal reference.
     accountName: (r.account_name as string | null) ?? ((r.external_account_ref as string).startsWith("pending:") ? accountDisplayName(null, r.external_account_ref as string) : null),

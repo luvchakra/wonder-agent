@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { listRuntimeEvents, getDid, compareShouldCanDid } from "@/modules/runtime-assurance/service";
 import { getAgent } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -55,7 +56,7 @@ const NOW_EFFECTIVE: Record<string, string> = {
  * comparison logic itself; Experience Agent only composes it — see
  * EXPERIENCE-P0-03. */
 export default async function AgentRuntimePage({ params }: { params: Promise<{ agentId: string }> }) {
-  const { agentId } = await params;
+  const { agentId: raw } = await params;
   let ctx;
   try {
     ctx = await requirePermission("runtime.read");
@@ -64,6 +65,8 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
     throw err;
   }
 
+  // FOUNDATION-P0-34: the URL carries the agent's number; an old UUID link redirects.
+  const agentId = await pageRef(ctx.tenantId!, "agents", raw, (ref) => `/runtime/agents/${ref}`);
   const agent = await getAgent(ctx.tenantId!, agentId);
   if (!agent) redirect("/agents");
 
@@ -83,7 +86,7 @@ export default async function AgentRuntimePage({ params }: { params: Promise<{ a
         <p className="mt-1 text-sm text-muted-foreground">Runtime Assurance — {ACCESS_VIEW.did}: what this agent actually did, compared with {ACCESS_VIEW.should} and {ACCESS_VIEW.can}.</p>
       </div>
 
-      <AgentTabs agentId={agentId} active="runtime" />
+      <AgentTabs agentRef={agent.ref ?? agentId} active="runtime" />
 
       <Suspense fallback={null}>
         <RuntimeEventEvidenceDrawer events={eventsPage.events} />

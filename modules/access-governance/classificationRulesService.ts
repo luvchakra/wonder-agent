@@ -43,6 +43,8 @@ const APPLY_ON_PUBLISH_LIMIT = 5000;
 
 export type ClassificationRule = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref: number | null;
   name: string;
   description: string | null;
   triggerType: string;
@@ -63,6 +65,7 @@ export type ClassificationRule = {
 function toRule(r: Row): ClassificationRule {
   return {
     id: r.id as string,
+    ref: (r.ref as number | null) ?? null,
     name: r.name as string,
     description: (r.description as string | null) ?? null,
     triggerType: r.trigger_type as string,

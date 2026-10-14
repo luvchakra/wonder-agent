@@ -130,7 +130,7 @@ export function PackageForm({ packageId, defaults, people }: { packageId: string
         <Submit pending={pending}>{packageId ? "Save package" : "Create package"}</Submit>
         <Outcome state={state} />
         {state.status === "saved" && !packageId && state.id ? (
-          <a href={`/access/packages/${state.id}`} className="text-xs font-medium text-primary hover:underline">
+          <a href={`/access/packages/${state.ref ?? state.id}`} className="text-xs font-medium text-primary hover:underline">
             Open it
           </a>
         ) : null}

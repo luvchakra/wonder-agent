@@ -4359,3 +4359,42 @@ this and on another agent's main-based server alike), CSV runs still
 `ledger://fy2026` text in `mcp-inventory`; none involves these pages. The
 nightly run is the full check.
 
+
+## 2026-10-14 — Numbers in access page URLs (FOUNDATION-P0-34, part 2)
+
+Owner decision (CLAUDE.md §19.13): object pages show the object's number per
+organization, never its UUID. Converted with `pageRef()` (404 for an unknown
+number, an old UUID link redirects keeping the query string):
+`/access/accounts/[id]`, `/access/applications/[id]` (and its `/onboarding`
+redirect), `/access/catalog/[applicationId]`,
+`/access/classification-rules/[ruleId]`, `/access/onboarding-templates/[templateId]`,
+`/access/packages/[id]`, and the agent's Access (CAN) tab `/access/agents/[agentId]`.
+
+- **Data.** `ref` added to `Application` (`toApplication`), `InventoryAccount`
+  (with `applicationRef`/`agentRef` from embedded `applications(ref)`/`agents(ref)`),
+  `ClassificationRule`, `ApplicationOnboardingTemplate`, `AccessPackage`,
+  `CatalogItem.applicationRef`, and `applicationRef` on the entitlement inventory.
+- **Links.** Lists and detail pages link by number: applications, accounts,
+  entitlements, catalog, packages (and "Open it" after creating one),
+  classification rules and templates (and the client redirect after creating
+  one), integration discovery's matched/suggested application.
+- **Actions.** `registerApplicationAction` and the access/risk/runtime agent
+  actions redirect to the number (`refOf()` added to `lib/refs/objectRef.ts`
+  for actions holding only a UUID). `revalidatePath` on these pages now names
+  the route (`"/(customer)/access/applications/[id]", "page"` etc.), since the
+  page URL is no longer the UUID.
+- **Left as UUID links (they redirect):** a data source's "1 agent" link, the
+  Risk overview's account-finding link, account links elsewhere with only an
+  account id. API routes keep UUIDs; their JSON gains `ref`.
+
+Verified: typecheck clean; eslint on changed files clean; Vitest
+modules/access-governance, agent-identity, operations, lib/refs, modules/ui,
+app/actions 77 files / 651 tests, and app, tests/architecture, lib 44 files /
+304 tests passed; local E2E (`next build`, port 3200, `E2E_SLOW_MACHINE=1`;
+the machine was slow, ~5–11 s per agent registration): access-packages,
+account-inventory, classification-rules, onboarding-templates,
+application-catalog, application-onboarding, request-catalog and
+f1-reconciliation all passed (66 in one run, the three that timed out under
+load passed on a rerun, 32/32); agent specs in the Identity Agent entry.
+f1-reconciliation's expiry sweep now requests the access request's number URL:
+a UUID link only redirects, so the sweep on the page did not run (from part 1).

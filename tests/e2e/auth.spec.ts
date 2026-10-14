@@ -564,7 +564,7 @@ test.describe("tenant isolation (UI level)", () => {
     await tenantTwoPage.getByLabel("Agent name").fill(agentName);
     await tenantTwoPage.getByLabel("Agent type").fill("automation");
     await tenantTwoPage.getByRole("button", { name: "Register", exact: true }).click();
-    await expect(tenantTwoPage).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
+    await expect(tenantTwoPage).toHaveURL(/\/agents\/\d+$/);
     const agentUrl = tenantTwoPage.url();
     await tenantTwoContext.close();
 

@@ -110,13 +110,13 @@ const escapeLike = (value: string) => value.replace(/[\\%_]/g, (c) => `\\${c}`);
 export async function listEntitlementInventory(
   tenantId: string,
   { q = "", page = 1, pageSize = 50 }: { q?: string; page?: number; pageSize?: number } = {},
-): Promise<{ rows: (EntitlementWithContext & { applicationDisplayName: string | null })[]; total: number }> {
+): Promise<{ rows: (EntitlementWithContext & { applicationDisplayName: string | null; applicationRef: number | null })[]; total: number }> {
   const supabase = await supabaseServer();
   const size = Math.min(Math.max(pageSize, 1), 200);
   const from = (Math.max(page, 1) - 1) * size;
   let query = supabase
     .from("entitlements")
-    .select("*, applications(name, display_name)", { count: "exact" })
+    .select("*, applications(name, display_name, ref)", { count: "exact" })
     .eq("tenant_id", tenantId)
     .order("name", { ascending: true })
     .order("id", { ascending: true })
@@ -125,10 +125,11 @@ export async function listEntitlementInventory(
   if (term) query = query.ilike("name", `%${escapeLike(term)}%`);
   const { data, error, count } = await query;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  const rows = (data ?? []).map((row: Record<string, unknown> & { applications: { name: string; display_name: string | null } | null }) => ({
+  const rows = (data ?? []).map((row: Record<string, unknown> & { applications: { name: string; display_name: string | null; ref: number | null } | null }) => ({
     ...toEntitlement(row),
     applicationName: row.applications?.name ?? "",
     applicationDisplayName: row.applications?.display_name ?? null,
+    applicationRef: row.applications?.ref ?? null,
   }));
   return { rows, total: count ?? rows.length };
 }

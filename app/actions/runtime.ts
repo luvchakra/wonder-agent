@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { refOf } from "@/lib/refs/objectRef";
 import { requireAnyPermissionFor } from "@/lib/rbac/authorize";
 import { agentResource } from "@/app/_shared/agentScope";
 import { engageEmergencyControl, ingestRuntimeEvent, liftEmergencyControl } from "@/modules/runtime-assurance/service";
@@ -23,7 +24,7 @@ export async function submitRuntimeEventAction(agentId: string, formData: FormDa
     dataClassification: String(formData.get("dataClassification") ?? "") || undefined,
     success: true,
   });
-  redirect(`/runtime/agents/${agentId}`);
+  redirect(`/runtime/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 // RUNTIME-P0-18 — emergency controls. Every one needs runtime.emergency,
@@ -46,7 +47,7 @@ export async function setGatewayOnlyAction(agentId: string, enabled: boolean): P
   return asResult(async () => {
     const ctx = await requirePermission("runtime.emergency");
     await setAgentGatewayOnly(ctx.tenantId!, ctx.userId, agentId, enabled);
-    revalidatePath(`/agents/${agentId}`);
+    revalidatePath("/(customer)/agents/[id]", "page");
   });
 }
 
@@ -70,6 +71,6 @@ export async function revokeAllAgentKeysAction(agentId: string, reason: string):
   return asResult(async () => {
     const ctx = await requireAnyPermissionFor(["runtime.emergency", "agent.update"], agentResource(agentId));
     await revokeAllAgentApiKeys(ctx.tenantId!, ctx.userId, agentId, reason);
-    revalidatePath(`/agents/${agentId}`);
+    revalidatePath("/(customer)/agents/[id]", "page");
   });
 }

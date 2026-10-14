@@ -60,7 +60,7 @@ export default async function OnboardingTemplatesPage() {
                 {templates.map((t) => (
                   <Tr key={t.id}>
                     <Td>
-                      <Link href={`/access/onboarding-templates/${t.id}`} className="font-medium text-primary hover:underline">
+                      <Link href={`/access/onboarding-templates/${t.ref ?? t.id}`} className="font-medium text-primary hover:underline">
                         {t.name}
                       </Link>
                       <span className="block text-xs text-muted-foreground">

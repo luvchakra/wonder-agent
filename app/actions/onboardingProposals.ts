@@ -20,7 +20,7 @@ export async function createProposalAction(applicationId: string, _prev: Proposa
   const ctx = await requirePermission("integration.update");
   try {
     const p = await createOnboardingProposal(ctx.tenantId!, ctx.userId, applicationId, { kind: formData.get("kind"), text: formData.get("text") });
-    revalidatePath(`/access/applications/${applicationId}/onboarding`);
+    revalidatePath("/(customer)/access/applications/[id]", "page");
     return { status: "saved", message: `Proposal ready (${p.overallConfidence} confidence${p.aiUsed ? (p.aiError ? "; the AI step did not help" : "; refined by AI") : ""}). Review it below.` };
   } catch (err) {
     return formError(err);
@@ -37,7 +37,7 @@ export async function decideProposalAction(applicationId: string, proposalId: st
     } else {
       await dismissOnboardingProposal(ctx.tenantId!, ctx.userId, proposalId);
     }
-    revalidatePath(`/access/applications/${applicationId}/onboarding`);
+    revalidatePath("/(customer)/access/applications/[id]", "page");
     return {
       status: "saved",
       message: action === "apply" ? "Applied to the draft configuration. Validate, simulate and have it approved before anything goes live." : "Dismissed.",

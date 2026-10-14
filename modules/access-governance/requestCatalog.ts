@@ -225,6 +225,8 @@ export type CatalogEntitlement = {
 
 export type CatalogItem = {
   applicationId: string;
+  /** FOUNDATION-P0-34: the application's number in URLs. */
+  applicationRef: number | null;
   name: string;
   /** ACCESS-P0-31: its name and display name, which an agent contract may name. */
   names: string[];
@@ -250,7 +252,7 @@ export async function listRequestCatalog(tenantId: string, filter: { q?: string;
   const supabase = await supabaseServer();
   let query = supabase
     .from("applications")
-    .select("id, name, display_name, description, vendor, risk_level, data_classification", { count: "exact" })
+    .select("id, ref, name, display_name, description, vendor, risk_level, data_classification", { count: "exact" })
     .eq("tenant_id", tenantId)
     .eq("onboarding_status", "ACTIVE");
   if (filter.applicationId) query = query.eq("id", UUID_RE.test(filter.applicationId) ? filter.applicationId : "00000000-0000-0000-0000-000000000000");
@@ -295,6 +297,7 @@ export async function listRequestCatalog(tenantId: string, filter: { q?: string;
     const appRisk = assessRisk({ appRiskLevel: a.risk_level, appDataClassification: a.data_classification });
     return {
       applicationId: a.id as string,
+      applicationRef: (a.ref as number | null) ?? null,
       name: (a.display_name as string | null) ?? (a.name as string),
       names: [a.name as string, a.display_name as string | null].filter((n): n is string => Boolean(n)),
       description: (a.description as string | null) ?? null,

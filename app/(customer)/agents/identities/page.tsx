@@ -159,7 +159,7 @@ export default async function NhiInventoryPage({ searchParams }: { searchParams:
                     </Td>
                     <Td>
                       {e.agent ? (
-                        <Link href={`/agents/${e.agent.id}`} className="text-primary hover:underline">
+                        <Link href={`/agents/${e.agent.ref ?? e.agent.id}`} className="text-primary hover:underline">
                           {e.agent.name}
                         </Link>
                       ) : (

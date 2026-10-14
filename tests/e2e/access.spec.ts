@@ -1,13 +1,14 @@
 import { test, expect } from "@playwright/test";
 import { authFile } from "./support/testUsers";
+import { refInUrl } from "./support/objectRefs";
 
 async function registerAgent(page: import("@playwright/test").Page, name: string): Promise<string> {
   await page.goto("/agents/new");
   await page.getByLabel("Agent name").fill(name);
   await page.getByLabel("Agent type").fill("automation");
   await page.getByRole("button", { name: "Register", exact: true }).click();
-  await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
-  return page.url().split("/agents/")[1];
+  await expect(page).toHaveURL(/\/agents\/\d+$/);
+  return String(refInUrl(page, "/agents/"));
 }
 
 test.describe("Access module", () => {
@@ -28,7 +29,8 @@ test.describe("Access module", () => {
     await page.getByLabel("Category").fill("saas");
     await page.getByLabel("External-facing (email, messaging, public API)").check();
     await page.getByRole("button", { name: "Register application" }).click();
-    await expect(page).toHaveURL(/\/access\/applications\/[0-9a-f-]{36}$/);
+    // FOUNDATION-P0-34: the new application's page is at its number.
+    await expect(page).toHaveURL(/\/access\/applications\/\d+$/);
     await expect(page.getByRole("heading", { level: 1, name: appName })).toBeVisible();
 
     await page.goto(`/access?q=${encodeURIComponent(appName)}`);
@@ -36,6 +38,7 @@ test.describe("Access module", () => {
     await expect(row).toBeVisible();
     await expect(row.locator("span.rounded-full", { hasText: "External" })).toBeVisible();
     await expect(row.locator("span.rounded-full", { hasText: "Discovered" })).toBeVisible();
+    await expect(row.getByRole("link", { name: appName })).toHaveAttribute("href", /^\/access\/applications\/\d+$/);
   });
 
   test("an agent's Access (CAN) page shows the access graph and effective access sections", async ({ page }) => {

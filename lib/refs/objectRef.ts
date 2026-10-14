@@ -84,6 +84,16 @@ export async function pageRef(tenantId: string, table: RefTable, raw: string | u
 }
 
 /**
+ * For a server action that only holds a UUID: the object's number for its
+ * page URL, read as the user within the tenant. Falls back to the UUID (the
+ * page redirects it) when the row is not readable.
+ */
+export async function refOf(tenantId: string, table: RefTable, id: string): Promise<string> {
+  const found = await resolveRef(tenantId, table, id);
+  return found ? String(found.ref) : id;
+}
+
+/**
  * Organizations in the platform console (vendor-only, after
  * requirePlatformAdmin): one global number per organization.
  */

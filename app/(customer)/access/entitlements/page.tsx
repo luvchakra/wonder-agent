@@ -85,7 +85,7 @@ export default async function EntitlementsPage({ searchParams }: { searchParams:
                       ) : null}
                     </Td>
                     <Td>
-                      <Link href={`/access/applications/${e.applicationId}`} className="text-primary hover:underline">
+                      <Link href={`/access/applications/${e.applicationRef ?? e.applicationId}`} className="text-primary hover:underline">
                         {e.applicationDisplayName ?? e.applicationName}
                       </Link>
                     </Td>

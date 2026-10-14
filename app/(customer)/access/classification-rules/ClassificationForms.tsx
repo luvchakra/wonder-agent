@@ -65,7 +65,8 @@ export function ClassificationRuleForm({ ruleId, initial, applications }: { rule
           }
           setError(null);
           setSaved(true);
-          if (!ruleId) router.push(`/access/classification-rules/${(r.data as { id: string }).id}`);
+          const made = r.data as { id: string; ref?: number | null };
+          if (!ruleId) router.push(`/access/classification-rules/${made.ref ?? made.id}`);
           else router.refresh();
         });
       }}

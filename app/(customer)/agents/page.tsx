@@ -55,6 +55,7 @@ export default async function AgentsPage() {
 
   const rows: AgentRow[] = agents.map((a) => ({
     id: a.id,
+    ref: a.ref ?? null,
     agentName: a.agentName,
     displayName: a.displayName,
     agentType: a.agentType,

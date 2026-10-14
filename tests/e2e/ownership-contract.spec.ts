@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { getSeededUserId } from "./support/seedTestData";
 import { TEST_USERS, authFile } from "./support/testUsers";
+import { agentIdOnPage } from "./support/objectRefs";
 
 /**
  * IDENTITY-P0-13 — ownership and contract completeness, against the real
@@ -38,8 +39,8 @@ test.describe.serial("ownership and contract completeness", () => {
     await page.getByLabel("Purpose").fill("E2E ownership and contract completeness");
     await page.getByLabel("Environment").selectOption("production");
     await page.getByRole("button", { name: "Register", exact: true }).click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
-    agentId = page.url().split("/agents/")[1];
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
+    agentId = await agentIdOnPage(page);
   });
 
   test("a delegated owner needs an expiry, and the API refuses one without", async ({ page }) => {

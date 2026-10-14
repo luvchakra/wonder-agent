@@ -19,6 +19,8 @@ export type ActionGovernanceResult = {
 
 export type Application = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   name: string;
   category: string | null;
@@ -142,6 +144,8 @@ export type OnboardingQuestion = { key: string; label: string; type: "text" | "y
  */
 export type ApplicationOnboardingTemplate = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   name: string;
   description: string | null;
   /** The connection type (integration_types.id) it is for; null for applications without a connector. */

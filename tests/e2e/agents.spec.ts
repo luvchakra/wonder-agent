@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { getSeededUserId } from "./support/seedTestData";
 import { TEST_USERS, authFile } from "./support/testUsers";
+import { agentIdOnPage, refInUrl } from "./support/objectRefs";
 
 test.describe("Identity module — agents", () => {
   test.use({ storageState: authFile("adminOne") });
@@ -20,7 +21,7 @@ test.describe("Identity module — agents", () => {
     await page.getByLabel("Criticality").selectOption("high");
     await page.getByRole("button", { name: "Register", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
     await expect(page.getByRole("heading", { name: agentName })).toBeVisible();
     await expect(page.getByText("automation")).toBeVisible();
   });
@@ -34,7 +35,7 @@ test.describe("Identity module — agents", () => {
     // a purpose set") — a real governance rule, not an incidental field.
     await page.getByLabel("Purpose").fill("End-to-end lifecycle coverage");
     await page.getByRole("button", { name: "Register", exact: true }).click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
 
     // A lifecycle transition requires an ACTIVE business owner AND technical
     // owner ("Agent requires an active business_owner and technical_owner") —
@@ -67,20 +68,31 @@ test.describe("Identity module — agents", () => {
     await page.getByLabel("Agent name").fill(agentName);
     await page.getByLabel("Agent type").fill("automation");
     await page.getByRole("button", { name: "Register", exact: true }).click();
-    await expect(page).toHaveURL(/\/agents\/([0-9a-f-]{36})/);
-    const agentId = page.url().split("/agents/")[1];
+    // FOUNDATION-P0-34: the agent's page and its sections carry its number, never its UUID.
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
+    const agentRef = refInUrl(page, "/agents/");
+    const agentId = await agentIdOnPage(page);
 
     const nav = page.getByRole("navigation", { name: "Agent sections" });
     await nav.getByRole("link", { name: "Access (CAN)" }).click();
-    await expect(page).toHaveURL(`/access/agents/${agentId}`);
+    await expect(page).toHaveURL(`/access/agents/${agentRef}`);
 
-    await page.goto(`/agents/${agentId}`);
+    await page.goto(`/agents/${agentRef}`);
     await page.getByRole("navigation", { name: "Agent sections" }).getByRole("link", { name: "Runtime (DID)" }).click();
-    await expect(page).toHaveURL(`/runtime/agents/${agentId}`);
+    await expect(page).toHaveURL(`/runtime/agents/${agentRef}`);
 
-    await page.goto(`/agents/${agentId}`);
+    await page.goto(`/agents/${agentRef}`);
     await page.getByRole("navigation", { name: "Agent sections" }).getByRole("link", { name: "Risk & Findings" }).click();
-    await expect(page).toHaveURL(`/risk/agents/${agentId}`);
+    await expect(page).toHaveURL(`/risk/agents/${agentRef}`);
+
+    // An old link with the UUID still works: each agent page redirects it to the number.
+    for (const base of ["/agents", "/access/agents", "/runtime/agents", "/risk/agents", "/risk/rogue"]) {
+      await page.goto(`${base}/${agentId}`);
+      await expect(page).toHaveURL(`${base}/${agentRef}`);
+    }
+    // A number that names no agent here is not found.
+    await page.goto("/agents/999999999");
+    await expect(page.getByText("This page could not be found")).toBeVisible();
   });
 
   test("discovery inbox and duplicate-review pages are reachable from the list page", async ({ page }) => {
@@ -117,7 +129,7 @@ test.describe("agents — design rebuild", () => {
   test("agent detail shows the governance posture panel, and no raw JSON", async ({ page }) => {
     await page.goto("/agents");
     await page.getByRole("link", { name: /^E2E Agent/ }).first().click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
 
     await expect(page.getByRole("heading", { name: "Agent information" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Governance posture" })).toBeVisible();

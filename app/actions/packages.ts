@@ -20,7 +20,7 @@ import {
  * (§17.5); the tenant comes from the session (#2) and every rule is the
  * service's.
  */
-export type PackageFormState = { status: "idle" } | { status: "saved"; message: string; id?: string } | { status: "error"; message: string };
+export type PackageFormState = { status: "idle" } | { status: "saved"; message: string; id?: string; ref?: number | null } | { status: "error"; message: string };
 
 function formError(err: unknown): PackageFormState {
   const e = err as { message?: string; code?: string };
@@ -32,7 +32,7 @@ const str = (f: FormData, k: string) => {
 };
 const refresh = (packageId?: string) => {
   revalidatePath("/access/packages");
-  if (packageId) revalidatePath(`/access/packages/${packageId}`);
+  if (packageId) revalidatePath("/(customer)/access/packages/[id]", "page");
 };
 
 function packageInput(f: FormData): Record<string, unknown> {
@@ -59,7 +59,7 @@ export async function savePackageAction(packageId: string | null, _prev: Package
   try {
     const p = packageId ? await updatePackage(ctx.tenantId!, ctx.userId, packageId, packageInput(formData)) : await createPackage(ctx.tenantId!, ctx.userId, packageInput(formData));
     refresh(p.id);
-    return { status: "saved", message: packageId ? "Saved." : `Created "${p.name}" as a draft. Add what it includes, then activate it.`, id: p.id };
+    return { status: "saved", message: packageId ? "Saved." : `Created "${p.name}" as a draft. Add what it includes, then activate it.`, id: p.id, ref: p.ref };
   } catch (err) {
     return formError(err);
   }

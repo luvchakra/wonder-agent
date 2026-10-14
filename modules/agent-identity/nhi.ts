@@ -36,7 +36,7 @@ type LinkedRow = {
   status: string;
   created_at: string;
   agent_id: string;
-  agents: { id: string; agent_name: string; lifecycle_state: string } | null;
+  agents: { id: string; ref?: number | null; agent_name: string; lifecycle_state: string } | null;
 };
 
 export function inventoryFromSources(
@@ -62,12 +62,12 @@ export function inventoryFromSources(
       sourceSystem: row.source_system,
       sourceName: sourceNames.get(row.source_system) ?? row.source_system,
       status: orphaned ? "orphaned" : "linked",
-      agent: agent ? { id: agent.id, name: agent.agent_name, lifecycleState: agent.lifecycle_state } : null,
+      agent: agent ? { id: agent.id, ref: agent.ref ?? null, name: agent.agent_name, lifecycleState: agent.lifecycle_state } : null,
       classification: null,
       confidenceLevel: null,
       owner: null,
       lastSeenAt: row.created_at,
-      href: agent ? `/agents/${agent.id}` : `/agents/discovery`,
+      href: agent ? `/agents/${agent.ref ?? agent.id}` : `/agents/discovery`,
     });
   }
 
@@ -102,7 +102,7 @@ export async function buildNhiInventory(tenantId: string): Promise<NhiInventoryE
   const [linkedRes, inbox, integrations] = await Promise.all([
     supabase
       .from("agent_identities")
-      .select("external_reference, source_system, identity_type, status, created_at, agent_id, agents(id, agent_name, lifecycle_state)")
+      .select("external_reference, source_system, identity_type, status, created_at, agent_id, agents(id, ref, agent_name, lifecycle_state)")
       .eq("tenant_id", tenantId)
       .order("created_at", { ascending: false })
       .limit(2000),

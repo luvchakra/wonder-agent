@@ -463,10 +463,12 @@ test.describe.serial("F1 reconciliation chain", () => {
     // The end date comes: one removal task, however often the sweep runs.
     const removalTasks = async () => (await db.from("access_fulfilment_tasks").select("id, status").eq("tenant_id", tenantId).eq("removal_grant_id", eveGrant.id)).data ?? [];
     await db.from("access_requests").update({ requested_expiry: new Date(Date.now() - 60_000).toISOString() }).eq("tenant_id", tenantId).eq("id", extension.id);
-    expect((await request.get(`/access/requests/${extension.id}`)).status()).toBe(200); // the page sweeps its organization
+    // FOUNDATION-P0-34: the request's page is at its number (a UUID link only redirects there, before the sweep).
+    const extensionRef = (await db.from("access_requests").select("ref").eq("tenant_id", tenantId).eq("id", extension.id).single()).data!.ref as number;
+    expect((await request.get(`/access/requests/${extensionRef}`)).status()).toBe(200); // the page sweeps its organization
     expect(await removalTasks()).toHaveLength(1);
     await db.from("access_requests").update({ expiry_processed_at: null }).eq("tenant_id", tenantId).eq("id", extension.id);
-    expect((await request.get(`/access/requests/${extension.id}`)).status()).toBe(200);
+    expect((await request.get(`/access/requests/${extensionRef}`)).status()).toBe(200);
     const tasks = await removalTasks();
     expect(tasks).toHaveLength(1);
     expect(tasks[0].status).toBe("open");
@@ -509,6 +511,8 @@ test.describe.serial("F1 reconciliation chain", () => {
 
     // For: the people you manage are listed without searching.
     await page.goto(`/access/catalog/${appId}`);
+    // FOUNDATION-P0-34: an old UUID link redirects to the application's number.
+    await expect(page).toHaveURL(/\/access\/catalog\/\d+$/);
     const forSelect = page.getByRole("combobox", { name: "For", exact: true });
     await expect(forSelect.locator('optgroup[label="People you manage"] option', { hasText: fayName })).toHaveCount(1);
   });

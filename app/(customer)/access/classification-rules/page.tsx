@@ -60,7 +60,7 @@ export default async function ClassificationRulesPage() {
                   return (
                     <Tr key={r.id}>
                       <Td>
-                        <Link href={`/access/classification-rules/${r.id}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/access/classification-rules/${r.ref ?? r.id}`} className="font-medium text-primary hover:underline">
                           {r.name}
                         </Link>
                         <span className="block text-xs text-muted-foreground">

@@ -127,7 +127,7 @@ export default async function DiscoveryDetailPage({ params }: { params: Promise<
             {app ? (
               <p>
                 {d.status === "REGISTERED" ? "Registered as " : "Matched to "}
-                <Link href={`/access/applications/${app.id}`} className="font-medium text-primary hover:underline">
+                <Link href={`/access/applications/${app.ref ?? app.id}`} className="font-medium text-primary hover:underline">
                   {app.displayName ?? app.name}
                 </Link>
                 .
@@ -140,7 +140,7 @@ export default async function DiscoveryDetailPage({ params }: { params: Promise<
             {suggested && d.status === "UNRECOGNIZED" ? (
               <p>
                 Possibly{" "}
-                <Link href={`/access/applications/${suggested.id}`} className="font-medium text-primary hover:underline">
+                <Link href={`/access/applications/${suggested.ref ?? suggested.id}`} className="font-medium text-primary hover:underline">
                   {suggested.displayName ?? suggested.name}
                 </Link>
                 : similar name. Link it if it is the same application.

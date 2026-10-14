@@ -15,6 +15,7 @@ import type {
 export function toAgent(row: any): Agent {
   return {
     id: row.id,
+    ref: row.ref ?? null,
     tenantId: row.tenant_id,
     agentName: row.agent_name,
     displayName: row.display_name,

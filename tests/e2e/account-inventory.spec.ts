@@ -167,6 +167,8 @@ test.describe.serial("account inventory", () => {
 
     await page.getByRole("link", { name: "ghost" }).click();
     await expect(page.getByRole("heading", { level: 1, name: "ghost" })).toBeVisible();
+    // FOUNDATION-P0-34: the account's page is at its number.
+    await expect(page).toHaveURL(/\/access\/accounts\/\d+$/);
     await expect(page.getByText("Nothing matched")).toBeVisible();
     await page.getByRole("searchbox", { name: "Find an identity" }).fill(`E2E Acc bo ${stamp}`);
     await page.getByRole("button", { name: "Find" }).click();

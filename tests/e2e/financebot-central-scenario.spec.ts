@@ -1,6 +1,7 @@
 import { test, expect } from "@playwright/test";
 import { authFile, TENANT_ONE } from "./support/testUsers";
 import { getTenantIdBySlug, seedFinanceBotAccess } from "./support/seedFinanceBotAccess";
+import { agentIdOnPage, refInUrl } from "./support/objectRefs";
 
 /**
  * CLAUDE.md §11's central acceptance scenario, driven end-to-end through
@@ -37,8 +38,9 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     await page.getByLabel("Criticality").selectOption("critical");
     await page.getByLabel("Data classification").fill("financial");
     await page.getByRole("button", { name: "Register", exact: true }).click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
-    const agentId = page.url().split("/agents/")[1];
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
+    const agentRef = refInUrl(page, "/agents/");
+    const agentId = await agentIdOnPage(page);
 
     // 2. SHOULD — the approved contract: financial reporting on Snowflake
     // only. The publish form lives inside a collapsed <details>, whose
@@ -59,13 +61,13 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     await seedFinanceBotAccess(tenantId, agentId);
 
     // 4. DID — a real runtime event: FinanceBot reading Snowflake CustomerDB.
-    await page.goto(`/runtime/agents/${agentId}`);
+    await page.goto(`/runtime/agents/${agentRef}`);
     await page.getByLabel("Application").fill("Snowflake");
     await page.getByLabel("Resource").fill("CustomerDB");
     await page.getByLabel("Action").fill("read");
     await page.getByLabel("Data classification").fill("customer_data");
     await page.getByRole("button", { name: "Submit event", exact: true }).click();
-    await expect(page).toHaveURL(`/runtime/agents/${agentId}`);
+    await expect(page).toHaveURL(`/runtime/agents/${agentRef}`);
 
     // 5. The comparison surfaces SHOULD/CAN/DID and at least one deviation.
     await expect(page.getByText(/Snowflake:financial reporting/)).toBeVisible();
@@ -78,16 +80,16 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
 
     // 6. Risk evaluation generates the excessive-access finding with
     // evidence and a removal recommendation.
-    await page.goto(`/risk/agents/${agentId}`);
+    await page.goto(`/risk/agents/${agentRef}`);
     // Wait for the evaluation itself (the server action's response), as
     // QA-P0-19 did for step 9: the URL is the same before and after, so the
     // URL check proved nothing, and on 2026-09-26 under full-suite load the
     // finding was looked for before the evaluation had run.
     await Promise.all([
-      page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === `/risk/agents/${agentId}`),
+      page.waitForResponse((r) => r.request().method() === "POST" && new URL(r.url()).pathname === `/risk/agents/${agentRef}`),
       page.getByRole("button", { name: "Run risk evaluation now" }).click(),
     ]);
-    await expect(page).toHaveURL(`/risk/agents/${agentId}`);
+    await expect(page).toHaveURL(`/risk/agents/${agentRef}`);
 
     const findingHeading = page.getByRole("heading", { level: 3, name: `${agentName} has effective access beyond its approved contract` });
     await expect(findingHeading).toBeVisible({ timeout: 20_000 });
@@ -112,7 +114,7 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     // on WonderAgent's own access_grants row. It does not write back to the
     // source IAM — connectors are read-only in P0 (non-negotiable #12) — so
     // this asserts WonderAgent's record of the access, not Saviynt's.
-    await page.goto(`/access/agents/${agentId}`);
+    await page.goto(`/access/agents/${agentRef}`);
     await expect(page.getByText("0 grants")).toBeVisible();
     await expect(page.getByRole("row", { name: /CustomerDB_READ/ })).toHaveCount(0);
 
@@ -123,9 +125,9 @@ test.describe("FinanceBot central scenario (CLAUDE.md §11)", () => {
     // full suite's two-worker load the Resolve click used to land on the
     // still-updating page and be lost, and the "resolved" assertion then
     // flaked. Each action now waits for its own server response.
-    await page.goto(`/risk/agents/${agentId}`);
+    await page.goto(`/risk/agents/${agentRef}`);
     const isActionPost = (r: import("@playwright/test").Response) =>
-      r.request().method() === "POST" && new URL(r.url()).pathname === `/risk/agents/${agentId}`;
+      r.request().method() === "POST" && new URL(r.url()).pathname === `/risk/agents/${agentRef}`;
     await Promise.all([
       page.waitForResponse(isActionPost),
       page.getByRole("button", { name: "Run risk evaluation now" }).click(),
