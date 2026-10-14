@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
 import { openConnection, sendEvents, type ReceivingConnection } from "./support/connections";
+import { agentIdOnPage, refInUrl } from "./support/objectRefs";
 
 /**
  * IDENTITY-P0-11 / IDENTITY-P0-12 — Shadow AI and the non-human identity
@@ -19,6 +20,7 @@ import { openConnection, sendEvents, type ReceivingConnection } from "./support/
 
 const ref = `e2e-shadow-bot-${Date.now()}`;
 let agentId = "";
+let agentRef = 0;
 let conn: ReceivingConnection;
 
 const sendEvent = (request: APIRequestContext, data: Record<string, unknown>) =>
@@ -75,8 +77,9 @@ test.describe.serial("shadow AI discovery", () => {
     await page.getByLabel("Agent type").fill("automation");
     await page.getByLabel("Purpose").fill("E2E shadow AI registration");
     await page.getByRole("button", { name: "Register Agent" }).click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}$/);
-    agentId = page.url().split("/agents/")[1];
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
+    agentRef = refInUrl(page, "/agents/");
+    agentId = await agentIdOnPage(page);
 
     const res = await sendEvent(page.request, { agentRef: ref });
     expect(res.status()).toBe(202);
@@ -92,7 +95,7 @@ test.describe.serial("shadow AI discovery", () => {
     await expect(page.getByRole("heading", { name: "Non-human identities" })).toBeVisible();
     const row = page.getByRole("row").filter({ hasText: ref });
     await expect(row.getByText("Linked", { exact: true })).toBeVisible();
-    await expect(row.getByRole("link", { name: ref }).first()).toHaveAttribute("href", `/agents/${agentId}`);
+    await expect(row.getByRole("link", { name: ref }).first()).toHaveAttribute("href", `/agents/${agentRef}`);
 
     const other = await browser.newContext({ storageState: authFile("adminTwo") });
     const otherPage = await other.newPage();

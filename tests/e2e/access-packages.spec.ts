@@ -257,6 +257,8 @@ test.describe.serial("access packages", () => {
     await ctx.close();
 
     await page.goto(`/access/packages/${ids.pkg}`);
+    // FOUNDATION-P0-34: an old UUID link redirects to the package's number.
+    await expect(page).toHaveURL(/\/access\/packages\/\d+$/);
     await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
     await expect(page.getByText("To be removed").first()).toBeVisible();
     await page.goto("/access/packages?view=manage");

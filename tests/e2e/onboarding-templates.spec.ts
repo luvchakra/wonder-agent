@@ -131,7 +131,10 @@ test.describe.serial("application onboarding templates", () => {
   test("the pages show the template and the questionnaire", async ({ page }) => {
     await page.goto("/access/onboarding-templates");
     await expect(page.getByRole("heading", { level: 1, name: "Onboarding templates" })).toBeVisible();
-    await expect(page.getByRole("link", { name: `E2E SaaS template ${stamp}` })).toBeVisible();
+    await expect(page.getByRole("link", { name: `E2E SaaS template ${stamp}` })).toHaveAttribute("href", /^\/access\/onboarding-templates\/\d+$/);
+    // FOUNDATION-P0-34: an old UUID link redirects to the template's number.
+    await page.goto(`/access/onboarding-templates/${templateId}`);
+    await expect(page).toHaveURL(/\/access\/onboarding-templates\/\d+$/);
     await page.goto(`/access/applications/${appId}?tab=onboarding`);
     await expect(page.getByText("Questionnaire", { exact: true })).toBeVisible();
     await expect(page.getByText("Every required question is answered.", { exact: false })).toBeVisible();

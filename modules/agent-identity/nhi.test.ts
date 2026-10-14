@@ -57,6 +57,11 @@ describe("inventoryFromSources (IDENTITY-P0-11)", () => {
     expect(rows[0].href).toBe("/agents/discovery/7/svc-backup");
   });
 
+  it("links an agent by its number when it has one (FOUNDATION-P0-34)", () => {
+    const [row] = inventoryFromSources([linkedRow({ agents: { id: "a1", ref: 7, agent_name: "FinanceBot", lifecycle_state: "ACTIVE" } })], [], names);
+    expect(row).toMatchObject({ agent: { id: "a1", ref: 7 }, href: "/agents/7" });
+  });
+
   it("marks a link whose agent is retired or gone as orphaned, and skips the inbox's duplicate orphan entry", () => {
     const rows = inventoryFromSources(
       [linkedRow({ agents: { id: "a1", agent_name: "Old", lifecycle_state: "RETIRED" } }), linkedRow({ external_reference: "svc-x", agents: null })],

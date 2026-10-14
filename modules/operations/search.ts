@@ -57,8 +57,11 @@ export async function search(tenantId: string, permissions: string[], query: str
     if (!current || SEVERITY_RANK[f.severity] > SEVERITY_RANK[current]) worstFindingByAgent.set(f.agentId, f.severity);
   }
 
+  // FOUNDATION-P0-34: agent links carry the agent's number when the agents were listed (UUID links still redirect).
+  const agents = permissions.includes("agent.read") ? await listAgents(tenantId) : [];
+  const agentRef = new Map(agents.map((a) => [a.id, String(a.ref ?? a.id)]));
+  const agentKey = (id: string) => agentRef.get(id) ?? id;
   if (permissions.includes("agent.read")) {
-    const agents = await listAgents(tenantId);
     for (const a of agents) {
       if (!a.agentName.toLowerCase().includes(q)) continue;
       const masked = maskRiskField(worstFindingByAgent.get(a.id) ?? null, canViewRisk);
@@ -67,7 +70,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: a.id,
         title: a.agentName,
         subtitle: a.agentType,
-        href: `/agents/${a.id}`,
+        href: `/agents/${agentKey(a.id)}`,
         freshness: new Date().toISOString(),
         ...masked,
       });
@@ -111,7 +114,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: identity.id,
         title: identity.externalReference,
         subtitle: identity.agentName || identity.sourceSystem,
-        href: `/agents/${identity.agentId}`,
+        href: `/agents/${agentKey(identity.agentId)}`,
         freshness: identity.createdAt,
       });
     }
@@ -125,7 +128,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: owner.id,
         title: owner.userDisplayName || owner.userEmail,
         subtitle: owner.agentName ? `${owner.ownerType.replace(/_/g, " ")} of ${owner.agentName}` : owner.ownerType.replace(/_/g, " "),
-        href: `/agents/${owner.agentId}`,
+        href: `/agents/${agentKey(owner.agentId)}`,
         freshness: owner.assignedAt,
       });
     }
@@ -139,7 +142,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: f.id,
         title: f.title,
         subtitle: f.category,
-        href: `/risk/agents/${f.agentId}`,
+        href: `/risk/agents/${agentKey(f.agentId)}`,
         freshness: f.createdAt,
         riskSeverity: f.severity,
         riskMasked: false,
@@ -222,7 +225,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: d.decisionId,
         title: `${d.decision.replace(/_/g, " ")}${d.enforced ? "" : " (observed)"}: ${d.action}${target ? ` on ${target}` : ""}`,
         subtitle: `${d.code} · request ${d.requestId}`,
-        href: `/runtime/agents/${d.agentId}`,
+        href: `/runtime/agents/${agentKey(d.agentId)}`,
         freshness: d.createdAt,
       });
     }

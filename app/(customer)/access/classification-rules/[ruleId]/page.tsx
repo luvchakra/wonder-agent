@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getClassificationRule, listClassificationRuns, listLiveApplications } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader } from "@/modules/ui";
@@ -28,8 +29,9 @@ export default async function ClassificationRulePage({ params }: { params: Promi
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { ruleId } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the rule's number; an old UUID link redirects.
+  const ruleId = await pageRef(tenantId, "entitlement_classification_rules", (await params).ruleId, (ref) => `/access/classification-rules/${ref}`);
   const canManage = ctx.permissions.includes("access.manage");
   const [rule, runs, applications] = await Promise.all([
     getClassificationRule(tenantId, ruleId),

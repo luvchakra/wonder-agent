@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
   checkPackageEligibility,
@@ -33,9 +34,10 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
   const sp = await searchParams;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the package's number; an old UUID link redirects.
+  const id = await pageRef(tenantId, "access_packages", (await params).id, (ref) => `/access/packages/${ref}`, sp);
   const canManage = ctx.permissions.includes("access.manage");
   const canApprove = ctx.permissions.includes("access.approve");
   const canRequest = ctx.permissions.includes("access.request");

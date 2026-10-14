@@ -28,7 +28,7 @@ export async function generateAgentInventoryReport(tenantId: string): Promise<Re
     "agent_inventory",
     agents.map((a) => ({
       id: a.id,
-      href: `/agents/${a.id}`,
+      href: `/agents/${a.ref ?? a.id}`,
       fields: { name: a.agentName, type: a.agentType, environment: a.environment, criticality: a.criticality, lifecycleState: a.lifecycleState },
     })),
   );
@@ -41,7 +41,7 @@ export async function generateOwnershipReport(tenantId: string): Promise<ReportO
       const owners = await listOwners(tenantId, a.id);
       return {
         id: a.id,
-        href: `/agents/${a.id}`,
+        href: `/agents/${a.ref ?? a.id}`,
         fields: {
           agentName: a.agentName,
           owners: owners.map((o) => `${o.ownerType}:${o.userId}`).join("; ") || "(none)",

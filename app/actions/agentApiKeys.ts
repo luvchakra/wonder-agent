@@ -28,7 +28,7 @@ export async function createAgentApiKeyAction(
       // A date input gives YYYY-MM-DD; the key expires at the end of that day (UTC).
       expiresAt: expiry ? `${expiry}T23:59:59Z` : null,
     });
-    revalidatePath(`/agents/${agentId}`);
+    revalidatePath("/(customer)/agents/[id]", "page");
     return { status: "created", secret, name: key.name };
   } catch (err) {
     if (err instanceof ApiError) return { status: "error", message: err.message };
@@ -44,7 +44,7 @@ export async function revokeAgentApiKeyAction(
   try {
     const ctx = await requireAnyPermissionFor(["agent.update", "runtime.emergency"], agentResource(agentId));
     await revokeAgentApiKey(ctx.tenantId!, ctx.userId, agentId, keyId, reason);
-    revalidatePath(`/agents/${agentId}`);
+    revalidatePath("/(customer)/agents/[id]", "page");
     return { success: true };
   } catch (err) {
     if (err instanceof ApiError) return { success: false, error: err.message };

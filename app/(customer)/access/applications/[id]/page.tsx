@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import {
   getAccountSummary,
   getApplicationDetail,
@@ -54,8 +55,11 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const [{ id }, { tab: requestedTab }] = await Promise.all([params, searchParams]);
+  const [{ id: raw }, sp] = await Promise.all([params, searchParams]);
+  const requestedTab = sp.tab;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the application's number; an old UUID link redirects.
+  const id = await pageRef(tenantId, "applications", raw, (ref) => `/access/applications/${ref}`, sp);
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");

@@ -2,6 +2,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test, expect, request as playwrightRequest, type APIRequestContext } from "@playwright/test";
 import { authFile } from "./support/testUsers";
+import { agentIdOnPage } from "./support/objectRefs";
 
 /**
  * INTEGRATION-P0-07 (codebase-map D6) — MCP runtime events reach Runtime,
@@ -93,8 +94,8 @@ test.describe.serial("MCP events bridge into runtime", () => {
     await page.getByLabel("Agent type").fill("automation");
     await page.getByLabel("Purpose").fill("E2E MCP bridge");
     await page.getByRole("button", { name: "Register Agent" }).click();
-    await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}$/);
-    agentId = page.url().split("/agents/")[1];
+    await expect(page).toHaveURL(/\/agents\/\d+$/);
+    agentId = await agentIdOnPage(page);
 
     const externalId = `rec-${Date.now()}`;
     expect((await (await post({ externalId, agentIdentityRef: ref, resource: "CustomerDB" })).json()).data.runtime).toBe("recorded");

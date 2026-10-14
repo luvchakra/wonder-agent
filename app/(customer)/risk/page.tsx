@@ -46,17 +46,19 @@ export default async function RiskIndexPage() {
 
   const rows = agents.map((a) => ({
     id: a.id,
+    ref: a.ref ?? null,
     agentName: a.agentName,
     openFindings: findingCountByAgent.get(a.id) ?? 0,
     worstSeverity: worstSeverityByAgent.get(a.id) ?? null,
   }));
 
   const nameById = new Map(agents.map((a) => [a.id, a.displayName?.trim() || a.agentName]));
+  const refById = new Map(agents.map((a) => [a.id, a.ref ?? a.id]));
   const severityRank: Record<string, number> = rank;
   const findingRows: FindingRow[] = [
     ...findings.map((f) => ({
       id: f.id,
-      href: `/risk/agents/${f.agentId}`,
+      href: `/risk/agents/${refById.get(f.agentId) ?? f.agentId}`,
       subject: nameById.get(f.agentId) ?? "Unknown agent",
       title: f.title,
       severity: f.severity,

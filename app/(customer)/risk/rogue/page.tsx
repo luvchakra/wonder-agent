@@ -70,7 +70,7 @@ export default async function RogueAgentsPage() {
                 {flaggedAgents.map((a) => (
                   <Tr key={a.id}>
                     <Td>
-                      <Link href={`/risk/rogue/${a.id}`} className="text-primary hover:underline">
+                      <Link href={`/risk/rogue/${a.ref ?? a.id}`} className="text-primary hover:underline">
                         {a.agentName}
                       </Link>
                     </Td>

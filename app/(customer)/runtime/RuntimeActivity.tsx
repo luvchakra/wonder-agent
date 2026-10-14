@@ -11,6 +11,8 @@ import { eventResult, humanizeEventType } from "./eventLabels";
 export type ActivityRow = {
   id: string;
   agentId: string;
+  /** FOUNDATION-P0-34: the agent's number for its page URL. */
+  agentRef: string;
   agentName: string;
   eventTime: string;
   source: string;
@@ -203,7 +205,7 @@ export function RuntimeActivity({ rows, windowLabel }: { rows: ActivityRow[]; wi
                   ))}
                 </dl>
                 <Link
-                  href={`/runtime/agents/${selected.agentId}`}
+                  href={`/runtime/agents/${selected.agentRef}`}
                   className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
                 >
                   {ACCESS_VIEWS_COMPARED} for this agent

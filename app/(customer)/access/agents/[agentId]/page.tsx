@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import {
   listAccountsForAgent,
   getEffectiveAccess,
@@ -40,7 +41,7 @@ const GRANT_TYPES = [
  * own service contract; Experience Agent only composes it — see
  * EXPERIENCE-P0-03 and docs/design/ownership-map.md. */
 export default async function AgentAccessPage({ params }: { params: Promise<{ agentId: string }> }) {
-  const { agentId } = await params;
+  const { agentId: raw } = await params;
   let ctx;
   try {
     ctx = await requirePermission("access.read");
@@ -49,6 +50,8 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
     throw err;
   }
 
+  // FOUNDATION-P0-34: the URL carries the agent's number; an old UUID link redirects.
+  const agentId = await pageRef(ctx.tenantId!, "agents", raw, (ref) => `/access/agents/${ref}`);
   const agent = await getAgent(ctx.tenantId!, agentId);
   if (!agent) redirect("/agents");
 
@@ -69,7 +72,7 @@ export default async function AgentAccessPage({ params }: { params: Promise<{ ag
         <p className="mt-1 text-sm text-muted-foreground">{ACCESS_VIEW.can}: what this agent can technically do, derived from IAM data.</p>
       </div>
 
-      <AgentTabs agentId={agentId} active="access" />
+      <AgentTabs agentRef={agent.ref ?? agentId} active="access" />
 
       <Suspense fallback={null}>
         <AccessPathEvidenceDrawer agentId={agentId} />

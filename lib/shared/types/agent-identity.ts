@@ -22,6 +22,8 @@ export type AgentCriticality = "low" | "medium" | "high" | "critical";
 
 export type Agent = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   agentName: string;
   displayName: string | null;
@@ -298,7 +300,7 @@ export type NhiInventoryEntry = {
   sourceSystem: string;
   sourceName: string;
   status: NhiStatus;
-  agent: { id: string; name: string; lifecycleState: string } | null;
+  agent: { id: string; ref?: number | null; name: string; lifecycleState: string } | null;
   classification: DetectionClassification | null;
   confidenceLevel: ConfidenceLevel | null;
   owner: string | null;

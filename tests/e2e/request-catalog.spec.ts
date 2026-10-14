@@ -154,6 +154,8 @@ test.describe.serial("request catalog", () => {
     await expect(page.getByText("Approved automatically").first()).toBeVisible();
     await page.getByRole("link", { name: "Reader" }).click();
     await expect(page.getByRole("heading", { level: 1, name: `Request E2E Req App ${stamp}` })).toBeVisible();
+    // FOUNDATION-P0-34: the application's request page is at its number, keeping the chosen entitlement.
+    await expect(page).toHaveURL(/\/access\/catalog\/\d+\?entitlement=/);
     await page.getByRole("textbox", { name: /Why you need it/ }).fill("Monthly close reporting from the screen");
     await page.getByRole("button", { name: "Submit request" }).click();
     await expect(page.getByText(/An identical request is already open/)).toBeVisible();

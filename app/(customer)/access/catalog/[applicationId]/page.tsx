@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getRequestCatalogItem, requestsActingFor, withinContract } from "@/modules/access-governance/service";
 import { getAgentContract, getIdentityForUser, listDirectReports, listIdentities, listOwnedIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -19,9 +20,10 @@ export default async function RequestAccessPage({ params, searchParams }: { para
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { applicationId } = await params;
   const sp = await searchParams;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the application's number; an old UUID link redirects.
+  const applicationId = await pageRef(tenantId, "applications", (await params).applicationId, (ref) => `/access/catalog/${ref}`, sp);
   const find = (sp.find ?? "").slice(0, 100);
   const [item, me, found, delegators] = await Promise.all([
     getRequestCatalogItem(tenantId, applicationId),

@@ -49,6 +49,8 @@ const LIVE: AssignmentStatus[] = ["provisioning", "active", "partially_failed"];
 
 export type AccessPackage = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref: number | null;
   name: string;
   description: string | null;
   ownerIdentityId: string | null;
@@ -89,6 +91,7 @@ export type PackageDetail = AccessPackage & { resources: PackageResource[]; risk
 function toPackage(r: Record<string, unknown>): Omit<AccessPackage, "ownerName"> {
   return {
     id: r.id as string,
+    ref: (r.ref as number | null) ?? null,
     name: r.name as string,
     description: (r.description as string | null) ?? null,
     ownerIdentityId: (r.owner_identity_id as string | null) ?? null,

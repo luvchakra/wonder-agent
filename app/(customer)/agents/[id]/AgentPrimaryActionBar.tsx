@@ -18,7 +18,7 @@ import { ConfirmActionDialog, type ConfirmActionResult, Button, LinkButton } fro
  * launching a certification campaign or creating a new contract version —
  * see the Experience Agent audit log).
  */
-export function AgentPrimaryActionBar({ agentId, agentName }: { agentId: string; agentName: string }) {
+export function AgentPrimaryActionBar({ agentId, agentRef, agentName }: { agentId: string; agentRef: number | string; agentName: string }) {
   const router = useRouter();
 
   async function transition(toState: string, reason: string): Promise<ConfirmActionResult> {
@@ -74,11 +74,11 @@ export function AgentPrimaryActionBar({ agentId, agentName }: { agentId: string;
         </Button>
       </Link>
 
-      <LinkButton href={`/risk/agents/${agentId}`} variant="outline" size="sm">
+      <LinkButton href={`/risk/agents/${agentRef}`} variant="outline" size="sm">
         Investigate
       </LinkButton>
 
-      <LinkButton href={`/access/agents/${agentId}`} variant="outline" size="sm">
+      <LinkButton href={`/access/agents/${agentRef}`} variant="outline" size="sm">
         View Access Graph
       </LinkButton>
     </div>

@@ -23,6 +23,7 @@ export function toTemplate(r: Row): ApplicationOnboardingTemplate {
   const defaults = (r.defaults as ValidTemplate["defaults"] | null) ?? { config: {}, businessOwnerIdentityId: null, technicalOwnerIdentityId: null };
   return {
     id: r.id as string,
+    ref: (r.ref as number | null) ?? null,
     name: r.name as string,
     description: (r.description as string | null) ?? null,
     connectionTypeKey: (r.connection_type_key as string | null) ?? null,

@@ -92,7 +92,7 @@ export default async function RequestCatalogPage({ searchParams }: { searchParam
                 description={item.vendor ?? undefined}
                 actions={
                   canRequest && item.requestable ? (
-                    <LinkButton href={`/access/catalog/${item.applicationId}`} size="sm">
+                    <LinkButton href={`/access/catalog/${item.applicationRef ?? item.applicationId}`} size="sm">
                       Request
                     </LinkButton>
                   ) : (
@@ -108,7 +108,7 @@ export default async function RequestCatalogPage({ searchParams }: { searchParam
                       <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-1.5">
                         <span className="min-w-0">
                           {canRequest && e.requestable ? (
-                            <Link href={`/access/catalog/${item.applicationId}?entitlement=${e.id}`} className="font-medium text-primary hover:underline">
+                            <Link href={`/access/catalog/${item.applicationRef ?? item.applicationId}?entitlement=${e.id}`} className="font-medium text-primary hover:underline">
                               {e.name}
                             </Link>
                           ) : (

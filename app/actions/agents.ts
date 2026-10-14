@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { refOf } from "@/lib/refs/objectRef";
 import { requirePermissionFor } from "@/lib/rbac/authorize";
 import { agentResource } from "@/app/_shared/agentScope";
 import {
@@ -47,7 +48,7 @@ export async function createAgentAction(formData: FormData) {
   if (result.kind === "duplicate_candidate") {
     redirect(`/agents/duplicates?highlight=${result.candidate.id}`);
   }
-  redirect(`/agents/${result.agent.id}`);
+  redirect(`/agents/${result.agent.ref ?? result.agent.id}`);
 }
 
 export async function mergeDuplicateCandidateAction(formData: FormData) {
@@ -61,7 +62,7 @@ export async function confirmDistinctAction(formData: FormData) {
   const ctx = await requirePermission("agent.create");
   const candidateId = String(formData.get("candidateId") ?? "");
   const agent = await confirmDistinctAndRegister(ctx.tenantId!, ctx.userId, candidateId);
-  redirect(`/agents/${agent.id}`);
+  redirect(`/agents/${agent.ref ?? agent.id}`);
 }
 
 export async function assignOwnerAction(agentId: string, formData: FormData) {
@@ -77,7 +78,7 @@ export async function assignOwnerAction(agentId: string, formData: FormData) {
       ? { expiresAt: dateField(formData, "delegationExpiresOn", true) ?? "" }
       : undefined,
   );
-  redirect(`/agents/${agentId}`);
+  redirect(`/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 /** A yyyy-mm-dd date input as an ISO timestamp, at the start or end of that UTC day. */
@@ -92,7 +93,7 @@ export async function reviewOwnershipAction(agentId: string): Promise<{ ok: bool
   const ctx = await requirePermissionFor("agent.update", agentResource(agentId));
   try {
     const r = await reviewOwnership(ctx.tenantId!, ctx.userId, agentId);
-    revalidatePath(`/agents/${agentId}`);
+    revalidatePath("/(customer)/agents/[id]", "page");
     return { ok: true, message: `Ownership confirmed for ${r.confirmed} owner${r.confirmed === 1 ? "" : "s"}.` };
   } catch (err) {
     const e = err as { message?: string; code?: string };
@@ -109,7 +110,7 @@ export async function transitionLifecycleAction(agentId: string, formData: FormD
     String(formData.get("reason") ?? ""),
     { actorType: "user", actorId: ctx.userId, roles: ctx.roles },
   );
-  redirect(`/agents/${agentId}`);
+  redirect(`/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function createContractAction(agentId: string, formData: FormData) {
@@ -140,7 +141,7 @@ export async function createContractAction(agentId: string, formData: FormData) 
     allowedEnvironments: formData.getAll("allowedEnvironments").map(String) as AgentEnvironment[],
     expiresAt: dateField(formData, "expiresOn", true),
   });
-  redirect(`/agents/${agentId}`);
+  redirect(`/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function addRelationshipAction(agentId: string, formData: FormData) {
@@ -151,7 +152,7 @@ export async function addRelationshipAction(agentId: string, formData: FormData)
     String(formData.get("relatedAgentId")),
     formData.get("relationshipType") as AgentRelationshipType,
   );
-  redirect(`/agents/${agentId}`);
+  redirect(`/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function linkIdentityAction(agentId: string, formData: FormData) {
@@ -168,7 +169,7 @@ export async function linkIdentityAction(agentId: string, formData: FormData) {
       basis: "Linked manually on the agent page",
     },
   );
-  redirect(`/agents/${agentId}`);
+  redirect(`/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 /**
@@ -234,7 +235,7 @@ export async function registerDiscoveryCandidateAction(formData: FormData) {
     if (!(err instanceof ApiError && err.status === 412)) throw err;
   }
 
-  redirect(`/agents/${agent.id}`);
+  redirect(`/agents/${agent.ref ?? agent.id}`);
 }
 
 /** Agent Discovery — reviewer marks a candidate as not worth tracking. */
@@ -263,5 +264,5 @@ export async function linkDiscoveryCandidateAction(formData: FormData) {
     matchedAgentId,
     identityType: (formData.get("identityType") as AgentIdentityType) || undefined,
   });
-  redirect(`/agents/${matchedAgentId}`);
+  redirect(`/agents/${await refOf(ctx.tenantId!, "agents", matchedAgentId)}`);
 }

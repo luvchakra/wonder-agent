@@ -1,6 +1,7 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { authFile } from "./support/testUsers";
 import { openConnection } from "./support/connections";
+import { agentIdOnPage } from "./support/objectRefs";
 
 /**
  * ACCESS-P0-12 — policy targets and the publish step, against the real app,
@@ -21,8 +22,8 @@ async function registerAgent(page: Page): Promise<string> {
   await page.getByLabel("Agent name").fill(`E2E Policy Agent ${Date.now()}`);
   await page.getByLabel("Agent type").fill("automation");
   await page.getByRole("button", { name: "Register", exact: true }).click();
-  await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
-  return page.url().split("/agents/")[1];
+  await expect(page).toHaveURL(/\/agents\/\d+$/);
+  return agentIdOnPage(page);
 }
 
 test.describe.serial("policy targets and publishing", () => {

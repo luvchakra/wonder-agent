@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { refOf } from "@/lib/refs/objectRef";
 import {
   addInvestigationNote,
   assignFinding,
@@ -21,19 +22,19 @@ import type { FindingStatus, InvestigationStatus, ResolutionType } from "@/lib/s
 export async function evaluateAgentRiskAction(agentId: string) {
   const ctx = await requirePermission("risk.manage");
   await evaluateAgentRisk(ctx.tenantId!, agentId);
-  redirect(`/risk/agents/${agentId}`);
+  redirect(`/risk/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function assignFindingAction(agentId: string, findingId: string, formData: FormData) {
   const ctx = await requirePermission("risk.manage");
   await assignFinding(ctx.tenantId!, ctx.userId, findingId, String(formData.get("assigneeId") ?? ""));
-  redirect(`/risk/agents/${agentId}`);
+  redirect(`/risk/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function remediateFindingAction(agentId: string, findingId: string) {
   const ctx = await requirePermission("risk.manage");
   await remediateFinding(ctx.tenantId!, ctx.userId, findingId);
-  redirect(`/risk/agents/${agentId}`);
+  redirect(`/risk/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function resolveFindingAction(agentId: string, findingId: string, formData: FormData) {
@@ -53,14 +54,14 @@ export async function resolveFindingAction(agentId: string, findingId: string, f
     stillTriggered,
     expiresAt: String(formData.get("expiresAt") ?? "") || undefined,
   });
-  redirect(`/risk/agents/${agentId}`);
+  redirect(`/risk/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function transitionFindingStatusAction(agentId: string, findingId: string, formData: FormData) {
   const ctx = await requirePermission("risk.manage");
   const status = formData.get("status") as FindingStatus;
   await transitionFindingStatus(ctx.tenantId!, ctx.userId, findingId, status);
-  redirect(`/risk/agents/${agentId}`);
+  redirect(`/risk/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 /**

@@ -16,7 +16,7 @@ import { parseQuestions, questionsText } from "./format";
 
 type Template = ApplicationOnboardingTemplate;
 
-async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; data?: { id: string }; message?: string }> {
+async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; data?: { id: string; ref?: number | null }; message?: string }> {
   const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
   const json = await res.json().catch(() => ({}));
   if (!res.ok || !json.ok) return { ok: false, message: json.error?.message ?? "It could not be saved" };
@@ -78,7 +78,7 @@ export function TemplateForm({ template, connectionTypes, people }: { template?:
           }
           setError(null);
           setSaved(true);
-          if (!template && r.data) router.push(`/access/onboarding-templates/${r.data.id}`);
+          if (!template && r.data) router.push(`/access/onboarding-templates/${r.data.ref ?? r.data.id}`);
           else router.refresh();
         });
       }}

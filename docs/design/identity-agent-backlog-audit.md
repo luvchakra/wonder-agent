@@ -2023,3 +2023,31 @@ this and on another agent's main-based server alike), CSV runs still
 `ledger://fy2026` text in `mcp-inventory`; none involves these pages. The
 nightly run is the full check.
 
+
+## 2026-10-14 — Agent pages at the agent's number (FOUNDATION-P0-34, part 2)
+
+Owner decision (CLAUDE.md §19.13). `/agents/[id]`, `/access/agents/[agentId]`,
+`/runtime/agents/[agentId]`, `/risk/agents/[agentId]` and
+`/risk/rogue/[agentId]` resolve the agent's number with `pageRef()` (404 for an
+unknown number; an old UUID link redirects). The overview page resolves the
+tenant first, then runs the scoped `agent.read` check on the resolved agent as
+before (FOUNDATION-P0-19). `Agent.ref` added (`toAgent`); `AgentTabs` takes
+`agentRef`; the primary and rogue action bars, the agents list, the NHI
+inventory (`nhi.ts`, with a unit test), the home dashboard, runtime and risk
+lists, search results and agent reports link by number. Registering an agent
+and the agent server actions redirect to the number.
+
+Left as UUID links (they redirect): related-agent links, duplicate review and
+discovery "matched agent" links, links from other areas holding only an
+agent id (identity detail, campaigns, SoD conflicts, access requests).
+
+E2E: a support helper (`tests/e2e/support/objectRefs.ts`) reads the number
+from the URL and the UUID through the agents API; 17 specs updated, and
+agents.spec asserts the four sections' number URLs, that an old UUID link
+redirects on all five agent pages, and that an unknown number is not found.
+Verified locally (port 3200): agents, risk, access, runtime, financebot,
+ownership-contract, agent-api-keys, data-sources, shadow-ai, sod,
+gateway-enforcement, policy-publish, investigations, emergency-controls,
+runtime-gateway, mcp-bridge — 115 tests passed in total across the runs (an earlier run without
+`E2E_SLOW_MACHINE` timed out on registration under load and left a blocking
+SoD policy in tenant two, which was disabled before the rerun).

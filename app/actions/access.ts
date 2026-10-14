@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { resolveRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { refOf } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
   addPolicyException,
@@ -48,13 +49,13 @@ export async function createManualGrantAction(agentId: string, formData: FormDat
     String(formData.get("entitlementId")),
     formData.get("grantType") as GrantType,
   );
-  redirect(`/access/agents/${agentId}`);
+  redirect(`/access/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function evaluateAgentAction(agentId: string) {
   const ctx = await requirePermission("access.read");
   await evaluatePolicies(ctx.tenantId!, agentId);
-  redirect(`/access/agents/${agentId}`);
+  redirect(`/access/agents/${await refOf(ctx.tenantId!, "agents", agentId)}`);
 }
 
 export async function decideAccessRequestAction(requestId: string, formData: FormData) {

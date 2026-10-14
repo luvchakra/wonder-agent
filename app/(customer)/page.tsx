@@ -307,7 +307,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                       <Tr key={e.id}>
                         <Td className="whitespace-nowrap text-muted-foreground">{relativeTime(e.eventTime, nowMs)}</Td>
                         <Td>
-                          <Link href={`/runtime/agents/${e.agentId}`} className="font-medium text-foreground hover:text-primary">
+                          <Link href={`/runtime/agents/${agent?.ref ?? e.agentId}`} className="font-medium text-foreground hover:text-primary">
                             {agent ? agentLabel(agent) : "Unknown agent"}
                           </Link>
                         </Td>
@@ -350,7 +350,7 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
                   {topRisky.map((a) => (
                     <Tr key={a.id}>
                       <Td>
-                        <Link href={`/risk/agents/${a.id}`} className="font-medium text-foreground hover:text-primary">
+                        <Link href={`/risk/agents/${a.ref ?? a.id}`} className="font-medium text-foreground hover:text-primary">
                           {agentLabel(a)}
                         </Link>
                       </Td>

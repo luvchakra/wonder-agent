@@ -18,6 +18,7 @@ import type {
 export function toApplication(row: any): Application {
   return {
     id: row.id,
+    ref: row.ref ?? null,
     tenantId: row.tenant_id,
     name: row.name,
     category: row.category,

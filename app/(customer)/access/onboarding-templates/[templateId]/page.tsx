@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getOnboardingTemplate } from "@/modules/access-governance/service";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { listConnectorDefinitions } from "@/modules/integrations/framework/catalog";
@@ -20,8 +21,9 @@ export default async function OnboardingTemplatePage({ params }: { params: Promi
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { templateId } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the template's number; an old UUID link redirects.
+  const templateId = await pageRef(tenantId, "application_onboarding_templates", (await params).templateId, (ref) => `/access/onboarding-templates/${ref}`);
   const canManage = ctx.permissions.includes("access.manage");
   const [template, types, people] = await Promise.all([
     getOnboardingTemplate(tenantId, templateId),

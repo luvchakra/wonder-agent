@@ -50,10 +50,12 @@ export default async function RuntimeIndexPage() {
   ]);
 
   const nameById = new Map(agents.map((a) => [a.id, a.displayName?.trim() || a.agentName]));
+  const refById = new Map(agents.map((a) => [a.id, String(a.ref ?? a.id)]));
   const rows: ActivityRow[] = page.events.map((e) => ({
     id: e.id,
     agentId: e.agentId,
     agentName: nameById.get(e.agentId) ?? "Unknown agent",
+    agentRef: refById.get(e.agentId) ?? e.agentId,
     eventTime: e.eventTime,
     source: e.source,
     action: e.action,
@@ -120,7 +122,7 @@ export default async function RuntimeIndexPage() {
                   <Tr key={d.decisionId}>
                     <Td className="whitespace-nowrap tabular-nums text-muted-foreground">{d.createdAt.slice(0, 16).replace("T", " ")}</Td>
                     <Td>
-                      <Link href={`/agents/${d.agentId}`} className="font-medium text-foreground hover:text-primary">
+                      <Link href={`/agents/${refById.get(d.agentId) ?? d.agentId}`} className="font-medium text-foreground hover:text-primary">
                         {nameById.get(d.agentId) ?? "Unknown agent"}
                       </Link>
                     </Td>

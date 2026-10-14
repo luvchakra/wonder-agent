@@ -141,6 +141,11 @@ test.describe.serial("entitlement classification rules", () => {
     await page.getByRole("link", { name: `E2E Class Rule ${stamp}` }).click();
     await expect(page.getByRole("heading", { level: 1, name: `E2E Class Rule ${stamp}` })).toBeVisible();
     await expect(page.getByText("v2 live", { exact: true })).toBeVisible();
+    // FOUNDATION-P0-34: the rule's page is at its number; an old UUID link redirects there.
+    await expect(page).toHaveURL(/\/access\/classification-rules\/\d+$/);
+    const numbered = page.url();
+    await page.goto(`/access/classification-rules/${ruleId}`);
+    await expect(page).toHaveURL(numbered);
   });
 
   test("another organization sees and changes none of it; read-only cannot write", async ({ browser }) => {

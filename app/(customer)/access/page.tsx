@@ -155,7 +155,7 @@ export default async function ApplicationInventoryPage({
                 {rows.map((a) => (
                   <Tr key={a.id}>
                     <Td>
-                      <Link href={`/access/applications/${a.id}`} className="font-medium text-primary hover:underline">
+                      <Link href={`/access/applications/${a.ref ?? a.id}`} className="font-medium text-primary hover:underline">
                         {a.displayName ?? a.name}
                       </Link>
                       <span className="mt-0.5 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">

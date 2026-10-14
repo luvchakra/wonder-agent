@@ -147,7 +147,7 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                   {p.risk === "critical" ? ", then an access manager" : ""} · {p.maxDurationDays ? `up to ${p.maxDurationDays} days` : "no end date"}
                 </p>
                 <div className="mt-3">
-                  <LinkButton href={`/access/packages/${p.id}`} size="sm" variant={view === "browse" ? "default" : "outline"}>
+                  <LinkButton href={`/access/packages/${p.ref ?? p.id}`} size="sm" variant={view === "browse" ? "default" : "outline"}>
                     {view === "browse" ? "View and request" : "Open"}
                   </LinkButton>
                 </div>

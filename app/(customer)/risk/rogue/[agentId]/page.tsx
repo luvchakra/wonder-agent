@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getAgent, getOwnershipIssues, listOwners } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
 import { compareShouldCanDid } from "@/modules/runtime-assurance/service";
@@ -22,7 +23,7 @@ const ROGUE_CATEGORIES: RogueCategory[] = ["behavioral_deviation", "identity_ano
  * business logic, same as every other Experience Agent screen.
  */
 export default async function RogueAgentDetailPage({ params }: { params: Promise<{ agentId: string }> }) {
-  const { agentId } = await params;
+  const { agentId: raw } = await params;
   let ctx;
   try {
     ctx = await requirePermission("risk.read");
@@ -31,6 +32,8 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
     throw err;
   }
 
+  // FOUNDATION-P0-34: the URL carries the agent's number; an old UUID link redirects.
+  const agentId = await pageRef(ctx.tenantId!, "agents", raw, (ref) => `/risk/rogue/${ref}`);
   const agent = await getAgent(ctx.tenantId!, agentId);
   if (!agent) redirect("/risk/rogue");
 
@@ -60,25 +63,25 @@ export default async function RogueAgentDetailPage({ params }: { params: Promise
           {agent.agentType} · {agent.environment} · lifecycle: {agent.lifecycleState}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          <Link href={`/agents/${agentId}`} className="text-primary hover:underline">
+          <Link href={`/agents/${agent.ref ?? agentId}`} className="text-primary hover:underline">
             Agent Overview
           </Link>
           {" · "}
-          <Link href={`/access/agents/${agentId}`} className="text-primary hover:underline">
+          <Link href={`/access/agents/${agent.ref ?? agentId}`} className="text-primary hover:underline">
             Access (CAN)
           </Link>
           {" · "}
-          <Link href={`/runtime/agents/${agentId}`} className="text-primary hover:underline">
+          <Link href={`/runtime/agents/${agent.ref ?? agentId}`} className="text-primary hover:underline">
             Runtime (DID)
           </Link>
           {" · "}
-          <Link href={`/risk/agents/${agentId}`} className="text-primary hover:underline">
+          <Link href={`/risk/agents/${agent.ref ?? agentId}`} className="text-primary hover:underline">
             All findings
           </Link>
         </p>
 
         <div className="mt-3">
-          <RogueAgentActionBar agentId={agentId} agentName={agent.agentName} />
+          <RogueAgentActionBar agentId={agentId} agentRef={agent.ref ?? agentId} agentName={agent.agentName} />
         </div>
       </div>
 

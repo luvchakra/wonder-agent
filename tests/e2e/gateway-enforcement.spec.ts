@@ -1,6 +1,7 @@
 import { test, expect, request as playwrightRequest, type APIRequestContext, type Page } from "@playwright/test";
 import { TENANT_TWO, authFile } from "./support/testUsers";
 import { openConnection, type ReceivingConnection } from "./support/connections";
+import { agentIdOnPage } from "./support/objectRefs";
 
 /**
  * PLATFORM-P0-12 + RUNTIME-P0-15: real enforcement, switched per tenant by
@@ -21,8 +22,8 @@ async function registerAgent(page: Page, name: string): Promise<string> {
   await page.getByLabel("Agent name").fill(name);
   await page.getByLabel("Agent type").fill("automation");
   await page.getByRole("button", { name: "Register", exact: true }).click();
-  await expect(page).toHaveURL(/\/agents\/[0-9a-f-]{36}/);
-  return page.url().split("/agents/")[1];
+  await expect(page).toHaveURL(/\/agents\/\d+$/);
+  return agentIdOnPage(page);
 }
 
 async function agentKey(storage: string, browser: import("@playwright/test").Browser, name: string): Promise<string> {

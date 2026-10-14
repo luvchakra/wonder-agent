@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getAccountAccessLedger, getInventoryAccount, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerStatus } from "@/modules/access-governance/service";
 import { listAccessFindings, remediationLabel } from "@/modules/risk/service";
 import { listIdentities } from "@/modules/agent-identity/service";
@@ -32,9 +33,11 @@ export default async function AccountDetailPage({ params, searchParams }: { para
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
-  const find = ((await searchParams).find ?? "").slice(0, 100);
+  const sp = await searchParams;
+  const find = (sp.find ?? "").slice(0, 100);
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the account's number; an old UUID link redirects.
+  const id = await pageRef(tenantId, "accounts", (await params).id, (ref) => `/access/accounts/${ref}`, sp);
   const canManage = ctx.permissions.includes("access.manage");
   const canRemediate = ctx.permissions.includes("risk.manage");
   const [account, provenance, ledger, findings] = await Promise.all([
@@ -84,13 +87,13 @@ export default async function AccountDetailPage({ params, searchParams }: { para
                 <span className="font-mono text-xs">{account.externalAccountRef}</span>
               </Detail>
               <Detail label="Application">
-                <Link href={`/access/applications/${account.applicationId}`} className="text-primary hover:underline">
+                <Link href={`/access/applications/${account.applicationRef ?? account.applicationId}`} className="text-primary hover:underline">
                   {account.applicationName}
                 </Link>
               </Detail>
               <Detail label="Belongs to">
                 {account.identityId ? (
-                  <Link href={account.agentId ? `/agents/${account.agentId}` : `/identities/${account.identityId}`} className="text-primary hover:underline">
+                  <Link href={account.agentId ? `/agents/${account.agentRef ?? account.agentId}` : `/identities/${account.identityId}`} className="text-primary hover:underline">
                     {account.identityName ?? "Unknown identity"}
                   </Link>
                 ) : (
@@ -122,7 +125,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
           />
           <CardBody>
             {account.agentId ? (
-              <Link href={`/agents/${account.agentId}`} className="text-sm text-primary hover:underline">
+              <Link href={`/agents/${account.agentRef ?? account.agentId}`} className="text-sm text-primary hover:underline">
                 Open the agent
               </Link>
             ) : canManage ? (

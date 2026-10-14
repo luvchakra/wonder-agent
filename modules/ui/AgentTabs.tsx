@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export type AgentTabKey = "overview" | "access" | "runtime" | "risk";
 
-const TABS: { key: AgentTabKey; label: string; href: (agentId: string) => string }[] = [
+const TABS: { key: AgentTabKey; label: string; href: (agentRef: number | string) => string }[] = [
   { key: "overview", label: "Overview", href: (id) => `/agents/${id}` },
   { key: "access", label: "Access (CAN)", href: (id) => `/access/agents/${id}` },
   { key: "runtime", label: "Runtime (DID)", href: (id) => `/runtime/agents/${id}` },
@@ -19,7 +19,8 @@ const TABS: { key: AgentTabKey; label: string; href: (agentId: string) => string
  * tablist — using tab semantics for full page navigation would misuse the
  * role for screen-reader users.
  */
-export function AgentTabs({ agentId, active }: { agentId: string; active: AgentTabKey }) {
+/** `agentRef` is the agent's number (FOUNDATION-P0-34); its UUID still works (the page redirects). */
+export function AgentTabs({ agentRef, active }: { agentRef: number | string; active: AgentTabKey }) {
   return (
     <nav
       aria-label="Agent sections"
@@ -30,7 +31,7 @@ export function AgentTabs({ agentId, active }: { agentId: string; active: AgentT
         return (
           <Link
             key={tab.key}
-            href={tab.href(agentId)}
+            href={tab.href(agentRef)}
             aria-current={isActive ? "page" : undefined}
             className={`shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
               isActive

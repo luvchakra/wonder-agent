@@ -20,7 +20,7 @@ export async function linkAccountAction(accountId: string, _prev: AccountFormSta
   const unlink = formData.get("intent") === "unlink";
   try {
     const a = await linkAccount(ctx.tenantId!, ctx.userId, accountId, unlink ? null : String(formData.get("identityId") ?? ""));
-    revalidatePath(`/access/accounts/${accountId}`);
+    revalidatePath("/(customer)/access/accounts/[id]", "page");
     revalidatePath("/access/accounts");
     return { status: "saved", message: a.identityId ? `Linked to ${a.identityName ?? "the identity"}.` : "Unlinked. The account is an orphan." };
   } catch (err) {
@@ -33,7 +33,7 @@ export async function reconcileAccountsAction(applicationId: string, prev: Accou
   const ctx = await requirePermission("access.manage");
   try {
     const run = await reconcileApplicationAccounts(ctx.tenantId!, ctx.userId, applicationId);
-    revalidatePath(`/access/applications/${applicationId}`);
+    revalidatePath("/(customer)/access/applications/[id]", "page");
     revalidatePath("/access/accounts");
     return {
       status: "saved",
@@ -63,7 +63,7 @@ export async function reconcileAccessAction(applicationId: string, _prev: Access
       return { status: "previewed", run: await reconcileApplicationAccess(ctx.tenantId!, ctx.userId, applicationId, { dryRun: true }) };
     }
     const run = await reconcileApplicationAccess(ctx.tenantId!, ctx.userId, applicationId, { dryRun: false, previewRunId });
-    revalidatePath(`/access/applications/${applicationId}`);
+    revalidatePath("/(customer)/access/applications/[id]", "page");
     return { status: "applied", run };
   } catch (err) {
     const e = err as { message?: string; code?: string };
