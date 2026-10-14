@@ -272,6 +272,9 @@ export type McpTool = {
   /** Owner feedback 2026-10-14: an AI agent behind the tool (it drafts, answers, generates), and why. */
   kind: "ai_agent" | "tool";
   kindReason: string | null;
+  /** What the server declared about an AI agent: it only answers, or only drafts; its output is AI-generated. */
+  declaredAutonomy: "answer_only" | "draft_only" | null;
+  declaredAiGenerated: boolean;
 };
 
 export type McpResource = {

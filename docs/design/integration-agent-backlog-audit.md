@@ -3032,3 +3032,44 @@ tool is labelled, appears in the discovery inbox and its review page opens;
 the other tools do not) and shadow-ai 4/4. The spec's server name and
 resource URI are now unique per run: earlier runs' identical ones had made
 its `getByText` checks ambiguous.
+
+### 2026-10-15 — INTEGRATION-P0-31: trust the server's declaration of an AI agent
+
+Owner request. WonderArk's MCP server (WonderArk PR #42) now declares, in each
+tool's `_meta` (MCP's implementation-specific metadata; MCP has no agent
+type), `"wonderapps.biz/entity": "ai_agent" | "tool"`. For an AI agent it
+also declares `"wonderapps.biz/ai": { autonomy: "answer_only" | "draft_only",
+output: "ai-generated", acts: false }`. WonderID guessed from the name and
+description, and the mcp_tool definition dropped `_meta`, so the declaration
+was lost.
+
+- `readToolDeclaration(meta)` (mcpNormalize.ts, pure) reads the dotted keys as
+  exact, own keys, never as a dotted path or an inherited property. It is
+  untrusted external data (§17.2): only "ai_agent" / "tool", only the two
+  autonomy values, and `output === "ai-generated"` count; anything else is
+  absent. An AI block on a declared tool is ignored.
+- The mcp driver adds `_declaredEntity`, `_declaredAutonomy` and
+  `_declaredAiGenerated` beside `_operation`. The mcp-server definition maps
+  them, and the mcp_tool family declares them as optional fields. The
+  connector boundary (#20) is unchanged: the driver still only lists.
+- `classifyToolKind(name, description, declared)`: the declaration first
+  ("Declared by the server"), then the existing guess only when there is no
+  valid declaration. The inventory re-checks stored values on read
+  (`declaredEntityOf`).
+- `/integrations/mcp` lists AI agents in their own "AI agents" section with
+  the reason and, when declared, "Answers only" / "Drafts only" and
+  "AI-generated output". The tools table and its counts hold tools only. No new
+  buttons (§19.5).
+- The declaration chooses a label only. It decides no permission, risk or
+  autonomy (#9, #19). A declared agent is still an Agent Discovery candidate
+  for a person to register, link or ignore. The discovery signal is renamed
+  "Tool is an AI agent" (it said "declared by the server" even for a guess).
+
+Verified: typecheck; eslint; Vitest 435/435 over mcpNormalize, mcpInventory,
+the framework (including the driver keeping `_meta` by its exact keys, and a
+nested or invalid declaration dropped) and agent-identity. Local E2E
+mcp-inventory 3/3: a stub server with WonderArk's `_meta` shape lists the
+declared agent under "AI agents" with "Declared by the server", "Drafts only"
+and "AI-generated output". A `draft_…` tool declared "tool" stays in the
+tools table. The live WonderArk server needs its stored bearer token, so it
+is confirmed by rediscovering it in the app after the merge.

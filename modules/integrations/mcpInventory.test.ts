@@ -59,6 +59,24 @@ describe("buildMcpInventory (INTEGRATION-P0-06)", () => {
     expect(server).toMatchObject({ endpoint: "https://m2.example.com", serverName: null, lastDiscoveredAt: null, tools: [], resources: [] });
   });
 
+  it("labels a tool by what the server declared first, then by the guess; a stored invalid value counts as absent", () => {
+    const [server] = buildMcpInventory(
+      [integration("m1", "mcp")],
+      [
+        obj("m1", "mcp_tool", "ask_assistant", { name: "ask_assistant", declaredEntity: "ai_agent", declaredAutonomy: "answer_only", declaredAiGenerated: true }, "2026-10-15T00:00:00Z"),
+        obj("m1", "mcp_tool", "draft_note", { name: "draft_note", declaredEntity: "tool" }, "2026-10-15T00:00:00Z"),
+        obj("m1", "mcp_tool", "draft_reply", { name: "draft_reply", declaredEntity: "agent", declaredAutonomy: "anything" }, "2026-10-15T00:00:00Z"),
+        obj("m1", "mcp_tool", "get_record", { name: "get_record" }, "2026-10-15T00:00:00Z"),
+      ],
+    );
+    expect(server.tools.map((t) => [t.name, t.kind, t.kindReason, t.declaredAutonomy, t.declaredAiGenerated])).toEqual([
+      ["ask_assistant", "ai_agent", "Declared by the server", "answer_only", true],
+      ["draft_note", "tool", "Declared by the server", null, false],
+      ["draft_reply", "ai_agent", 'Name starts with "draft"', null, false],
+      ["get_record", "tool", null, null, false],
+    ]);
+  });
+
   it("an unrecognised stored operation reads as unknown", () => {
     const [server] = buildMcpInventory([integration("m1", "mcp")], [obj("m1", "mcp_tool", "t", { operation: "admin" }, "2026-09-25T00:00:00Z")]);
     expect(server.tools[0]).toMatchObject({ name: "t", operation: "unknown", operationBasis: "none" });

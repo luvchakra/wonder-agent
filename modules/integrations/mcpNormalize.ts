@@ -43,8 +43,53 @@ const AI_VERBS = new Set(["draft", "generate", "summarize", "summarise", "ask", 
 const AI_DESCRIPTION = /\b(AI|A\.I\.|LLM|GPT|language model|generative|machine learning|AI[- ]powered|AI assistant|chatbot)\b/i;
 
 export type McpToolKind = { kind: "ai_agent" | "tool"; reason: string | null };
+export type DeclaredEntity = "ai_agent" | "tool";
+export type DeclaredAutonomy = "answer_only" | "draft_only";
 
-export function classifyToolKind(name: string, description: string | null): McpToolKind {
+/**
+ * What the server itself declares about a tool in its `_meta` (MCP's field
+ * for implementation-specific metadata; MCP has no "agent" type). WonderApps
+ * servers declare `"wonderapps.biz/entity": "ai_agent" | "tool"` and, for an
+ * AI agent, `"wonderapps.biz/ai": { autonomy, output, acts }`. The keys
+ * contain a dot, so they are read as exact keys, never as dotted paths.
+ * Untrusted external data (§17.2): only the known values count; anything
+ * else is absent. It chooses a label only, never permissions, risk or
+ * autonomy (#9, #19).
+ */
+export type McpToolDeclaration = { entity: DeclaredEntity | null; autonomy: DeclaredAutonomy | null; aiGenerated: boolean };
+
+const ENTITY_KEY = "wonderapps.biz/entity";
+const AI_KEY = "wonderapps.biz/ai";
+const own = (o: object, key: string): unknown => (Object.prototype.hasOwnProperty.call(o, key) ? (o as Record<string, unknown>)[key] : undefined);
+const isObject = (v: unknown): v is object => typeof v === "object" && v !== null && !Array.isArray(v);
+
+export function readToolDeclaration(meta: unknown): McpToolDeclaration {
+  const none: McpToolDeclaration = { entity: null, autonomy: null, aiGenerated: false };
+  if (!isObject(meta)) return none;
+  const entity = own(meta, ENTITY_KEY);
+  if (entity !== "ai_agent" && entity !== "tool") return none;
+  if (entity === "tool") return { entity, autonomy: null, aiGenerated: false };
+  const ai = own(meta, AI_KEY);
+  if (!isObject(ai)) return { entity, autonomy: null, aiGenerated: false };
+  const autonomy = own(ai, "autonomy");
+  return {
+    entity,
+    autonomy: autonomy === "answer_only" || autonomy === "draft_only" ? autonomy : null,
+    aiGenerated: own(ai, "output") === "ai-generated",
+  };
+}
+
+/** A stored declared entity, re-checked on read: only the known values count. */
+export function declaredEntityOf(v: unknown): DeclaredEntity | null {
+  return v === "ai_agent" || v === "tool" ? v : null;
+}
+
+/**
+ * The server's declaration decides first; the name and description guess
+ * only when there is no valid declaration.
+ */
+export function classifyToolKind(name: string, description: string | null, declared: DeclaredEntity | null = null): McpToolKind {
+  if (declared) return { kind: declared, reason: "Declared by the server" };
   const m = description ? AI_DESCRIPTION.exec(description) : null;
   if (m) return { kind: "ai_agent", reason: `Description mentions "${m[0]}"` };
   const verb = firstVerb(name);
