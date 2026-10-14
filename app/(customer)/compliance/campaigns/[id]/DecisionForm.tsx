@@ -32,8 +32,20 @@ export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; su
   const [delegateToUserId, setDelegateToUserId] = useState("");
   const [overrideSoD, setOverrideSoD] = useState(false);
   const [until, setUntil] = useState("");
+  const [askEmail, setAskEmail] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   async function submit(): Promise<ConfirmActionResult> {
+    // COMPLIANCE-P0-14 part 3: asking someone is recorded first, while the item is still open.
+    if (decision === "request_information" && askEmail.trim()) {
+      const asked = await fetch(`/api/v1/compliance/items/${itemId}/consultations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ askedOfEmail: askEmail.trim(), question: justification }),
+      });
+      const askedBody = await asked.json();
+      if (!asked.ok || !askedBody.ok) return { kind: "single", success: false, error: askedBody.error?.message ?? "Request failed" };
+    }
     const res = await fetch(`/api/v1/compliance/items/${itemId}/decisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -48,13 +60,10 @@ export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; su
 
   async function handleDirectSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     const result = await submit();
     if (result.kind === "single" && result.success) router.refresh();
-    // errors from the direct (non-confirm) path are rare (validation already
-    // happened client-side); a failed decision here would show as no visible
-    // change, which is an acceptable gap for the non-destructive paths —
-    // "revoke" (the one with real consequences) always goes through the
-    // confirm dialog below, which does surface errors.
+    else if (result.kind === "single") setError(result.error ?? "Request failed");
   }
 
   const fields = (
@@ -75,6 +84,9 @@ export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; su
           value={delegateToUserId}
           onChange={(e) => setDelegateToUserId(e.target.value)}
         />
+      )}
+      {decision === "request_information" && (
+        <TextField label="Ask (optional)" name="askEmail" type="email" placeholder="their email" value={askEmail} onChange={(e) => setAskEmail(e.target.value)} />
       )}
       {(decision === "defer" || decision === "exception") && (
         <TextField label={decision === "defer" ? "Review by" : "Keep until"} name="until" type="date" required value={until} onChange={(e) => setUntil(e.target.value)} />
@@ -118,6 +130,11 @@ export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; su
       <Button type="submit" variant="secondary" disabled={!justification.trim() || ((decision === "defer" || decision === "exception") && !until)}>
         Submit
       </Button>
+      {error && (
+        <p role="alert" className="w-full text-sm text-destructive">
+          {error}
+        </p>
+      )}
     </form>
   );
 }
