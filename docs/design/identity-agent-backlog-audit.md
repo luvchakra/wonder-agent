@@ -1959,3 +1959,12 @@ policies above cover the finish row.
   - an external whose end date passed yesterday becomes LEAVE_PENDING with a
     `schedule` leaver event and its tasks, and viewing again adds nothing.
 - Typecheck, eslint and `next build` are clean.
+
+## 2026-10-14 — Review info for COMPLIANCE-P0-10
+
+Published `getIdentityReviewInfo(tenantId, ids)` (`directory.ts`, exported
+from `service.ts`): for each identity, its signed-in user, its manager's
+identity and its owner's identity, read with the service role and filtered
+by `tenant_id` explicitly. Compliance uses it to pick each item's
+reviewer and to refuse self-certification. No schema change in this
+module. Verified through Compliance's checks.

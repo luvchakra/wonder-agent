@@ -28,6 +28,7 @@ export async function POST(request: Request) {
       cadence: body.cadence as CampaignCadence,
       dueDate: body.dueDate,
       reviewerId: body.reviewerId ?? ctx.userId,
+      reviewerKind: body.reviewerKind,
     });
     return NextResponse.json({ ok: true, data: campaign });
   } catch (err) {

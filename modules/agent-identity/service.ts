@@ -59,6 +59,7 @@ export {
   type IdentityListRow,
   type RelationshipView,
   type SourceDisagreementRow,
+  getIdentityReviewInfo,
 } from "./directory";
 export {
   listIdentitiesForCorrelation,

@@ -3965,3 +3965,21 @@ The authorization engine is unchanged: it treats the copies like any other assig
     - the delegate can then manage access for someone else;
     - ended early, the copy is gone and so is the right.
   - `permission-catalog` 9/9 after its fix.
+
+## 2026-10-14 — Certification support for COMPLIANCE-P0-10
+
+Published two services for Compliance's reviews of people's access
+(`modules/access-governance/certificationSupport.ts`, exported from
+`service.ts`):
+- `listIdentityGrantsForReview(tenantId, { applicationId, privilegedOnly })`:
+  live grants (not revoked or missing, fulfilment none or verified) on
+  accounts that belong to an identity and not an agent.
+- `requestCertifiedRemoval(tenantId, actorId, { grantId,
+  certificationItemId, justification })`: records an approved `remove`
+  request (the reviewer's decision is the approval), reuses an open one
+  for the same grant, audits `access.certified_removal_requested`, and
+  hands it to `pendRequest` so it is fulfilled and verified like any other
+  removal.
+
+Verified through Compliance's checks (unit 483/483, E2E brownfield revoke
+reaching a `remove` task). No schema change in this module.

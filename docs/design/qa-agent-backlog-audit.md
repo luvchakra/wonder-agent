@@ -2017,3 +2017,13 @@ explained.**
 **Verified.**
 - `npx vitest run modules/integrations/framework`: 17 files, 318 tests passed (1 live file skipped).
 - Typecheck and eslint are clean.
+
+## 2026-10-14 — QA-P0-22: brownfield migration fixture (done)
+
+`brownfield.spec.ts` gains its certification step now that
+COMPLIANCE-P0-10 part 1 exists: an application-owner review of the
+imported access (5 items, all reviewed by the application owner), a
+read-only user refused (403), one grant certified, the external person's
+grant revoked through to a `remove` fulfilment task, and another
+organization seeing no items. Local E2E with `compliance.spec.ts`: 24/24.
+QA-P0-22 is Done.

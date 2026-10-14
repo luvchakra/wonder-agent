@@ -57,6 +57,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <option value="entitlement">entitlement</option>
                 <option value="privileged_access">privileged_access</option>
                 <option value="high_risk_agent">high_risk_agent</option>
+                <option value="identity_access">people&apos;s access</option>
               </SelectField>
               <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
               <SelectField label="Cadence" name="cadence" defaultValue="one_time">
@@ -65,6 +66,12 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <option value="event_driven">event_driven</option>
               </SelectField>
               <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+              {/* COMPLIANCE-P0-10: for people's access; the reviewer above takes items nobody else fits. */}
+              <SelectField label="Reviewed by (people's access)" name="reviewerKind" defaultValue="named">
+                <option value="named">the reviewer</option>
+                <option value="manager">each person&apos;s manager</option>
+                <option value="application_owner">the application&apos;s owner</option>
+              </SelectField>
               <div className="sm:col-span-2">
                 <Button type="submit">Launch</Button>
               </div>
@@ -88,6 +95,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <option value="entitlement">entitlement</option>
                 <option value="privileged_access">privileged_access</option>
                 <option value="high_risk_agent">high_risk_agent</option>
+                <option value="identity_access">people&apos;s access</option>
               </SelectField>
               <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
               <SelectField label="Cadence" name="cadence" defaultValue="one_time">
@@ -96,6 +104,12 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <option value="event_driven">event_driven</option>
               </SelectField>
               <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+              {/* COMPLIANCE-P0-10: for people's access; the reviewer above takes items nobody else fits. */}
+              <SelectField label="Reviewed by (people's access)" name="reviewerKind" defaultValue="named">
+                <option value="named">the reviewer</option>
+                <option value="manager">each person&apos;s manager</option>
+                <option value="application_owner">the application&apos;s owner</option>
+              </SelectField>
               <div className="sm:col-span-2">
                 <Button type="submit">Launch</Button>
               </div>

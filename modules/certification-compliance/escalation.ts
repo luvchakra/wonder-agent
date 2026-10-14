@@ -34,7 +34,8 @@ export async function escalateOverdueItems(tenantId: string, actorId: string | n
   let escalatedCount = 0;
   for (const row of overdueRows ?? []) {
     const item = toCertificationItem(row);
-    const owners = await listOwners(tenantId, item.agentId);
+    // COMPLIANCE-P0-10: a person's access has no agent owner; it goes to whoever launched the campaign.
+    const owners = item.agentId ? await listOwners(tenantId, item.agentId) : [];
     const businessOwner = owners.find((o) => o.ownerType === "business_owner");
     const escalatedTo = businessOwner?.userId ?? row.certification_campaigns?.created_by ?? item.reviewerId;
 

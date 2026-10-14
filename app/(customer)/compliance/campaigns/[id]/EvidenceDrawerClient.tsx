@@ -3,7 +3,7 @@
 import { EvidenceDrawer, useEvidenceDrawerParam, Button, Badge } from "@/modules/ui";
 import type { CertificationSnapshot } from "@/lib/shared/types/compliance";
 
-type ItemForEvidence = { id: string; agentId: string; snapshot: CertificationSnapshot | null };
+type ItemForEvidence = { id: string; agentId: string | null; snapshot: CertificationSnapshot | null };
 
 /**
  * EXPERIENCE-P0-06 — the point-in-time evidence snapshot (COMPLIANCE-P0-03)
@@ -31,12 +31,21 @@ export function EvidenceDrawerClient({ items }: { items: ItemForEvidence[] }) {
       {snapshot && (
         <div className="space-y-3 text-sm">
           <p className="text-xs text-muted-foreground">Captured {snapshot.capturedAt}</p>
-          <div>
-            <p className="text-xs text-muted-foreground">Agent contract</p>
-            <p className="text-foreground">
-              {snapshot.agentContractId ? `v${snapshot.agentContractVersion} (${snapshot.agentContractId})` : "No active contract at capture time"}
-            </p>
-          </div>
+          {snapshot.person ? (
+            <div>
+              <p className="text-xs text-muted-foreground">Whose access</p>
+              <p className="text-foreground">
+                {snapshot.person.displayName} ({snapshot.person.identityType.toLowerCase().replace(/_/g, " ")}){snapshot.account ? ` · account ${snapshot.account.ref}` : ""}
+              </p>
+            </div>
+          ) : (
+            <div>
+              <p className="text-xs text-muted-foreground">Agent contract</p>
+              <p className="text-foreground">
+                {snapshot.agentContractId ? `v${snapshot.agentContractVersion} (${snapshot.agentContractId})` : "No active contract at capture time"}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-muted-foreground">Access grant</p>
             {snapshot.accessGrant ? (

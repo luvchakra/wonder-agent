@@ -11,7 +11,12 @@ export async function launchCampaignAction(formData: FormData) {
   const campaign = await launchCampaign(ctx.tenantId!, ctx.userId, {
     name: String(formData.get("name") ?? ""),
     scopeType: (formData.get("scopeType") as CampaignScopeType) || "agent",
-    scope: criticalityRaw ? { criticality: criticalityRaw.split(",").map((s) => s.trim()) } : {},
+    scope: {
+      ...(criticalityRaw ? { criticality: criticalityRaw.split(",").map((s) => s.trim()) } : {}),
+      // COMPLIANCE-P0-10: people's access, optionally privileged only.
+      ...(formData.get("privilegedOnly") === "on" ? { privilegedOnly: true } : {}),
+    },
+    reviewerKind: (String(formData.get("reviewerKind") ?? "") || undefined) as "named" | "manager" | "application_owner" | undefined,
     cadence: (formData.get("cadence") as CampaignCadence) || "one_time",
     // The Reviewer field is optional and submits "" when left blank, and ""
     // is not null — `?? ctx.userId` never fired, so a blank field sent an
@@ -25,12 +30,13 @@ export async function launchCampaignAction(formData: FormData) {
 }
 
 export async function recordDecisionAction(campaignId: string, itemId: string, formData: FormData) {
-  const ctx = await requirePermission("compliance.manage");
+  const ctx = await requirePermission("compliance.read");
   await recordDecision(ctx.tenantId!, ctx.userId, itemId, {
     decision: formData.get("decision") as DecisionType,
     justification: String(formData.get("justification") ?? ""),
     delegateToUserId: String(formData.get("delegateToUserId") ?? "") || undefined,
     overrideSoD: formData.get("overrideSoD") === "on",
+    canManageCompliance: ctx.permissions.includes("compliance.manage"),
   });
   redirect(`/compliance/campaigns/${campaignId}`);
 }

@@ -28,6 +28,7 @@ export function toCertificationCampaign(row: any): CertificationCampaign {
     buildStatus: row.build_status ?? "ready",
     buildError: row.build_error ?? null,
     itemsTotal: row.items_total ?? null,
+    reviewerKind: row.reviewer_kind ?? "named",
   };
 }
 
@@ -36,7 +37,9 @@ export function toCertificationItem(row: any): CertificationItem {
     id: row.id,
     tenantId: row.tenant_id,
     campaignId: row.campaign_id,
-    agentId: row.agent_id,
+    agentId: row.agent_id ?? null,
+    identityId: row.identity_id ?? null,
+    accountId: row.account_id ?? null,
     accessGrantId: row.access_grant_id,
     reviewerId: row.reviewer_id,
     riskAtReview: row.risk_at_review,

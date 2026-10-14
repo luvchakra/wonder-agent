@@ -1219,3 +1219,55 @@ Left out:
 - the evidence export and the operations report still read every item.
   They need the complete set by design.
 
+
+### 2026-10-14 — COMPLIANCE-P0-10 part 1: reviews of people's access
+
+Certification campaigns covered only agents. This part adds reviews of
+people's application access (human, external and service-account
+identities), so an organization can certify who holds what.
+
+Built:
+- **Migration `0180_compliance_identity_access_reviews.sql`** (applied):
+  - campaign scope `identity_access`;
+  - `certification_campaigns.reviewer_kind` (named, manager,
+    application_owner; existing campaigns are named);
+  - `certification_items.agent_id` is nullable, with new `identity_id`
+    and `account_id`; a check makes every item about exactly one agent or
+    one identity.
+- **Migration `0181_compliance_identity_items_same_tenant.sql`** (applied):
+  composite same-organization foreign keys from an item to its identity
+  and account.
+- **`identityReviewRules.ts`** (pure): who reviews an item (the manager or
+  the application owner, falling back to the campaign's named reviewer
+  when missing or when that person is the subject), and that nobody
+  certifies their own access.
+- **Launch:** an `identity_access` campaign reads grants through Access's
+  published `listIdentityGrantsForReview` (application filter, privileged
+  only) and Identity's `getIdentityReviewInfo`. Each item's snapshot holds
+  the person, account, grant, privilege level and reviewer.
+- **Decisions:** approve, revoke, delegate, request information.
+  - Approving one's own access is refused (409 `SELF_CERTIFICATION`).
+  - Revoke goes through Access's `requestCertifiedRemoval`: an approved
+    `remove` request that becomes a fulfilment task and is verified like
+    any other removal. The item's remediation id is the request id.
+  - A reviewer needs `compliance.read` plus being the item's reviewer;
+    agent items still need `compliance.manage`.
+- **UI:** the campaigns form adds "people's access" and "Reviewed by";
+  the items table shows whose access; the evidence drawer shows the
+  person and account.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest unit and architecture: 483/483, including the reviewer rules 3/3.
+- `tests/compliance/identity-reviews-isolation.sql` against dev: 5/5
+  (another organization's identity 23503; an item about nobody 23514;
+  member sees 1; other organization sees 0 and cannot insert, 42501).
+- Local E2E `brownfield.spec.ts` + `compliance.spec.ts`: 24/24. The
+  brownfield certify step launches an application-owner review, checks a
+  read-only user gets 403, certifies one grant, revokes an external
+  person's grant through to a `remove` task, and checks another
+  organization sees no items.
+
+Left for part 2: defer, escalate and exception decisions; a reviewer
+inbox across campaigns; owner reviews of applications, roles and
+packages; templates, calendar and analytics.
