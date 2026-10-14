@@ -140,7 +140,8 @@ export function chainOutcome(steps: StepState[]): { state: "rejected" } | { stat
   return { state: "open", stage: Math.min(...open.map((s) => s.stage)) };
 }
 
-export type Actor = { userId: string; canApproveAsAccessManager: boolean };
+/** ACCESS-P0-23: `actingFor` — the members whose approvals this member decides now, by delegation. */
+export type Actor = { userId: string; canApproveAsAccessManager: boolean; actingFor?: string[] };
 export type ActionableStep = { id: string; stage: number; status: StepStatus; approverKind: ApproverKind; approverUserId: string | null };
 
 /**
@@ -151,7 +152,13 @@ export type ActionableStep = { id: string; stage: number; status: StepStatus; ap
  */
 export function actionableStep(steps: ActionableStep[], stage: number, actor: Actor): ActionableStep | null {
   const current = steps.filter((s) => s.stage === stage && s.status === "pending");
-  return current.find((s) => s.approverUserId === actor.userId) ?? (actor.canApproveAsAccessManager ? current.find((s) => s.approverKind === "access_managers") : undefined) ?? null;
+  return (
+    current.find((s) => s.approverUserId === actor.userId) ??
+    // ACCESS-P0-23: a step naming someone whose approvals this member holds by delegation.
+    current.find((s) => s.approverUserId !== null && (actor.actingFor ?? []).includes(s.approverUserId)) ??
+    (actor.canApproveAsAccessManager ? current.find((s) => s.approverKind === "access_managers") : undefined) ??
+    null
+  );
 }
 
 /** When a pending step runs out of time: escalate a named step once, else expire the request. */

@@ -3776,3 +3776,87 @@ had to look in their Approvals inbox. This part adds that notification.
   - read-only 403.
 - Typecheck, eslint and `next build` are clean. Migration 0175 is applied
   to the dev project.
+
+## 2026-10-14 — ACCESS-P0-23 part 1: approver delegation
+
+Design §5.3: "out-of-office and standing delegations of approval, request
+and administration rights, time-limited, audited, never to the subject of
+the request". This part covers approval rights, item 5 of the owner's
+priority list.
+
+**Migration 0176.**
+- `access_delegations` records the delegator, the delegate, the scope
+  (`approvals`), when it starts and ends, why, who made it, and who ended it
+  and when.
+  - Both people are members of the organization (foreign keys to
+    `tenant_memberships`).
+  - Never to oneself, at most 180 days, and it ends after it starts.
+  - Each person sees the delegations they give or receive; an access
+    manager (`has_tenant_permission(access.manage)`) sees all. The service
+    writes.
+- `access_request_approvals.decided_on_behalf_of` records whom a delegated
+  decision was for.
+
+**Rules** (pure, `delegationRules.ts`; `approvalRules.actionableStep`).
+- A member delegates their own approvals, from now (or a set start) until a
+  date. Only an access manager may delegate someone else's.
+- `actingFor` returns whose approvals a member holds now.
+- `actionableStep` checks the member's own step first, then a step naming
+  someone they stand in for, then an access-manager step.
+- A delegation never passes on access-manager rights; it covers named steps
+  only.
+- The engine's existing refusal to let anyone decide a request they made,
+  or one that is for them, applies to the person deciding, whoever they act
+  for.
+
+**Engine.**
+- `decideApprovalStep` reads the delegations in force and records
+  `decided_by` (the delegate) and `decided_on_behalf_of` (the approver). The
+  approval audit carries `onBehalfOf`.
+- `listRequestIdsAwaiting` includes the delegated steps, so the delegate's
+  Approvals inbox shows them.
+- Approver notifications (ACCESS-P0-38 part 2) also reach a named
+  approver's delegates.
+
+**Service and API.**
+- `delegations.ts`: list (as the caller), create (both people active
+  members) and end. A delegation can be ended by the person away, the
+  delegate, or an access manager; for anyone else it is not found.
+- Create and end are audited; the reason is typed text.
+- `/api/v1/access/delegations` (GET, POST) and `[id]/revoke`, with
+  access.read. The service decides who may act.
+
+**UI.** Approvals view › "Away? Delegate your approvals" opens
+`/access/delegations`. It lists the delegations in place ("In force" or
+"Scheduled") with an "End" button, plus a folded "New delegation" form.
+Access managers can choose whose approvals.
+
+**Left out, recorded (part 2).**
+- Delegation of request rights (asking on someone's behalf).
+- Delegation of administration rights.
+- Delegating fulfilment tasks; ACCESS-P0-42's reassignment covers handing
+  over a single task.
+
+**Verified.**
+- Unit tests: `delegationRules.test.ts` 4, including delegated step
+  matching; `modules/access-governance` 321 in all.
+- Database: `tests/access/delegations-isolation.sql`, 9 of 9 as expected,
+  rolled back.
+- Local E2E, one worker:
+  - `approval-links-drafts.spec.ts` and `request-catalog.spec.ts` (the
+    approval engine changed) passed in the combined run;
+  - `approval-delegation.spec.ts` 4/4 on its own rerun. The spec covers:
+    - a non-delegate cannot see or decide the step;
+    - only an access manager delegates someone else's approvals;
+    - delegating to oneself is refused;
+    - the delegate sees and decides the step, with `decided_by` and
+      `decided_on_behalf_of` recorded and `onBehalfOf` in the audit;
+    - another organization sees and ends none;
+    - once ended, nothing is delegated;
+    - the page.
+  - The first run's failures were in the test, not the feature: a
+    delegation left by an interrupted run, and a second request for the
+    same entitlement returned as the open one. The setup now ends
+    leftovers, and the second request uses its own entitlement.
+- Typecheck, eslint and `next build` are clean. Migration 0176 is applied
+  to the dev project.

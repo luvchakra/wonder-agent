@@ -5,6 +5,7 @@ import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { listPermissionHolders } from "@/lib/rbac/permissionHolders";
 import { notify } from "@/modules/operations/service";
+import { activeDelegatesOf } from "./delegations";
 import { APPROVAL_LINK_TTL_HOURS, approvalLinkPath, approvalLinkState, isLinkToken, type LinkState } from "./approvalLinkRules";
 
 /**
@@ -45,11 +46,16 @@ export async function notifyApprovers(tenantId: string, requestId: string, stage
     ]);
     if (!req || req.tenant_id !== tenantId) return 0;
     const users = new Set<string>();
+    const named: string[] = [];
     for (const s of (steps ?? []) as Row[]) {
       if (s.tenant_id !== tenantId) continue;
-      if (s.approver_user_id) users.add(s.approver_user_id as string);
-      else if (s.approver_kind === "access_managers") for (const u of await listPermissionHolders(tenantId, "access.approve")) users.add(u);
+      if (s.approver_user_id) {
+        users.add(s.approver_user_id as string);
+        named.push(s.approver_user_id as string);
+      } else if (s.approver_kind === "access_managers") for (const u of await listPermissionHolders(tenantId, "access.approve")) users.add(u);
     }
+    // ACCESS-P0-23: whoever holds a named approver's approvals by delegation hears too.
+    for (const delegates of (await activeDelegatesOf(tenantId, named)).values()) for (const d of delegates) users.add(d);
     // Nobody decides their own request, or one for themselves.
     users.delete(req.requested_by as string);
     const subject = (req.subject as unknown as Row | null) ?? null;

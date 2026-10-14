@@ -23,6 +23,7 @@ import {
 } from "./approvalRules";
 import { pendRequest } from "./pendingGrants";
 import { notifyApprovers } from "./approvalLinks";
+import { approvalsActingFor } from "./delegations";
 
 /**
  * ACCESS-P0-19 — the approval engine for requests made through the
@@ -367,7 +368,10 @@ export async function decideApprovalStep(
   const steps = await currentChain(tenantId, actor.userId, row);
   const outcome = chainOutcome(steps);
   if (outcome.state !== "open") throw new ApiError(409, "INVALID_TRANSITION", "The approval chain is already complete");
-  const step = actionableStep(steps, outcome.stage, actor);
+  // ACCESS-P0-23: whose approvals this member also holds now, by delegation.
+  const actingFor = await approvalsActingFor(tenantId, actor.userId);
+  const step = actionableStep(steps, outcome.stage, { ...actor, actingFor });
+  const onBehalfOf = step && step.approverUserId && step.approverUserId !== actor.userId ? step.approverUserId : null;
   if (!step) throw new ApiError(403, "NOT_AN_APPROVER", "You are not an approver of this request at its current stage");
   // An access-manager review is a second pair of eyes: not someone who
   // already approved an earlier stage of this request.
@@ -378,7 +382,7 @@ export async function decideApprovalStep(
   const now = new Date();
   const { data: decided, error: decideError } = await admin
     .from("access_request_approvals")
-    .update({ status: decision, decided_by: actor.userId, decided_at: now.toISOString(), decider_roles: actor.roles, comment: note })
+    .update({ status: decision, decided_by: actor.userId, decided_on_behalf_of: onBehalfOf, decided_at: now.toISOString(), decider_roles: actor.roles, comment: note })
     .eq("tenant_id", tenantId)
     .eq("id", step.id)
     .eq("status", "pending")
@@ -411,6 +415,7 @@ export async function decideApprovalStep(
       policyId: row.request_policy_id ?? null,
       policyVersion: decided.policy_version ?? null,
       approverRoles: actor.roles,
+      onBehalfOf,
     },
     // WID-H07: the comment stays on the approval step (access_request_approvals.comment).
     typedText: { comment: note },
@@ -543,8 +548,10 @@ export async function getRequestWithApprovals(tenantId: string, requestId: strin
 /** Ids of waiting requests this person may decide now (named, or as an access manager), not their own. */
 export async function listRequestIdsAwaiting(tenantId: string, actor: { userId: string; canApproveAsAccessManager: boolean }): Promise<string[]> {
   const supabase = await supabaseServer();
+  // ACCESS-P0-23: and the steps of those whose approvals this member holds by delegation.
+  const named = [actor.userId, ...(await approvalsActingFor(tenantId, actor.userId))].filter((id) => UUID_RE.test(id));
   let query = supabase.from("access_request_approvals").select("request_id, approver_kind, approver_user_id, access_requests!inner(status, requested_by)").eq("tenant_id", tenantId).eq("status", "pending");
-  query = actor.canApproveAsAccessManager ? query.or(`approver_user_id.eq.${actor.userId},approver_kind.eq.access_managers`) : query.eq("approver_user_id", actor.userId);
+  query = actor.canApproveAsAccessManager ? query.or(`approver_user_id.in.(${named.join(",")}),approver_kind.eq.access_managers`) : query.in("approver_user_id", named);
   const { data, error } = await query.limit(500);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   const rows = (data ?? []).filter((r) => {
@@ -552,13 +559,13 @@ export async function listRequestIdsAwaiting(tenantId: string, actor: { userId: 
     return ar.status === "pending" && ar.requested_by !== actor.userId;
   });
   // An open access-manager review is not theirs where they decided an earlier stage.
-  const openReviews = [...new Set(rows.filter((r) => r.approver_user_id !== actor.userId).map((r) => r.request_id as string))];
+  const openReviews = [...new Set(rows.filter((r) => r.approver_kind === "access_managers").map((r) => r.request_id as string))];
   const { data: decided, error: decidedError } = openReviews.length
     ? await supabase.from("access_request_approvals").select("request_id").eq("tenant_id", tenantId).eq("decided_by", actor.userId).neq("status", "invalidated").in("request_id", openReviews)
     : { data: [], error: null };
   if (decidedError) throw new ApiError(500, "QUERY_FAILED", decidedError.message);
   const already = new Set((decided ?? []).map((r) => r.request_id as string));
-  return [...new Set(rows.filter((r) => r.approver_user_id === actor.userId || !already.has(r.request_id as string)).map((r) => r.request_id as string))];
+  return [...new Set(rows.filter((r) => r.approver_kind !== "access_managers" || !already.has(r.request_id as string)).map((r) => r.request_id as string))];
 }
 
 /**
