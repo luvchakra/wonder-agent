@@ -57,6 +57,8 @@ export type ConsentRecord = {
 
 export type PrivacyRequest = {
   id: string;
+  /** FOUNDATION-P0-34: the request's number in this organization, its URL key. */
+  ref?: number | null;
   reference: string;
   regime: Regime;
   requestType: RequestType;
@@ -95,6 +97,8 @@ export type LegalHold = { id: string; name: string; reason: string; dataCategori
 
 export type BreachIncident = {
   id: string;
+  /** FOUNDATION-P0-34: the breach's number in this organization, its URL key. */
+  ref?: number | null;
   reference: string;
   title: string;
   description: string;

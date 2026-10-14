@@ -477,6 +477,8 @@ test.describe.serial("connector provisioning", () => {
     // Its own page: owner, then escalate into an investigation.
     const { data: me } = await db.from("users").select("id").eq("email", "e2e-admin-1@e2e.wonderagent.test").single();
     await page.goto(`/risk/rogue-accounts/${finding.id}`);
+    // FOUNDATION-P0-34: an old UUID link redirects to the finding's number.
+    await expect(page).toHaveURL(/\/risk\/rogue-accounts\/\d+$/);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     // Chosen once the page is interactive (a choice made before hydration is not seen).
     await expect(async () => {

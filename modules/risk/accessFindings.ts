@@ -78,6 +78,7 @@ function toAccessFinding(r: Row): AccessFinding {
     remediationRequestStatus: null,
     exceptionUntil: (r.exception_until as string | null) ?? null,
     decisionReason: (r.decision_reason as string | null) ?? null,
+    ref: (r.ref as number | null | undefined) ?? null,
   };
 }
 

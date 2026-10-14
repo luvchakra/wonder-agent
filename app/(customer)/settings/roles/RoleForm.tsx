@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  */
 
 export type FormPermission = { key: string; label: string; description: string; resource: string; module: string; moduleLabel: string; sensitivity: string };
-type Initial = { roleId?: string; name: string; description: string; permissions: string[]; copyFrom?: { id: string; name: string } | null };
+type Initial = { roleId?: string; roleRef?: number | null; name: string; description: string; permissions: string[]; copyFrom?: { id: string; name: string } | null };
 
 const STEPS = ["Basic details", "Permissions", "Review"] as const;
 const initialState: RoleActionState = { ok: false, message: null };
@@ -274,7 +274,7 @@ export function RoleForm({ catalog, actorHolds, initial, mode }: { catalog: Form
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
             {shownStep === 0 ? (
-              <Link href={initial.roleId ? `/settings/roles/${initial.roleId}` : "/settings/roles"} className="text-sm text-muted-foreground hover:text-foreground">
+              <Link href={initial.roleId ? `/settings/roles/${initial.roleRef ?? initial.roleId}` : "/settings/roles"} className="text-sm text-muted-foreground hover:text-foreground">
                 Cancel
               </Link>
             ) : (

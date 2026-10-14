@@ -126,6 +126,8 @@ test("owner request 2026-10-13: another organization with a chosen prefix and en
   const admin = await browser.newContext({ storageState: authFile("platformAdmin") });
   const ap = await admin.newPage();
   await ap.goto(`/platform-admin/tenants/${tenant!.id}?view=environment`);
+  // FOUNDATION-P0-34: an old UUID link redirects to the organization's number, keeping the view.
+  await expect(ap).toHaveURL(/\/platform-admin\/tenants\/\d+\?view=environment$/);
   await ap.getByLabel("Address prefix").fill(`${prefix}-renamed`);
   await ap.getByRole("button", { name: "Change address" }).click();
   // Renamed out of its prefix group, it re-renders as an organization of its own (the address check below is the database's).

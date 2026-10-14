@@ -6,6 +6,7 @@ import { Badge, CountPills, EmptyState } from "@/modules/ui";
 
 export type CampaignRow = {
   id: string;
+  ref?: number | null;
   name: string;
   scopeType: string;
   status: string;
@@ -62,7 +63,7 @@ export function CampaignsList({ campaigns }: { campaigns: CampaignRow[] }) {
                 {c.status}
               </Badge>
               <Link
-                href={`/compliance/campaigns/${c.id}`}
+                href={`/compliance/campaigns/${c.ref ?? c.id}`}
                 className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-ring/50 hover:bg-accent/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
               >
                 Review<span className="sr-only"> {c.name}</span>

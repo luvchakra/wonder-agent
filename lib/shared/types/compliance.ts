@@ -34,6 +34,8 @@ export type CertificationCampaign = {
   buildError?: string | null;
   itemsTotal?: number | null;
   reviewerKind?: CampaignReviewerKind;
+  /** FOUNDATION-P0-34: the campaign's number in this organization, its URL key. */
+  ref?: number | null;
 };
 
 export type UsageAtReview = "used" | "never" | "unknown";

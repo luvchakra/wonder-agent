@@ -88,7 +88,7 @@ export default async function AuthorizationPoliciesPage({ searchParams }: { sear
                 {policies.map((p) => (
                   <Tr key={p.id}>
                     <Td>
-                      <Link href={`/settings/authorization-policies/${p.id}`} className="font-medium text-foreground hover:text-primary">
+                      <Link href={`/settings/authorization-policies/${p.ref ?? p.id}`} className="font-medium text-foreground hover:text-primary">
                         {p.name}
                       </Link>
                     </Td>

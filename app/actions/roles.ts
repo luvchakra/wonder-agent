@@ -29,6 +29,6 @@ export async function removeRoleAction(formData: FormData): Promise<{ ok: true }
     throw err;
   }
   revalidatePath("/settings/roles");
-  revalidatePath(`/settings/users/${userId}`);
+  revalidatePath("/settings/users/[userId]", "page");
   return { ok: true };
 }

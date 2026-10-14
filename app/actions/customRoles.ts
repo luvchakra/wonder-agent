@@ -34,7 +34,7 @@ export async function saveRoleAction(_prev: RoleActionState, formData: FormData)
   }
   if (!result.ok) return { ok: false, message: "Check the highlighted fields.", errors: result.errors };
   revalidatePath("/settings/roles");
-  redirect(`/settings/roles/${result.roleId}?saved=${roleId ? "updated" : "created"}`);
+  redirect(`/settings/roles/${result.roleRef ?? result.roleId}?saved=${roleId ? "updated" : "created"}`);
 }
 
 export async function setRoleStatusAction(_prev: RoleActionState, formData: FormData): Promise<RoleActionState> {
@@ -47,7 +47,7 @@ export async function setRoleStatusAction(_prev: RoleActionState, formData: Form
     return refused(err);
   }
   revalidatePath("/settings/roles");
-  revalidatePath(`/settings/roles/${roleId}`);
+  revalidatePath("/settings/roles/[id]", "page");
   return { ok: true, message: status === "active" ? "Activated. Its holders have its permissions again." : "Deactivated. Its holders lose its permissions on their next request." };
 }
 

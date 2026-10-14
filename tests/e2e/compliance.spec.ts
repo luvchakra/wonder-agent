@@ -31,9 +31,15 @@ test.describe("Compliance module", () => {
     await page.getByLabel("Campaign name").fill(campaignName);
     await page.getByRole("button", { name: "Launch", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/compliance\/campaigns\/[0-9a-f-]{36}/);
+    // FOUNDATION-P0-34: the campaign's page is keyed by its number, not its UUID.
+    await expect(page).toHaveURL(/\/compliance\/campaigns\/\d+$/);
+    const campaignPath = new URL(page.url()).pathname;
     await expect(page.getByRole("heading", { name: "Certification Items" })).toBeVisible();
     await expect(page.getByText(/\d+ total · \d+ pending · \d+ decided · \d+ overdue · \d+ escalated/)).toBeVisible();
+    // An old UUID link still opens it, at the number URL.
+    const campaignId = ((await (await page.request.get("/api/v1/compliance/campaigns")).json()).data as { id: string; name: string }[]).find((c) => c.name === campaignName)!.id;
+    await page.goto(`/compliance/campaigns/${campaignId}`);
+    await expect(page).toHaveURL(new RegExp(`${campaignPath}$`));
 
     await page.goto("/compliance/campaigns");
     // The campaign index is a list of rows with a Review action now, not a
@@ -50,7 +56,7 @@ test.describe("Compliance module", () => {
       await page.getByLabel("Scope type").selectOption(scopeType);
       await page.getByRole("button", { name: "Launch", exact: true }).click();
 
-      await expect(page).toHaveURL(/\/compliance\/campaigns\/[0-9a-f-]{36}/);
+      await expect(page).toHaveURL(/\/compliance\/campaigns\/\d+$/);
       await expect(page.getByText(/an unexpected error occurred/i)).not.toBeVisible();
     });
   }

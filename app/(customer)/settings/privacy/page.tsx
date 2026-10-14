@@ -356,7 +356,7 @@ export default async function PrivacyPage({ searchParams }: { searchParams: Prom
                     return (
                       <Tr key={r.id}>
                         <Td>
-                          <Link href={`/settings/privacy/requests/${r.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
+                          <Link href={`/settings/privacy/requests/${r.ref ?? r.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
                             {r.reference}
                           </Link>
                         </Td>
@@ -403,7 +403,7 @@ export default async function PrivacyPage({ searchParams }: { searchParams: Prom
                     return (
                       <Tr key={b.id}>
                         <Td>
-                          <Link href={`/settings/privacy/breaches/${b.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
+                          <Link href={`/settings/privacy/breaches/${b.ref ?? b.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
                             {b.reference}
                           </Link>
                         </Td>

@@ -47,6 +47,7 @@ type InvestigationRow = {
   created_at: string;
   updated_at: string;
   resolved_at: string | null;
+  ref?: number | null;
 };
 
 function toInvestigation(r: InvestigationRow): Investigation {
@@ -64,6 +65,7 @@ function toInvestigation(r: InvestigationRow): Investigation {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     resolvedAt: r.resolved_at,
+    ref: r.ref ?? null,
   };
 }
 

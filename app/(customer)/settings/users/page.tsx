@@ -154,7 +154,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   return (
                     <Tr key={u.userId}>
                       <Td>
-                        <Link href={`/settings/users/${u.userId}`} className="flex min-w-0 items-center gap-3 rounded-md hover:text-primary">
+                        <Link href={`/settings/users/${u.memberRef ?? u.userId}`} className="flex min-w-0 items-center gap-3 rounded-md hover:text-primary">
                           <span aria-hidden="true" className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">
                             {initials(name)}
                           </span>

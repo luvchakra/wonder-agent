@@ -26,6 +26,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
   const [campaigns, counts, templates] = await Promise.all([listCampaigns(ctx.tenantId!), campaignItemCounts(ctx.tenantId!), listCampaignTemplates(ctx.tenantId!)]);
   const rows: CampaignRow[] = campaigns.map((c) => ({
     id: c.id,
+    ref: c.ref,
     name: c.name,
     scopeType: c.scopeType,
     status: c.buildStatus === "building" ? "building" : c.buildStatus === "failed" ? "failed" : c.status,

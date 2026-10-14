@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listAssignableRoles } from "@/lib/rbac/roles";
 import { getAccessHistory, getUserDetail, listUserSessions } from "@/lib/users/users";
@@ -64,7 +65,9 @@ export default async function UserDetailPage({
     if (err instanceof ApiError && err.status === 403) redirect("/settings");
     throw err;
   }
-  const [{ userId }, sp] = await Promise.all([params, searchParams]);
+  const [{ userId: raw }, sp] = await Promise.all([params, searchParams]);
+  // FOUNDATION-P0-34: the URL carries the membership's number; an old user-id link redirects.
+  const userId = await pageRef(ctx.tenantId!, "tenant_memberships", raw, (ref) => `/settings/users/${ref}`, sp);
   // Assigning roles: roles.assign, or the legacy role.manage (FOUNDATION-P0-24/25).
   const canAssign = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
   const tab: TabKey = (TABS.find((t) => t.key === sp.tab)?.key ?? "roles") as TabKey;
@@ -171,7 +174,7 @@ export default async function UserDetailPage({
             {TABS.map((t) => (
               <Link
                 key={t.key}
-                href={`/settings/users/${user.userId}${t.key === "roles" ? "" : `?tab=${t.key}`}`}
+                href={`/settings/users/${user.memberRef ?? user.userId}${t.key === "roles" ? "" : `?tab=${t.key}`}`}
                 aria-current={t.key === tab ? "page" : undefined}
                 className={cn(
                   "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm",
@@ -272,7 +275,7 @@ export default async function UserDetailPage({
                         <Tr key={g.id}>
                           <Td>
                             {can("groups.view") ? (
-                              <Link href={`/settings/groups/${g.id}`} className="font-medium text-foreground hover:text-primary">
+                              <Link href={`/settings/groups/${g.ref ?? g.id}`} className="font-medium text-foreground hover:text-primary">
                                 {g.name}
                               </Link>
                             ) : (

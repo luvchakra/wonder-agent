@@ -1336,3 +1336,14 @@ it, and the grant form fills in the session's own id. Every other console
 page moved into `app/platform-admin/(console)` (same URLs) behind a
 table-only layout. Detail and verification: Foundation audit log, same
 date.
+
+## 2026-10-14 — FOUNDATION-P0-34: organizations in the console by number
+
+`/platform-admin/tenants/<ref>` (and `/usage`) take the organization's
+global number (`platformTenantRef`); an old UUID link redirects, keeping
+`?view=`. Both pages now check `isPlatformAdmin()` themselves before the
+lookup (a page renders alongside its layout, so the layout's check alone
+does not order it). The organizations list, environment rows and the
+remove-environment redirect link by number (`PlatformTenant.ref`,
+`Organization.ref`). Detail and verification: Foundation audit log, same
+date.

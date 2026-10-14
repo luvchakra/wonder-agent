@@ -285,6 +285,8 @@ test.describe.serial("reviews of WonderID role assignments", () => {
     const requester = await browser.newContext({ storageState: authFile("requester") });
     const page = await requester.newPage();
     await page.goto(`/compliance/consultations/${consultationId}`);
+    // FOUNDATION-P0-34: an old UUID link redirects to the question's number.
+    await expect(page).toHaveURL(/\/compliance\/consultations\/\d+$/);
     await expect(page.getByText("Does this person still need this role?")).toBeVisible();
     await page.getByLabel("Your answer").fill("Yes, until the audit closes");
     await page.getByRole("button", { name: "Send answer" }).click();

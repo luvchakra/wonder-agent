@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { platformTenantRef } from "@/lib/refs/objectRef";
+import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import { getTenant, getUsageSummary } from "@/modules/platform-admin/service";
 import { Card, StatusBadge, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { PageHeading } from "@/app/platform-admin/PageHeading";
@@ -16,7 +18,9 @@ const STATUS = {
 
 /** PLATFORM-P0-05.1 — usage vs. limit for one tenant. */
 export default async function TenantUsagePage({ params }: { params: Promise<{ tenantId: string }> }) {
-  const { tenantId } = await params;
+  // Vendor-only (checked here too, before any lookup); FOUNDATION-P0-34: the URL carries the global number.
+  if (!(await isPlatformAdmin())) notFound();
+  const tenantId = await platformTenantRef((await params).tenantId, (ref) => `/platform-admin/tenants/${ref}/usage`);
   const tenant = await getTenant(tenantId);
   if (!tenant) notFound();
 
@@ -24,7 +28,7 @@ export default async function TenantUsagePage({ params }: { params: Promise<{ te
 
   return (
     <>
-      <Link href={`/platform-admin/tenants/${tenantId}`} className="text-sm font-medium text-primary hover:underline">
+      <Link href={`/platform-admin/tenants/${tenant.ref ?? tenantId}`} className="text-sm font-medium text-primary hover:underline">
         ← Organization
       </Link>
       <PageHeading title={`Usage — ${tenant.name}`} />

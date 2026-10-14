@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requireAnyPermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getRoleDetail } from "@/lib/rbac/customRoles";
 import { MODULE_LABEL, PERMISSION_MODULES, listPermissionCatalog } from "@/lib/rbac/permissionCatalog";
@@ -34,7 +35,9 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
     if (err instanceof ApiError && err.status === 403) redirect("/settings");
     throw err;
   }
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const [{ id: raw }, sp] = await Promise.all([params, searchParams]);
+  // FOUNDATION-P0-34: the URL carries the role's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "roles", raw, (ref) => `/settings/roles/${ref}`, sp);
   const [role, catalog, provenance] = await Promise.all([getRoleDetail(ctx.tenantId!, id), listPermissionCatalog(), getRecordProvenance(ctx.tenantId!, "roles", id)]);
   if (!role) notFound();
   const tab = TABS.find((t) => t.key === sp.tab)?.key ?? "permissions";
@@ -73,7 +76,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
               <>
                 {" "}
                 · copied from{" "}
-                <Link href={`/settings/roles/${role.copiedFrom.id}`} className="text-primary hover:underline">
+                <Link href={`/settings/roles/${role.copiedFrom.ref ?? role.copiedFrom.id}`} className="text-primary hover:underline">
                   {role.copiedFrom.displayName}
                 </Link>
               </>
@@ -82,12 +85,12 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
         </div>
         <div className="flex flex-wrap gap-2">
           {can("roles.create") ? (
-            <LinkButton href={`/settings/roles/new?copy=${role.id}`} size="sm" variant="outline">
+            <LinkButton href={`/settings/roles/new?copy=${role.ref ?? role.id}`} size="sm" variant="outline">
               Copy ID role
             </LinkButton>
           ) : null}
           {role.custom && can("roles.update") ? (
-            <LinkButton href={`/settings/roles/${role.id}/edit`} size="sm">
+            <LinkButton href={`/settings/roles/${role.ref ?? role.id}/edit`} size="sm">
               Edit ID role
             </LinkButton>
           ) : null}
@@ -128,7 +131,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
             {TABS.map((t) => (
               <Link
                 key={t.key}
-                href={`/settings/roles/${role.id}${t.key === "permissions" ? "" : `?tab=${t.key}`}`}
+                href={`/settings/roles/${role.ref ?? role.id}${t.key === "permissions" ? "" : `?tab=${t.key}`}`}
                 aria-current={t.key === tab ? "page" : undefined}
                 className={cn(
                   "-mb-px border-b-2 px-3 py-2 text-sm",
@@ -177,7 +180,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
                     {role.groups.map((g) => (
                       <li key={g.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                         {can("groups.view") ? (
-                          <Link href={`/settings/groups/${g.id}`} className="min-w-0 font-medium text-foreground hover:text-primary">
+                          <Link href={`/settings/groups/${g.ref ?? g.id}`} className="min-w-0 font-medium text-foreground hover:text-primary">
                             {g.name}
                           </Link>
                         ) : (
@@ -202,7 +205,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
                   <ul className="divide-y divide-border rounded-lg border border-border">
                     {role.holders.map((h) => (
                       <li key={h.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
-                        <Link href={`/settings/users/${h.userId}`} className="min-w-0 hover:text-primary">
+                        <Link href={`/settings/users/${h.memberRef ?? h.userId}`} className="min-w-0 hover:text-primary">
                           <span className="block font-medium text-foreground">{h.name}</span>
                           {h.name !== h.email ? <span className="block text-xs text-muted-foreground">{h.email}</span> : null}
                         </Link>

@@ -173,7 +173,9 @@ test.describe.serial("authorization engine", () => {
   test("the screens: assignment terms on the user page, and the policies screen", async ({ browser }) => {
     const admin = await browser.newContext({ storageState: authFile("adminOne") });
     const page = await admin.newPage();
+    // FOUNDATION-P0-34: an old user-id link redirects to the membership's number.
     await page.goto(`/settings/users/${requesterId}`);
+    await expect(page).toHaveURL(/\/settings\/users\/\d+$/);
     await page.getByLabel("Assign an ID role").selectOption({ label: `${roleName} (change terms)` });
     await page.getByText("Scope, timing and conditions").click();
     await page.getByLabel("Applies to").first().selectOption("environment");
@@ -195,9 +197,14 @@ test.describe.serial("authorization engine", () => {
     await page.locator("#policy-scope").selectOption("agent");
     await page.getByRole("checkbox", { name: `E2E Authz Prod ${stamp}` }).check();
     await page.getByRole("button", { name: "Create policy" }).click();
-    await expect(page).toHaveURL(/\/settings\/authorization-policies\/[0-9a-f-]{36}\?created=1/, { timeout: 30_000 });
-    policyIds.push(page.url().split("/settings/authorization-policies/")[1]!.split("?")[0]!);
+    // FOUNDATION-P0-34: the policy's page is keyed by its number, not its UUID.
+    await expect(page).toHaveURL(/\/settings\/authorization-policies\/\d+\?created=1/, { timeout: 30_000 });
+    const policyRef = page.url().split("/settings/authorization-policies/")[1]!.split("?")[0]!;
     await expect(page.getByText(`E2E Screen policy ${stamp} was created.`)).toBeVisible();
+    const screenPolicyId = ((await (await page.request.get("/api/v1/authorization-policies")).json()).data as { id: string; name: string }[]).find((p) => p.name === `E2E Screen policy ${stamp}`)!.id;
+    policyIds.push(screenPolicyId);
+    await page.goto(`/settings/authorization-policies/${screenPolicyId}`);
+    await expect(page).toHaveURL(new RegExp(`/settings/authorization-policies/${policyRef}$`));
     await expect(page.getByText(`Agents: E2E Authz Prod ${stamp}`)).toBeVisible();
     await page.getByRole("button", { name: "Delete", exact: true }).click();
     await page.getByRole("button", { name: "Delete policy" }).click();

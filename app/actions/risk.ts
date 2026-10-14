@@ -77,7 +77,7 @@ function investigationError(err: unknown): InvestigationFormState {
 
 export async function createInvestigationAction(_prev: InvestigationFormState, formData: FormData): Promise<InvestigationFormState> {
   const ctx = await requirePermission("risk.manage");
-  let id: string;
+  let ref: number | string;
   try {
     const input = validateCreateInvestigation({
       title: formData.get("title"),
@@ -85,11 +85,12 @@ export async function createInvestigationAction(_prev: InvestigationFormState, f
       priority: formData.get("priority") || undefined,
       findingIds: formData.getAll("findingIds").map(String),
     });
-    id = (await createInvestigation(ctx.tenantId!, ctx.userId, input)).id;
+    const created = await createInvestigation(ctx.tenantId!, ctx.userId, input);
+    ref = created.ref ?? created.id;
   } catch (err) {
     return investigationError(err);
   }
-  redirect(`/risk/investigations/${id}`);
+  redirect(`/risk/investigations/${ref}`);
 }
 
 export async function changeInvestigationStatusAction(investigationId: string, _prev: InvestigationFormState, formData: FormData): Promise<InvestigationFormState> {
@@ -97,7 +98,7 @@ export async function changeInvestigationStatusAction(investigationId: string, _
   try {
     const to = String(formData.get("status") ?? "") as InvestigationStatus;
     const updated = await changeInvestigationStatus(ctx.tenantId!, ctx.userId, investigationId, to, String(formData.get("reason") ?? "") || null);
-    revalidatePath(`/risk/investigations/${investigationId}`);
+    revalidatePath("/risk/investigations/[id]", "page");
     return { status: "saved", message: `Status is now ${updated.status.replace(/_/g, " ")}.` };
   } catch (err) {
     return investigationError(err);
@@ -109,7 +110,7 @@ export async function assignInvestigationAction(investigationId: string, _prev: 
   try {
     const assigneeId = String(formData.get("assigneeId") ?? "") || null;
     await assignInvestigation(ctx.tenantId!, ctx.userId, investigationId, assigneeId);
-    revalidatePath(`/risk/investigations/${investigationId}`);
+    revalidatePath("/risk/investigations/[id]", "page");
     return { status: "saved", message: assigneeId ? "Assigned." : "Unassigned." };
   } catch (err) {
     return investigationError(err);
@@ -120,7 +121,7 @@ export async function addInvestigationNoteAction(investigationId: string, _prev:
   const ctx = await requirePermission("risk.manage");
   try {
     await addInvestigationNote(ctx.tenantId!, ctx.userId, investigationId, String(formData.get("note") ?? ""));
-    revalidatePath(`/risk/investigations/${investigationId}`);
+    revalidatePath("/risk/investigations/[id]", "page");
     return { status: "saved", message: "Note added." };
   } catch (err) {
     return investigationError(err);

@@ -61,7 +61,7 @@ export async function generateAccessCertificationReport(tenantId: string): Promi
     for (const item of items) {
       rows.push({
         id: item.id,
-        href: `/compliance/campaigns/${campaign.id}`,
+        href: `/compliance/campaigns/${campaign.ref ?? campaign.id}`,
         fields: {
           campaign: campaign.name,
           agentId: item.agentId,

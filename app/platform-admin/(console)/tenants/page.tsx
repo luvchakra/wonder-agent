@@ -43,7 +43,7 @@ function OrganizationTable({ rows, label }: { rows: Row[]; label: string }) {
           return (
             <Tr key={org.id}>
               <Td>
-                <Link href={`/platform-admin/tenants/${org.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
+                <Link href={`/platform-admin/tenants/${org.ref ?? org.id}`} className="font-medium text-foreground hover:text-primary hover:underline">
                   {org.name}
                 </Link>
               </Td>
@@ -62,7 +62,7 @@ function OrganizationTable({ rows, label }: { rows: Row[]; label: string }) {
                 <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
               </Td>
               <Td className="md:text-right">
-                <Link href={`/platform-admin/tenants/${org.id}`} className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent">
+                <Link href={`/platform-admin/tenants/${org.ref ?? org.id}`} className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent">
                   Manage
                 </Link>
               </Td>

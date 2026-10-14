@@ -21,6 +21,8 @@ import { escalationIn, permissionDiff, validateRoleInput, type RoleInput } from 
 
 export type RoleSummary = {
   id: string;
+  /** FOUNDATION-P0-34: the role's number (built-in roles have their own), its URL key. */
+  ref: number | null;
   name: string;
   displayName: string;
   description: string | null;
@@ -30,15 +32,15 @@ export type RoleSummary = {
   holderCount: number;
 };
 
-export type RoleHolder = { userId: string; name: string; email: string; status: string };
+export type RoleHolder = { userId: string; /** The membership's number: the key of the user page. */ memberRef: number | null; name: string; email: string; status: string };
 
 export type RoleDetail = RoleSummary & {
   permissions: string[];
   holders: RoleHolder[];
   /** Groups that carry the role; their members hold it too (FOUNDATION-P0-26). */
-  groups: { id: string; name: string; status: string; memberCount: number }[];
+  groups: { id: string; ref: number | null; name: string; status: string; memberCount: number }[];
   createdBy: string | null;
-  copiedFrom: { id: string; displayName: string } | null;
+  copiedFrom: { id: string; ref: number | null; displayName: string } | null;
   updatedAt: string;
 };
 
@@ -46,6 +48,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 type RoleRow = {
   id: string;
+  ref: number | null;
   name: string;
   display_name: string;
   description: string | null;
@@ -57,7 +60,7 @@ type RoleRow = {
   role_permissions: { permissions: { key: string } | null }[];
 };
 
-const ROLE_SELECT = "id, name, display_name, description, tenant_id, status, created_by, copied_from, updated_at, role_permissions(permissions(key))";
+const ROLE_SELECT = "id, ref, name, display_name, description, tenant_id, status, created_by, copied_from, updated_at, role_permissions(permissions(key))";
 
 async function holderCounts(tenantId: string): Promise<Map<string, number>> {
   const supabase = await supabaseServer();
@@ -74,6 +77,7 @@ async function holderCounts(tenantId: string): Promise<Map<string, number>> {
 function toSummary(r: RoleRow, holders: number): RoleSummary {
   return {
     id: r.id,
+    ref: r.ref ?? null,
     name: r.name,
     displayName: r.display_name,
     description: r.description,
@@ -114,19 +118,19 @@ export async function getRoleDetail(tenantId: string, roleId: string): Promise<R
   const db = supabaseServiceRole();
   const [{ data: people }, { data: memberships }, copied, { data: groupRows, error: groupsError }] = await Promise.all([
     ids.length ? db.from("users").select("id, email, display_name").in("id", ids) : Promise.resolve({ data: [] }),
-    ids.length ? db.from("tenant_memberships").select("user_id, status").eq("tenant_id", tenantId).in("user_id", ids) : Promise.resolve({ data: [] }),
+    ids.length ? db.from("tenant_memberships").select("user_id, status, ref").eq("tenant_id", tenantId).in("user_id", ids) : Promise.resolve({ data: [] }),
     r.copied_from ? readRole(tenantId, r.copied_from) : Promise.resolve(null),
     supabase
       .from("group_roles")
-      .select("groups(id, name, status, group_members(count))")
+      .select("groups(id, ref, name, status, group_members(count))")
       .eq("tenant_id", tenantId)
       .eq("role_id", r.id)
-      .returns<{ groups: { id: string; name: string; status: string; group_members: { count: number }[] } | null }[]>(),
+      .returns<{ groups: { id: string; ref: number | null; name: string; status: string; group_members: { count: number }[] } | null }[]>(),
   ]);
   if (groupsError) throw new ApiError(500, "QUERY_FAILED", groupsError.message);
-  const statusOf = new Map(((memberships ?? []) as { user_id: string; status: string }[]).map((m) => [m.user_id, m.status]));
+  const membershipOf = new Map(((memberships ?? []) as { user_id: string; status: string; ref: number | null }[]).map((m) => [m.user_id, m]));
   const holders = ((people ?? []) as { id: string; email: string; display_name: string | null }[])
-    .map((p) => ({ userId: p.id, name: p.display_name || p.email, email: p.email, status: statusOf.get(p.id) ?? "removed" }))
+    .map((p) => ({ userId: p.id, memberRef: membershipOf.get(p.id)?.ref ?? null, name: p.display_name || p.email, email: p.email, status: membershipOf.get(p.id)?.status ?? "removed" }))
     .sort((a, b) => a.name.localeCompare(b.name));
   return {
     ...toSummary(r, holders.length),
@@ -137,10 +141,10 @@ export async function getRoleDetail(tenantId: string, roleId: string): Promise<R
     holders,
     groups: (groupRows ?? [])
       .filter((g) => g.groups)
-      .map((g) => ({ id: g.groups!.id, name: g.groups!.name, status: g.groups!.status, memberCount: g.groups!.group_members[0]?.count ?? 0 }))
+      .map((g) => ({ id: g.groups!.id, ref: g.groups!.ref ?? null, name: g.groups!.name, status: g.groups!.status, memberCount: g.groups!.group_members[0]?.count ?? 0 }))
       .sort((a, b) => a.name.localeCompare(b.name)),
     createdBy: r.created_by,
-    copiedFrom: copied ? { id: copied.id, displayName: copied.display_name } : null,
+    copiedFrom: copied ? { id: copied.id, ref: copied.ref ?? null, displayName: copied.display_name } : null,
     updatedAt: r.updated_at,
   };
 }
@@ -182,7 +186,7 @@ async function writePermissions(roleId: string, keys: string[], previous: string
   return { added, removed };
 }
 
-export type RoleResult = { ok: true; roleId: string } | { ok: false; errors: Record<string, string> };
+export type RoleResult = { ok: true; roleId: string; roleRef?: number | null } | { ok: false; errors: Record<string, string> };
 
 /** Create a custom role, optionally copied from another role this tenant can see. */
 export async function createRole(tenantId: string, actor: Actor, input: RoleInput, copyFromId?: string | null): Promise<RoleResult> {
@@ -207,8 +211,8 @@ export async function createRole(tenantId: string, actor: Actor, input: RoleInpu
   const { data, error } = await supabaseServiceRole()
     .from("roles")
     .insert({ tenant_id: tenantId, name: v.name, display_name: v.name, description: v.description, is_system: false, created_by: actor.userId, copied_from: source?.id ?? null })
-    .select("id")
-    .single<{ id: string }>();
+    .select("id, ref")
+    .single<{ id: string; ref: number | null }>();
   if (error || !data) {
     const r = refusal(error);
     if (r && (r.code === "ROLE_NAME_RESERVED" || r.code === "ROLE_NAME_TAKEN")) return { ok: false, errors: { name: r.message } };
@@ -231,7 +235,7 @@ export async function createRole(tenantId: string, actor: Actor, input: RoleInpu
     outcome: "success",
     metadata: { name: v.name, permissions: v.permissions, copiedFrom: source?.name ?? null },
   });
-  return { ok: true, roleId: data.id };
+  return { ok: true, roleId: data.id, roleRef: data.ref };
 }
 
 async function customRoleIn(tenantId: string, roleId: string): Promise<RoleRow> {
@@ -280,7 +284,7 @@ export async function updateRole(tenantId: string, actor: Actor, roleId: string,
     outcome: "success",
     metadata: { name: v.name, renamedFrom: r.name !== v.name ? r.name : null, ...diff },
   });
-  return { ok: true, roleId: r.id };
+  return { ok: true, roleId: r.id, roleRef: r.ref };
 }
 
 /** Activate or deactivate a custom role. An inactive role grants nothing, and cannot be assigned. */

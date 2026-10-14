@@ -59,7 +59,8 @@ async function addThroughWizard(page: Page, person: { name: string; email: strin
   await page.getByRole("button", { name: "Next" }).click();
   await expect(page.getByRole("region", { name: "Review" })).toContainText(person.email);
   await page.getByRole("button", { name: method === "invite" ? "Send invitation" : "Add user" }).click();
-  await expect(page).toHaveURL(/\/settings\/users\/[0-9a-f-]{36}\?created=/, { timeout: 30_000 });
+  // FOUNDATION-P0-34: the new member's page is keyed by the membership's number.
+  await expect(page).toHaveURL(/\/settings\/users\/\d+\?created=/, { timeout: 30_000 });
   created.push(await userIdOf(person.email));
 }
 

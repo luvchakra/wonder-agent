@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { listAgents } from "@/modules/agent-identity/service";
 import { getInvestigation } from "@/modules/risk/service";
@@ -47,8 +48,9 @@ export default async function InvestigationPage({ params }: { params: Promise<{ 
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the investigation's number; an old UUID link redirects.
+  const id = await pageRef(tenantId, "investigations", (await params).id, (ref) => `/risk/investigations/${ref}`);
   const [inv, members, agents, provenance] = await Promise.all([getInvestigation(tenantId, id), listTenantMembersWithRoles(tenantId), listAgents(tenantId), getRecordProvenance(tenantId, "investigations", id)]);
   if (!inv) notFound();
 

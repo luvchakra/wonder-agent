@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requireAnyPermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getAuthorizationPolicy } from "@/lib/rbac/authorizationPolicies";
 import { describeScope } from "@/lib/rbac/authorizeCore";
@@ -25,7 +26,9 @@ export default async function AuthorizationPolicyPage({ params, searchParams }: 
     throw err;
   }
   const canManage = ctx.permissions.includes("tenant.security.manage");
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const [{ id: raw }, sp] = await Promise.all([params, searchParams]);
+  // FOUNDATION-P0-34: the URL carries the policy's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "authorization_policies", raw, (ref) => `/settings/authorization-policies/${ref}`, sp);
   const [policy, form, roles, provenance] = await Promise.all([
     getAuthorizationPolicy(ctx.tenantId!, id),
     canManage ? loadPolicyFormData(ctx.tenantId!) : Promise.resolve(null),

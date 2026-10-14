@@ -11,7 +11,7 @@ import { environmentFamilyKey } from "@/lib/tenant/environmentFamily";
 
 const ORDER = ["production", "staging", "test", "development", "sandbox"];
 
-export type Organization = { id: string; name: string; primary: PlatformTenant; environments: PlatformTenant[] };
+export type Organization = { id: string; /** The organization tenant's number, its console URL key. */ ref: number | null; name: string; primary: PlatformTenant; environments: PlatformTenant[] };
 
 export function groupOrganizations(tenants: PlatformTenant[]): Organization[] {
   const members = tenants.map((t) => ({ tenantId: t.tenantId, slug: t.slug ?? "", environment: t.environment, parentTenantId: t.parentTenantId ?? null }));
@@ -31,6 +31,6 @@ export function groupOrganizations(tenants: PlatformTenant[]): Organization[] {
     const root = list.find((t) => !t.parentTenantId && list.some((o) => o.parentTenantId === t.tenantId));
     const environments = [...list].sort((a, b) => (a === root ? -1 : b === root ? 1 : rank(a.environment) - rank(b.environment)));
     const primary = environments[0];
-    return { id: primary.tenantId, name: primary.name ?? primary.tenantId, primary, environments };
+    return { id: primary.tenantId, ref: primary.ref ?? null, name: primary.name ?? primary.tenantId, primary, environments };
   });
 }

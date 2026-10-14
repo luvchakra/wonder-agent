@@ -69,7 +69,7 @@ export async function askConsultation(tenantId: string, actorId: string, itemId:
     userId: askedOf,
     type: "certification_due",
     title: "An access review asks for your input",
-    body: `${about ? `${about}. ` : ""}Answer at /compliance/consultations/${data.id as string}`,
+    body: `${about ? `${about}. ` : ""}Answer at /compliance/consultations/${String(data.ref ?? data.id)}`,
     referenceType: "certification_consultation",
     referenceId: data.id as string,
   });

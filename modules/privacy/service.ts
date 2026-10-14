@@ -347,6 +347,7 @@ export async function withdrawMyConsent(tenantId: string, userId: string, purpos
 function toRequest(r: any): PrivacyRequest {
   return {
     id: r.id,
+    ref: r.ref ?? null,
     reference: r.reference,
     regime: r.regime,
     requestType: r.request_type,
@@ -744,6 +745,7 @@ export async function runRetentionForTenant(tenantId: string): Promise<Record<st
 function toBreach(r: any): BreachIncident {
   return {
     id: r.id,
+    ref: r.ref ?? null,
     reference: r.reference,
     title: r.title,
     description: r.description,

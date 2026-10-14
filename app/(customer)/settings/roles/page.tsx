@@ -30,7 +30,7 @@ function RoleTable({ roles, showStatus }: { roles: RoleSummary[]; showStatus: bo
         {roles.map((r) => (
           <Tr key={r.id}>
             <Td>
-              <Link href={`/settings/roles/${r.id}`} className="font-medium text-foreground hover:text-primary">
+              <Link href={`/settings/roles/${r.ref ?? r.id}`} className="font-medium text-foreground hover:text-primary">
                 {r.displayName}
               </Link>
               {r.description ? <span className="block max-w-xl text-xs text-muted-foreground">{r.description}</span> : null}

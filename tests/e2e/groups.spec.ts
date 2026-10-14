@@ -22,6 +22,7 @@ const stamp = Date.now().toString(36);
 const groupName = `E2E Reporting Team ${stamp}`;
 const roleName = `E2E Group Reports ${stamp}`;
 let groupId = "";
+let groupRef = "";
 let roleId = "";
 
 test.describe.serial("groups", () => {
@@ -50,9 +51,11 @@ test.describe.serial("groups", () => {
     await page.getByLabel("Group name").fill(groupName);
     await page.getByLabel("Description").fill("People who read the organization's reports.");
     await page.getByRole("button", { name: "Create group" }).click();
-    await expect(page).toHaveURL(/\/settings\/groups\/[0-9a-f-]{36}\?created=1/, { timeout: 30_000 });
-    groupId = page.url().split("/settings/groups/")[1]!.split("?")[0]!;
+    // FOUNDATION-P0-34: the group's page is keyed by its number, not its UUID.
+    await expect(page).toHaveURL(/\/settings\/groups\/\d+\?created=1/, { timeout: 30_000 });
+    groupRef = page.url().split("/settings/groups/")[1]!.split("?")[0]!;
     await expect(page.getByText(`${groupName} was created.`)).toBeVisible();
+    groupId = ((await (await page.request.get("/api/v1/groups")).json()).data as { id: string; name: string }[]).find((g) => g.name === groupName)!.id;
 
     await page.getByLabel("Give the group an ID role").selectOption({ label: roleName });
     await page.getByRole("button", { name: "Assign ID role" }).click();
@@ -167,7 +170,9 @@ test.describe.serial("groups", () => {
     const page = await admin.newPage();
     const requester = await browser.newContext({ storageState: authFile("requester") });
     const requesterPage = await requester.newPage();
+    // An old UUID link still opens the group, at its number URL.
     await page.goto(`/settings/groups/${groupId}`);
+    await expect(page).toHaveURL(new RegExp(`/settings/groups/${groupRef}$`));
     await page.getByRole("button", { name: "Delete group" }).click();
     await page.getByRole("button", { name: "Delete group" }).click();
     await expect(page).toHaveURL(/\/settings\/groups\?deleted=1/, { timeout: 30_000 });

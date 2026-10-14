@@ -1452,3 +1452,12 @@ identity holds a live package and the viewer has both `risk.manage` and
   - Run 5: stopped on the owner's instruction to kill long-pending E2E.
 
 The story stays Partial until the nightly run passes this spec.
+
+## 2026-10-14 — FOUNDATION-P0-34: investigations and rogue-access findings by number
+
+Investigations open at `/risk/investigations/<ref>` and rogue-access
+findings at `/risk/rogue-accounts/<ref>`; old UUID links redirect. The
+lists, search and the create redirect link by number; `toInvestigation`
+and `toAccessFinding` map `ref`; status/assign/note actions revalidate the
+route. The identity page's finding links still use the UUID (they
+redirect). Detail and verification: Foundation audit log, same date.

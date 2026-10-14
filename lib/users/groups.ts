@@ -20,6 +20,8 @@ import { TENANT_WIDE, termsToRow, type AssignmentTerms } from "@/lib/rbac/assign
 
 export type GroupSummary = {
   id: string;
+  /** FOUNDATION-P0-34: the group's number in this organization, its URL key. */
+  ref: number | null;
   name: string;
   description: string | null;
   status: "active" | "inactive";
@@ -28,6 +30,8 @@ export type GroupSummary = {
 };
 export type GroupMember = {
   userId: string;
+  /** The membership's number: the key of the member's user page. */
+  memberRef: number | null;
   name: string;
   email: string;
   status: string;
@@ -35,6 +39,7 @@ export type GroupMember = {
 };
 export type GroupRole = {
   roleId: string;
+  roleRef: number | null;
   name: string;
   displayName: string;
   custom: boolean;
@@ -63,6 +68,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 type GroupRow = {
   id: string;
+  ref: number | null;
   name: string;
   description: string | null;
   status: "active" | "inactive";
@@ -76,16 +82,18 @@ type GroupRow = {
       name: string;
       display_name: string;
       tenant_id: string | null;
+      ref: number | null;
     } | null;
   })[];
 };
 
 const GROUP_SELECT =
-  "id, name, description, status, created_at, updated_at, group_members(user_id, created_at), group_roles(role_id, created_at, " + TERMS + ", roles(name, display_name, tenant_id))";
+  "id, ref, name, description, status, created_at, updated_at, group_members(user_id, created_at), group_roles(role_id, created_at, " + TERMS + ", roles(name, display_name, tenant_id, ref))";
 
 function summary(g: GroupRow): GroupSummary {
   return {
     id: g.id,
+    ref: g.ref ?? null,
     name: g.name,
     description: g.description,
     status: g.status,
@@ -119,7 +127,7 @@ export async function getGroup(tenantId: string, groupId: string): Promise<Group
   const db = supabaseServiceRole();
   const [{ data: people }, { data: memberships }] = await Promise.all([
     ids.length ? db.from("users").select("id, email, display_name").in("id", ids) : Promise.resolve({ data: [] }),
-    ids.length ? db.from("tenant_memberships").select("user_id, status").eq("tenant_id", tenantId).in("user_id", ids) : Promise.resolve({ data: [] }),
+    ids.length ? db.from("tenant_memberships").select("user_id, status, ref").eq("tenant_id", tenantId).in("user_id", ids) : Promise.resolve({ data: [] }),
   ]);
   const personOf = new Map(
     (
@@ -130,7 +138,7 @@ export async function getGroup(tenantId: string, groupId: string): Promise<Group
       }[]
     ).map((p) => [p.id, p]),
   );
-  const statusOf = new Map(((memberships ?? []) as { user_id: string; status: string }[]).map((m) => [m.user_id, m.status]));
+  const membershipOf = new Map(((memberships ?? []) as { user_id: string; status: string; ref: number | null }[]).map((m) => [m.user_id, m]));
   return {
     ...summary(g),
     createdAt: g.created_at,
@@ -140,9 +148,10 @@ export async function getGroup(tenantId: string, groupId: string): Promise<Group
         const p = personOf.get(m.user_id);
         return {
           userId: m.user_id,
+          memberRef: membershipOf.get(m.user_id)?.ref ?? null,
           name: p?.display_name || p?.email || "A former member",
           email: p?.email ?? "",
-          status: statusOf.get(m.user_id) ?? "removed",
+          status: membershipOf.get(m.user_id)?.status ?? "removed",
           addedAt: m.created_at,
         };
       })
@@ -151,6 +160,7 @@ export async function getGroup(tenantId: string, groupId: string): Promise<Group
       .filter((r) => r.roles)
       .map((r) => ({
         roleId: r.role_id,
+        roleRef: r.roles!.ref ?? null,
         name: r.roles!.name,
         displayName: r.roles!.display_name,
         custom: r.roles!.tenant_id !== null,
@@ -164,16 +174,17 @@ export async function getGroup(tenantId: string, groupId: string): Promise<Group
 /** The groups a person is in, with each group's roles — for their user page and effective permissions. */
 export type UserGroup = {
   id: string;
+  ref: number | null;
   name: string;
   status: string;
-  roles: { id: string; name: string; displayName: string; status: string; terms: AssignmentTerms }[];
+  roles: { id: string; ref: number | null; name: string; displayName: string; status: string; terms: AssignmentTerms }[];
 };
 
 export async function groupsOfUser(tenantId: string, userId: string): Promise<UserGroup[]> {
   if (!UUID_RE.test(userId)) return [];
   const { data, error } = await supabaseServiceRole()
     .from("group_members")
-    .select(`group_id, groups(id, name, status, group_roles(${TERMS}, roles(id, name, display_name, status)))`)
+    .select(`group_id, groups(id, ref, name, status, group_roles(${TERMS}, roles(id, ref, name, display_name, status)))`)
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
     .returns<
@@ -181,11 +192,13 @@ export async function groupsOfUser(tenantId: string, userId: string): Promise<Us
         group_id: string;
         groups: {
           id: string;
+          ref: number | null;
           name: string;
           status: string;
           group_roles: (TermsRow & {
             roles: {
               id: string;
+              ref: number | null;
               name: string;
               display_name: string;
               status: string;
@@ -199,12 +212,14 @@ export async function groupsOfUser(tenantId: string, userId: string): Promise<Us
     .filter((r) => r.groups)
     .map((r) => ({
       id: r.groups!.id,
+      ref: r.groups!.ref ?? null,
       name: r.groups!.name,
       status: r.groups!.status,
       roles: r
         .groups!.group_roles.filter((gr) => gr.roles)
         .map((gr) => ({
           id: gr.roles!.id,
+          ref: gr.roles!.ref ?? null,
           name: gr.roles!.name,
           displayName: gr.roles!.display_name,
           status: gr.roles!.status,
@@ -218,7 +233,7 @@ function cleanName(v: unknown): string {
   return typeof v === "string" ? v.trim().replace(/\s+/g, " ") : "";
 }
 
-export type GroupResult = { ok: true; groupId: string } | { ok: false; errors: Record<string, string> };
+export type GroupResult = { ok: true; groupId: string; groupRef?: number | null } | { ok: false; errors: Record<string, string> };
 
 function validate(input: { name?: unknown; description?: unknown }): { ok: true; name: string; description: string | null } | { ok: false; errors: Record<string, string> } {
   const name = cleanName(input.name);
@@ -240,8 +255,8 @@ export async function createGroup(tenantId: string, actorId: string, input: { na
       description: v.description,
       created_by: actorId,
     })
-    .select("id")
-    .single<{ id: string }>();
+    .select("id, ref")
+    .single<{ id: string; ref: number | null }>();
   if (error || !data) {
     if (error?.code === "23505")
       return {
@@ -260,7 +275,7 @@ export async function createGroup(tenantId: string, actorId: string, input: { na
     outcome: "success",
     metadata: { name: v.name },
   });
-  return { ok: true, groupId: data.id };
+  return { ok: true, groupId: data.id, groupRef: data.ref };
 }
 
 async function groupIn(tenantId: string, groupId: string): Promise<GroupRow> {
@@ -292,7 +307,7 @@ export async function updateGroup(tenantId: string, actorId: string, groupId: st
     outcome: "success",
     metadata: { name: v.name, renamedFrom: g.name !== v.name ? g.name : null },
   });
-  return { ok: true, groupId: g.id };
+  return { ok: true, groupId: g.id, groupRef: g.ref };
 }
 
 /** Delete a group: its members lose its roles on their next request. */

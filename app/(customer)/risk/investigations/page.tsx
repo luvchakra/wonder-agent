@@ -133,7 +133,7 @@ export default async function InvestigationsPage({ searchParams }: { searchParam
                 {rows.map((i) => (
                   <Tr key={i.id}>
                     <Td>
-                      <Link href={`/risk/investigations/${i.id}`} className="block font-medium text-primary hover:underline">
+                      <Link href={`/risk/investigations/${i.ref ?? i.id}`} className="block font-medium text-primary hover:underline">
                         {i.reference}
                       </Link>
                       <span className="block text-xs text-muted-foreground">{i.title}</span>
