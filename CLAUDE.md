@@ -1631,10 +1631,13 @@ UUID. An object page is `/access/requests/42`, not
    UUID would not.
 4. **Old links keep working.** A URL with a UUID still resolves and
    redirects to the number URL.
-5. **New object tables** get the number column and trigger in their own
-   migration, with every other object table's (§19.10 has the list of
-   object tables).
+5. **How.** A page calls `pageRef(tenantId, table, params.id, path)`
+   (`lib/refs/objectRef.ts`): it returns the UUID, 404s, or redirects an
+   old UUID link. Links use the object's `ref`. A new object table with
+   its own page gets `ref`, the `assign_object_ref` trigger and the unique
+   `(tenant_id, ref)` index in its own migration, and joins `REF_TABLES`.
 
-Status: rolling out from 2026-10-14. Until a page is converted it still
-shows a UUID; converting the remaining object pages is tracked in
+Status: rolling out from 2026-10-14. Migration 0192 numbered every object
+table with a page; access requests use their numbers in URLs. Converting
+the remaining object pages is tracked in
 `docs/plan/01-FOUNDATION-AGENT-BACKLOG.md` (FOUNDATION-P0-34).

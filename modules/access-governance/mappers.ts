@@ -97,6 +97,7 @@ export function toAccessRequest(row: any): AccessRequest {
   return {
     id: row.id,
     requestNumber: row.request_number ?? null,
+    ref: row.ref ?? null,
     tenantId: row.tenant_id,
     agentId: row.agent_id ?? null,
     subjectIdentityId: row.subject_identity_id ?? null,

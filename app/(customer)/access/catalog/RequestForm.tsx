@@ -164,7 +164,7 @@ export function RequestForm({
         </p>
       </div>
       {state.status === "saved" && state.requestNumber ? (
-        <Link key={state.requestNumber} href={`/access/requests/${state.requestId}`} className="inline-block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Open request ${state.requestNumber}`}>
+        <Link key={state.requestNumber} href={`/access/requests/${Number(state.requestNumber.slice(3))}`} className="inline-block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Open request ${state.requestNumber}`}>
           <RequestNumberBarcode number={state.requestNumber} label={state.duplicate ? "Already open as" : "Request number"} />
         </Link>
       ) : null}

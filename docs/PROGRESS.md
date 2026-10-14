@@ -23,9 +23,9 @@ Generated 2026-10-14 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 231 |
-| Partial | 26 |
+| Partial | 27 |
 | Deferred | 1 |
-| Not Started | 17 |
+| Not Started | 16 |
 | **Total tracked** | **275** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 3 | 46 | `████████████████░░` 87% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 4 | 0 | 2 | 46 | `████████████████░░` 87% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 20 | 0 | 0 | 1 | 21 | `█████████████████░` 95% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 26 | 3 | 0 | 0 | 29 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 40 done · 3 partial · 0 deferred · 3 not started (46 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 40 done · 4 partial · 0 deferred · 2 not started (46 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -107,7 +107,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
 | FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; D11 approved 2026-10-12) | Done — 2026-10-12: migrations 0126–0127; `wa_ac_` bearer on /api/v1/* through a backing automation member (RLS and the engine unchanged); four-eyes create/extend; expiry, CIDR, rate limit, rotate, revoke; per-call audit with on-behalf-of; /api/v1/tenant/configuration; CONFIGURATION_ADMIN template |
 | FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Done — 2026-10-11: CSV via the framework (member kind, 0125) with preview; POST /api/v1/users/invitations (session; automation credential with P0-31); expiry, re-send, revoke; no role escalation |
-| FOUNDATION-P0-34 | Short number keys in URLs: a per-organization number on every object table, number URLs on every object page, UUID links redirect (owner decision 2026-10-14, CLAUDE.md §19.13) | Not started |
+| FOUNDATION-P0-34 | Short number keys in URLs: a per-organization number on every object table, number URLs on every object page, UUID links redirect (owner decision 2026-10-14, CLAUDE.md §19.13) | Partial — 2026-10-14: migration 0192 (`ref` on 24 object tables, counters, triggers; run by the owner), `lib/refs/objectRef.ts` (`pageRef`), access requests converted; other object pages next |
 
 ### 02 — Identity Agent
 

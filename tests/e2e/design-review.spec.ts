@@ -321,13 +321,12 @@ test.describe("design review — structure and theming", () => {
 
     const tabs = page.getByRole("navigation", { name: "Primary" });
     const targets = await tabs.locator("a, button").all();
-    expect(targets.length, "the tab bar should expose five destinations").toBe(5);
+    expect(targets.length, "the bar holds only More (owner request 2026-10-14)").toBe(1);
 
     for (const target of targets) {
       const box = await target.boundingBox();
       expect(box, "every tab needs a hit area").not.toBeNull();
-      // 44px is the platform guidance; the bar is 4 across plus More, so
-      // width is constrained — height is what must hold up.
+      // 44px is the platform guidance; height is what must hold up.
       expect(box!.height, "tab hit area is too short to tap reliably").toBeGreaterThanOrEqual(40);
     }
   });
