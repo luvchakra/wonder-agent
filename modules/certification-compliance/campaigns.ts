@@ -9,7 +9,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { getAgentContract, listAgents } from "@/modules/agent-identity/service";
 import { getEffectiveAccess, listPolicyEvaluations, getApplication, getEntitlement, listIdentityGrantsForReview } from "@/modules/access-governance/service";
-import { getIdentityReviewInfo } from "@/modules/agent-identity/service";
+import { getHumanIdentityIdsForUsers, getIdentityReviewInfo } from "@/modules/agent-identity/service";
+import { listRoleAssignmentsForReview } from "@/lib/rbac/roleAssignmentReview";
 import { REVIEWER_KINDS, resolveReviewer, type ReviewerKind } from "./identityReviewRules";
 import { getFindings } from "@/modules/risk/service";
 import { getDid } from "@/modules/runtime-assurance/service";
@@ -210,6 +211,73 @@ async function populateIdentityItems(tenantId: string, campaignId: string, input
   return rows.length;
 }
 
+/**
+ * COMPLIANCE-P0-11: one item per WonderID role a member holds, directly or
+ * through a group (privileged roles only, or all). The item is about the
+ * member's person identity; it goes to their manager or the named
+ * reviewer, never to the member.
+ */
+async function populateRoleItems(tenantId: string, campaignId: string, input: LaunchCampaignInput): Promise<number> {
+  const assignments = await listRoleAssignmentsForReview(tenantId, { privilegedOnly: input.scope?.privilegedOnly === true });
+  const identityOf = await getHumanIdentityIdsForUsers(tenantId, assignments.map((a) => a.userId));
+  const info = await getIdentityReviewInfo(tenantId, [...identityOf.values()]);
+  const managers = await getIdentityReviewInfo(tenantId, [...new Set([...info.values()].map((p) => p.managerIdentityId).filter((x): x is string => Boolean(x)))]);
+  const kind = input.reviewerKind ?? "named";
+  const now = new Date().toISOString();
+  const rows = assignments.flatMap((a) => {
+    const identityId = identityOf.get(a.userId);
+    if (!identityId) return [];
+    const person = info.get(identityId);
+    const managerId = person?.managerIdentityId ?? null;
+    const reviewer = resolveReviewer(kind, { subjectUserId: a.userId, managerUserId: managerId ? (managers.get(managerId)?.userId ?? null) : null, applicationOwnerUserId: null }, input.reviewerId);
+    return [
+      {
+        tenant_id: tenantId,
+        campaign_id: campaignId,
+        identity_id: identityId,
+        role_id: a.roleId,
+        role_source: a.source,
+        group_id: a.groupId,
+        reviewer_id: reviewer.reviewerId,
+        risk_at_review: a.privileged ? "high" : null,
+        usage_at_review: "unknown",
+        recommendation: a.privileged ? "review" : "keep",
+        due_date: input.dueDate ?? null,
+        snapshot: {
+          capturedAt: now,
+          agentContractId: null,
+          agentContractVersion: null,
+          accessGrant: null,
+          policyEvaluations: [],
+          riskAtReview: null,
+          usageAtReview: "unknown",
+          person: { id: identityId, displayName: person?.displayName ?? "Unknown person", identityType: person?.identityType ?? "HUMAN" },
+          role: {
+            id: a.roleId,
+            name: a.roleName,
+            displayName: a.roleDisplayName,
+            privileged: a.privileged,
+            source: a.source,
+            group: a.groupId ? { id: a.groupId, name: a.groupName ?? "" } : null,
+            scopeType: a.scopeType,
+            expiresAt: a.expiresAt,
+          },
+          privilegeLevel: a.privileged ? "privileged" : "standard",
+          reviewer: { kind, fallback: reviewer.fallback },
+        },
+      },
+    ];
+  });
+  // Privileged first.
+  rows.sort((x, y) => Number(y.snapshot.role.privileged) - Number(x.snapshot.role.privileged));
+  const svc = supabaseServiceRole();
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
+    if (error) throw new ApiError(500, "CREATE_FAILED", error.message);
+  }
+  return rows.length;
+}
+
 /** A build error as it may be shown and stored: short, and never a stack or a secret. */
 function buildErrorText(err: unknown): string {
   return err instanceof ApiError ? err.message.slice(0, 300) : "The items could not be built. Launch the campaign again.";
@@ -228,6 +296,8 @@ async function buildCampaign(tenantId: string, actorId: string, campaignId: stri
     let total: number;
     if (input.scopeType === "identity_access") {
       total = await populateIdentityItems(tenantId, campaignId, input, ids.applicationId);
+    } else if (input.scopeType === "role_assignments") {
+      total = await populateRoleItems(tenantId, campaignId, input);
     } else {
       const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
       total = await populateCertificationItems(tenantId, campaignId, agents, input, grantFilter);
@@ -301,6 +371,9 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     applicationId = typeof input.scope?.applicationId === "string" && input.scope.applicationId ? input.scope.applicationId : null;
     if (applicationId && !(await getApplication(tenantId, applicationId))) throw new ApiError(404, "APPLICATION_NOT_FOUND");
     if (input.reviewerKind !== undefined && !(REVIEWER_KINDS as readonly string[]).includes(input.reviewerKind)) throw new ApiError(400, "INVALID_INPUT", "reviewerKind: named, manager or application_owner");
+  } else if (input.scopeType === "role_assignments") {
+    // COMPLIANCE-P0-11: the manager or the named reviewer (roles have no application owner).
+    if (input.reviewerKind !== undefined && input.reviewerKind !== "named" && input.reviewerKind !== "manager") throw new ApiError(400, "INVALID_INPUT", "reviewerKind: named or manager");
   } else if (input.scopeType === "entitlement") {
     entitlementId = typeof input.scope?.entitlementId === "string" ? input.scope.entitlementId : null;
     if (!entitlementId) throw new ApiError(400, "INVALID_INPUT", "scope.entitlementId is required for scope_type 'entitlement'");
@@ -320,7 +393,7 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
       due_date: input.dueDate ?? null,
       created_by: actorId,
       build_status: "building",
-      reviewer_kind: input.scopeType === "identity_access" ? (input.reviewerKind ?? "named") : "named",
+      reviewer_kind: input.scopeType === "identity_access" || input.scopeType === "role_assignments" ? (input.reviewerKind ?? "named") : "named",
     })
     .select()
     .single();
@@ -339,7 +412,7 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     objectType: "certification_campaign",
     objectId: campaign.id,
     outcome: "success",
-    metadata: { scopeType: input.scopeType, scope: input.scope ?? {}, ...(input.scopeType === "identity_access" ? { reviewerKind: input.reviewerKind ?? "named" } : {}) },
+    metadata: { scopeType: input.scopeType, scope: input.scope ?? {}, ...(input.scopeType === "identity_access" || input.scopeType === "role_assignments" ? { reviewerKind: input.reviewerKind ?? "named" } : {}) },
   });
 
   return campaign;

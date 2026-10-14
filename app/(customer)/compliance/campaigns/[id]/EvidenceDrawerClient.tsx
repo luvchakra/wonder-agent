@@ -47,8 +47,14 @@ export function EvidenceDrawerClient({ items }: { items: ItemForEvidence[] }) {
             </div>
           )}
           <div>
-            <p className="text-xs text-muted-foreground">Access grant</p>
-            {snapshot.accessGrant ? (
+            <p className="text-xs text-muted-foreground">{snapshot.role ? "WonderID role" : "Access grant"}</p>
+            {snapshot.role ? (
+              <p className="text-foreground">
+                {snapshot.role.displayName}
+                {snapshot.role.privileged ? " (privileged)" : ""} · {snapshot.role.group ? `through group ${snapshot.role.group.name}` : "assigned directly"}
+                {snapshot.role.expiresAt ? ` · until ${snapshot.role.expiresAt}` : ""}
+              </p>
+            ) : snapshot.accessGrant ? (
               <p className="text-foreground">
                 {snapshot.accessGrant.application ?? "?"}:{snapshot.accessGrant.entitlementName ?? "?"}
                 {snapshot.accessGrant.dataClassification ? ` (${snapshot.accessGrant.dataClassification})` : ""}

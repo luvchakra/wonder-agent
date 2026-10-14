@@ -2,6 +2,8 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { removeRole } from "@/lib/rbac/roles";
+import { removeGroupMember } from "@/lib/users/groups";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { revokeAccessGrant, getAccessGrant, getEntitlement, createAccessRequest, requestCertifiedRemoval } from "@/modules/access-governance/service";
 import { getIdentityReviewInfo, listOwners } from "@/modules/agent-identity/service";
@@ -69,7 +71,9 @@ export async function recordDecision(
 
   let snapshot: unknown;
   let remediationId: string | null = null;
-  if (item.identityId) {
+  if (item.roleSource) {
+    ({ snapshot, remediationId } = await roleItemDecision(tenantId, actorId, item, input));
+  } else if (item.identityId) {
     ({ snapshot, remediationId } = await identityItemDecision(tenantId, actorId, item, input));
   } else {
     ({ snapshot, remediationId } = await agentItemDecision(tenantId, actorId, item as CertificationItem & { agentId: string }, input));
@@ -252,6 +256,48 @@ async function identityItemDecision(tenantId: string, actorId: string, item: Cer
   }
   const snapshot = { ...(item.snapshot as Record<string, unknown> | null), decidedAt: new Date().toISOString(), subject: subject ? { displayName: subject.displayName, identityType: subject.identityType } : null };
   return { snapshot, remediationId };
+}
+
+/**
+ * COMPLIANCE-P0-11: a WonderID role the person holds. Never certified by
+ * that person. A revoke removes it now through Foundation's services: the
+ * direct assignment (`removeRole`), or the person from the group the role
+ * comes from (`removeGroupMember`), before the decision is recorded, so a
+ * refused removal (the last administrator, say) records nothing.
+ */
+async function roleItemDecision(tenantId: string, actorId: string, item: CertificationItem, input: RecordDecisionInput): Promise<{ snapshot: unknown; remediationId: string | null }> {
+  if (!(IDENTITY_ITEM_DECISIONS as readonly string[]).includes(input.decision)) {
+    throw new ApiError(400, "INVALID_INPUT", "For a role assignment: approve, revoke, delegate or request_information");
+  }
+  const subject = (await getIdentityReviewInfo(tenantId, [item.identityId!])).get(item.identityId!) ?? null;
+  if (selfCertificationRefused(input.decision, actorId, subject?.userId ?? null)) {
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "compliance.sod_conflict_blocked", objectType: "certification_item", objectId: item.id, outcome: "failure", metadata: { reason: "self-certification" } });
+    throw new ApiError(409, "SELF_CERTIFICATION", "Nobody certifies their own access");
+  }
+  const role = item.snapshot?.role;
+  if (input.decision === "revoke") {
+    if (!subject?.userId || !role) throw new ApiError(409, "NO_SPECIFIC_GRANT", "This item names no role assignment to remove");
+    if (item.roleSource === "group") {
+      if (!item.groupId) throw new ApiError(409, "GROUP_GONE", "The group this role came from no longer exists");
+      await removeGroupMember(tenantId, actorId, item.groupId, subject.userId);
+    } else {
+      await removeRole(tenantId, actorId, subject.userId, role.name);
+    }
+  }
+  if (input.decision === "approve" || input.decision === "revoke") {
+    await writeAudit({
+      tenantId,
+      actorId,
+      actorType: "user",
+      action: input.decision === "approve" ? "compliance.access_certified" : "compliance.access_revoked",
+      objectType: "certification_item",
+      objectId: item.id,
+      outcome: "success",
+      metadata: { userId: subject?.userId ?? null, role: role?.name ?? null, source: item.roleSource, groupId: item.groupId, campaignId: item.campaignId },
+    });
+  }
+  const snapshot = { ...(item.snapshot as Record<string, unknown> | null), decidedAt: new Date().toISOString(), subject: subject ? { displayName: subject.displayName, identityType: subject.identityType } : null };
+  return { snapshot, remediationId: null };
 }
 
 export async function listDecisionsForItem(tenantId: string, itemId: string): Promise<CertificationDecision[]> {

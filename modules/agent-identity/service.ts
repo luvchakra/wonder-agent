@@ -60,6 +60,7 @@ export {
   type RelationshipView,
   type SourceDisagreementRow,
   getIdentityReviewInfo,
+  getHumanIdentityIdsForUsers,
 } from "./directory";
 export {
   listIdentitiesForCorrelation,

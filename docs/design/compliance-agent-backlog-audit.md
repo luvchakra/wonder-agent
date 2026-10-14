@@ -1271,3 +1271,45 @@ Verified:
 Left for part 2: defer, escalate and exception decisions; a reviewer
 inbox across campaigns; owner reviews of applications, roles and
 packages; templates, calendar and analytics.
+
+### 2026-10-14 — COMPLIANCE-P0-11: reviews of WonderID role assignments
+
+Access reviews now cover the roles members hold in WonderID itself, so an
+organization can certify who administers it.
+
+Built:
+- **Migration `0183_compliance_role_assignment_reviews.sql`** (applied to
+  dev): campaign scope `role_assignments`; `certification_items` gains
+  `role_id` (set null if the role is deleted), `role_source` (direct or
+  group) and `group_id` (same-organization foreign key; set null if the
+  group is deleted). The snapshot keeps the names either way.
+- **Launch:** reads Foundation's `listRoleAssignmentsForReview` (direct
+  and group assignments, active people only, current terms; privileged
+  when any permission of the role is privileged) and Identity's
+  `getHumanIdentityIdsForUsers`. One item per role per person, about the
+  person's identity, privileged first; `scope.privilegedOnly` keeps only
+  privileged roles. Reviewer: the manager or the named reviewer
+  (`application_owner` is refused for this scope); never the person.
+- **Decisions:** approve, revoke, delegate, request information. Approving
+  one's own role is refused (409 `SELF_CERTIFICATION`). A revoke removes
+  the role first, through Foundation's `removeRole` (direct) or
+  `removeGroupMember` (group), so a refused removal (the last
+  administrator, say) records no decision. Each certify and revoke writes
+  `compliance.access_certified` / `compliance.access_revoked`.
+- **UI:** "WonderID roles" in the campaign scope list; the items table and
+  evidence drawer show the role, whether it is privileged and where it
+  comes from.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files; `next build`.
+- Vitest compliance, operations, rbac, identity and architecture: 301/301.
+- `tests/compliance/role-reviews-isolation.sql` against dev: 5/5.
+- Local E2E `compliance.spec.ts` (now also launching a "role_assignments"
+  campaign from the form) and `role-reviews.spec.ts`: 20/20 (the first run
+  expected 403/404 from another organization; the items list answers 200
+  with no items, and a decision on the item 404. Assertion corrected).
+
+Left out: a delegation's time-bound role copies are not reviewed (they end
+with the delegation); automation credentials are reviewed on their own
+page. A group revoke removes the person from the whole group, which can
+take away more than the one role; the evidence drawer says which group.

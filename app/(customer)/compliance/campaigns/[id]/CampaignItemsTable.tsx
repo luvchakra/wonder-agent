@@ -11,7 +11,12 @@ type CampaignItemRow = {
   agentId: string | null;
   identityId?: string | null;
   /** COMPLIANCE-P0-10: whose access and which, from the item's snapshot. */
-  snapshot?: { person?: { displayName: string }; accessGrant?: { application?: string; entitlementName?: string } | null } | null;
+  snapshot?: {
+    person?: { displayName: string };
+    accessGrant?: { application?: string; entitlementName?: string } | null;
+    /** COMPLIANCE-P0-11: a WonderID role, directly or through a group. */
+    role?: { displayName: string; privileged: boolean; group: { name: string } | null };
+  } | null;
   riskAtReview: string | null;
   usageAtReview: string | null;
   recommendation: string | null;
@@ -34,7 +39,9 @@ export function CampaignItemsTable({ items, totalCount, currentUserId }: { items
               {i.snapshot?.person?.displayName ?? "Identity"}
             </Link>
             <span className="block text-xs text-muted-foreground">
-              {i.snapshot?.accessGrant?.application ?? "?"} · {i.snapshot?.accessGrant?.entitlementName ?? "?"}
+              {i.snapshot?.role
+                ? `${i.snapshot.role.displayName}${i.snapshot.role.privileged ? " (privileged)" : ""} · ${i.snapshot.role.group ? `group ${i.snapshot.role.group.name}` : "direct"}`
+                : `${i.snapshot?.accessGrant?.application ?? "?"} · ${i.snapshot?.accessGrant?.entitlementName ?? "?"}`}
             </span>
           </span>
         ) : (

@@ -4,7 +4,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 ✅ done · 🔶 partly done · ⬜ not started · progress counts partly done as half
 
-**Overall: 56%** `██████░░░░`
+**Overall: 57%** `██████░░░░`
 
 | # | Phase | Progress |
 |---|---|---|
@@ -14,7 +14,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 4 | [Provisioning](#4-provisioning) | `██████░░░░` 55% |
 | 5 | [AI agents](#5-ai-agents) | `██████████` 100% |
 | 6 | [Risk, reviews and compliance](#6-risk-reviews-and-compliance) | `██████████` 100% |
-| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `█████░░░░░` 50% |
+| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `██████░░░░` 60% |
 | 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `██░░░░░░░░` 20% |
 | 9 | [Agent ID and trusted credentials](#9-agent-id-and-trusted-credentials) | `░░░░░░░░░░` 0% |
 | 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `████░░░░░░` 35% |
@@ -98,7 +98,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Ready-made reports and exports
 - ✅ Billing (Stripe, Razorpay)
 
-## 7. Lifecycle and reviews for everyone — 50%
+## 7. Lifecycle and reviews for everyone — 60%
 
 - ✅ Shared rule engine
 - 🔶 Attribute rules
@@ -106,7 +106,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Identity detail pages
 - ✅ Entitlement types and classification
 - 🔶 Reviews for every identity type
-- ⬜ Reviews of administrators
+- ✅ Reviews of administrators
 - ⬜ Review templates and SLA reporting
 - ⬜ Merging duplicate people
 - ⬜ Field-level audit detail

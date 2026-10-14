@@ -3417,3 +3417,14 @@ automation specs: 32/32. Owner decision (14 Oct, 13:45 IST): keep the variable w
 binding; it still relies on Supabase's "Confirm email" setting, and removal
 still needs a redeploy. Tracker: `docs/WonderID/FINDINGS-REMEDIATION.md`,
 WID-H10.
+
+## 2026-10-14 — Role assignments for reviews (COMPLIANCE-P0-11)
+
+Published `listRoleAssignmentsForReview(tenantId, { privilegedOnly })`
+(`lib/rbac/roleAssignmentReview.ts`) for Compliance's reviews of WonderID
+roles: one row per role an active person holds, directly (not a
+delegation's copy) or through an active group, within its current terms,
+with whether the role is privileged (any permission with sensitivity
+`privileged`). Service role, every query filtered by `tenant_id`. Revokes
+go through the existing `removeRole` and `removeGroupMember`; no change to
+either. No schema change in this module.
