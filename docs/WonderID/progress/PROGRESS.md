@@ -125,7 +125,7 @@ Exit test: not run.
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Not started | Needs D12 |
+| OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Partial | 2026-10-14: condition language, evaluation, simulation and run-log entries (`modules/operations/rules`); storing the run log needs its table |
 | IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Not started | |
 | IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Partial | Backlog: events, tasks, transitions, ownership transfer built; rules not |
 | IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Partial | Backlog: Partial |
