@@ -5,6 +5,10 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentitySource, PendingCorrelation, ReconciliationRun } from "@/lib/shared/types/integrations";
 import type { IdentityType, SourcedFields } from "@/lib/shared/types/agent-identity";
+import { inviteFromIdentitySource, rolesWithPermissions } from "@/lib/users/users";
+import { listAssignableRoles } from "@/lib/rbac/roles";
+import { invitationEscalation } from "@/lib/users/userRules";
+import { TENANT_ADMIN_ROLE } from "@/lib/rbac/delegatedRoleRules";
 import { applySourcedIdentities, listAttributeDefinitions, listIdentitiesForCorrelation, revertSourceRecord, type SourcedOp, type SourcedResult } from "@/modules/agent-identity/service";
 import {
   MAX_RECORDS_PER_RUN,
@@ -55,6 +59,8 @@ function toSource(r: Row): IdentitySource {
     leaverThresholdPercent: Number(r.leaver_threshold_percent),
     schedule: r.schedule as IdentitySource["schedule"],
     status: r.status as IdentitySource["status"],
+    defaultIdRole: (r.default_id_role as string | null) ?? null,
+    defaultIdRoleSetBy: (r.default_id_role_set_by as string | null) ?? null,
     createdAt: r.created_at as string,
     updatedAt: r.updated_at as string,
   };
@@ -518,6 +524,25 @@ export async function executeReconciliation(
       if (r.conflictsError && errors.length < 200) errors.push({ ref: r.ref, message: `disagreements: ${r.conflictsError}` });
     }
 
+    // 7b. Owner decision 2026-10-14: each new person with an e-mail is
+    // invited to WonderID with the source's default ID role. A refusal is
+    // reported, never fatal: the identity itself was imported.
+    if (source.defaultIdRole && source.defaultIdRoleSetBy && source.identityType === "HUMAN") {
+      const created = new Map(ops.filter((o) => o.op === "create").map((o) => [o.ref, o.fields]));
+      for (const r of results) {
+        if (r.action !== "created") continue;
+        const f = created.get(r.ref);
+        const email = f?.email?.trim();
+        if (!email) continue;
+        const sent = await inviteFromIdentitySource(
+          tenantId,
+          { id: source.id, defaultIdRole: source.defaultIdRole, defaultIdRoleSetBy: source.defaultIdRoleSetBy },
+          { email, displayName: f?.displayName?.trim() || email, jobTitle: f?.title ?? null, department: f?.department ?? null },
+        ).catch((err: unknown) => ({ outcome: "refused" as const, message: err instanceof Error ? err.message : "failed" }));
+        if (sent.outcome === "refused" && errors.length < 200) errors.push({ ref: r.ref, message: `WonderID invitation: ${sent.message ?? "refused"}` });
+      }
+    }
+
     // 8. Leavers: only after a full run with every record handled.
     if (mode === "full" && source.leaverStrategy !== "none" && counts.errors === 0) {
       const presentLinks = [...links.entries()].filter(([, l]) => l.present).map(([externalId, l]) => ({ externalId, identityId: l.identityId }));
@@ -951,4 +976,49 @@ export async function unlinkSourceRecord(
     typedText: { externalId },
   });
   return { identityId, ...undo, accountsToRematch, ...(rematchError ? { rematchError } : {}) };
+}
+
+/**
+ * Owner decision 2026-10-14 — sets (or clears, with null) the ID role an
+ * identity source's new people are invited with. Only an assignable role,
+ * never the organization administrator's, and only by someone holding every
+ * permission it carries (no escalation, as for any invitation). Audited.
+ */
+export async function setSourceDefaultIdRole(
+  tenantId: string,
+  actor: { userId: string; permissions: readonly string[] },
+  sourceId: string,
+  role: unknown,
+): Promise<IdentitySource> {
+  const current = await getIdentitySource(tenantId, sourceId);
+  if (!current) throw new ApiError(404, "NOT_FOUND", "No such identity source");
+  const name = role === null || role === "" ? null : typeof role === "string" ? role.trim() : "";
+  if (name !== null) {
+    if (!name) throw new ApiError(400, "VALIDATION_FAILED", "role: an ID role name, or empty for none");
+    if (name === TENANT_ADMIN_ROLE) throw new ApiError(400, "VALIDATION_FAILED", "role: the organization administrator role is never given automatically");
+    if (!(await listAssignableRoles(tenantId)).some((r) => r.name === name)) throw new ApiError(400, "VALIDATION_FAILED", "role: one of this organization's active ID roles");
+    const [withPermissions] = await rolesWithPermissions(tenantId, [name]);
+    const escalated = invitationEscalation(withPermissions?.permissions ?? [], actor.permissions);
+    if (escalated.length) throw new ApiError(403, "ROLE_ESCALATION", `You can only choose an ID role whose permissions you hold. Not held: ${escalated.join(", ")}`);
+  }
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("identity_sources")
+    .update({ default_id_role: name, default_id_role_set_by: name ? actor.userId : null, updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .eq("id", sourceId)
+    .select()
+    .single();
+  if (error || !data) writeError(error ?? { message: "Failed to update source" });
+  await writeAudit({
+    tenantId,
+    actorId: actor.userId,
+    actorType: "user",
+    action: "identity_source.default_id_role_set",
+    objectType: "identity_source",
+    objectId: sourceId,
+    outcome: "success",
+    metadata: { from: current.defaultIdRole ?? null, to: name },
+  });
+  return toSource(data);
 }

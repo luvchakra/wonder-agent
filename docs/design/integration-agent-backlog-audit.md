@@ -2928,3 +2928,32 @@ QA-P0-07 (`modules/integrations/framework/contract.test.ts`) pins the connectors
 3. **Gateway.** `gateway.ts:253` does not pass an LDAP or SQL driver's read-completeness report through. That is harmless today, because neither driver reports one.
 
 No code changed.
+
+### 2026-10-14 — Default ID role for new people from an identity source (owner test feedback 8, part 2)
+
+Owner decision (chat, 2026-10-14): "in the HR import/reconciliation
+setting, give option which default role should be added".
+
+Built:
+- Migration 0189 (applied to dev): `identity_sources.default_id_role` and
+  `default_id_role_set_by` (nullable; null keeps today's behaviour).
+- `setSourceDefaultIdRole` + PUT
+  `/api/v1/integrations/identity-sources/:id/default-id-role`
+  (integration.update, plus role assignment and users.invite to choose a
+  role; refused for automation credentials). Only an active assignable ID
+  role, never TENANT_SUPER_ADMIN, and only one whose permissions the saver
+  holds (no escalation). Audited `identity_source.default_id_role_set`.
+- Reconciliation step 7b: each person the run creates, with an e-mail, is
+  invited (Foundation's `inviteFromIdentitySource` → `inviteUser`) with the
+  role, on the authority of whoever set it, re-checked on every run
+  (`memberHeldPermissions`: still an active member holding every permission
+  of the role). Someone already a member is left as they are; a refusal is
+  a run error, never fatal. The invitation audit carries `via:
+  identity_source` and the source id.
+- Source page: a "WonderID access for new people" card with the select.
+
+Verified: typecheck; eslint; `next build`; Vitest architecture,
+integrations and lib/users 568/568; local E2E `identity-sources` 21/21 (new
+test: administrator role and unknown role 400; read-only and another
+organization refused; a joiner from the CSV is invited with READ_ONLY,
+audited via the source; cleared, the next joiner gets no access).

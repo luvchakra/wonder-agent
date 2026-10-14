@@ -297,6 +297,7 @@ export async function inviteUser(
   tenant: { tenantId: string; name: string; url: string | null },
   actor: { userId: string; email: string | null; permissions: readonly string[] },
   input: InviteInput,
+  via?: Record<string, unknown>,
 ): Promise<{ ok: true; value: InviteResult; invite: ValidInvite } | { ok: false; errors: Record<string, string> }> {
   const assignable = (await listAssignableRoles(tenant.tenantId)).map((r) => r.name);
   const parsed = validateInvite(input, assignable);
@@ -368,7 +369,7 @@ export async function inviteUser(
     objectId: userId,
     outcome: "success",
     // No e-mail address or name: identifiers only (#10, §17.7).
-    metadata: { roles: v.roles, accountType: v.accountType, authMethod: v.authMethod, existingAccount, emailSent, previousStatus: existing?.status ?? null },
+    metadata: { roles: v.roles, accountType: v.accountType, authMethod: v.authMethod, existingAccount, emailSent, previousStatus: existing?.status ?? null, ...(via ?? {}) },
   });
   return { ok: true, value: { userId, status, emailSent, existingAccount }, invite: v };
 }
@@ -735,3 +736,55 @@ export async function getAccessHistory(tenantId: string, userId: string, limit =
 }
 
 export { checkRoleGrant, databaseRefusal };
+
+// ------------------------------------------------------------- joiners from an identity source (owner decision 2026-10-14)
+
+/**
+ * The permissions a member holds now through their tenant-wide, current
+ * role assignments (direct or delegated); null when they are not an active
+ * member. Used to re-check, on each run, that whoever set an identity
+ * source's default ID role may still grant it.
+ */
+export async function memberHeldPermissions(tenantId: string, userId: string): Promise<string[] | null> {
+  const db = supabaseServiceRole();
+  const { data: m } = await db.from("tenant_memberships").select("tenant_id, status").eq("tenant_id", tenantId).eq("user_id", userId).maybeSingle();
+  if (!m || m.tenant_id !== tenantId || m.status !== "active") return null;
+  const now = Date.now();
+  const { data, error } = await db.from("user_roles").select("tenant_id, starts_at, expires_at, roles(name)").eq("tenant_id", tenantId).eq("user_id", userId);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const names = ((data ?? []) as unknown as { tenant_id: string; starts_at: string | null; expires_at: string | null; roles: { name: string } | null }[])
+    .filter((r) => r.tenant_id === tenantId && (!r.starts_at || Date.parse(r.starts_at) <= now) && (!r.expires_at || Date.parse(r.expires_at) > now))
+    .map((r) => r.roles?.name)
+    .filter((n): n is string => Boolean(n));
+  return [...new Set((await rolesWithPermissions(tenantId, [...new Set(names)])).flatMap((r) => r.permissions))];
+}
+
+/**
+ * Invites a person an identity source has just created, with the source's
+ * default ID role, on the authority of whoever set that role (checked again
+ * now: still an active member holding every permission the role carries).
+ * Someone already in the organization is left as they are.
+ */
+export async function inviteFromIdentitySource(
+  tenantId: string,
+  source: { id: string; defaultIdRole: string; defaultIdRoleSetBy: string },
+  person: { email: string; displayName: string; jobTitle?: string | null; department?: string | null },
+): Promise<{ outcome: "invited" | "already_member" | "refused"; message?: string }> {
+  const holds = await memberHeldPermissions(tenantId, source.defaultIdRoleSetBy);
+  if (!holds) return { outcome: "refused", message: "whoever set the default ID role is no longer an active member; set it again" };
+  const db = supabaseServiceRole();
+  const [{ data: setter }, { data: tenantRow }] = await Promise.all([
+    db.from("users").select("email").eq("id", source.defaultIdRoleSetBy).maybeSingle<{ email: string | null }>(),
+    db.from("tenants").select("name, slug").eq("id", tenantId).maybeSingle<{ name: string; slug: string | null }>(),
+  ]);
+  const tenant = { tenantId, name: tenantRow?.name ?? "your organization", url: tenantRow?.slug ? await urlForTenant(tenantRow.slug) : null };
+  const result = await inviteUser(
+    tenant,
+    { userId: source.defaultIdRoleSetBy, email: setter?.email ?? null, permissions: holds },
+    { email: person.email, displayName: person.displayName, jobTitle: person.jobTitle ?? undefined, department: person.department ?? undefined, accountType: "internal", authMethod: "tenant_default", method: "invite", roles: [source.defaultIdRole] },
+    { via: "identity_source", sourceId: source.id },
+  );
+  if (result.ok) return { outcome: "invited" };
+  if (result.errors.email?.startsWith("Already in this organization") || result.errors.email?.startsWith("That's you")) return { outcome: "already_member" };
+  return { outcome: "refused", message: Object.values(result.errors).join("; ") };
+}

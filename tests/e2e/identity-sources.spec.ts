@@ -361,3 +361,46 @@ test.describe.serial("identity sources — unlink with undo (WID-H01)", () => {
     }
   });
 });
+
+test.describe("default ID role for new people (owner decision 2026-10-14)", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("new people from the HR import are invited with the source's default ID role; the administrator role and other organizations are refused", async ({ request, browser }) => {
+    test.setTimeout(90_000);
+    const id = await createSource(request, { name: `E2E default ID role ${stamp}`, authoritative: true, priority: 10 });
+    const set = (ctx: APIRequestContext, role: string | null) => ctx.put(`/api/v1/integrations/identity-sources/${id}/default-id-role`, { data: { role } });
+
+    expect((await set(request, "TENANT_SUPER_ADMIN")).status()).toBe(400);
+    expect((await set(request, "NO_SUCH_ROLE")).status()).toBe(400);
+    const ok = await set(request, "READ_ONLY");
+    expect(ok.status(), await ok.text()).toBe(200);
+    expect((await ok.json()).data.defaultIdRole).toBe("READ_ONLY");
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    expect([403, 404]).toContain((await set(ro.request, null)).status());
+    await ro.close();
+    const two = await browser.newContext({ storageState: authFile("adminTwo") });
+    expect([403, 404]).toContain((await set(two.request, "READ_ONLY")).status());
+    await two.close();
+
+    const email = mail("joiner");
+    const run = await runCsv(request, id, csv([["J1", `E2E Joiner ${stamp}`, email, "Finance", "Analyst", "", "active"]]));
+    expect(run.createdCount).toBe(1);
+
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
+    const tenantId = await getTenantIdBySlug(TENANT_ONE.slug);
+    const { data: user } = await db.from("users").select("id").eq("email", email).single();
+    const { data: membership } = await db.from("tenant_memberships").select("status").eq("tenant_id", tenantId).eq("user_id", user!.id).single();
+    expect(membership!.status).toBe("invited");
+    const { data: roles } = await db.from("user_roles").select("roles(name)").eq("tenant_id", tenantId).eq("user_id", user!.id);
+    expect((roles ?? []).map((r) => (r.roles as unknown as { name: string }).name)).toEqual(["READ_ONLY"]);
+    const { data: audit } = await db.from("audit_logs").select("metadata").eq("tenant_id", tenantId).eq("action", "user.invited").eq("object_id", user!.id);
+    expect(audit?.some((a) => (a.metadata as { via?: string }).via === "identity_source")).toBe(true);
+
+    // Cleared: the next new person gets no WonderID access.
+    expect((await set(request, null)).status()).toBe(200);
+    const second = mail("joiner2");
+    await runCsv(request, id, csv([["J2", `E2E Joiner Two ${stamp}`, second, "Finance", "Analyst", "", "active"]]), "partial");
+    const { data: none } = await db.from("users").select("id").eq("email", second).maybeSingle();
+    expect(none).toBeNull();
+  });
+});

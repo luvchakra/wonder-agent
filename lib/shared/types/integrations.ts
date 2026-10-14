@@ -346,6 +346,9 @@ export type IdentitySource = {
   leaverThresholdPercent: number;
   schedule: "manual" | "daily" | "hourly";
   status: "active" | "paused";
+  /** Owner decision 2026-10-14: the ID role new people from this source are invited with (null: none). */
+  defaultIdRole?: string | null;
+  defaultIdRoleSetBy?: string | null;
   createdAt: string;
   updatedAt: string;
 };
