@@ -4,6 +4,8 @@ import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
+  LINK_MESSAGE,
+  openApprovalLink,
   endedRemoval,
   getRequestCatalogItem,
   getRequestWithApprovals,
@@ -93,7 +95,7 @@ function Step({ s }: { s: ApprovalView }) {
   );
 }
 
-export default async function AccessRequestDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AccessRequestDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ link?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("access.read");
@@ -115,6 +117,9 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
   ]);
   if (!found) notFound();
   const { request: r, steps } = found;
+  // ACCESS-P0-38 part 2: arriving from an approver's link. It is checked and used up here; deciding is the normal form below.
+  const linkToken = (await searchParams).link;
+  const linkState = linkToken ? await openApprovalLink(tenantId, ctx.userId, r.id, linkToken, r.status) : null;
   const status = lineState(r, requestProgress(tasks, grants), undefined, endedRemoval(grants));
   const live = steps.filter((s) => s.status !== "invalidated");
   const invalidated = steps.filter((s) => s.status === "invalidated");
@@ -147,6 +152,11 @@ export default async function AccessRequestDetailPage({ params }: { params: Prom
         <span aria-hidden> / </span>
         <span className="text-foreground">Request</span>
       </nav>
+      {linkState ? (
+        <p role="status" className={`rounded-md border px-3 py-2 text-sm ${linkState === "valid" ? "border-primary/30 bg-primary/5 text-foreground" : "border-border bg-muted text-muted-foreground"}`}>
+          {LINK_MESSAGE[linkState]}
+        </p>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="break-words text-[22px] font-semibold tracking-[-0.015em] text-foreground">

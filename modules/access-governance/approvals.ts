@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { runAfterResponse } from "@/lib/shared/afterResponse";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessRequest } from "@/lib/shared/types/access-governance";
 import { getIdentity, getIdentityForUser, getIdentityNames } from "@/modules/agent-identity/service";
@@ -21,6 +22,7 @@ import {
   type StepStatus,
 } from "./approvalRules";
 import { pendRequest } from "./pendingGrants";
+import { notifyApprovers } from "./approvalLinks";
 
 /**
  * ACCESS-P0-19 — the approval engine for requests made through the
@@ -253,6 +255,9 @@ export async function startApprovalChain(tenantId: string, actorId: string, requ
     outcome: "success",
     metadata: { actionFingerprint: fingerprint, steps: steps.map((s) => ({ stage: s.stage, approverKind: s.approverKind, approverIdentityId: s.approverIdentityId, reason: s.reason })) },
   });
+  // ACCESS-P0-38 part 2: the first stage's approvers hear of it, with a link of their own.
+  const open = steps.filter((s) => s.status === "pending").map((s) => s.stage);
+  if (open.length) runAfterResponse(() => notifyApprovers(tenantId, request.id, Math.min(...open)));
   return steps;
 }
 
@@ -323,6 +328,8 @@ async function openStage(tenantId: string, requestId: string, stage: number, tim
     .eq("status", "waiting");
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
   await admin.from("access_requests").update({ approval_stage: stage }).eq("tenant_id", tenantId).eq("id", requestId).eq("status", "pending");
+  // ACCESS-P0-38 part 2: the next stage's approvers hear of it.
+  runAfterResponse(() => notifyApprovers(tenantId, requestId, stage));
 }
 
 export type ApproverActor = { userId: string; roles: string[]; canApproveAsAccessManager: boolean };

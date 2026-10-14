@@ -20,9 +20,16 @@ async function call<T>(url: string, init?: RequestInit): Promise<{ data?: T; err
   return !res.ok || !json.ok ? { error: json.error?.message ?? "It could not be done" } : { data: json.data as T };
 }
 
-export function BasketForm({ people, items }: { people: { id: string; label: string }[]; items: { value: string; label: string }[] }) {
+type Draft = { id: string; name: string; payload: { subjectIdentityIds: string[]; items: string[]; justification: string } };
+
+export function BasketForm({ people, items, drafts = [] }: { people: { id: string; label: string }[]; items: { value: string; label: string }[]; drafts?: Draft[] }) {
   const [subjects, setSubjects] = useState<string[]>([]);
   const [chosen, setChosen] = useState<string[]>([]);
+  const [why, setWhy] = useState("");
+  // ACCESS-P0-38 part 2: a saved basket, to finish and send later.
+  const [draftId, setDraftId] = useState("");
+  const [draftName, setDraftName] = useState("");
+  const [draftNote, setDraftNote] = useState<string | null>(null);
   const [model, setModel] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,14 +87,42 @@ export function BasketForm({ people, items }: { people: { id: string; label: str
                 const [applicationId, entitlementId] = v.split("|");
                 return { applicationId, entitlementId: entitlementId || null, durationDays: f.get("durationDays") || null };
               }),
-              justification: f.get("justification"),
+              justification: why,
             }),
           });
           if (r.error) setError(r.error);
-          else setSent(r.data!);
+          else {
+            setSent(r.data!);
+            // A sent draft is done with.
+            if (draftId) await call(`/api/v1/access/requests/drafts/${draftId}`, { method: "DELETE" });
+          }
         });
       }}
     >
+      {drafts.length ? (
+        <SelectField
+          label="Start from a draft"
+          name="draft"
+          value={draftId}
+          className="max-w-xs"
+          onChange={(e) => {
+            const d = drafts.find((x) => x.id === e.target.value);
+            setDraftId(e.target.value);
+            setDraftName(d?.name ?? "");
+            setSubjects(d ? d.payload.subjectIdentityIds.filter((id) => people.some((p) => p.id === id)) : []);
+            setChosen(d ? d.payload.items.filter((v) => items.some((i) => i.value === v)) : []);
+            setWhy(d?.payload.justification ?? "");
+          }}
+        >
+          <option value="">New basket</option>
+          {drafts.map((d) => (
+            <option key={d.id} value={d.id}>
+              {d.name}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+
       <fieldset>
         <legend className="text-sm font-medium text-foreground">For</legend>
         <div className="mt-2 grid max-h-48 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
@@ -155,7 +190,7 @@ export function BasketForm({ people, items }: { people: { id: string; label: str
           </option>
         ))}
       </SelectField>
-      <TextareaField label="Why" name="justification" rows={2} maxLength={2000} />
+      <TextareaField label="Why" name="justification" rows={2} maxLength={2000} value={why} onChange={(e) => setWhy(e.target.value)} />
 
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending || subjects.length === 0 || chosen.length === 0}>
@@ -168,6 +203,39 @@ export function BasketForm({ people, items }: { people: { id: string; label: str
           </p>
         ) : null}
       </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted-foreground">Save as draft</summary>
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <input aria-label="Draft name" value={draftName} onChange={(e) => setDraftName(e.target.value)} placeholder="Name" maxLength={200} className="h-8 w-56 rounded-md border border-input bg-background px-2 text-sm text-foreground" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={pending || !draftName.trim()}
+            onClick={() =>
+              start(async () => {
+                const body = JSON.stringify({ name: draftName, payload: { subjectIdentityIds: subjects, items: chosen, justification: why } });
+                const r = await call<{ id: string }>(draftId ? `/api/v1/access/requests/drafts/${draftId}` : "/api/v1/access/requests/drafts", {
+                  method: draftId ? "PUT" : "POST",
+                  headers: { "content-type": "application/json" },
+                  body,
+                });
+                if (r.error) return setError(r.error);
+                setDraftId(r.data!.id);
+                setError(null);
+                setDraftNote("Draft saved. Nothing was sent.");
+              })
+            }
+          >
+            Save draft
+          </Button>
+          {draftNote ? (
+            <span role="status" className="text-xs text-success">
+              {draftNote}
+            </span>
+          ) : null}
+        </div>
+      </details>
     </form>
   );
 }
