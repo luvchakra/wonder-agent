@@ -38,7 +38,7 @@ export async function inviteUserAction(_prev: ActionState, formData: FormData): 
     ctx = await requirePermission(invitePermission(method));
     // Granting roles on the way in is role management.
     if (roles.length && !ctx.permissions.some((p) => p === "roles.assign" || p === "role.manage")) {
-      return { ok: false, message: "You can add people, but assigning roles needs role management. Leave the roles empty, or ask an administrator." };
+      return { ok: false, message: "You can add people, but assigning ID roles needs role management. Leave the ID roles empty, or ask an administrator." };
     }
   } catch (err) {
     return refused(err);
@@ -156,7 +156,7 @@ export async function updateUserNameAction(_prev: ActionState, formData: FormDat
 export async function assignUserRoleAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const userId = String(formData.get("userId") ?? "");
   const role = String(formData.get("role") ?? "");
-  if (!role) return { ok: false, message: "Choose a role." };
+  if (!role) return { ok: false, message: "Choose an ID role." };
   const terms = termsFromForm(formData, role);
   if (!terms.ok) return { ok: false, message: "Check the assignment's scope and dates.", errors: terms.errors };
   try {
@@ -164,6 +164,8 @@ export async function assignUserRoleAction(_prev: ActionState, formData: FormDat
     await assignRole(ctx.tenantId!, ctx.userId, userId, role, terms.terms);
     revalidatePath(`/settings/users/${userId}`);
     revalidatePath("/settings/users");
+    // The same form sits on a person's identity page (owner feedback 2026-10-14).
+    revalidatePath("/identities/[id]", "page");
     return { ok: true, message: `${role} assigned.` };
   } catch (err) {
     return refused(err);

@@ -12,7 +12,7 @@ import { removeRoleAction } from "@/app/actions/roles";
  * direct invocation from a Client Component is safe here, unlike actions
  * that redirect internally).
  */
-export function RemoveRoleButton({ userId, role }: { userId: string; role: string }) {
+export function RemoveRoleButton({ userId, role, label = role }: { userId: string; role: string; label?: string }) {
   const router = useRouter();
 
   async function handleConfirm(): Promise<ConfirmActionResult> {
@@ -31,14 +31,14 @@ export function RemoveRoleButton({ userId, role }: { userId: string; role: strin
   return (
     <ConfirmActionDialog
       trigger={
-        <button type="button" className="text-xs text-destructive hover:underline" aria-label={`Remove ${role}`}>
+        <button type="button" className="text-xs text-destructive hover:underline" aria-label={`Remove ${label}`}>
           ×
         </button>
       }
-      title="Remove role"
-      description={`This removes the "${role}" role from this user immediately.`}
-      scopePreview="1 role removed from 1 user."
-      confirmLabel="Remove role"
+      title="Remove ID role"
+      description={`This removes the "${label}" ID role from this person immediately.`}
+      scopePreview="1 ID role removed from 1 person."
+      confirmLabel="Remove ID role"
       onConfirm={handleConfirm}
       onDone={(result) => {
         if (result.kind === "single" && result.success) router.refresh();

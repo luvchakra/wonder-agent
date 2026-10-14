@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 type RoleOption = { name: string; label: string; custom?: boolean };
 /** Owner feedback 2026-10-14: a person the organization already governs, to start from. */
 export type PersonOption = { id: string; displayName: string; email: string; title: string | null; department: string | null };
-const STEPS = ["Basic details", "Roles", "Review"] as const;
+const STEPS = ["Basic details", "ID roles", "Review"] as const;
 const initial: ActionState = { ok: false, message: null };
 
 export function NewUserWizard({
@@ -208,13 +208,13 @@ export function NewUserWizard({
           </fieldset>
 
           <fieldset hidden={shownStep !== 1} className="space-y-3">
-            <legend className="text-sm font-semibold text-foreground">Select roles</legend>
+            <legend className="text-sm font-semibold text-foreground">Select ID roles</legend>
             {canAssignRoles ? (
               <>
                 <input
                   type="search"
-                  aria-label="Search roles"
-                  placeholder="Search roles"
+                  aria-label="Search ID roles"
+                  placeholder="Search ID roles"
                   value={roleQuery}
                   onChange={(e) => setRoleQuery(e.target.value)}
                   className={cn(fieldInputClass, "max-w-sm")}
@@ -229,13 +229,13 @@ export function NewUserWizard({
                       </label>
                     </li>
                   ))}
-                  {visibleRoles.length === 0 ? <li className="px-4 py-3 text-sm text-muted-foreground">No role matches.</li> : null}
+                  {visibleRoles.length === 0 ? <li className="px-4 py-3 text-sm text-muted-foreground">No ID role matches.</li> : null}
                 </ul>
                 {errors.roles ? <p className="text-xs text-destructive">{errors.roles}</p> : null}
-                <p className="text-xs text-muted-foreground">Roles grant access only while the membership is active. Scoped assignments arrive with the authorization engine.</p>
+                <p className="text-xs text-muted-foreground">ID roles grant access only while the membership is active. Scoped assignments arrive with the authorization engine.</p>
               </>
             ) : (
-              <p className="text-sm text-muted-foreground">You can add people, but assigning roles needs role management. An administrator can assign roles afterwards.</p>
+              <p className="text-sm text-muted-foreground">You can add people, but assigning ID roles needs role management. An administrator can assign ID roles afterwards.</p>
             )}
           </fieldset>
 
@@ -250,7 +250,7 @@ export function NewUserWizard({
               <Row label="Joins" value={values.method === "invite" ? "By invitation" : "Now, as active"} />
             </dl>
             <div className="rounded-lg border border-border p-4 text-sm">
-              <p className="font-medium text-foreground">Roles</p>
+              <p className="font-medium text-foreground">ID roles</p>
               {values.roles.length ? (
                 <ul className="mt-2 space-y-1">
                   {values.roles.map((r) => (
@@ -260,7 +260,7 @@ export function NewUserWizard({
                   ))}
                 </ul>
               ) : (
-                <p className="mt-2 text-muted-foreground">No roles — they will have no access until one is assigned.</p>
+                <p className="mt-2 text-muted-foreground">No ID roles — they will have no access until one is assigned.</p>
               )}
             </div>
           </section>

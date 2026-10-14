@@ -62,7 +62,7 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
       </nav>
       {sp.created ? (
         <p role="status" className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-          {group.name} was created. Give it roles and add its people.
+          {group.name} was created. Give it ID roles and add its people.
         </p>
       ) : null}
       <div>
@@ -74,10 +74,10 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-5">
           <Card>
-            <CardHeader title={`Roles (${group.roleAssignments.length})`} description="Everyone in the group holds these roles." />
+            <CardHeader title={`ID roles (${group.roleAssignments.length})`} description="Everyone in the group holds these ID roles." />
             <CardBody className="space-y-4">
               {group.roleAssignments.length === 0 ? (
-                <EmptyState title="No roles yet" description="A group without roles gives its members nothing." />
+                <EmptyState title="No ID roles yet" description="A group without ID roles gives its members nothing." />
               ) : (
                 <ul className="divide-y divide-border rounded-lg border border-border">
                   {group.roleAssignments.map((r) => (

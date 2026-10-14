@@ -154,7 +154,7 @@ test.describe("users and the membership lifecycle", () => {
     test("nobody changes their own membership or grants themselves a role", async ({ page }) => {
       const me = await getSeededUserId(TEST_USERS.adminOne.email);
       await page.goto(`/settings/users/${me}`);
-      await expect(page.getByText("Another administrator manages your own membership and roles.")).toBeVisible();
+      await expect(page.getByText("Another administrator manages your own membership and ID roles.")).toBeVisible();
       await expect(page.getByRole("button", { name: "Suspend" })).toHaveCount(0);
       const suspend = await page.request.post(`/api/v1/users/${me}/status`, { data: { action: "suspend", reason: "trying" } });
       expect(suspend.status()).toBe(403);

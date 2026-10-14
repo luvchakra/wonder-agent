@@ -39,7 +39,7 @@ export default async function NewUserPage({ searchParams }: { searchParams: Prom
       </nav>
       <div>
         <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Add new user</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Invite someone to your organization, or add them now, and choose the roles they start with.</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Invite someone to your organization, or add them now, and choose the ID roles they start with.</p>
       </div>
       <NewUserWizard
         roles={roles.map((r) => ({ name: r.name, label: r.displayName, custom: r.custom }))}

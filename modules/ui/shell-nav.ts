@@ -112,7 +112,8 @@ export const ADMIN_AREA: ShellNavItem = {
       "Users & Roles",
       [
         page("Users", "/settings/users", "users.view"),
-        page("Roles", "/settings/roles", "roles.view", "role.manage"),
+        // WonderID's own roles are "ID roles" (owner feedback 2026-10-14), unlike roles in applications.
+        page("ID Roles", "/settings/roles", "roles.view", "role.manage"),
         page("Permissions", "/settings/permissions", "permissions.view"),
         page("Authorization Policies", "/settings/authorization-policies", "permissions.view", "tenant.security.manage"),
         page("Single Sign-On", "/settings/sso", "sso.manage"),

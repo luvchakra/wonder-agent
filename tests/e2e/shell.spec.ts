@@ -87,7 +87,7 @@ test.describe("customer shell", () => {
     // The Admin sidebar's menus; the page's own one is open.
     for (const name of ["Identities", "Applications", "Policies & Controls", "Reports & Audit", "Integrations", "Organization Settings", "Privacy & Audit"]) await expect(nav.getByRole("button", { name, exact: true })).toBeVisible();
     await expect(nav.getByRole("button", { name: "Users & Roles" })).toHaveAttribute("aria-expanded", "true");
-    await expect(nav.getByRole("link", { name: "Roles", exact: true })).toBeVisible();
+    await expect(nav.getByRole("link", { name: "ID Roles", exact: true })).toBeVisible();
     await expect(nav.getByRole("link", { name: "Users", exact: true })).toHaveAttribute("aria-current", "page");
     // Another group's pages stay folded.
     await expect(nav.getByRole("link", { name: "Sync Jobs" })).toHaveCount(0);

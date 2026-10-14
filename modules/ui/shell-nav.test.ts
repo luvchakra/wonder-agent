@@ -104,7 +104,7 @@ describe("searchNav (the sidebar's menu search)", () => {
   it("finds pages by name, group or area, with where they live", () => {
     expect(searchNav(SHELL_NAV, "sync")).toEqual([{ label: "Sync Jobs", href: "/integrations/jobs", trail: ["Administration", "Integrations"] }]);
     expect(searchNav(SHELL_NAV, "workforce")).toEqual([{ label: "Workforce", href: "/identities/humans", trail: ["Administration", "Identities"] }]);
-    expect(searchNav(SHELL_NAV, "users roles").map((m) => m.label)).toEqual(["Users", "Roles", "Permissions", "Authorization Policies", "Single Sign-On", "API Clients"]);
+    expect(searchNav(SHELL_NAV, "users roles").map((m) => m.label)).toEqual(["Users", "ID Roles", "Permissions", "Authorization Policies", "Single Sign-On", "API Clients"]);
     expect(searchNav(SHELL_NAV, "violations")).toEqual([{ label: "SoD Violations", href: "/sod/conflicts", trail: ["Risk & Detection"] }]);
   });
 

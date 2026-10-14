@@ -157,18 +157,18 @@ export function RemoveMemberButton({ groupId, userId, name }: { groupId: string;
 
 export function AddGroupRoleForm({ groupId, roles, applications, agents }: { groupId: string; roles: { name: string; label: string }[]; applications: ScopeOption[]; agents: ScopeOption[] }) {
   const [state, action] = useActionState(addGroupRoleAction, initial);
-  if (!roles.length) return <p className="text-xs text-muted-foreground">There are no roles to give.</p>;
+  if (!roles.length) return <p className="text-xs text-muted-foreground">There are no ID roles to give.</p>;
   return (
     <form action={action} className="space-y-2">
       <input type="hidden" name="groupId" value={groupId} />
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-[16rem] flex-1">
           <label htmlFor="add-group-role" className={fieldLabelClass}>
-            Give the group a role
+            Give the group an ID role
           </label>
           <select id="add-group-role" name="role" required defaultValue="" className={fieldInputClass}>
             <option value="" disabled>
-              Choose a role
+              Choose an ID role
             </option>
             {roles.map((r) => (
               <option key={r.name} value={r.name}>
@@ -178,7 +178,7 @@ export function AddGroupRoleForm({ groupId, roles, applications, agents }: { gro
           </select>
         </div>
         <PendingSubmitButton size="sm" pendingLabel="Assigning…">
-          Assign role
+          Assign ID role
         </PendingSubmitButton>
       </div>
       <AssignmentTermsFields idPrefix="group-role" applications={applications} agents={agents} errors={state.errors} />

@@ -39,7 +39,7 @@ const ROUTES = [
   { path: "/reports", heading: "Reports" },
   { path: "/search", heading: "Search" },
   { path: "/settings", heading: "Administration" },
-  { path: "/settings/roles", heading: "Roles" },
+  { path: "/settings/roles", heading: "ID Roles" },
   { path: "/settings/users", heading: "Users" },
   { path: "/settings/permissions", heading: "Permission catalog" },
   { path: "/settings/authorization-policies", heading: "Authorization policies" },

@@ -37,14 +37,14 @@ const ACTIONS: { action: StatusAction; label: string; from: MembershipStatus[]; 
     destructive: true,
     explain: "Their access stops now and every session they hold is ended. You can reactivate them later.",
   },
-  { action: "reactivate", label: "Reactivate", from: ["suspended", "deactivated"], permission: "suspend", destructive: false, explain: "Their roles take effect again." },
+  { action: "reactivate", label: "Reactivate", from: ["suspended", "deactivated"], permission: "suspend", destructive: false, explain: "Their ID roles take effect again." },
   {
     action: "deactivate",
     label: "Deactivate",
     from: ["active", "invited", "suspended"],
     permission: "suspend",
     destructive: true,
-    explain: "For people who have left. Access stops and sessions end; the record and roles stay.",
+    explain: "For people who have left. Access stops and sessions end; the record and ID roles stay.",
   },
   {
     action: "remove",
@@ -52,7 +52,7 @@ const ACTIONS: { action: StatusAction; label: string; from: MembershipStatus[]; 
     from: ["active", "invited", "suspended", "deactivated"],
     permission: "remove",
     destructive: true,
-    explain: "They leave the organization and lose every role here. The history stays in the audit log.",
+    explain: "They leave the organization and lose every ID role here. The history stays in the audit log.",
   },
 ];
 
@@ -166,18 +166,18 @@ export function AssignRoleForm({
   agents?: ScopeOption[];
 }) {
   const [state, formAction] = useActionState(assignUserRoleAction, initial);
-  if (!roles.length) return <p className="text-xs text-muted-foreground">They hold every role there is to assign.</p>;
+  if (!roles.length) return <p className="text-xs text-muted-foreground">They hold every ID role there is to assign.</p>;
   return (
     <form action={formAction} className="space-y-2">
       <input type="hidden" name="userId" value={userId} />
       <div className="flex flex-wrap items-end gap-2">
         <div className="min-w-[14rem]">
           <label htmlFor="assign-role" className={fieldLabelClass}>
-            Assign a role
+            Assign an ID role
           </label>
           <select id="assign-role" name="role" required className={fieldInputClass} defaultValue="">
             <option value="" disabled>
-              Choose a role
+              Choose an ID role
             </option>
             {roles.map((r) => (
               <option key={r.name} value={r.name}>
@@ -187,7 +187,7 @@ export function AssignRoleForm({
           </select>
         </div>
         <PendingSubmitButton size="sm" pendingLabel="Assigning…">
-          Assign role
+          Assign ID role
         </PendingSubmitButton>
       </div>
       <AssignmentTermsFields idPrefix="assign" applications={applications} agents={agents} errors={state.errors} />

@@ -31,7 +31,7 @@ export default async function SettingsPage() {
             Users
           </Link>
           <Link href="/settings/roles" className="block text-primary hover:underline">
-            Users &amp; Roles
+            ID Roles
           </Link>
           <Link href="/settings/sso" className="block text-primary hover:underline">
             Single Sign-On

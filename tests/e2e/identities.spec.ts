@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from "@playwright/test";
-import { authFile } from "./support/testUsers";
+import { authFile, TEST_USERS } from "./support/testUsers";
+import { getSeededUserId } from "./support/seedTestData";
 
 /**
  * IDENTITY-P0-15/16/17 — the WonderID identity directory, against the real
@@ -157,7 +158,7 @@ test.describe.serial("identity directory", () => {
     const tabs = page.getByRole("tablist", { name: "Identity sections" });
     for (const name of [/^Groups/, /^Risk/, /^Activity/]) await expect(tabs.getByRole("tab", { name })).toBeVisible();
     await tabs.getByRole("tab", { name: /^Groups/ }).click();
-    await expect(page.getByRole("tabpanel").getByText(/In no groups|Roles:|No roles/).first()).toBeVisible();
+    await expect(page.getByRole("tabpanel").getByText(/In no groups|ID roles:|No ID roles/).first()).toBeVisible();
     await tabs.getByRole("tab", { name: /^Risk/ }).click();
     await expect(page.getByRole("tabpanel").getByText(/No findings|found \d{4}-/).first()).toBeVisible();
     await tabs.getByRole("tab", { name: /^Activity/ }).click();
@@ -199,5 +200,51 @@ test.describe("identity directory — other organizations and roles", () => {
     const requester = await browser.newContext({ storageState: authFile("requester") });
     expect((await requester.request.get("/api/v1/identities")).status()).toBe(403);
     await requester.close();
+  });
+});
+
+// Owner feedback 2026-10-14: a person's page shows the ID roles (WonderID's
+// own roles) they hold, and an administrator adds and removes them there.
+test.describe("ID roles on a person's page", () => {
+  test.describe.configure({ timeout: 90_000 });
+
+  test("an administrator adds an ID role and removes it; a read-only member cannot", async ({ browser }) => {
+    const admin = await browser.newContext({ storageState: authFile("adminOne") });
+    const page = await admin.newPage();
+    const personId = await findPerson(page.request, TEST_USERS.requester.email);
+    const requesterId = await getSeededUserId(TEST_USERS.requester.email);
+    // Start from a requester without the Auditor ID role (a 404 here just means they don't hold it).
+    await page.request.delete(`/api/v1/users/${requesterId}/roles?role=AUDITOR`);
+    try {
+      await page.goto(`/identities/${personId}?tab=id-roles`);
+      const panel = page.getByRole("tabpanel");
+      const held = panel.getByRole("list", { name: "ID roles held" });
+      await expect(held).toContainText("Requester");
+      await expect(held).not.toContainText("Auditor");
+
+      await panel.getByText("Add ID role", { exact: true }).click();
+      await panel.getByLabel("Assign an ID role").selectOption({ label: "Auditor" });
+      await panel.getByRole("button", { name: "Assign ID role" }).click();
+      await expect(panel.getByText("AUDITOR assigned.")).toBeVisible({ timeout: 30_000 });
+      await expect(held).toContainText("Auditor", { timeout: 30_000 });
+
+      await held.getByRole("button", { name: "Remove Auditor" }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.getByRole("button", { name: "Remove ID role" }).click();
+      await expect(dialog.getByText("Done.")).toBeVisible({ timeout: 30_000 });
+      await dialog.getByRole("button", { name: "Close" }).click();
+      await expect(held).not.toContainText("Auditor", { timeout: 30_000 });
+    } finally {
+      await page.request.delete(`/api/v1/users/${requesterId}/roles?role=AUDITOR`);
+      await admin.close();
+    }
+
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    const roPage = await ro.newPage();
+    await roPage.goto(`/identities/${personId}?tab=id-roles`);
+    await expect(roPage.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(roPage.getByText("Add ID role", { exact: true })).toHaveCount(0);
+    await expect(roPage.getByRole("button", { name: /^Remove / })).toHaveCount(0);
+    await ro.close();
   });
 });

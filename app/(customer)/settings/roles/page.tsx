@@ -11,14 +11,16 @@ import { objectActionsFor } from "@/modules/operations/exportRegistry";
 // how many permissions each grants and how many people hold it. Assigning
 // roles to people is on each user's page (FOUNDATION-P0-23).
 
-export const metadata = { title: "Roles" };
+// Owner feedback 2026-10-14: these are "ID roles", the roles that manage
+// WonderID itself, as opposed to the roles people hold in applications.
+export const metadata = { title: "ID Roles" };
 
 function RoleTable({ roles, showStatus }: { roles: RoleSummary[]; showStatus: boolean }) {
   return (
     <TableContainer>
       <Thead>
         <tr>
-          <Th>Role</Th>
+          <Th>ID role</Th>
           <Th hideBelow="lg">Permissions</Th>
           <Th>People</Th>
           {showStatus ? <Th>Status</Th> : null}
@@ -66,20 +68,20 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
     <div className="space-y-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Roles</h1>
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">ID Roles</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            Roles bundle permissions from the{" "}
+            ID roles decide who can manage WonderID. Each bundles permissions from the{" "}
             <Link href="/settings/permissions" className="text-primary hover:underline">
               permission catalog
             </Link>
-            . System roles are defined by WonderID; custom roles are your organization&apos;s own.
+            .
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["roles"])} />
           {ctx.permissions.includes("roles.create") ? (
             <LinkButton href="/settings/roles/new" size="sm">
-              Create role
+              Create ID role
             </LinkButton>
           ) : null}
         </div>
@@ -87,23 +89,23 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
 
       {sp.deleted ? (
         <p role="status" className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-          The role was deleted.
+          The ID role was deleted.
         </p>
       ) : null}
 
       <Card>
-        <CardHeader title={`Custom roles (${custom.length})`} description="Defined by your organization. Changes apply to everyone who holds them on their next request." />
+        <CardHeader title={`Custom ID roles (${custom.length})`} description="Defined by your organization. Changes apply to everyone who holds them on their next request." />
         <CardBody>
           {custom.length ? (
             <RoleTable roles={custom} showStatus />
           ) : (
             <EmptyState
-              title="No custom roles yet"
-              description="Create one from scratch, or copy a system role and adjust it."
+              title="No custom ID roles yet"
+              description="Create one from scratch, or copy a system ID role and adjust it."
               action={
                 ctx.permissions.includes("roles.create") ? (
                   <LinkButton href="/settings/roles/new" size="sm" variant="outline">
-                    Create role
+                    Create ID role
                   </LinkButton>
                 ) : undefined
               }
@@ -113,7 +115,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
       </Card>
 
       <Card>
-        <CardHeader title={`System roles (${system.length})`} description="Defined by WonderID. They can't be edited, but can be copied into a custom role." />
+        <CardHeader title={`System ID roles (${system.length})`} description="Defined by WonderID. They can't be edited, but can be copied into a custom ID role." />
         <CardBody>
           <RoleTable roles={system} showStatus={false} />
         </CardBody>

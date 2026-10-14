@@ -54,8 +54,8 @@ test.describe.serial("groups", () => {
     groupId = page.url().split("/settings/groups/")[1]!.split("?")[0]!;
     await expect(page.getByText(`${groupName} was created.`)).toBeVisible();
 
-    await page.getByLabel("Give the group a role").selectOption({ label: roleName });
-    await page.getByRole("button", { name: "Assign role" }).click();
+    await page.getByLabel("Give the group an ID role").selectOption({ label: roleName });
+    await page.getByRole("button", { name: "Assign ID role" }).click();
     await expect(page.getByText("Role given to the group.")).toBeVisible({ timeout: 30_000 });
 
     await page.getByLabel("Add a person").selectOption(await getSeededUserId(TEST_USERS.requester.email));

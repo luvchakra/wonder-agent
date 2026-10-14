@@ -23,6 +23,13 @@ import { listIdentityFindings } from "@/modules/risk/service";
 import { listObjectActivity } from "@/modules/operations/service";
 import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm, UnlinkSourceRecordButton } from "../IdentityForms";
 import { listSourceLinksForIdentity } from "@/modules/integrations/service";
+import { findMemberForPerson, getUserDetail } from "@/lib/users/users";
+import { STATUS_LABEL as MEMBERSHIP_STATUS_LABEL, roleLabel } from "@/lib/users/userRules";
+import { listAssignableRoles } from "@/lib/rbac/roles";
+import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
+import { loadScopeOptions } from "../../settings/roles/scopeOptions";
+import { RemoveRoleButton } from "../../settings/roles/RemoveRoleButton";
+import { AssignRoleForm } from "../../settings/users/[userId]/UserActions";
 import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
 
 // IDENTITY-P0-15/16/17 — one identity: its details, accountable people,
@@ -89,6 +96,21 @@ function AccessLedgerList({ entries, refreshed }: { entries: IdentityAccessEntry
   );
 }
 
+// Owner feedback 2026-10-14 — a person's ID roles (the roles that manage
+// WonderID), read and changed through Foundation's user services, which
+// check the tenant, refuse self-grants and audit. Null member: no WonderID
+// membership here yet.
+async function loadIdRoles(tenantId: string, person: { userId: string | null; email: string | null }, canAssign: boolean) {
+  const userId = await findMemberForPerson(tenantId, person);
+  if (!userId) return { ok: true as const, member: null, assignable: [], scope: null };
+  const [member, assignable, scope] = await Promise.all([
+    getUserDetail(tenantId, userId),
+    canAssign ? listAssignableRoles(tenantId) : Promise.resolve([]),
+    loadScopeOptions(tenantId),
+  ]);
+  return { ok: true as const, member, assignable, scope };
+}
+
 function Detail({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
@@ -116,7 +138,9 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   if (!identity) notFound();
 
   const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
-  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks, groups, findings, activity] = await Promise.all([
+  const canAssignIdRoles = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
+  const canSeeIdRoles = identity.identityType === "HUMAN" && (canAssignIdRoles || ctx.permissions.includes("users.view") || ctx.permissions.includes("roles.view"));
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks, groups, findings, activity, idRoles] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
@@ -131,7 +155,12 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     identity.userId ? groupsOfUser(tenantId, identity.userId) : Promise.resolve(null),
     canReadRisk ? listIdentityFindings(tenantId, { identityId: id, agentId: identity.agentId ?? null }) : Promise.resolve(null),
     canReadAudit ? listObjectActivity(tenantId, [id, identity.userId ?? "", identity.agentId ?? ""], 50) : Promise.resolve(null),
+    canSeeIdRoles ? loadIdRoles(tenantId, { userId: identity.userId, email: identity.email }, canAssignIdRoles).catch(() => ({ ok: false as const })) : Promise.resolve(null),
   ]);
+  const idMember = idRoles?.ok ? idRoles.member : null;
+  // Nobody changes their own ID roles (the service and database refuse it too).
+  const canChangeIdRoles = canAssignIdRoles && !!idMember && idMember.userId !== ctx.userId;
+  const scopeName = new Map(idRoles?.ok && idRoles.scope ? [...idRoles.scope.applications, ...idRoles.scope.agents].map((o) => [o.id, o.label]) : []);
   const openTasks = lifecycleTasks.filter((t) => t.status === "open");
   const footprint = openTasks.some((t) => t.taskType === "transfer_ownership") ? await getOwnershipFootprint(tenantId, id) : null;
   const transitionOptions = allowedTransitions(identity.lifecycleState).map((to) => {
@@ -160,6 +189,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
 
   const tabs = [
     { value: "overview", label: "Overview" },
+    ...(idRoles ? [{ value: "id-roles", label: "ID Roles", ...(idMember ? { count: idMember.roles.length } : {}) }] : []),
     ...(isPerson ? [{ value: "lifecycle", label: "Lifecycle", count: openTasks.length }] : []),
     ...(ledger ? [{ value: "access", label: "Access", count: ledger.entries.length }] : []),
     ...(groups ? [{ value: "groups", label: "Groups", count: groups.length }] : []),
@@ -264,6 +294,65 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
             </p>
           </TabPanel>
 
+          {idRoles ? (
+            <TabPanel value="id-roles" className="space-y-4 pt-4">
+              {!idRoles.ok ? (
+                <p role="alert" className="text-sm text-destructive">
+                  ID roles couldn&apos;t be loaded. Nothing was changed.
+                </p>
+              ) : !idMember ? (
+                <EmptyState title="No WonderID access" description="They need WonderID access before they can hold an ID role." />
+              ) : (
+                <>
+                  {idMember.status !== "active" ? (
+                    <p className="text-xs text-muted-foreground">Held, but not in effect while their membership is {MEMBERSHIP_STATUS_LABEL[idMember.status].toLowerCase()}.</p>
+                  ) : null}
+                  {idMember.roles.length === 0 ? (
+                    <EmptyState title="No ID roles" description="ID roles decide what they can manage in WonderID." />
+                  ) : (
+                    <ul className="divide-y divide-border rounded-lg border border-border" aria-label="ID roles held">
+                      {idMember.roles.map((r) => {
+                        const label = r.displayName || roleLabel(r.role);
+                        return (
+                          <li key={r.role} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                            <span className="min-w-0">
+                              <span className="font-medium text-foreground">{label}</span>
+                              <span className="text-muted-foreground"> · {r.custom ? "Custom" : "System"}</span>
+                              {r.active ? null : (
+                                <Badge tone="warning" className="ml-2">
+                                  Inactive
+                                </Badge>
+                              )}
+                              <span className="block text-xs text-muted-foreground">
+                                {describeTerms(r.terms, (sid) => scopeName.get(sid) ?? "Not found")}
+                                {termsCurrent(r.terms, now) ? "" : " · not in effect"}
+                              </span>
+                            </span>
+                            {canChangeIdRoles ? <RemoveRoleButton userId={idMember.userId} role={r.role} label={label} /> : null}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                  {canChangeIdRoles && idRoles.scope ? (
+                    <details className="rounded-md border border-border">
+                      <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-foreground">Add ID role</summary>
+                      <div className="border-t border-border p-3">
+                        <AssignRoleForm
+                          userId={idMember.userId}
+                          roles={idRoles.assignable.map((r) => ({ name: r.name, label: idMember.roles.some((a) => a.role === r.name) ? `${r.displayName} (change terms)` : r.displayName }))}
+                          applications={idRoles.scope.applications}
+                          agents={idRoles.scope.agents}
+                        />
+                      </div>
+                    </details>
+                  ) : null}
+                  {canAssignIdRoles && idMember.userId === ctx.userId ? <p className="text-xs text-muted-foreground">Another administrator manages your own ID roles.</p> : null}
+                </>
+              )}
+            </TabPanel>
+          ) : null}
+
           {isPerson ? (
             <TabPanel value="lifecycle" className="space-y-6 pt-4">
               <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -362,7 +451,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
                         <Link href={`/settings/groups/${g.id}`} className="font-medium text-primary hover:underline">
                           {g.name}
                         </Link>
-                        <span className="block text-xs text-muted-foreground">{g.roles.length ? `Roles: ${g.roles.map((r) => r.displayName).join(", ")}` : "No roles"}</span>
+                        <span className="block text-xs text-muted-foreground">{g.roles.length ? `ID roles: ${g.roles.map((r) => r.displayName).join(", ")}` : "No ID roles"}</span>
                       </span>
                       {g.status !== "active" ? <Badge tone="neutral">{g.status}</Badge> : null}
                     </li>

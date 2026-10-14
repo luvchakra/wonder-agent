@@ -38,7 +38,7 @@ export default async function PermissionCatalogPage({ searchParams }: { searchPa
       <div>
         <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Permission catalog</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Every permission in WonderID, by product area. Roles are built from these; the identifiers are fixed by the product so policies and audits stay comparable.
+          Every permission in WonderID, by product area. ID roles are built from these; the identifiers are fixed by the product so policies and audits stay comparable.
         </p>
       </div>
 
@@ -122,7 +122,7 @@ export default async function PermissionCatalogPage({ searchParams }: { searchPa
                       <Th>Permission</Th>
                       <Th hideBelow="lg">Resource · action</Th>
                       <Th>Sensitivity</Th>
-                      <Th hideBelow="xl">Granted by system roles</Th>
+                      <Th hideBelow="xl">Granted by system ID roles</Th>
                     </tr>
                   </Thead>
                   <tbody>
@@ -141,7 +141,7 @@ export default async function PermissionCatalogPage({ searchParams }: { searchPa
                             <Badge tone={SENSITIVITY_TONE[p.sensitivity]}>{SENSITIVITY_LABEL[p.sensitivity]}</Badge>
                           </Td>
                           <Td hideBelow="xl">
-                            <span className="text-xs text-muted-foreground">{p.roles.length ? p.roles.map(roleLabel).join(", ") : "No role yet"}</span>
+                            <span className="text-xs text-muted-foreground">{p.roles.length ? p.roles.map(roleLabel).join(", ") : "No ID role yet"}</span>
                           </Td>
                         </Tr>
                       ))}

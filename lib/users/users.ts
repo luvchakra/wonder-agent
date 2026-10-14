@@ -139,6 +139,31 @@ async function membershipIn(tenantId: string, userId: string): Promise<Membershi
   return data;
 }
 
+/**
+ * Owner feedback 2026-10-14 — the member a person's identity stands for in
+ * this organization, so their identity page can show and change their ID
+ * roles: the identity's own user, or else the account with the same email.
+ * Only a membership in *this* tenant counts (filtered by tenant_id, §14), and
+ * never a removed one. Returns the member's user id, or null.
+ */
+export async function findMemberForPerson(tenantId: string, person: { userId: string | null; email: string | null }): Promise<string | null> {
+  let userId = person.userId && UUID.test(person.userId) ? person.userId : null;
+  const email = person.email?.trim();
+  if (!userId && email) {
+    const { data, error } = await supabaseServiceRole()
+      .from("users")
+      .select("id")
+      .ilike("email", email.replace(/([%_\\])/g, "\\$1"))
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    userId = data?.id ?? null;
+  }
+  if (!userId) return null;
+  const m = await membershipIn(tenantId, userId);
+  return m && m.status !== "removed" ? userId : null;
+}
+
 export type RoleAssignment = {
   role: string;
   displayName: string;
