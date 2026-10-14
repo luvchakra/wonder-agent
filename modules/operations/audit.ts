@@ -68,3 +68,24 @@ export async function exportAuditLogs(tenantId: string, filter: AuditLogFilter =
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return (data ?? []).map(toAuditLogEntry);
 }
+
+/**
+ * IDENTITY-P0-17 — the recent audit trail about one record (or the records
+ * that are one subject, e.g. an identity, its user and its agent), newest
+ * first, for its own page. Same scoping as listAuditLogs (the caller's
+ * client, RLS to their organizations, filtered on tenantId); bounded.
+ */
+export async function listObjectActivity(tenantId: string, objectIds: string[], limit = 50): Promise<AuditLogEntry[]> {
+  const ids = [...new Set(objectIds.filter(Boolean))];
+  if (!ids.length) return [];
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("audit_logs")
+    .select()
+    .eq("tenant_id", tenantId)
+    .in("object_id", ids)
+    .order("created_at", { ascending: false })
+    .limit(Math.min(Math.max(limit, 1), MAX_PAGE_SIZE));
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return (data ?? []).map(toAuditLogEntry);
+}

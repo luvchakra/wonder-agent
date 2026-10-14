@@ -8,13 +8,13 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-10-13 from 11 module backlogs.
+Generated 2026-10-14 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**224 of 273 tracked stories complete — 82%**
+**225 of 273 tracked stories complete — 82%**
 
 ```
 █████████████████████████████████░░░░░░░  82%
@@ -22,8 +22,8 @@ Generated 2026-10-13 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 224 |
-| Partial | 28 |
+| Done | 225 |
+| Partial | 27 |
 | Deferred | 1 |
 | Not Started | 20 |
 | **Total tracked** | **273** |
@@ -39,7 +39,7 @@ and are deliberately excluded from the counts above.
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 2 | 45 | `████████████████░░` 89% |
-| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 19 | 1 | 0 | 1 | 21 | `████████████████░░` 90% |
+| 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 20 | 0 | 0 | 1 | 21 | `█████████████████░` 95% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 26 | 3 | 0 | 0 | 29 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
@@ -112,7 +112,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** AI Agent Identity & Lifecycle  
 **Backlog status:** DORMANT — do not start until the user says "Run Identity Agent"  
-**Stories:** 19 done · 1 partial · 0 deferred · 1 not started (21 tracked) · 8 P1 / 3 P2 ahead
+**Stories:** 20 done · 0 partial · 0 deferred · 1 not started (21 tracked) · 8 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -133,7 +133,7 @@ and are deliberately excluded from the counts above.
 | IDENTITY-P0-14 | Defects D3 + D4 from the codebase map | Done — 2026-09-25: every identity link states confidence + basis and is audited (`agent.identity_linked`); ASSESSED reachable (REGISTERED → ASSESSED → APPROVED, direct path kept) |
 | IDENTITY-P0-15 | Unified identity reference model (human, external, machine, service account, application, workload, API, AI agent) | Done — 2026-09-26, migrations 0077–0079 |
 | IDENTITY-P0-16 | Identity attributes and relationships | Done — 2026-09-26 |
-| IDENTITY-P0-17 | Identities directory and identity detail | Partial — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit) done; Groups, Access, Risk and Activity views wait on later phases |
+| IDENTITY-P0-17 | Identities directory and identity detail | Done — 2026-09-26: overview, all/people/external/machine lists, create, detail (overview, relationships, attributes, edit). Access tab with ACCESS-P0-24. 2026-10-14: Groups (the user's WonderID groups and roles), Risk (findings about the identity and its agent) and Activity (its audit trail) tabs |
 | IDENTITY-P0-18 | Human lifecycle: joiner, mover, leaver, rehire, ownership transfer | Done — 2026-09-26: events, governed tasks, transitions, ownership transfer (0084/0085). 2026-10-12: leavers' access becomes removal work and connectors disable their accounts (WID-C02). 2026-10-13: birthright packages assigned automatically to active joiners, rehires and movers (owner decision; 0151) |
 | IDENTITY-P0-19 | AI agent onboarding journey, sponsor, agent access packages, lifecycle policies | Not Started — 2026-09-26, WonderID |
 | IDENTITY-P0-20 | Non-human identities from accounts; owner from source or an unowned queue; agent accounts by identifier (F1, #46) | Done — 2026-10-11: no migration; reconciliation creates or finds the identity, owner from the source, Onboarding › Unowned Identities, requests refuse unowned subjects |

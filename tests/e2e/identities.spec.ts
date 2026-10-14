@@ -151,6 +151,18 @@ test.describe.serial("identity directory", () => {
     await page.goto(`/identities/machines?q=${encodeURIComponent(`svc-e2e-${stamp}`)}`);
     await expect(page.getByRole("link", { name: `svc-e2e-${stamp}` })).toBeVisible();
   });
+
+  test("IDENTITY-P0-17: a person's page shows their groups, findings and activity", async ({ page }) => {
+    await page.goto(`/identities/${adminPersonId}`);
+    const tabs = page.getByRole("tablist", { name: "Identity sections" });
+    for (const name of [/^Groups/, /^Risk/, /^Activity/]) await expect(tabs.getByRole("tab", { name })).toBeVisible();
+    await tabs.getByRole("tab", { name: /^Groups/ }).click();
+    await expect(page.getByRole("tabpanel").getByText(/In no groups|Roles:|No roles/).first()).toBeVisible();
+    await tabs.getByRole("tab", { name: /^Risk/ }).click();
+    await expect(page.getByRole("tabpanel").getByText(/No findings|found \d{4}-/).first()).toBeVisible();
+    await tabs.getByRole("tab", { name: /^Activity/ }).click();
+    await expect(page.getByRole("tabpanel").getByRole("link", { name: "Full audit log" })).toBeVisible();
+  });
 });
 
 test.describe("identity directory — other organizations and roles", () => {

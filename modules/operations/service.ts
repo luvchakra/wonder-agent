@@ -9,7 +9,7 @@ import "server-only";
  * Integration) is expected to call at the moment its own event occurs.
  */
 
-export { listAuditLogs, exportAuditLogs } from "./audit";
+export { listAuditLogs, exportAuditLogs, listObjectActivity } from "./audit";
 export { toCsv } from "./csv";
 export { notify, wasRecentlyNotified, listNotifications, markNotificationRead, listNotificationPreferences, setNotificationPreference } from "./notifications";
 export { search, maskRiskField } from "./search";

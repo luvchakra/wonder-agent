@@ -641,3 +641,38 @@ export async function reopenEndedExceptions(tenantId: string, now = new Date()):
   }
   return ids.length;
 }
+
+/** IDENTITY-P0-17 — one finding about an identity, for its Risk tab. */
+export type IdentityFindingSummary = { id: string; category: string; severity: RiskSeverity; status: FindingStatus; title: string; ticketNumber: string | null; agentId: string | null; createdAt: string };
+
+/**
+ * IDENTITY-P0-17 — the findings about one identity: its accounts' rogue
+ * access, and, for an AI agent's identity, the agent's own findings. Open
+ * first, newest first; bounded. The member's own client (RLS to their
+ * organizations) plus the tenant filter (§14).
+ */
+export async function listIdentityFindings(tenantId: string, subject: { identityId: string; agentId: string | null }, limit = 100): Promise<IdentityFindingSummary[]> {
+  const supabase = await supabaseServer();
+  const or = subject.agentId ? `identity_id.eq.${subject.identityId},agent_id.eq.${subject.agentId}` : `identity_id.eq.${subject.identityId}`;
+  if (!/^[0-9a-f-]{36}$/i.test(subject.identityId) || (subject.agentId && !/^[0-9a-f-]{36}$/i.test(subject.agentId))) return [];
+  const { data, error } = await supabase
+    .from("risk_findings")
+    .select(`id, category, severity, status, title, agent_id, created_at, ${TICKET}`)
+    .eq("tenant_id", tenantId)
+    .or(or)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = ((data ?? []) as Row[]).map((r) => ({
+    id: r.id as string,
+    category: r.category as string,
+    severity: r.severity as RiskSeverity,
+    status: r.status as FindingStatus,
+    title: r.title as string,
+    ticketNumber: ((r.ticket as Row | null)?.ticket_number as string | undefined) ?? null,
+    agentId: (r.agent_id as string | null) ?? null,
+    createdAt: r.created_at as string,
+  }));
+  const open = (s: FindingStatus) => OPEN.includes(s);
+  return rows.sort((a, b) => Number(open(b.status)) - Number(open(a.status)));
+}

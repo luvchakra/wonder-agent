@@ -1777,3 +1777,14 @@ Tests:
 - `humanLifecycle.test.ts`, "opensBirthright";
 - E2E `birthright.spec.ts` and `human-lifecycle.spec.ts`.
 See the Access log for the rest.
+
+## 2026-10-14 — IDENTITY-P0-17 done: Groups, Risk and Activity on the identity page
+
+**What was built.** The identity page gained three tabs, each shown only when it applies and the viewer may see it.
+- **Groups:** the WonderID groups of the identity's user, with each group's roles. Only for an identity linked to a user. Uses Foundation's `groupsOfUser`.
+- **Risk:** findings about the identity, open first. That is rogue access on its accounts, linking to the finding page, and, for an AI agent's identity, the agent's own findings. Shown with `risk.read`; served by Risk's new `listIdentityFindings`, which reads with the caller's client plus the tenant filter.
+- **Activity:** the latest 50 audit events about the identity, its user account and its AI agent, with a link to the full audit log. Shown with `audit.read`; served by Operations' new `listObjectActivity`, through the caller's client (RLS) plus the tenant filter.
+
+The Access tab already existed (ACCESS-P0-24). Lifecycle events and tasks stay on the Lifecycle tab.
+
+**Verified.** Typecheck, eslint and `next build` clean. Local E2E identities 18/18, including a new test that opens the Groups, Risk and Activity tabs on a person's page. That spec already proves another organization's admin gets a 404 on the page.
