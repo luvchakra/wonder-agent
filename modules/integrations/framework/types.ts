@@ -107,7 +107,7 @@ export const CANONICAL_FIELDS: Record<ResourceKind, { required: readonly string[
   },
   mcp_tool: {
     required: ["externalId", "name"],
-    optional: ["description", "operation", "operationBasis", "destructive", "inputSchema"],
+    optional: ["description", "operation", "operationBasis", "destructive", "declaredEntity", "declaredAutonomy", "declaredAiGenerated", "inputSchema"],
     objects: ["inputSchema"],
   },
   mcp_resource: {

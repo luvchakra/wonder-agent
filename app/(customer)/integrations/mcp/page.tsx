@@ -19,11 +19,18 @@ const OPERATION: Record<McpToolOperation, { label: string; tone: BadgeTone }> = 
   unknown: { label: "Unknown", tone: "neutral" },
 };
 
+/** What the server declared an AI agent may do (a label only; it governs nothing). */
+const AUTONOMY: Record<"answer_only" | "draft_only", string> = { answer_only: "Answers only", draft_only: "Drafts only" };
+
 const fmt = (iso: string | null) => (iso ? iso.slice(0, 16).replace("T", " ") : "Never");
 
 function ServerCard({ server, canDiscover }: { server: McpServerInventory; canDiscover: boolean }) {
-  const current = server.tools.filter((t) => t.stillDeclared);
+  // An AI agent the server offers is listed as an agent, not as a tool.
+  const agents = server.tools.filter((t) => t.kind === "ai_agent");
+  const tools = server.tools.filter((t) => t.kind !== "ai_agent");
+  const current = tools.filter((t) => t.stillDeclared);
   const writes = current.filter((t) => t.operation === "write").length;
+  const currentAgents = agents.filter((t) => t.stillDeclared).length;
   return (
     <Card>
       <CardHeader
@@ -33,14 +40,37 @@ function ServerCard({ server, canDiscover }: { server: McpServerInventory; canDi
       />
       <CardBody className="space-y-4">
         <p className="text-xs text-muted-foreground">
-          Last discovered {fmt(server.lastDiscoveredAt)} · {current.length} tool{current.length === 1 ? "" : "s"} ({writes} write) ·{" "}
+          Last discovered {fmt(server.lastDiscoveredAt)} · {currentAgents ? `${currentAgents} AI agent${currentAgents === 1 ? "" : "s"} · ` : ""}
+          {current.length} tool{current.length === 1 ? "" : "s"} ({writes} write) ·{" "}
           {server.resources.filter((r) => r.stillDeclared).length} resource{server.resources.length === 1 ? "" : "s"}
           {server.protocolVersion ? ` · MCP ${server.protocolVersion}` : ""}
         </p>
 
+        {agents.length > 0 ? (
+          <div>
+            <h3 className="text-sm font-medium text-foreground">AI agents</h3>
+            <ul className="mt-2 divide-y divide-border rounded-lg border border-border">
+              {agents.map((t) => (
+                <li key={t.name} className="space-y-1 px-3 py-2 text-sm">
+                  <span className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="font-mono text-xs text-foreground">{t.name}</span>
+                    <span className="flex flex-wrap gap-1">
+                      {t.declaredAutonomy ? <Badge tone="info" className="whitespace-nowrap">{AUTONOMY[t.declaredAutonomy]}</Badge> : null}
+                      {t.declaredAiGenerated ? <Badge tone="neutral" className="whitespace-nowrap">AI-generated output</Badge> : null}
+                      {t.stillDeclared ? null : <Badge tone="neutral">No longer declared</Badge>}
+                    </span>
+                  </span>
+                  <span className="block text-xs text-muted-foreground">{t.kindReason}</span>
+                  {t.description ? <span className="line-clamp-2 block text-xs text-muted-foreground">{t.description}</span> : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {server.tools.length === 0 ? (
           <EmptyState title="No tools discovered" description={server.lastDiscoveredAt ? "The server declared no tools." : "Run discovery to read what this server offers."} />
-        ) : (
+        ) : tools.length === 0 ? null : (
           <TableContainer label={`${server.integrationName} tools`} bare>
             <Thead>
               <tr>
@@ -52,16 +82,10 @@ function ServerCard({ server, canDiscover }: { server: McpServerInventory; canDi
               </tr>
             </Thead>
             <tbody>
-              {server.tools.map((t) => (
+              {tools.map((t) => (
                 <Tr key={t.name}>
                   <Td>
                     <span className="font-mono text-xs text-foreground md:whitespace-nowrap">{t.name}</span>
-                    {t.kind === "ai_agent" ? (
-                      <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
-                        <Badge tone="info" className="whitespace-nowrap">AI agent</Badge>
-                        {t.kindReason}
-                      </span>
-                    ) : null}
                   </Td>
                   <Td>
                     <span className="flex flex-wrap gap-1">

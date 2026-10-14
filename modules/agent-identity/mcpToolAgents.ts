@@ -18,7 +18,7 @@ export function mcpToolAgentEntry(
 ): DiscoveryInboxEntry {
   const signals: DetectionSignal[] = [
     { signal: "AI runtime / MCP source", source: server.integrationName, observedValue: "mcp", strength: "strong", scoreContribution: 35 },
-    { signal: "AI tool declared by the server", source: server.integrationName, observedValue: `${tool.name}: ${tool.kindReason ?? "classified as an AI agent"}`, strength: "medium", scoreContribution: 25 },
+    { signal: "Tool is an AI agent", source: server.integrationName, observedValue: `${tool.name}: ${tool.kindReason ?? "classified as an AI agent"}`, strength: "medium", scoreContribution: 25 },
   ];
   if (tool.operation === "write") {
     signals.push({ signal: "Acts, not only reads", source: server.integrationName, observedValue: "write tool", strength: "weak", scoreContribution: 10 });

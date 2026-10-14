@@ -15,6 +15,8 @@ const tool = (over: Partial<McpTool> = {}): McpTool => ({
   stillDeclared: true,
   kind: "ai_agent",
   kindReason: 'Name starts with "draft"',
+  declaredAutonomy: null,
+  declaredAiGenerated: false,
   ...over,
 });
 
@@ -23,7 +25,7 @@ describe("mcpToolAgentEntry", () => {
     const e = mcpToolAgentEntry(server, tool(), undefined, 7);
     expect(e).toMatchObject({ externalId: "draft_whatsapp_reply", integrationId: "conn-1", integrationRef: 7, sourceSystem: "conn-1", category: "new", classification: "PROBABLE_AGENT", candidateStatus: "open", owner: null, application: "wonderark", changeType: "NEW" });
     expect(e.confidenceScore).toBe(70);
-    expect(e.signals.map((s) => s.signal)).toEqual(["AI runtime / MCP source", "AI tool declared by the server", "Acts, not only reads"]);
+    expect(e.signals.map((s) => s.signal)).toEqual(["AI runtime / MCP source", "Tool is an AI agent", "Acts, not only reads"]);
   });
 
   it("carries a recorded decision and marks a tool no longer declared as stale", () => {

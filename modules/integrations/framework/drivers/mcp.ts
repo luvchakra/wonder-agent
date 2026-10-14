@@ -1,4 +1,4 @@
-import { classifyToolOperation } from "../../mcpNormalize";
+import { classifyToolOperation, readToolDeclaration } from "../../mcpNormalize";
 import type { ConnectorDriverSession, DriverFactory } from "../engine";
 import { ConnectorRequestError, type FetchLike } from "../http";
 import { fillTemplate } from "../mapping";
@@ -15,7 +15,9 @@ import { addressKey } from "../address";
  * `tools/call` or anything else that acts (non-negotiable #12). Each tool
  * gains `_operation`, `_operationBasis` and `_destructive` from the
  * deterministic classification (annotations first, then the verb its name
- * starts with), which a definition maps like any other field. A server's
+ * starts with), and `_declaredEntity`, `_declaredAutonomy` and
+ * `_declaredAiGenerated` from what its `_meta` declares (validated), which a
+ * definition maps like any other field. A server's
  * descriptions are data, never instructions (§17.2).
  */
 
@@ -152,7 +154,17 @@ export function mcpDriver(fetchImpl: FetchLike): DriverFactory {
           if (typeof t !== "object" || t === null) return t;
           const tool = t as Record<string, unknown>;
           const op = classifyToolOperation(String(tool.name ?? ""), tool.annotations);
-          return { ...tool, _operation: op.operation, _operationBasis: op.basis, _destructive: op.destructive };
+          // What the server declares the tool to be (an AI agent or a tool), validated.
+          const declared = readToolDeclaration(tool._meta);
+          return {
+            ...tool,
+            _operation: op.operation,
+            _operationBasis: op.basis,
+            _destructive: op.destructive,
+            _declaredEntity: declared.entity,
+            _declaredAutonomy: declared.autonomy,
+            _declaredAiGenerated: declared.aiGenerated,
+          };
         });
       },
     };

@@ -4,7 +4,7 @@ import type { Integration, IntegrationObject, McpResource, McpServerInventory, M
 import { listIntegrations } from "./integrations";
 import { getNormalizedObjectsForTenant } from "./objects";
 import { connectionDriver } from "./framework/engine";
-import { classifyToolKind } from "./mcpNormalize";
+import { classifyToolKind, declaredEntityOf } from "./mcpNormalize";
 
 /**
  * INTEGRATION-P0-06 (master P0-10) — the published MCP inventory: every
@@ -46,13 +46,16 @@ export function buildMcpInventory(integrations: Integration[], objects: Integrat
         const operation = OPERATIONS.includes(n.operation as McpToolOperation) ? (n.operation as McpToolOperation) : "unknown";
         const name = str(n.name) ?? o.externalId;
         const description = str(n.description);
-        const kind = classifyToolKind(name, description);
+        const kind = classifyToolKind(name, description, declaredEntityOf(n.declaredEntity));
+        const agent = kind.kind === "ai_agent";
         return {
           integrationId: integration.id,
           name,
           description,
           kind: kind.kind,
           kindReason: kind.reason,
+          declaredAutonomy: agent && (n.declaredAutonomy === "answer_only" || n.declaredAutonomy === "draft_only") ? (n.declaredAutonomy as McpTool["declaredAutonomy"]) : null,
+          declaredAiGenerated: agent && n.declaredAiGenerated === true,
           operation,
           operationBasis: basisOf(n.operationBasis),
           destructive: n.destructive === true,

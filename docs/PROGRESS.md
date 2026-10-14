@@ -14,7 +14,7 @@ Generated 2026-10-14 from 11 module backlogs.
 
 ## Overall
 
-**232 of 275 tracked stories complete — 84%**
+**233 of 276 tracked stories complete — 84%**
 
 ```
 ██████████████████████████████████░░░░░░  84%
@@ -22,11 +22,11 @@ Generated 2026-10-14 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 232 |
+| Done | 233 |
 | Partial | 26 |
 | Deferred | 1 |
 | Not Started | 16 |
-| **Total tracked** | **275** |
+| **Total tracked** | **276** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -40,7 +40,7 @@ and are deliberately excluded from the counts above.
 |---|---|---|---|---|---|---|---|
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 41 | 3 | 0 | 2 | 46 | `████████████████░░` 89% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 20 | 0 | 0 | 1 | 21 | `█████████████████░` 95% |
-| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 26 | 3 | 0 | 0 | 29 | `████████████████░░` 90% |
+| 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 27 | 3 | 0 | 0 | 30 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
@@ -143,7 +143,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Integration Hub & Connectors  
 **Backlog status:** DORMANT — do not start until the user says "Run Integration Agent"  
-**Stories:** 26 done · 3 partial · 0 deferred · 0 not started (29 tracked) · 2 P1 / 3 P2 ahead
+**Stories:** 27 done · 3 partial · 0 deferred · 0 not started (30 tracked) · 2 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -176,6 +176,7 @@ and are deliberately excluded from the counts above.
 | INTEGRATION-P0-20 | Custom attributes as mapping targets; schedule on every connection (F1, #66) | Done — 2026-10-11: `attribute:<name>` targets validated on save, typed and written with provenance by Identity; schedule on every reading connection and `/api/v1/integrations/<id>/schedule` |
 | INTEGRATION-P0-21 | Definition extensions for integrators (F3, #69) | Done — 2026-10-12 slice 1: transforms `regex` (safe patterns only), `replace`, `coalesce`, `dateAdd`; API key in the request body (`auth.type: body`). Slice 2: incremental `changes` resources (scheduled syncs read only what changed, with a full read at least daily; incremental runs mark nothing missing). Part 3a: signing in with a private key (`private_key_jwt`, the `jwt_bearer` grant; RS256/ES256) and client certificates (mutual TLS). Part 3b: OAuth authorization code with PKCE ("Connect" on the connection's page; the callback arrives at the connection's receiver; tokens encrypted, refreshed and rotated). Part 4: definitions download as files and open in the editor; a connection upgrades to another version after a preview of what changes, never widening writes, with a full read next |
 | INTEGRATION-P0-22 | Standard provisioning: SCIM and LDAP (F3) | Partial — 2026-10-12 slice 1: built-in `scim-2` connection type (users, groups, membership with RFC 7644 paging; add and remove group members, disable and create users through the existing write pipeline, off until turned on). Slice 2: LDAP writes (`{ ldap: { dn, modify |
+| INTEGRATION-P0-31 | MCP tools that are AI agents: the server's own `_meta` declaration first, then the name/description guess; listed as AI agents and offered to Agent Discovery (owner requests 2026-10-14/15) | Done — 2026-10-15: `readToolDeclaration` (exact `wonderapps.biz/entity` and `wonderapps.biz/ai` keys, known values only), kept by the mcp driver and definition; `classifyToolKind` declaration-first ("Declared by the server"); "AI agents" section on `/integrations/mcp` with "Answers only" / "Drafts only" and "AI-generated output"; AI tools are Agent Discovery candidates (#220). A label only: no permission, risk or autonomy depends on it |
 
 ### 04 — Access Agent
 
