@@ -3612,3 +3612,89 @@ otherwise was left to the access managers.
   - the screens;
   - read-only 403 and another organization 404.
 - Typecheck, eslint and `next build` are clean.
+## 2026-10-14 — ACCESS-P0-38 part 1: request baskets and model-after
+
+Design §5.3: one request, many changes; bulk requests for others;
+"model after". This is the owner's priority list, item 4.
+
+**Migration 0174.** `access_requests.basket_id`, additive and indexed. A
+basket's requests share it; a request sent on its own keeps it null. No
+new table, so RLS is unchanged.
+
+**Rules** (pure, `requestBasketRules.ts`).
+- `validateBasket`:
+  - one to 50 people and one to 20 lines, at most 200 requests in all;
+  - each line is access to add or remove, or an account to disable, with an
+    optional duration;
+  - repeated people and lines are dropped.
+- `modelAfterLines` proposes the model's access the person lacks. It leaves
+  out, each with a reason:
+  - access the person already has;
+  - access already asked for;
+  - anything not requestable;
+  - anything on an application that is not live.
+- `summarizeBasket` counts the requests made, the open ones returned, and
+  the refusals by code.
+
+**Service** (`requestBaskets.ts`).
+- `submitRequestBasket` sends every line for every person through
+  `submitAccessRequest`, the same deterministic path as a single request:
+  - policy, the scope to request for others, requestable, type, duration,
+    agent contract and agent SoD;
+  - the request's own approval route;
+  - duplicate detection.
+- The basket id is set by the server, never taken from the client.
+- Each outcome is reported on its own line; a refusal never hides or undoes
+  another.
+- People are handled four at a time; one person's lines go in order.
+- One audit event per basket with the counts. Each request audits as
+  before.
+- `modelAfter` reads, as the caller (RLS), the live grants of both people
+  and the person's open requests.
+  - The model's access may be seen by an access manager, by the model, or
+    by the model's manager; anyone else gets 403.
+  - It proposes; it sends nothing.
+- `listBasketRequests` returns a basket's requests, as the caller can see
+  them.
+
+**API.**
+- `POST /api/v1/access/requests/basket` (access.request). It returns 200
+  with each line's outcome, even when some lines are refused.
+- `GET /api/v1/access/requests/basket/:id` (access.read).
+- `GET /api/v1/access/requests/model-after?subject=&model=`
+  (access.request).
+
+**UI.**
+- Request access › "Several at once" (`/access/catalog/basket`).
+- People to choose from: yourself, your reports, what you own, and for an
+  access manager every active person.
+- A folded "Same access as…" fills the items from model-after for the first
+  person chosen, saying what was left out and why.
+- After sending, each person and item shows its real outcome, linked to its
+  request.
+
+**Left out, recorded** (part 2, or other stories).
+- **Saved drafts and signed approval links:** ACCESS-P0-38 part 2.
+- **Entitlement SoD in model-after:** design §5.3 says "minus SoD blocks",
+  but entitlement SoD is ACCESS-P0-22 (not built). Agent SoD still applies
+  at submission.
+- **Change-account-attribute lines.**
+- **Peer recommendations** (ACCESS-P0-41).
+
+**Verified.**
+- Unit tests: `requestBasketRules.test.ts` 4.
+- Local E2E: `request-baskets.spec.ts` 5/5 with `request-catalog.spec.ts`
+  (because `submitAccessRequest` changed), 19 passed and 3 skipped. The
+  skipped three are ACCESS-P0-33's catalog tests: they depend on an
+  application made in another describe block, and with 2 workers they ran
+  in a different worker. That quirk is in the existing spec, not this
+  change. The basket spec covers:
+  - model-after's line and reasons;
+  - per-line outcomes (2 approved, 2 `NOT_REQUESTABLE`);
+  - a repeat returning the open requests;
+  - the basket's requests by id;
+  - the screen;
+  - another organization's basket refused per line (`NOT_FOUND`);
+  - read-only 403.
+- Typecheck, eslint and `next build` are clean. Migration 0174 is applied
+  to the dev project.
