@@ -75,7 +75,8 @@ test.describe.serial("automation credentials", () => {
     await page.goto("/settings/automation");
     await page.getByLabel("Name").fill(credentialName);
     await page.getByLabel("Application identity").selectOption({ label: `E2E Pipeline App ${stamp}` });
-    await expect(page.getByLabel("Role")).toHaveValue("CONFIGURATION_ADMIN");
+    // In the page, not the Admin sidebar's "Users & Roles" list.
+    await expect(page.getByRole("main").getByLabel("Role")).toHaveValue("CONFIGURATION_ADMIN");
     await page.getByRole("button", { name: "Create credential" }).click();
     await expect(page.getByRole("status")).toContainText("another administrator approves it");
     secret = (await page.getByTestId("automation-secret").textContent())!.trim();

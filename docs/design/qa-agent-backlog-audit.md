@@ -2018,6 +2018,37 @@ explained.**
 - `npx vitest run modules/integrations/framework`: 17 files, 318 tests passed (1 live file skipped).
 - Typecheck and eslint are clean.
 
+## 2026-10-14 — Nightly E2E of 14 October: causes and fixes
+
+The full run (Actions run 38489991517, both halves on Vercel) was red.
+
+**Second half.** `permission-catalog.spec.ts` matched the Admin sidebar's own "Administration" heading, which has existed since the new navigation (13 October). It was fixed in #189 by scoping the lookup to the page.
+
+**First half.** It ran past its 35 minutes, so 73 tests did not run. Three tests failed:
+1. **`automation-credentials.spec.ts:74`.** `getByLabel("Role")` also matched the sidebar list `<ul aria-label="Users & Roles">` (`modules/ui/AppSidebar.tsx:125`). The lookup is now scoped to `main`. Every other `getByLabel`, `getByPlaceholder` and unscoped role lookup in `tests/e2e` was checked against the sidebar labels; none other collides.
+2. **`bulk-invitations.spec.ts`, `afterAll` timeout.** It deleted about 46 invited users one at a time, at roughly 3.5 s each because of cascades, against a 60 s hook limit. It also ignored errors and used an array that was never filled.
+   - The deletes now run eight at a time, under a 180 s hook limit, and any failed delete fails the hook.
+   - Locally: 46 users in 21 s.
+3. **`connector-provisioning.spec.ts:537`** ended "fulfilled_unverified", not verified, at its 180 s limit, during its second 90 s wait.
+   - The product does reach verified: about 31 s locally, every task ending `verified`.
+   - The chain is slow because each read is followed by an organization-wide access-ledger rebuild, including the rogue-findings sync, after both its account and its access steps. That is 8–10 s each unloaded and 20–23 s with two workers.
+   - The test's limit is now 240 s, which fits both of its own waits.
+   - The slowness itself is a product item, handed to Access (see that audit log). It is also why the first half overran.
+
+**Flaky.**
+- design-review at 390 px, parts 1 and 2: these were stopped by the 35-minute cut-off, not by a layout fault.
+- `integrations.spec.ts`, the "authoring page" spec: it clicked the JSON tab before the page was interactive. It now retries the click until the tab is selected. The EXPERIENCE-P0-30 form spec likewise retries its first entry until the form shows it.
+
+**Verified locally (`next start`, `--retries=0`).**
+- `connector-provisioning`: 25/25.
+- `automation-credentials`, `bulk-invitations` and `integrations`: 23 passed. The one failure was `integrations.spec.ts:7` waiting for a navigation after "New connection"; it did not recur in two reruns, and is noted, unexplained.
+- `integrations` with `--repeat-each=2`: 21/21.
+
+**Left.**
+- The ledger-rebuild cost (Access, with Integration and Risk).
+- A race in `connectorFulfilment.ts`, fixed in the same pull request (Access audit log).
+- With two workers, the RISK-P0-13 "added to a package" test (line 524) can fill its 180 s the same way; it is unchanged pending the performance fix.
+
 ## 2026-10-14 — QA-P0-22: brownfield migration fixture (done)
 
 `brownfield.spec.ts` gains its certification step now that
