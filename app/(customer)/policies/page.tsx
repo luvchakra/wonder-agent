@@ -30,58 +30,55 @@ export default async function PoliciesPage() {
   const policies = await listPolicies(ctx.tenantId!);
   const canPublish = ctx.permissions.includes("policy.publish");
 
+  const createForm = (
+    <form action={createPolicyAction} className="grid gap-3 sm:grid-cols-2">
+      <TextField label="Policy name" name="name" required />
+      <SelectField label="Category" name="policyCategory">
+        {CATEGORIES.map((c) => (
+          <option key={c} value={c}>
+            {c}
+          </option>
+        ))}
+      </SelectField>
+      <SelectField label="Action" name="action">
+        {ACTIONS.map((a) => (
+          <option key={a} value={a}>
+            {a}
+          </option>
+        ))}
+      </SelectField>
+      {/* ACCESS-P0-12: what it applies to, its priority, and whether it takes effect now. */}
+      <SelectField label="Applies to" name="targetType" defaultValue="">
+        <option value="">Every request</option>
+        {POLICY_TARGET_TYPES.map((t) => (
+          <option key={t} value={t}>
+            {TARGET_LABEL[t]}
+          </option>
+        ))}
+      </SelectField>
+      <TextField label="Target" name="targetValue" placeholder="e.g. delete_customer, finance-mcp:post_journal" />
+      <TextField label="Priority" name="priority" type="number" defaultValue="0" min={-1000} max={1000} />
+      <SelectField label="Status" name="status" defaultValue={canPublish ? "active" : "draft"}>
+        <option value="draft">Save as draft</option>
+        {canPublish ? <option value="active">Publish now</option> : null}
+      </SelectField>
+      <div className="flex justify-end sm:col-span-2">
+        <Button type="submit">Create</Button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-foreground">Policies</h1>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["policies"])} />
+        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["policies"])} create={{ label: "Create policy…", title: "Create a policy", content: createForm }} />
       </div>
 
       <Card>
         <CardHeader title="Policies" description={`${policies.length} defined`} />
         <CardBody>
           <PoliciesTable policies={policies} />
-        </CardBody>
-      </Card>
-
-      <Card>
-        <CardHeader title="Create a policy" />
-        <CardBody>
-          <form action={createPolicyAction} className="flex flex-wrap items-end gap-2">
-            <TextField label="Policy name" name="name" required />
-            <SelectField label="Category" name="policyCategory">
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </SelectField>
-            <SelectField label="Action" name="action">
-              {ACTIONS.map((a) => (
-                <option key={a} value={a}>
-                  {a}
-                </option>
-              ))}
-            </SelectField>
-            {/* ACCESS-P0-12: what it applies to, its priority, and whether it takes effect now. */}
-            <SelectField label="Applies to" name="targetType" defaultValue="">
-              <option value="">Every request</option>
-              {POLICY_TARGET_TYPES.map((t) => (
-                <option key={t} value={t}>
-                  {TARGET_LABEL[t]}
-                </option>
-              ))}
-            </SelectField>
-            <TextField label="Target" name="targetValue" placeholder="e.g. delete_customer, finance-mcp:post_journal" />
-            <TextField label="Priority" name="priority" type="number" defaultValue="0" min={-1000} max={1000} />
-            <SelectField label="Status" name="status" defaultValue={canPublish ? "active" : "draft"}>
-              <option value="draft">Save as draft</option>
-              {canPublish ? <option value="active">Publish now</option> : null}
-            </SelectField>
-            <Button type="submit" variant="secondary">
-              Create
-            </Button>
-          </form>
         </CardBody>
       </Card>
     </div>

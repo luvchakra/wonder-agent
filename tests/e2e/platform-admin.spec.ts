@@ -123,6 +123,8 @@ test.describe("Platform-admin console", () => {
   test("owner request 2026-10-13: a notice can be ended by hand", async ({ page }) => {
     const title = `E2E notice ${Date.now().toString(36)}`;
     await page.goto("/platform-admin/announcements");
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Publish notice…" }).click();
     // Scoped to the test organization, so no real customer sees it.
     await page.locator("#scope").selectOption("tenant");
     await page.locator("#tenantId").selectOption({ label: TENANT_ONE.name });

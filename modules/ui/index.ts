@@ -42,6 +42,6 @@ export type { Slice, TrendSeries } from "./charts";
 export { CoverageBars } from "./CoverageBars";
 export { PeriodSelect, type PeriodOption } from "./PeriodSelect";
 export { ACCESS_VIEW, ACCESS_VIEWS_COMPARED } from "./accessViews";
-export { ObjectActionsMenu, type ObjectExportItem, type ObjectImportItem } from "./ObjectActionsMenu";
+export { ObjectActionsMenu, CreateDialogForm, useCloseCreateDialog, type ObjectExportItem, type ObjectImportItem, type ObjectCreateItem } from "./ObjectActionsMenu";
 export { RecordProvenance, provenanceText, type RecordProvenanceProps, type RecordProvenanceData } from "./RecordProvenance";
 export { EnvironmentBadge, ENVIRONMENT_COLOR, environmentColor, type EnvironmentKind } from "./environment";

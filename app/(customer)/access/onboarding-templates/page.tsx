@@ -5,7 +5,7 @@ import { listOnboardingTemplates } from "@/modules/access-governance/service";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { listConnectorDefinitions } from "@/modules/integrations/framework/catalog";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { TemplateForm } from "./TemplateForms";
 
 export const metadata = { title: "Onboarding templates" };
@@ -26,15 +26,28 @@ export default async function OnboardingTemplatesPage() {
   const typeName = new Map(types.map((t) => [t.key, t.name]));
   return (
     <div className="space-y-5">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Onboarding templates</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Start onboarding an application with its defaults, owners, entitlement types and questions already set.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Onboarding templates</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Start onboarding an application with its defaults, owners, entitlement types and questions already set.</p>
+        </div>
+        <ObjectActionsMenu
+          create={
+            canManage
+              ? {
+                  label: "New template…",
+                  title: "New template",
+                  content: <TemplateForm connectionTypes={types.map((t) => ({ id: t.key, name: t.name }))} people={people.map((p) => ({ id: p.id, name: p.displayName }))} />,
+                }
+              : undefined
+          }
+        />
       </div>
       <Card>
         <CardHeader title="Templates" description={`${templates.length} in use`} />
         <CardBody>
           {templates.length === 0 ? (
-            <EmptyState title="No templates yet" description={canManage ? "Add the first one below." : "An access administrator can add them."} />
+            <EmptyState title="No templates yet" description={canManage ? "Add the first one from Actions." : "An access administrator can add them."} />
           ) : (
             <TableContainer label="Onboarding templates" bare>
               <Thead>
@@ -62,14 +75,6 @@ export default async function OnboardingTemplatesPage() {
           )}
         </CardBody>
       </Card>
-      {canManage ? (
-        <details className="rounded-lg border border-border bg-card p-4">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">New template</summary>
-          <div className="mt-4">
-            <TemplateForm connectionTypes={types.map((t) => ({ id: t.key, name: t.name }))} people={people.map((p) => ({ id: p.id, name: p.displayName }))} />
-          </div>
-        </details>
-      ) : null}
     </div>
   );
 }

@@ -34,14 +34,17 @@ export default async function IdentityAttributesPage() {
             here whenever an identity is saved.
           </p>
         </div>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["identity-attributes"])} />
+        <ObjectActionsMenu
+          {...objectActionsFor(ctx.permissions, ["identity-attributes"])}
+          create={canManage ? { label: "Add attribute…", title: "Add an attribute", content: <AttributeDefinitionForm /> } : undefined}
+        />
       </div>
 
       <Card>
         <CardHeader title="Attributes" description={`${definitions.filter((d) => d.active).length} active`} />
         <CardBody>
           {definitions.length === 0 ? (
-            <EmptyState title="No attributes defined" description={canManage ? "Add the first one below." : "An identity administrator can add them."} />
+            <EmptyState title="No attributes defined" description={canManage ? "Add the first one from Actions." : "An identity administrator can add them."} />
           ) : (
             <TableContainer label="Identity attributes" bare>
               <Thead>
@@ -91,14 +94,6 @@ export default async function IdentityAttributesPage() {
         </CardBody>
       </Card>
 
-      {canManage ? (
-        <Card>
-          <CardHeader title="Add an attribute" />
-          <CardBody>
-            <AttributeDefinitionForm />
-          </CardBody>
-        </Card>
-      ) : null}
     </div>
   );
 }

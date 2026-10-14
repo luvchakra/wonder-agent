@@ -186,6 +186,8 @@ test.describe.serial("authorization engine", () => {
     await page.goto("/settings/authorization-policies");
     await expect(page.getByRole("heading", { name: "Authorization policies", level: 1 })).toBeVisible();
     await expect(page.getByRole("link", { name: `E2E Four eyes ${stamp}` })).toBeVisible();
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "New policy…" }).click();
     await page.getByLabel("Policy name").fill(`E2E Screen policy ${stamp}`);
     await page.getByRole("radio", { name: "Require approval" }).check();
     await page.getByRole("searchbox", { name: "Search permissions" }).fill("agent.delete");

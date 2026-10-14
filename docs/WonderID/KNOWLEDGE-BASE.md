@@ -93,6 +93,7 @@ The everyday cycle looks like this:
 
 **Everywhere**
 - **Search:** global search finds identities, agents, applications, findings, requests and more.
+- **Creating something from a list:** open the list's **Actions** menu at the top right and choose the first item (for example "Create policy…", "New group…" or "Add data source…"). The form opens in a window over the list. It is only there if you are allowed to create that kind of record.
 - **Notifications:** in the app, and by email if you choose.
 - **On phones and tablets:** WonderID can be installed like an app, and every screen works at phone size. Install it once from the main address (account menu › Install the app, or id.wonderapps.biz/install): the one app opens every organization and environment you belong to, and switching between them stays in the app. This works in Chrome and Edge on a computer. On phones (Android and iPhone) and in Firefox a switch opens the other address in the browser's overlay, with its own sign-in (owner decision, 14 Oct: keep it that way). An organization's own address no longer installs a separate app. Each address keeps its own sign-in, so the first visit to an organization in the app asks you to sign in there.
 - **Light and dark mode:** both are supported.
@@ -655,6 +656,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Creating a record from a list page now starts from the page's Actions menu, in a window over the list, instead of a form at the bottom of the page (policies, investigations, groups, data sources, discoveries, attributes, rules, templates, delegations, campaigns, privacy records, single sign-on and more). |
 | 14 Oct 2026 | Entitlements and entitlement types: more attributes, edit, disable and delete from a row menu, shown as tables; onboarding shown in the application's Onboarding tab. |
 | 14 Oct 2026 | An entitlement added by hand must be under one of the application's entitlement types. |
 | 14 Oct 2026 | Application pages have tabs (Details, Entitlements, Onboarding, Accounts, Settings); entitlements can be added by hand on the Entitlements tab. |

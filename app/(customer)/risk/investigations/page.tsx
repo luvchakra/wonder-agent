@@ -6,7 +6,7 @@ import { listAgents } from "@/modules/agent-identity/service";
 import { listFindingSummaries, listInvestigations } from "@/modules/risk/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { InvestigationStatus } from "@/lib/shared/types/risk";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, SeverityBadge, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
+import { Badge, Card, EmptyState, KpiCard, SeverityBadge, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { CreateInvestigationForm } from "./InvestigationForms";
 import { STATUS_BADGE } from "./labels";
@@ -71,7 +71,25 @@ export default async function InvestigationsPage({ searchParams }: { searchParam
             none of its findings is still open.
           </p>
         </div>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["investigations"])} />
+        <ObjectActionsMenu
+          {...objectActionsFor(ctx.permissions, ["investigations"])}
+          create={
+            canManage
+              ? {
+                  label: "Open investigation…",
+                  title: "Open an investigation",
+                  content:
+                    openFindings.length === 0 ? (
+                      <EmptyState title="No open findings" description="Investigations group open findings; there are none right now." />
+                    ) : (
+                      <CreateInvestigationForm
+                        findings={openFindings.slice(0, 50).map((f) => ({ id: f.id, title: f.title, agentName: agentName.get(f.agentId) ?? "Unknown agent", severity: f.severity }))}
+                      />
+                    ),
+                }
+              : undefined
+          }
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -98,7 +116,7 @@ export default async function InvestigationsPage({ searchParams }: { searchParam
         </nav>
         <div className="mt-4">
           {rows.length === 0 ? (
-            <EmptyState title="No investigations in this view" description={canManage ? "Open one below from the findings that belong together." : "Nothing to show yet."} />
+            <EmptyState title="No investigations in this view" description={canManage ? "Open one from Actions with the findings that belong together." : "Nothing to show yet."} />
           ) : (
             <TableContainer label="Investigations" bare>
               <Thead>
@@ -145,20 +163,6 @@ export default async function InvestigationsPage({ searchParams }: { searchParam
         </div>
       </Card>
 
-      {canManage ? (
-        <Card>
-          <CardHeader title="Open an investigation" description="Recorded in the audit log and on the investigation's timeline." />
-          <CardBody>
-            {openFindings.length === 0 ? (
-              <EmptyState title="No open findings" description="Investigations group open findings; there are none right now." />
-            ) : (
-              <CreateInvestigationForm
-                findings={openFindings.slice(0, 50).map((f) => ({ id: f.id, title: f.title, agentName: agentName.get(f.agentId) ?? "Unknown agent", severity: f.severity }))}
-              />
-            )}
-          </CardBody>
-        </Card>
-      ) : null}
     </div>
   );
 }

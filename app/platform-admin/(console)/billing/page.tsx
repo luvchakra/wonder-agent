@@ -3,7 +3,7 @@ import { listTenants } from "@/modules/platform-admin/service";
 import { configuredProviders } from "@/modules/billing/config";
 import { formatMoney } from "@/modules/billing/rules";
 import { decideAdjustmentAction, requestAdjustmentAction, updatePriceAction } from "@/app/actions/platformBilling";
-import { Badge, Button, Card, CardBody, CardHeader, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, CardHeader, CreateDialogForm, ObjectActionsMenu, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "@/app/platform-admin/PageHeading";
 
@@ -23,12 +23,76 @@ export default async function PlatformBillingPage() {
   const providers = configuredProviders();
   const tenantName = new Map(tenants.map((t) => [t.tenantId, t.name ?? t.tenantId]));
 
+  const adjustmentForm = (
+    <CreateDialogForm action={requestAdjustmentAction} className="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label htmlFor="adj-tenant" className={fieldLabelClass}>
+          Tenant
+        </label>
+        <select id="adj-tenant" name="tenantId" required defaultValue="" className={fieldInputClass}>
+          <option value="" disabled>
+            Choose…
+          </option>
+          {tenants.map((t) => (
+            <option key={t.tenantId} value={t.tenantId}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="adj-kind" className={fieldLabelClass}>
+          Kind
+        </label>
+        <select id="adj-kind" name="kind" required defaultValue="refund" className={fieldInputClass}>
+          <option value="refund">Refund (needs invoice id and amount)</option>
+          <option value="plan_override">Plan override</option>
+          <option value="cancel_immediately">Cancel immediately</option>
+        </select>
+      </div>
+      <div>
+        <label htmlFor="adj-invoice" className={fieldLabelClass}>
+          Invoice id (refund)
+        </label>
+        <input id="adj-invoice" name="invoiceId" className={fieldInputClass} />
+      </div>
+      <div>
+        <label htmlFor="adj-amount" className={fieldLabelClass}>
+          Refund amount (e.g. 499.00)
+        </label>
+        <input id="adj-amount" name="amount" inputMode="decimal" className={fieldInputClass} />
+      </div>
+      <div>
+        <label htmlFor="adj-plan" className={fieldLabelClass}>
+          Target plan (override)
+        </label>
+        <select id="adj-plan" name="targetPlan" defaultValue="" className={fieldInputClass}>
+          <option value="">—</option>
+          <option value="free">Free</option>
+          <option value="pro">Pro</option>
+          <option value="max">Max</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+      </div>
+      <div className="sm:col-span-2">
+        <label htmlFor="adj-reason" className={fieldLabelClass}>
+          Reason (kept in the audit trail)
+        </label>
+        <textarea id="adj-reason" name="reason" required minLength={10} rows={2} placeholder="At least 10 characters" className={fieldInputClass} />
+      </div>
+      <div className="sm:col-span-2">
+        <Button type="submit">Request (a second administrator approves)</Button>
+      </div>
+    </CreateDialogForm>
+  );
+
   return (
     <>
       <PageHeading title="Billing">
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <StatusBadge tone={providers.stripe ? "success" : "neutral"}>Stripe {providers.stripe ? "configured" : "not configured"}</StatusBadge>
           <StatusBadge tone={providers.razorpay ? "success" : "neutral"}>Razorpay {providers.razorpay ? "configured" : "not configured"}</StatusBadge>
+          <ObjectActionsMenu create={{ label: "Request adjustment…", title: "Request an adjustment", content: adjustmentForm }} />
         </div>
       </PageHeading>
 
@@ -84,72 +148,6 @@ export default async function PlatformBillingPage() {
           </TableContainer>
         )}
       </Card>
-
-      <details className={disclosure}>
-        <summary className={summary}>Request an adjustment</summary>
-        <CardBody className="border-t border-border">
-          <form action={requestAdjustmentAction} className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="adj-tenant" className={fieldLabelClass}>
-                Tenant
-              </label>
-              <select id="adj-tenant" name="tenantId" required defaultValue="" className={fieldInputClass}>
-                <option value="" disabled>
-                  Choose…
-                </option>
-                {tenants.map((t) => (
-                  <option key={t.tenantId} value={t.tenantId}>
-                    {t.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="adj-kind" className={fieldLabelClass}>
-                Kind
-              </label>
-              <select id="adj-kind" name="kind" required defaultValue="refund" className={fieldInputClass}>
-                <option value="refund">Refund (needs invoice id and amount)</option>
-                <option value="plan_override">Plan override</option>
-                <option value="cancel_immediately">Cancel immediately</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="adj-invoice" className={fieldLabelClass}>
-                Invoice id (refund)
-              </label>
-              <input id="adj-invoice" name="invoiceId" className={fieldInputClass} />
-            </div>
-            <div>
-              <label htmlFor="adj-amount" className={fieldLabelClass}>
-                Refund amount (e.g. 499.00)
-              </label>
-              <input id="adj-amount" name="amount" inputMode="decimal" className={fieldInputClass} />
-            </div>
-            <div>
-              <label htmlFor="adj-plan" className={fieldLabelClass}>
-                Target plan (override)
-              </label>
-              <select id="adj-plan" name="targetPlan" defaultValue="" className={fieldInputClass}>
-                <option value="">—</option>
-                <option value="free">Free</option>
-                <option value="pro">Pro</option>
-                <option value="max">Max</option>
-                <option value="enterprise">Enterprise</option>
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <label htmlFor="adj-reason" className={fieldLabelClass}>
-                Reason (kept in the audit trail)
-              </label>
-              <textarea id="adj-reason" name="reason" required minLength={10} rows={2} placeholder="At least 10 characters" className={fieldInputClass} />
-            </div>
-            <div className="sm:col-span-2">
-              <Button type="submit">Request (a second administrator approves)</Button>
-            </div>
-          </form>
-        </CardBody>
-      </details>
 
       <Card>
         <CardHeader title="Price catalogue" description="Changing an amount unlinks the provider price; the next checkout creates a new one. Existing subscribers keep their price." />

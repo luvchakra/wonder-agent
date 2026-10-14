@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import {
   addRelationshipAction,
@@ -14,7 +14,7 @@ import {
   updateIdentityAction,
   type IdentityFormState,
 } from "@/app/actions/identities";
-import { Button, SelectField, TextField, TextareaField, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Button, SelectField, TextField, TextareaField, fieldInputClass, fieldLabelClass, useCloseCreateDialog } from "@/modules/ui";
 import {
   IDENTITY_STATUSES,
   IDENTITY_TYPES,
@@ -362,6 +362,10 @@ export function UnlinkSourceRecordButton({ identityId, sourceId, externalId, lab
 export function AttributeDefinitionForm() {
   const [state, action, pending] = useActionState(createAttributeDefinitionAction, IDLE);
   const [dataType, setDataType] = useState("string");
+  const closeDialog = useCloseCreateDialog();
+  useEffect(() => {
+    if (state.status === "saved") closeDialog();
+  }, [state, closeDialog]);
   return (
     <form action={action} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       <TextField label="Display name" name="displayName" required maxLength={120} placeholder="Cost center" />

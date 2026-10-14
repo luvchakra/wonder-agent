@@ -1,8 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import type { PrivacyActionState } from "@/app/actions/privacy";
-import { PendingSubmitButton } from "@/modules/ui";
+import { PendingSubmitButton, useCloseCreateDialog } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 
 /**
@@ -30,6 +30,11 @@ export function PrivacyForm({
 }) {
   const [state, formAction] = useActionState(action, initial);
   const errors = state.errors ?? {};
+  // In the Actions menu's create dialog, a saved form closes it; elsewhere this does nothing.
+  const closeDialog = useCloseCreateDialog();
+  useEffect(() => {
+    if (state.ok) closeDialog();
+  }, [state, closeDialog]);
   return (
     <form action={formAction} className={cn("space-y-3", className)}>
       {children}

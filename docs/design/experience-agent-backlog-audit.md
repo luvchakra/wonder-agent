@@ -4125,3 +4125,89 @@ Android (web apps there have a different identity model). Asked, the owner
 chose to keep the overlay on phones. The knowledge base now says switching
 inside one app works in Chrome and Edge on a computer only; the code
 (#198) stays as it is.
+
+## 2026-10-14 — Create lives under Actions on every list page (owner decision)
+
+Owner feedback on the Policies page: "You can add the create option under
+actions, no need to add the create row at the end. Add create option under
+action for all the pages, put it in Claude.md." Recorded as a rule in
+CLAUDE.md §19.5 (Minimal UI).
+
+What changed:
+- `modules/ui/ObjectActionsMenu.tsx`: an optional `create` prop
+  (`{ label, title, content }`) adds a first menu item (Plus icon,
+  separated from export/import) that opens the form in a dialog styled like
+  the import dialog. The dialog scrolls inside the viewport, fits a phone
+  (`calc(100vw - 2rem)`), has a close button and starts in the form's first
+  field. The menu renders when only `create` is given.
+  `useCloseCreateDialog()` lets a form that stays on the page close the
+  dialog after a save; `CreateDialogForm` does it for a plain server-action
+  form. Both are no-ops outside the dialog. Exported from `modules/ui`.
+- Pages moved (form, gate, action and validation unchanged; the item is
+  passed only when the old card was shown):
+  - `/policies` (Create policy…), `/risk/investigations` (Open
+    investigation…), `/integrations/discovery` (Add discovery…; "Discover
+    from a connector" stays, it runs discovery rather than creating one
+    record), `/identities/attributes` (Add attribute…), `/identities/rules`
+    (New rule…), `/access/data-sources` (Add data source…; "Link an
+    entitlement" stays), `/access/classification-rules` (New rule…),
+    `/access/onboarding-templates` (New template…), `/access/delegations`
+    (New delegation…), `/compliance/campaigns` (Launch campaign…; the
+    `?launch=1` view from the menu still shows the form at the top),
+    `/settings/groups` (New group…), `/settings/authorization-policies`
+    (New policy…), `/settings/automation` (New credential…),
+    `/settings/sso` (Add connection…), `/settings/privacy` (per section:
+    Log request…, Record breach…, Add record…, Add purpose…, Place legal
+    hold…);
+  - vendor console: `/platform-admin/tenants` (Create organization…),
+    `/platform-admin/announcements` (Publish notice…),
+    `/platform-admin/billing` (Request adjustment…).
+- Close after save: forms that redirect close by navigating (policies,
+  investigations, discovery, groups, authorization policies, rules,
+  templates, campaigns, privacy requests and breaches). Forms that stay call
+  the hook: attributes, data sources, delegations, `PrivacyForm` (records,
+  purposes, legal holds) and the `CreateDialogForm` ones (SSO, tenants,
+  announcements, billing adjustment). The automation credential dialog
+  deliberately stays open: the new secret is shown there once.
+- "…below" empty-state copy now says "from Actions".
+
+Deliberately left:
+- `/my-privacy` "Make a request": a member's own data-rights page, not an
+  admin list; the request form stays in view so the right is easy to use.
+- `/settings/security` "Add an authenticator app": a personal enrolment
+  flow (QR code, verify step), not a list create.
+- `/access/request-policies` "Set a policy": an upsert editor whose scope
+  is picked by a GET form that reloads the page, which would close a dialog.
+- `/platform-admin/admins` "Grant platform admin": the PLATFORM_ADMIN_EMAILS
+  bootstrap (WID-H10, today) lands there with the form shown and its own id
+  filled in; the bootstrap spec relies on that.
+- Detail-page forms (edit, add-to, relationships) and
+  `app/(customer)/access/applications/[id]/*` (another session).
+- Header "New …" buttons that open a `/new` page (users, packages,
+  applications, identities) are already header actions.
+
+Verified: `npm run typecheck`; eslint on changed files (clean); Vitest
+`modules/ui` + `tests/architecture` 18 files, 139 tests passed (9 in
+`ObjectActionsMenu.test.tsx`, 7 new: create-only menu renders, create item
+first and separated, dialog titled and holding the form, focus in the first
+field, hook closes, `CreateDialogForm` runs the action then closes, hook is a
+no-op outside); `npm run build` passed. Local E2E against a production build
+on port 3200: application-discovery, authorization, automation-credentials,
+compliance, data-sources, groups, investigations, policy-publish,
+platform-admin, role-reviews: 71 passed, 1 skipped (the WID-H10 bootstrap
+test, PLATFORM_ADMIN_EMAILS not set locally); navigation-smoke,
+trust-compliance, approval-delegation, identity-rules, classification-rules,
+onboarding-templates: 87 passed. After the focus change a rebuild and rerun
+of eight of those files: 52 passed, 1 skipped, 1 failed
+(automation-credentials API-only test 2 hit the 30 s test timeout mid-way,
+then passed with the whole file, 14/14, on its own run; the UI change does
+not touch it).
+
+Specs changed: each opens Actions → the create item before using the form
+(application-discovery, authorization, automation-credentials (form,
+status and secret now read inside the dialog), compliance, data-sources,
+groups, investigations, policy-publish, platform-admin, role-reviews).
+data-sources: a saved create closes the dialog, so the "Added X." message
+is no longer on screen; the spec now asserts the dialog closed and the new
+source's row is in the list, and the read-only check also asserts there is
+no create item in the menu.

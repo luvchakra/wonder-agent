@@ -41,7 +41,27 @@ export default async function AuthorizationPoliciesPage({ searchParams }: { sear
             Explicit rules that override what roles allow: deny an action, or hold it for approval, across the organization or in a scope. A policy never grants anything.
           </p>
         </div>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["authorization-policies"])} />
+        <ObjectActionsMenu
+          {...objectActionsFor(ctx.permissions, ["authorization-policies"])}
+          create={
+            form
+              ? {
+                  label: "New policy…",
+                  title: "New policy",
+                  content: (
+                    <PolicyForm
+                      values={{ name: "", description: null, effect: "DENY", permissions: [], scopeType: "tenant", scopeValues: [], exemptRoleIds: [] }}
+                      catalog={form.catalog}
+                      roles={form.roles}
+                      applications={form.applications}
+                      agents={form.agents}
+                      submitLabel="Create policy"
+                    />
+                  ),
+                }
+              : undefined
+          }
+        />
       </div>
       {sp.deleted ? (
         <p role="status" className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
@@ -91,21 +111,6 @@ export default async function AuthorizationPoliciesPage({ searchParams }: { sear
           )}
         </CardBody>
       </Card>
-      {form ? (
-        <Card>
-          <CardHeader title="New policy" description="Applies from the next request of everyone it covers." />
-          <CardBody>
-            <PolicyForm
-              values={{ name: "", description: null, effect: "DENY", permissions: [], scopeType: "tenant", scopeValues: [], exemptRoleIds: [] }}
-              catalog={form.catalog}
-              roles={form.roles}
-              applications={form.applications}
-              agents={form.agents}
-              submitLabel="Create policy"
-            />
-          </CardBody>
-        </Card>
-      ) : null}
     </div>
   );
 }

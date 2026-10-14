@@ -36,12 +36,16 @@ test.describe.serial("data sources", () => {
 
     await page.goto("/access/data-sources");
     await expect(page.getByRole("heading", { name: "Data sources", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Add data source…" }).click();
     await page.getByLabel("Data source name").fill(dsName);
     await page.getByLabel("Kind").selectOption("warehouse");
     await page.getByLabel("Application (optional)").selectOption({ label: "Snowflake" });
     await page.getByLabel("Classification", { exact: true }).fill("restricted");
     await page.getByRole("button", { name: "Add data source" }).click();
-    await expect(page.getByText(`Added ${dsName}.`)).toBeVisible();
+    // A saved create closes its dialog; the new source is then in the page's list.
+    await expect(page.getByRole("dialog", { name: "Add a data source" })).toBeHidden();
+    await expect(page.getByRole("row").filter({ hasText: dsName })).toBeVisible();
 
     await page.reload();
     const dsId = await page.getByLabel("Opens data source").locator("option", { hasText: dsName }).getAttribute("value");
@@ -61,6 +65,8 @@ test.describe.serial("data sources", () => {
 
   test("an invalid data source is refused and says why, never shown as saved", async ({ page }) => {
     await page.goto("/access/data-sources");
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Add data source…" }).click();
     await page.getByLabel("Data source name").fill(dsName);
     await page.getByRole("button", { name: "Add data source" }).click();
     await expect(page.getByText(/already exists/)).toBeVisible();
@@ -72,6 +78,13 @@ test.describe.serial("data sources", () => {
     await page.goto("/access/data-sources");
     await expect(page.getByText(dsName)).toBeVisible();
     await expect(page.getByRole("heading", { name: "Add a data source" })).toHaveCount(0);
+    // No create item in the Actions menu either.
+    const actions = page.getByRole("button", { name: "Actions", exact: true });
+    if (await actions.count()) {
+      await actions.click();
+      await expect(page.getByRole("menuitem").first()).toBeVisible();
+      await expect(page.getByRole("menuitem", { name: "Add data source…" })).toHaveCount(0);
+    }
     expect((await page.request.post("/api/v1/access/data-sources", { data: { name: "ro", kind: "api" } })).status()).toBe(403);
     await ctx.close();
   });

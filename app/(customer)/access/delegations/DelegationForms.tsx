@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
-import { Button, SelectField, TextField } from "@/modules/ui";
+import { Button, SelectField, TextField, useCloseCreateDialog } from "@/modules/ui";
 
 /** ACCESS-P0-23 — the delegation form and its revoke button; the server validates and its message is shown. */
 
@@ -15,6 +15,7 @@ async function call(url: string, body?: unknown): Promise<string | null> {
 
 export function DelegationForm({ people, everyone, canDelegateAdministration = false }: { people: { id: string; label: string }[]; everyone: { id: string; label: string }[] | null; canDelegateAdministration?: boolean }) {
   const router = useRouter();
+  const closeDialog = useCloseCreateDialog();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   return (
@@ -33,7 +34,10 @@ export function DelegationForm({ people, everyone, canDelegateAdministration = f
             reason: f.get("reason"),
           });
           setError(err);
-          if (!err) router.refresh();
+          if (!err) {
+            router.refresh();
+            closeDialog();
+          }
         });
       }}
     >

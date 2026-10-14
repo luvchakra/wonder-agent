@@ -73,13 +73,17 @@ test.describe.serial("automation credentials", () => {
 
   test("create shows the secret once; it is pending and the creator cannot approve it", async ({ page, baseURL }) => {
     await page.goto("/settings/automation");
-    await page.getByLabel("Name").fill(credentialName);
-    await page.getByLabel("Application identity").selectOption({ label: `E2E Pipeline App ${stamp}` });
-    // In the page, not the Admin sidebar's "Users & Roles" list.
-    await expect(page.getByRole("main").getByLabel("Role")).toHaveValue("CONFIGURATION_ADMIN");
-    await page.getByRole("button", { name: "Create credential" }).click();
-    await expect(page.getByRole("status")).toContainText("another administrator approves it");
-    secret = (await page.getByTestId("automation-secret").textContent())!.trim();
+    // The create form lives in the header's Actions menu (2026-10-14); the secret is shown there, once.
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "New credential…" }).click();
+    const dialog = page.getByRole("dialog", { name: "New credential" });
+    await dialog.getByLabel("Name").fill(credentialName);
+    await dialog.getByLabel("Application identity").selectOption({ label: `E2E Pipeline App ${stamp}` });
+    // In the dialog, not the Admin sidebar's "Users & Roles" list.
+    await expect(dialog.getByLabel("Role")).toHaveValue("CONFIGURATION_ADMIN");
+    await dialog.getByRole("button", { name: "Create credential" }).click();
+    await expect(dialog.getByRole("status")).toContainText("another administrator approves it");
+    secret = (await dialog.getByTestId("automation-secret").textContent())!.trim();
     expect(secret).toMatch(/^wa_ac_[A-Za-z0-9_-]{43}$/);
 
     const { data: row } = await db().from("automation_credentials").select("id, status, key_hash").eq("tenant_id", tenantId).eq("name", credentialName).single();
