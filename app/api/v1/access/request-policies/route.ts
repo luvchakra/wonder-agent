@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await requirePermission("access.manage");
     const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
-    return NextResponse.json({ ok: true, data: await saveRequestPolicy(ctx.tenantId!, ctx.userId, body) });
+    // ACCESS-P0-35: 200 with the policy when it applied; 202 with the change when it waits for a second person.
+    const result = await saveRequestPolicy(ctx.tenantId!, ctx.userId, body);
+    return result.status === "applied" ? NextResponse.json({ ok: true, data: result.policy }) : NextResponse.json({ ok: true, data: { pendingChange: result.change } }, { status: 202 });
   } catch (err) {
     return errorResponse(err);
   }

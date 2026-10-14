@@ -133,10 +133,13 @@ export async function savePolicyAction(_prev: RequestFormState, formData: FormDa
   for (const k of POLICY_FIELDS) if (formData.has(k)) input[k] = String(formData.get(k) ?? "");
   for (const k of POLICY_FLAGS) input[k] = formData.get(k) === "on";
   try {
-    const p = await saveRequestPolicy(ctx.tenantId!, ctx.userId, input);
+    const result = await saveRequestPolicy(ctx.tenantId!, ctx.userId, input);
     revalidatePath("/access/request-policies");
     revalidatePath("/access/catalog");
-    return { status: "saved", message: `Saved "${p.name}".` };
+    // ACCESS-P0-35: with two or more administrators it waits for someone else; say so, not "saved".
+    return result.status === "applied"
+      ? { status: "saved", message: `Saved "${result.policy.name}".` }
+      : { status: "saved", message: "Proposed: another administrator approves it before it applies." };
   } catch (err) {
     return formError(err);
   }
