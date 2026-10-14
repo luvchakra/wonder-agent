@@ -464,6 +464,40 @@ export async function listAccountableHumans(tenantId: string): Promise<{ id: str
   return (data ?? []).map((r) => ({ id: r.id as string, displayName: r.display_name as string, email: (r.email as string | null) ?? null }));
 }
 
+/**
+ * Owner feedback 2026-10-14 — people the organization governs who cannot
+ * sign in to WonderID yet: active person identities with an e-mail and no
+ * membership (by user or by e-mail), for "Add user" to start from. Read as
+ * the caller (RLS) with an explicit tenant filter; the membership read is
+ * the service role, filtered by this tenant, and returns ids and e-mails only.
+ */
+export async function listPeopleWithoutAccess(tenantId: string): Promise<{ id: string; displayName: string; email: string; title: string | null; department: string | null }[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("identities")
+    .select("id, display_name, email, title, department, user_id")
+    .eq("tenant_id", tenantId)
+    .eq("identity_type", "HUMAN")
+    .eq("status", "active")
+    .not("email", "is", null)
+    .order("display_name")
+    .limit(500);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const { data: members, error: memberError } = await supabaseServiceRole()
+    .from("tenant_memberships")
+    .select("tenant_id, user_id, users(email)")
+    .eq("tenant_id", tenantId)
+    .neq("status", "removed")
+    .limit(5000);
+  if (memberError) throw new ApiError(500, "QUERY_FAILED", memberError.message);
+  const rows = ((members ?? []) as unknown as { tenant_id: string; user_id: string; users: { email: string | null } | null }[]).filter((m) => m.tenant_id === tenantId);
+  const memberIds = new Set(rows.map((m) => m.user_id));
+  const memberEmails = new Set(rows.map((m) => (m.users?.email ?? "").toLowerCase()).filter(Boolean));
+  return (data ?? [])
+    .filter((r) => !(r.user_id && memberIds.has(r.user_id as string)) && !memberEmails.has(String(r.email).toLowerCase()))
+    .map((r) => ({ id: r.id as string, displayName: r.display_name as string, email: r.email as string, title: (r.title as string | null) ?? null, department: (r.department as string | null) ?? null }));
+}
+
 // ---------------------------------------------------------------- writes
 
 /**

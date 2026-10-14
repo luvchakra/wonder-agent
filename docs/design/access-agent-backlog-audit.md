@@ -4176,3 +4176,24 @@ disable, delete; a type in use refuses deletion with 409, then deletes),
 request-catalog, application-onboarding, onboarding-proposals,
 onboarding-templates, fulfilment-assignment and classification-rules
 44/44.
+
+### 2026-10-14 — Administrators may approve their own onboarding (owner test feedback 7)
+
+Owner decision (feedback doc item 7, confirmed in chat: "allow for user
+with an admin role"): an organization administrator (TENANT_SUPER_ADMIN)
+may approve an application onboarding they submitted. Everyone else still
+needs a second person.
+
+Built: migration 0188 (applied to dev) adds `self_approved` to
+`application_onboardings` and replaces the four-eyes check with one that
+allows approver = submitter only when `self_approved`; `blockReason`
+takes `actorIsAdmin`; `decideOnboarding` requires a note for a
+self-approval, sets `self_approved` and audits `selfApproved: true`; the
+route passes the caller's roles; the Approve button is enabled for an
+administrator's own submission with the note marked required. CLAUDE.md
+§18.4.2 records the exception.
+
+Verified: typecheck; eslint; `next build`; Vitest onboardingRules +
+architecture 37/37; local E2E `application-onboarding` + `users` 26/26
+(an administrator's own approval without a note is 400; a second person's
+approval still works).

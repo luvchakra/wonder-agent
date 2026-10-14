@@ -15,18 +15,35 @@ import { cn } from "@/lib/utils";
  */
 
 type RoleOption = { name: string; label: string; custom?: boolean };
+/** Owner feedback 2026-10-14: a person the organization already governs, to start from. */
+export type PersonOption = { id: string; displayName: string; email: string; title: string | null; department: string | null };
 const STEPS = ["Basic details", "Roles", "Review"] as const;
 const initial: ActionState = { ok: false, message: null };
 
-export function NewUserWizard({ roles, canInvite, canAdd, canAssignRoles }: { roles: RoleOption[]; canInvite: boolean; canAdd: boolean; canAssignRoles: boolean }) {
+export function NewUserWizard({
+  roles,
+  canInvite,
+  canAdd,
+  canAssignRoles,
+  people = [],
+  initialPersonId = null,
+}: {
+  roles: RoleOption[];
+  canInvite: boolean;
+  canAdd: boolean;
+  canAssignRoles: boolean;
+  people?: PersonOption[];
+  initialPersonId?: string | null;
+}) {
+  const initialPerson = people.find((p) => p.id === initialPersonId) ?? null;
   const [state, formAction] = useActionState(inviteUserAction, initial);
   const [step, setStep] = useState(0);
   const [roleQuery, setRoleQuery] = useState("");
   const [values, setValues] = useState({
-    displayName: "",
-    email: "",
-    jobTitle: "",
-    department: "",
+    displayName: initialPerson?.displayName ?? "",
+    email: initialPerson?.email ?? "",
+    jobTitle: initialPerson?.title ?? "",
+    department: initialPerson?.department ?? "",
     accountType: "internal",
     authMethod: "tenant_default",
     method: canInvite ? "invite" : "add",
@@ -37,6 +54,12 @@ export function NewUserWizard({ roles, canInvite, canAdd, canAssignRoles }: { ro
   // A server error on a basic-details field reopens that step.
   const shownStep = state.errors && (errors.email || errors.displayName || errors.accountType || errors.authMethod || errors.method) && step === 2 ? 0 : step;
 
+  const [personId, setPersonId] = useState(initialPerson?.id ?? "");
+  const choosePerson = (id: string) => {
+    setPersonId(id);
+    const p = people.find((x) => x.id === id);
+    if (p) setValues((v) => ({ ...v, displayName: p.displayName, email: p.email, jobTitle: p.title ?? "", department: p.department ?? "" }));
+  };
   const set = (k: keyof typeof values) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setValues((v) => ({ ...v, [k]: e.target.value }));
   const toggleRole = (name: string) => setValues((v) => ({ ...v, roles: v.roles.includes(name) ? v.roles.filter((r) => r !== name) : [...v.roles, name] }));
   const next = () => {
@@ -77,6 +100,21 @@ export function NewUserWizard({ roles, canInvite, canAdd, canAssignRoles }: { ro
             <legend className="sr-only">Basic details</legend>
             <div className="space-y-4">
               <h2 className="text-sm font-semibold text-foreground">User information</h2>
+              {people.length ? (
+                <div>
+                  <label htmlFor="fromIdentity" className={fieldLabelClass}>
+                    From an identity <span className="font-normal text-muted-foreground">(optional)</span>
+                  </label>
+                  <select id="fromIdentity" value={personId} onChange={(e) => choosePerson(e.target.value)} className={fieldInputClass}>
+                    <option value="">Someone new</option>
+                    {people.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.displayName} ({p.email})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               <div>
                 <label htmlFor="displayName" className={fieldLabelClass}>
                   Full name

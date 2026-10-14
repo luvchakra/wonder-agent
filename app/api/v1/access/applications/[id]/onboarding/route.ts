@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { TENANT_ADMIN_ROLE } from "@/lib/rbac/delegatedRoleRules";
 import {
   answerOnboarding,
   configureOnboarding,
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       case "reject":
         // WID-H06: the four-eyes approval of an onboarding is a person's decision.
         await refuseAutomationCaller("Approving an onboarding");
-        data = await decideOnboarding(tenantId, actorId, id, { approve: body.action === "approve", note: body.note });
+        data = await decideOnboarding(tenantId, actorId, id, { approve: body.action === "approve", note: body.note }, ctx.roles.includes(TENANT_ADMIN_ROLE));
         break;
       case "promote":
         data = await promoteOnboarding(tenantId, actorId, id);

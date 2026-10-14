@@ -203,3 +203,22 @@ test.describe("users and the membership lifecycle", () => {
     });
   });
 });
+
+test.describe("adding a user from an identity (owner feedback 2026-10-14)", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("a governed person without a sign-in can be picked, and their details fill the form", async ({ page, request }) => {
+    const stamp = Date.now();
+    const email = `e2e-from-identity-${stamp}@example.test`;
+    const created = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E From Identity ${stamp}`, email } });
+    expect(created.status(), await created.text()).toBe(201);
+    const id = (await created.json()).data.id as string;
+
+    await page.goto(`/identities/${id}`);
+    await page.getByRole("link", { name: "Give WonderID access" }).click();
+    await expect(page).toHaveURL(new RegExp(`/settings/users/new\\?identity=${id}`));
+    await expect(page.getByLabel("Full name")).toHaveValue(`E2E From Identity ${stamp}`);
+    await expect(page.getByLabel("Email address")).toHaveValue(email);
+    await expect(page.getByLabel("From an identity (optional)")).toHaveValue(id);
+  });
+});

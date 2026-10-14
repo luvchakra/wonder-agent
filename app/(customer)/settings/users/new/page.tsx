@@ -4,6 +4,7 @@ import { requireAnyPermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listAssignableRoles } from "@/lib/rbac/roles";
 import { NewUserWizard } from "./NewUserWizard";
+import { listPeopleWithoutAccess } from "@/modules/agent-identity/service";
 
 // FOUNDATION-P0-23 — Add New User (spec §7–9, mockups 2–3): basic details,
 // roles, review. Inviting needs users.invite, adding now needs
@@ -12,7 +13,7 @@ import { NewUserWizard } from "./NewUserWizard";
 
 export const metadata = { title: "Add user" };
 
-export default async function NewUserPage() {
+export default async function NewUserPage({ searchParams }: { searchParams: Promise<{ identity?: string }> }) {
   let ctx;
   try {
     ctx = await requireAnyPermission(["users.invite", "users.create"]);
@@ -21,7 +22,12 @@ export default async function NewUserPage() {
     if (err instanceof ApiError && err.status === 403) redirect("/settings/users");
     throw err;
   }
-  const roles = await listAssignableRoles(ctx.tenantId!);
+  // Owner feedback 2026-10-14: start from a person the organization already governs.
+  const [roles, people, { identity }] = await Promise.all([
+    listAssignableRoles(ctx.tenantId!),
+    ctx.permissions.includes("identity.read") ? listPeopleWithoutAccess(ctx.tenantId!).catch(() => []) : Promise.resolve([]),
+    searchParams,
+  ]);
   return (
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
@@ -40,6 +46,8 @@ export default async function NewUserPage() {
         canInvite={ctx.permissions.includes("users.invite")}
         canAdd={ctx.permissions.includes("users.create")}
         canAssignRoles={ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage")}
+        people={people}
+        initialPersonId={identity ?? null}
       />
     </div>
   );

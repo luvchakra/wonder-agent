@@ -47,6 +47,7 @@ export {
   listOwnedIdentities,
   listDirectReports,
   listAccountableHumans,
+  listPeopleWithoutAccess,
   createIdentity,
   updateIdentity,
   listIdentityRelationships,

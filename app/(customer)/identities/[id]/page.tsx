@@ -197,6 +197,12 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
             Open the AI agent
           </LinkButton>
         ) : null}
+        {/* Owner feedback 2026-10-14: a governed person with no WonderID sign-in can be given one. */}
+        {identity.identityType === "HUMAN" && identity.email && !identity.userId && (ctx.permissions.includes("users.invite") || ctx.permissions.includes("users.create")) ? (
+          <LinkButton href={`/settings/users/new?identity=${identity.id}`} variant="outline" size="sm">
+            Give WonderID access
+          </LinkButton>
+        ) : null}
       </div>
 
       {isAgent ? (
