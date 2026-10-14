@@ -31,6 +31,7 @@ export function RequestForm({
   people,
   withinAgentContract = {},
   selfLabel,
+  onBehalf = [],
 }: {
   applicationId: string;
   options: RequestOption[];
@@ -40,9 +41,12 @@ export function RequestForm({
   /** ACCESS-P0-31: for each of your agents, the options its contract approves. */
   withinAgentContract?: Record<string, string[]>;
   selfLabel: string;
+  /** ACCESS-P0-23 part 2: members who delegated their requests to this one; the request is for them. */
+  onBehalf?: { id: string; label: string }[];
 }) {
   const [state, action, pending] = useActionState(submitRequestAction.bind(null, applicationId), IDLE);
   const [subject, setSubject] = useState("");
+  const [asWho, setAsWho] = useState("");
   const [choice, setChoice] = useState(initialOption);
   // ACCESS-P0-30: a request can also take access away or disable the account; folded, as the rarer case.
   const [kind, setKind] = useState<"grant" | "remove" | "disable_account">("grant");
@@ -57,25 +61,37 @@ export function RequestForm({
 
   return (
     <form action={action} className="space-y-4">
-      <SelectField label="For" name="subjectIdentityId" value={subject} onChange={(e) => setSubject(e.target.value)}>
-        <option value="">{selfLabel}</option>
-        {[...new Set(people.map((p) => p.group ?? ""))].map((group) => {
-          const options = people
-            .filter((p) => (p.group ?? "") === group)
-            .map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.label}
-              </option>
-            ));
-          return group ? (
-            <optgroup key={group} label={group}>
-              {options}
-            </optgroup>
-          ) : (
-            options
-          );
-        })}
-      </SelectField>
+      {onBehalf.length ? (
+        <SelectField label="Asking as" name="onBehalfOf" value={asWho} onChange={(e) => setAsWho(e.target.value)} hint={asWho ? "For them; you are both recorded, and neither of you approves it" : undefined}>
+          <option value="">Myself</option>
+          {onBehalf.map((p) => (
+            <option key={p.id} value={p.id}>
+              On behalf of {p.label}
+            </option>
+          ))}
+        </SelectField>
+      ) : null}
+      {asWho ? null : (
+        <SelectField label="For" name="subjectIdentityId" value={subject} onChange={(e) => setSubject(e.target.value)}>
+          <option value="">{selfLabel}</option>
+          {[...new Set(people.map((p) => p.group ?? ""))].map((group) => {
+            const options = people
+              .filter((p) => (p.group ?? "") === group)
+              .map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.label}
+                </option>
+              ));
+            return group ? (
+              <optgroup key={group} label={group}>
+                {options}
+              </optgroup>
+            ) : (
+              options
+            );
+          })}
+        </SelectField>
+      )}
       <input type="hidden" name="requestType" value={kind} />
       {kind !== "disable_account" ? (
         <SelectField label={kind === "remove" ? "Access to remove" : "Access"} name="entitlementId" value={opt.value} onChange={(e) => setChoice(e.target.value)}>

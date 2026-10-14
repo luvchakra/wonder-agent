@@ -11,8 +11,8 @@ export const metadata = { title: "Delegations" };
 
 const day = (iso: string) => new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
 
-// ACCESS-P0-23 — hand your approvals to someone while you are away. They
-// decide on your behalf; every decision records both of you.
+// ACCESS-P0-23 — hand your approvals (or, part 2, your requests) to someone
+// while you are away. They act on your behalf; every action records both of you.
 export default async function DelegationsPage() {
   let ctx;
   try {
@@ -37,7 +37,7 @@ export default async function DelegationsPage() {
       </nav>
       <div>
         <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Delegations</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Someone decides your approvals while you are away. Nobody decides a request they made or that is for them.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Someone decides your approvals, or asks for access for you, while you are away. Nobody decides a request they made or that is for them.</p>
       </div>
       <Card>
         <CardHeader title="In place" />
@@ -50,6 +50,7 @@ export default async function DelegationsPage() {
                 <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span className="min-w-0">
                     {name(d.delegatorUserId)} → {name(d.delegateUserId)}
+                    <span className="text-muted-foreground"> · {d.scope === "requests" ? "asking for access" : "approvals"}</span>
                     <span className="block text-xs text-muted-foreground">
                       {day(d.startsAt)} – {day(d.endsAt)}
                       {d.reason ? ` · ${d.reason}` : ""}

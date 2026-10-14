@@ -43,6 +43,8 @@ export type ChainInput = {
   packageOwner?: Person;
   isPackage?: boolean;
   requesterUserId: string;
+  /** ACCESS-P0-23 part 2: whom a delegate asked for; they approve it no more than the requester does. */
+  onBehalfOfUserId?: string | null;
   subjectUserId: string | null;
 };
 
@@ -61,6 +63,7 @@ function resolve(kind: Exclude<ApproverKind, "access_managers">, person: Person,
   if (!person.active) return open(`The ${label} is not active: an access manager approves instead`);
   if (!person.userId) return open(`The ${label} cannot sign in to WonderID: an access manager approves instead`);
   if (person.userId === c.requesterUserId) return open(`The ${label} made this request: an access manager approves instead`);
+  if (c.onBehalfOfUserId && person.userId === c.onBehalfOfUserId) return open(`The ${label} asked for this through a delegate: an access manager approves instead`);
   if (person.userId === c.subjectUserId) return open(`The ${label} is who the access is for: an access manager approves instead`);
   return { approverKind: kind, approverIdentityId: person.identityId, approverUserId: person.userId, reason: null };
 }

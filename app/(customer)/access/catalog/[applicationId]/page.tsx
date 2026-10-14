@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getRequestCatalogItem, withinContract } from "@/modules/access-governance/service";
+import { getRequestCatalogItem, requestsActingFor, withinContract } from "@/modules/access-governance/service";
 import { getAgentContract, getIdentityForUser, listDirectReports, listIdentities, listOwnedIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Button, Card, CardBody, CardHeader, EmptyState, fieldInputClass, fieldLabelClass } from "@/modules/ui";
@@ -23,11 +23,16 @@ export default async function RequestAccessPage({ params, searchParams }: { para
   const sp = await searchParams;
   const tenantId = ctx.tenantId!;
   const find = (sp.find ?? "").slice(0, 100);
-  const [item, me, found] = await Promise.all([
+  const [item, me, found, delegators] = await Promise.all([
     getRequestCatalogItem(tenantId, applicationId),
     getIdentityForUser(tenantId, ctx.userId),
     find ? listIdentities(tenantId, { types: ["HUMAN", "EXTERNAL"], status: "active", q: find, pageSize: 20 }) : Promise.resolve({ rows: [], total: 0 }),
+    requestsActingFor(tenantId, ctx.userId),
   ]);
+  // ACCESS-P0-23 part 2: the members who let this one ask on their behalf now.
+  const onBehalf = (await Promise.all(delegators.map(async (userId) => ({ userId, identity: await getIdentityForUser(tenantId, userId) }))))
+    .filter((d) => d.identity)
+    .map((d) => ({ id: d.userId, label: d.identity!.displayName }));
   if (!item) notFound();
   // ACCESS-P0-31: what you own (service accounts, machine identities, agents) can be requested for too;
   // for an agent, only what its contract approves is offered (the server checks again).
@@ -102,6 +107,7 @@ export default async function RequestAccessPage({ params, searchParams }: { para
                 people={people}
                 withinAgentContract={withinAgentContract}
                 selfLabel={me ? `Me (${me.displayName})` : "Me"}
+                onBehalf={onBehalf}
               />
             ) : (
               <EmptyState title="Nothing here is requestable" description="A request policy decides what can be requested; ask an access manager." />

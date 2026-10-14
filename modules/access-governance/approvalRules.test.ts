@@ -43,6 +43,10 @@ describe("planApprovalChain", () => {
     expect(byManager[0].reason).toMatch(/made this request/);
     const ownerIsSubject = planApprovalChain(input({ route: "owner_approval", subjectUserId: "u-owner", requesterUserId: "u-mgr" }));
     expect(ownerIsSubject[0].reason).toMatch(/who the access is for/);
+    // ACCESS-P0-23 part 2: nor the person a delegate asked for.
+    const viaDelegate = planApprovalChain(input({ route: "manager_approval", requesterUserId: "u-delegate", onBehalfOfUserId: "u-mgr", subjectUserId: "u-report" }));
+    expect(viaDelegate[0]).toMatchObject({ approverKind: "access_managers" });
+    expect(viaDelegate[0].reason).toMatch(/through a delegate/);
   });
 
   it("adds an access-manager review for critical risk, and asks each approver once", () => {

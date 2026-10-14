@@ -18,6 +18,8 @@ let tenantId = "";
 let appId = "";
 let entId = "";
 let ent2Id = "";
+let ent3Id = "";
+let requesterUser = "";
 let iamUser = "";
 let roUser = "";
 let delegationId = "";
@@ -63,14 +65,17 @@ test.describe.serial("approver delegation", () => {
     const user = async (email: string) => (await db().from("users").select("id").eq("email", email).single()).data!.id as string;
     iamUser = await user(TEST_USERS.iamAdminOne.email);
     roUser = await user(TEST_USERS.readOnly.email);
+    requesterUser = await user(TEST_USERS.requester.email);
     // A delegation an earlier run left in force between these two would change what is expected here.
     await db().from("access_delegations").update({ revoked_at: new Date().toISOString() }).eq("tenant_id", tenantId).in("delegator_user_id", [iamUser, roUser]).is("revoked_at", null);
+    await db().from("access_delegations").update({ revoked_at: new Date().toISOString() }).eq("tenant_id", tenantId).eq("delegate_user_id", requesterUser).is("revoked_at", null);
     const { data: owner } = await db().from("identities").select("id").eq("tenant_id", tenantId).eq("user_id", iamUser).limit(1).single();
     appId = (await (await request.post("/api/v1/access/applications", { data: { name: `E2E Delegation App ${stamp}`, appType: "saas", riskLevel: "low", dataClassification: "internal" } })).json())
       .data.id;
     entId = (await (await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: `Viewer ${stamp}`, dataClassification: "internal", privilegeLevel: "standard" } })).json())
       .data.id;
     ent2Id = (await (await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: `Editor ${stamp}`, dataClassification: "internal", privilegeLevel: "standard" } })).json()).data.id;
+    ent3Id = (await (await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: `Reader ${stamp}`, dataClassification: "internal", privilegeLevel: "standard" } })).json()).data.id;
     await promote(request, browser, appId, owner!.id as string);
     const policy = await request.post("/api/v1/access/request-policies", {
       data: { applicationId: appId, name: `E2E Delegation Policy ${stamp}`, autoApprove: false, approval: "owner_approval", riskThreshold: "high" },
@@ -129,6 +134,41 @@ test.describe.serial("approver delegation", () => {
     expect(await waiting(ro.request)).not.toContain(id);
     expect((await decide(ro.request, id)).status()).toBe(403);
     await ro.close();
+  });
+
+  test("part 2: a delegate asks for access on the person's behalf; neither of them approves it", async ({ request, browser }) => {
+    test.setTimeout(90_000);
+    const asker = await browser.newContext({ storageState: authFile("requester") });
+    const ask3 = (onBehalfOf: string) => asker.request.post("/api/v1/access/requests", { data: { applicationId: appId, entitlementId: ent3Id, justification: "While they are away", onBehalfOf } });
+    // No delegation: refused.
+    const refused = await ask3(iamUser);
+    expect(refused.status(), await refused.text()).toBe(403);
+    expect((await refused.json()).error.code).toBe("NO_DELEGATION");
+
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    const made = await iam.request.post("/api/v1/access/delegations", { data: { delegateUserId: requesterUser, scope: "requests", endsAt: new Date(Date.now() + 3 * 86_400_000).toISOString() } });
+    expect(made.status(), await made.text()).toBe(201);
+    expect((await made.json()).data).toMatchObject({ scope: "requests", delegatorUserId: iamUser });
+
+    const res = await ask3(iamUser);
+    expect(res.status(), await res.text()).toBe(201);
+    const id = (await res.json()).data.id as string;
+    const { data: row } = await db().from("access_requests").select("requested_by, requested_on_behalf_of, subject_identity_id").eq("id", id).single();
+    const { data: iamIdentity } = await db().from("identities").select("id").eq("tenant_id", tenantId).eq("user_id", iamUser).limit(1).single();
+    expect(row).toMatchObject({ requested_by: requesterUser, requested_on_behalf_of: iamUser, subject_identity_id: iamIdentity!.id });
+    // The owner's step goes to access managers: the owner asked for it through a delegate.
+    const { data: steps } = await db().from("access_request_approvals").select("approver_kind, reason").eq("request_id", id);
+    expect(steps!.every((s) => s.approver_kind === "access_managers")).toBe(true);
+    expect((await iam.request.post(`/api/v1/access/requests/${id}/decision`, { data: { decision: "approved", comment: "mine" } })).status()).toBe(409);
+    const decided = await decide(request, id);
+    expect(decided.status(), await decided.text()).toBe(200);
+    const { data: audit } = await db().from("audit_logs").select("metadata").eq("tenant_id", tenantId).eq("object_id", id).in("action", ["access.request_submitted", "access.request_auto_approved"]);
+    expect(audit?.[0]?.metadata).toMatchObject({ onBehalfOf: iamUser });
+
+    await iam.request.post(`/api/v1/access/delegations/${(await made.json()).data.id}/revoke`);
+    expect((await ask3(iamUser)).status()).toBe(403);
+    await iam.close();
+    await asker.close();
   });
 
   test("the delegations page", async ({ page }) => {

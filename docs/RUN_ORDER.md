@@ -753,6 +753,15 @@ Until the owner says otherwise, the order is:
 8. QA-P0-07: connector contract tests.
 9. EXPERIENCE-P0-30: the guided connector definition editor.
 
+Owner decisions, 14 October (later):
+- ACCESS-P0-35's four-eyes publish applies only to organizations with two or
+  more administrators.
+- Administration delegation (ACCESS-P0-23 part 3) is approved, although it
+  changes Foundation's authorization engine.
+- `docs/WonderID/ROADMAP-PROGRESS.md` item marks and the knowledge base
+  (revision history at the end, newest first) are updated in the same pull
+  request as the stories document.
+
 INTEGRATION-P0-26 (ServiceNow ticketing for manual fulfilment) is Low by the
 owner's decision of the same day; internal assignment comes first.
 

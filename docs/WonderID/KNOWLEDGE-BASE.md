@@ -21,72 +21,11 @@
 17. [Safety and trust](#17-safety-and-trust)
 18. [Coming soon](#18-coming-soon)
 
-[Revision history](#revision-history) is below.
+[Revision history](#revision-history) is at the end, newest first.
 
-**Last updated:** 13 October 2026
+**Last updated:** 14 October 2026
 
 A plain-language guide to what WonderID does, how its parts fit together and where to find each feature. It is kept current as the product changes.
-
----
-
-## Revision history
-
-| Date | What changed |
-|---|---|
-| 13 Sep 2026 | First version of the product: organizations, sign-in, roles and permissions, and AI agent identities with owners, lifecycle and approved purpose. |
-| 14 Sep 2026 | Connections to other systems, effective access and policies, runtime activity, risk scoring and rogue-agent detection, access reviews, audit trail, reports, notifications, search, and the vendor administration console. Single sign-on and two-step verification. |
-| 15 Sep 2026 | New visual design; agent discovery became a full detect, review and register flow. |
-| 16 Sep 2026 | AI summaries (OpenAI or Gemini, your own key optional), email notifications, the governance evidence pack as a PDF, governance drift and posture, scheduled review escalation. |
-| 17 Sep 2026 | Public website, redesigned screens, forgot-password, tables that turn into cards on phones. |
-| 18 Sep 2026 | Faster pages, Google sign-in, the help centre with an ask-the-guide assistant, the real logo. |
-| 19 Sep 2026 | More global search results, more notification triggers, an extra risk factor for privileged access. |
-| 25 Sep 2026 | Light console design; per-agent API keys; the Runtime Gateway with emergency stop and tool filtering; inventories of non-human identities, shadow AI, MCP servers and data sources; investigations; separation-of-duties checks; policy drafts and publishing. |
-| 25 Sep 2026 | The product became **WonderID**: one directory for every kind of identity, not only AI agents. |
-| 26 Sep 2026 | Identity sources and matching, joiner/mover/leaver with ownership transfer, the application catalog and onboarding, accounts inventory, application discovery, the request catalog, approvals and access packages, organization addresses and branding, users, roles, groups and scoped permissions. |
-| 1 Oct 2026 | Billing (Stripe and Razorpay), privacy tools (GDPR, DPDP), a tamper-evident audit trail, financial and privacy control frameworks, security hardening. |
-| 2 Oct 2026 | Microsoft and LinkedIn sign-in; single sign-on creates members only after a real single sign-on. |
-| 9 Oct 2026 | Help centre checked against the product; pricing on the website. |
-| 10 Oct 2026 | The connection framework with built-in connectors; CSV import and export on every list; install on phones and tablets; the "why does this person have access" ledger; a separate Admin menu; Global Configuration. |
-| 11 Oct 2026 | Detecting what was removed in a connected system; automatic flow after every sync; access imported from connected systems and labelled approved, legacy, unproven or rogue; service accounts and agents as owned identities; access requests that end verified, with tasks for application owners; time-bound access; one inbox; bulk invitations. |
-| 12 Oct 2026 | Automation credentials for your own tools; connected systems that make approved changes themselves; removing rogue access through a request; a limit on mass changes; richer connection types; faster scheduled syncs that read only what changed. |
-| 12 Oct 2026 | This guide rewritten to cover the whole product. |
-| 12 Oct 2026 | Every rogue account gets a ticket number (RA-000001, …), one per account, that closes once the account is fixed. |
-| 12 Oct 2026 | Connections can sign in with a private key instead of a shared secret, or with a client certificate. |
-| 12 Oct 2026 | Connections can sign in with the provider: an administrator presses Connect and approves on the system's own sign-in page. |
-| 12 Oct 2026 | Connection types can be downloaded and opened elsewhere, and a connection can move to a newer version after a preview; this guide was corrected where it promised more than the product does. |
-| 12 Oct 2026 | Any application with a SCIM 2.0 service can be connected and make approved changes (add and remove group members, disable and create users); LDAP directories can add and remove group members. |
-| 12 Oct 2026 | Stronger safeguards: emergency controls block in every gateway mode; high-risk access always needs a person; nobody approves their own request; automation credentials never approve or certify. |
-| 12 Oct 2026 | A role given to an automation credential pauses it until a second administrator approves; owners are reminded about removals that the system has not confirmed. |
-| 12 Oct 2026 | Ended access shows whether it is really gone; removing access and disabling accounts are due within a day; refused automation calls are audited, and the database caps automation credential expiry at a year. |
-| 12 Oct 2026 | When someone leaves, each access they hold becomes its own removal task, due within a day; removals more than a day overdue go to the access managers. |
-| 12 Oct 2026 | Identity providers and HR systems can push people to WonderID over SCIM 2.0 as they join, change and leave. |
-| 12 Oct 2026 | Agents that act without asking the Runtime Gateway, or despite a "no", now get a gateway bypass finding. |
-| 12 Oct 2026 | A sync cut short at a limit counts as partial, so the next sync still reads everything it missed. |
-| 12 Oct 2026 | Rogue access that was approved later is recorded as "approved afterwards", with its request, never as fixed. |
-| 12 Oct 2026 | An account matched to a person stays with them when an email address or username is reused; the sync results say so. |
-| 12 Oct 2026 | A sync is held when every record of a kind would go missing at once, at any size; people are held at a lower share than other records. |
-| 12 Oct 2026 | A connection's change sends the system one key however often it is tried; a change that may already have been made is checked by reading the system before it is sent again. |
-| 12 Oct 2026 | A sync that reads fewer records than the system says it holds counts as partial and marks nothing missing. |
-| 12 Oct 2026 | Audit records are kept at least a year on every plan: 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. |
-| 12 Oct 2026 | When someone leaves, a connection that can disable accounts (with changes turned on) disables their account at once; people still remove each access. |
-| 12 Oct 2026 | A "gateway only" setting per agent: acting around the gateway is critical and suspends the agent at the gateway. |
-| 12 Oct 2026 | Rogue access on an account can be accepted as an exception (up to 90 days) or closed as a false positive, with a reason, by someone other than the account's owner. |
-| 12 Oct 2026 | When two identity sources disagree on a detail, the higher-priority source still wins, and the disagreement is listed with both values and sources for review; it clears itself once they agree. |
-| 12 Oct 2026 | A source record matched to the wrong person can be unlinked from the person's page: the details it changed are restored (unless they changed since), and it is never matched to that person again without someone deciding. |
-| 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
-| 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
-| 12 Oct 2026 | Audit records hold identifiers, not personal data: accounts, people and outside systems' ids are recorded by id or as a fingerprint, never as an email, name or login. |
-| 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
-| 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
-| 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
-| 13 Oct 2026 | Birthright packages: people who join, are rehired or move get the packages meant for them automatically. Two administrators turn birthright on, and a change to the package needs approval again. |
-| 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
-| 13 Oct 2026 | Separation of duties described as it is: it covers the same person performing two actions for an AI agent; rules on combinations of access are not provided yet. |
-| 13 Oct 2026 | An organization can require two-step verification. Members then verify with an authenticator app, or set one up, before they see anything; automation credentials are exempt. |
-| 13 Oct 2026 | When someone moves and no longer qualifies for a birthright package, their manager has 14 days to keep it; otherwise it is removed. |
-| 13 Oct 2026 | New navigation: Home, My Workspace, Access, AI Agents, Access Reviews, Risk & Detection, Self Service, then Administration with its own sidebar. New pages: Rogue Accounts, Onboarding Reviews. The dashboard now summarizes the whole platform. |
-| 13 Oct 2026 | Reporting: how to create reports today (ready-made reports, exports of every list for spreadsheets and BI tools) and the planned report builder. |
-| 13 Oct 2026 | Access review campaigns are built in the background, so launching one never makes you wait. |
 
 ---
 
@@ -250,6 +189,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 **Your own connection types**
 - An integrator can describe any system with an HTTP, LDAP, SQL, MCP or file interface: no code, just a definition.
 - **Checked as you type:** the editor checks the definition and can try it against the real system before saving.
+- **Form or JSON:** write it in a guided form (basics, settings, sign-in, one kind of record at a time) or as JSON; both edit the same definition. After "Try it", field paths can be picked from the sample response.
 - **Sharing and upgrading:** download a connection type as a file and open it in another organization's editor. When a newer version is published, a connection shows "available"; its preview lists what changes (settings, sign-in, what it reads and how fields are mapped) before you upgrade. An upgrade never allows more changes in the system than before, and the next sync reads everything again.
 - **Cleaning up values:** values can be changed into the form WonderID needs. For example: make text lowercase, look values up in a table, pick out part of a value with a pattern, replace text, fall back to another field, or shift a date.
 - **Sign-in styles for the system:** none, basic, bearer token, API key (in a header, the address or the request body), OAuth client credentials, LDAP bind and database user.
@@ -310,6 +250,10 @@ All information from your systems reaches WonderID through **connections**. Ther
 
 An AI assistant can **propose** an onboarding configuration; a person always reviews and approves it.
 
+**Onboarding templates:** an administrator can keep a template per connection type, with a questionnaire, so applications of that kind are onboarded the same way (Admin → Applications → Onboarding Templates).
+
+**Entitlement types and classification rules:** each application can name its kinds of entitlement (role, group, permission set) with their own request rules and durations. Classification rules set an entitlement's privilege level, data classification, type, whether it is requestable and whether it is SOX-relevant, from what is known about it and its application, when it is imported or changes. They never override a value a person set; a rule is simulated first and published by a second person (Admin → Organization Settings → Classification Rules).
+
 **Accounts**
 - Each account is matched to its identity.
 - **Once matched, an account stays with its person.** If a later sync would match it to someone else (for example, an email address given to a new person), the account keeps its person. The connection's sync results count it as "kept with their person"; relink it by hand if it really changed hands.
@@ -350,6 +294,12 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 - **People you manage:** yes.
 - **A service account you own:** yes.
 - **An AI agent you are the business owner of:** yes, but only what its approved contract allows; anything else is refused.
+- **Someone who handed you their requests:** while their delegation is in force, you can ask "on behalf of" them, with their request rights (never an access manager's). Both of you are recorded, and neither of you can approve it.
+
+**Several at once**
+- **Basket:** ask for several pieces of access, for one or more people, in one go (Request access → Several at once). Each line is its own request.
+- **Model after:** ask for the same access a colleague has.
+- **Drafts:** save a basket and finish it later.
 
 **Request policies and approvals**
 - Each application or permission can have its own policy, covering:
@@ -358,6 +308,8 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
   - how long access may last;
   - whether a reason is required.
 - Nobody can approve a request they made, or one that is for them.
+- Approvers get a message with a link straight to the request when it reaches them.
+- **Away?** Hand your approvals or your requests to a colleague until a date (Approvals → Delegate your approvals). They act on your behalf, every decision records both of you, and either of you (or an access manager) can end it.
 - A request policy can approve low- and medium-risk requests automatically; these are recorded as approved automatically. High-risk requests always wait for a person.
 - Separation-of-duties rules can block a request that would give a conflicting combination of access.
 
@@ -391,8 +343,11 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 An approved request is not access yet. It becomes access once the change is made in the system and WonderID sees it there.
 
 **By a person: fulfilment tasks**
-- **Where tasks go:** each approved change opens a task for the application's owner, who is notified.
-- **Working a task:** the owner claims it, makes the change in the system, and marks it done or failed (with a reason).
+- **Where tasks go:** each approved change opens a task for whoever the application names under "Fulfilled by": a person or a group, optionally per entitlement type; otherwise the application's owner. They are notified.
+- **Groups:** any member of the group can claim a group's task.
+- **Reassigning:** a task can be handed to someone else with a reason; the new assignee is notified, and the handover is audited.
+- **Workload:** the fulfilment page shows how many open and overdue tasks each person and group has.
+- **Working a task:** the assignee claims it, makes the change in the system, and marks it done or failed (with a reason).
 - **Deadlines:** tasks are due within a set time (3 days by default) and send a daily reminder when overdue.
 - **Closing:** a task closes itself when the next sync confirms the change.
 - **Where:** Access Governance → Fulfilment Tasks.
@@ -681,3 +636,77 @@ These pages are for the WonderID service operator only, never for customers:
 - **Ready-made connections** for Microsoft Entra ID, an HR system (Workday or SuccessFactors) and ServiceNow ticketing.
 - **Reviews for every identity type** on joiner, mover and leaver events.
 - **Your own reports:** a report builder over governed datasets, with an optional read-only SQL mode (see [Creating reports](#creating-reports)).
+
+---
+
+## Revision history
+
+Newest first.
+
+| Date | What changed |
+|---|---|
+| 14 Oct 2026 | Your request rights can be handed to a colleague for a time: they ask for access on your behalf, both of you are recorded, and neither of you approves it. |
+| 14 Oct 2026 | Connection types can be written in a guided form beside the JSON, with field paths picked from a sample response. |
+| 14 Oct 2026 | Approved access for someone with both an everyday and an admin account on an application goes to their everyday account; admin access still waits for a person to choose. |
+| 14 Oct 2026 | Approvals can be handed to a colleague while you are away, until a date; they decide on your behalf and both of you are recorded. |
+| 14 Oct 2026 | Approvers get a message with a link to the request; requests can be saved as drafts and finished later. |
+| 14 Oct 2026 | Several requests at once: a basket of access for one or more people, or the same access as a colleague (model after). |
+| 14 Oct 2026 | Fulfilment tasks go to a person or a group chosen per application (and per entitlement type); a group's members claim them, tasks can be reassigned with a reason, and a workload view shows who has what. |
+| 14 Oct 2026 | Onboarding templates per connection type, with a questionnaire, so each application is onboarded the same way. |
+| 14 Oct 2026 | Entitlement types per application, and classification rules that set an entitlement's privilege and data classification, published by a second person. |
+| 14 Oct 2026 | Identities can end on their end date, and a manager can disable all of a person's access at once; attribute rules run on the shared rule engine with a stored run log. |
+| 14 Oct 2026 | The identity page has Groups, Risk and Activity tabs. |
+| 13 Oct 2026 | Access review campaigns are built in the background, so launching one never makes you wait. |
+| 13 Oct 2026 | Reporting: how to create reports today (ready-made reports, exports of every list for spreadsheets and BI tools) and the planned report builder. |
+| 13 Oct 2026 | New navigation: Home, My Workspace, Access, AI Agents, Access Reviews, Risk & Detection, Self Service, then Administration with its own sidebar. New pages: Rogue Accounts, Onboarding Reviews. The dashboard now summarizes the whole platform. |
+| 13 Oct 2026 | When someone moves and no longer qualifies for a birthright package, their manager has 14 days to keep it; otherwise it is removed. |
+| 13 Oct 2026 | An organization can require two-step verification. Members then verify with an authenticator app, or set one up, before they see anything; automation credentials are exempt. |
+| 13 Oct 2026 | Separation of duties described as it is: it covers the same person performing two actions for an AI agent; rules on combinations of access are not provided yet. |
+| 13 Oct 2026 | An organization can limit the hosts its connections may reach; everything else is refused, redirects included. |
+| 13 Oct 2026 | Birthright packages: people who join, are rehired or move get the packages meant for them automatically. Two administrators turn birthright on, and a change to the package needs approval again. |
+| 13 Oct 2026 | An address that names no organization now answers "not found" (404) on the live service too, not only locally. |
+| 12 Oct 2026 | An automation credential limited to certain addresses is now tested every night at the production edge: a caller who forges the address headers is refused. Where the address comes from, per deployment, is in the security controls. |
+| 12 Oct 2026 | Erasure now also reaches the person's account names, the values their sources sent, and the email, login and name in connector changes, for guests and partners as well as staff. It reports what a source or system still holds, to be erased there. |
+| 12 Oct 2026 | Audit records hold identifiers, not personal data: accounts, people and outside systems' ids are recorded by id or as a fingerprint, never as an email, name or login. |
+| 12 Oct 2026 | Reasons, comments and notes people type are no longer copied into audit records: they stay on the request, task or finding, and the audit record keeps a fingerprint of them. |
+| 12 Oct 2026 | An account unlinked from a person is matched again at the next sync, but never back to that person without someone deciding; undoing a wrong source match also re-matches that person's accounts. |
+| 12 Oct 2026 | A source record matched to the wrong person can be unlinked from the person's page: the details it changed are restored (unless they changed since), and it is never matched to that person again without someone deciding. |
+| 12 Oct 2026 | When two identity sources disagree on a detail, the higher-priority source still wins, and the disagreement is listed with both values and sources for review; it clears itself once they agree. |
+| 12 Oct 2026 | Rogue access on an account can be accepted as an exception (up to 90 days) or closed as a false positive, with a reason, by someone other than the account's owner. |
+| 12 Oct 2026 | A "gateway only" setting per agent: acting around the gateway is critical and suspends the agent at the gateway. |
+| 12 Oct 2026 | When someone leaves, a connection that can disable accounts (with changes turned on) disables their account at once; people still remove each access. |
+| 12 Oct 2026 | Audit records are kept at least a year on every plan: 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. |
+| 12 Oct 2026 | A sync that reads fewer records than the system says it holds counts as partial and marks nothing missing. |
+| 12 Oct 2026 | A connection's change sends the system one key however often it is tried; a change that may already have been made is checked by reading the system before it is sent again. |
+| 12 Oct 2026 | A sync is held when every record of a kind would go missing at once, at any size; people are held at a lower share than other records. |
+| 12 Oct 2026 | An account matched to a person stays with them when an email address or username is reused; the sync results say so. |
+| 12 Oct 2026 | Rogue access that was approved later is recorded as "approved afterwards", with its request, never as fixed. |
+| 12 Oct 2026 | A sync cut short at a limit counts as partial, so the next sync still reads everything it missed. |
+| 12 Oct 2026 | Agents that act without asking the Runtime Gateway, or despite a "no", now get a gateway bypass finding. |
+| 12 Oct 2026 | Identity providers and HR systems can push people to WonderID over SCIM 2.0 as they join, change and leave. |
+| 12 Oct 2026 | When someone leaves, each access they hold becomes its own removal task, due within a day; removals more than a day overdue go to the access managers. |
+| 12 Oct 2026 | Ended access shows whether it is really gone; removing access and disabling accounts are due within a day; refused automation calls are audited, and the database caps automation credential expiry at a year. |
+| 12 Oct 2026 | A role given to an automation credential pauses it until a second administrator approves; owners are reminded about removals that the system has not confirmed. |
+| 12 Oct 2026 | Stronger safeguards: emergency controls block in every gateway mode; high-risk access always needs a person; nobody approves their own request; automation credentials never approve or certify. |
+| 12 Oct 2026 | Any application with a SCIM 2.0 service can be connected and make approved changes (add and remove group members, disable and create users); LDAP directories can add and remove group members. |
+| 12 Oct 2026 | Connection types can be downloaded and opened elsewhere, and a connection can move to a newer version after a preview; this guide was corrected where it promised more than the product does. |
+| 12 Oct 2026 | Connections can sign in with the provider: an administrator presses Connect and approves on the system's own sign-in page. |
+| 12 Oct 2026 | Connections can sign in with a private key instead of a shared secret, or with a client certificate. |
+| 12 Oct 2026 | Every rogue account gets a ticket number (RA-000001, …), one per account, that closes once the account is fixed. |
+| 12 Oct 2026 | This guide rewritten to cover the whole product. |
+| 12 Oct 2026 | Automation credentials for your own tools; connected systems that make approved changes themselves; removing rogue access through a request; a limit on mass changes; richer connection types; faster scheduled syncs that read only what changed. |
+| 11 Oct 2026 | Detecting what was removed in a connected system; automatic flow after every sync; access imported from connected systems and labelled approved, legacy, unproven or rogue; service accounts and agents as owned identities; access requests that end verified, with tasks for application owners; time-bound access; one inbox; bulk invitations. |
+| 10 Oct 2026 | The connection framework with built-in connectors; CSV import and export on every list; install on phones and tablets; the "why does this person have access" ledger; a separate Admin menu; Global Configuration. |
+| 9 Oct 2026 | Help centre checked against the product; pricing on the website. |
+| 2 Oct 2026 | Microsoft and LinkedIn sign-in; single sign-on creates members only after a real single sign-on. |
+| 1 Oct 2026 | Billing (Stripe and Razorpay), privacy tools (GDPR, DPDP), a tamper-evident audit trail, financial and privacy control frameworks, security hardening. |
+| 26 Sep 2026 | Identity sources and matching, joiner/mover/leaver with ownership transfer, the application catalog and onboarding, accounts inventory, application discovery, the request catalog, approvals and access packages, organization addresses and branding, users, roles, groups and scoped permissions. |
+| 25 Sep 2026 | The product became **WonderID**: one directory for every kind of identity, not only AI agents. |
+| 25 Sep 2026 | Light console design; per-agent API keys; the Runtime Gateway with emergency stop and tool filtering; inventories of non-human identities, shadow AI, MCP servers and data sources; investigations; separation-of-duties checks; policy drafts and publishing. |
+| 19 Sep 2026 | More global search results, more notification triggers, an extra risk factor for privileged access. |
+| 18 Sep 2026 | Faster pages, Google sign-in, the help centre with an ask-the-guide assistant, the real logo. |
+| 17 Sep 2026 | Public website, redesigned screens, forgot-password, tables that turn into cards on phones. |
+| 16 Sep 2026 | AI summaries (OpenAI or Gemini, your own key optional), email notifications, the governance evidence pack as a PDF, governance drift and posture, scheduled review escalation. |
+| 15 Sep 2026 | New visual design; agent discovery became a full detect, review and register flow. |
+| 14 Sep 2026 | Connections to other systems, effective access and policies, runtime activity, risk scoring and rogue-agent detection, access reviews, audit trail, reports, notifications, search, and the vendor administration console. Single sign-on and two-step verification. |
+| 13 Sep 2026 | First version of the product: organizations, sign-in, roles and permissions, and AI agent identities with owners, lifecycle and approved purpose. |

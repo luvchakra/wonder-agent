@@ -84,7 +84,7 @@ function toStep(r: Record<string, unknown>): ApprovalStep {
   };
 }
 
-type RequestRow = Record<string, unknown> & { id: string; tenant_id: string; status: string; requested_by: string; subject_identity_id: string | null };
+type RequestRow = Record<string, unknown> & { id: string; tenant_id: string; status: string; requested_by: string; requested_on_behalf_of?: string | null; subject_identity_id: string | null };
 type PolicyTerms = { id: string | null; approval: RequestPolicy["approval"]; approvalMode: RequestPolicy["approvalMode"]; approvalTimeoutDays: number; onTimeout: RequestPolicy["onTimeout"]; updatedAt: string | null };
 
 async function loadPolicyTerms(tenantId: string, policyId: string | null, packageId?: string | null): Promise<PolicyTerms> {
@@ -208,6 +208,7 @@ async function buildChain(tenantId: string, req: RequestRow, now: Date): Promise
     packageOwner,
     isPackage: Boolean(req.access_package_id),
     requesterUserId: req.requested_by,
+    onBehalfOfUserId: (req.requested_on_behalf_of as string | null | undefined) ?? null,
     subjectUserId: subject.userId,
   });
   const fingerprint = fingerprintOf(tenantId, req, matter, terms.id);
@@ -361,7 +362,7 @@ export async function decideApprovalStep(
   if (row.status !== "pending") throw new ApiError(409, "INVALID_TRANSITION", `The request is ${row.status}, not waiting`);
 
   const subject = await getIdentity(tenantId, row.subject_identity_id);
-  if (actor.userId === row.requested_by || (subject?.userId && actor.userId === subject.userId)) {
+  if (actor.userId === row.requested_by || actor.userId === row.requested_on_behalf_of || (subject?.userId && actor.userId === subject.userId)) {
     throw new ApiError(409, "SELF_APPROVAL", "Nobody approves or rejects a request they made or that is for them");
   }
 
@@ -550,13 +551,13 @@ export async function listRequestIdsAwaiting(tenantId: string, actor: { userId: 
   const supabase = await supabaseServer();
   // ACCESS-P0-23: and the steps of those whose approvals this member holds by delegation.
   const named = [actor.userId, ...(await approvalsActingFor(tenantId, actor.userId))].filter((id) => UUID_RE.test(id));
-  let query = supabase.from("access_request_approvals").select("request_id, approver_kind, approver_user_id, access_requests!inner(status, requested_by)").eq("tenant_id", tenantId).eq("status", "pending");
+  let query = supabase.from("access_request_approvals").select("request_id, approver_kind, approver_user_id, access_requests!inner(status, requested_by, requested_on_behalf_of)").eq("tenant_id", tenantId).eq("status", "pending");
   query = actor.canApproveAsAccessManager ? query.or(`approver_user_id.in.(${named.join(",")}),approver_kind.eq.access_managers`) : query.in("approver_user_id", named);
   const { data, error } = await query.limit(500);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   const rows = (data ?? []).filter((r) => {
-    const ar = r.access_requests as unknown as { status: string; requested_by: string };
-    return ar.status === "pending" && ar.requested_by !== actor.userId;
+    const ar = r.access_requests as unknown as { status: string; requested_by: string; requested_on_behalf_of: string | null };
+    return ar.status === "pending" && ar.requested_by !== actor.userId && ar.requested_on_behalf_of !== actor.userId;
   });
   // An open access-manager review is not theirs where they decided an earlier stage.
   const openReviews = [...new Set(rows.filter((r) => r.approver_kind === "access_managers").map((r) => r.request_id as string))];
