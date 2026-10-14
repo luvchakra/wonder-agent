@@ -9,7 +9,7 @@ import { RoleForm } from "../RoleForm";
 // FOUNDATION-P0-25 — Create custom role (spec §15–17, 21; mockups 5–8),
 // from scratch or as a copy of any role this organization can see.
 
-export const metadata = { title: "Create role" };
+export const metadata = { title: "Create ID role" };
 
 export default async function NewRolePage({ searchParams }: { searchParams: Promise<{ copy?: string }> }) {
   let ctx;
@@ -26,14 +26,14 @@ export default async function NewRolePage({ searchParams }: { searchParams: Prom
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
         <Link href="/settings/roles" className="hover:text-foreground">
-          Roles
+          ID Roles
         </Link>
         <span aria-hidden="true"> / </span>
-        <span className="text-foreground">Create role</span>
+        <span className="text-foreground">Create ID role</span>
       </nav>
       <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Create custom role</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Name the role, choose its permissions from the catalog, and review before creating it.</p>
+        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Create custom ID role</h1>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Name the ID role, choose its permissions from the catalog, and review before creating it.</p>
       </div>
       <RoleForm
         mode="create"

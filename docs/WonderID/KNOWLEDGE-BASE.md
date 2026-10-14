@@ -12,7 +12,7 @@
 8. [Making the change: by a person or automatically](#8-making-the-change-by-a-person-or-automatically)
 9. [Risk and findings](#9-risk-and-findings)
 10. [Reviews, policies and compliance](#10-reviews-policies-and-compliance)
-11. [Users, roles and permissions](#11-users-roles-and-permissions)
+11. [Users, ID roles and permissions](#11-users-id-roles-and-permissions)
 12. [Audit, reports, notifications and search](#12-audit-reports-notifications-and-search)
 13. [Privacy](#13-privacy)
 14. [Billing](#14-billing)
@@ -460,7 +460,7 @@ Findings are raised for:
 
 ---
 
-## 11. Users, roles and permissions
+## 11. Users, ID roles and permissions
 
 **Users**
 - **Inviting:** invite people one at a time or in bulk from a CSV (preview first).
@@ -468,12 +468,14 @@ Findings are raised for:
 - **From the HR import:** an identity source can name a default ID role (never the organization administrator role). Each new person it imports with an email is invited to WonderID with that role, on the authority of whoever chose it; people already in WonderID are left as they are.
 - **From an identity:** Add user can start from a person already under Identities (their name, email, title and department fill in), and a person's page has "Give WonderID access" when they can't sign in yet.
 
-**Roles**
-- Built-in and custom roles are made from a catalog of permissions.
-- An invitation or role assignment can never give more than the person giving it holds.
+**ID roles**
+- ID roles decide who can manage WonderID itself. They are different from the roles people hold in your applications, which WonderID governs.
+- Built-in (system) and custom ID roles are made from a catalog of permissions.
+- An invitation or ID role assignment can never give more than the person giving it holds, and nobody can give themselves an ID role.
+- **On a person's page:** the ID Roles tab shows the ID roles a person holds. An administrator who can assign roles adds one there ("Add ID role") or removes one. A person who can't sign in to WonderID yet needs WonderID access first.
 
 **Groups**
-- Assign roles to a group instead of each person.
+- Assign ID roles to a group instead of each person.
 
 **Scoped permissions**
 - Give a permission for one application, one area or one kind of object, instead of the whole organization.
@@ -482,7 +484,7 @@ Findings are raised for:
 - Connect your organization's identity provider.
 - Members are created only after a real single sign-on.
 
-**Where:** Admin → Users & Permissions.
+**Where:** Admin → Users & Roles (Users, ID Roles, Permissions); a person's own page under Identities.
 
 ---
 
@@ -658,6 +660,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | WonderID's own roles are now called "ID roles" everywhere (the sidebar, the ID Roles page, users, groups and permissions), to tell them apart from roles in your applications. A person's page has an ID Roles tab that shows the ID roles they hold, where an administrator can add or remove one. |
 | 14 Oct 2026 | An application's entitlements show "Requestable" only when someone can really request them; without a request policy they show "Needs a request policy", and the request catalog says why. The onboarding Approve button now works for an administrator's own submission. |
 | 14 Oct 2026 | An HR import (identity source) can give new people WonderID access: choose a default ID role on the source's page, and each new person it imports with an email is invited with it. |
 | 14 Oct 2026 | An administrator can approve an application onboarding they submitted (a note is required and it is recorded as self-approved). Add user can start from a person already under Identities, and a person's page has "Give WonderID access". |

@@ -48,8 +48,8 @@ export function RoleStatusActions({
           <input type="hidden" name="status" value={status === "active" ? "inactive" : "active"} />
           <p className="text-sm text-foreground">
             {status === "active"
-              ? `Deactivate this role? ${holders ? `The ${holders} ${holders === 1 ? "person" : "people"} holding it lose its permissions on their next request.` : "Nobody holds it now."}`
-              : "Activate this role? Its holders get its permissions again."}
+              ? `Deactivate this ID role? ${holders ? `The ${holders} ${holders === 1 ? "person" : "people"} holding it lose its permissions on their next request.` : "Nobody holds it now."}`
+              : "Activate this ID role? Its holders get its permissions again."}
           </p>
           <div className="flex gap-2">
             <PendingSubmitButton size="sm" variant={status === "active" ? "destructive" : "default"} pendingLabel="Saving…">
@@ -63,10 +63,10 @@ export function RoleStatusActions({
       ) : confirm === "delete" ? (
         <form action={deleteAction} className="space-y-2">
           <input type="hidden" name="roleId" value={roleId} />
-          <p className="text-sm text-foreground">Delete this role? It can&apos;t be undone; the audit log keeps its history.</p>
+          <p className="text-sm text-foreground">Delete this ID role? It can&apos;t be undone; the audit log keeps its history.</p>
           <div className="flex gap-2">
             <PendingSubmitButton size="sm" variant="destructive" pendingLabel="Deleting…">
-              Delete role
+              Delete ID role
             </PendingSubmitButton>
             <Button type="button" size="sm" variant="ghost" onClick={() => setConfirm(null)}>
               Cancel

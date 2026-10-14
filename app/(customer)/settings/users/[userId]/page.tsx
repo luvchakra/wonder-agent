@@ -26,7 +26,7 @@ import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
 export const metadata = { title: "User" };
 
 const TABS = [
-  { key: "roles", label: "Roles & groups" },
+  { key: "roles", label: "ID roles & groups" },
   { key: "permissions", label: "Effective permissions" },
   { key: "history", label: "Access history" },
   { key: "sessions", label: "Sessions" },
@@ -43,8 +43,8 @@ const HISTORY_LABEL: Record<string, string> = {
   "user.removed": "Removed",
   "user.updated": "Details changed",
   "user.sessions_revoked": "Sessions revoked",
-  "role.assigned": "Role assigned",
-  "role.removed": "Role removed",
+  "role.assigned": "ID role assigned",
+  "role.removed": "ID role removed",
   "group.member_added": "Added to a group",
   "group.member_removed": "Removed from a group",
 };
@@ -162,7 +162,7 @@ export default async function UserDetailPage({
             {!removed && !self && (can("users.suspend") || can("users.remove")) ? (
               <StatusActions userId={user.userId} name={name} status={user.status} canSuspend={can("users.suspend")} canRemove={can("users.remove")} />
             ) : null}
-            {self ? <p className="text-xs text-muted-foreground">Another administrator manages your own membership and roles.</p> : null}
+            {self ? <p className="text-xs text-muted-foreground">Another administrator manages your own membership and ID roles.</p> : null}
           </CardBody>
         </Card>
 
@@ -186,17 +186,17 @@ export default async function UserDetailPage({
           {tab === "roles" ? (
             <Card>
               <CardHeader
-                title={`Assigned roles (${user.roles.length})`}
+                title={`ID roles (${user.roles.length})`}
                 description={user.status === "active" ? undefined : "Held, but not in effect while the membership isn't active."}
               />
               <CardBody className="space-y-4">
                 {user.roles.length === 0 ? (
-                  <EmptyState title="No roles" description="Without a role they have no access in this organization." />
+                  <EmptyState title="No ID roles" description="Without an ID role they have no access in this organization." />
                 ) : (
                   <TableContainer>
                     <Thead>
                       <tr>
-                        <Th>Role</Th>
+                        <Th>ID role</Th>
                         <Th>Type</Th>
                         <Th hideBelow="lg">Applies</Th>
                         <Th hideBelow="xl">Assigned</Th>
@@ -233,7 +233,7 @@ export default async function UserDetailPage({
                           <Td hideBelow="lg">{r.grantedBy?.name ?? "—"}</Td>
                           {canAssign && !self ? (
                             <Td className="text-right">
-                              <RemoveRoleButton userId={user.userId} role={r.role} />
+                              <RemoveRoleButton userId={user.userId} role={r.role} label={r.displayName || roleLabel(r.role)} />
                             </Td>
                           ) : null}
                         </Tr>
@@ -255,16 +255,16 @@ export default async function UserDetailPage({
 
           {tab === "roles" ? (
             <Card>
-              <CardHeader title={`Groups (${user.groups.length})`} description="Roles a group carries apply to every member of the group." />
+              <CardHeader title={`Groups (${user.groups.length})`} description="ID roles a group carries apply to every member of the group." />
               <CardBody>
                 {user.groups.length === 0 ? (
-                  <EmptyState title="Not in any group" description="Add people to groups on the Groups page to give them roles together." />
+                  <EmptyState title="Not in any group" description="Add people to groups on the Groups page to give them ID roles together." />
                 ) : (
                   <TableContainer>
                     <Thead>
                       <tr>
                         <Th>Group</Th>
-                        <Th>Roles it gives</Th>
+                        <Th>ID roles it gives</Th>
                       </tr>
                     </Thead>
                     <tbody>
@@ -294,7 +294,7 @@ export default async function UserDetailPage({
                                 ))}
                               </span>
                             ) : (
-                              <span className="text-xs text-muted-foreground">No roles</span>
+                              <span className="text-xs text-muted-foreground">No ID roles</span>
                             )}
                           </Td>
                         </Tr>
@@ -310,13 +310,13 @@ export default async function UserDetailPage({
             <Card>
               <CardHeader
                 title={`Effective permissions (${user.permissions.length})`}
-                description="What their roles let them do in this organization, and which roles grant each permission."
+                description="What their ID roles let them do in this organization, and which ID roles grant each permission."
               />
               <CardBody>
                 {user.status !== "active" ? (
                   <EmptyState title="No effective permissions" description={`A ${STATUS_LABEL[user.status].toLowerCase()} member can't use any permission in this organization.`} />
                 ) : user.permissions.length === 0 ? (
-                  <EmptyState title="No permissions" description="They hold no role that grants a permission." />
+                  <EmptyState title="No permissions" description="They hold no ID role that grants a permission." />
                 ) : (
                   <TableContainer>
                     <Thead>
@@ -351,7 +351,7 @@ export default async function UserDetailPage({
 
           {tab === "history" ? (
             <Card>
-              <CardHeader title="Access history" description="Changes to their membership and roles in this organization, newest first, including refused attempts." />
+              <CardHeader title="Access history" description="Changes to their membership and ID roles in this organization, newest first, including refused attempts." />
               <CardBody>
                 {!history?.length ? (
                   <EmptyState title="Nothing recorded yet" />

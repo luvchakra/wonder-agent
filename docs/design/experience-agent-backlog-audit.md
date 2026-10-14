@@ -4211,3 +4211,30 @@ data-sources: a saved create closes the dialog, so the "Added X." message
 is no longer on screen; the spec now asserts the dialog closed and the new
 source's row is in the list, and the read-only check also asserts there is
 no create item in the menu.
+
+## 2026-10-14 — "ID Roles" in the sidebar, and an ID Roles tab on a person's page
+
+Owner feedback: WonderID's own roles are "ID roles", and every person's
+page should offer adding one. Foundation's audit log (same date) has the
+service side.
+
+- Sidebar (`modules/ui/shell-nav.ts`): Users & Roles → "ID Roles" (route
+  unchanged, `/settings/roles`); the Administration landing link likewise.
+  `shell-nav.test.ts` updated for the search result label.
+- Person identity page (`app/(customer)/identities/[id]/page.tsx`), HUMAN
+  identities, for viewers with users.view, roles.view, roles.assign or
+  role.manage: a new "ID Roles" tab after Overview (the page's tab
+  pattern). It lists the ID roles held (name, system or custom, terms),
+  with the shared remove button per role and, folded behind an "Add ID
+  role" disclosure (§19.5), the existing assign form with its scope terms.
+  Both only with roles.assign/role.manage, and never on your own page
+  ("Another administrator manages your own ID roles."). Without a
+  membership the tab says they need WonderID access first (the header's
+  "Give WonderID access" link is not repeated). A failed read says so
+  instead of showing an empty list. The groups tab now says "ID roles:".
+- Controls: one new tab; the add form is folded; nothing else added.
+
+Specs changed: `custom-roles`, `users`, `groups`, `authorization`,
+`shell`, `navigation-smoke`, `identities` (renamed text, plus the new ID
+roles test). Verified: local E2E 19/19 `identities`, 92/92 for the rest;
+typecheck, eslint, vitest 153/153, `next build`.

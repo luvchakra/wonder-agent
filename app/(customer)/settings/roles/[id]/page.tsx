@@ -17,7 +17,7 @@ import { RoleStatusActions } from "./RoleStatusActions";
 // grants, and who holds it. System roles are read-only here; custom roles
 // can be edited, deactivated or (when nobody holds them) deleted.
 
-export const metadata = { title: "Role" };
+export const metadata = { title: "ID Role" };
 
 const TABS = [
   { key: "permissions", label: "Permissions" },
@@ -46,7 +46,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
         <Link href="/settings/roles" className="hover:text-foreground">
-          Roles
+          ID Roles
         </Link>
         <span aria-hidden="true"> / </span>
         <span className="text-foreground">{role.displayName}</span>
@@ -54,7 +54,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
 
       {sp.saved ? (
         <p role="status" className="rounded-md border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
-          {sp.saved === "created" ? `${role.displayName} was created.` : "Saved. People who hold the role get the change on their next request."}
+          {sp.saved === "created" ? `${role.displayName} was created.` : "Saved. People who hold the ID role get the change on their next request."}
         </p>
       ) : null}
 
@@ -62,7 +62,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">{role.displayName}</h1>
-            <Badge tone={role.custom ? "info" : "accent"}>{role.custom ? "Custom role" : "System role"}</Badge>
+            <Badge tone={role.custom ? "info" : "accent"}>{role.custom ? "Custom ID role" : "System ID role"}</Badge>
             {role.custom ? <Badge tone={role.status === "active" ? "success" : "neutral"}>{role.status === "active" ? "Active" : "Inactive"}</Badge> : null}
           </div>
           <RecordProvenance record={provenance} className="mt-1" />
@@ -83,12 +83,12 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
         <div className="flex flex-wrap gap-2">
           {can("roles.create") ? (
             <LinkButton href={`/settings/roles/new?copy=${role.id}`} size="sm" variant="outline">
-              Copy role
+              Copy ID role
             </LinkButton>
           ) : null}
           {role.custom && can("roles.update") ? (
             <LinkButton href={`/settings/roles/${role.id}/edit`} size="sm">
-              Edit role
+              Edit ID role
             </LinkButton>
           ) : null}
         </div>
@@ -124,7 +124,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
         </Card>
 
         <div className="min-w-0 space-y-4">
-          <nav aria-label="Role sections" className="flex gap-1 border-b border-border">
+          <nav aria-label="ID role sections" className="flex gap-1 border-b border-border">
             {TABS.map((t) => (
               <Link
                 key={t.key}
@@ -171,7 +171,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
             <Card>
               <CardBody>
                 {role.groups.length === 0 ? (
-                  <EmptyState title="No group carries this role" description="Give it to a group on the Groups page; every member then holds it." />
+                  <EmptyState title="No group carries this ID role" description="Give it to a group on the Groups page; every member then holds it." />
                 ) : (
                   <ul className="divide-y divide-border rounded-lg border border-border">
                     {role.groups.map((g) => (
@@ -197,7 +197,7 @@ export default async function RoleDetailPage({ params, searchParams }: { params:
             <Card>
               <CardBody>
                 {role.holders.length === 0 ? (
-                  <EmptyState title="Nobody holds this role" description="Assign it from a user's page." />
+                  <EmptyState title="Nobody holds this ID role" description="Add it from a person's identity page or user page." />
                 ) : (
                   <ul className="divide-y divide-border rounded-lg border border-border">
                     {role.holders.map((h) => (

@@ -29,7 +29,7 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Groups</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Give roles to a team once instead of person by person. Everyone in a group holds its roles.</p>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Give ID roles to a team once instead of person by person. Everyone in a group holds its ID roles.</p>
         </div>
         <ObjectActionsMenu
           {...objectActionsFor(ctx.permissions, ["groups"])}
@@ -45,14 +45,14 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
         <CardHeader title={`${groups.length} group${groups.length === 1 ? "" : "s"}`} />
         <CardBody>
           {groups.length === 0 ? (
-            <EmptyState title="No groups yet" description="Create a group for a team, then give it roles and add its people." />
+            <EmptyState title="No groups yet" description="Create a group for a team, then give it ID roles and add its people." />
           ) : (
             <TableContainer>
               <Thead>
                 <tr>
                   <Th>Group</Th>
                   <Th>Members</Th>
-                  <Th hideBelow="lg">Roles</Th>
+                  <Th hideBelow="lg">ID roles</Th>
                 </tr>
               </Thead>
               <tbody>
@@ -74,7 +74,7 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
                             </Badge>
                           ))
                         ) : (
-                          <span className="text-xs text-muted-foreground">No roles</span>
+                          <span className="text-xs text-muted-foreground">No ID roles</span>
                         )}
                       </div>
                     </Td>

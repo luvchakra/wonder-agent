@@ -3491,3 +3491,40 @@ option on each person's page.
 Verified: typecheck; eslint; `next build`; local E2E `users` (new test:
 identity → Give WonderID access → form filled) with
 `application-onboarding`, 26/26.
+
+### 2026-10-14 — "ID roles", and ID roles on a person's page (owner feedback)
+
+Owner feedback: "give option on every user page to add Platform Role, lets
+call it 'ID Role'" and "Call these Roles as 'ID Roles'". ID roles are
+WonderID's own roles (the `roles` table: system roles such as Tenant
+Administrator, Identity Administrator, and custom roles), as opposed to
+roles people hold in applications, which stay "roles".
+
+- Wording only, on Foundation's screens: the ID Roles page, role detail,
+  create and edit, the Users list (column and filter), a user's page
+  ("ID roles & groups", "Assign an ID role", "Assign ID role"), the Add
+  user wizard's "ID roles" step, groups, the permission catalog, and the
+  messages of `assignUserRoleAction`. No route, API path, table,
+  permission key or identifier was renamed; the help guide was not changed
+  (owner rule).
+- New `findMemberForPerson(tenantId, { userId, email })` in
+  `lib/users/users.ts`: the member a person's identity stands for (its own
+  user, else the account with the same email), only when that account has
+  a non-removed membership in this tenant (`tenant_memberships` filtered by
+  `tenant_id`, §14). The identity page reads that member's ID roles with
+  `getUserDetail` and changes them only through the existing
+  `assignUserRoleAction` / `removeRoleAction` → `assignRole` / `removeRole`
+  (roles.assign or role.manage, self-grant refused in the service and the
+  database, audited). `assignUserRoleAction` now also revalidates
+  `/identities/[id]`.
+- No schema, permission or RLS change.
+
+Verified: typecheck; eslint on changed files; vitest `modules/ui
+tests/architecture lib/users` 153/153; `next build`; local E2E on :3200:
+`identities` 19/19 (new test: admin adds Auditor from the requester's
+person page, sees it, removes it; read-only sees no "Add ID role"), and
+`custom-roles`, `users`, `groups`, `authorization`, `shell`,
+`navigation-smoke` 92/92 (counts include the 7 sign-in setup steps).
+
+Left out: nothing of this request. (The default ID role in the HR import
+settings, part 2's other half, shipped separately in #208.)

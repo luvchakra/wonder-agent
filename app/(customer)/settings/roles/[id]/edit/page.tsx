@@ -9,7 +9,7 @@ import { RoleForm } from "../../RoleForm";
 // FOUNDATION-P0-25 — edit a custom role. System roles are never editable
 // (they 404 here; the service and database refuse them too).
 
-export const metadata = { title: "Edit role" };
+export const metadata = { title: "Edit ID role" };
 
 export default async function EditRolePage({ params }: { params: Promise<{ id: string }> }) {
   let ctx;
@@ -27,7 +27,7 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">
         <Link href="/settings/roles" className="hover:text-foreground">
-          Roles
+          ID Roles
         </Link>
         <span aria-hidden="true"> / </span>
         <Link href={`/settings/roles/${role.id}`} className="hover:text-foreground">
@@ -39,7 +39,7 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
       <div>
         <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Edit {role.displayName}</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Changes apply to the {role.holderCount} {role.holderCount === 1 ? "person" : "people"} holding this role on their next request.
+          Changes apply to the {role.holderCount} {role.holderCount === 1 ? "person" : "people"} holding this ID role on their next request.
         </p>
       </div>
       <RoleForm

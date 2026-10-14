@@ -27,15 +27,17 @@ test.describe.serial("custom roles", () => {
     const ctx = await browser.newContext({ storageState: authFile("adminOne") });
     const page = await ctx.newPage();
     await page.goto("/settings/roles");
-    await expect(page.getByRole("heading", { name: "Roles", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "ID Roles", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Custom ID roles/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^System ID roles/ })).toBeVisible();
     for (const r of ["Tenant Administrator", "Agent Administrator", "Runtime Security Administrator", "Governance Administrator", "Security Analyst"]) {
       await expect(page.getByRole("link", { name: r, exact: true })).toBeVisible();
     }
     await page.getByRole("link", { name: "Security Administrator", exact: true }).click();
-    await expect(page.getByText("System role", { exact: true })).toBeVisible();
+    await expect(page.getByText("System ID role", { exact: true })).toBeVisible();
     await expect(page.getByText("Permission summary")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Edit role" })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: "Copy role" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Edit ID role" })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Copy ID role" })).toBeVisible();
     await ctx.close();
   });
 
@@ -43,7 +45,7 @@ test.describe.serial("custom roles", () => {
     const ctx = await browser.newContext({ storageState: authFile("adminOne") });
     const page = await ctx.newPage();
     await page.goto("/settings/roles/new");
-    await page.getByLabel("Role name").fill(roleName);
+    await page.getByLabel("ID role name").fill(roleName);
     await page.getByLabel("Description").fill("Reviews certifications and compliance evidence.");
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("searchbox", { name: "Search permissions" }).fill("certifications");
@@ -54,11 +56,11 @@ test.describe.serial("custom roles", () => {
     const review = page.getByRole("region", { name: "Review" });
     await expect(review).toContainText(roleName);
     await expect(review).toContainText("View certifications and controls");
-    await page.getByRole("button", { name: "Create role" }).click();
+    await page.getByRole("button", { name: "Create ID role" }).click();
     await expect(page).toHaveURL(/\/settings\/roles\/[0-9a-f-]{36}\?saved=created/, { timeout: 30_000 });
     roleId = page.url().split("/settings/roles/")[1]!.split("?")[0]!;
     await expect(page.getByText(`${roleName} was created.`)).toBeVisible();
-    await expect(page.getByText("Custom role", { exact: true })).toBeVisible();
+    await expect(page.getByText("Custom ID role", { exact: true })).toBeVisible();
     await expect(page.getByText("compliance.read")).toBeVisible();
     await ctx.close();
   });
@@ -134,14 +136,14 @@ test.describe.serial("custom roles", () => {
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("checkbox", { name: "View reports" }).check();
     await page.getByRole("button", { name: "Next" }).click();
-    await page.getByRole("button", { name: "Save role" }).click();
-    await expect(page.getByText("Saved. People who hold the role get the change on their next request.")).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Save ID role" }).click();
+    await expect(page.getByText("Saved. People who hold the ID role get the change on their next request.")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("report.read")).toBeVisible();
 
     await page.getByRole("button", { name: "Delete" }).click();
-    await page.getByRole("button", { name: "Delete role" }).click();
+    await page.getByRole("button", { name: "Delete ID role" }).click();
     await expect(page).toHaveURL(/\/settings\/roles\?deleted=1/);
-    await expect(page.getByText("The role was deleted.")).toBeVisible();
+    await expect(page.getByText("The ID role was deleted.")).toBeVisible();
     await ctx.close();
   });
 });

@@ -110,7 +110,7 @@ export function RoleForm({ catalog, actorHolds, initial, mode }: { catalog: Form
             ) : null}
             <div>
               <label htmlFor="role-name" className={fieldLabelClass}>
-                Role name
+                ID role name
               </label>
               <input
                 id="role-name"
@@ -163,7 +163,7 @@ export function RoleForm({ catalog, actorHolds, initial, mode }: { catalog: Form
             </div>
             {unheld ? (
               <p className="text-xs text-muted-foreground">
-                {unheld} permission{unheld === 1 ? " is" : "s are"} unavailable: a role can only include permissions you hold yourself.
+                {unheld} permission{unheld === 1 ? " is" : "s are"} unavailable: an ID role can only include permissions you hold yourself.
               </p>
             ) : null}
             {errors.permissions ? <p className="text-xs text-destructive">{errors.permissions}</p> : null}
@@ -239,7 +239,7 @@ export function RoleForm({ catalog, actorHolds, initial, mode }: { catalog: Form
           <section hidden={shownStep !== 2} aria-label="Review" className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2 rounded-lg border border-border p-4 text-sm">
               <p className="font-medium text-foreground">{name || "—"}</p>
-              <p className="text-muted-foreground">Custom role{initial.copyFrom ? `, copied from ${initial.copyFrom.name}` : ""}</p>
+              <p className="text-muted-foreground">Custom ID role{initial.copyFrom ? `, copied from ${initial.copyFrom.name}` : ""}</p>
               <p className="text-foreground">{description || "—"}</p>
               <p className="text-xs text-muted-foreground">Scope: the whole organization. Conditions: none.</p>
             </div>
@@ -287,7 +287,7 @@ export function RoleForm({ catalog, actorHolds, initial, mode }: { catalog: Form
                 Next
               </Button>
             ) : (
-              <PendingSubmitButton pendingLabel="Saving…">{mode === "edit" ? "Save role" : "Create role"}</PendingSubmitButton>
+              <PendingSubmitButton pendingLabel="Saving…">{mode === "edit" ? "Save ID role" : "Create ID role"}</PendingSubmitButton>
             )}
           </div>
         </form>

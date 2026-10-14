@@ -174,11 +174,11 @@ test.describe.serial("authorization engine", () => {
     const admin = await browser.newContext({ storageState: authFile("adminOne") });
     const page = await admin.newPage();
     await page.goto(`/settings/users/${requesterId}`);
-    await page.getByLabel("Assign a role").selectOption({ label: `${roleName} (change terms)` });
+    await page.getByLabel("Assign an ID role").selectOption({ label: `${roleName} (change terms)` });
     await page.getByText("Scope, timing and conditions").click();
     await page.getByLabel("Applies to").first().selectOption("environment");
     await page.getByRole("checkbox", { name: "Production" }).check();
-    await page.getByRole("button", { name: "Assign role" }).click();
+    await page.getByRole("button", { name: "Assign ID role" }).click();
     await expect(page.getByText(`${roleName} assigned.`)).toBeVisible({ timeout: 30_000 });
     await page.reload();
     await expect(page.getByRole("row", { name: new RegExp(roleName) }).getByText("Environment: production")).toBeVisible();

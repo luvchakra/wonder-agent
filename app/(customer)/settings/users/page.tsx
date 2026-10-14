@@ -52,7 +52,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Users</h1>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">People in your organization, their status and the roles that give them access.</p>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">People in your organization, their status and the ID roles that let them use WonderID.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {/* FOUNDATION-P0-32: Import CSV… invites many people at once (preview first); Export CSV lists the members. */}
@@ -97,10 +97,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             </div>
             <div>
               <label htmlFor="role" className={fieldLabelClass}>
-                Role
+                ID role
               </label>
               <select id="role" name="role" defaultValue={role} className={fieldInputClass}>
-                <option value="">All roles</option>
+                <option value="">All ID roles</option>
                 {roles.map((r) => (
                   <option key={r.id} value={r.name}>
                     {r.displayName}
@@ -143,7 +143,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               <Thead>
                 <tr>
                   <Th>Name</Th>
-                  <Th hideBelow="lg">Roles</Th>
+                  <Th hideBelow="lg">ID roles</Th>
                   <Th>Status</Th>
                   <Th hideBelow="xl">Last active</Th>
                 </tr>
@@ -176,7 +176,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                               </Badge>
                             ))
                           ) : (
-                            <span className="text-xs text-muted-foreground">No roles</span>
+                            <span className="text-xs text-muted-foreground">No ID roles</span>
                           )}
                         </div>
                       </Td>
