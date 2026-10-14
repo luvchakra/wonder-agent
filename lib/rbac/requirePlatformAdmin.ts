@@ -4,6 +4,7 @@ import { cache } from "react";
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { getSessionUser } from "@/lib/tenant/session";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { writePlatformAudit } from "@/modules/platform-admin/auditLog";
 import { isListedPlatformAdmin, parsePlatformAdminEmails } from "./platformAdminEmails";
 
 /**
@@ -34,13 +35,23 @@ export const isPlatformAdmin = cache(async (): Promise<boolean> => {
 
   // Owner request (2026-10-13): or listed in PLATFORM_ADMIN_EMAILS, for an
   // account whose email Supabase Auth has confirmed (read from Auth, never
-  // from the request).
+  // from the request), signed in by a method that proves the mailbox, never
+  // enterprise SSO (WID-H10).
   const list = parsePlatformAdminEmails(process.env.PLATFORM_ADMIN_EMAILS);
   if (list.size === 0 || !user.email || !list.has(user.email.trim().toLowerCase())) return false;
   const { data: account, error: accountError } = await admin.auth.admin.getUserById(user.id);
   if (accountError || !account?.user) return false;
-  return isListedPlatformAdmin(list, { email: account.user.email, emailConfirmedAt: account.user.email_confirmed_at });
+  const providers = (account.user.identities ?? []).map((i) => i.provider);
+  const admitted = isListedPlatformAdmin(list, { email: account.user.email, emailConfirmedAt: account.user.email_confirmed_at, isSsoUser: account.user.is_sso_user, providers });
+  // WID-H10: the first console access through the variable leaves a platform audit record.
+  if (admitted) {
+    const { data: seen, error: seenError } = await admin.from("platform_audit_logs").select("id").eq("actor_id", user.id).eq("action", ENV_ACCESS_ACTION).limit(1);
+    if (!seenError && !seen?.length) await writePlatformAudit({ actorId: user.id, action: ENV_ACCESS_ACTION, newValue: { via: "PLATFORM_ADMIN_EMAILS", providers }, result: "success" });
+  }
+  return admitted;
 });
+
+const ENV_ACCESS_ACTION = "platform.admin_access_via_env";
 
 export async function requirePlatformAdmin(): Promise<{ userId: string }> {
   const user = await getSessionUser();

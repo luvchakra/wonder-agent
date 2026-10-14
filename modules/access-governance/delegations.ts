@@ -4,7 +4,7 @@ import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { grantDelegatedRoles, revokeDelegatedRoles } from "@/lib/rbac/delegatedRoles";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { actingFor, isActive, validateDelegation, type DelegationInput, type DelegationScope } from "./delegationRules";
+import { actingFor, delegationMemberRefusal, isActive, validateDelegation, type DelegationInput, type DelegationScope } from "./delegationRules";
 
 /**
  * ACCESS-P0-23 — approver and (part 2) request delegation. Reads as the caller (RLS: their own,
@@ -58,13 +58,11 @@ export async function createDelegation(tenantId: string, caller: Caller, input: 
   const v = validateDelegation(input, caller, new Date());
   if ("error" in v) throw new ApiError(v.status ?? 400, v.status === 403 ? "FORBIDDEN" : "VALIDATION_FAILED", v.error);
   const admin = supabaseServiceRole();
-  // Both are active members of this organization.
-  const { data: members, error: memberError } = await admin.from("tenant_memberships").select("user_id, status").eq("tenant_id", tenantId).in("user_id", [v.delegator_user_id, v.delegate_user_id]);
+  // Both are active people in this organization; never an automation credential (WID-H06).
+  const { data: members, error: memberError } = await admin.from("tenant_memberships").select("user_id, status, account_type").eq("tenant_id", tenantId).in("user_id", [v.delegator_user_id, v.delegate_user_id]);
   if (memberError) throw new ApiError(500, "QUERY_FAILED", memberError.message);
-  for (const id of [v.delegator_user_id, v.delegate_user_id]) {
-    if (!(members ?? []).some((m) => m.user_id === id && m.status === "active"))
-      throw new ApiError(404, "NOT_FOUND", `${id === v.delegate_user_id ? "delegateUserId" : "delegatorUserId"}: not an active member of this organization`);
-  }
+  const refusal = delegationMemberRefusal(members ?? [], { delegator: v.delegator_user_id, delegate: v.delegate_user_id });
+  if (refusal) throw new ApiError(refusal.status, refusal.code, refusal.error);
   const { data, error } = await admin
     .from("access_delegations")
     .insert({ tenant_id: tenantId, ...v, created_by: caller.userId })

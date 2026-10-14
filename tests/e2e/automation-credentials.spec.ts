@@ -181,6 +181,25 @@ test.describe.serial("automation credentials", () => {
     await api.dispose();
   });
 
+  test("WID-H06: no delegation, of any scope, gives a credential roles or acts for one", async ({ page }) => {
+    const { data: cred } = await db().from("automation_credentials").select("backing_user_id").eq("id", credentialId).single();
+    const bot = cred!.backing_user_id as string;
+    const { data: iam } = await db().from("users").select("id").eq("email", TEST_USERS.iamAdminOne.email).single();
+    const endsAt = new Date(Date.now() + 3 * 86_400_000).toISOString();
+    for (const scope of ["administration", "approvals", "requests"]) {
+      const to = await page.request.post("/api/v1/access/delegations", { data: { delegatorUserId: iam!.id, delegateUserId: bot, scope, endsAt } });
+      expect(to.status(), scope).toBe(409);
+      expect((await to.json()).error.code).toBe("AUTOMATION_MEMBER");
+      const from = await page.request.post("/api/v1/access/delegations", { data: { delegatorUserId: bot, delegateUserId: iam!.id, scope, endsAt } });
+      expect(from.status(), scope).toBe(409);
+      expect((await from.json()).error.code).toBe("AUTOMATION_MEMBER");
+    }
+    const { count: delegations } = await db().from("access_delegations").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).or(`delegator_user_id.eq.${bot},delegate_user_id.eq.${bot}`);
+    expect(delegations).toBe(0);
+    const { count: copies } = await db().from("user_roles").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("user_id", bot).not("delegation_id", "is", null);
+    expect(copies).toBe(0);
+  });
+
   test("WID-H08: an address limit uses only the edge's address; spoofed headers never satisfy it", async ({ baseURL }) => {
     // Addresses from TEST-NET-3 (RFC 5737): no real caller has one.
     const SPOOFED = "203.0.113.7";

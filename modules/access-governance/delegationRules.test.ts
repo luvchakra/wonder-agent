@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actingFor, isActive, validateDelegation } from "./delegationRules";
+import { actingFor, delegationMemberRefusal, isActive, validateDelegation } from "./delegationRules";
 import { actionableStep, type ActionableStep } from "./approvalRules";
 
 const ME = "11111111-1111-1111-1111-111111111111";
@@ -69,5 +69,28 @@ describe("approver delegation (ACCESS-P0-23)", () => {
     const list = [{ delegatorUserId: SAM, delegateUserId: ME, scope: "requests" as const, ...d }];
     expect(actingFor(list, ME, now, "requests")).toEqual([SAM]);
     expect(actingFor(list, ME, now)).toEqual([]);
+  });
+});
+
+describe("WID-H06: no delegation names an automation credential", () => {
+  const p = "11111111-1111-4111-8111-111111111111";
+  const q = "22222222-2222-4222-8222-222222222222";
+  const people = [
+    { user_id: p, status: "active", account_type: "internal" },
+    { user_id: q, status: "active", account_type: "internal" },
+  ];
+  it("allows two active people", () => {
+    expect(delegationMemberRefusal(people, { delegator: p, delegate: q })).toBeNull();
+  });
+  it("refuses an automation member as the delegate", () => {
+    const members = [people[0], { ...people[1], account_type: "automation" }];
+    expect(delegationMemberRefusal(members, { delegator: p, delegate: q })).toMatchObject({ status: 409, code: "AUTOMATION_MEMBER" });
+  });
+  it("refuses an automation member as the delegator", () => {
+    const members = [{ ...people[0], account_type: "automation" }, people[1]];
+    expect(delegationMemberRefusal(members, { delegator: p, delegate: q })).toMatchObject({ status: 409, code: "AUTOMATION_MEMBER" });
+  });
+  it("refuses someone who is not an active member", () => {
+    expect(delegationMemberRefusal([people[0], { ...people[1], status: "suspended" }], { delegator: p, delegate: q })).toMatchObject({ status: 404 });
   });
 });

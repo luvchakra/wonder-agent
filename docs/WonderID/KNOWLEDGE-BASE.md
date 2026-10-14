@@ -383,7 +383,7 @@ An approved request is not access yet. It becomes access once the change is made
 - **Limits:** it expires within a year (the database refuses anything longer), can be limited to certain network addresses, and is rate-limited.
   The address is the one the platform's edge reports, never one the caller sends. This is tested every night at the production edge.
 - **The secret:** it is shown once. Only a fingerprint of it is kept.
-- **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions.
+- **What it can do:** only what its roles allow. It can never approve access, certify, approve an onboarding or manage automation credentials: those are people's decisions. It can never delegate or be delegated to; its roles change only on its own page.
 - **Audit:** every call it is allowed to make is audited. Refused calls are audited too, whether the credential is pending, revoked or expired, the address is not allowed, or it is over its rate limit. To keep the record readable, each reason is recorded at most once a minute per credential.
 - **Where:** Settings → Automation Credentials.
 
@@ -650,6 +650,7 @@ Newest first.
 | Date | What changed |
 |---|---|
 | 14 Oct 2026 | Access reviews can cover the WonderID roles members hold, directly or through a group, privileged roles first; nobody certifies their own role, and a revoke removes it at once. |
+| 14 Oct 2026 | Delegation never involves an automation credential, in either direction: its roles change only on its own page. The vendor console's listed-address path no longer accepts enterprise SSO or Microsoft-only sign-ins, and its first use is recorded in the platform audit. |
 | 14 Oct 2026 | Access reviews cover people's application access too: reviewed by the manager, the application owner or a named reviewer; a revoke becomes an approved removal, verified at the source. |
 | 14 Oct 2026 | In organizations with two or more Tenant Administrators, a change to a request policy waits for someone else to approve it, showing what it changes; every applied change is kept as a numbered version. |
 | 14 Oct 2026 | Administration can be handed to a colleague for a time: they get copies of the person's roles until the end date, removed at once if it ends early. Tenant Administrator is never handed over. |

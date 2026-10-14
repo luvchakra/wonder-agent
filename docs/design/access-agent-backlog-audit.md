@@ -4040,3 +4040,28 @@ Published two services for Compliance's reviews of people's access
 
 Verified through Compliance's checks (unit 483/483, E2E brownfield revoke
 reaching a `remove` task). No schema change in this module.
+
+## 2026-10-14 — WID-H06 (reopened): no delegation names an automation credential
+
+The high-risk register reopened WID-H06 at 12:06 IST: ACCESS-P0-23 part 3
+(#189) let an administration delegation copy a person's roles to an
+automation credential's backing member, outside the credential's escalation
+check and four-eyes re-approval. Fixed:
+- `delegationMemberRefusal` (`delegationRules.ts`): delegator and delegate
+  must be active and not `automation` members, for every scope;
+  `createDelegation` uses it (409 `AUTOMATION_MEMBER`).
+- **Migration `0182_access_delegations_no_automation.sql`** (applied to
+  dev): triggers refuse such a delegation, and any `user_roles` row with a
+  `delegation_id` for an automation member, for every writer including the
+  service role. No existing row was affected (checked: 0 and 0).
+
+Verified:
+- `npm run typecheck`; eslint on the changed files.
+- Vitest `delegationRules.test.ts` 9/9 (4 new), with `platformAdminEmails`
+  and architecture: 33/33.
+- `tests/access/delegations-no-automation.sql` against dev: 5/5.
+- E2E `automation-credentials.spec.ts` "WID-H06: no delegation, of any
+  scope, gives a credential roles or acts for one". Local E2E
+  `automation-credentials` + `approval-delegation` + `platform-admin`: 32/32.
+
+Tracker: `docs/WonderID/FINDINGS-REMEDIATION.md`, WID-H06.

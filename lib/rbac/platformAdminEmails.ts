@@ -18,8 +18,26 @@ export function parsePlatformAdminEmails(raw: string | undefined): Set<string> {
   );
 }
 
-/** Whether a confirmed account's email is on the list. */
-export function isListedPlatformAdmin(list: ReadonlySet<string>, account: { email: string | null | undefined; emailConfirmedAt: string | null | undefined }): boolean {
+/**
+ * WID-H10: sign-in methods that prove the person controls the mailbox.
+ * Email (a confirmation link or a one-time code to the mailbox) and the
+ * providers that verify the email they return. Enterprise SSO (`sso:*`),
+ * whose email is asserted by a customer's own IdP, and Microsoft (`azure`),
+ * whose email claim is not verified, are not on it.
+ */
+export const PROVEN_EMAIL_PROVIDERS: ReadonlySet<string> = new Set(["email", "google", "linkedin_oidc"]);
+
+/**
+ * Whether a confirmed account's email is on the list, signed in by a
+ * method that proves the mailbox: never an SSO account, and at least one
+ * identity from PROVEN_EMAIL_PROVIDERS.
+ */
+export function isListedPlatformAdmin(
+  list: ReadonlySet<string>,
+  account: { email: string | null | undefined; emailConfirmedAt: string | null | undefined; isSsoUser?: boolean | null; providers: readonly string[] },
+): boolean {
   if (!account.email || !account.emailConfirmedAt) return false;
+  if (account.isSsoUser || account.providers.some((p) => p.startsWith("sso"))) return false;
+  if (!account.providers.some((p) => PROVEN_EMAIL_PROVIDERS.has(p))) return false;
   return list.has(account.email.trim().toLowerCase());
 }
