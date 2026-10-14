@@ -128,7 +128,7 @@ Exit test: not run.
 | OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Partial | 2026-10-14: condition language, evaluation, simulation and run-log entries (`modules/operations/rules`); storing the run log needs its table |
 | IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Not started | |
 | IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Partial | Backlog: events, tasks, transitions, ownership transfer built; rules not |
-| IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Partial | Backlog: Partial |
+| IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Not started | |
 | COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Not started | Backlog: Not Started |
 | COMPLIANCE-P0-11 Certification of administrators | Compliance | | Not started | Backlog: Not Started |
