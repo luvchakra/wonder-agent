@@ -7,6 +7,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { closeTasksForGrants } from "./fulfilmentTasks";
 import { registerConnectorTypes } from "./entitlementTypes";
+import { classifyEntitlements } from "./classificationRulesService";
 import { accountRefOf } from "./accountRules";
 import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
 import {
@@ -213,6 +214,15 @@ async function reconcileAccess(
 
     await applyEntitlements(admin, tenantId, applicationId, integrationId, entPlan);
     await applyGrants(admin, tenantId, integrationId, grantPlan, entPlan.byRef);
+    // ACCESS-P0-33: the organization's classification rules on what this run brought in or changed. Never fails the run.
+    await classifyEntitlements(
+      tenantId,
+      [
+        ...entPlan.creates.map((c) => ({ entitlementId: entPlan.byRef.get(c.ref)!, trigger: "entitlement.imported" })),
+        ...entPlan.updates.map((u) => ({ entitlementId: u.id, trigger: "entitlement.changed", changed: u.changes.map((c) => c.field) })),
+      ].filter((i) => i.entitlementId && !i.entitlementId.startsWith("new:")),
+      { correlationId: opts.syncJobId ?? null },
+    );
 
     const run = await record({ status: "succeeded", counts, samples, plan_hash: planHash });
     await writeAudit({

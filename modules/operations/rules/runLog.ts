@@ -10,7 +10,7 @@ import type { RunLogEntry } from "./runtime";
  * version; members read it. Append-only.
  */
 
-export type RuleTable = "lifecycle_rules";
+export type RuleTable = "lifecycle_rules" | "entitlement_classification_rules";
 
 export type RuleRunRecord = Omit<RunLogEntry, "outcome"> & { outcome: RunLogEntry["outcome"] | "skipped"; detail?: string };
 

@@ -35,6 +35,7 @@ export {
   simulateRules,
   validateRule,
   ruleReferences,
+  sameRuleDefinition,
   EFFECT_CATALOGUE,
   type Rule,
   type RuleEffect,

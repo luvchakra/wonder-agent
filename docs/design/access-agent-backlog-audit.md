@@ -3296,3 +3296,101 @@ Design §5.4. Classification rules (part 2) set the same fields.
   - the application page shows the type editor;
   - read-only gets 403 and another organization 404, or an empty list.
 - Typecheck, eslint and `next build` are clean.
+
+## 2026-10-14 — ACCESS-P0-33 part 2: entitlement classification rules
+
+Design §5.2.1 and §5.4. An imported application brings entitlements with no
+classification. A classification rule matches them and sets their
+classification, with every value it sets traceable to the rule.
+
+**Owner decision (2026-10-14).** "Entitlement behaviour today is okay."
+Ownerless entitlements stay requestable and fall back to the application
+owner (ACCESS-P0-19). This closes part 1's open question; nothing changes.
+
+**Migration 0170.**
+- `entitlement_classification_rules`:
+  - holds a working copy and the published copy that runs, as Identity's
+    `lifecycle_rules` (0166) does;
+  - publishing is four-eyes: the approver is never the person who asked,
+    and the database checks this;
+  - a new rule starts report-only;
+  - one name per organization, ignoring case.
+- `entitlement_classification_rule_versions`: one row per publish, with who
+  asked and who approved. Append-only: an update trigger refuses changes.
+- `rule_runs` now also accepts this table's runs. The widening is additive.
+- Members read; writes go through the service.
+
+**Rules** (pure, `classificationRules.ts`).
+- Triggers: `entitlement.imported` and `entitlement.changed`.
+- Scope: optionally, a list of this organization's applications.
+- Conditions read `entitlement.*` (name, type, privilege level, data
+  classification, requestable, SOX, has owner, external),
+  `application.*` (name, display name, risk level, data classification,
+  type, vendor), and `old.*` / `new.*`.
+- Effects set only: privilege level, data classification, type,
+  requestable, SOX-relevant. Each value is checked.
+- A value a person set (`field_provenance` `by: person`) is never
+  overridden. The run log records it as skipped, with the reason.
+- Each value a rule writes records the rule and its version as provenance.
+
+**Service** (`classificationRulesService.ts`).
+- List, get, create, update and retire. Edits use optimistic `updated_at`
+  checks. An edit clears the simulation.
+- Simulate runs the working copy as if enforced over the entitlements in
+  scope, up to 50,000, paged by id. It shows what would change and what
+  would be skipped, and writes nothing.
+- Request publish needs a simulation since the last edit. Approval, by
+  someone else, publishes the next version.
+- An enforced rule is applied to the existing entitlements in its scope
+  when it is published, up to 5,000. The approval reports the count as
+  `appliedTo`.
+- `classifyEntitlements` runs the published rules on an import (after
+  `applyGrants` in `connectorAccess.ts`) and on a manually created
+  entitlement. It never throws, so a failure never undoes an import. Every
+  outcome goes to `rule_runs`.
+
+**API:** `/api/v1/access/classification-rules`, with `[ruleId]`, `simulate`,
+`publish` (`request` or `approve`), `retire` and `runs`. Reads need
+access.read; writes need access.manage.
+
+**UI.** Admin › Organization Settings › Classification Rules, next to
+Identity Rules. It has two pages:
+- the list, with a form to create a rule;
+- the rule, showing what it does, its single next step, and its recent
+  runs.
+
+The owner's Access list is unchanged; the nav test pins it.
+
+**Left out, recorded.**
+- An application's own rule page or tab.
+- Rules computing the owner. Owner provenance exists, but the owner stays
+  with the person or the source.
+- Applying a rule to more than 5,000 existing entitlements at publish time.
+  Past that, the next import or change classifies the rest.
+
+**Verified.**
+- Unit tests: `classificationRules.test.ts` 5. `npx vitest run modules
+  tests/architecture lib` passes, 1532, after the nav link moved to Admin
+  (the owner's Access list is pinned by `shell-nav.test.ts`).
+- Database: `tests/access/classification-rules-isolation.sql`, 11 of 11 as
+  expected. It rolls itself back, leaving no fixtures.
+- Local E2E: `classification-rules.spec.ts` with `request-catalog.spec.ts`
+  and `f1-reconciliation.spec.ts` (the import path changed), 37/37 in
+  8.0 minutes. The new spec covers:
+  - refused conditions and effects;
+  - a simulation first, then four-eyes publishing;
+  - report-only changes nothing and logs `reported`;
+  - enforce applies to the three matching existing entitlements
+    (`appliedTo: 3`), with rule provenance;
+  - a person's requestable value kept;
+  - a new entitlement classified on creation;
+  - the pages;
+  - another organization 404 (including a scope naming its application);
+  - read-only 403;
+  - a retired rule stops.
+- **Found by that run and fixed:** the "entitlements classified" audit
+  event passed a text run label (`publish:<rule>:<version>`) as the audit
+  log's uuid correlation id, so `writeAudit` refused it. The label now goes
+  in the metadata, and only a uuid is used as the correlation id. Checked by
+  typecheck; the spec does not read audit rows.
+- Typecheck, eslint and `next build` are clean.

@@ -1019,3 +1019,18 @@ The row is Partial in the live phase doc.
   exported from `modules/operations/service.ts`.
 - **First user:** Identity's attribute rules (IDENTITY-P0-21). The rule page
   shows each rule's recent runs.
+
+### 2026-10-14 — The rule runtime's second user: classification rules
+
+Additive changes made for Access's classification rules (ACCESS-P0-33 part 2):
+
+- **`sameRuleDefinition(a, b)`** in `modules/operations/rules/runtime.ts`:
+  compares two rule definitions as canonical JSON (keys sorted), so "nothing
+  to publish" does not depend on the key order the database returns.
+- **`RuleTable`** in `runLog.ts` now also accepts
+  `entitlement_classification_rules`, matching `rule_runs`' widened check in
+  migration 0170 (Access's migration).
+
+Verified with the Access work: the Operations rule tests still pass inside
+`npx vitest run modules tests/architecture lib`, and so do the run-log rows
+for classification rules in `classification-rules.spec.ts`.
