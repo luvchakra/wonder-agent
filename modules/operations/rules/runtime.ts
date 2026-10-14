@@ -305,3 +305,20 @@ export function ruleReferences(rule: Pick<Rule, "condition" | "effects">): strin
   for (const e of rule.effects) for (const v of Object.values(e.params)) for (const ref of valueRefs(v)) out.add(ref);
   return [...out];
 }
+
+/** Key order is not meaning: stored JSON comes back with its keys reordered. */
+function canonical(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonical).join(",")}]`;
+  if (v && typeof v === "object")
+    return `{${Object.keys(v as Record<string, unknown>)
+      .filter((k) => (v as Record<string, unknown>)[k] !== undefined)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonical((v as Record<string, unknown>)[k])}`)
+      .join(",")}}`;
+  return JSON.stringify(v ?? null);
+}
+
+/** Whether two rule definitions say the same thing (for "unpublished changes" and "already published"). */
+export function sameRuleDefinition(a: unknown, b: unknown): boolean {
+  return canonical(a) === canonical(b);
+}

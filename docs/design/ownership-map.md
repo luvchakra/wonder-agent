@@ -77,6 +77,7 @@ excluded (list in the migration's header).
 | `onboarding_proposals` | INT | INTEGRATION-P0-12: proposals from an OpenAPI document or sample account (schema, identifier, correlation, entitlements, operations with evidence, risk, policies, assumptions, questions, destructive actions, tests) with AI provenance; the input is not stored (hash and size only). Applying writes only an onboarding draft. Members read only; the service writes |
 | `entitlements` | AA | Roles/permissions/entitlements on an application; since ACCESS-P0-19 an optional owner (an identity) who approves requests for it; since ACCESS-P0-33 a type, `requestable`, `sox_relevant` and per-field provenance (0169) |
 | `application_entitlement_types` | AA | An application's entitlement types and how each is requested, certified and timed (ACCESS-P0-33, 0169); registered from the connector or added by hand; member reads, service-role writes |
+| `entitlement_classification_rules`, `entitlement_classification_rule_versions` | AA | The organization's entitlement classification rules (ACCESS-P0-33 part 2, 0170): set privilege level, data classification, type, requestable or SOX flag when an entitlement is imported or changes, never over a person's value. A working copy and the published copy that runs; four-eyes publishing; append-only versions. Evaluated by OA's shared rule runtime (D12). Member reads; service-role writes from AA's `classificationRulesService` |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |
 | `access_paths` | AA | Materialized/explainable path from agent → data |
 | `policies` | AA | Identity/Access/Runtime/Agent/Lifecycle policy definitions |
@@ -128,7 +129,7 @@ excluded (list in the migration's header).
 | `connector_definitions` | INT | An organization's own connector definitions (immutable versions; built-in definitions live in `modules/integrations/framework/definitions`) |
 | `connector_traffic` | INT | The Connector Gateway's traffic ledger: per connection, per minute, requests, errors, blocked, bytes and duration by host only (service-role writes, member reads; migration 0110) |
 | `notifications` | OA | In-app/email notification records |
-| `rule_runs` | OA | The automation run log of every module's rules (OPERATIONS-P0-11, D12, migration 0167): each evaluation's outcome, planned effects and the rule version; written by the owning module through OA's `recordRuleRuns()`, read by members; append-only |
+| `rule_runs` | OA | The automation run log of every module's rules (OPERATIONS-P0-11, D12, migration 0167; classification rules since 0170): each evaluation's outcome, planned effects and the rule version; written by the owning module through OA's `recordRuleRuns()`, read by members; append-only |
 | `reports` | OA | Saved/scheduled report definitions |
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
 | `environment_orders` | PA | Paid environments an organization's owner bought (migration 0161; test-mode payments while no provider is configured) |

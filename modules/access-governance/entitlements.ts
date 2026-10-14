@@ -32,6 +32,13 @@ export async function createEntitlement(
   // organization's row (23503). Say so, rather than a generic 500.
   if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That application is not in this organization");
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to create entitlement");
+  // ACCESS-P0-33: a hand-made entitlement is classified like an imported one.
+  const { classifyEntitlements } = await import("./classificationRulesService");
+  const classified = await classifyEntitlements(tenantId, [{ entitlementId: data.id as string, trigger: "entitlement.imported" }]);
+  if (classified.changed) {
+    const again = await getEntitlement(tenantId, data.id as string);
+    if (again) return again;
+  }
   return toEntitlement(data);
 }
 

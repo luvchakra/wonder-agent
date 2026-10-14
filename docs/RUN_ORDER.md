@@ -727,3 +727,27 @@ First audit run, 09:06 IST, `main` @ `376473b`:
 - C01 `ACCEPTED` on the owner's risk acceptance;
 - H05 stays `CHANGED`; H06 stays `FIXED`;
 - the full nightly suite has not been green since #119–#132.
+
+## 2026-10-14 — Owner priority: onboarding, requests, approvals, provisioning
+
+The owner asked that stories about application onboarding, access request
+creation, approvals and provisioning of accounts and entitlements go first.
+Until the owner says otherwise, the order is:
+
+1. ACCESS-P0-33: entitlement types and classification rules (finishing).
+2. ACCESS-P0-34: application onboarding templates per connection type, with
+   a questionnaire form.
+3. ACCESS-P0-38: request baskets for many changes and identities,
+   model-after, saved drafts and signed approval links.
+4. ACCESS-P0-23: delegations of approval, request and administration.
+5. INTEGRATION-P0-26: ServiceNow ticketing for manual fulfilment.
+6. QA-P0-22: the brownfield fixture, HR → request → provision → certify →
+   revoke → verify.
+7. ACCESS-P0-35: approved changes to request policies and the other
+   governance objects.
+8. QA-P0-07: connector contract tests.
+9. EXPERIENCE-P0-30: the guided connector definition editor.
+
+RISK-P0-13 (rogue access remediation through approval and provisioning)
+stays Partial until the nightly E2E passes. Certification (COMPLIANCE-P0-10,
+-11, -14) and the other High items follow this list.

@@ -168,3 +168,18 @@ export type { AccessCounts } from "./connectorAccessRules";
 // ACCESS-P0-33: entitlement types per application, and the entitlement's governance fields.
 export { listEntitlementTypes, createEntitlementType, updateEntitlementType, setEntitlementGovernance, registerConnectorTypes } from "./entitlementTypes";
 export { REQUEST_MODES } from "./entitlementTypeRules";
+// ACCESS-P0-33 part 2: entitlement classification rules on the shared rule runtime (D12).
+export {
+  listClassificationRules,
+  getClassificationRule,
+  createClassificationRule,
+  updateClassificationRule,
+  simulateClassificationRule,
+  requestClassificationRulePublish,
+  approveClassificationRulePublish,
+  retireClassificationRule,
+  listClassificationRuns,
+  type ClassificationRule,
+  type ClassificationSimulation,
+} from "./classificationRulesService";
+export { SETTABLE as CLASSIFICATION_SETTABLE, CLASSIFICATION_TRIGGERS } from "./classificationRules";
