@@ -49,8 +49,36 @@ test.describe("Integration module", () => {
     await page.goto("/integrations/types/new");
     await expect(page.getByRole("heading", { name: "Write a connection type" })).toBeVisible();
     await expect(page.getByText("Valid: My application v1.0.0")).toBeVisible();
+    await page.getByRole("tab", { name: "JSON" }).click();
     await page.getByLabel("Definition (JSON)").fill('{"schemaVersion":1,"key":"x","driver":"http"}');
     await expect(page.getByRole("alert").first()).toContainText("must be lowercase");
+  });
+
+  test("EXPERIENCE-P0-30: the form and the JSON edit one definition, and the form's publishes", async ({ page }) => {
+    const key = `e2e-guided-${Date.now()}`;
+    await page.goto("/integrations/types/new");
+    await page.getByLabel("Name", { exact: true }).fill("E2E Guided");
+    await page.getByLabel("Key", { exact: true }).fill(key);
+    // A resource added in the form, its required fields mapped.
+    await page.getByLabel("Add", { exact: true }).selectOption("entitlement");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByLabel("Path", { exact: true }).fill("/api/roles");
+    await page.getByLabel("externalId (required)").fill("id");
+    await page.getByLabel("name (required)").fill("title");
+    await expect(page.getByText("Valid: E2E Guided v1.0.0")).toBeVisible();
+
+    await page.getByRole("tab", { name: "JSON" }).click();
+    const json = JSON.parse(await page.getByLabel("Definition (JSON)").inputValue());
+    expect(json).toMatchObject({ key, name: "E2E Guided", resources: { entitlement: { request: { path: "/api/roles" }, fields: { externalId: "id", name: "title" } } } });
+    // And back: a JSON edit shows in the form.
+    await page.getByLabel("Definition (JSON)").fill(JSON.stringify({ ...json, version: "1.0.1" }, null, 2));
+    await page.getByRole("tab", { name: "Form" }).click();
+    await expect(page.getByLabel("Version", { exact: true })).toHaveValue("1.0.1");
+
+    await page.getByRole("button", { name: "Publish" }).click();
+    await expect(page).not.toHaveURL(/\/types\/new/);
+    await page.goto("/integrations/types");
+    await expect(page.getByText("E2E Guided").first()).toBeVisible();
   });
 
   test("a connection's credential, connection and sync actions never hit the app's error boundary", async ({ page }) => {

@@ -177,7 +177,7 @@ Exit test: not run.
 | ACCESS-P0-34 Onboarding templates and questionnaire | Access | #74 | Done | 2026-10-14: templates per connection type (connector definition key) with configuration defaults, default owners, entitlement types and a questionnaire (0171, 0172); onboarding starts from a fitting template; required questions block validation; a changed answer means validating and approving again |
 | ACCESS-P0-38 † Baskets, model-after, drafts, signed links | Access | | Done | 2026-10-14. Part 1 (#180, 0174): baskets of many lines for many people, each its own checked request; model-after with reasons. Part 2 (0175): approvers notified when a stage opens, each with a single-use 72-hour link that still needs their session; saved drafts |
 | IDENTITY-P0-25 † Generated identifiers | Identity | | Not started | |
-| EXPERIENCE-P0-30 Guided connector editor | Experience | #75 | Not started | |
+| EXPERIENCE-P0-30 Guided connector editor | Experience | #75 | Done | Form tab beside the JSON; one shared text, so it validates and publishes identically; field picker over a "Try it" sample |
 | QA-P0-25 Integrator setup suite | QA | #76 | Not started | |
 
 ## F8: Advanced governance
@@ -225,3 +225,4 @@ Exit test: not run.
 - 2026-10-13: `ROADMAP-STORIES.md` added, generated from this file, the backlogs, the run order and git history (`npm run roadmap`); INTEGRATION-P0-22 row brought in line with its backlog (Partial).
 - 2026-10-13: Priorities table added (owner request); unfinished INTEGRATION stories set to Low, for later implementation.
 - 2026-10-14: QA-P0-22 partial (brownfield E2E to verified access). It found that approval opened no fulfilment task for a person with a standard and an admin account; standard access now goes to the one standard account.
+- 2026-10-14: QA-P0-07 done (connector contract tests, #185). EXPERIENCE-P0-30 done (guided connector editor).
