@@ -213,7 +213,13 @@ export type RequestActor = { userId: string; canManageAccess: boolean };
  * otherwise it waits for approval. An identical open request is returned
  * rather than duplicated.
  */
-export async function submitAccessRequest(tenantId: string, actor: RequestActor, input: RequestInput): Promise<{ request: AccessRequest; duplicate: boolean }> {
+export async function submitAccessRequest(
+  tenantId: string,
+  actor: RequestActor,
+  input: RequestInput,
+  /** ACCESS-P0-38: set by the server for a basket's requests, never taken from the client. */
+  opts: { basketId?: string } = {},
+): Promise<{ request: AccessRequest; duplicate: boolean }> {
   const applicationId = typeof input.applicationId === "string" ? input.applicationId : "";
   const entitlementId = typeof input.entitlementId === "string" && input.entitlementId ? input.entitlementId : null;
   if (!UUID_RE.test(applicationId) || (entitlementId && !UUID_RE.test(entitlementId))) throw new ApiError(400, "VALIDATION_FAILED", "applicationId (and entitlementId, if given): ids");
@@ -337,6 +343,7 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
       entitlement_id: entitlementId,
       request_type: requestType,
       justification,
+      basket_id: opts.basketId ?? null,
       status: decision.initialStatus,
       request_policy_id: policy!.id,
       policy_result: { checks: decision.checks },

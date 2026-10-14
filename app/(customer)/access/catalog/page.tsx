@@ -38,9 +38,17 @@ export default async function RequestCatalogPage({ searchParams }: { searchParam
             Applications you can ask for, with what each entitlement allows, how risky it is and who approves it.
           </p>
         </div>
-        <LinkButton href="/access/requests?view=mine" variant="outline" size="sm">
-          My requests
-        </LinkButton>
+        <div className="flex flex-wrap gap-2">
+          {canRequest ? (
+            // ACCESS-P0-38: several people or items in one go.
+            <LinkButton href="/access/catalog/basket" variant="outline" size="sm">
+              Several at once
+            </LinkButton>
+          ) : null}
+          <LinkButton href="/access/requests?view=mine" variant="outline" size="sm">
+            My requests
+          </LinkButton>
+        </div>
       </div>
 
       <form method="get" className="flex items-end gap-2">
