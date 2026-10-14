@@ -49,7 +49,13 @@ test.describe("Integration module", () => {
     await page.goto("/integrations/types/new");
     await expect(page.getByRole("heading", { name: "Write a connection type" })).toBeVisible();
     await expect(page.getByText("Valid: My application v1.0.0")).toBeVisible();
-    await page.getByRole("tab", { name: "JSON" }).click();
+    // That text is server-rendered: the tab opens only once the page is interactive
+    // (a Radix tab ignores a press made before hydration).
+    const jsonTab = page.getByRole("tab", { name: "JSON" });
+    await expect(async () => {
+      await jsonTab.click();
+      await expect(jsonTab).toHaveAttribute("aria-selected", "true", { timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
     await page.getByLabel("Definition (JSON)").fill('{"schemaVersion":1,"key":"x","driver":"http"}');
     await expect(page.getByRole("alert").first()).toContainText("must be lowercase");
   });
@@ -57,7 +63,11 @@ test.describe("Integration module", () => {
   test("EXPERIENCE-P0-30: the form and the JSON edit one definition, and the form's publishes", async ({ page }) => {
     const key = `e2e-guided-${Date.now()}`;
     await page.goto("/integrations/types/new");
-    await page.getByLabel("Name", { exact: true }).fill("E2E Guided");
+    // Typed before the page is interactive, the value is lost; retry until the check shows it.
+    await expect(async () => {
+      await page.getByLabel("Name", { exact: true }).fill("E2E Guided");
+      await expect(page.getByText("Valid: E2E Guided v1.0.0")).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
     await page.getByLabel("Key", { exact: true }).fill(key);
     // A resource added in the form, its required fields mapped.
     await page.getByLabel("Add", { exact: true }).selectOption("entitlement");
