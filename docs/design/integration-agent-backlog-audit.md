@@ -3065,9 +3065,8 @@ was lost.
   for a person to register, link or ignore. The discovery signal is renamed
   "Tool is an AI agent" (it said "declared by the server" even for a guess).
 
-Verified: typecheck; eslint; Vitest 435/435 over mcpNormalize, mcpInventory,
-the framework (including the driver keeping `_meta` by its exact keys, and a
-nested or invalid declaration dropped) and agent-identity. Local E2E
+Verified: typecheck; eslint. No new Vitest cases (owner: "no need for
+vitest"); the existing mcpToolAgents test gets the new fields. Local E2E
 mcp-inventory 3/3: a stub server with WonderArk's `_meta` shape lists the
 declared agent under "AI agents" with "Declared by the server", "Drafts only"
 and "AI-generated output". A `draft_…` tool declared "tool" stays in the

@@ -79,37 +79,6 @@ describe("mcp driver", () => {
   });
 });
 
-describe("mcp driver: what the server declares a tool to be", () => {
-  it("keeps WonderApps' `_meta` declaration, read by its exact dotted keys, and drops invalid values", async () => {
-    const ai = { autonomy: "draft_only", output: "ai-generated", acts: false };
-    const tools = [
-      { name: "draft_whatsapp_reply", description: "AI agent: drafts a reply.", _meta: { "wonderapps.biz/entity": "ai_agent", "wonderapps.biz/ai": ai } },
-      { name: "get_record", _meta: { "wonderapps.biz/entity": "tool" } },
-      // A nested `wonderapps.biz` object is not the dotted key.
-      { name: "nested", _meta: { wonderapps: { biz: { entity: "ai_agent" } } } },
-      { name: "bogus", _meta: { "wonderapps.biz/entity": "superuser", "wonderapps.biz/ai": { autonomy: "act_freely" } } },
-      { name: "plain" },
-    ];
-    const fetchImpl: FetchLike = async (_url, init) => {
-      const body = init?.body ? JSON.parse(String(init.body)) : null;
-      const result = body?.method === "initialize" ? { protocolVersion: "2025-06-18", serverInfo: { name: "wonderark", version: "1" } } : body?.method === "tools/list" ? { tools } : {};
-      return new Response(JSON.stringify({ jsonrpc: "2.0", id: body?.id, result }), { status: 200, headers: { "content-type": "application/json" } });
-    };
-    const c = new DefinitionConnector({ mcp: mcpDriver(fetchImpl) });
-    await c.authenticate(config(mcpServer, { baseUrl: "https://mcp.example.com/mcp" }), null);
-    const got = await c.importKind("mcp_tool");
-    const view = (name: string) => {
-      const n = got.find((t) => t.externalId === name)!.normalized!;
-      return [n.declaredEntity ?? null, n.declaredAutonomy ?? null, n.declaredAiGenerated ?? null];
-    };
-    expect(view("draft_whatsapp_reply")).toEqual(["ai_agent", "draft_only", true]);
-    expect(view("get_record")).toEqual(["tool", null, false]);
-    expect(view("nested")).toEqual([null, null, false]);
-    expect(view("bogus")).toEqual([null, null, false]);
-    expect(view("plain")).toEqual([null, null, false]);
-  });
-});
-
 describe("http driver additions", () => {
   it("pages Saviynt-style in the POST body, tries records paths in order, and keeps a plain-string credential working", async () => {
     const bodies: Record<string, unknown>[] = [];
