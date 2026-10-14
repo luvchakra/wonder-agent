@@ -95,6 +95,7 @@ export const MAIN_ADDRESS_PATHS = [
   "/forgot-password",
   "/update-password",
   "/help",
+  "/install",
   "/platform-admin",
   "/organizations",
   "/onboarding",

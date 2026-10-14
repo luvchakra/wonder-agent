@@ -51,6 +51,12 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/(.*)", headers: securityHeaders }];
   },
+  // Owner request 2026-10-14: the opt-in that lets the one installed app
+  // (main address) open this organization address in its window. Public,
+  // like the manifest; proxy.ts never runs on /.well-known/.
+  async rewrites() {
+    return [{ source: "/.well-known/web-app-origin-association", destination: "/web-app-origin-association" }];
+  },
   experimental: {
     // Keep a visited dynamic route's payload in the client router cache
     // for 30s, so Back/Forward and re-clicking a nav item paint instantly

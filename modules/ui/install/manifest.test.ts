@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { buildManifest, requestOrigin } from "./manifest";
+import { buildManifest, originAssociation, requestOrigin, siteOf } from "./manifest";
 
 /** EXPERIENCE-P0-26 — the web app manifest has what installing needs. */
 const root = join(__dirname, "..", "..", "..");
@@ -61,5 +61,32 @@ describe("requestOrigin", () => {
 
   it("refuses a host that is not a plain hostname", () => {
     for (const h of [null, "", "evil.com/path", "a b", "x\"y", "host:abc", "-bad.example"]) expect(requestOrigin(h, "https"), String(h)).toBeNull();
+  });
+});
+
+describe("one installed app for every organization (owner request, 2026-10-14)", () => {
+  const base = "id.wonderapps.biz";
+  it("the main address is the app: opens at /organizations and extends to every organization address", () => {
+    const m = buildManifest("https://id.wonderapps.biz", base) as Record<string, unknown>;
+    expect(m).toMatchObject({ id: "/", start_url: "/organizations", display: "standalone" });
+    expect(m.scope_extensions).toEqual([{ type: "origin", origin: "https://*.id.wonderapps.biz" }]);
+  });
+  it("an organization address is not installable on its own and extends nothing", () => {
+    const m = buildManifest("https://acme-dev.id.wonderapps.biz", base) as Record<string, unknown>;
+    expect(m.display).toBe("browser");
+    expect(m.scope_extensions).toBeUndefined();
+  });
+  it("without organization addresses nothing changes", () => {
+    const m = buildManifest("http://localhost:3000", null) as Record<string, unknown>;
+    expect(m).toMatchObject({ start_url: "/", display: "standalone" });
+    expect(m.scope_extensions).toBeUndefined();
+  });
+  it("each organization address opts in only the main address's app, naming no organization", () => {
+    expect(originAssociation("https://acme.id.wonderapps.biz", base)).toEqual({ "https://id.wonderapps.biz/": { scope: "/" } });
+    expect(originAssociation("https://evil.example", base)).toEqual({});
+    expect(originAssociation("https://id.wonderapps.biz.evil.example", base)).toEqual({});
+    expect(siteOf("https://notid.wonderapps.biz", base)).toBeNull();
+    // Locally the port is part of every origin.
+    expect(originAssociation("http://acme.localhost:3100", "localhost")).toEqual({ "http://localhost:3100/": { scope: "/" } });
   });
 });

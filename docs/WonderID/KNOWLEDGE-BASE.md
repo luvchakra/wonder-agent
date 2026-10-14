@@ -94,7 +94,7 @@ The everyday cycle looks like this:
 **Everywhere**
 - **Search:** global search finds identities, agents, applications, findings, requests and more.
 - **Notifications:** in the app, and by email if you choose.
-- **On phones and tablets:** WonderID can be installed like an app, and every screen works at phone size.
+- **On phones and tablets:** WonderID can be installed like an app, and every screen works at phone size. Install it once from the main address (account menu › Install the app, or id.wonderapps.biz/install): the one app opens every organization and environment you belong to, and switching between them stays in the app. This needs Chrome, Edge or Samsung Internet; on iPhone and in Firefox a switch opens in the browser. An organization's own address no longer installs a separate app. Each address keeps its own sign-in, so the first visit to an organization in the app asks you to sign in there.
 - **Light and dark mode:** both are supported.
 - **Help centre:** open to anyone, no sign-in needed. It has a user guide, an FAQ and an assistant that answers questions from the guide.
 
@@ -649,6 +649,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | One installed app for every organization and environment: install from the main address, and switching stays inside the app (Chrome, Edge, Samsung Internet). |
 | 14 Oct 2026 | Vendor console access now comes only from the platform administrators list. An address set in the hosting environment can only open Platform Admins to add someone (or itself) to that list; every grant is audited. |
 | 14 Oct 2026 | Access reviews of people and WonderID roles can defer an item, escalate it to whoever launched the campaign, or keep the access as an exception until a date, after which it is removed. |
 | 14 Oct 2026 | Access reviews can cover the WonderID roles members hold, directly or through a group, privileged roles first; nobody certifies their own role, and a revoke removes it at once. |

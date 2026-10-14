@@ -8,7 +8,7 @@ import { getProfile, getSessionUser } from "@/lib/tenant/session";
 import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContext";
 import { platformConsoleAccess } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
-import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
+import { getHostTenant, mainAppUrl, urlForTenant } from "@/lib/tenant/hostTenant";
 import { countOpenAccessFindings, countOpenAgentFindings } from "@/modules/risk/service";
 import { AppSidebar, MobileNavDrawer, MobileNavTrigger } from "@/modules/ui/AppSidebar";
 import { MobileTabBar } from "@/modules/ui/MobileTabBar";
@@ -110,6 +110,8 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   }));
 
   const badges: ShellBadgeCounts = { risk: openFindings + openAccessFindings };
+  // Owner request 2026-10-14: the one installable app is on the main address.
+  const main = await mainAppUrl();
   const sidebarUser = {
     email: user.email ?? "",
     displayName: profile?.displayName ?? null,
@@ -165,6 +167,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
               displayName={sidebarUser.displayName}
               subtitle={sidebarUser.roleLabel}
               isPlatformAdmin={sidebarUser.isPlatformAdmin}
+              installUrl={main ? `${main}/install` : null}
               onSignOut={signOutAction}
             />
           </div>

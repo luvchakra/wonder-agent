@@ -54,7 +54,7 @@ async function sessionLimitsFor(supabase: ReturnType<typeof createServerClient>,
  * data, so there is no reason to gate them behind a session — see
  * app/help/layout.tsx.
  */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help", "/service-unavailable", "/tenant-not-found"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help", "/install", "/service-unavailable", "/tenant-not-found"];
 /** Paths the idle/absolute session-expiry clock does not run on. */
 const UNENFORCED_PATHS = [
   "/sign-in",
