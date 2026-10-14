@@ -4262,3 +4262,10 @@ design-review tests are unchanged apart from a message.
 
 Verified: typecheck; eslint; local E2E shell + design-review mobile/rail
 tests 13/13; a 390px screenshot shows the round button over the content, bottom right.
+
+### 2026-10-14 — Agents list fits at 1280px
+
+The design-review sweep found `/agents` 8px wider than its card at 1280px with
+long owner names (Owner was `whitespace-nowrap`, 265px). Owner names now wrap,
+and the table is 926px in 926px. Verified: the design-review spec passes 7/7
+locally.

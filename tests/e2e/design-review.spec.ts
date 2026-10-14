@@ -99,6 +99,24 @@ async function scrollingTables(page: Page): Promise<string[]> {
   );
 }
 
+/** At phone width, tables wider than the screen or still showing their header row. */
+async function uncollapsedTables(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    const out: string[] = [];
+    for (const table of Array.from(document.querySelectorAll("table"))) {
+      // React/Next leave hidden, empty parse-context tables in the
+      // body while streaming rows; they are not rendered UI.
+      if (!table.querySelector("tbody tr")) continue;
+      if (table.getBoundingClientRect().width > vw + 2) out.push(`a table is ${Math.round(table.getBoundingClientRect().width)}px wide`);
+      for (const head of Array.from(table.querySelectorAll("thead"))) {
+        if (getComputedStyle(head).display !== "none") out.push("a table head is still shown at phone width");
+      }
+    }
+    return out;
+  });
+}
+
 async function horizontalOverflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 }
@@ -138,48 +156,87 @@ async function clippedElements(page: Page): Promise<string[]> {
 test.describe("design review — layout holds at every width", () => {
   test.use({ storageState: authFile("adminOne") });
 
-  // The route list outgrew one test's budget at the wide widths once the
-  // WonderID screens joined it (two full-suite runs on 2026-09-26 timed
-  // out on the last routes, while the spec alone passed), so each width
-  // sweeps it in two halves.
-  const mid = Math.ceil(ROUTES.length / 2);
-  const PARTS = [ROUTES.slice(0, mid), ROUTES.slice(mid)];
-  for (const { name, width, height } of WIDTHS) {
-    for (const [part, partRoutes] of PARTS.entries()) {
-      test(`no horizontal overflow at ${name} (${width}px), part ${part + 1}`, async ({ page }) => {
-        // A sweep of many routes in one test, not a unit check.
-        test.setTimeout(300_000);
-        await page.setViewportSize({ width, height });
-        const problems: string[] = [];
+  // Each route is loaded once and measured at every width by resizing the
+  // window, instead of loaded again for each width: 8 times fewer page
+  // loads, and the same checks. Loading each route at every width took most
+  // of a nightly half's 35 minutes (the 2026-10-14 nightly timed out).
+  // The one-heading, leaked-value and phone-table checks, which each loaded
+  // every route again, run in the same pass at the widths they used (1440
+  // and 390). The routes are swept in four parts, so a slow part fails on
+  // its own.
+  const PARTS = 4;
+  const size = Math.ceil(ROUTES.length / PARTS);
+  for (let part = 0; part < PARTS; part++) {
+    const partRoutes = ROUTES.slice(part * size, (part + 1) * size);
+    test(`every route at every width: no overflow, one heading, no leaked values, tables collapse on phones, part ${part + 1}`, async ({ page }) => {
+      // A sweep of many routes in one test, not a unit check.
+      test.setTimeout(300_000);
+      const problems: string[] = [];
 
-        // Agent 360 has a dynamic URL, so part 1 resolves it from the list.
-        let routes = partRoutes;
-        if (part === 0) {
-          await settle(page, "/agents");
-          const agentHref = await page.locator('a[href^="/agents/"][href*="-"]').first().getAttribute("href");
-          if (agentHref) routes = [...partRoutes, agentHref];
-        }
+      // Agent 360 and the agent-scoped pages have dynamic URLs, so part 1
+      // resolves one agent from the list; it also takes the report route,
+      // which is not in ROUTES.
+      let routes = partRoutes;
+      // Only the phone-table check applies to these (an access graph's
+      // canvas is wider than a phone on purpose; it pans).
+      const tablesOnly: string[] = [];
+      if (part === 0) {
+        await settle(page, "/agents");
+        const agentHref = await page.evaluate(() =>
+          Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href^="/agents/"]'))
+            .map((a) => a.getAttribute("href") ?? "")
+            .find((h) => /^\/agents\/(\d+|[0-9a-f-]{36})$/.test(h)),
+        );
+        const agentId = agentHref?.split("/agents/")[1];
+        if (agentHref) routes = [...partRoutes, agentHref];
+        tablesOnly.push("/reports/agent-inventory", ...(agentId ? [`/runtime/agents/${agentId}`, `/access/agents/${agentId}`] : []));
+      }
 
-        for (const route of routes) {
-          await settle(page, route);
+      for (const route of [...routes, ...tablesOnly]) {
+        const onlyTables = tablesOnly.includes(route);
+        await page.setViewportSize({ width: WIDTHS[0].width, height: WIDTHS[0].height });
+        await settle(page, route);
+        for (const { width, height } of WIDTHS) {
+          if (onlyTables && width !== 390) continue;
+          await page.setViewportSize({ width, height });
+          // Let the layout and any resize observers catch up.
+          await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+          await page.waitForTimeout(100);
 
-          const overflow = await horizontalOverflow(page);
-          if (overflow > 1) problems.push(`${route}: page scrolls ${overflow}px horizontally`);
-
-          for (const clipped of await clippedElements(page)) {
-            problems.push(`${route}: ${clipped}`);
+          if (!onlyTables) {
+            const overflow = await horizontalOverflow(page);
+            if (overflow > 1) problems.push(`${route} at ${width}px: page scrolls ${overflow}px horizontally`);
+            for (const clipped of await clippedElements(page)) problems.push(`${route} at ${width}px: ${clipped}`);
           }
 
           // Screens rebuilt with column priorities must fit their tables to
           // the card at tablet-and-up widths rather than scroll sideways.
           if (width >= 768 && FIT_TABLES.includes(route)) {
-            for (const region of await scrollingTables(page)) problems.push(`${route}: table scrolls sideways (${region})`);
+            for (const region of await scrollingTables(page)) problems.push(`${route} at ${width}px: table scrolls sideways (${region})`);
+          }
+
+          // At desktop width: exactly one top-level heading, and no
+          // serialized objects or placeholder values in the visible text.
+          if (width === 1440 && ROUTES.includes(route)) {
+            const h1s = await page.locator("h1").count();
+            if (h1s !== 1) problems.push(`${route}: ${h1s} <h1> elements`);
+            const text = (await page.locator("body").innerText()).replace(/\s+/g, " ");
+            for (const needle of ["[object Object]", "undefined", "NaN", '{"type":']) {
+              if (text.includes(needle)) problems.push(`${route}: shows ${needle}`);
+            }
+          }
+
+          // At phone width (UI-UX-DESIGN-RULES.md's table section): critical
+          // data never needs sideways scrolling, so every table collapses to
+          // labelled cards.
+          if (width === 390) {
+            for (const problem of await uncollapsedTables(page)) problems.push(`${route} at 390px: ${problem}`);
           }
         }
+      }
 
-        expect(problems, `layout breaks at ${width}px:\n${problems.join("\n")}`).toEqual([]);
-      });
-    }
+      expect(problems, `layout breaks:\n${problems.join("\n")}`).toEqual([]);
+    });
   }
 });
 
@@ -239,80 +296,6 @@ test.describe("design review — structure and theming", () => {
     const dark = await readSurfaces();
     expect(dark.body, "dark mode page background should be dark").toBeLessThan(0.3);
     expect(dark.rail, "the sidebar should be dark in dark mode").toBeLessThan(0.3);
-  });
-
-  test("every screen has exactly one top-level heading", async ({ page }) => {
-    test.setTimeout(120_000);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    const problems: string[] = [];
-
-    for (const route of ROUTES) {
-      await settle(page, route);
-      const count = await page.locator("h1").count();
-      if (count !== 1) problems.push(`${route}: ${count} <h1> elements`);
-    }
-
-    expect(problems, problems.join("\n")).toEqual([]);
-  });
-
-  test("no serialized objects or placeholder values leak into visible text", async ({ page }) => {
-    test.setTimeout(120_000);
-    await page.setViewportSize({ width: 1440, height: 900 });
-    const problems: string[] = [];
-
-    for (const route of ROUTES) {
-      await settle(page, route);
-      const text = (await page.locator("body").innerText()).replace(/\s+/g, " ");
-      for (const needle of ["[object Object]", "undefined", "NaN", '{"type":']) {
-        if (text.includes(needle)) problems.push(`${route}: shows ${needle}`);
-      }
-    }
-
-    expect(problems, problems.join("\n")).toEqual([]);
-  });
-
-  test("tables collapse to labelled cards below md, never sideways scroll", async ({ page }) => {
-    // UI-UX-DESIGN-RULES.md's table section: critical data must never
-    // require horizontal scrolling. Every raw table in the product goes
-    // through the shared TableContainer, so this checks the rule holds
-    // wherever one actually renders — including the agent-scoped and
-    // report routes, which are not in ROUTES above.
-    test.setTimeout(150_000);
-    await page.setViewportSize({ width: 390, height: 844 });
-
-    await page.goto("/agents");
-    const agentHref = await page
-      .locator('a[href^="/agents/"]')
-      .evaluateAll((links) => links.map((l) => l.getAttribute("href")).find((h) => /^\/agents\/[0-9a-f-]{36}$/.test(h ?? "")) ?? null);
-    const agentId = agentHref?.split("/agents/")[1];
-
-    const routes = [
-      ...ROUTES,
-      "/reports/agent-inventory",
-      ...(agentId ? [`/runtime/agents/${agentId}`, `/access/agents/${agentId}`] : []),
-    ];
-
-    const problems: string[] = [];
-    for (const route of routes) {
-      await settle(page, route);
-      const bad = await page.evaluate(() => {
-        const vw = document.documentElement.clientWidth;
-        const out: string[] = [];
-        for (const table of Array.from(document.querySelectorAll("table"))) {
-          // React/Next leave hidden, empty parse-context tables in the
-          // body while streaming rows; they are not rendered UI.
-          if (!table.querySelector("tbody tr")) continue;
-          if (table.getBoundingClientRect().width > vw + 2) out.push(`a table is ${Math.round(table.getBoundingClientRect().width)}px wide`);
-          for (const head of Array.from(table.querySelectorAll("thead"))) {
-            if (getComputedStyle(head).display !== "none") out.push("a table head is still shown at phone width");
-          }
-        }
-        return out;
-      });
-      for (const problem of bad) problems.push(`${route}: ${problem}`);
-    }
-
-    expect(problems, problems.join("\n")).toEqual([]);
   });
 
   test("mobile tab targets are large enough to hit", async ({ page }) => {
