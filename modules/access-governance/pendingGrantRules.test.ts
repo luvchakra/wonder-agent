@@ -12,6 +12,15 @@ describe("chooseAccount (ACCESS-P0-28)", () => {
   it("never picks between several real accounts", () => {
     expect(chooseAccount([{ id: "a", status: "active" }, { id: "b", status: "active" }])).toEqual({ kind: "ambiguous", count: 2 });
   });
+  it("puts standard access on the one standard account beside an admin account, never privileged access", () => {
+    const two = [
+      { id: "std", status: "active", accountType: "standard" },
+      { id: "adm", status: "active", accountType: "privileged" },
+    ];
+    expect(chooseAccount(two)).toEqual({ kind: "existing", accountId: "std" });
+    expect(chooseAccount(two, { privilegedEntitlement: true })).toEqual({ kind: "ambiguous", count: 2 });
+    expect(chooseAccount([...two, { id: "std2", status: "active", accountType: "standard" }])).toEqual({ kind: "ambiguous", count: 3 });
+  });
   it("names the placeholder after the subject", () => {
     expect(placeholderRef({ identityId: "i1", agentId: null })).toBe("pending:i1");
     expect(placeholderRef({ identityId: null, agentId: "a1" })).toBe("pending:agent:a1");

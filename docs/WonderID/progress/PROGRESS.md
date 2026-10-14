@@ -211,7 +211,7 @@ Exit test: not run.
 | Story | Module | Status |
 |---|---|---|
 | QA-P0-21 Security hardening pass | QA | Not started (backlog: Not Started) |
-| QA-P0-22 Brownfield fixture | QA | Not started (backlog: Not Started) |
+| QA-P0-22 Brownfield fixture | QA | Partial: HR to verified and removed access end to end (`brownfield.spec.ts`); the certification step waits for COMPLIANCE-P0-10 |
 
 ## History
 
@@ -224,3 +224,4 @@ Exit test: not run.
 - 2026-10-11: EXPERIENCE-P0-28 done.
 - 2026-10-13: `ROADMAP-STORIES.md` added, generated from this file, the backlogs, the run order and git history (`npm run roadmap`); INTEGRATION-P0-22 row brought in line with its backlog (Partial).
 - 2026-10-13: Priorities table added (owner request); unfinished INTEGRATION stories set to Low, for later implementation.
+- 2026-10-14: QA-P0-22 partial (brownfield E2E to verified access). It found that approval opened no fulfilment task for a person with a standard and an admin account; standard access now goes to the one standard account.

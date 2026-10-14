@@ -23,9 +23,9 @@ Generated 2026-10-14 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 227 |
-| Partial | 25 |
+| Partial | 26 |
 | Deferred | 1 |
-| Not Started | 20 |
+| Not Started | 19 |
 | **Total tracked** | **273** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 27 | 3 | 0 | 6 | 36 | `██████████████░░░░` 75% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 18 | 10 | 0 | 3 | 31 | `██████████░░░░░░░░` 58% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 18 | 11 | 0 | 2 | 31 | `██████████░░░░░░░░` 58% |
 
 ---
 
@@ -390,7 +390,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 18 done · 10 partial · 0 deferred · 3 not started (31 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 18 done · 11 partial · 0 deferred · 2 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -421,7 +421,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
-| QA-P0-22 | Brownfield migration fixture | Not Started — 2026-09-26, WonderID |
+| QA-P0-22 | Brownfield migration fixture | Partial — 2026-10-14: `brownfield.spec.ts` covers HR import to verified and removed access for legitimate, privileged, stale, orphan, ambiguous, service, agent and external cases, conflicting sources and legacy access; certification waits for COMPLIANCE-P0-10 |
 | QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Done — 2026-10-11: person, service account and agent to verified; removal and expiry revoked; approver ≠ requester; isolation SQL for 0123/0124; repeated reconciliation changes nothing |
 | QA-P0-26 | Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification (F3) | Done — 2026-10-12: the write mass-change guard (`integration.maxWritesPerHour`, default 100 per connection per hour) built and tested; read-only connection types cannot be turned on; no attempt key reaches a system twice; verification of every operation in `connector-provisioning.spec.ts` |
