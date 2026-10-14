@@ -118,17 +118,17 @@ Exit test: not run.
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | |
-| RISK-P0-13 Rogue access remediation | Risk | | In progress | Core (2026-10-12, migration 0130): "Remove access" on a rogue-access finding raises an ordinary request under the application's policy; connector, verification, finding resolves verified fixed. `connector-provisioning.spec.ts` runs the F3 exit scenario. Other remediation actions, severity factors and trend remain |
+| RISK-P0-13 Rogue access remediation | Risk | | Partial | Every remediation action, severity, trend and the finding page; the last, adding access to a package the identity holds, 2026-10-14 (#169). Done once its E2E passes in the nightly run |
 | QA-P0-26 Provisioning safety suite | QA | | Done | 2026-10-12, no migration. The mass-change guard on writes: at most `integration.maxWritesPerHour` (default 100) changes per connection per hour; past it nothing is sent and the task goes to its owner with the reason. Tests in `connector-provisioning.spec.ts`: read-only types cannot be turned on, the guard, Try again once the limit allows, no attempt key sent twice, every operation verified |
 
 ## F4: Lifecycle and certification
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Not started | Needs D12 |
+| OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Partial | 2026-10-14: condition language, evaluation, simulation and run-log entries (`modules/operations/rules`); storing the run log needs its table |
 | IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Not started | |
 | IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Partial | Backlog: events, tasks, transitions, ownership transfer built; rules not |
-| IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Partial | Backlog: Partial |
+| IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Not started | |
 | COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Not started | Backlog: Not Started |
 | COMPLIANCE-P0-11 Certification of administrators | Compliance | | Not started | Backlog: Not Started |

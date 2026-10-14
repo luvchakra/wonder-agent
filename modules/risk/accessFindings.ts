@@ -484,24 +484,41 @@ export async function authorizeRogueFinding(tenantId: string, actorId: string, f
   if (decidesOwnAccess(decider?.id ?? null, identityId)) throw new ApiError(403, "SELF_DECISION", "Someone other than the account's owner approves its access");
 
   const ticketNumber = ((finding.ticket as Row | null)?.ticket_number as string | undefined) ?? null;
-  const { recordApprovedAfterwards } = await import("@/modules/access-governance/service");
+  const entitlementId = (finding.entitlement_id as string | null) ?? null;
+  const { recordApprovedAfterwards, listAssignments, addPackageResource } = await import("@/modules/access-governance/service");
+  let packageName: string | null = null;
+  let expiresAt = authorization.until;
+  if (authorization.kind === "package") {
+    // Only a package the identity already holds: adding the access to it gives nobody new access.
+    const held = await listAssignments(tenantId, { identityId, packageId: authorization.packageId, live: true, pageSize: 1 });
+    if (!held.rows.length) throw new ApiError(409, "PACKAGE_NOT_HELD", "Choose a package this identity already holds");
+    packageName = held.rows[0].packageName;
+    // The approval ends when the package assignment does.
+    expiresAt = held.rows[0].expiresAt;
+    try {
+      await addPackageResource(tenantId, actorId, authorization.packageId!, { applicationId, entitlementId });
+    } catch (err) {
+      if (!(err instanceof ApiError && err.code === "DUPLICATE")) throw err;
+    }
+  }
   const { requestId } = await recordApprovedAfterwards(
     tenantId,
     actorId,
     {
       subjectIdentityId: identityId,
       applicationId,
-      entitlementId: (finding.entitlement_id as string | null) ?? null,
+      entitlementId,
       accessGrantId: (finding.access_grant_id as string | null) ?? null,
-      justification: authorizationJustification(authorization, ticketNumber),
-      expiresAt: authorization.until,
+      justification: authorizationJustification(authorization, ticketNumber, packageName),
+      expiresAt,
     },
     now,
   );
 
   const admin = supabaseServiceRole();
   const decidedAt = now.toISOString();
-  const reason = authorization.kind === "legacy" ? `Recognized as legacy access: ${authorization.reason}` : `Approved afterwards: ${authorization.reason}`;
+  const what = authorization.kind === "legacy" ? "Recognized as legacy access" : authorization.kind === "package" ? `Added to the access package ${packageName ?? ""}`.trimEnd() : "Approved afterwards";
+  const reason = `${what}: ${authorization.reason}`;
   const { data: updated, error: updateError } = await admin
     .from("risk_findings")
     .update({
@@ -522,7 +539,7 @@ export async function authorizeRogueFinding(tenantId: string, actorId: string, f
   if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
   // The approval stands either way; the next ledger refresh closes a finding that changed meanwhile.
   if (!updated) throw new ApiError(409, "CONFLICT", "The approval was recorded, but the finding changed meanwhile; reload");
-  await admin.from("risk_evidence").insert({ finding_id: findingId, evidence_type: "access_request", reference_id: requestId, summary: authorization.kind === "legacy" ? "Recognized as legacy access" : "Approved afterwards" });
+  await admin.from("risk_evidence").insert({ finding_id: findingId, evidence_type: "access_request", reference_id: requestId, summary: what });
   await writeAudit({
     tenantId,
     actorId,
@@ -531,7 +548,7 @@ export async function authorizeRogueFinding(tenantId: string, actorId: string, f
     objectType: "risk_finding",
     objectId: findingId,
     outcome: "success",
-    metadata: { kind: authorization.kind, until: authorization.until, requestId, fromStatus: finding.status },
+    metadata: { kind: authorization.kind, until: expiresAt, requestId, packageId: authorization.packageId ?? null, fromStatus: finding.status },
     typedText: { reason: authorization.reason },
   });
   return toAccessFinding(updated as Row);

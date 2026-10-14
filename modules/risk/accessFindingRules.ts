@@ -63,18 +63,25 @@ export function validateRogueDecision(input: RogueDecisionInput, now: Date): Rog
  * access as it stands (`authorize`) or recognizes it as legacy access that
  * predates WonderID (`legacy`), with a reason and, optionally, an end date
  * (time-bound: the access is removed then, ACCESS-P0-32). At most ten years,
- * the longest a request may run. Pure (#9).
+ * the longest a request may run. `package` covers it by an access package
+ * the identity already holds: the access is added to that package. Pure (#9).
  */
 export const ROGUE_AUTHORIZATION_MAX_DAYS = 3650;
-export type RogueAuthorizationInput = { kind?: unknown; reason?: unknown; until?: unknown };
-export type RogueAuthorization = { kind: "authorize" | "legacy"; reason: string; until: string | null };
+export type RogueAuthorizationInput = { kind?: unknown; reason?: unknown; until?: unknown; packageId?: unknown };
+export type RogueAuthorization = { kind: "authorize" | "legacy" | "package"; reason: string; until: string | null; packageId?: string };
 
 export function validateRogueAuthorization(input: RogueAuthorizationInput, now: Date): RogueAuthorization | { error: string } {
   const kind = input.kind ?? "authorize";
-  if (kind !== "authorize" && kind !== "legacy") return { error: "kind: authorize or legacy" };
+  if (kind !== "authorize" && kind !== "legacy" && kind !== "package") return { error: "kind: authorize, legacy or package" };
   const reason = typeof input.reason === "string" ? input.reason.trim() : "";
   if (!reason) return { error: "reason: say why this access is approved" };
   if (reason.length > 1000) return { error: "reason: at most 1000 characters" };
+  if (kind === "package") {
+    const packageId = typeof input.packageId === "string" ? input.packageId : "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(packageId)) return { error: "packageId: choose a package the identity holds" };
+    // The package assignment decides how long it lasts.
+    return { kind, reason, until: null, packageId };
+  }
   if (input.until === undefined || input.until === null || input.until === "") return { kind, reason, until: null };
   if (typeof input.until !== "string") return { error: "until: a date" };
   const until = new Date(/^\d{4}-\d{2}-\d{2}$/.test(input.until) ? `${input.until}T23:59:59Z` : input.until);
@@ -84,8 +91,8 @@ export function validateRogueAuthorization(input: RogueAuthorizationInput, now: 
 }
 
 /** The request's justification for an approval given afterwards: what it was, and why. */
-export function authorizationJustification(a: RogueAuthorization, ticketNumber: string | null): string {
-  const what = a.kind === "legacy" ? "Recognized as legacy access" : "Approved afterwards";
+export function authorizationJustification(a: RogueAuthorization, ticketNumber: string | null, packageName?: string | null): string {
+  const what = a.kind === "legacy" ? "Recognized as legacy access" : a.kind === "package" ? `Added to the access package ${packageName ?? ""}`.trimEnd() : "Approved afterwards";
   return `${what}${ticketNumber ? ` (${ticketNumber})` : ""}: ${a.reason}`.slice(0, 2000);
 }
 

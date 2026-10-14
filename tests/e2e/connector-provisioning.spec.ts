@@ -119,7 +119,10 @@ async function syncAndWait(request: APIRequestContext) {
   const res = await request.post(`/api/v1/integrations/${integrationId}/sync`);
   expect(res.status(), await res.text()).toBe(202);
   const jobId = (await res.json()).data.id as string;
-  await expect.poll(async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string; pipelineStatus?: string }[]).find((j) => j.id === jobId)?.status, { timeout: 60_000 }).toMatch(/succeeded|partial/);
+  const job = async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string; pipelineStatus?: string }[]).find((j) => j.id === jobId);
+  await expect.poll(async () => (await job())?.status, { timeout: 60_000 }).toMatch(/succeeded|partial/);
+  // The steps after the read (reconciliation, classification, rogue findings) run on: wait for them too.
+  await expect.poll(async () => (await job())?.pipelineStatus, { timeout: 120_000 }).not.toBe("running");
 }
 
 const verificationJobs = async (request: APIRequestContext) =>
@@ -516,6 +519,67 @@ test.describe.serial("connector provisioning", () => {
     expect(open).toEqual([]);
     // A second approval is refused: the finding is closed.
     expect((await request.post(`/api/v1/findings/${finding.id}/authorize`, { data: { reason: "again" } })).status()).toBe(409);
+  });
+
+  test("RISK-P0-13: rogue access is added to a package its holder already has; nobody gains access and it is approved from then on", async ({ request, page }) => {
+    test.setTimeout(180_000);
+    const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
+    const writesBefore = system.writes.length;
+    const fin = (await entitlementIdByRef(tenantId, appId, "g-fin"))!;
+    const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
+    // A package Dee holds (assigned outright here: the fixture, not the behaviour under test), and one Dee does not.
+    const pkg = async (name: string) => {
+      const id = (await (await request.post("/api/v1/access/packages", { data: { name: `${name} ${stamp}`, eligibleIdentityTypes: ["HUMAN"], ownerIdentityId: people.ana } })).json()).data.id as string;
+      expect((await request.post(`/api/v1/access/packages/${id}/resources`, { data: { applicationId: appId, entitlementId: ops } })).status()).toBe(201);
+      expect((await request.patch(`/api/v1/access/packages/${id}`, { data: { status: "active" } })).status()).toBe(200);
+      return id;
+    };
+    const held = await pkg("E2E Prov Ops kit");
+    const other = await pkg("E2E Prov Other kit");
+    const { error: assignError } = await db.from("access_package_assignments").insert({ tenant_id: tenantId, package_id: held, identity_id: people.dee, source: "direct", status: "active", justification: "E2E fixture" });
+    expect(assignError).toBeNull();
+
+    // Dee is put back in Finance directly on the system: rogue.
+    system.members["g-fin"].push("u-dee");
+    await syncAndWait(request);
+    const { data: dee } = await db.from("accounts").select("id").eq("tenant_id", tenantId).eq("application_id", appId).eq("external_account_ref", "u-dee").single();
+    const findingOf = async () =>
+      (await db.from("risk_findings").select("id, status, resolution_type, resolution_reason, access_grant_id").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).eq("entitlement_id", fin).order("created_at", { ascending: false }).limit(1)).data?.[0];
+    await expect.poll(async () => (await findingOf())?.status, { timeout: 60_000 }).toBe("open");
+    const finding = (await findingOf())!;
+
+    // Only a package Dee holds.
+    const refused = await request.post(`/api/v1/findings/${finding.id}/authorize`, { data: { kind: "package", packageId: other, reason: "Part of the kit" } });
+    expect(refused.status()).toBe(409);
+    expect((await refused.json()).error.code).toBe("PACKAGE_NOT_HELD");
+
+    // From the finding's page: the package Dee holds is the one offered.
+    await page.goto(`/risk/rogue-accounts/${finding.id}`);
+    await page.getByText("Other outcomes").click();
+    await expect(async () => {
+      await page.getByLabel("Outcome").selectOption("package");
+      await expect(page.getByRole("combobox", { name: /^Package/ })).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 15_000 });
+    // A label's name includes its select's text, so "Package" is matched as a prefix (the outcome list mentions a package too).
+    await expect(page.getByRole("combobox", { name: /^Package/ }).locator("option")).toHaveText([`E2E Prov Ops kit ${stamp}`]);
+    await page.getByLabel("Reason").fill("Finance read is part of the Operations kit");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Approved afterwards", { exact: true })).toBeVisible({ timeout: 30_000 });
+    expect(await findingOf()).toMatchObject({ status: "resolved", resolution_type: "approved_afterwards", resolution_reason: `Added to the access package E2E Prov Ops kit ${stamp}: Finance read is part of the Operations kit` });
+
+    // The package now includes Finance; the other one does not; nothing was written to the system.
+    const resources = async (id: string) => ((await db.from("access_package_resources").select("entitlement_id").eq("tenant_id", tenantId).eq("package_id", id)).data ?? []).map((r) => r.entitlement_id).sort();
+    expect(await resources(held)).toEqual([fin, ops].sort());
+    expect(await resources(other)).toEqual([ops]);
+    expect(system.writes.slice(writesBefore)).toEqual([]);
+    const { data: grant } = await db.from("access_grants").select("request_id").eq("tenant_id", tenantId).eq("id", finding.access_grant_id!).single();
+    const { data: req } = await db.from("access_requests").select("status, justification").eq("tenant_id", tenantId).eq("id", grant!.request_id!).single();
+    expect(req).toMatchObject({ status: "fulfilled", justification: expect.stringContaining("Added to the access package") });
+
+    // The next read keeps it approved.
+    await syncAndWait(request);
+    const { data: open } = await db.from("risk_findings").select("id").eq("tenant_id", tenantId).eq("category", "rogue_access").eq("account_id", dee!.id).eq("entitlement_id", fin).in("status", ["open", "assigned", "investigating"]);
+    expect(open).toEqual([]);
   });
 
   test("slice 2: approved access is added by the connector and verified", async ({ request }) => {

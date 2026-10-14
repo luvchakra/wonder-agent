@@ -943,3 +943,58 @@ so members can turn it off.
 
 **Verified.** The export-registry unit tests (canonical columns; every
 importable kind on some page) and the bulk-invitations E2E.
+
+### 2026-10-14 — OPERATIONS-P0-11 (runtime part): the shared rule runtime (D12)
+
+Decision D12 (approved 2026-10-12) puts one rule runtime in Operations for
+every module's rule tables. This is its code half, in `modules/operations/rules`:
+
+- **`expression.ts`, the condition language of design §5.2.1.** It parses and
+  evaluates `and`, `or`, `not`, `exists`, `changed`, the comparisons
+  `= != ≠ < > <= >= in matches was`, lists, and references under `identity`,
+  `old`, `new`, `manager`, `owner`, `sponsor`, `organization`, `source`,
+  `application`, `entitlement` and `event`.
+  - Code evaluates it; no model or SQL is involved (#9, #19).
+  - It fails closed: a missing value makes every comparison false, except
+    `exists` and `!=`.
+  - It reads own properties only, so no prototype members. Text compares
+    without case.
+  - Input is bounded: 4,000 characters, a nesting depth of 32, and patterns of
+    at most 200 characters with no nested repeats.
+  - `validateCondition` rejects an attribute the organization has not defined.
+- **`runtime.ts`, rule evaluation.** A rule has a trigger, scope, condition,
+  effects, mode (enforce or report-only), priority, version and status, and
+  every effect comes from the effect catalogue. `evaluateRules` works like
+  this:
+  - It runs the published rules for one event in priority order.
+  - A later rule sees the attributes an earlier *enforced* rule set; a
+    report-only rule changes nothing.
+  - A rule that cannot be evaluated becomes an error entry with no effects.
+  - A granting effect becomes a request unless the rule was approved under
+    four-eyes (#15).
+  - It returns run-log entries holding the rule version, the outcome and the
+    planned effects.
+- **`runtime.ts`, validation and simulation.**
+  - `validateRule` checks the trigger, the condition, the effect parameters
+    and the attributes.
+  - `simulateRules` runs drafts as if enforced and lists who gains, loses or
+    changes what, leaving out changes that set a value it already has.
+  - It holds the run when the share of identities affected is above the
+    mass-change guard.
+- **Pure.** There is no I/O or clock. The owning module carries out the
+  planned effects through its own governed paths and stores the run log with
+  its own timestamps.
+
+**Verified.** `npx vitest run modules/operations/rules`: 2 files, 25 tests
+passed. `npm run typecheck` is clean, and eslint is clean on the new files.
+
+**Left out.**
+- *Storing the run log.* It needs a table, and the database tool was not
+  available in this session.
+- *The run-log page.*
+- *Computed values with the connector mapping templates.* Effect values are
+  literals or references for now.
+- *Wiring into the owners' rule tables.* That is IDENTITY-P0-18 (finish),
+  IDENTITY-P0-21 and ACCESS-P0-33.
+
+The row is Partial in the live phase doc.
