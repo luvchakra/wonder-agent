@@ -147,6 +147,10 @@ test.describe.serial("reviews of WonderID role assignments", () => {
     const actions = (audit ?? []).map((a) => `${a.action}:${a.object_id}`);
     expect(actions).toEqual(expect.arrayContaining([`compliance.access_revoked:${priv.id}`, `compliance.access_revoked:${std.id}`, `compliance.access_certified:${other.id}`]));
 
+    // COMPLIANCE-P0-14 part 2: a revoked role is gone when decided.
+    const closure = (await (await request.get("/api/v1/reports/revocation_closure")).json()).data.rows as { id: string; fields: Record<string, unknown> }[];
+    expect(closure.find((r) => r.id === priv.id)?.fields).toMatchObject({ outcome: "removed", subject: expect.any(String) });
+
     // Another organization sees none of these items.
     const two = await browser.newContext({ storageState: authFile("adminTwo") });
     const theirs = await two.request.get(`/api/v1/compliance/campaigns/${campaignId}/items`);

@@ -1405,3 +1405,26 @@ Verified:
 Left for part 2: consultation (reviewer asks the person or owner), the
 closed-loop revocation report, the termination SLA report. Archiving a
 template is API-only for now (one action per list item, §19.5).
+
+### 2026-10-14 — COMPLIANCE-P0-14 part 2: closed-loop revocation and termination SLA evidence
+
+Built:
+- `listRevocations(tenantId)` (`revocations.ts`): every revoke decided in
+  an access review with its closure: a person's application access through
+  Access's `removalOutcomes` (verified, removed awaiting the next read,
+  pending, failed; due date; confirmed time); WonderID roles and agent
+  grants are removed when the decision is recorded.
+- Two reports, registered by Operations (`/reports/revocation_closure`,
+  `/reports/leaver_removal_sla`, CSV and JSON like the others).
+
+Verified:
+- typecheck; eslint; `next build`; Vitest operations, access, compliance
+  and architecture 499/499 (controlEvidenceRules 2/2).
+- Local E2E: `brownfield.spec.ts` (the revoked external access shows
+  pending with a due date), `role-reviews.spec.ts` (a revoked role shows
+  removed), `leaver-removals.spec.ts` (the leaver's removal shows open,
+  due within a day, linked to the person): 22 + 15 (the first brownfield
+  run hit a Supabase 502 at its setup's tenant lookup, infrastructure; the
+  rerun passed 15/15).
+
+Left: consultation (part 3).

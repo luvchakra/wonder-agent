@@ -14,6 +14,8 @@ const REPORTS: { type: ReportType; label: string; description: string }[] = [
   { type: "risk", label: "Risk Report", description: "Risk findings across every category and severity." },
   { type: "audit_evidence", label: "Audit Evidence Report", description: "Security-sensitive audit events, for compliance evidence." },
   { type: "policy_compliance", label: "Policy Compliance Report", description: "Policy evaluation results across every agent." },
+  { type: "revocation_closure", label: "Revocation Closure", description: "Every access review revoke, and whether the access is confirmed gone." },
+  { type: "leaver_removal_sla", label: "Leaver Removal SLA", description: "Each leaver's removals in the last 90 days against their due date." },
 ];
 
 // OPERATIONS-P0-04.1/04.2.

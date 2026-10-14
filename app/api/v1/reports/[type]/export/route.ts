@@ -14,6 +14,8 @@ const VALID_TYPES: ReportType[] = [
   "risk",
   "audit_evidence",
   "policy_compliance",
+  "revocation_closure",
+  "leaver_removal_sla",
 ];
 
 /** OPERATIONS-P0-04.1 — report export, gated on report.export same as every other export path. */

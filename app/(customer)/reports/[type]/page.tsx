@@ -15,6 +15,8 @@ const VALID_TYPES: ReportType[] = [
   "risk",
   "audit_evidence",
   "policy_compliance",
+  "revocation_closure",
+  "leaver_removal_sla",
 ];
 
 export default async function ReportDetailPage({ params }: { params: Promise<{ type: string }> }) {

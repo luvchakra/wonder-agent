@@ -4083,3 +4083,13 @@ columns and the `record_provenance` trigger. Compliance's migration 0185
 adds them with the same loop as 0115; `lib/provenance/tables.ts` lists
 them, and its unit test now reads every provenance migration, not only
 0115. Checked on dev: the trigger exists on all four.
+
+## 2026-10-14 — Control evidence reads (COMPLIANCE-P0-14 part 2)
+
+Published `removalOutcomes(tenantId, requestIds)` and
+`leaverRemovalTasks(tenantId, days)` (`controlEvidence.ts`) with pure rules
+`removalOutcome` and `slaOutcome` (`controlEvidenceRules.ts`, 2/2): a
+removal is verified only when every grant it names is revoked by a read of
+the system; a leaver task is on time, late, overdue, open or failed against
+its due date ("done" is the person's completion or the confirming read).
+Service role, filtered by tenant. No schema change.

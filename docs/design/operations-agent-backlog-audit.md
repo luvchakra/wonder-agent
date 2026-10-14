@@ -1034,3 +1034,12 @@ Additive changes made for Access's classification rules (ACCESS-P0-33 part 2):
 Verified with the Access work: the Operations rule tests still pass inside
 `npx vitest run modules tests/architecture lib`, and so do the run-log rows
 for classification rules in `classification-rules.spec.ts`.
+
+## 2026-10-14 — Two control-evidence reports (COMPLIANCE-P0-14 part 2)
+
+Report types `revocation_closure` (Compliance's `listRevocations`) and
+`leaver_removal_sla` (Access's `leaverRemovalTasks`, 90 days, with the
+person's name from Identity) join the registry: the type, the three lists
+of valid types (page, JSON and CSV routes) and the Reports page. Same
+live-computation model and per-row drill-through as the others. Verified
+by the E2E named in the Compliance audit log, same date.
