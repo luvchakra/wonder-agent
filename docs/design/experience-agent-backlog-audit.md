@@ -4072,3 +4072,46 @@ the menu at 1280px.
 - Typecheck, eslint and `next build` are clean.
 
 **Left.** The field picker is unit-tested, but not driven end to end against a live system: a preview needs a reachable API. The form does not edit writes or receiving channels; those stay in JSON.
+
+## 2026-10-14 — One installed app for every organization and environment (owner request)
+
+The owner installed WonderID and could not switch organization or
+environment inside it. Cause: each organization and environment is its own
+origin (`<slug>.id.wonderapps.biz`), and an installed web app stays on the
+origin it came from, so a switch left the app (browser overlay or the
+browser) or was dropped. Asked, the owner chose one app for everything.
+
+Built:
+- **Manifest** (`modules/ui/install/manifest.ts`, `app/manifest.ts`): on
+  the main address the app opens at `/organizations` and declares
+  `scope_extensions` for `https://*.<base>`; on an organization address
+  the manifest says `display: "browser"`, so it no longer installs a
+  separate app that could never switch. Without organization addresses
+  (local) nothing changes.
+- **Opt-in** at `/.well-known/web-app-origin-association` on every address
+  (rewrite in `next.config.ts` to `app/web-app-origin-association`, outside
+  `/api` so the connector boundary is unchanged): names only the main
+  address's app, never an organization; public like the manifest.
+- **`/install`** on the main address (public; on an organization address it
+  redirects there): the browser's install prompt when it offers one,
+  otherwise where to find it. The account menu links to it.
+- `lib/tenant/host.ts` and `proxy.ts`: `/install` is served on the main
+  address and needs no session.
+
+Browser support (checked 2026-10-14): `scope_extensions` ships in Chrome
+and Edge 138 (desktop and Android) and Samsung Internet; not in Safari or
+Firefox, where a switch still opens in the browser. Wildcard origins follow
+Chrome's documented example (`https://*.example.com`); this cannot be
+exercised in CI and is to be confirmed on the owner's phone after deploy.
+Each address keeps its own sign-in (unchanged).
+
+Verified: typecheck; eslint; Vitest install, tenant and architecture
+85/85 + manifest 33/33; `next build`; over HTTP on a local build
+(`BASE_APP_HOST=localhost`): main manifest has the extension, the
+organization manifest is `browser`, the association names only the main
+app, `/install` 200 on main and 307 to it from an organization address;
+local E2E `auth`, `org-address-required`, `tenant-address`: 42 passed,
+1 skipped (skipped on main too).
+
+Left out: an app installed earlier from an organization address must be
+removed and installed again from the main address.

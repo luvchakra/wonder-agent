@@ -3462,3 +3462,10 @@ form fills in their own id).
 Verified: typecheck; eslint; Vitest rbac and architecture 64/64; `next
 build`; local E2E with `PLATFORM_ADMIN_EMAILS` set to the IAM admin:
 `platform-admin`, `manage-organizations`, `first-organization` 24/24.
+
+## 2026-10-14 — /install is public and served on the main address
+
+For the one installed app (Experience audit log, same date): `/install`
+joins `PUBLIC_PATHS` in `proxy.ts` and `MAIN_ADDRESS_PATHS` in
+`lib/tenant/host.ts`. It shows only install guidance, reads no data. Local
+E2E `auth`, `org-address-required`, `tenant-address`: 42 passed, 1 skipped.
