@@ -14,16 +14,16 @@ Generated 2026-10-14 from 11 module backlogs.
 
 ## Overall
 
-**227 of 273 tracked stories complete — 83%**
+**228 of 273 tracked stories complete — 84%**
 
 ```
-█████████████████████████████████░░░░░░░  83%
+█████████████████████████████████░░░░░░░  84%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 227 |
-| Partial | 26 |
+| Done | 228 |
+| Partial | 25 |
 | Deferred | 1 |
 | Not Started | 19 |
 | **Total tracked** | **273** |
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 27 | 3 | 0 | 6 | 36 | `██████████████░░░░` 75% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 18 | 11 | 0 | 2 | 31 | `██████████░░░░░░░░` 58% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 19 | 10 | 0 | 2 | 31 | `███████████░░░░░░░` 61% |
 
 ---
 
@@ -390,7 +390,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 18 done · 11 partial · 0 deferred · 2 not started (31 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 19 done · 10 partial · 0 deferred · 2 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -406,7 +406,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-04.4 | Regression fixes only, smallest safe change | Done — both fixes this pass were minimal, logged in Foundation's audit log, re-verified |
 | QA-P0-05 | Clean install verification | Partial — 2026-09-16: a genuine from-scratch `git clone` + `npm ci` + typecheck/lint/full test suite (260/260)/production build all verified clean in an isolated directory (no carried-over `node_modules`/`.env.local`); the fresh-database migration-apply half still deliberately not attempted — creating a Supabase branch is a real billable action, and the user chose to skip it rather than incur the cost for this verification pass |
 | QA-P0-06 | Authentication suite (SAML/OIDC/session) | Partial — role-mapping and session-expiry still only unit-tested (idle/absolute-expiry timing isn't practically E2E-testable without waiting real clock time); 2026-09-16 added real browser coverage for what was previously fully uncovered: sign-in success/failure, sign-up (including the already-registered-email and under-minlength-password paths), logout, unauthenticated redirect, and negative-permission/tenant-isolation checks (`tests/e2e/auth.spec.ts`, part of `QA-P0-16`). SAML/OIDC real IdP exchange and wrong-tenant/domain SSO paths remain out of scope (no test IdP available) |
-| QA-P0-07 | Connector contract tests | Partial — Generic REST connector partially covered across existing unit tests; not all 8 named properties independently tested per connector; Saviynt/MCP contract tests not built |
+| QA-P0-07 | Connector contract tests | Done — 2026-10-14: `modules/integrations/framework/contract.test.ts`, 145 tests; every built-in connector tested for each property or listed in its `GAPS` table with the reason (no read retry, 429 not waited out, no per-connection rate limit on receivers) |
 | QA-P0-08 | Runtime test corpus | Done — 2026-09-19: `tests/runtime/should-can-did-corpus.ts`, six deterministic cases (one per named category), reused (not re-authored) by both `modules/runtime-assurance/compare.test.ts` (QA-P0-09) and `modules/risk/rules.test.ts` — see audit log |
 | QA-P0-09 | SHOULD/CAN/DID reproducibility | Done — `compare.test.ts` directly asserts identical repeated output and evaluator-version stability |
 | QA-P0-10 | Risk regression suite | Partial — 1 positive + 1 negative test exist, covering 3 of 8 categories; the full 5-kind × 8-category matrix is not built (deferred to Risk Agent's own further work, not duplicated here per non-negotiable #18) |

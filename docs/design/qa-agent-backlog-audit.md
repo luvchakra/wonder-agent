@@ -1986,3 +1986,34 @@ explained.**
 - Typecheck and eslint are clean.
 
 **Left.** The certification step needs campaigns over people's application access (COMPLIANCE-P0-10). Today's campaigns certify AI agents' access only. Once that story lands, the step goes into this spec and the story becomes Done.
+
+## 2026-10-14 — QA-P0-07: connector contract tests
+
+**What was built.** `modules/integrations/framework/contract.test.ts`, 145 tests over every built-in connector. It covers nine properties: authentication, discovery, pagination, partial failure, retry, rate limiting, idempotency, credential rotation and traceability.
+- **HTTP connectors (11).** The suite is generated from `BUILTIN_DEFINITIONS`: frappe-hr, erpnext, keycloak, gitea, mattermost, nextcloud, openbao, kubernetes, saviynt, zendesk and scim-2.
+  - A fake server builds its records from each definition's own requests, paging, record paths, fields and filters.
+  - A new HTTP built-in is therefore covered without a fixture.
+- **Other drivers.**
+  - ldap-directory and postgresql run their real drivers against fake `ldapts` and `pg` clients.
+  - csv-file and mcp-server use fake fetches.
+  - webhook, runtime-gateway and scim-inbound go through the receive and SCIM rules.
+- **Gaps.** What a connector does not do is listed in an exported `GAPS` table with the reason. A last block checks that every connector × property pair is either tested or listed.
+
+**Gaps recorded (behaviour pinned by the tests, not changed).**
+- **Reads are not retried.** A 5xx, timeout or network error fails that kind for the run, and the next sync is the retry. The only exception is an OAuth 401, which is retried once with a new token. Writes are never resent by the driver; `writeIsRepeatable` decides whether a retry is allowed.
+- **A 429 is not waited out**, and `Retry-After` is not read. Rate limiting is the Gateway's outbound pacing.
+- **The `/api/connect` receivers have no per-connection rate limit.** They have body-size caps and at most 500 events per request. Handed to Integration as a follow-up.
+- **Paging:**
+  - openbao: Vault's LIST returns every key in one response;
+  - SQL: one statement with `LIMIT`;
+  - CSV: one file per kind, at most 10 MB;
+  - webhook and runtime-gateway: data is pushed, so there is nothing to page.
+- **Redelivered events.** Deduplication runs in the database (`receive.ts`), and only the stable id it keys on is unit-tested.
+
+**Observations, not defects.**
+- `http.ts:332`, the "after refreshing the token" message, can never be reached: a second 401 fails earlier with "HTTP 401". The behaviour is right; only the wording differs.
+- The Gateway wrapper for LDAP and SQL (`gateway.ts:253`) does not pass a driver's read-completeness report through. Neither driver produces one today.
+
+**Verified.**
+- `npx vitest run modules/integrations/framework`: 17 files, 318 tests passed (1 live file skipped).
+- Typecheck and eslint are clean.
