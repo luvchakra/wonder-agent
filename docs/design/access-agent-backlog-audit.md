@@ -4133,3 +4133,46 @@ Verified: typecheck; eslint; `next build`; local E2E
 `application-catalog`, `request-catalog`, `classification-rules` 28/28
 (the new steps: no form without a type; an unknown type 400; a type added,
 then an entitlement under it, stored with that type).
+
+### 2026-10-14 — Entitlements tab rebuilt; onboarding in its tab (owner test feedback 2–5)
+
+Owner feedback (WonderID Test Feedback doc): 2 "more attributes to an
+Entitlement and Entitlement Type, check Saviynt"; 3 "Edit and
+Disable/Delete an Entitlement or Entitlement Type"; 4 "make the UI more
+professional"; 5 "instead of the Open Onboarding button, show the page".
+
+Built:
+- Migration 0187 (additive, applied to dev): entitlements get display
+  name, description, risk level (low–critical), certifiable and status
+  (active / inactive); entitlement types get display name, description and
+  status. These follow Saviynt's entitlement and entitlement-type
+  attributes (display name, description, risk, certifiable/requestable,
+  SOX, status); Saviynt's custom properties map to WonderID's existing
+  custom attributes and were not duplicated.
+- `updateEntitlement` / `deleteEntitlement` (PATCH / DELETE
+  `/api/v1/access/entitlements/:id`) and `deleteEntitlementType` (DELETE on
+  the type route), access.manage, audited. Rules (`entitlementEditRules.ts`,
+  pure): a connector's entitlement keeps its name and is disabled, not
+  deleted (#7); one ever granted is disabled, so its history stays; a type
+  still used by entitlements is disabled, not deleted. Every field a person
+  changes is recorded as their decision (classification rules don't
+  override it).
+- A disabled entitlement is hidden from the request catalog and refused on
+  request; a disabled type refuses new entitlements and makes its
+  entitlements unrequestable (`entitlementRequestRules`).
+- The Entitlements tab is two tables (entitlements; entitlement types) with
+  one row menu each (Edit…, Disable/Enable, Delete…), "Add" in each card's
+  header and dialogs for the forms; the old inline rows are gone
+  (`EntitlementsPanel.tsx`; `AddEntitlement.tsx` and `EntitlementTypes.tsx`
+  removed).
+- Onboarding is shown inside the Onboarding tab (`OnboardingPanel.tsx`,
+  streamed with Suspense); `/access/applications/:id/onboarding` redirects
+  to `?tab=onboarding`.
+
+Verified: typecheck; eslint; `next build`; Vitest entitlementEditRules and
+entitlementTypeRules plus architecture (29/29); local E2E: application-catalog
+11/11 (add type, add entitlement under it with display name and risk, edit,
+disable, delete; a type in use refuses deletion with 409, then deletes),
+request-catalog, application-onboarding, onboarding-proposals,
+onboarding-templates, fulfilment-assignment and classification-rules
+44/44.

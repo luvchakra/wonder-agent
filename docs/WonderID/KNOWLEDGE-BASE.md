@@ -252,7 +252,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 
 **Onboarding templates:** an administrator can keep a template per connection type, with a questionnaire, so applications of that kind are onboarded the same way (Admin → Applications → Onboarding Templates).
 
-**An application's page** has tabs: Details, Entitlements, Onboarding, Accounts and, for administrators, Settings (edit and lifecycle). When an application's entitlements don't come from a connector, administrators add them on the Entitlements tab, each under one of the application's entitlement types (add a type first); onboarding's "Entitlement model discovered" step passes once there is at least one. Entitlement types only group entitlements; they are not entitlements themselves.
+**An application's page** has tabs: Details, Entitlements, Onboarding, Accounts and, for administrators, Settings (edit and lifecycle). The Entitlements tab lists the application's entitlements and its entitlement types as tables. Each entitlement has a display name, description, type, privilege, risk, data classification, whether it can be requested or reviewed, SOX relevance and a status; each type has a display name, description, how it is requested, its durations and whether it is reviewed. Administrators add either from the card's header (an entitlement always under one of the types) and edit, disable or delete one from its row's menu. Something in use is disabled rather than deleted: an entitlement from a connector or one ever granted, and a type entitlements still have. A disabled entitlement can't be requested, and a disabled type takes no new entitlements. The Onboarding tab shows the whole onboarding (configure, validate, simulate, approve, promote); onboarding's "Entitlement model discovered" step passes once there is at least one entitlement.
 
 **Entitlement types and classification rules:** each application can name its kinds of entitlement (role, group, permission set) with their own request rules and durations. Classification rules set an entitlement's privilege level, data classification, type, whether it is requestable and whether it is SOX-relevant, from what is known about it and its application, when it is imported or changes. They never override a value a person set; a rule is simulated first and published by a second person (Admin → Organization Settings → Classification Rules).
 
@@ -655,6 +655,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Entitlements and entitlement types: more attributes, edit, disable and delete from a row menu, shown as tables; onboarding shown in the application's Onboarding tab. |
 | 14 Oct 2026 | An entitlement added by hand must be under one of the application's entitlement types. |
 | 14 Oct 2026 | Application pages have tabs (Details, Entitlements, Onboarding, Accounts, Settings); entitlements can be added by hand on the Entitlements tab. |
 | 14 Oct 2026 | Access reviews: a reviewer can ask a colleague about an item; the answer is kept with the item. |

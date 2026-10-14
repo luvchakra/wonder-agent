@@ -39,6 +39,7 @@ describe("entitlementRequestRules (ACCESS-P0-33)", () => {
     expect(entitlementRequestRules({ requestable: false }, null, null)).toMatchObject({ ok: false, status: 403, code: "NOT_REQUESTABLE" });
     expect(entitlementRequestRules({ requestable: true }, type({ requestMode: "not_requestable" }), null)).toMatchObject({ ok: false, code: "NOT_REQUESTABLE" });
     expect(entitlementRequestRules({ requestable: true }, null, 10)).toEqual({ ok: true, durationDays: 10 });
+    expect(entitlementRequestRules({ requestable: true }, type({ status: "inactive" }), null)).toMatchObject({ ok: false, code: "NOT_REQUESTABLE" });
   });
 
   it("applies the type's default, and caps at its maximum", () => {

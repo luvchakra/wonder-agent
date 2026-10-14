@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
@@ -14,14 +15,14 @@ import {
 } from "@/modules/access-governance/service";
 import { listGroups } from "@/lib/users/groups";
 import { FulfilmentAssignments } from "./FulfilmentAssignments";
-import { EntitlementTypes } from "./EntitlementTypes";
-import { AddEntitlement } from "./AddEntitlement";
+import { EntitlementsPanel } from "./EntitlementsPanel";
+import { OnboardingPanel } from "./onboarding/OnboardingPanel";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, Tabs, TabPanel } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, KpiCard, LinkButton, Tabs, TabPanel } from "@/modules/ui";
 import { ApplicationForm } from "../ApplicationForm";
-import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../labels";
+import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL } from "../labels";
 import { LifecycleForm } from "./onboarding/OnboardingForms";
 import { ReconcileAccessForm, ReconcileAccountsForm } from "../../accounts/AccountForms";
 
@@ -181,63 +182,23 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
             </CardBody>
           </Card>
         </TabPanel>
-        <TabPanel value="entitlements" className="space-y-4 pt-4">
-          <Card>
-            <CardHeader title="Entitlements" description={entitlements.length > 50 ? `The first 50 of ${entitlements.length}.` : undefined} />
-            <CardBody>
-              {entitlements.length === 0 ? (
-                <EmptyState
-                  title="No entitlements"
-                  description={fromConnector ? "They arrive when the connector is read." : "Add the entitlements people can hold in this application, each under one of its entitlement types."}
-                />
-              ) : (
-                <ul className="divide-y divide-border text-sm">
-                  {entitlements.slice(0, 50).map((e) => (
-                    <li key={e.id} className="flex items-center justify-between gap-2 py-1.5">
-                      <span className="min-w-0 truncate text-foreground">{e.name}</span>
-                      <span className="flex shrink-0 gap-1">
-                        {e.privilegeLevel !== "standard" ? <Badge tone={e.privilegeLevel === "admin" ? "danger" : "warning"}>{e.privilegeLevel}</Badge> : null}
-                        {e.dataClassification ? <Badge tone="neutral">{e.dataClassification}</Badge> : null}
-                        {e.entitlementType ? <Badge tone="info">{e.entitlementType}</Badge> : null}
-                        {e.requestable === false ? <Badge tone="neutral">Not requestable</Badge> : null}
-                        {e.soxRelevant ? <Badge tone="warning">SOX</Badge> : null}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {canManage && !fromConnector ? <AddEntitlement applicationId={id} types={entitlementTypes.map((t) => t.name)} /> : null}
-            </CardBody>
-          </Card>
-          <Card>
-            <CardBody>
-              <EntitlementTypes applicationId={id} types={entitlementTypes} canManage={canManage} />
-            </CardBody>
-          </Card>
+        <TabPanel value="entitlements" className="pt-4">
+          <EntitlementsPanel
+            applicationId={id}
+            entitlements={entitlements.slice(0, 200)}
+            total={entitlements.length}
+            types={entitlementTypes}
+            canManage={canManage}
+            fromConnector={fromConnector}
+          />
         </TabPanel>
-        <TabPanel value="onboarding" className="pt-4">
+        <TabPanel value="onboarding" className="space-y-4 pt-4">
+          <Suspense fallback={<p className="text-sm text-muted-foreground">Loading onboarding…</p>}>
+            <OnboardingPanel app={app} ctx={{ tenantId, userId: ctx.userId, permissions: ctx.permissions }} />
+          </Suspense>
           <Card>
-            <CardHeader
-              title="Onboarding"
-              description={
-                onboarding
-                  ? `Configuration v${onboarding.configVersion}. ${ONBOARDING_STAGE_LABEL[onboarding.status].label}.`
-                  : "Configure, validate, simulate and approve how this application is governed."
-              }
-              actions={
-                app.onboardingStatus !== "RETIRED" || onboarding ? (
-                  <LinkButton href={`/access/applications/${id}/onboarding`} size="sm" variant={onboarding ? "outline" : "default"}>
-                    {onboarding ? "Open onboarding" : canManage ? "Start onboarding" : "View onboarding"}
-                  </LinkButton>
-                ) : null
-              }
-            />
+            <CardHeader title="Fulfilment" description="Who carries out this application's access changes that are done by hand." />
             <CardBody>
-              {onboarding ? (
-                <Badge tone={ONBOARDING_STAGE_LABEL[onboarding.status].tone}>{ONBOARDING_STAGE_LABEL[onboarding.status].label}</Badge>
-              ) : (
-                <p className="text-sm text-muted-foreground">Not started.</p>
-              )}
               <FulfilmentAssignments
                 applicationId={id}
                 assignments={assignments}

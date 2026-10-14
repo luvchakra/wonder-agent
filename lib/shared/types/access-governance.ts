@@ -103,6 +103,14 @@ export type Entitlement = {
   requestable?: boolean;
   /** ACCESS-P0-33: drives certification scope and evidence retention. */
   soxRelevant?: boolean;
+  /** Owner feedback 2026-10-14 (after Saviynt): what people see, its risk, reviews, and whether it is in use. */
+  displayName?: string | null;
+  description?: string | null;
+  riskLevel?: "low" | "medium" | "high" | "critical" | null;
+  certifiable?: boolean;
+  status?: "active" | "inactive";
+  /** Imported by a connector (its name and existence come from the source). */
+  fromConnector?: boolean;
 };
 
 /** ACCESS-P0-33: how one type of an application's entitlements is offered and governed. */
@@ -117,6 +125,9 @@ export type ApplicationEntitlementType = {
   maxDurationDays: number | null;
   requestPolicyId: string | null;
   origin: "manual" | "connector";
+  displayName?: string | null;
+  description?: string | null;
+  status?: "active" | "inactive";
   /** How many of the application's entitlements have this type. */
   entitlementCount?: number;
 };

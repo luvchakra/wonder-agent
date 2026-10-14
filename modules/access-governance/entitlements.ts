@@ -23,10 +23,12 @@ export async function createEntitlement(
   let typeName: string | null = null;
   if (entitlementType !== undefined && entitlementType !== null && entitlementType !== "") {
     const wanted = typeof entitlementType === "string" ? entitlementType.trim().toLowerCase() : "";
-    const { data: types, error: typeError } = await supabase.from("application_entitlement_types").select("name").eq("tenant_id", tenantId).eq("application_id", applicationId).limit(200);
+    const { data: types, error: typeError } = await supabase.from("application_entitlement_types").select("name, status").eq("tenant_id", tenantId).eq("application_id", applicationId).limit(200);
     if (typeError) throw new ApiError(500, "QUERY_FAILED", typeError.message);
-    typeName = ((types ?? []) as { name: string }[]).find((t) => t.name.toLowerCase() === wanted)?.name ?? null;
-    if (!typeName) throw new ApiError(400, "VALIDATION_FAILED", "entitlementType: one of this application's entitlement types");
+    const found = ((types ?? []) as { name: string; status: string }[]).find((t) => t.name.toLowerCase() === wanted);
+    if (!found) throw new ApiError(400, "VALIDATION_FAILED", "entitlementType: one of this application's entitlement types");
+    if (found.status === "inactive") throw new ApiError(409, "TYPE_DISABLED", "That entitlement type is disabled");
+    typeName = found.name;
   }
   const { data, error } = await supabase
     .from("entitlements")

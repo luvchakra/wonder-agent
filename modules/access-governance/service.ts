@@ -180,7 +180,16 @@ export { listRequestDrafts, saveRequestDraft, deleteRequestDraft, type RequestDr
 export { LINK_MESSAGE, type LinkState } from "./approvalLinkRules";
 export { submitRequestBasket, modelAfter, listBasketRequests, type BasketResult, type BasketRequest } from "./requestBaskets";
 export { BASKET_LIMITS } from "./requestBasketRules";
-export { listEntitlementTypes, createEntitlementType, updateEntitlementType, setEntitlementGovernance, registerConnectorTypes } from "./entitlementTypes";
+export {
+  listEntitlementTypes,
+  createEntitlementType,
+  updateEntitlementType,
+  deleteEntitlementType,
+  setEntitlementGovernance,
+  updateEntitlement,
+  deleteEntitlement,
+  registerConnectorTypes,
+} from "./entitlementTypes";
 export { REQUEST_MODES } from "./entitlementTypeRules";
 // ACCESS-P0-33 part 2: entitlement classification rules on the shared rule runtime (D12).
 export {

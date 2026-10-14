@@ -68,19 +68,62 @@ test.describe.serial("application catalog", () => {
     await page.getByRole("tab", { name: "Details" }).click();
     await expect(page.getByText("Acme Corp").first()).toBeVisible();
 
-    // An entitlement added by hand, on the Entitlements tab, always under a type.
+    // Owner feedback 2026-10-14: entitlements and types are tables with a row menu (edit, disable, delete);
+    // "Add" sits in each card's header, and an entitlement is always added under a type.
     await page.getByRole("tab", { name: "Entitlements" }).click();
     await expect(page.getByText("To add an entitlement, first add an entitlement type below.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add entitlement" })).toBeDisabled();
     expect((await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: "Untyped", entitlementType: "No such type" } })).status()).toBe(400);
-    await page.getByLabel("New entitlement type").fill("Role");
     await page.getByRole("button", { name: "Add type" }).click();
-    await page.getByLabel("Type of the new entitlement").selectOption("Role");
-    await page.getByLabel("New entitlement", { exact: true }).fill(`E2E Cat Ent ${stamp}`);
-    await page.getByLabel("New entitlement privilege").selectOption("admin");
+    const typeDialog = page.getByRole("dialog");
+    await typeDialog.getByLabel("Type name").fill("Role");
+    await typeDialog.getByLabel("Type display name").fill("Application role");
+    await typeDialog.getByRole("button", { name: "Add type" }).click();
+    await expect(typeDialog).toBeHidden();
+    await expect(page.getByText("Application role")).toBeVisible();
+
+    const ent = `E2E Cat Ent ${stamp}`;
     await page.getByRole("button", { name: "Add entitlement" }).click();
-    await expect(page.getByText(`E2E Cat Ent ${stamp}`)).toBeVisible();
-    const added = ((await (await request.get(`/api/v1/access/applications/${appId}/entitlements`)).json()).data as { name: string; entitlementType: string | null }[]).find((e) => e.name === `E2E Cat Ent ${stamp}`);
-    expect(added?.entitlementType).toBe("Role");
+    const entDialog = page.getByRole("dialog");
+    await entDialog.getByLabel("Type of the entitlement").selectOption("Role");
+    await entDialog.getByLabel("Entitlement name").fill(ent);
+    await entDialog.getByLabel("Display name").fill(`${ent} reader`);
+    await entDialog.getByLabel("Privilege").selectOption("admin");
+    await entDialog.getByLabel("Risk").selectOption("high");
+    await entDialog.getByRole("button", { name: "Add entitlement" }).click();
+    await expect(entDialog).toBeHidden();
+    await expect(page.getByText(`${ent} reader`)).toBeVisible();
+    const read = async () =>
+      ((await (await request.get(`/api/v1/access/applications/${appId}/entitlements`)).json()).data as { id: string; name: string; entitlementType: string | null; riskLevel: string | null; displayName: string | null; description: string | null; status: string }[]).find(
+        (e) => e.name === ent,
+      );
+    expect(await read()).toMatchObject({ entitlementType: "Role", riskLevel: "high", displayName: `${ent} reader`, status: "active" });
+
+    // A type in use cannot be deleted.
+    const types = (await (await request.get(`/api/v1/access/applications/${appId}/entitlement-types`)).json()).data as { id: string; name: string }[];
+    const roleType = types.find((t) => t.name === "Role")!;
+    expect((await request.delete(`/api/v1/access/applications/${appId}/entitlement-types/${roleType.id}`)).status()).toBe(409);
+
+    // Edit, disable, then delete through the row menu.
+    await page.getByRole("button", { name: `Actions for ${ent}` }).click();
+    await page.getByRole("menuitem", { name: "Edit…" }).click();
+    await page.getByRole("dialog").getByLabel("Description").fill("Reads the finance reports");
+    await page.getByRole("dialog").getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Reads the finance reports")).toBeVisible();
+    await page.getByRole("button", { name: `Actions for ${ent}` }).click();
+    await page.getByRole("menuitem", { name: "Disable" }).click();
+    await expect.poll(async () => (await read())?.status).toBe("inactive");
+    await page.getByRole("button", { name: `Actions for ${ent}` }).click();
+    await page.getByRole("menuitem", { name: "Delete…" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText(`${ent} reader`)).toBeHidden();
+    expect(await read()).toBeUndefined();
+
+    // Unused now: the type can be deleted.
+    await page.getByRole("button", { name: "Actions for type Role" }).click();
+    await page.getByRole("menuitem", { name: "Delete…" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByText("Application role")).toBeHidden();
   });
 });
 
