@@ -3395,3 +3395,14 @@ Administration delegation is approved by the owner, and Access's delegations cal
 - `assignRole` turns a copy into an ordinary assignment when an administrator sets its terms.
 
 **Verified.** Detail in the Access audit log of the same date: unit tests, isolation SQL 10/10, and the authorization, custom-roles, users and permission-catalog E2E specs.
+
+## 2026-10-14 — Role assignments for reviews (COMPLIANCE-P0-11)
+
+Published `listRoleAssignmentsForReview(tenantId, { privilegedOnly })`
+(`lib/rbac/roleAssignmentReview.ts`) for Compliance's reviews of WonderID
+roles: one row per role an active person holds, directly (not a
+delegation's copy) or through an active group, within its current terms,
+with whether the role is privileged (any permission with sensitivity
+`privileged`). Service role, every query filtered by `tenant_id`. Revokes
+go through the existing `removeRole` and `removeGroupMember`; no change to
+either. No schema change in this module.

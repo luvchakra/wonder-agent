@@ -324,6 +324,27 @@ export async function getIdentityReviewInfo(
   return out;
 }
 
+/**
+ * COMPLIANCE-P0-11: each member's person identity in this organization
+ * (user id → identity id), for reviews of their WonderID roles. Service
+ * role, filtered by tenant.
+ */
+export async function getHumanIdentityIdsForUsers(tenantId: string, userIds: string[]): Promise<Map<string, string>> {
+  const unique = [...new Set(userIds.filter((id) => UUID_RE.test(id)))];
+  const out = new Map<string, string>();
+  for (let i = 0; i < unique.length; i += 500) {
+    const { data, error } = await supabaseServiceRole()
+      .from("identities")
+      .select("id, tenant_id, user_id")
+      .eq("tenant_id", tenantId)
+      .eq("identity_type", "HUMAN")
+      .in("user_id", unique.slice(i, i + 500));
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    for (const r of data ?? []) if (r.tenant_id === tenantId && r.user_id) out.set(r.user_id as string, r.id as string);
+  }
+  return out;
+}
+
 export type SourceDisagreementRow = {
   id: string;
   identityId: string;

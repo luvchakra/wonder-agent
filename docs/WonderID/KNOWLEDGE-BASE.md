@@ -435,6 +435,7 @@ Findings are raised for:
 - **Evidence:** each decision is captured as evidence.
 - **Who can review:** reviewers can't review their own access.
 - **People's access:** a campaign can cover the application access people, contractors and service accounts hold (all of it, one application, or privileged access only). Each item goes to the person's manager, the application's owner or a named reviewer; the named reviewer takes items nobody else fits. A revoke becomes a removal that is already approved, carried out by a task or the connection, and counted as done only once the system no longer shows it.
+- **WonderID roles:** a campaign can cover the roles members hold in WonderID itself, directly or through a group (all of them, or privileged roles only, which are listed first). Each item shows the person, the role and where it comes from, and goes to the person's manager or a named reviewer. A revoke takes effect at once: the role is removed, or the person leaves the group the role comes from. Automation credentials are reviewed on their own page.
 
 **Policies**
 - Access and agent policies have targets and a priority.
@@ -648,6 +649,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Access reviews can cover the WonderID roles members hold, directly or through a group, privileged roles first; nobody certifies their own role, and a revoke removes it at once. |
 | 14 Oct 2026 | Access reviews cover people's application access too: reviewed by the manager, the application owner or a named reviewer; a revoke becomes an approved removal, verified at the source. |
 | 14 Oct 2026 | In organizations with two or more Tenant Administrators, a change to a request policy waits for someone else to approve it, showing what it changes; every applied change is kept as a numbered version. |
 | 14 Oct 2026 | Administration can be handed to a colleague for a time: they get copies of the person's roles until the end date, removed at once if it ends early. Tenant Administrator is never handed over. |

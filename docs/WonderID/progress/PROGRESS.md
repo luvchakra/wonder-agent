@@ -134,7 +134,7 @@ Exit test: not run.
 | IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Done | 2026-10-14: entitlement types per application (0169): how each is requested, certifiable, default and maximum duration; entitlement type, requestable and SOX flags with provenance; enforced on requests. Classification rules (0170) on the shared rule runtime: simulate, four-eyes publish, report-only then enforce (applied to existing entitlements), never over a person's value, run log. Owner: ownerless entitlements stay requestable |
 | COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Partial | 2026-10-14 part 1 (0180, 0181): campaigns over people's application access, reviewed by the manager, the application owner or a named reviewer; certify (never one's own) or revoke as an approved removal verified at the source. Left: defer/escalate/exception, owner reviews, templates, calendar, analytics |
-| COMPLIANCE-P0-11 Certification of administrators | Compliance | | Not started | Backlog: Not Started |
+| COMPLIANCE-P0-11 Certification of administrators | Compliance | | Done | 2026-10-14 (0183): campaigns over WonderID role assignments, direct and through a group, privileged first; reviewed by the manager or a named reviewer, never one's own; a revoke removes the role or the group membership through Foundation's services |
 | COMPLIANCE-P0-14 † Templates, preview, consultation, closed loop, SLA report | Compliance | | Not started | |
 | IDENTITY-P0-23 † Human identity merge | Identity | | Not started | |
 | FOUNDATION-P0-33 † Attribute-level audit detail | Foundation + Operations | | Not started | |
@@ -211,7 +211,7 @@ Exit test: not run.
 | Story | Module | Status |
 |---|---|---|
 | QA-P0-21 Security hardening pass | QA | Not started (backlog: Not Started) |
-| QA-P0-22 Brownfield fixture | QA | Partial: HR to verified and removed access end to end (`brownfield.spec.ts`); the certification step waits for COMPLIANCE-P0-10 |
+| QA-P0-22 Brownfield fixture | QA | Done: HR to verified and removed access end to end, and its certification (`brownfield.spec.ts`) |
 
 ## History
 
@@ -230,3 +230,4 @@ Exit test: not run.
 - 2026-10-14: ACCESS-P0-23 part 3, administration delegation (migration 0178).
 - 2026-10-14: ACCESS-P0-35 part 1, approved request policy changes (migration 0179).
 - 2026-10-14: COMPLIANCE-P0-10 part 1, reviews of people's application access (migrations 0180, 0181).
+- 2026-10-14: COMPLIANCE-P0-11, reviews of WonderID role assignments (migration 0183).

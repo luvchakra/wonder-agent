@@ -58,6 +58,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <option value="privileged_access">privileged_access</option>
                 <option value="high_risk_agent">high_risk_agent</option>
                 <option value="identity_access">people&apos;s access</option>
+                <option value="role_assignments">WonderID roles</option>
               </SelectField>
               <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
               <SelectField label="Cadence" name="cadence" defaultValue="one_time">
@@ -96,6 +97,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
                 <option value="privileged_access">privileged_access</option>
                 <option value="high_risk_agent">high_risk_agent</option>
                 <option value="identity_access">people&apos;s access</option>
+                <option value="role_assignments">WonderID roles</option>
               </SelectField>
               <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
               <SelectField label="Cadence" name="cadence" defaultValue="one_time">

@@ -1968,3 +1968,10 @@ identity and its owner's identity, read with the service role and filtered
 by `tenant_id` explicitly. Compliance uses it to pick each item's
 reviewer and to refuse self-certification. No schema change in this
 module. Verified through Compliance's checks.
+
+## 2026-10-14 — Person identities for role reviews (COMPLIANCE-P0-11)
+
+Published `getHumanIdentityIdsForUsers(tenantId, userIds)` (`directory.ts`,
+exported from `service.ts`): each member's HUMAN identity in the
+organization, service role, filtered by `tenant_id`. Compliance uses it to
+make each role-review item about the person. No schema change.
