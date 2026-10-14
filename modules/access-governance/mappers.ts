@@ -68,6 +68,12 @@ export function toEntitlement(row: any): Entitlement {
     entitlementType: row.entitlement_type ?? null,
     requestable: row.requestable ?? true,
     soxRelevant: row.sox_relevant ?? false,
+    displayName: row.display_name ?? null,
+    description: row.description ?? null,
+    riskLevel: row.risk_level ?? null,
+    certifiable: row.certifiable ?? true,
+    status: row.status === "inactive" ? "inactive" : "active",
+    fromConnector: Boolean(row.source_integration_id),
   };
 }
 

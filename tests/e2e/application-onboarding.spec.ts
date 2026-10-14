@@ -159,11 +159,10 @@ test.describe.serial("application onboarding", () => {
   });
 
   test("the onboarding screen shows the steps, the checklist and the live version", async ({ page }) => {
-    await page.goto(`/access/applications/${appId}`);
-    await page.getByRole("tab", { name: "Onboarding" }).click();
-    await expect(page.getByRole("heading", { name: "Onboarding" })).toBeVisible();
-    await page.getByRole("link", { name: "Open onboarding" }).click();
-    await expect(page.getByRole("heading", { level: 1, name: `Onboard E2E Onb ${stamp}` })).toBeVisible();
+    // Shown in the application's Onboarding tab; the old address lands there.
+    await page.goto(`/access/applications/${appId}/onboarding`);
+    await expect(page).toHaveURL(new RegExp(`/access/applications/${appId}\\?tab=onboarding`));
+    await expect(page.getByRole("tab", { name: "Onboarding", selected: true })).toBeVisible();
     await expect(page.getByRole("list", { name: "Onboarding steps" })).toBeVisible();
     await expect(page.getByText("Identity/account schema validated")).toBeVisible();
     await expect(page.getByText(/Not automation ready/)).toBeVisible();
@@ -172,7 +171,7 @@ test.describe.serial("application onboarding", () => {
 
   test("the screen walks a new application from start to a failed validation", async ({ page, request }) => {
     const uiAppId = await registerApp(request, `E2E Onb UI ${stamp}`);
-    await page.goto(`/access/applications/${uiAppId}/onboarding`);
+    await page.goto(`/access/applications/${uiAppId}?tab=onboarding`);
     await page.getByRole("radio", { name: /Quick start/ }).check();
     await page.getByRole("button", { name: "Start onboarding" }).click();
     await expect(page.getByRole("button", { name: "Save configuration" })).toBeVisible();

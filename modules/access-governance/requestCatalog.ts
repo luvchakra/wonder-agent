@@ -256,7 +256,7 @@ export async function listRequestCatalog(tenantId: string, filter: { q?: string;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   const ids = (apps ?? []).map((a) => a.id as string);
   const { data: ents, error: entError } = ids.length
-    ? await supabase.from("entitlements").select("id, application_id, name, privilege_level, data_classification").eq("tenant_id", tenantId).in("application_id", ids).order("name").limit(2000)
+    ? await supabase.from("entitlements").select("id, application_id, name, privilege_level, data_classification").eq("tenant_id", tenantId).in("application_id", ids).eq("status", "active").order("name").limit(2000)
     : { data: [], error: null };
   if (entError) throw new ApiError(500, "QUERY_FAILED", entError.message);
   const items = (apps ?? []).map((a) => {
@@ -347,7 +347,7 @@ export async function submitAccessRequest(
     getIdentity(tenantId, subjectId),
     supabase.from("applications").select("id, name, display_name, onboarding_status, risk_level, data_classification").eq("tenant_id", tenantId).eq("id", applicationId).maybeSingle(),
     entitlementId
-      ? supabase.from("entitlements").select("id, application_id, privilege_level, data_classification, requestable, entitlement_type").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle()
+      ? supabase.from("entitlements").select("id, application_id, privilege_level, data_classification, requestable, entitlement_type, status").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     listRequestPolicies(tenantId),
   ]);
@@ -391,7 +391,8 @@ export async function submitAccessRequest(
   // ACCESS-P0-33: an entitlement not requestable (itself or by its type) is refused; its type's default and maximum duration apply.
   if (timed && entRes.data) {
     const typeRules = entitlementRequestRules(
-      { requestable: entRes.data.requestable !== false },
+      // A disabled entitlement (status inactive) is not requestable either.
+      { requestable: entRes.data.requestable !== false && entRes.data.status !== "inactive" },
       await typeForRequest(tenantId, applicationId, (entRes.data.entitlement_type as string | null) ?? null),
       durationRaw !== null && Number.isFinite(durationRaw) ? durationRaw : null,
     );

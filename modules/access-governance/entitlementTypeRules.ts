@@ -8,7 +8,17 @@ import type { EntitlementTypeRequestMode } from "@/lib/shared/types/access-gover
 
 export const REQUEST_MODES: readonly EntitlementTypeRequestMode[] = ["single", "multiple", "free_text", "not_requestable"];
 
-export type EntitlementTypeInput = { name?: unknown; requestMode?: unknown; certifiable?: unknown; defaultDurationDays?: unknown; maxDurationDays?: unknown; requestPolicyId?: unknown };
+export type EntitlementTypeInput = {
+  name?: unknown;
+  requestMode?: unknown;
+  certifiable?: unknown;
+  defaultDurationDays?: unknown;
+  maxDurationDays?: unknown;
+  requestPolicyId?: unknown;
+  displayName?: unknown;
+  description?: unknown;
+  status?: unknown;
+};
 export type ValidEntitlementType = {
   name?: string;
   request_mode?: EntitlementTypeRequestMode;
@@ -16,7 +26,22 @@ export type ValidEntitlementType = {
   default_duration_days?: number | null;
   max_duration_days?: number | null;
   request_policy_id?: string | null;
+  display_name?: string | null;
+  description?: string | null;
+  status?: "active" | "inactive";
 };
+
+/** Optional text: trimmed, empty is none, at most `max` characters. */
+export function optionalText(v: unknown, field: string, max: number): string | null | { error: string } {
+  if (v === null || v === "") return null;
+  if (typeof v !== "string") return { error: `${field}: text` };
+  const t = v.trim();
+  if (!t) return null;
+  if (t.length > max) return { error: `${field}: at most ${max} characters` };
+  return t;
+}
+
+export const STATUSES = ["active", "inactive"] as const;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -64,6 +89,19 @@ export function validateEntitlementType(
       return { error: "requestPolicyId: a request policy, or empty" };
     out.request_policy_id = input.requestPolicyId ? (input.requestPolicyId as string) : null;
   }
+  for (const [key, col, max] of [
+    ["displayName", "display_name", 200],
+    ["description", "description", 2000],
+  ] as const) {
+    if (input[key] === undefined) continue;
+    const t = optionalText(input[key], key, max);
+    if (t !== null && typeof t === "object") return t;
+    out[col] = t;
+  }
+  if (input.status !== undefined) {
+    if (!STATUSES.includes(input.status as "active")) return { error: "status: active or inactive" };
+    out.status = input.status as "active" | "inactive";
+  }
   return out;
 }
 
@@ -74,7 +112,7 @@ export function typeName(raw: unknown): string | null {
   return name || null;
 }
 
-export type TypeForRequest = { requestMode: EntitlementTypeRequestMode; defaultDurationDays: number | null; maxDurationDays: number | null } | null;
+export type TypeForRequest = { requestMode: EntitlementTypeRequestMode; defaultDurationDays: number | null; maxDurationDays: number | null; status?: "active" | "inactive" } | null;
 
 /**
  * What a request for this entitlement must respect (grant or extend):
@@ -89,7 +127,7 @@ export function entitlementRequestRules(
   type: TypeForRequest,
   durationDays: number | null,
 ): { ok: true; durationDays: number | null } | { ok: false; status: 400 | 403; code: string; message: string } {
-  if (!entitlement.requestable || type?.requestMode === "not_requestable") return { ok: false, status: 403, code: "NOT_REQUESTABLE", message: "This access cannot be requested" };
+  if (!entitlement.requestable || type?.requestMode === "not_requestable" || type?.status === "inactive") return { ok: false, status: 403, code: "NOT_REQUESTABLE", message: "This access cannot be requested" };
   let duration = durationDays;
   if (duration === null && type?.defaultDurationDays) duration = type.defaultDurationDays;
   if (type?.maxDurationDays) {

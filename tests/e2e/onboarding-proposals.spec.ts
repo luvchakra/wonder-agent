@@ -115,7 +115,7 @@ test.describe.serial("onboarding proposals", () => {
   });
 
   test("the onboarding screen shows the proposal and asks for one", async ({ page }) => {
-    await page.goto(`/access/applications/${appId}/onboarding`);
+    await page.goto(`/access/applications/${appId}?tab=onboarding`);
     await expect(page.getByRole("heading", { name: "Proposed configuration" })).toBeVisible();
     await expect(page.getByText("Unresolved questions").or(page.getByText("Suggested tests")).first()).toBeVisible();
     await page.getByRole("combobox", { name: "From", exact: true }).selectOption("sample");

@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { ApplicationEntitlementType, Entitlement } from "@/lib/shared/types/access-governance";
 import { toEntitlement } from "./mappers";
 import { typeName, validateEntitlementType, type EntitlementTypeInput, type TypeForRequest } from "./entitlementTypeRules";
+import { entitlementDeleteRefusal, typeDeleteRefusal, validateEntitlementEdit, type EntitlementEditInput } from "./entitlementEditRules";
 
 /**
  * ACCESS-P0-33 (design §5.4) — an application's entitlement types, and the
@@ -31,6 +32,9 @@ function toType(r: Row): ApplicationEntitlementType {
     maxDurationDays: (r.max_duration_days as number | null) ?? null,
     requestPolicyId: (r.request_policy_id as string | null) ?? null,
     origin: r.origin as ApplicationEntitlementType["origin"],
+    displayName: (r.display_name as string | null) ?? null,
+    description: (r.description as string | null) ?? null,
+    status: r.status === "inactive" ? "inactive" : "active",
   };
 }
 
@@ -158,7 +162,7 @@ export async function typeForRequest(tenantId: string, applicationId: string, en
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("application_entitlement_types")
-    .select("name, request_mode, default_duration_days, max_duration_days")
+    .select("name, request_mode, default_duration_days, max_duration_days, status")
     .eq("tenant_id", tenantId)
     .eq("application_id", applicationId)
     .ilike(
@@ -173,6 +177,7 @@ export async function typeForRequest(tenantId: string, applicationId: string, en
     requestMode: data.request_mode as NonNullable<TypeForRequest>["requestMode"],
     defaultDurationDays: (data.default_duration_days as number | null) ?? null,
     maxDurationDays: (data.max_duration_days as number | null) ?? null,
+    status: data.status === "inactive" ? "inactive" : "active",
   };
 }
 
@@ -232,4 +237,108 @@ export async function setEntitlementGovernance(tenantId: string, actorId: string
     metadata: { changed: set },
   });
   return toEntitlement(data);
+}
+
+/**
+ * Owner feedback 2026-10-14 — deletes an entitlement type nothing uses.
+ * One still in use is disabled instead (status inactive), so its
+ * entitlements keep their type and history.
+ */
+export async function deleteEntitlementType(tenantId: string, actorId: string, applicationId: string, typeId: string): Promise<void> {
+  if (!UUID_RE.test(typeId) || !UUID_RE.test(applicationId)) throw new ApiError(404, "NOT_FOUND", "No such type");
+  const admin = supabaseServiceRole();
+  const { data: current, error } = await admin.from("application_entitlement_types").select("id, tenant_id, name").eq("tenant_id", tenantId).eq("application_id", applicationId).eq("id", typeId).maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!current || current.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "No such type");
+  const { count, error: countError } = await admin
+    .from("entitlements")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("application_id", applicationId)
+    .ilike("entitlement_type", (current.name as string).replace(/[\\%_]/g, (c) => `\\${c}`));
+  if (countError) throw new ApiError(500, "QUERY_FAILED", countError.message);
+  const refusal = typeDeleteRefusal({ entitlements: count ?? 0 });
+  if (refusal) throw new ApiError(409, refusal.code, refusal.message);
+  const { error: deleteError } = await admin.from("application_entitlement_types").delete().eq("tenant_id", tenantId).eq("id", typeId);
+  if (deleteError) writeError(deleteError);
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.entitlement_type_deleted", objectType: "application", objectId: applicationId, outcome: "success", metadata: { typeId, name: current.name } });
+}
+
+/**
+ * Owner feedback 2026-10-14 — a person edits an entitlement: its name (not
+ * for a connector's), display name, description, type (one of the
+ * application's active types), privilege, classification, risk, whether it
+ * is requestable or certifiable, SOX relevance, and its status (disable or
+ * enable). Each field changed is recorded as a person's decision, which
+ * classification rules never override.
+ */
+export async function updateEntitlement(tenantId: string, actorId: string, entitlementId: string, input: EntitlementEditInput): Promise<Entitlement> {
+  if (!UUID_RE.test(entitlementId)) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+  const admin = supabaseServiceRole();
+  const { data: current, error: readError } = await admin
+    .from("entitlements")
+    .select("id, tenant_id, application_id, source_integration_id, field_provenance")
+    .eq("tenant_id", tenantId)
+    .eq("id", entitlementId)
+    .maybeSingle();
+  if (readError) throw new ApiError(500, "QUERY_FAILED", readError.message);
+  if (!current || current.tenant_id !== tenantId) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+  const v = validateEntitlementEdit(input, { fromConnector: Boolean(current.source_integration_id) });
+  if ("error" in v) throw new ApiError(400, "VALIDATION_FAILED", v.error);
+  const set: Row = { ...v.set };
+  if (v.typeName !== undefined) {
+    if (v.typeName === null) set.entitlement_type = null;
+    else {
+      const { data: types, error: typeError } = await admin.from("application_entitlement_types").select("name, status").eq("tenant_id", tenantId).eq("application_id", current.application_id as string).limit(200);
+      if (typeError) throw new ApiError(500, "QUERY_FAILED", typeError.message);
+      const found = ((types ?? []) as { name: string; status: string }[]).find((t) => t.name.toLowerCase() === v.typeName!.toLowerCase());
+      if (!found) throw new ApiError(400, "VALIDATION_FAILED", "entitlementType: one of this application's entitlement types");
+      if (found.status === "inactive") throw new ApiError(409, "TYPE_DISABLED", "That entitlement type is disabled");
+      set.entitlement_type = found.name;
+    }
+  }
+  const at = new Date().toISOString();
+  const provenance = { ...((current.field_provenance as Row) ?? {}) };
+  for (const col of Object.keys(set)) provenance[col] = { by: "person", userId: actorId, at };
+  const { data, error } = await admin
+    .from("entitlements")
+    .update({ ...set, field_provenance: provenance, updated_at: at })
+    .eq("tenant_id", tenantId)
+    .eq("id", entitlementId)
+    .select("*")
+    .single();
+  if (error?.code === "23514") throw new ApiError(400, "VALIDATION_FAILED", error.message);
+  if (error || !data) throw new ApiError(500, "UPDATE_FAILED", error?.message ?? "Could not save");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: set.status === "inactive" ? "access.entitlement_disabled" : set.status === "active" ? "access.entitlement_enabled" : "access.entitlement_updated",
+    objectType: "entitlement",
+    objectId: entitlementId,
+    outcome: "success",
+    metadata: { changed: set },
+  });
+  return toEntitlement(data);
+}
+
+/**
+ * Owner feedback 2026-10-14 — deletes an entitlement added by hand that was
+ * never granted. A connector's, or one ever granted, is disabled instead.
+ */
+export async function deleteEntitlement(tenantId: string, actorId: string, entitlementId: string): Promise<void> {
+  if (!UUID_RE.test(entitlementId)) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+  const admin = supabaseServiceRole();
+  const { data: current, error } = await admin.from("entitlements").select("id, tenant_id, application_id, name, source_integration_id").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!current || current.tenant_id !== tenantId) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
+  const { count, error: countError } = await admin.from("access_grants").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("entitlement_id", entitlementId);
+  if (countError) throw new ApiError(500, "QUERY_FAILED", countError.message);
+  const refusal = entitlementDeleteRefusal({ fromConnector: Boolean(current.source_integration_id), grants: count ?? 0 });
+  if (refusal) throw new ApiError(409, refusal.code, refusal.message);
+  const { error: deleteError } = await admin.from("entitlements").delete().eq("tenant_id", tenantId).eq("id", entitlementId);
+  // Something else refers to it (a request, a package, a policy): keep it.
+  if (deleteError?.code === "23503") throw new ApiError(409, "IN_USE", "Requests, packages or policies refer to it; disable it instead");
+  if (deleteError) throw new ApiError(500, "DELETE_FAILED", deleteError.message);
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.entitlement_deleted", objectType: "entitlement", objectId: entitlementId, outcome: "success", metadata: { applicationId: current.application_id, name: current.name } });
 }
