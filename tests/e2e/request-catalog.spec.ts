@@ -222,8 +222,7 @@ test.describe.serial("ACCESS-P0-33: entitlement types shape requests", () => {
 
   test("the application page shows the types; read-only and another organization cannot change them", async ({ page, browser }) => {
     test.skip(!typeId, "needs the first test");
-    await page.goto(`/access/applications/${appId}`);
-    await page.getByText(/^Entitlement types \(/).click();
+    await page.goto(`/access/applications/${appId}?tab=entitlements`);
     await expect(page.getByLabel("license: requested as")).toHaveValue("not_requestable");
 
     const ro = await browser.newContext({ storageState: authFile("readOnly") });

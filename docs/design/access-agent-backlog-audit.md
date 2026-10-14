@@ -4093,3 +4093,24 @@ removal is verified only when every grant it names is revoked by a read of
 the system; a leaver task is on time, late, overdue, open or failed against
 its due date ("done" is the person's completion or the confirming read).
 Service role, filtered by tenant. No schema change.
+
+### 2026-10-14 — Application page tabs; entitlements added by hand (owner request)
+
+Built (owner screenshots: the entitlement-type form overflowed its card;
+"add tabs"; "why is Entitlement model discovered failing"):
+- `/access/applications/:id` is now tabs (Details, Entitlements,
+  Onboarding, Accounts, Settings for managers; `?tab=` opens one). KPIs and
+  the title stay above them.
+- The entitlement-type form wraps instead of a fixed grid, so it no longer
+  overflows; the types are a section on the Entitlements tab, not folded.
+- Cause of the failing onboarding step: the application had entitlement
+  types but no entitlements, and the page offered no way to add one (the
+  API `POST /api/v1/access/applications/:id/entitlements` existed, unused).
+  `AddEntitlement.tsx` adds one (name, privilege) when entitlements don't
+  come from a connector; the empty state and the step's hint now say where.
+
+Verified: typecheck; eslint; `next build`; Vitest onboardingRules 16/16;
+local E2E `application-catalog`, `request-catalog`,
+`application-onboarding`, `fulfilment-assignment` 37/37 after the tabs, and
+`application-catalog` + `application-onboarding` 21/21 with the new
+add-entitlement step.

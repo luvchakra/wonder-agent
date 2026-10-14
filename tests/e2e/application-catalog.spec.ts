@@ -61,10 +61,19 @@ test.describe.serial("application catalog", () => {
     await page.goto(`/access/applications/${appId}`);
     await expect(page.getByRole("heading", { level: 1, name: `E2E Cat ${stamp}` })).toBeVisible();
     await expect(page.getByRole("link", { name: `E2E App Owner ${stamp}` }).first()).toBeVisible();
+    await page.getByRole("tab", { name: "Settings" }).click();
     await page.getByLabel("Vendor").fill("Acme Corp");
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByText("Saved.")).toBeVisible();
+    await page.getByRole("tab", { name: "Details" }).click();
     await expect(page.getByText("Acme Corp").first()).toBeVisible();
+
+    // An entitlement added by hand, on the Entitlements tab.
+    await page.getByRole("tab", { name: "Entitlements" }).click();
+    await page.getByLabel("New entitlement", { exact: true }).fill(`E2E Cat Ent ${stamp}`);
+    await page.getByLabel("New entitlement privilege").selectOption("admin");
+    await page.getByRole("button", { name: "Add entitlement" }).click();
+    await expect(page.getByText(`E2E Cat Ent ${stamp}`)).toBeVisible();
   });
 });
 

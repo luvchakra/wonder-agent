@@ -155,7 +155,7 @@ test.describe.serial("fulfilment task assignment", () => {
     await expect(page.getByText(`group E2E Fulfilers ${stamp}`).first()).toBeVisible();
     await page.getByText("Workload", { exact: true }).click();
     await expect(page.getByText(`E2E Fulfilers ${stamp}`, { exact: true })).toBeVisible();
-    await page.goto(`/access/applications/${applicationId}`);
+    await page.goto(`/access/applications/${applicationId}?tab=onboarding`);
     await page.getByText("Fulfilled by", { exact: true }).click();
     await expect(page.getByText(`E2E Fulfilers ${stamp} (group)`).first()).toBeVisible();
   });

@@ -160,6 +160,7 @@ test.describe.serial("application onboarding", () => {
 
   test("the onboarding screen shows the steps, the checklist and the live version", async ({ page }) => {
     await page.goto(`/access/applications/${appId}`);
+    await page.getByRole("tab", { name: "Onboarding" }).click();
     await expect(page.getByRole("heading", { name: "Onboarding" })).toBeVisible();
     await page.getByRole("link", { name: "Open onboarding" }).click();
     await expect(page.getByRole("heading", { level: 1, name: `Onboard E2E Onb ${stamp}` })).toBeVisible();

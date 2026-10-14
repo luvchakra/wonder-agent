@@ -137,7 +137,7 @@ export function evaluateChecklist(ctx: ChecklistContext): { items: ChecklistItem
   const items: ChecklistItem[] = [
     item("account_schema", "Identity/account schema validated", Boolean(config.accountIdentifierField), true, `Accounts are identified by ${config.accountIdentifierField}`, "Name the field that uniquely identifies an account"),
     item("account_correlation", "Account correlation configured", Boolean(config.correlation), true, config.correlation ? `${config.correlation.accountField} → identity ${config.correlation.identityField}` : "", "Say how an account finds its identity"),
-    item("entitlement_model", "Entitlement model discovered", ctx.entitlementCount > 0, true, `${ctx.entitlementCount} entitlement${ctx.entitlementCount === 1 ? "" : "s"}`, config.entitlementSource === "connector" ? "Sync the integration to import entitlements" : "Add the application's entitlements"),
+    item("entitlement_model", "Entitlement model discovered", ctx.entitlementCount > 0, true, `${ctx.entitlementCount} entitlement${ctx.entitlementCount === 1 ? "" : "s"}`, config.entitlementSource === "connector" ? "Sync the integration to import entitlements" : "Add entitlements on the application's Entitlements tab"),
     // Spec §8.5 lists disable and delete as one item; they are checked together.
     ...OPERATION_ITEMS.map(({ key, label, ops }) => {
       const wanted = ops.filter((op) => config.operations[op]);

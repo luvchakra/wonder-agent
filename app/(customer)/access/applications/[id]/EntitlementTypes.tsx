@@ -7,8 +7,8 @@ import { Button } from "@/modules/ui/Button";
 import type { ApplicationEntitlementType } from "@/lib/shared/types/access-governance";
 
 /**
- * ACCESS-P0-33 — an application's entitlement types, folded under its
- * entitlements: how each is offered in a request, whether it is
+ * ACCESS-P0-33 — an application's entitlement types, on the application's
+ * Entitlements tab: how each is offered in a request, whether it is
  * certifiable, its default and maximum duration. Saved through
  * /api/v1/access/applications/:id/entitlement-types (access.manage); the
  * server validates and its own message is shown.
@@ -44,7 +44,7 @@ function TypeRow({ applicationId, type, canManage }: { applicationId: string; ty
       </p>
       {canManage ? (
         <form
-          className="grid grid-cols-2 gap-2 sm:grid-cols-[12rem_auto_6rem_6rem_auto] sm:items-end"
+          className="flex flex-wrap items-end gap-x-3 gap-y-2"
           onSubmit={(e) => {
             e.preventDefault();
             start(async () => {
@@ -53,7 +53,7 @@ function TypeRow({ applicationId, type, canManage }: { applicationId: string; ty
             });
           }}
         >
-          <label className="col-span-2 sm:col-span-1">
+          <label className="w-full sm:w-48">
             <span className="block text-xs text-muted-foreground">Requested as</span>
             <select aria-label={`${type.name}: requested as`} value={v.requestMode} onChange={(e) => setV({ ...v, requestMode: e.target.value as typeof v.requestMode })} className={field}>
               {Object.entries(MODE_LABEL).map(([value, label]) => (
@@ -63,11 +63,11 @@ function TypeRow({ applicationId, type, canManage }: { applicationId: string; ty
               ))}
             </select>
           </label>
-          <label className="flex items-center gap-1.5 text-sm text-foreground">
+          <label className="flex h-8 items-center gap-1.5 text-sm text-foreground">
             <input type="checkbox" checked={v.certifiable} onChange={(e) => setV({ ...v, certifiable: e.target.checked })} aria-label={`${type.name}: certifiable`} />
             Certifiable
           </label>
-          <label>
+          <label className="w-24">
             <span className="block text-xs text-muted-foreground">Default days</span>
             <input
               aria-label={`${type.name}: default days`}
@@ -77,7 +77,7 @@ function TypeRow({ applicationId, type, canManage }: { applicationId: string; ty
               className={field}
             />
           </label>
-          <label>
+          <label className="w-24">
             <span className="block text-xs text-muted-foreground">Max days</span>
             <input aria-label={`${type.name}: max days`} inputMode="numeric" value={v.maxDurationDays} onChange={(e) => setV({ ...v, maxDurationDays: e.target.value })} className={field} />
           </label>
@@ -86,7 +86,7 @@ function TypeRow({ applicationId, type, canManage }: { applicationId: string; ty
             Save
           </Button>
           {error ? (
-            <p role="alert" className="col-span-full text-xs text-destructive">
+            <p role="alert" className="w-full text-xs text-destructive">
               {error}
             </p>
           ) : null}
@@ -108,8 +108,10 @@ export function EntitlementTypes({ applicationId, types, canManage }: { applicat
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   return (
-    <details className="mt-3 border-t border-border pt-3">
-      <summary className="cursor-pointer text-xs text-muted-foreground">Entitlement types ({types.length})</summary>
+    <section aria-labelledby="entitlement-types">
+      <h2 id="entitlement-types" className="text-sm font-semibold text-foreground">
+        Entitlement types ({types.length})
+      </h2>
       {types.length ? (
         <ul className="mt-2 divide-y divide-border">
           {types.map((t) => (
@@ -121,7 +123,7 @@ export function EntitlementTypes({ applicationId, types, canManage }: { applicat
       )}
       {canManage ? (
         <form
-          className="mt-2 flex items-end gap-2"
+          className="mt-3 flex max-w-md flex-wrap items-end gap-2"
           onSubmit={(e) => {
             e.preventDefault();
             start(async () => {
@@ -140,12 +142,12 @@ export function EntitlementTypes({ applicationId, types, canManage }: { applicat
             Add type
           </Button>
           {error ? (
-            <p role="alert" className="text-xs text-destructive">
+            <p role="alert" className="w-full text-xs text-destructive">
               {error}
             </p>
           ) : null}
         </form>
       ) : null}
-    </details>
+    </section>
   );
 }
