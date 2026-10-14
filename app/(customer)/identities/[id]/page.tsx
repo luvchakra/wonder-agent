@@ -17,7 +17,10 @@ import {
 } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getIdentityAccessLedger, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type IdentityAccessEntry, type LedgerStatus } from "@/modules/access-governance/service";
-import { RecordProvenance, Badge, Card, EmptyState, LinkButton, TabPanel, Tabs } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, EmptyState, LinkButton, SeverityBadge, TabPanel, Tabs } from "@/modules/ui";
+import { groupsOfUser } from "@/lib/users/groups";
+import { listIdentityFindings } from "@/modules/risk/service";
+import { listObjectActivity } from "@/modules/operations/service";
 import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm, UnlinkSourceRecordButton } from "../IdentityForms";
 import { listSourceLinksForIdentity } from "@/modules/integrations/service";
 import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
@@ -107,11 +110,13 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("identity.manage");
   const canReadAccess = ctx.permissions.includes("access.read");
+  const canReadRisk = ctx.permissions.includes("risk.read");
+  const canReadAudit = ctx.permissions.includes("audit.read");
   const identity = await getIdentity(tenantId, id);
   if (!identity) notFound();
 
   const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
-  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks] = await Promise.all([
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks, groups, findings, activity] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
@@ -122,6 +127,10 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     canReadAccess ? getIdentityAccessLedger(tenantId, id) : Promise.resolve(null),
     getRecordProvenance(tenantId, "identities", id),
     identity.identityType === "AI_AGENT" ? Promise.resolve([]) : listSourceLinksForIdentity(tenantId, id),
+    // IDENTITY-P0-17: the WonderID groups of the identity's user, its findings, and what happened to it.
+    identity.userId ? groupsOfUser(tenantId, identity.userId) : Promise.resolve(null),
+    canReadRisk ? listIdentityFindings(tenantId, { identityId: id, agentId: identity.agentId ?? null }) : Promise.resolve(null),
+    canReadAudit ? listObjectActivity(tenantId, [id, identity.userId ?? "", identity.agentId ?? ""], 50) : Promise.resolve(null),
   ]);
   const openTasks = lifecycleTasks.filter((t) => t.status === "open");
   const footprint = openTasks.some((t) => t.taskType === "transfer_ownership") ? await getOwnershipFootprint(tenantId, id) : null;
@@ -153,6 +162,9 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     { value: "overview", label: "Overview" },
     ...(isPerson ? [{ value: "lifecycle", label: "Lifecycle", count: openTasks.length }] : []),
     ...(ledger ? [{ value: "access", label: "Access", count: ledger.entries.length }] : []),
+    ...(groups ? [{ value: "groups", label: "Groups", count: groups.length }] : []),
+    ...(findings ? [{ value: "risk", label: "Risk", count: findings.filter((f) => !["resolved", "false_positive"].includes(f.status)).length }] : []),
+    ...(activity ? [{ value: "activity", label: "Activity" }] : []),
     { value: "relationships", label: "Relationships", count: current.length },
     { value: "attributes", label: "Attributes", count: storedKeys.length },
     ...(canManage ? [{ value: "edit", label: "Edit" }] : []),
@@ -329,6 +341,90 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
           {ledger ? (
             <TabPanel value="access" className="pt-4">
               <AccessLedgerList entries={ledger.entries} refreshed={ledger.refreshed} />
+            </TabPanel>
+          ) : null}
+
+          {groups ? (
+            <TabPanel value="groups" className="pt-4">
+              {groups.length === 0 ? (
+                <EmptyState title="In no groups" description="WonderID groups this person's user belongs to appear here." />
+              ) : (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                  {groups.map((g) => (
+                    <li key={g.id} className="flex flex-wrap items-start justify-between gap-3 px-3 py-2.5 text-sm">
+                      <span className="min-w-0">
+                        <Link href={`/settings/groups/${g.id}`} className="font-medium text-primary hover:underline">
+                          {g.name}
+                        </Link>
+                        <span className="block text-xs text-muted-foreground">{g.roles.length ? `Roles: ${g.roles.map((r) => r.displayName).join(", ")}` : "No roles"}</span>
+                      </span>
+                      {g.status !== "active" ? <Badge tone="neutral">{g.status}</Badge> : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </TabPanel>
+          ) : null}
+
+          {findings ? (
+            <TabPanel value="risk" className="pt-4">
+              {findings.length === 0 ? (
+                <EmptyState title="No findings" description="Rogue access on this identity's accounts, and an AI agent's own findings, appear here." />
+              ) : (
+                <ul className="divide-y divide-border rounded-lg border border-border">
+                  {findings.map((f) => (
+                    <li key={f.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-sm">
+                      <span className="min-w-0">
+                        {f.category === "rogue_access" ? (
+                          <Link href={`/risk/rogue-accounts/${f.id}`} className="font-medium text-primary hover:underline">
+                            {f.title}
+                          </Link>
+                        ) : f.agentId ? (
+                          <Link href={`/risk/rogue/${f.agentId}`} className="font-medium text-primary hover:underline">
+                            {f.title}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-foreground">{f.title}</span>
+                        )}
+                        <span className="block text-xs text-muted-foreground">
+                          {f.ticketNumber ? `${f.ticketNumber} · ` : ""}
+                          {f.status.replace(/_/g, " ")} · found {f.createdAt.slice(0, 10)}
+                        </span>
+                      </span>
+                      <SeverityBadge severity={f.severity} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </TabPanel>
+          ) : null}
+
+          {activity ? (
+            <TabPanel value="activity" className="pt-4">
+              {activity.length === 0 ? (
+                <EmptyState title="No activity recorded" description="Changes to this identity, its user account and its AI agent appear here." />
+              ) : (
+                <ol className="divide-y divide-border rounded-lg border border-border">
+                  {activity.map((a) => (
+                    <li key={a.id} className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 text-sm">
+                      <span className="min-w-0">
+                        <span className="font-mono text-xs text-foreground">{a.action}</span>
+                        <span className="text-xs text-muted-foreground"> · {a.actorType === "user" ? "by a person" : `by the ${a.actorType}`}</span>
+                      </span>
+                      <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                        {a.outcome === "failure" ? <Badge tone="danger">Failed</Badge> : null}
+                        {a.createdAt.slice(0, 16).replace("T", " ")}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                The latest 50.{" "}
+                <Link href="/audit" className="text-primary hover:underline">
+                  Full audit log
+                </Link>
+              </p>
             </TabPanel>
           ) : null}
 

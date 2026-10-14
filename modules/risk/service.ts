@@ -9,7 +9,7 @@ import "server-only";
 export { getFindings, listFindingSummaries, type FindingSummary, countOpenAgentFindings, getFinding, getFindingAsOfDetection, assignFinding, remediateFinding, resolveFinding, transitionFindingStatus } from "./findings";
 export { evaluateAgentRisk } from "./rules";
 // ACCESS-P0-25: findings about access on an account, for any identity type.
-export { syncRogueAccessFindings, listAccessFindings, listOpenAccessFindingsPage, countOpenAccessFindings, getRogueAccessTrend, accessSubjectKey, decideRogueFinding, reopenEndedExceptions, authorizeRogueFinding, assignRogueFinding, escalateRogueFinding, getRogueFinding } from "./accessFindings";
+export { syncRogueAccessFindings, listAccessFindings, listOpenAccessFindingsPage, countOpenAccessFindings, getRogueAccessTrend, accessSubjectKey, decideRogueFinding, reopenEndedExceptions, authorizeRogueFinding, assignRogueFinding, escalateRogueFinding, getRogueFinding, listIdentityFindings, type IdentityFindingSummary } from "./accessFindings";
 export { requestAccessFindingRemoval } from "./accessRemediation";
 export { remediationLabel } from "./accessRemediationRules";
 export {
