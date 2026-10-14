@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { BASKET_LIMITS, listRequestCatalog } from "@/modules/access-governance/service";
+import { BASKET_LIMITS, listRequestCatalog, listRequestDrafts } from "@/modules/access-governance/service";
 import { getIdentityForUser, listAccountableHumans, listDirectReports, listOwnedIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardBody } from "@/modules/ui";
@@ -22,11 +22,12 @@ export default async function RequestBasketPage() {
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
   const me = await getIdentityForUser(tenantId, ctx.userId);
-  const [catalog, reports, owned, everyone] = await Promise.all([
+  const [catalog, reports, owned, everyone, drafts] = await Promise.all([
     listRequestCatalog(tenantId, { pageSize: 50, requestableOnly: true }),
     listDirectReports(tenantId, me?.id ?? null),
     listOwnedIdentities(tenantId, ctx.userId, me?.id ?? null),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
+    listRequestDrafts(tenantId, ctx.userId),
   ]);
   const people = new Map<string, string>();
   if (me) people.set(me.id, "Myself");
@@ -54,7 +55,7 @@ export default async function RequestBasketPage() {
       </div>
       <Card>
         <CardBody>
-          <BasketForm people={[...people].map(([id, label]) => ({ id, label }))} items={items} />
+          <BasketForm people={[...people].map(([id, label]) => ({ id, label }))} items={items} drafts={drafts} />
         </CardBody>
       </Card>
     </div>

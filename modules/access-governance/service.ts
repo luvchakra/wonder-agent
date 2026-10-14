@@ -171,6 +171,9 @@ export {
 } from "./connectorAccess";
 export type { AccessCounts } from "./connectorAccessRules";
 // ACCESS-P0-33: entitlement types per application, and the entitlement's governance fields.
+export { openApprovalLink } from "./approvalLinks";
+export { listRequestDrafts, saveRequestDraft, deleteRequestDraft, type RequestDraft } from "./requestDrafts";
+export { LINK_MESSAGE, type LinkState } from "./approvalLinkRules";
 export { submitRequestBasket, modelAfter, listBasketRequests, type BasketResult, type BasketRequest } from "./requestBaskets";
 export { BASKET_LIMITS } from "./requestBasketRules";
 export { listEntitlementTypes, createEntitlementType, updateEntitlementType, setEntitlementGovernance, registerConnectorTypes } from "./entitlementTypes";

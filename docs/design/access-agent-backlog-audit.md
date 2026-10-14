@@ -3698,3 +3698,81 @@ new table, so RLS is unchanged.
   - read-only 403.
 - Typecheck, eslint and `next build` are clean. Migration 0174 is applied
   to the dev project.
+
+## 2026-10-14 — ACCESS-P0-38 part 2: approve from a message; saved drafts
+
+Design §5.3, "approve from e-mail or chat". Building it showed that
+approvers were never notified when a request's stage reached them; they
+had to look in their Approvals inbox. This part adds that notification.
+
+**Migration 0175.**
+- `access_approval_links` holds one link per approver per stage opened:
+  - only the SHA-256 of a 32-byte random token is stored;
+  - the request is a same-organization foreign key;
+  - each link expires and is single-use;
+  - a member reads only their own links; the service writes.
+- `access_request_drafts` holds a member's saved baskets (people, items,
+  reason; at most 64 KB). A member reads only their own; the service
+  writes.
+
+**Notification and link** (`approvalLinks.ts`, `approvalLinkRules.ts`).
+- When a chain starts, and whenever a later stage opens, each approver of
+  that stage is told (type `approval_required`, in the app and by e-mail).
+  - A named approver gets a message; an access-manager step reaches every
+    holder of `access.approve`.
+  - The requester and the person the access is for are never told.
+  - Each message carries the recipient's own link,
+    `/access/requests/:id?link=<token>`, prefixed with `APP_BASE_URL` when
+    it is set. It is valid 72 hours and single-use.
+  - Notifying runs after the response and never throws.
+  - Audited as `access.approvers_notified`, with the count.
+- Opening the link on the request page checks it against the member
+  signed in:
+  - **valid:** marked used, with an atomic `used_at is null` update; the
+    page says "Opened from your approval message";
+  - **used, expired, not yours, already decided or unknown:** the page
+    says so;
+  - opening is audited (`access.approval_link_opened` or
+    `access.approval_link_refused`).
+  - The link decides nothing. The decision is the page's normal form,
+    under the approver's session and the approval engine's checks (#15,
+    §17.4): there is never approval by unauthenticated link.
+
+**Drafts** (`requestDrafts.ts`).
+- List, save (new, or replacing the member's own) and delete. At most 20
+  per member. Owner and tenant are checked on every write.
+- Validated to a basket's shape: people ids, at most 50; items
+  `app|entitlement`, at most 20; the reason.
+- API: `/api/v1/access/requests/drafts` (GET, POST) and `[draftId]` (PUT,
+  DELETE), all with access.request.
+- UI on "Several at once":
+  - "Start from a draft" appears when the member has drafts;
+  - a folded "Save as draft" saves the basket;
+  - a draft sent as a basket is deleted.
+
+**Left out, recorded.**
+- Pre-selecting a decision from the link: the page shows the normal
+  form.
+- Chat channels (Slack, Teams): those are Operations' notification
+  channels, F7.
+- Re-sending links when a stage is escalated.
+
+**Verified.**
+- Unit tests: `approvalLinkRules.test.ts` 3, covering every link state,
+  the token format and draft validation, plus the basket rules.
+- Database: `tests/access/approval-links-drafts-isolation.sql`, 7 of 7 as
+  expected, rolled back.
+- Local E2E, one worker, 25/25: `approval-links-drafts.spec.ts`,
+  `request-catalog.spec.ts` (the approval engine changed) and
+  `request-baskets.spec.ts`. The new spec covers:
+  - the approver notified with their own link, only the hash stored, and
+    the requester not asked;
+  - another member told the link is not theirs;
+  - the approver's first opening valid and the second "already used";
+  - opening decides nothing;
+  - a malformed link refused;
+  - drafts saved, replaced and deleted;
+  - another member's or organization's drafts 404;
+  - read-only 403.
+- Typecheck, eslint and `next build` are clean. Migration 0175 is applied
+  to the dev project.

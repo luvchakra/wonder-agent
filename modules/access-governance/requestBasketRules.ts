@@ -103,3 +103,22 @@ export function summarizeBasket(results: BasketItemResult[]): { created: number;
   }
   return { created, existing, refused, byCode };
 }
+
+export type DraftPayload = { subjectIdentityIds: string[]; items: string[]; justification: string };
+
+/**
+ * ACCESS-P0-38 part 2: a saved basket may be unfinished, but it stays a
+ * basket's shape and size: people (identity ids) and items
+ * ("<application>|<entitlement or empty>"), plus the reason.
+ */
+export function validateDraft(input: { name?: unknown; payload?: unknown }): { name: string; payload: DraftPayload } | { error: string } {
+  const name = typeof input.name === "string" ? input.name.trim().slice(0, 200) : "";
+  if (!name) return { error: "name: give the draft a name" };
+  const p = (input.payload ?? {}) as Record<string, unknown>;
+  const subjects = Array.isArray(p.subjectIdentityIds) ? p.subjectIdentityIds : [];
+  const items = Array.isArray(p.items) ? p.items : [];
+  if (subjects.length > BASKET_LIMITS.subjects || !subjects.every((s) => typeof s === "string" && UUID_RE.test(s))) return { error: `payload.subjectIdentityIds: at most ${BASKET_LIMITS.subjects} identity ids` };
+  if (items.length > BASKET_LIMITS.lines || !items.every((i) => typeof i === "string" && /^[0-9a-f-]{36}\|([0-9a-f-]{36})?$/i.test(i))) return { error: `payload.items: at most ${BASKET_LIMITS.lines} items` };
+  const justification = typeof p.justification === "string" ? p.justification.slice(0, 2000) : "";
+  return { name, payload: { subjectIdentityIds: [...new Set(subjects as string[])], items: [...new Set(items as string[])], justification } };
+}
