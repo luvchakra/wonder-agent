@@ -77,7 +77,10 @@ test.describe.serial("bulk invitation", () => {
     await dialog.getByLabel(/CSV file/).setInputFiles({ name: "members.csv", mimeType: "text/csv", buffer: Buffer.from(csv, "utf8") });
     await dialog.getByRole("button", { name: "Preview" }).click();
     const table = dialog.getByRole("table");
-    await expect(table).toContainText("Bulk Person 0");
+    // The preview reads all 50 rows through the connector framework and checks
+    // each against the members and roles; on a Vercel build machine that took
+    // longer than the 20 s default (nightly of 2026-10-14).
+    await expect(table).toContainText("Bulk Person 0", { timeout: 60_000 });
     await expect(table).toContainText("Already in this organization");
     await expect(table).toContainText("Unknown role: NO_SUCH_ROLE");
     await dialog.getByRole("button", { name: /Confirm import \(42\)/ }).click();

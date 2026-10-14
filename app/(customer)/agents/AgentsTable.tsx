@@ -195,7 +195,7 @@ export function AgentsTable({ agents, nowMs }: { agents: AgentRow[]; nowMs: numb
       header: "Owner",
       sortable: true,
       hideBelow: "xl",
-      render: (a) => (a.owner ? <span className="whitespace-nowrap">{a.owner}</span> : <span className="text-muted-foreground">Unassigned</span>),
+      render: (a) => (a.owner ? <span className="break-words">{a.owner}</span> : <span className="text-muted-foreground">Unassigned</span>),
     },
     {
       key: "lastSeenAt",

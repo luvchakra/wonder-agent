@@ -2058,3 +2058,40 @@ read-only user refused (403), one grant certified, the external person's
 grant revoked through to a `remove` fulfilment task, and another
 organization seeing no items. Local E2E with `compliance.spec.ts`: 24/24.
 QA-P0-22 is Done.
+
+### 2026-10-14 — Nightly E2E: half 1 out of time; design-review sweep made 10× cheaper
+
+The 14 October nightly was red in both halves. #192 (merged after that run)
+already fixed four of its failures: permission-catalog and
+automation-credentials lookups scoped to the page, bulk-invitations' cleanup
+batched, and connector-provisioning's create-then-grant budget. Re-run
+locally on today's main, permission-catalog and automation-credentials
+pass, and so does the 50-row bulk invitation when run on its own.
+
+What #192 did not address: half 1 ran out of its 35 minutes (157 passed,
+73 never ran). The design-review spec loaded every route once per width (39
+routes × 8 widths = 312 loads in 16 tests), then three more tests loaded
+every route again (headings and leaked values at 1440px, tables collapsing at
+390px). Locally that spec took more than 40 minutes.
+
+- The sweep now loads each route once and measures it at all eight widths by
+  resizing the window. It runs the heading and leaked-value checks at 1440px
+  and the phone-table check at 390px in the same pass. The routes are split
+  into four parts. The checks are the same; the agent-scoped and report pages
+  keep only the phone-table check, as before.
+- The sweep found a real overflow: `/agents` at 1280px was 8px wider than its
+  card, because a long owner name could not wrap. Owner names now wrap
+  (`AgentsTable.tsx`).
+- bulk-invitations' first preview check gets 60s instead of 20s: the
+  50-row preview through the connector framework took longer than 20s on the
+  2-core Vercel build machine.
+
+Verified locally:
+- the design-review spec, all 7 tests, passes in 4.1 minutes (over 40 before);
+- the bulk-invitation 50-row test passes on its own (2.6 minutes);
+- automation-credentials and permission-catalog pass 9/9.
+
+Concurrent sign-ins by other sessions running E2E against the same test
+users made the auth setup fail locally at times (the sign-in rate limit), so
+the design-review run used `--no-deps` with the saved adminOne session.
+Tonight's nightly is the full check.
