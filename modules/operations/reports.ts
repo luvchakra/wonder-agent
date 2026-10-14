@@ -2,7 +2,9 @@ import "server-only";
 
 import { listAgents, listOwners } from "@/modules/agent-identity/service";
 import { getFindings } from "@/modules/risk/service";
-import { listCampaigns, listCampaignItems, listControlFrameworks, listControls, listControlMappings } from "@/modules/certification-compliance/service";
+import { listCampaigns, listCampaignItems, listControlFrameworks, listControls, listControlMappings, listRevocations } from "@/modules/certification-compliance/service";
+import { leaverRemovalTasks } from "@/modules/access-governance/service";
+import { getIdentityNames } from "@/modules/agent-identity/service";
 import { listAuditLogs } from "./audit";
 import type { ReportOutput, ReportRow, ReportType } from "@/lib/shared/types/operations";
 import type { RogueCategory } from "@/lib/shared/types/risk";
@@ -163,5 +165,45 @@ export async function generateReport(tenantId: string, reportType: ReportType): 
       return generateAuditEvidenceReport(tenantId);
     case "policy_compliance":
       return generatePolicyComplianceReport(tenantId);
+    case "revocation_closure":
+      return generateRevocationClosureReport(tenantId);
+    case "leaver_removal_sla":
+      return generateLeaverRemovalSlaReport(tenantId);
   }
+}
+
+/**
+ * COMPLIANCE-P0-14 part 2 — closed-loop revocation as control evidence:
+ * each revoke decided in an access review and whether the access is gone
+ * (verified at the source, removed and awaiting the next read, pending,
+ * failed; WonderID roles and agent grants are removed when decided).
+ */
+export async function generateRevocationClosureReport(tenantId: string): Promise<ReportOutput> {
+  const rows = await listRevocations(tenantId);
+  return output(
+    "revocation_closure",
+    rows.map((r) => ({
+      id: r.itemId,
+      href: `/compliance/campaigns/${r.campaignId}`,
+      fields: { campaign: r.campaignName, subject: r.subject, access: r.access, revokedOn: r.decidedAt, outcome: r.outcome, dueAt: r.dueAt, confirmedAt: r.verifiedAt },
+    })),
+  );
+}
+
+/**
+ * COMPLIANCE-P0-14 part 2 — termination SLA: each leaver's removal and
+ * disable tasks of the last 90 days against their due date (on time, late,
+ * overdue, open, failed), with the person they were for.
+ */
+export async function generateLeaverRemovalSlaReport(tenantId: string): Promise<ReportOutput> {
+  const tasks = await leaverRemovalTasks(tenantId, 90);
+  const names = await getIdentityNames(tenantId, [...new Set(tasks.map((t) => t.identityId).filter((x): x is string => Boolean(x)))]);
+  return output(
+    "leaver_removal_sla",
+    tasks.map((t) => ({
+      id: t.taskId,
+      href: t.identityId ? `/identities/${t.identityId}` : "/access/fulfilment",
+      fields: { person: t.identityId ? (names.get(t.identityId)?.displayName ?? "Unknown") : "Unknown", application: t.applicationName, change: t.kind === "remove" ? "remove access" : "disable account", opened: t.openedAt, due: t.dueAt, done: t.doneAt, outcome: t.outcome },
+    })),
+  );
 }

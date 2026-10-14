@@ -152,7 +152,10 @@ export type ReportType =
   | "access_violation"
   | "risk"
   | "audit_evidence"
-  | "policy_compliance";
+  | "policy_compliance"
+  // COMPLIANCE-P0-14 part 2: control evidence.
+  | "revocation_closure"
+  | "leaver_removal_sla";
 
 export type ReportRow = {
   id: string;

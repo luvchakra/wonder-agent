@@ -71,6 +71,14 @@ test.describe.serial("a leaver's access becomes removal work", () => {
     const list = await request.get("/api/v1/access/fulfilment-tasks?view=all");
     const mine = ((await list.json()).data as { accessGrantId: string; reason: string | null }[]).find((t) => t.accessGrantId === liveGrantId);
     expect(mine?.reason).toBe("leaver");
+
+    // COMPLIANCE-P0-14 part 2: the termination SLA report shows it, open and due within a day.
+    const report = await request.get("/api/v1/reports/leaver_removal_sla");
+    expect(report.status(), await report.text()).toBe(200);
+    const rows = (await report.json()).data.rows as { href: string; fields: Record<string, unknown> }[];
+    const row = rows.find((r) => r.fields.application === `e2e-leaver-app-${stamp}`);
+    expect(row?.fields).toMatchObject({ change: "remove access", outcome: "open" });
+    expect(row?.href).toBe(`/identities/${personId}`);
   });
 
   test("a later step does not open the removals again", async ({ request }) => {

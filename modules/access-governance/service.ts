@@ -22,6 +22,7 @@ export { refreshAccessLedger, refreshAccessLedgerForAllTenants, getIdentityAcces
 export { LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerSource, type LedgerStatus } from "./ledgerRules";
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
 export { recordApprovedAfterwards, type ApprovedAfterwardsInput } from "./approvedAfterwards";
+export { removalOutcomes, leaverRemovalTasks, type RemovalStatus, type LeaverRemovalRow } from "./controlEvidence";
 export { grantsForRequest, requestProgressFor } from "./pendingGrants";
 export { listFulfilmentTasks, actOnFulfilmentTask, remindOverdueFulfilmentTasks, reassignFulfilmentTask, fulfilmentWorkload, type FulfilmentTask, type FulfilmentWorkload } from "./fulfilmentTasks";
 export { listFulfilmentAssignments, setFulfilmentAssignment, removeFulfilmentAssignment, activeGroupIdsOf, type FulfilmentAssignment } from "./fulfilmentAssignments";

@@ -135,7 +135,7 @@ Exit test: not run.
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Done | 2026-10-14: entitlement types per application (0169): how each is requested, certifiable, default and maximum duration; entitlement type, requestable and SOX flags with provenance; enforced on requests. Classification rules (0170) on the shared rule runtime: simulate, four-eyes publish, report-only then enforce (applied to existing entitlements), never over a person's value, run log. Owner: ownerless entitlements stay requestable |
 | COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Partial | 2026-10-14 part 1 (0180, 0181): campaigns over people's application access, reviewed by the manager, the application owner or a named reviewer; certify (never one's own) or revoke as an approved removal verified at the source. Part 2 (0184): defer, escalate, exception (kept until a date, then removed). Left: owner reviews, templates, calendar, analytics |
 | COMPLIANCE-P0-11 Certification of administrators | Compliance | | Done | 2026-10-14 (0183): campaigns over WonderID role assignments, direct and through a group, privileged first; reviewed by the manager or a named reviewer, never one's own; a revoke removes the role or the group membership through Foundation's services |
-| COMPLIANCE-P0-14 † Templates, preview, consultation, closed loop, SLA report | Compliance | | Partial | 2026-10-14 part 1 (0185): campaign templates (save, launch, archive) and a preview that counts a campaign before launch. Left: consultation, closed-loop revocation report, termination SLA report |
+| COMPLIANCE-P0-14 † Templates, preview, consultation, closed loop, SLA report | Compliance | | Partial | 2026-10-14 part 1 (0185): campaign templates (save, launch, archive) and a preview that counts a campaign before launch. Part 2: reports "Revocation closure" (closed loop) and "Leaver removal SLA" (termination SLA). Left: consultation |
 | IDENTITY-P0-23 † Human identity merge | Identity | | Not started | |
 | FOUNDATION-P0-33 † Attribute-level audit detail | Foundation + Operations | | Not started | |
 
@@ -233,3 +233,4 @@ Exit test: not run.
 - 2026-10-14: COMPLIANCE-P0-11, reviews of WonderID role assignments (migration 0183).
 - 2026-10-14: COMPLIANCE-P0-10 part 2, defer, escalate and exception decisions (migration 0184).
 - 2026-10-14: COMPLIANCE-P0-14 part 1, campaign templates and preview (migration 0185).
+- 2026-10-14: COMPLIANCE-P0-14 part 2, revocation closure and leaver removal SLA reports.

@@ -14,6 +14,8 @@ const VALID_TYPES: ReportType[] = [
   "risk",
   "audit_evidence",
   "policy_compliance",
+  "revocation_closure",
+  "leaver_removal_sla",
 ];
 
 /** OPERATIONS-P0-04.1/04.2 — computed live at request time, carries generatedAt + per-row drill-through hrefs. */

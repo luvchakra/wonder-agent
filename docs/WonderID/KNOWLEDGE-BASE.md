@@ -94,7 +94,7 @@ The everyday cycle looks like this:
 **Everywhere**
 - **Search:** global search finds identities, agents, applications, findings, requests and more.
 - **Notifications:** in the app, and by email if you choose.
-- **On phones and tablets:** WonderID can be installed like an app, and every screen works at phone size. Install it once from the main address (account menu › Install the app, or id.wonderapps.biz/install): the one app opens every organization and environment you belong to, and switching between them stays in the app. This needs Chrome, Edge or Samsung Internet; on iPhone and in Firefox a switch opens in the browser. An organization's own address no longer installs a separate app. Each address keeps its own sign-in, so the first visit to an organization in the app asks you to sign in there.
+- **On phones and tablets:** WonderID can be installed like an app, and every screen works at phone size. Install it once from the main address (account menu › Install the app, or id.wonderapps.biz/install): the one app opens every organization and environment you belong to, and switching between them stays in the app. This works in Chrome and Edge on a computer. On phones (Android and iPhone) and in Firefox a switch opens the other address in the browser's overlay, with its own sign-in (owner decision, 14 Oct: keep it that way). An organization's own address no longer installs a separate app. Each address keeps its own sign-in, so the first visit to an organization in the app asks you to sign in there.
 - **Light and dark mode:** both are supported.
 - **Help centre:** open to anyone, no sign-in needed. It has a user guide, an FAQ and an assistant that answers questions from the guide.
 
@@ -499,7 +499,7 @@ What an administrator can use today, and what is planned. Everything
 runs inside your organization and respects the viewer's permissions.
 
 **Today: ready-made reports** (Administration › Reports & Audit › Reports, permission `report.read`)
-- Eight reports, computed live when you open them:
+- Ten reports, computed live when you open them:
   - agent inventory;
   - ownership;
   - access certification;
@@ -507,7 +507,9 @@ runs inside your organization and respects the viewer's permissions.
   - access violations;
   - risk;
   - audit evidence;
-  - policy compliance.
+  - policy compliance;
+  - revocation closure: every revoke decided in an access review, and whether the access is confirmed gone at the source (WonderID roles and agent grants are removed when decided);
+  - leaver removal SLA: each leaver's removals of the last 90 days against their due date (on time, late, overdue, open or failed).
 - Each one downloads as CSV, or is read as JSON through the API:
   - `GET /api/v1/reports/{type}`;
   - `GET /api/v1/reports/{type}/export?format=csv`.
@@ -650,6 +652,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Two control-evidence reports: revocation closure (is each revoked access really gone?) and leaver removal SLA (were leavers' removals done in time?). Correction: switching inside one installed app works on a computer only; on phones it opens in the browser's overlay. |
 | 14 Oct 2026 | Access review templates: save a campaign's settings and launch it again in one click; Preview shows what a campaign will hold before it starts. |
 | 14 Oct 2026 | One installed app for every organization and environment: install from the main address, and switching stays inside the app (Chrome, Edge, Samsung Internet). |
 | 14 Oct 2026 | Vendor console access now comes only from the platform administrators list. An address set in the hosting environment can only open Platform Admins to add someone (or itself) to that list; every grant is audited. |

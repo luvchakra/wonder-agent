@@ -363,6 +363,13 @@ test.describe.serial("brownfield: HR to verified access", () => {
     const { data: keptRequest } = await db().from("access_requests").select("status, requested_expiry, subject_identity_id").eq("id", keptId).single();
     expect(keptRequest).toMatchObject({ status: "fulfilled", subject_identity_id: svc.identityId });
     expect(new Date(keptRequest!.requested_expiry as string).toISOString()).toBe(until);
+
+    // COMPLIANCE-P0-14 part 2: closed-loop revocation. The revoke is approved, its removal not yet done or seen at the source.
+    const closure = await request.get("/api/v1/reports/revocation_closure");
+    expect(closure.status(), await closure.text()).toBe(200);
+    const closed = ((await closure.json()).data.rows as { id: string; fields: Record<string, unknown> }[]).find((r) => r.id === ext.id);
+    expect(closed?.fields).toMatchObject({ outcome: "pending", campaign: `E2E BF Review ${stamp}` });
+    expect(closed?.fields.dueAt).toBeTruthy();
   });
 
   test("another organization sees none of it", async ({ browser }) => {

@@ -4115,3 +4115,13 @@ local E2E `auth`, `org-address-required`, `tenant-address`: 42 passed,
 
 Left out: an app installed earlier from an organization address must be
 removed and installed again from the main address.
+
+## 2026-10-14 — Correction: one installed app switches only on a computer
+
+After #198 the owner found that on Android a switch still opened in
+Chrome's overlay. The compatibility table relied on was derived data;
+Chrome's own announcement says scope extensions are not supported on
+Android (web apps there have a different identity model). Asked, the owner
+chose to keep the overlay on phones. The knowledge base now says switching
+inside one app works in Chrome and Edge on a computer only; the code
+(#198) stays as it is.
