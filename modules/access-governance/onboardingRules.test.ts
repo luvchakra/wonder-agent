@@ -52,7 +52,17 @@ describe("checklist (spec §8.5)", () => {
     const r = evaluateChecklist({ config: full, app, integration: { capabilities: allCaps, lastSyncStatus: "succeeded" }, entitlementCount: 4 });
     expect(r.blockingFailures).toEqual([]);
     expect(r.automationReady).toBe(true);
-    expect(r.items).toHaveLength(15);
+    // The questionnaire item is not applicable without a template's questions (ACCESS-P0-34).
+    expect(r.items).toHaveLength(16);
+    expect(r.items.find((i) => i.key === "questionnaire")).toMatchObject({ state: "not_applicable", blocking: false });
+  });
+
+  it("an unanswered required question stops promotion (ACCESS-P0-34)", () => {
+    const base = { config: full, app, integration: { capabilities: allCaps, lastSyncStatus: "succeeded" }, entitlementCount: 4 };
+    const open = evaluateChecklist({ ...base, questionnaire: { missing: ["Hosting"] } });
+    expect(open.blockingFailures).toEqual(["questionnaire"]);
+    expect(open.items.find((i) => i.key === "questionnaire")?.detail).toBe("Answer: Hosting");
+    expect(evaluateChecklist({ ...base, questionnaire: { missing: [] } }).blockingFailures).toEqual([]);
   });
 
   it("a missing account identifier stops promotion (spec §8.6)", () => {

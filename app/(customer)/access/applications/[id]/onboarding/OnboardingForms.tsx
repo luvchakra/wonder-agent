@@ -2,7 +2,9 @@
 
 import { useActionState } from "react";
 import { Loader2 } from "lucide-react";
+import type { OnboardingQuestion } from "@/lib/shared/types/access-governance";
 import {
+  answerOnboardingAction,
   applicationLifecycleAction,
   configureOnboardingAction,
   onboardingStepAction,
@@ -41,10 +43,21 @@ function Pending({ pending, idle, busy }: { pending: boolean; idle: string; busy
   );
 }
 
-export function StartOnboardingForm({ applicationId }: { applicationId: string }) {
+export function StartOnboardingForm({ applicationId, templates = [] }: { applicationId: string; templates?: { id: string; name: string; specific: boolean }[] }) {
   const [state, action, pending] = useActionState(startOnboardingAction.bind(null, applicationId), IDLE);
   return (
     <form action={action} className="space-y-4">
+      {templates.length ? (
+        // ACCESS-P0-34: only templates that fit this application's connection are offered. One made for its connection type is the default; a general one is a choice.
+        <SelectField label="Template" name="templateId" defaultValue={templates[0].specific ? templates[0].id : ""} className="max-w-md">
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+          <option value="">No template</option>
+        </SelectField>
+      ) : null}
       <fieldset>
         <legend className="text-sm font-medium text-foreground">How much guidance?</legend>
         <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
@@ -62,6 +75,36 @@ export function StartOnboardingForm({ applicationId }: { applicationId: string }
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" disabled={pending}>
           <Pending pending={pending} idle="Start onboarding" busy="Starting…" />
+        </Button>
+        <Result state={state} />
+      </div>
+    </form>
+  );
+}
+
+/** ACCESS-P0-34: the template's questionnaire. Saving a change after validation means validating again. */
+export function QuestionnaireForm({ applicationId, questions, answers }: { applicationId: string; questions: OnboardingQuestion[]; answers: Record<string, string | boolean> }) {
+  const [state, action, pending] = useActionState(answerOnboardingAction.bind(null, applicationId), IDLE);
+  const shown = (q: OnboardingQuestion) => (answers[q.key] === undefined ? "" : answers[q.key] === true ? "yes" : answers[q.key] === false ? "no" : String(answers[q.key]));
+  return (
+    <form action={action} className="space-y-3">
+      {questions.map((q) => {
+        const label = `${q.label}${q.required ? "" : " (optional)"}`;
+        if (q.type === "text") return <TextareaField key={q.key} label={label} name={`answer.${q.key}`} defaultValue={shown(q)} rows={2} maxLength={2000} />;
+        return (
+          <SelectField key={q.key} label={label} name={`answer.${q.key}`} defaultValue={shown(q)} className="max-w-md">
+            <option value="">Not answered</option>
+            {(q.type === "yes_no" ? ["yes", "no"] : (q.options ?? [])).map((o) => (
+              <option key={o} value={o}>
+                {q.type === "yes_no" ? (o === "yes" ? "Yes" : "No") : o}
+              </option>
+            ))}
+          </SelectField>
+        );
+      })}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="submit" variant="outline" disabled={pending}>
+          <Pending pending={pending} idle="Save answers" busy="Saving…" />
         </Button>
         <Result state={state} />
       </div>

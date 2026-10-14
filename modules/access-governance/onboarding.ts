@@ -3,10 +3,12 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import type { ApplicationOnboardingStatus } from "@/lib/shared/types/access-governance";
+import type { ApplicationOnboardingStatus, ApplicationOnboardingTemplate } from "@/lib/shared/types/access-governance";
 import { getIntegration, getNormalizedObjects, listSyncJobs } from "@/modules/integrations/service";
 import { listIdentitiesForCorrelation } from "@/modules/agent-identity/service";
-import { getApplicationDetail } from "./catalog";
+import { getApplicationDetail, updateApplication } from "./catalog";
+import { declareTemplateTypes, getOnboardingTemplate, listOnboardingTemplates, templateForStart } from "./onboardingTemplates";
+import { connectionTypeKeyOf, missingAnswers, templateFits, validateAnswers, type Answers } from "./onboardingTemplateRules";
 import { belongsToApplication } from "./connectorAccessRules";
 import {
   EMPTY_CONFIG,
@@ -57,6 +59,9 @@ export type ApplicationOnboarding = {
   decisionNote: string | null;
   promotedAt: string | null;
   promotedHash: string | null;
+  /** ACCESS-P0-34: the template it started from, and the questionnaire's answers. */
+  templateId: string | null;
+  answers: Answers;
   updatedAt: string;
 };
 
@@ -84,6 +89,8 @@ function toOnboarding(r: Row): ApplicationOnboarding {
     decisionNote: (r.decision_note as string | null) ?? null,
     promotedAt: (r.promoted_at as string | null) ?? null,
     promotedHash: (r.promoted_hash as string | null) ?? null,
+    templateId: (r.template_id as string | null) ?? null,
+    answers: (r.answers as Answers | null) ?? {},
     updatedAt: r.updated_at as string,
   };
 }
@@ -168,11 +175,20 @@ async function requireOnboarding(tenantId: string, applicationId: string): Promi
   return { o: toOnboarding(row), row };
 }
 
-export async function startOnboarding(tenantId: string, actorId: string, applicationId: string, mode: unknown): Promise<ApplicationOnboarding> {
+/**
+ * Starts onboarding, optionally from a template (ACCESS-P0-34): its
+ * configuration defaults fill the draft, its owners fill the application's
+ * empty owner fields, and its entitlement types are declared on the
+ * application. A template for a connection type fits only an application
+ * connected through that type. Re-onboarding keeps the earlier
+ * configuration and does not apply a template.
+ */
+export async function startOnboarding(tenantId: string, actorId: string, applicationId: string, mode: unknown, templateId?: unknown): Promise<ApplicationOnboarding> {
   const app = await getApplicationDetail(tenantId, applicationId);
   if (!app) throw new ApiError(404, "NOT_FOUND", "No such application");
   if (app.onboardingStatus === "RETIRED") throw new ApiError(409, "RETIRED", "A retired application is not onboarded");
   const m = mode === "quick_start" || mode === "advanced" ? mode : "assisted";
+  if (templateId !== undefined && templateId !== null && templateId !== "" && typeof templateId !== "string") throw new ApiError(400, "VALIDATION_FAILED", "templateId: a template");
   const existing = await loadRow(tenantId, applicationId);
   if (existing) {
     const o = toOnboarding(existing);
@@ -182,17 +198,34 @@ export async function startOnboarding(tenantId: string, actorId: string, applica
     await audit(tenantId, actorId, applicationId, "started", { mode: m, reonboarding: true });
     return again;
   }
-  const config: OnboardingConfig = { ...EMPTY_CONFIG, integrationId: app.sourceIntegrationId };
+  let config: OnboardingConfig = { ...EMPTY_CONFIG, integrationId: app.sourceIntegrationId };
+  const chosen = templateId ? await templateForStart(tenantId, templateId as string) : null;
+  if (chosen) {
+    const connection = app.sourceIntegrationId ? await getIntegration(tenantId, app.sourceIntegrationId) : null;
+    if (!templateFits(chosen.template.connectionTypeKey, connectionTypeKeyOf(connection))) {
+      throw new ApiError(409, "TEMPLATE_DOES_NOT_FIT", `templateId: "${chosen.template.name}" is for applications connected through ${chosen.template.connectionTypeKey}`);
+    }
+    config = validateOnboardingConfig(chosen.stored.defaults.config, config);
+  }
   // Service role: the application was just read under RLS in this tenant.
   const { data, error } = await supabaseServiceRole()
     .from("application_onboardings")
-    .insert({ tenant_id: tenantId, application_id: applicationId, mode: m, status: "CONFIGURING", config, config_hash: configHash(config), created_by: actorId })
+    .insert({ tenant_id: tenantId, application_id: applicationId, mode: m, status: "CONFIGURING", config, config_hash: configHash(config), created_by: actorId, template_id: chosen?.template.id ?? null })
     .select()
     .single();
   if (error?.code === "23505") return (await getOnboarding(tenantId, applicationId))!;
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Could not start onboarding");
+  let declaredTypes = 0;
+  if (chosen) {
+    // Owners the application has stay; only empty ones take the template's.
+    const owners: Record<string, string> = {};
+    if (!app.businessOwnerIdentityId && chosen.template.defaults.businessOwnerIdentityId) owners.businessOwnerIdentityId = chosen.template.defaults.businessOwnerIdentityId;
+    if (!app.technicalOwnerIdentityId && chosen.template.defaults.technicalOwnerIdentityId) owners.technicalOwnerIdentityId = chosen.template.defaults.technicalOwnerIdentityId;
+    if (Object.keys(owners).length) await updateApplication(tenantId, actorId, applicationId, owners);
+    declaredTypes = await declareTemplateTypes(tenantId, applicationId, actorId, chosen.stored.entitlement_types);
+  }
   await syncCatalogStatus(tenantId, applicationId, "CONFIGURING", Boolean(config.integrationId));
-  await audit(tenantId, actorId, applicationId, "started", { mode: m });
+  await audit(tenantId, actorId, applicationId, "started", { mode: m, templateId: chosen?.template.id ?? null, declaredTypes });
   return toOnboarding(data);
 }
 
@@ -231,6 +264,62 @@ export async function configureOnboarding(tenantId: string, actorId: string, app
   return updated;
 }
 
+/**
+ * ACCESS-P0-34: records the questionnaire's answers. A change after
+ * validation is a change to what is approved, so the onboarding goes back
+ * to configuring and is validated, simulated and approved again.
+ */
+export async function answerOnboarding(tenantId: string, actorId: string, applicationId: string, input: unknown): Promise<ApplicationOnboarding> {
+  const { o } = await requireOnboarding(tenantId, applicationId);
+  const reason = blockReason("configure", stateOf(o), actorId);
+  if (reason) throw new ApiError(409, "INVALID_STAGE", reason);
+  if (!o.templateId) throw new ApiError(409, "NO_QUESTIONNAIRE", "This onboarding did not start from a template with questions");
+  const template = await getOnboardingTemplate(tenantId, o.templateId);
+  if (!template) throw new ApiError(404, "NOT_FOUND", "The template is no longer in this organization");
+  const checked = validateAnswers(template.questions, input, o.answers);
+  if ("error" in checked) throw new ApiError(400, "VALIDATION_FAILED", checked.error);
+  const { answers } = checked;
+  if (JSON.stringify(answers) === JSON.stringify(o.answers)) return o;
+  const updated = await transition(
+    tenantId,
+    applicationId,
+    { configHash: o.configHash },
+    {
+      answers,
+      status: "CONFIGURING",
+      validated_hash: null,
+      simulated_hash: null,
+      submitted_by: null,
+      submitted_at: null,
+      approved_by: null,
+      approved_at: null,
+      approved_hash: null,
+      approved_config: null,
+    },
+  );
+  await syncCatalogStatus(tenantId, applicationId, "CONFIGURING", Boolean(o.config.integrationId));
+  // The answers stay on the onboarding record; the audit names the questions answered.
+  await audit(tenantId, actorId, applicationId, "answered", { templateId: o.templateId, answered: Object.keys(answers), missing: missingAnswers(template.questions, answers).length });
+  return updated;
+}
+
+/** The active templates that fit an application's connection type (ACCESS-P0-34): typed ones first, then those for any application. */
+export async function onboardingTemplatesFor(tenantId: string, applicationId: string): Promise<ApplicationOnboardingTemplate[]> {
+  const app = await getApplicationDetail(tenantId, applicationId);
+  if (!app) return [];
+  const [templates, connection] = await Promise.all([listOnboardingTemplates(tenantId), app.sourceIntegrationId ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null)]);
+  const type = connectionTypeKeyOf(connection);
+  return templates.filter((t) => templateFits(t.connectionTypeKey, type)).sort((a, b) => Number(b.connectionTypeKey !== null) - Number(a.connectionTypeKey !== null));
+}
+
+/** The template's required questions still unanswered; null without a questionnaire. */
+async function questionnaireState(tenantId: string, o: ApplicationOnboarding): Promise<{ missing: string[] } | null> {
+  if (!o.templateId) return null;
+  const template = await getOnboardingTemplate(tenantId, o.templateId);
+  if (!template || !template.questions.length) return null;
+  return { missing: missingAnswers(template.questions, o.answers) };
+}
+
 async function checklistContext(tenantId: string, applicationId: string, config: OnboardingConfig) {
   const app = await getApplicationDetail(tenantId, applicationId);
   if (!app) throw new ApiError(404, "NOT_FOUND", "No such application");
@@ -260,8 +349,9 @@ export async function validateOnboarding(tenantId: string, actorId: string, appl
   const { o } = await requireOnboarding(tenantId, applicationId);
   const reason = blockReason("validate", stateOf(o), actorId);
   if (reason) throw new ApiError(409, "INVALID_STAGE", reason);
-  const { app, integration } = await checklistContext(tenantId, applicationId, o.config);
+  const [{ app, integration }, questionnaire] = await Promise.all([checklistContext(tenantId, applicationId, o.config), questionnaireState(tenantId, o)]);
   const result = evaluateChecklist({
+    questionnaire,
     config: o.config,
     app: { businessOwnerIdentityId: app.businessOwnerIdentityId, technicalOwnerIdentityId: app.technicalOwnerIdentityId, riskLevel: app.riskLevel, dataClassification: app.dataClassification },
     integration,
@@ -353,7 +443,14 @@ export async function decideOnboarding(
       : { status: "REJECTED", decision_note: note, submitted_by: null, submitted_at: null },
   );
   await syncCatalogStatus(tenantId, applicationId, decision.approve ? "APPROVED" : "REJECTED", Boolean(o.config.integrationId));
-  await audit(tenantId, actorId, applicationId, decision.approve ? "approved" : "rejected", { configVersion: o.configVersion, configHash: o.configHash }, { note });
+  await audit(
+    tenantId,
+    actorId,
+    applicationId,
+    decision.approve ? "approved" : "rejected",
+    { configVersion: o.configVersion, configHash: o.configHash, templateId: o.templateId, answered: Object.keys(o.answers) },
+    { note },
+  );
   return updated;
 }
 

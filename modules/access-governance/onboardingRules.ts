@@ -107,6 +107,8 @@ export type ChecklistContext = {
   /** The linked integration, or null when not connected. */
   integration: { capabilities: Record<string, boolean | undefined>; lastSyncStatus: string | null } | null;
   entitlementCount: number;
+  /** ACCESS-P0-34: the template's required questions still unanswered; null without a questionnaire. */
+  questionnaire?: { missing: string[] } | null;
 };
 
 const OPERATION_ITEMS: { key: string; label: string; ops: OnboardingOperation[] }[] = [
@@ -162,6 +164,14 @@ export function evaluateChecklist(ctx: ChecklistContext): { items: ChecklistItem
     item("request_policy", "Request policy configured", Boolean(config.requestPolicy), true, (config.requestPolicy ?? "").replace(/_/g, " "), "Choose how access is requested"),
     item("certification_policy", "Certification policy configured", Boolean(config.certificationPolicy), true, config.certificationPolicy ?? "", "Choose how often access is reviewed"),
     item("provenance", "Audit/provenance enabled", config.provenanceEnabled, true, "Every change is audited with its source", "Audit and provenance must stay on"),
+    item(
+      "questionnaire",
+      "Questionnaire answered",
+      ctx.questionnaire ? ctx.questionnaire.missing.length === 0 : null,
+      true,
+      "Every required question is answered",
+      `Answer: ${(ctx.questionnaire?.missing ?? []).join("; ")}`,
+    ),
   ];
   const blockingFailures = items.filter((i) => i.blocking && i.state === "fail").map((i) => i.key);
   // Automation ready: every operation wanted and declared by the connector.

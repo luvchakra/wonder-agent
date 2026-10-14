@@ -121,6 +121,27 @@ export type ApplicationEntitlementType = {
   entitlementCount?: number;
 };
 
+/** ACCESS-P0-34 — a question of an onboarding template's questionnaire. */
+export type OnboardingQuestion = { key: string; label: string; type: "text" | "yes_no" | "choice"; options?: string[]; required: boolean };
+
+/**
+ * ACCESS-P0-34 — a starting point for onboarding applications of one
+ * connection type (or of none): configuration defaults, default owners, the
+ * entitlement types to declare, and a questionnaire.
+ */
+export type ApplicationOnboardingTemplate = {
+  id: string;
+  name: string;
+  description: string | null;
+  /** The connection type (integration_types.id) it is for; null for applications without a connector. */
+  connectionTypeKey: string | null;
+  defaults: { config: Record<string, unknown>; businessOwnerIdentityId: string | null; technicalOwnerIdentityId: string | null };
+  entitlementTypes: { name: string; requestMode: EntitlementTypeRequestMode; certifiable: boolean; defaultDurationDays: number | null; maxDurationDays: number | null }[];
+  questions: OnboardingQuestion[];
+  status: "active" | "retired";
+  updatedAt: string;
+};
+
 /**
  * ACCESS-P0-13 (master P0-11) — where data lives: a database, warehouse,
  * bucket, file share, SaaS object or API, optionally inside an

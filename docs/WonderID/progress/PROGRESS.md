@@ -57,6 +57,8 @@ Every story's priority on `../ROADMAP-STORIES.md` comes from this table (owner r
 | Applies to | Priority | Why |
 |---|---|---|
 | EXPERIENCE-P0-32 | Medium | Owner request 2026-10-13: language picker in the header |
+| ACCESS-P0-42 | High | Owner request 2026-10-14: internal fulfilment task assignment instead of ticketing first |
+| INTEGRATION-P0-26 | Low | Owner decision 2026-10-14: ServiceNow fulfilment waits; internal assignment (ACCESS-P0-42) comes first |
 | QA-P0-02.1, QA-P0-02.2, QA-P0-06 | High | Tenant-isolation, RBAC and sign-in coverage (CLAUDE.md §17.8, P0) |
 | INTEGRATION-* (unfinished) | Low | Owner decision 2026-10-13: integration stories are implemented later |
 | F10 | High | Release gate |
@@ -117,7 +119,8 @@ Exit test: not run.
 | INTEGRATION-P0-23 † WonderID Relay | Integration | | Not started | Needs D7 |
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
-| INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | |
+| INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | Low (owner, 2026-10-14) |
+| ACCESS-P0-42 Internal fulfilment task assignment | Access | | Not started | Owner request 2026-10-14, High |
 | RISK-P0-13 Rogue access remediation | Risk | | Partial | Every remediation action, severity, trend and the finding page; the last, adding access to a package the identity holds, 2026-10-14 (#169). Done once its E2E passes in the nightly run |
 | QA-P0-26 Provisioning safety suite | QA | | Done | 2026-10-12, no migration. The mass-change guard on writes: at most `integration.maxWritesPerHour` (default 100) changes per connection per hour; past it nothing is sent and the task goes to its owner with the reason. Tests in `connector-provisioning.spec.ts`: read-only types cannot be turned on, the guard, Try again once the limit allows, no attempt key sent twice, every operation verified |
 
@@ -171,7 +174,7 @@ Exit test: not run.
 | OPERATIONS-P0-12 † Forms, e-mail templates, jobs page, run log | Operations | | Not started | |
 | PLATFORM-P0-13 (finish) Configuration bundles | Platform | | Partial | Backlog: Partial (Global Configuration built) |
 | PLATFORM-P0-15 † Certified definitions | Platform | | Not started | |
-| ACCESS-P0-34 Onboarding templates and questionnaire | Access | #74 | Not started | |
+| ACCESS-P0-34 Onboarding templates and questionnaire | Access | #74 | Done | 2026-10-14: templates per connection type (connector definition key) with configuration defaults, default owners, entitlement types and a questionnaire (0171, 0172); onboarding starts from a fitting template; required questions block validation; a changed answer means validating and approving again |
 | ACCESS-P0-38 † Baskets, model-after, drafts, signed links | Access | | Not started | |
 | IDENTITY-P0-25 † Generated identifiers | Identity | | Not started | |
 | EXPERIENCE-P0-30 Guided connector editor | Experience | #75 | Not started | |

@@ -77,8 +77,12 @@ export {
   decideOnboarding,
   promoteOnboarding,
   setApplicationLifecycle,
+  answerOnboarding,
+  onboardingTemplatesFor,
   type ApplicationOnboarding,
 } from "./onboarding";
+export { listOnboardingTemplates, getOnboardingTemplate, createOnboardingTemplate, updateOnboardingTemplate, retireOnboardingTemplate } from "./onboardingTemplates";
+export { templateFits as onboardingTemplateFits, missingAnswers as missingOnboardingAnswers } from "./onboardingTemplateRules";
 export {
   listAccountInventory,
   getAccountSummary,
