@@ -3376,3 +3376,22 @@ Owner feedback the same day: an organization set up as development, with no prod
 - `/organizations/manage` is unchanged.
 
 **Verified.** Typecheck and eslint clean. Local E2E: org-address-required (a server with the flag on) 1/1; first-organization and tenant-address 16/16.
+
+## 2026-10-14 — Delegated role assignments (for ACCESS-P0-23 part 3, owner-approved)
+
+Administration delegation is approved by the owner, and Access's delegations call it.
+
+**What changed.**
+- `lib/rbac/delegatedRoles.ts` (`grantDelegatedRoles`, `revokeDelegatedRoles`) writes and removes time-bound copies of one member's directly assigned roles for another.
+- Migration 0178 adds `user_roles.delegation_id`.
+
+**What did not change.** The authorization engine, permissions and RLS: a copy is an ordinary scoped, expiring assignment.
+
+**Guards.**
+- Tenant Administrator is never copied.
+- The no-self-grant check still applies.
+- A role already held is left alone.
+- There is no re-delegation.
+- `assignRole` turns a copy into an ordinary assignment when an administrator sets its terms.
+
+**Verified.** Detail in the Access audit log of the same date: unit tests, isolation SQL 10/10, and the authorization, custom-roles, users and permission-catalog E2E specs.

@@ -151,7 +151,8 @@ export async function assignRole(
   if (error?.code === "23505") {
     const { error: updateError } = await supabase
       .from("user_roles")
-      .update({ granted_by: actorId, ...termsToRow(terms) })
+      // An administrator setting the terms makes it an ordinary assignment, no longer a delegation's copy (ACCESS-P0-23 part 3).
+      .update({ granted_by: actorId, ...termsToRow(terms), delegation_id: null })
       .eq("tenant_id", tenantId)
       .eq("user_id", targetUserId)
       .eq("role_id", role.id);

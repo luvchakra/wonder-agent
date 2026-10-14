@@ -8,7 +8,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   try {
     const ctx = await requirePermission("access.read");
     const { id } = await params;
-    const data = await revokeDelegation(ctx.tenantId!, { userId: ctx.userId, canManageAccess: ctx.permissions.includes("access.manage") }, id);
+    const data = await revokeDelegation(ctx.tenantId!, { userId: ctx.userId, canManageAccess: ctx.permissions.includes("access.manage"), canManageRoles: ctx.permissions.includes("role.manage") }, id);
     return NextResponse.json({ ok: true, data });
   } catch (err) {
     return errorResponse(err);

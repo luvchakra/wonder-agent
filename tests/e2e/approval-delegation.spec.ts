@@ -171,6 +171,45 @@ test.describe.serial("approver delegation", () => {
     await asker.close();
   });
 
+  test("part 3: administration delegation gives the delegate copies of the person's roles until it ends", async ({ request, browser }) => {
+    test.setTimeout(90_000);
+    // Copies an interrupted run left behind would read as roles already held.
+    await db().from("user_roles").delete().eq("tenant_id", tenantId).eq("user_id", roUser).not("delegation_id", "is", null);
+    const until = new Date(Date.now() + 3 * 86_400_000).toISOString();
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    const asManager = () => ro.request.post("/api/v1/access/delegations", { data: { delegatorUserId: iamUser, delegateUserId: requesterUser, endsAt: until } });
+    expect((await asManager()).status()).toBe(403);
+
+    // Only someone who manages roles sets one up.
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    expect((await iam.request.post("/api/v1/access/delegations", { data: { delegateUserId: roUser, scope: "administration", endsAt: until } })).status()).toBe(403);
+    await iam.close();
+    // Tenant Administrator is never delegated: with nothing else to give, nothing is made.
+    const nothing = await request.post("/api/v1/access/delegations", { data: { delegateUserId: roUser, scope: "administration", endsAt: until } });
+    expect(nothing.status(), await nothing.text()).toBe(409);
+    expect((await nothing.json()).error.code).toBe("NOTHING_TO_DELEGATE");
+
+    const made = await request.post("/api/v1/access/delegations", { data: { delegatorUserId: iamUser, delegateUserId: roUser, scope: "administration", endsAt: until, reason: "Leave" } });
+    expect(made.status(), await made.text()).toBe(201);
+    const delegation = (await made.json()).data as { id: string; scope: string; roles: { granted: string[] } };
+    expect(delegation).toMatchObject({ scope: "administration", roles: { granted: ["IAM_ADMIN"] } });
+    const copies = async () => (await db().from("user_roles").select("expires_at, roles(name)").eq("tenant_id", tenantId).eq("user_id", roUser).eq("delegation_id", delegation.id)).data ?? [];
+    const [copy] = await copies();
+    expect((copy.roles as unknown as { name: string }).name).toBe("IAM_ADMIN");
+    expect(Date.parse(copy.expires_at as string)).toBe(Date.parse(until));
+
+    // The delegate now holds the person's rights: managing access for someone else works.
+    const asDelegate = await asManager();
+    expect(asDelegate.status(), await asDelegate.text()).toBe(201);
+    await ro.request.post(`/api/v1/access/delegations/${(await asDelegate.json()).data.id}/revoke`);
+
+    // Ended early: the copies go at once, and so do the rights.
+    expect((await request.post(`/api/v1/access/delegations/${delegation.id}/revoke`)).status()).toBe(200);
+    expect(await copies()).toEqual([]);
+    expect((await asManager()).status()).toBe(403);
+    await ro.close();
+  });
+
   test("the delegations page", async ({ page }) => {
     await page.goto("/access/requests?view=waiting");
     await page.getByRole("link", { name: "Delegate your approvals" }).click();

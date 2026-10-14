@@ -15,7 +15,8 @@ test.describe("permission catalog", () => {
     await page.goto("/settings/permissions");
     await expect(page.getByRole("heading", { name: "Permission catalog", level: 1 })).toBeVisible();
     for (const m of ["Discover", "Understand", "Govern", "Protect", "Assure", "Administration"]) {
-      await expect(page.getByRole("heading", { name: m, level: 2 })).toBeVisible();
+      // In the page, not the Admin sidebar's own "Administration" heading.
+      await expect(page.getByRole("main").getByRole("heading", { name: m, level: 2 })).toBeVisible();
     }
     // The kill switch is privileged, in Protect, granted to the Security and Tenant Administrators.
     await page.getByRole("search", { name: "Filter permissions" }).getByLabel("Search").fill("emergency");
