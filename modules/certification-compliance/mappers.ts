@@ -66,6 +66,7 @@ export function toCertificationDecision(row: any): CertificationDecision {
     decidedBy: row.decided_by,
     decidedAt: row.decided_at,
     remediationId: row.remediation_id,
+    until: row.until ?? null,
     snapshot: row.snapshot ?? null,
   };
 }

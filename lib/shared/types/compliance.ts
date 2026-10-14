@@ -106,7 +106,7 @@ export type CampaignMetrics = {
   escalatedItems: number;
 };
 
-export type DecisionType = "approve" | "revoke" | "modify" | "delegate" | "request_information";
+export type DecisionType = "approve" | "revoke" | "modify" | "delegate" | "request_information" | "defer" | "escalate" | "exception";
 
 export type CertificationDecision = {
   id: string;
@@ -116,6 +116,8 @@ export type CertificationDecision = {
   decidedBy: string;
   decidedAt: string;
   remediationId: string | null;
+  /** COMPLIANCE-P0-10 part 2: for defer, the new due date; for exception, the date the access ends. */
+  until: string | null;
   /** COMPLIANCE-P0-03 — a fresh snapshot captured at the moment of this decision. */
   snapshot: CertificationSnapshot | null;
 };

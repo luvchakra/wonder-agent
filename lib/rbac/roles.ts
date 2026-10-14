@@ -214,3 +214,35 @@ export async function removeRole(
     metadata: { role: roleName, targetUserId },
   });
 }
+
+/**
+ * COMPLIANCE-P0-10 part 2: an access-review exception keeps a member's
+ * direct role until a date. Only the end date changes; the scope and other
+ * terms stay. Never one's own role (the database refuses self-escalation
+ * too), never an automation credential's (its own page), never a
+ * delegation's copy. Service role, filtered by tenant; audited.
+ */
+export async function setRoleAssignmentEnd(tenantId: string, actorId: string, targetUserId: string, roleId: string, expiresAt: string): Promise<void> {
+  if (actorId === targetUserId) throw new ApiError(403, "SELF_ESCALATION", "You can't change your own role. Another administrator must do it.");
+  await assertTenantMember(tenantId, targetUserId, {});
+  const { data, error } = await supabaseServiceRole()
+    .from("user_roles")
+    .update({ expires_at: expiresAt })
+    .eq("tenant_id", tenantId)
+    .eq("user_id", targetUserId)
+    .eq("role_id", roleId)
+    .is("delegation_id", null)
+    .select("id");
+  if (error) throw refusalFrom(error) ?? new ApiError(500, "UPDATE_FAILED", error.message);
+  if (!data?.length) throw new ApiError(409, "NO_ASSIGNMENT", "That person no longer holds this role directly");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "role.assignment_changed",
+    objectType: "user_role",
+    objectId: targetUserId,
+    outcome: "success",
+    metadata: { roleId, targetUserId, expires_at: expiresAt, reason: "access review exception" },
+  });
+}

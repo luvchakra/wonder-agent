@@ -2,12 +2,12 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
-import { removeRole } from "@/lib/rbac/roles";
+import { removeRole, setRoleAssignmentEnd } from "@/lib/rbac/roles";
 import { removeGroupMember } from "@/lib/users/groups";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { revokeAccessGrant, getAccessGrant, getEntitlement, createAccessRequest, requestCertifiedRemoval } from "@/modules/access-governance/service";
+import { revokeAccessGrant, getAccessGrant, getEntitlement, createAccessRequest, recordApprovedAfterwards, requestCertifiedRemoval } from "@/modules/access-governance/service";
 import { getIdentityReviewInfo, listOwners } from "@/modules/agent-identity/service";
-import { IDENTITY_ITEM_DECISIONS, selfCertificationRefused } from "./identityReviewRules";
+import { escalationTarget, IDENTITY_ITEM_DECISIONS, selfCertificationRefused, validateUntil } from "./identityReviewRules";
 import type { CertificationDecision, CertificationItem, CertificationItemDetail, DecisionType } from "@/lib/shared/types/compliance";
 import { toCertificationDecision, toCertificationItem } from "./mappers";
 import { buildFreshSnapshot } from "./snapshot";
@@ -26,7 +26,12 @@ export type RecordDecisionInput = {
   overrideSoD?: boolean;
   /** COMPLIANCE-P0-10: agent items still need compliance.manage; a person's access needs only the assigned reviewer. Defaults to true for callers that already required it. */
   canManageCompliance?: boolean;
+  /** COMPLIANCE-P0-10 part 2: for defer, the new due date; for exception, the date the access ends. */
+  until?: string;
 };
+
+/** The decisions an agent's item takes (COMPLIANCE-P0-01); part 2's three are for people's access and roles. */
+const AGENT_ITEM_DECISIONS = ["approve", "revoke", "modify", "delegate", "request_information"];
 
 /**
  * COMPLIANCE-P0-01.3. Every decision is written once, immutably —
@@ -69,6 +74,24 @@ export async function recordDecision(
   }
   if (item.agentId && input.canManageCompliance === false) throw new ApiError(403, "FORBIDDEN", "Deciding an agent's certification needs compliance.manage");
 
+  let until: string | null = null;
+  if (item.agentId) {
+    if (!AGENT_ITEM_DECISIONS.includes(input.decision)) throw new ApiError(400, "INVALID_INPUT", "For an agent: approve, revoke, modify, delegate or request_information");
+  } else {
+    const v = validateUntil(input.decision, input.until, new Date());
+    if ("error" in v) throw new ApiError(400, "INVALID_INPUT", v.error);
+    until = v.until;
+    input = { ...input, until: until ?? undefined };
+  }
+  // Part 2: escalation goes to whoever launched the campaign.
+  let escalateTo: string | null = null;
+  if (input.decision === "escalate") {
+    const { data: campaign, error: campaignError } = await supabase.from("certification_campaigns").select("created_by").eq("tenant_id", tenantId).eq("id", item.campaignId).maybeSingle();
+    if (campaignError) throw new ApiError(500, "QUERY_FAILED", campaignError.message);
+    escalateTo = escalationTarget((campaign?.created_by as string | null) ?? null, actorId);
+    if (!escalateTo) throw new ApiError(409, "NO_ESCALATION_TARGET", "You launched this campaign; decide the item, or delegate it");
+  }
+
   let snapshot: unknown;
   let remediationId: string | null = null;
   if (item.roleSource) {
@@ -88,6 +111,7 @@ export async function recordDecision(
       decided_by: actorId,
       remediation_id: remediationId,
       snapshot,
+      until,
     })
     .select()
     .single();
@@ -95,6 +119,17 @@ export async function recordDecision(
 
   if (input.decision === "delegate") {
     const { error: updateError } = await supabase.from("certification_items").update({ reviewer_id: input.delegateToUserId }).eq("id", itemId);
+    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  } else if (input.decision === "defer") {
+    // Part 2: the item stays open with the later due date (and may escalate again once that passes).
+    const { error: updateError } = await supabase.from("certification_items").update({ due_date: until, escalated_at: null, escalated_to: null }).eq("tenant_id", tenantId).eq("id", itemId);
+    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  } else if (input.decision === "escalate") {
+    const { error: updateError } = await supabase
+      .from("certification_items")
+      .update({ reviewer_id: escalateTo, escalated_at: new Date().toISOString(), escalated_to: escalateTo })
+      .eq("tenant_id", tenantId)
+      .eq("id", itemId);
     if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
   } else if (input.decision !== "request_information") {
     const { error: updateError } = await supabase.from("certification_items").update({ status: "decided" }).eq("id", itemId);
@@ -241,7 +276,7 @@ async function agentItemDecision(
  */
 async function identityItemDecision(tenantId: string, actorId: string, item: CertificationItem, input: RecordDecisionInput): Promise<{ snapshot: unknown; remediationId: string | null }> {
   if (!(IDENTITY_ITEM_DECISIONS as readonly string[]).includes(input.decision)) {
-    throw new ApiError(400, "INVALID_INPUT", "For a person's access: approve, revoke, delegate or request_information");
+    throw new ApiError(400, "INVALID_INPUT", "For a person's access: approve, revoke, defer, escalate, exception, delegate or request_information");
   }
   const subject = (await getIdentityReviewInfo(tenantId, [item.identityId!])).get(item.identityId!) ?? null;
   if (selfCertificationRefused(input.decision, actorId, subject?.userId ?? null)) {
@@ -253,6 +288,20 @@ async function identityItemDecision(tenantId: string, actorId: string, item: Cer
     if (!item.accessGrantId) throw new ApiError(409, "NO_SPECIFIC_GRANT", "This item names no specific access to remove");
     const request = await requestCertifiedRemoval(tenantId, actorId, { grantId: item.accessGrantId, certificationItemId: item.id, justification: input.justification });
     remediationId = request.id;
+  } else if (input.decision === "exception") {
+    // Part 2: kept until a date, then removed by Access's daily expiry sweep (time-bound access).
+    if (!item.accessGrantId) throw new ApiError(409, "NO_SPECIFIC_GRANT", "This item names no specific access to keep");
+    const grant = await getAccessGrant(tenantId, item.accessGrantId);
+    if (!grant?.applicationId) throw new ApiError(409, "NO_SPECIFIC_GRANT", "That access no longer exists");
+    const kept = await recordApprovedAfterwards(tenantId, actorId, {
+      subjectIdentityId: item.identityId!,
+      applicationId: grant.applicationId,
+      entitlementId: grant.entitlementId ?? null,
+      accessGrantId: item.accessGrantId,
+      justification: `Access review exception: ${input.justification}`,
+      expiresAt: input.until!,
+    });
+    remediationId = kept.requestId;
   }
   const snapshot = { ...(item.snapshot as Record<string, unknown> | null), decidedAt: new Date().toISOString(), subject: subject ? { displayName: subject.displayName, identityType: subject.identityType } : null };
   return { snapshot, remediationId };
@@ -267,7 +316,7 @@ async function identityItemDecision(tenantId: string, actorId: string, item: Cer
  */
 async function roleItemDecision(tenantId: string, actorId: string, item: CertificationItem, input: RecordDecisionInput): Promise<{ snapshot: unknown; remediationId: string | null }> {
   if (!(IDENTITY_ITEM_DECISIONS as readonly string[]).includes(input.decision)) {
-    throw new ApiError(400, "INVALID_INPUT", "For a role assignment: approve, revoke, delegate or request_information");
+    throw new ApiError(400, "INVALID_INPUT", "For a role assignment: approve, revoke, defer, escalate, exception, delegate or request_information");
   }
   const subject = (await getIdentityReviewInfo(tenantId, [item.identityId!])).get(item.identityId!) ?? null;
   if (selfCertificationRefused(input.decision, actorId, subject?.userId ?? null)) {
@@ -283,17 +332,22 @@ async function roleItemDecision(tenantId: string, actorId: string, item: Certifi
     } else {
       await removeRole(tenantId, actorId, subject.userId, role.name);
     }
+  } else if (input.decision === "exception") {
+    // Part 2: a direct role is kept until a date (its own end date); a group's role cannot end for one member.
+    if (!subject?.userId || !item.roleId) throw new ApiError(409, "NO_SPECIFIC_GRANT", "This item names no role assignment to keep");
+    if (item.roleSource === "group") throw new ApiError(409, "GROUP_ROLE", "A role that comes from a group can't end for one person; certify or revoke it");
+    await setRoleAssignmentEnd(tenantId, actorId, subject.userId, item.roleId, input.until!);
   }
-  if (input.decision === "approve" || input.decision === "revoke") {
+  if (input.decision === "approve" || input.decision === "revoke" || input.decision === "exception") {
     await writeAudit({
       tenantId,
       actorId,
       actorType: "user",
-      action: input.decision === "approve" ? "compliance.access_certified" : "compliance.access_revoked",
+      action: input.decision === "approve" ? "compliance.access_certified" : input.decision === "exception" ? "compliance.access_exception" : "compliance.access_revoked",
       objectType: "certification_item",
       objectId: item.id,
       outcome: "success",
-      metadata: { userId: subject?.userId ?? null, role: role?.name ?? null, source: item.roleSource, groupId: item.groupId, campaignId: item.campaignId },
+      metadata: { userId: subject?.userId ?? null, role: role?.name ?? null, source: item.roleSource, groupId: item.groupId, campaignId: item.campaignId, until: input.until ?? null },
     });
   }
   const snapshot = { ...(item.snapshot as Record<string, unknown> | null), decidedAt: new Date().toISOString(), subject: subject ? { displayName: subject.displayName, identityType: subject.identityType } : null };

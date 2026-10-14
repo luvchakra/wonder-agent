@@ -29,7 +29,7 @@ function makePackage(): EvidenceExportPackage {
         escalatedAt: null,
         escalatedTo: null,
         decisions: [
-          { id: "decision-1", itemId: "item-1", decision: "approve", justification: "ok", decidedBy: "user-2", decidedAt: "x", remediationId: null, snapshot: null },
+          { id: "decision-1", itemId: "item-1", decision: "approve", justification: "ok", decidedBy: "user-2", decidedAt: "x", remediationId: null, until: null, snapshot: null },
         ],
       },
     ],

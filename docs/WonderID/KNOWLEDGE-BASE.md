@@ -430,7 +430,7 @@ Findings are raised for:
 
 **Access reviews (certifications)**
 - **Campaigns:** each campaign covers a chosen set of identities, applications or agents.
-- **Decisions:** reviewers keep, revoke or change each piece of access.
+- **Decisions:** reviewers keep, revoke or change each piece of access. For people's access and WonderID roles they can also defer (a new due date, at most 30 days away), escalate (to whoever launched the campaign) or make an exception (keep the access until a date, at most 90 days away; it is then removed automatically). An exception is not available for a role that comes from a group, and nobody makes one for their own access.
 - **Overdue items:** escalated automatically.
 - **Evidence:** each decision is captured as evidence.
 - **Who can review:** reviewers can't review their own access.
@@ -649,6 +649,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Access reviews of people and WonderID roles can defer an item, escalate it to whoever launched the campaign, or keep the access as an exception until a date, after which it is removed. |
 | 14 Oct 2026 | Access reviews can cover the WonderID roles members hold, directly or through a group, privileged roles first; nobody certifies their own role, and a revoke removes it at once. |
 | 14 Oct 2026 | Delegation never involves an automation credential, in either direction: its roles change only on its own page. The vendor console's listed-address path no longer accepts enterprise SSO or Microsoft-only sign-ins, and its first use is recorded in the platform audit. |
 | 14 Oct 2026 | Access reviews cover people's application access too: reviewed by the manager, the application owner or a named reviewer; a revoke becomes an approved removal, verified at the source. |

@@ -5,7 +5,18 @@ import { useRouter } from "next/navigation";
 import { ConfirmActionDialog, type ConfirmActionResult, Button, SelectField, TextField } from "@/modules/ui";
 import type { DecisionType } from "@/lib/shared/types/compliance";
 
-const DECISIONS: DecisionType[] = ["approve", "revoke", "modify", "delegate", "request_information"];
+const AGENT_DECISIONS: DecisionType[] = ["approve", "revoke", "modify", "delegate", "request_information"];
+/** COMPLIANCE-P0-10 part 2: a person's access or WonderID role. */
+const PERSON_DECISIONS: DecisionType[] = ["approve", "revoke", "exception", "defer", "escalate", "delegate", "request_information"];
+const LABEL: Partial<Record<DecisionType, string>> = { approve: "certify", exception: "exception (keep until)", defer: "defer (review later)", request_information: "request information" };
+
+export type DecisionSubject = "agent" | "person" | "role";
+
+const REVOKE_COPY: Record<DecisionSubject, { description: string; scope: string }> = {
+  agent: { description: "This calls revokeAccessGrant() for this item's access grant — the agent loses this access immediately.", scope: "1 access grant revoked." },
+  person: { description: "This approves the removal of this access. It is carried out by a task or the connection, and counted as done once the system no longer shows it.", scope: "1 approved removal." },
+  role: { description: "The role is removed now (or the person leaves the group it comes from).", scope: "1 role assignment removed." },
+};
 
 /**
  * EXPERIENCE-P0-04 — "revoke" really calls revokeAccessGrant() (Compliance
@@ -13,18 +24,20 @@ const DECISIONS: DecisionType[] = ["approve", "revoke", "modify", "delegate", "r
  * every other decision submits directly. Wired to the existing
  * POST /api/v1/compliance/items/:id/decisions route (unchanged).
  */
-export function DecisionForm({ itemId }: { itemId: string }) {
+export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; subject?: DecisionSubject }) {
+  const decisions = subject === "agent" ? AGENT_DECISIONS : PERSON_DECISIONS;
   const router = useRouter();
   const [decision, setDecision] = useState<DecisionType>("approve");
   const [justification, setJustification] = useState("");
   const [delegateToUserId, setDelegateToUserId] = useState("");
   const [overrideSoD, setOverrideSoD] = useState(false);
+  const [until, setUntil] = useState("");
 
   async function submit(): Promise<ConfirmActionResult> {
     const res = await fetch(`/api/v1/compliance/items/${itemId}/decisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ decision, justification, delegateToUserId: delegateToUserId || undefined, overrideSoD }),
+      body: JSON.stringify({ decision, justification, delegateToUserId: delegateToUserId || undefined, overrideSoD, until: until ? new Date(`${until}T23:59:59Z`).toISOString() : undefined }),
     });
     const body = await res.json();
     if (!res.ok || !body.ok) {
@@ -47,9 +60,9 @@ export function DecisionForm({ itemId }: { itemId: string }) {
   const fields = (
     <>
       <SelectField label="Decision" name="decision" value={decision} onChange={(e) => setDecision(e.target.value as DecisionType)}>
-        {DECISIONS.map((d) => (
+        {decisions.map((d) => (
           <option key={d} value={d}>
-            {d}
+            {LABEL[d] ?? d}
           </option>
         ))}
       </SelectField>
@@ -63,7 +76,10 @@ export function DecisionForm({ itemId }: { itemId: string }) {
           onChange={(e) => setDelegateToUserId(e.target.value)}
         />
       )}
-      {decision === "approve" && (
+      {(decision === "defer" || decision === "exception") && (
+        <TextField label={decision === "defer" ? "Review by" : "Keep until"} name="until" type="date" required value={until} onChange={(e) => setUntil(e.target.value)} />
+      )}
+      {decision === "approve" && subject === "agent" && (
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input type="checkbox" checked={overrideSoD} onChange={(e) => setOverrideSoD(e.target.checked)} />
           Override SoD (only if you own this agent)
@@ -83,8 +99,8 @@ export function DecisionForm({ itemId }: { itemId: string }) {
             </Button>
           }
           title="Revoke access"
-          description="This calls revokeAccessGrant() for this item's access grant — the agent loses this access immediately."
-          scopePreview="1 access grant revoked."
+          description={REVOKE_COPY[subject].description}
+          scopePreview={REVOKE_COPY[subject].scope}
           reasonRequired={false}
           confirmLabel="Revoke access"
           onConfirm={submit}
@@ -99,7 +115,7 @@ export function DecisionForm({ itemId }: { itemId: string }) {
   return (
     <form onSubmit={handleDirectSubmit} className="flex flex-wrap items-end gap-2">
       {fields}
-      <Button type="submit" variant="secondary" disabled={!justification.trim()}>
+      <Button type="submit" variant="secondary" disabled={!justification.trim() || ((decision === "defer" || decision === "exception") && !until)}>
         Submit
       </Button>
     </form>
