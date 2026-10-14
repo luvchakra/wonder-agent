@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getGroup } from "@/lib/users/groups";
 import { listUsers } from "@/lib/users/users";
@@ -28,7 +29,9 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
     if (err instanceof ApiError && err.status === 403) redirect("/settings");
     throw err;
   }
-  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const [{ id: raw }, sp] = await Promise.all([params, searchParams]);
+  // FOUNDATION-P0-34: the URL carries the group's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "groups", raw, (ref) => `/settings/groups/${ref}`, sp);
   const can = (p: string) => ctx.permissions.includes(p);
   const canAssign = can("roles.assign") || can("role.manage");
   const [group, people, assignable, scope, provenance] = await Promise.all([
@@ -83,7 +86,7 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
                   {group.roleAssignments.map((r) => (
                     <li key={r.roleId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
                       <span className="min-w-0">
-                        <Link href={`/settings/roles/${r.roleId}`} className="font-medium text-foreground hover:text-primary">
+                        <Link href={`/settings/roles/${r.roleRef ?? r.roleId}`} className="font-medium text-foreground hover:text-primary">
                           {r.displayName}
                         </Link>
                         <span className="ml-2 text-xs text-muted-foreground">
@@ -116,7 +119,7 @@ export default async function GroupPage({ params, searchParams }: { params: Prom
                 <ul className="divide-y divide-border rounded-lg border border-border">
                   {group.members.map((m) => (
                     <li key={m.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-sm">
-                      <Link href={`/settings/users/${m.userId}`} className="min-w-0 hover:text-primary">
+                      <Link href={`/settings/users/${m.memberRef ?? m.userId}`} className="min-w-0 hover:text-primary">
                         <span className="block font-medium text-foreground">{m.name}</span>
                         {m.email && m.email !== m.name ? <span className="block text-xs text-muted-foreground">{m.email}</span> : null}
                       </Link>

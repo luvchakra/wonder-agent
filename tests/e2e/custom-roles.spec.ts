@@ -19,6 +19,7 @@ import { getSeededUserId } from "./support/seedTestData";
 const stamp = Date.now().toString(36);
 const roleName = `E2E Compliance Reviewer ${stamp}`;
 let roleId = "";
+let roleRef = "";
 
 test.describe.serial("custom roles", () => {
   test.describe.configure({ timeout: 90_000 });
@@ -57,9 +58,11 @@ test.describe.serial("custom roles", () => {
     await expect(review).toContainText(roleName);
     await expect(review).toContainText("View certifications and controls");
     await page.getByRole("button", { name: "Create ID role" }).click();
-    await expect(page).toHaveURL(/\/settings\/roles\/[0-9a-f-]{36}\?saved=created/, { timeout: 30_000 });
-    roleId = page.url().split("/settings/roles/")[1]!.split("?")[0]!;
+    // FOUNDATION-P0-34: the role's page is keyed by its number, not its UUID.
+    await expect(page).toHaveURL(/\/settings\/roles\/\d+\?saved=created/, { timeout: 30_000 });
+    roleRef = page.url().split("/settings/roles/")[1]!.split("?")[0]!;
     await expect(page.getByText(`${roleName} was created.`)).toBeVisible();
+    roleId = ((await (await page.request.get("/api/v1/roles")).json()).data as { id: string; name: string; displayName: string }[]).find((r) => r.name === roleName || r.displayName === roleName)!.id;
     await expect(page.getByText("Custom ID role", { exact: true })).toBeVisible();
     await expect(page.getByText("compliance.read")).toBeVisible();
     await ctx.close();
@@ -91,8 +94,11 @@ test.describe.serial("custom roles", () => {
     expect((await del.json()).error.code).toBe("ROLE_IN_USE");
 
     // The holder shows on the role's People tab.
-    await adminPage.goto(`/settings/roles/${roleId}?tab=people`);
-    await expect(adminPage.getByRole("link", { name: new RegExp(TEST_USERS.requester.email) })).toBeVisible();
+    await adminPage.goto(`/settings/roles/${roleRef}?tab=people`);
+    const holder = adminPage.getByRole("link", { name: new RegExp(TEST_USERS.requester.email) });
+    await expect(holder).toBeVisible();
+    // The holder's user page is linked by the membership's number.
+    await expect(holder).toHaveAttribute("href", /^\/settings\/users\/\d+$/);
 
     expect((await adminPage.request.delete(`/api/v1/users/${requesterId}/roles?role=${encodeURIComponent(roleName)}`)).status()).toBe(200);
     expect(await probe()).toBe(403);
@@ -132,7 +138,9 @@ test.describe.serial("custom roles", () => {
   test("editing and deleting a custom role nobody holds", async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: authFile("adminOne") });
     const page = await ctx.newPage();
+    // An old UUID link still opens the editor, at the number URL.
     await page.goto(`/settings/roles/${roleId}/edit`);
+    await expect(page).toHaveURL(new RegExp(`/settings/roles/${roleRef}/edit$`));
     await page.getByRole("button", { name: "Next" }).click();
     await page.getByRole("checkbox", { name: "View reports" }).check();
     await page.getByRole("button", { name: "Next" }).click();

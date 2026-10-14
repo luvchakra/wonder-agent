@@ -27,6 +27,8 @@ export type AuthorizationPolicyRecord = {
   exemptRoleIds: string[];
   status: "active" | "inactive";
   updatedAt: string;
+  /** FOUNDATION-P0-34: the policy's number in this organization, its URL key. */
+  ref: number | null;
 };
 
 type Row = {
@@ -40,9 +42,10 @@ type Row = {
   exempt_role_ids: string[];
   status: "active" | "inactive";
   updated_at: string;
+  ref: number | null;
 };
 
-const SELECT = "id, name, description, effect, permissions, scope_type, scope_values, exempt_role_ids, status, updated_at";
+const SELECT = "id, name, description, effect, permissions, scope_type, scope_values, exempt_role_ids, status, updated_at, ref";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const toRecord = (r: Row): AuthorizationPolicyRecord => ({
@@ -56,6 +59,7 @@ const toRecord = (r: Row): AuthorizationPolicyRecord => ({
   exemptRoleIds: r.exempt_role_ids,
   status: r.status,
   updatedAt: r.updated_at,
+  ref: r.ref ?? null,
 });
 
 export async function listAuthorizationPolicies(tenantId: string): Promise<AuthorizationPolicyRecord[]> {
@@ -82,7 +86,7 @@ function refusal(error: { code?: string; message?: string }): ApiError {
   return new ApiError(500, "SAVE_FAILED", msg);
 }
 
-export type PolicyResult = { ok: true; id: string } | { ok: false; errors: Record<string, string> };
+export type PolicyResult = { ok: true; id: string; ref?: number | null } | { ok: false; errors: Record<string, string> };
 
 async function validated(input: Parameters<typeof validatePolicy>[0]) {
   const catalog = (await listPermissionCatalog()).map((p) => p.key);
@@ -105,13 +109,13 @@ export async function createAuthorizationPolicy(tenantId: string, actorId: strin
   const { data, error } = await supabaseServiceRole()
     .from("authorization_policies")
     .insert({ tenant_id: tenantId, ...toRow(v.value), created_by: actorId, updated_by: actorId })
-    .select("id")
-    .single<{ id: string }>();
+    .select("id, ref")
+    .single<{ id: string; ref: number | null }>();
   if (error || !data) throw refusal(error ?? {});
   // WID-H07: the description stays on the policy; the audit keeps its fingerprint.
   const { description, ...created } = toRow(v.value);
   await writeAudit({ tenantId, actorId, actorType: "user", action: "authorization_policy.created", objectType: "authorization_policy", objectId: data.id, outcome: "success", metadata: created, typedText: { description: (description as string | null) ?? null } });
-  return { ok: true, id: data.id };
+  return { ok: true, id: data.id, ref: data.ref };
 }
 
 export async function updateAuthorizationPolicy(tenantId: string, actorId: string, id: string, input: Parameters<typeof validatePolicy>[0]): Promise<PolicyResult> {

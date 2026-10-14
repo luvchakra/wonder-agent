@@ -47,7 +47,7 @@ export async function savePolicyAction(_prev: PolicyActionState, formData: FormD
   if (!result.ok) return { ok: false, message: "Check the highlighted fields.", errors: result.errors };
   revalidatePath("/settings/authorization-policies");
   if (id) return { ok: true, message: "Saved. It applies from the next request." };
-  redirect(`/settings/authorization-policies/${result.id}?created=1`);
+  redirect(`/settings/authorization-policies/${result.ref ?? result.id}?created=1`);
 }
 
 export async function setPolicyStatusAction(_prev: PolicyActionState, formData: FormData): Promise<PolicyActionState> {
@@ -60,7 +60,7 @@ export async function setPolicyStatusAction(_prev: PolicyActionState, formData: 
     return refused(err);
   }
   revalidatePath("/settings/authorization-policies");
-  revalidatePath(`/settings/authorization-policies/${id}`);
+  revalidatePath("/settings/authorization-policies/[id]", "page");
   return { ok: true, message: status === "active" ? "Activated. It applies from the next request." : "Deactivated. It no longer applies." };
 }
 

@@ -29,6 +29,7 @@ export function toCertificationCampaign(row: any): CertificationCampaign {
     buildError: row.build_error ?? null,
     itemsTotal: row.items_total ?? null,
     reviewerKind: row.reviewer_kind ?? "named",
+    ref: row.ref ?? null,
   };
 }
 

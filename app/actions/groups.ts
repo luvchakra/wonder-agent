@@ -30,10 +30,11 @@ function refused(err: unknown): GroupActionState {
   throw err;
 }
 
-function revalidate(groupId: string, userId?: string) {
+// FOUNDATION-P0-34: the pages are keyed by number, so revalidate the route, not one UUID path.
+function revalidate(userId?: string) {
   revalidatePath("/settings/groups");
-  revalidatePath(`/settings/groups/${groupId}`);
-  if (userId) revalidatePath(`/settings/users/${userId}`);
+  revalidatePath("/settings/groups/[id]", "page");
+  if (userId) revalidatePath("/settings/users/[userId]", "page");
 }
 
 export async function saveGroupAction(_prev: GroupActionState, formData: FormData): Promise<GroupActionState> {
@@ -55,9 +56,9 @@ export async function saveGroupAction(_prev: GroupActionState, formData: FormDat
       message: "Check the highlighted fields.",
       errors: result.errors,
     };
-  revalidate(result.groupId);
+  revalidate();
   if (groupId) return { ok: true, message: "Saved." };
-  redirect(`/settings/groups/${result.groupId}?created=1`);
+  redirect(`/settings/groups/${result.groupRef ?? result.groupId}?created=1`);
 }
 
 export async function deleteGroupAction(_prev: GroupActionState, formData: FormData): Promise<GroupActionState> {
@@ -89,7 +90,7 @@ export async function addGroupMemberAction(_prev: GroupActionState, formData: Fo
   } catch (err) {
     return refused(err);
   }
-  revalidate(groupId, userId);
+  revalidate(userId);
   return {
     ok: true,
     message: "Added. They get the group's roles on their next request.",
@@ -105,7 +106,7 @@ export async function removeGroupMemberAction(_prev: GroupActionState, formData:
   } catch (err) {
     return refused(err);
   }
-  revalidate(groupId, userId);
+  revalidate(userId);
   return {
     ok: true,
     message: "Removed. They lose the group's roles on their next request.",
@@ -124,7 +125,7 @@ export async function addGroupRoleAction(_prev: GroupActionState, formData: Form
   } catch (err) {
     return refused(err);
   }
-  revalidate(groupId);
+  revalidate();
   return {
     ok: true,
     message: "Role given to the group. Its members get it on their next request.",
@@ -140,6 +141,6 @@ export async function removeGroupRoleAction(_prev: GroupActionState, formData: F
   } catch (err) {
     return refused(err);
   }
-  revalidate(groupId);
+  revalidate();
   return { ok: true, message: "Role removed from the group." };
 }

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getConsultationForAnswer } from "@/modules/certification-compliance/service";
 import { Card, CardBody, CardHeader } from "@/modules/ui";
 import { AnswerForm } from "./AnswerForm";
@@ -8,7 +9,8 @@ import { AnswerForm } from "./AnswerForm";
 export default async function ConsultationPage({ params }: { params: Promise<{ id: string }> }) {
   const ctx = await getTenantContext();
   if (!ctx.tenantId) redirect("/sign-in");
-  const { id } = await params;
+  // FOUNDATION-P0-34: the URL carries the question's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId, "certification_consultations", (await params).id, (ref) => `/compliance/consultations/${ref}`);
   const c = await getConsultationForAnswer(ctx.tenantId, ctx.userId, id);
   if (!c) notFound();
   return (

@@ -156,7 +156,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: c.id,
         title: c.name,
         subtitle: c.status,
-        href: `/compliance/campaigns/${c.id}`,
+        href: `/compliance/campaigns/${c.ref ?? c.id}`,
         freshness: c.createdAt,
       });
     }
@@ -202,7 +202,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: i.id,
         title: `${i.reference}: ${i.title}`,
         subtitle: `${i.status.replace(/_/g, " ")} · ${i.priority} priority · ${i.openFindingCount} open of ${i.findingCount} findings`,
-        href: `/risk/investigations/${i.id}`,
+        href: `/risk/investigations/${i.ref ?? i.id}`,
         freshness: i.updatedAt,
         riskSeverity: i.worstSeverity,
         riskMasked: false,

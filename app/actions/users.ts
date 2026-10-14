@@ -10,6 +10,7 @@ import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantCont
 import { getSessionUser } from "@/lib/tenant/session";
 import { urlForTenant } from "@/lib/tenant/hostTenant";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { resolveRef } from "@/lib/refs/objectRef";
 import { acceptInvitation, changeUserStatus, inviteUser, resendInvitation, revokeUserSessions, updateUserName } from "@/lib/users/users";
 import { STATUS_ACTIONS, invitePermission, type InviteMethod, type StatusAction } from "@/lib/users/userRules";
 import { getIdentityForUser, updateIdentity } from "@/modules/agent-identity/service";
@@ -93,7 +94,9 @@ export async function inviteUserAction(_prev: ActionState, formData: FormData): 
   }
   revalidatePath("/settings/users");
   const q = new URLSearchParams({ created: result.value.status, email: result.value.emailSent ? "sent" : "not-sent", profile });
-  redirect(`/settings/users/${result.value.userId}?${q.toString()}`);
+  // FOUNDATION-P0-34: the new member's page, by its membership number.
+  const member = await resolveRef(ctx.tenantId!, "tenant_memberships", result.value.userId);
+  redirect(`/settings/users/${member?.ref ?? result.value.userId}?${q.toString()}`);
 }
 
 export async function changeUserStatusAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
@@ -104,7 +107,7 @@ export async function changeUserStatusAction(_prev: ActionState, formData: FormD
     const ctx = await requirePermission(action === "remove" ? "users.remove" : "users.suspend");
     const r = await changeUserStatus(ctx.tenantId!, ctx.userId, userId, action, formData.get("reason"));
     revalidatePath("/settings/users");
-    revalidatePath(`/settings/users/${userId}`);
+    revalidatePath("/settings/users/[userId]", "page");
     const ended = r.sessionsEnded === null ? "" : r.sessionsEnded > 0 ? ` ${r.sessionsEnded} session${r.sessionsEnded === 1 ? "" : "s"} ended.` : " They had no active sessions.";
     const done = { suspend: "Suspended.", reactivate: "Reactivated.", deactivate: "Deactivated.", remove: "Removed from the organization." }[action];
     return { ok: true, message: `${done}${ended}` };
@@ -118,7 +121,7 @@ export async function revokeSessionsAction(_prev: ActionState, formData: FormDat
   try {
     const ctx = await requirePermission("users.suspend");
     const n = await revokeUserSessions(ctx.tenantId!, ctx.userId, userId);
-    revalidatePath(`/settings/users/${userId}`);
+    revalidatePath("/settings/users/[userId]", "page");
     return { ok: true, message: n ? `${n} session${n === 1 ? "" : "s"} ended. They must sign in again.` : "They had no active sessions." };
   } catch (err) {
     return refused(err);
@@ -134,7 +137,7 @@ export async function resendInvitationAction(_prev: ActionState, formData: FormD
     const tenant = memberships.find((m) => m.tenantId === ctx.tenantId);
     const url = ctx.tenantSlug ? await urlForTenant(ctx.tenantSlug) : null;
     const { emailSent } = await resendInvitation({ tenantId: ctx.tenantId!, name: tenant?.name ?? "your organization", url }, { userId: ctx.userId, email: user?.email ?? null }, userId);
-    revalidatePath(`/settings/users/${userId}`);
+    revalidatePath("/settings/users/[userId]", "page");
     return { ok: true, message: emailSent ? "Sent again. The invitation is valid from today." : "Renewed from today, but the e-mail could not be sent; they can use \"Forgot password\"." };
   } catch (err) {
     return refused(err);
@@ -146,7 +149,7 @@ export async function updateUserNameAction(_prev: ActionState, formData: FormDat
   try {
     const ctx = await requirePermission("users.update");
     await updateUserName(ctx.tenantId!, ctx.userId, userId, formData.get("displayName"));
-    revalidatePath(`/settings/users/${userId}`);
+    revalidatePath("/settings/users/[userId]", "page");
     return { ok: true, message: "Saved." };
   } catch (err) {
     return refused(err);
@@ -162,7 +165,7 @@ export async function assignUserRoleAction(_prev: ActionState, formData: FormDat
   try {
     const ctx = await requireAnyPermission(["roles.assign", "role.manage"]);
     await assignRole(ctx.tenantId!, ctx.userId, userId, role, terms.terms);
-    revalidatePath(`/settings/users/${userId}`);
+    revalidatePath("/settings/users/[userId]", "page");
     revalidatePath("/settings/users");
     // The same form sits on a person's identity page (owner feedback 2026-10-14).
     revalidatePath("/identities/[id]", "page");

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getRoleDetail } from "@/lib/rbac/customRoles";
 import { MODULE_LABEL, listPermissionCatalog } from "@/lib/rbac/permissionCatalog";
@@ -20,7 +21,8 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
     if (err instanceof ApiError && err.status === 403) redirect("/settings/roles");
     throw err;
   }
-  const { id } = await params;
+  // FOUNDATION-P0-34: the URL carries the role's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "roles", (await params).id, (ref) => `/settings/roles/${ref}/edit`);
   const [role, catalog] = await Promise.all([getRoleDetail(ctx.tenantId!, id), listPermissionCatalog()]);
   if (!role || !role.custom) notFound();
   return (
@@ -30,7 +32,7 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
           ID Roles
         </Link>
         <span aria-hidden="true"> / </span>
-        <Link href={`/settings/roles/${role.id}`} className="hover:text-foreground">
+        <Link href={`/settings/roles/${role.ref ?? role.id}`} className="hover:text-foreground">
           {role.displayName}
         </Link>
         <span aria-hidden="true"> / </span>
@@ -54,7 +56,7 @@ export default async function EditRolePage({ params }: { params: Promise<{ id: s
           sensitivity: p.sensitivity,
         }))}
         actorHolds={ctx.permissions}
-        initial={{ roleId: role.id, name: role.displayName, description: role.description ?? "", permissions: role.permissions }}
+        initial={{ roleId: role.id, roleRef: role.ref, name: role.displayName, description: role.description ?? "", permissions: role.permissions }}
       />
     </div>
   );

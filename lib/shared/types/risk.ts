@@ -122,6 +122,8 @@ export type Investigation = {
   createdAt: string;
   updatedAt: string;
   resolvedAt: string | null;
+  /** FOUNDATION-P0-34: the investigation's number in this organization, its URL key. */
+  ref?: number | null;
 };
 
 export type InvestigationSummary = Investigation & {
@@ -181,6 +183,8 @@ export type AccessFinding = {
   /** WID-H04: an accepted exception's end, and why a person excepted or closed it. */
   exceptionUntil?: string | null;
   decisionReason?: string | null;
+  /** FOUNDATION-P0-34: the finding's number in this organization, its URL key. */
+  ref?: number | null;
 };
 
 /** What Access reports as rogue now: one entry per account (entitlementId null) or account and entitlement. */

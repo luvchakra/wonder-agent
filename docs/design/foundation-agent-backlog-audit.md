@@ -3561,3 +3561,47 @@ token).
 Next: the other object pages (identities, agents, applications, accounts,
 packages, integrations and sources, policies, risk, compliance, settings,
 privacy, platform tenants), and their links.
+
+### 2026-10-14 — FOUNDATION-P0-34 part 3: number URLs for settings, compliance, risk and the platform console
+
+Converted to the object's short number (`pageRef`; an old UUID link
+redirects, keeping the query string), with every main link switched:
+
+- Users (`/settings/users/<membership ref>`; `pageRef` on
+  `tenant_memberships` returns the member's user id): `listUsers` reads the
+  page's membership numbers in one extra query (this tenant only);
+  `getUserDetail`, group members and role holders carry `memberRef`; the
+  invite/add wizard redirects to the number.
+- Roles (`/settings/roles/<ref>` and `/<ref>/edit`; built-in roles keep
+  their own numbers), groups (`/settings/groups/<ref>`), authorization
+  policies (`/settings/authorization-policies/<ref>`): lists, create
+  redirects, cross-links (role ↔ group ↔ user, "copied from"), and
+  `roles/new?copy=` now take the number (a UUID still works).
+- Privacy requests and breaches (`/settings/privacy/{requests,breaches}/<ref>`).
+- Server actions revalidate the dynamic route (`"/settings/users/[userId]"`,
+  `"page"`, …) instead of a UUID path that no longer matches.
+- Shared types gained an optional `ref` (`CertificationCampaign`,
+  `Investigation`, `AccessFinding`, `PlatformTenant`); API routes unchanged
+  (their JSON gains the additive `ref`).
+
+Left as UUID links (they redirect): the identity page's group and
+rogue-finding links (identities are another conversion's area), the
+revocation-closure report's campaign link, the unused
+`recordDecisionAction` redirect, and `/settings/users?group=<uuid>` (a
+filter, not a page key). No database change (0192 already applied).
+
+Verified: typecheck; eslint on the 51 changed files and 9 specs; Vitest
+lib/users, lib/rbac, lib/refs, lib/shared, modules/platform-admin,
+operations, risk, privacy, certification-compliance, app and
+tests/architecture 442/442 (66 files). E2E specs updated: number URLs
+expected after create (groups, custom-roles, authorization, users,
+compliance, investigations) and an old UUID link asserted to redirect in
+each area (groups, roles editor, user page, policy, campaign,
+investigation, rogue finding, consultation, privacy request and breach,
+platform organization). Local E2E (production build on port 3400) on the
+ten affected specs (groups, custom-roles, authorization, users, compliance,
+investigations, role-reviews, first-organization, trust-compliance,
+bulk-invitations): 65/69 passed in the full run. The 4 failures were 3
+compliance launches whose dialog never submitted and one role-review answer
+that was not saved, all while other agents' E2E runs loaded the machine.
+compliance + role-reviews then passed 23/23 when run again on their own.

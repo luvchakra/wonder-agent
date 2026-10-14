@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { platformTenantRef } from "@/lib/refs/objectRef";
+import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
 import {
   ADDABLE_ENVIRONMENTS,
   INDUSTRIES,
@@ -60,7 +62,7 @@ function RemoveMenu({ label, text, action }: { label: string; text: string; acti
  * environment type, features, notes and status. The plan is the
  * organization's, the same in every environment (owner decision).
  */
-async function EnvironmentPage({ tenant, organization, base }: { tenant: PlatformTenant; organization: { id: string; name: string; envCount: number }; base: string | null }) {
+async function EnvironmentPage({ tenant, organization, base }: { tenant: PlatformTenant; organization: { id: string; ref: number | null; name: string; envCount: number }; base: string | null }) {
   const [stats, orgSub, flags, overrides] = await Promise.all([getEnvironmentStats(tenant.tenantId), getSubscription(organization.id), listFlagCatalog(), listTenantFlagOverrides(tenant.tenantId)]);
   const url = tenant.slug && tenant.status !== "deprovisioned" ? tenantUrl(tenant.slug, base) : null;
   const isOrganization = tenant.tenantId === organization.id;
@@ -68,7 +70,7 @@ async function EnvironmentPage({ tenant, organization, base }: { tenant: Platfor
   const lastActivity = stats.lastActivityAt ? new Date(stats.lastActivityAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }) + " IST" : "None recorded";
   return (
     <>
-      <Link href={`/platform-admin/tenants/${organization.id}`} className="text-sm font-medium text-primary hover:underline">
+      <Link href={`/platform-admin/tenants/${organization.ref ?? organization.id}`} className="text-sm font-medium text-primary hover:underline">
         ← {organization.name}
       </Link>
       <div className="space-y-1">
@@ -104,7 +106,7 @@ async function EnvironmentPage({ tenant, organization, base }: { tenant: Platfor
               <dd className="text-lg font-semibold text-foreground">{lastActivity}</dd>
             </div>
           </dl>
-          <Link href={`/platform-admin/tenants/${tenant.tenantId}/usage`} className="text-sm font-medium text-primary hover:underline">
+          <Link href={`/platform-admin/tenants/${tenant.ref ?? tenant.tenantId}/usage`} className="text-sm font-medium text-primary hover:underline">
             Usage against plan limits →
           </Link>
         </CardBody>
@@ -133,7 +135,7 @@ async function EnvironmentPage({ tenant, organization, base }: { tenant: Platfor
           ) : (
             <span className="text-muted-foreground">No plan yet</span>
           )}
-          <Link href={`/platform-admin/tenants/${organization.id}#plan`} className="font-medium text-primary hover:underline">
+          <Link href={`/platform-admin/tenants/${organization.ref ?? organization.id}#plan`} className="font-medium text-primary hover:underline">
             Change on the organization
           </Link>
         </CardBody>
@@ -216,15 +218,18 @@ async function EnvironmentPage({ tenant, organization, base }: { tenant: Platfor
  * environment's settings are on that environment's page.
  */
 export default async function PlatformTenantPage({ params, searchParams }: { params: Promise<{ tenantId: string }>; searchParams: Promise<{ view?: string }> }) {
-  const [{ tenantId }, { view }] = await Promise.all([params, searchParams]);
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(tenantId)) notFound();
+  const [{ tenantId: raw }, { view }] = await Promise.all([params, searchParams]);
+  // Vendor-only (the console layout checks too; a page renders alongside its layout, so check here before any lookup).
+  if (!(await isPlatformAdmin())) notFound();
+  // FOUNDATION-P0-34: the URL carries the organization's global number; an old UUID link redirects.
+  const tenantId = await platformTenantRef(raw, (ref) => `/platform-admin/tenants/${ref}${view ? `?view=${encodeURIComponent(view)}` : ""}`);
   const [tenant, all] = await Promise.all([getTenant(tenantId), listTenants({ includeDecommissioned: true })]);
   if (!tenant) notFound();
   const base = baseAppHost();
   // Removed environments are not part of an organization's current set.
   const orgs = groupOrganizations(all.filter((t) => t.status !== "deprovisioned" || t.tenantId === tenantId));
   const org = orgs.find((o) => o.environments.some((e) => e.tenantId === tenantId))!;
-  const organization = { id: org.id, name: org.name, envCount: org.environments.length };
+  const organization = { id: org.id, ref: org.ref, name: org.name, envCount: org.environments.length };
 
   if (org.primary.tenantId !== tenantId || view === "environment") return <EnvironmentPage tenant={tenant} organization={organization} base={base} />;
 
@@ -280,7 +285,7 @@ export default async function PlatformTenantPage({ params, searchParams }: { par
                   <Td>
                     <div className="flex items-center justify-end gap-1">
                       <Link
-                        href={isRoot ? `/platform-admin/tenants/${e.tenantId}?view=environment` : `/platform-admin/tenants/${e.tenantId}`}
+                        href={isRoot ? `/platform-admin/tenants/${e.ref ?? e.tenantId}?view=environment` : `/platform-admin/tenants/${e.ref ?? e.tenantId}`}
                         className="whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary hover:bg-accent"
                       >
                         Manage

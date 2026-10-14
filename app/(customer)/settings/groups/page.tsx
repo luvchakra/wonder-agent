@@ -59,7 +59,7 @@ export default async function GroupsPage({ searchParams }: { searchParams: Promi
                 {groups.map((g) => (
                   <Tr key={g.id}>
                     <Td>
-                      <Link href={`/settings/groups/${g.id}`} className="font-medium text-foreground hover:text-primary">
+                      <Link href={`/settings/groups/${g.ref ?? g.id}`} className="font-medium text-foreground hover:text-primary">
                         {g.name}
                       </Link>
                       {g.description ? <span className="block max-w-xl text-xs text-muted-foreground">{g.description}</span> : null}

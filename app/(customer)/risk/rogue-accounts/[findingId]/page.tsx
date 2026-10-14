@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { getRogueFinding, remediationLabel } from "@/modules/risk/service";
 import { listAssignments } from "@/modules/access-governance/service";
@@ -37,8 +38,9 @@ export default async function RogueFindingPage({ params }: { params: Promise<{ f
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { findingId } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the finding's number; an old UUID link redirects.
+  const findingId = await pageRef(tenantId, "risk_findings", (await params).findingId, (ref) => `/risk/rogue-accounts/${ref}`);
   const canManage = ctx.permissions.includes("risk.manage");
   const [finding, members] = await Promise.all([getRogueFinding(tenantId, findingId), canManage ? listTenantMembersWithRoles(tenantId) : Promise.resolve([])]);
   if (!finding) notFound();

@@ -13,6 +13,8 @@ export type AddableEnvironment = "production" | "development" | "test" | "stagin
 
 export type PlatformTenant = {
   tenantId: string;
+  /** FOUNDATION-P0-34: the organization's global number, its key in console URLs. */
+  ref?: number | null;
   environment: TenantEnvironment;
   /** For a development, test or staging environment: the production organization it belongs to. */
   parentTenantId?: string | null;

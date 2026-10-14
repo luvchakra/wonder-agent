@@ -14,6 +14,7 @@ import {
   createTenantEnvironment,
   renameTenantSlug,
   removeTenantEnvironment,
+  getTenant,
   changePlan,
   setTenantEnvironment,
   decommissionTenant,
@@ -89,7 +90,9 @@ export async function removeTenantEnvironmentAction(tenantId: string, organizati
   const { userId } = await requirePlatformAdmin();
   await removeTenantEnvironment(userId, tenantId);
   revalidatePath("/platform-admin/tenants", "layout");
-  redirect(`/platform-admin/tenants/${organizationId}`);
+  // FOUNDATION-P0-34: back to the organization's page, by its number.
+  const organization = await getTenant(organizationId);
+  redirect(`/platform-admin/tenants/${organization?.ref ?? organizationId}`);
 }
 
 /** Owner request 2026-10-13: a dev, test or staging environment of a production organization. */

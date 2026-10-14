@@ -1461,3 +1461,13 @@ Verified:
 Also in this change: CLAUDE.md §19.12 rule 2, the Claude Code audit
 routine goes through a pull request and never pushes to `main` (owner
 decision, 2026-10-14).
+
+## 2026-10-14 — FOUNDATION-P0-34: campaigns, consultations and privacy pages by number
+
+Campaign pages open at `/compliance/campaigns/<ref>`, consultation answers
+at `/compliance/consultations/<ref>` (the notification text names the
+number), and privacy requests and breaches at
+`/settings/privacy/{requests,breaches}/<ref>`; old UUID links redirect.
+The campaign list, search and the campaign report link by number;
+`toCertificationCampaign`, `toRequest` and `toBreach` map `ref`. Detail and
+verification: Foundation audit log, same date.

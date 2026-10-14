@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { RecordProvenance, Badge, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { getRequest } from "@/modules/privacy/service";
@@ -26,8 +27,8 @@ export default async function PrivacyRequestPage({ params }: { params: Promise<{
     if (err instanceof ApiError && err.status === 403) redirect("/settings");
     throw err;
   }
-  const { id } = await params;
-  if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
+  // FOUNDATION-P0-34: the URL carries the request's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "privacy_requests", (await params).id, (ref) => `/settings/privacy/requests/${ref}`);
   const [req, provenance] = await Promise.all([getRequest(ctx.tenantId!, id), getRecordProvenance(ctx.tenantId!, "privacy_requests", id)]);
   if (!req) notFound();
   const canProcess = ctx.permissions.includes("privacy.requests.process");

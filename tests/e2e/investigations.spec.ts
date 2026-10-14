@@ -47,7 +47,8 @@ test.describe.serial("investigations", () => {
     await page.getByLabel("Title").fill(`E2E investigation ${stamp}`);
     for (const t of titles) await page.getByRole("checkbox", { name: new RegExp(t) }).check();
     await page.getByRole("button", { name: "Open investigation" }).click();
-    await expect(page).toHaveURL(/\/risk\/investigations\/[0-9a-f-]{36}$/);
+    // FOUNDATION-P0-34: the investigation's page is keyed by its number, not its UUID.
+    await expect(page).toHaveURL(/\/risk\/investigations\/\d+$/);
     investigationUrl = new URL(page.url()).pathname;
 
     await expect(page.getByRole("heading", { name: `E2E investigation ${stamp}` })).toBeVisible();
@@ -55,8 +56,11 @@ test.describe.serial("investigations", () => {
     reference = ((await page.getByText(/^INV-\d{4}-\d{3,}$/).first().textContent()) ?? "").trim();
 
     // OPERATIONS-P0-08: search finds it by reference.
-    const found = (await (await page.request.get(`/api/v1/search?q=${reference}`)).json()).data as Array<{ objectType: string; href: string }>;
+    const found = (await (await page.request.get(`/api/v1/search?q=${reference}`)).json()).data as Array<{ objectType: string; id: string; href: string }>;
     expect(found.filter((r) => r.objectType === "investigation").map((r) => r.href)).toContain(investigationUrl);
+    // An old UUID link still opens it, at the number URL.
+    await page.goto(`/risk/investigations/${found.find((r) => r.href === investigationUrl)!.id}`);
+    await expect(page).toHaveURL(new RegExp(`${investigationUrl}$`));
     // Priority defaults to the worst grouped severity.
     await expect(page.getByText("critical", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Opened INV-\d{4}-\d{3,} with 2 finding\(s\), priority critical/)).toBeVisible();

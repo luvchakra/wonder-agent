@@ -135,14 +135,15 @@ export async function setTenantEnvironment(actorId: string, tenantId: string, en
  * report 2026-10-13: such organizations were missing from Tenants).
  * Decommissioned ones only when asked for.
  */
-const TENANT_COLUMNS = "id, name, slug, status, created_at, platform:platform_tenants!platform_tenants_tenant_id_fkey(environment, notes, created_at, parent_tenant_id)";
+const TENANT_COLUMNS = "id, ref, name, slug, status, created_at, platform:platform_tenants!platform_tenants_tenant_id_fkey(environment, notes, created_at, parent_tenant_id)";
 
-type TenantRow = { id: string; name: string; slug: string; status: PlatformTenant["status"]; created_at: string; platform: Record<string, unknown> | Record<string, unknown>[] | null };
+type TenantRow = { id: string; ref?: number | null; name: string; slug: string; status: PlatformTenant["status"]; created_at: string; platform: Record<string, unknown> | Record<string, unknown>[] | null };
 
 function fromTenantRow(r: TenantRow): PlatformTenant {
   const p = (Array.isArray(r.platform) ? r.platform[0] : r.platform) ?? null;
   return {
     tenantId: r.id,
+    ref: r.ref ?? null,
     environment: ((p?.environment as TenantEnvironment | undefined) ?? "production") as TenantEnvironment,
     parentTenantId: (p?.parent_tenant_id as string | null | undefined) ?? null,
     notes: (p?.notes as string | null | undefined) ?? null,

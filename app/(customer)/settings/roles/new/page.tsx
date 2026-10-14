@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getRoleDetail } from "@/lib/rbac/customRoles";
+import { resolveRef } from "@/lib/refs/objectRef";
 import { MODULE_LABEL, listPermissionCatalog } from "@/lib/rbac/permissionCatalog";
 import { RoleForm } from "../RoleForm";
 
@@ -21,7 +22,9 @@ export default async function NewRolePage({ searchParams }: { searchParams: Prom
     throw err;
   }
   const sp = await searchParams;
-  const [catalog, source] = await Promise.all([listPermissionCatalog(), sp.copy ? getRoleDetail(ctx.tenantId!, sp.copy) : Promise.resolve(null)]);
+  // FOUNDATION-P0-34: `copy` is the source role's number (an old UUID still works).
+  const copyFrom = (sp.copy ? await resolveRef(ctx.tenantId!, "roles", sp.copy) : null)?.id;
+  const [catalog, source] = await Promise.all([listPermissionCatalog(), copyFrom ? getRoleDetail(ctx.tenantId!, copyFrom) : Promise.resolve(null)]);
   return (
     <div className="space-y-5">
       <nav aria-label="Breadcrumb" className="text-sm text-muted-foreground">

@@ -158,6 +158,11 @@ test.describe.serial("trust and compliance", () => {
     await expect(page.getByRole("heading", { name: "My privacy" })).toBeVisible();
     await page.goto("/settings/privacy");
     await expect(page.getByRole("heading", { name: "Privacy & Data Protection" })).toBeVisible();
+    // FOUNDATION-P0-34: a privacy request and a breach open at their numbers; an old UUID link redirects.
+    await page.goto(`/settings/privacy/requests/${accessRequestId}`);
+    await expect(page).toHaveURL(/\/settings\/privacy\/requests\/\d+$/);
+    await page.goto(`/settings/privacy/breaches/${breachId}`);
+    await expect(page).toHaveURL(/\/settings\/privacy\/breaches\/\d+$/);
     await page.goto("/audit/integrity");
     await expect(page.getByText("Intact", { exact: true })).toBeVisible();
   });

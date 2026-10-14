@@ -45,6 +45,8 @@ import {
 
 export type DirectoryUser = {
   userId: string;
+  /** FOUNDATION-P0-34: the membership's number in this organization, the key of the user page. */
+  memberRef: number | null;
   email: string;
   displayName: string | null;
   status: MembershipStatus;
@@ -88,10 +90,25 @@ export async function listUsers(tenantId: string, filter: DirectoryFilter): Prom
     joined_at: string;
     total: number;
   }[];
+  // FOUNDATION-P0-34: the page's membership numbers, for the user-page links (this tenant only, §14).
+  const refOf = new Map<string, number>();
+  if (rows.length) {
+    const { data: refs, error: refError } = await supabaseServiceRole()
+      .from("tenant_memberships")
+      .select("user_id, ref")
+      .eq("tenant_id", tenantId)
+      .in(
+        "user_id",
+        rows.map((r) => r.user_id),
+      );
+    if (refError) throw new ApiError(500, "QUERY_FAILED", refError.message);
+    for (const m of (refs ?? []) as { user_id: string; ref: number }[]) refOf.set(m.user_id, Number(m.ref));
+  }
   return {
     total: rows[0] ? Number(rows[0].total) : 0,
     items: rows.map((r) => ({
       userId: r.user_id,
+      memberRef: refOf.get(r.user_id) ?? null,
       email: r.email,
       displayName: r.display_name,
       status: r.status,
@@ -126,12 +143,13 @@ type MembershipRow = {
   account_type: AccountType;
   auth_method: AuthMethod | null;
   created_at: string;
+  ref: number | null;
 };
 
 async function membershipIn(tenantId: string, userId: string): Promise<MembershipRow | null> {
   const { data, error } = await supabaseServiceRole()
     .from("tenant_memberships")
-    .select("user_id, status, status_reason, status_changed_at, status_changed_by, invited_by, invited_at, account_type, auth_method, created_at")
+    .select("user_id, status, status_reason, status_changed_at, status_changed_by, invited_by, invited_at, account_type, auth_method, created_at, ref")
     .eq("tenant_id", tenantId)
     .eq("user_id", userId)
     .maybeSingle<MembershipRow>();
@@ -180,6 +198,8 @@ export type RoleAssignment = {
 
 export type UserDetail = {
   userId: string;
+  /** FOUNDATION-P0-34: the membership's number, the key of the user page. */
+  memberRef: number | null;
   email: string;
   displayName: string | null;
   status: MembershipStatus;
@@ -264,6 +284,7 @@ export async function getUserDetail(tenantId: string, userId: string): Promise<U
   if (grantsError) throw new ApiError(500, "QUERY_FAILED", grantsError.message);
   return {
     userId,
+    memberRef: m.ref ?? null,
     email: user?.email ?? "",
     displayName: user?.display_name ?? null,
     status: m.status,

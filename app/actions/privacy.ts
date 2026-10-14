@@ -103,11 +103,12 @@ export async function saveConsentPurposeAction(_p: PrivacyActionState, formData:
 }
 
 export async function createRequestAction(_p: PrivacyActionState, formData: FormData): Promise<PrivacyActionState> {
-  let id: string;
+  let id: number | string;
   try {
     const ctx = await requirePermission("privacy.requests.process");
     const raw = formObject(formData);
-    id = (await createRequest(ctx.tenantId!, ctx.userId, raw as never)).id;
+    const created = await createRequest(ctx.tenantId!, ctx.userId, raw as never);
+    id = created.ref ?? created.id;
   } catch (err) {
     return refused(err);
   }
@@ -176,10 +177,11 @@ export async function releaseLegalHoldAction(holdId: string): Promise<void> {
 }
 
 export async function createBreachAction(_p: PrivacyActionState, formData: FormData): Promise<PrivacyActionState> {
-  let id: string;
+  let id: number | string;
   try {
     const ctx = await requirePermission("privacy.incidents.manage");
-    id = (await createBreach(ctx.tenantId!, ctx.userId, formObject(formData, ["regimes"]))).id;
+    const created = await createBreach(ctx.tenantId!, ctx.userId, formObject(formData, ["regimes"]));
+    id = created.ref ?? created.id;
   } catch (err) {
     return refused(err);
   }

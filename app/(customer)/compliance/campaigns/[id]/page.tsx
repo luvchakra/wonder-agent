@@ -3,6 +3,7 @@ import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getCampaign, getCampaignMetrics, listCampaignItemsPage } from "@/modules/certification-compliance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { CampaignItemsTable } from "./CampaignItemsTable";
@@ -12,7 +13,7 @@ import { RecordProvenance, Card, CardBody, EmptyState } from "@/modules/ui";
 type Search = { items_page?: string; items_pageSize?: string; items_sort?: string; items_dir?: string; items_q?: string };
 
 export default async function CampaignItemsPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<Search> }) {
-  const [{ id: campaignId }, sp] = await Promise.all([params, searchParams]);
+  const [{ id: rawId }, sp] = await Promise.all([params, searchParams]);
   let ctx;
   try {
     ctx = await requirePermission("compliance.read");
@@ -20,6 +21,8 @@ export default async function CampaignItemsPage({ params, searchParams }: { para
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
+  // FOUNDATION-P0-34: the URL carries the campaign's number; an old UUID link redirects.
+  const campaignId = await pageRef(ctx.tenantId!, "certification_campaigns", rawId, (ref) => `/compliance/campaigns/${ref}`, sp);
 
   // §15: one page of items from the database, and counts from the database.
   const [campaign, page, metrics, provenance] = await Promise.all([
