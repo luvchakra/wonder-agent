@@ -4114,3 +4114,22 @@ local E2E `application-catalog`, `request-catalog`,
 `application-onboarding`, `fulfilment-assignment` 37/37 after the tabs, and
 `application-catalog` + `application-onboarding` 21/21 with the new
 add-entitlement step.
+
+### 2026-10-14 — Entitlements added by hand only under a type (owner test feedback #1)
+
+Owner feedback (WonderID Test Feedback doc, item 1): "The entitlement
+addition should be allowed only under an entitlement type."
+
+Built:
+- The Entitlements tab's add form now requires a Type, chosen from the
+  application's own entitlement types; with none, it says to add a type
+  first and shows no form.
+- `createEntitlement` takes an optional `entitlementType`; when given it
+  must name one of the application's types (read under RLS, by tenant),
+  else 400, and the entitlement is stored with that type. The API stays
+  backward compatible for existing callers that send no type (#13).
+
+Verified: typecheck; eslint; `next build`; local E2E
+`application-catalog`, `request-catalog`, `classification-rules` 28/28
+(the new steps: no form without a type; an unknown type 400; a type added,
+then an entitlement under it, stored with that type).

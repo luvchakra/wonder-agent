@@ -25,6 +25,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       body.name,
       body.dataClassification,
       body.privilegeLevel,
+      body.entitlementType,
     );
     return NextResponse.json({ ok: true, data: entitlement }, { status: 201 });
   } catch (err) {

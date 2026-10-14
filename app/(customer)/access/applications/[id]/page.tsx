@@ -188,7 +188,7 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
               {entitlements.length === 0 ? (
                 <EmptyState
                   title="No entitlements"
-                  description={fromConnector ? "They arrive when the connector is read." : "Add the entitlements people can hold in this application. Entitlement types only group them."}
+                  description={fromConnector ? "They arrive when the connector is read." : "Add the entitlements people can hold in this application, each under one of its entitlement types."}
                 />
               ) : (
                 <ul className="divide-y divide-border text-sm">
@@ -206,7 +206,7 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
                   ))}
                 </ul>
               )}
-              {canManage && !fromConnector ? <AddEntitlement applicationId={id} /> : null}
+              {canManage && !fromConnector ? <AddEntitlement applicationId={id} types={entitlementTypes.map((t) => t.name)} /> : null}
             </CardBody>
           </Card>
           <Card>
