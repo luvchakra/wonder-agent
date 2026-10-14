@@ -14,16 +14,16 @@ Generated 2026-10-14 from 11 module backlogs.
 
 ## Overall
 
-**225 of 273 tracked stories complete — 82%**
+**227 of 273 tracked stories complete — 83%**
 
 ```
-█████████████████████████████████░░░░░░░  82%
+█████████████████████████████████░░░░░░░  83%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 225 |
-| Partial | 27 |
+| Done | 227 |
+| Partial | 25 |
 | Deferred | 1 |
 | Not Started | 20 |
 | **Total tracked** | **273** |
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 27 | 3 | 0 | 6 | 36 | `██████████████░░░░` 75% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 16 | 12 | 0 | 3 | 31 | `█████████░░░░░░░░░` 52% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 18 | 10 | 0 | 3 | 31 | `██████████░░░░░░░░` 58% |
 
 ---
 
@@ -390,14 +390,14 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 16 done · 12 partial · 0 deferred · 3 not started (31 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 18 done · 10 partial · 0 deferred · 3 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
 | QA-P0-01.1 | Repository & contract inventory | Done — `INTEGRATION_STATUS.md` §1, cross-referenced from every module's own Progress Tracker/audit log |
 | QA-P0-01.2 | Route map & permission matrix | Done — `INTEGRATION_STATUS.md` §2; found and fixed a stale route-prefix drift in `docs/design/ownership-map.md` (Compliance/Runtime/Risk) |
-| QA-P0-02.1 | Full cross-tenant sweep | Partial — DB/API/search/reports/jobs layers all verified live; `tests/operations/tenant-isolation.sql` and (2026-09-16) `tests/compliance/governance-attestation-tenant-isolation.sql` (new — closes `COMPLIANCE-P0-08`'s missing isolation test) both run live and passing; `platform_config_versions`/`platform_announcements` confirmed to have zero client-facing policies at all (no customer-session isolation test needed — no customer session can read them), see `INTEGRATION_STATUS.md` §3/§9 |
-| QA-P0-02.2 | RBAC boundary sweep | Partial — orphaned-permission check clean (0 found); negative-permission proof is generic (the shared gate function itself), not per-permission-key enumerated; SSO JIT mapping unit-tested, real IdP round-trip unverified (sandbox) |
+| QA-P0-02.1 | Full cross-tenant sweep | Done — DB/API/search/reports/jobs layers all verified live; `tests/operations/tenant-isolation.sql` and (2026-09-16) `tests/compliance/governance-attestation-tenant-isolation.sql` (new — closes `COMPLIANCE-P0-08`'s missing isolation test) both run live and passing; `platform_config_versions`/`platform_announcements` confirmed to have zero client-facing policies at all (no customer-session isolation test needed — no customer session can read them), see `INTEGRATION_STATUS.md` §3/§9 2026-10-14: **Done** — `tests/architecture/tenant-rls.test.ts` sweeps every migration: RLS on for every table with a `tenant_id`, each with a policy unless listed as vendor-only or service-role-only by design (14, each with its reason), and the list kept honest. Runs in CI with the unit tests |
+| QA-P0-02.2 | RBAC boundary sweep | Done — orphaned-permission check clean (0 found); negative-permission proof is generic (the shared gate function itself), not per-permission-key enumerated; SSO JIT mapping unit-tested, real IdP round-trip unverified (sandbox) 2026-10-14: **Done** (real IdP round trip stays blocked on FOUNDATION-P0-03.3) — `tests/architecture/route-gates.test.ts` enumerates: every customer API route checks a permission or is a listed self-service (tenant from membership) or public (self-authenticating) route; every vendor route requires a platform administrator; every cron route checks the secret; every server action reaches a gate itself or through a local helper; every permission key the code checks exists in the migrations' catalogue. Mutation-checked: an ungated route and an ungated action each fail it |
 | QA-P0-02.3 | Platform-admin isolation sweep | Done — live smoke test against every current `/platform-admin/*` page and `/api/platform/v1/*` route, all correctly denied unauthenticated |
 | QA-P0-03.1 | The FinanceBot acceptance scenario, executed live | Partial — SQL-fixture-level proof (6 of 8 steps, see `INTEGRATION_STATUS.md` §4) unchanged; 2026-09-16 added a full 8-step browser-driven proof, `tests/e2e/financebot-central-scenario.spec.ts` (see `QA-P0-16`), covering every PRD §11 step including remediation-request and grant-revocation-then-resolve — still `Partial` because that spec has not yet had a first real CI run (see `QA-P0-16`'s own notes on why it couldn't run live in this pass) |
 | QA-P0-04.1 | Pipeline sweep | Done — re-verified 2026-09-16: typecheck/lint/214 tests/cold-cache build all green repo-wide, `npm audit --production` 0 vulnerabilities, contrast-check all pairs pass both themes; see `INTEGRATION_STATUS.md` §9 |

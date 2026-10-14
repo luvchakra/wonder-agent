@@ -1940,3 +1940,22 @@ explained.**
   runs (seen locally on 12 October):** not reproduced. Both passed in the
   13 October full run on Vercel, which also runs two workers. Left until it
   recurs, with the failing output.
+
+## 2026-10-14 — QA-P0-02.1 and QA-P0-02.2: schema-wide RLS sweep and enumerated gate sweep
+
+**What was built.** Two architecture tests, run by CI with the unit tests on every change that touches them.
+- **`tests/architecture/route-gates.test.ts`** (QA-P0-02.2):
+  - all 203 customer API routes check a named permission (`requirePermission`, `requirePermissionFor`, `requireAnyPermission(For)`, or a per-kind permission table), except 7 self-service routes that must resolve the tenant from membership and 3 public ones that must authenticate themselves, each listed with its reason;
+  - every `app/api/platform` route requires a platform administrator, and every cron route checks `CRON_SECRET`;
+  - every exported server action reaches a gate, itself or through a local helper that does. Only sign-in, sign-up, password reset, password update (recovery session) and sign-out are exempt;
+  - every permission key the code checks exists in the catalogue the migrations build. All keys found are present.
+- **`tests/architecture/tenant-rls.test.ts`** (QA-P0-02.1):
+  - every table any migration creates with a `tenant_id` has RLS on. None was missing;
+  - each has at least one policy, except 14 tables that are vendor-only or service-role-only by design: platform records, billing intake, encrypted secrets and keys, and receiver credentials. Each is listed with its reason, and each migration's own comment confirms the intent;
+  - a listed table that later gains a policy has to come off the list.
+
+**Verified.**
+- `tests/architecture` 21/21.
+- Mutation check: a temporary ungated route and a temporary ungated action each failed the sweep, and the run passed again once they were removed.
+
+**Left.** QA-P0-06's real SAML/OIDC exchange, and the real-IdP part of QA-P0-02.2, need the SSO provider configured (owner action, FOUNDATION-P0-03.3).
