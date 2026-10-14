@@ -7,6 +7,9 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { listAttributeDefinitions } from "@/modules/agent-identity/service";
 import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { CsvImportForm, IntegrationImportForm, RunAutoRefresh, SourceForm } from "../SourceForms";
+import { DefaultIdRoleForm } from "./DefaultIdRoleForm";
+import { listAssignableRoles } from "@/lib/rbac/roles";
+import { TENANT_ADMIN_ROLE } from "@/lib/rbac/delegatedRoleRules";
 import { RUN_STATUS, TEMPLATE_LABEL } from "../labels";
 
 const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -21,12 +24,13 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
   }
   const { sourceId } = await params;
   const tenantId = ctx.tenantId!;
-  const [source, runs, integrations, provenance, definitions] = await Promise.all([
+  const [source, runs, integrations, provenance, definitions, idRoles] = await Promise.all([
     getIdentitySource(tenantId, sourceId),
     listReconciliationRuns(tenantId, sourceId),
     listIntegrations(tenantId),
     getRecordProvenance(tenantId, "identity_sources", sourceId),
     listAttributeDefinitions(tenantId),
+    listAssignableRoles(tenantId),
   ]);
   if (!source) notFound();
   const canRun = ctx.permissions.includes("integration.execute") && source.status === "active";
@@ -124,6 +128,20 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
           )}
         </CardBody>
       </Card>
+
+      {source.identityType === "HUMAN" && (canEdit || source.defaultIdRole) ? (
+        <Card>
+          <CardHeader title="WonderID access for new people" description="Each new person this source imports, with an e-mail, is invited to WonderID with this ID role." />
+          <CardBody>
+            <DefaultIdRoleForm
+              sourceId={source.id}
+              current={source.defaultIdRole ?? null}
+              roles={idRoles.filter((r) => r.name !== TENANT_ADMIN_ROLE).map((r) => ({ name: r.name, label: r.displayName }))}
+              disabled={!canEdit || !ctx.permissions.some((p) => p === "roles.assign" || p === "role.manage") || !ctx.permissions.includes("users.invite")}
+            />
+          </CardBody>
+        </Card>
+      ) : null}
 
       {canEdit ? (
         <Card>

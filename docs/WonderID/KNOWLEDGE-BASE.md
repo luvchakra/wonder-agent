@@ -465,6 +465,7 @@ Findings are raised for:
 **Users**
 - **Inviting:** invite people one at a time or in bulk from a CSV (preview first).
 - **Invitations:** they expire after 30 days and can be re-sent.
+- **From the HR import:** an identity source can name a default ID role (never the organization administrator role). Each new person it imports with an email is invited to WonderID with that role, on the authority of whoever chose it; people already in WonderID are left as they are.
 - **From an identity:** Add user can start from a person already under Identities (their name, email, title and department fill in), and a person's page has "Give WonderID access" when they can't sign in yet.
 
 **Roles**
@@ -657,6 +658,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | An HR import (identity source) can give new people WonderID access: choose a default ID role on the source's page, and each new person it imports with an email is invited with it. |
 | 14 Oct 2026 | An administrator can approve an application onboarding they submitted (a note is required and it is recorded as self-approved). Add user can start from a person already under Identities, and a person's page has "Give WonderID access". |
 | 14 Oct 2026 | Creating a record from a list page now starts from the page's Actions menu, in a window over the list, instead of a form at the bottom of the page (policies, investigations, groups, data sources, discoveries, attributes, rules, templates, delegations, campaigns, privacy records, single sign-on and more). |
 | 14 Oct 2026 | Entitlements and entitlement types: more attributes, edit, disable and delete from a row menu, shown as tables; onboarding shown in the application's Onboarding tab. |

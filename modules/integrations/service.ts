@@ -40,6 +40,7 @@ export {
   getIdentitySource,
   createIdentitySource,
   updateIdentitySource,
+  setSourceDefaultIdRole,
   listReconciliationRuns,
   getReconciliationRun,
   startReconciliation,
