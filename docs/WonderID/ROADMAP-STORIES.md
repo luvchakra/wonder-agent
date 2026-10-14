@@ -12,7 +12,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 
 ## Completed recently
 
-- ✅ **QA-P0-22** Brownfield migration fixture · this change
+- ✅ **QA-P0-22** Brownfield migration fixture
 - ✅ **EXPERIENCE-P0-30** Guided connector definition editor (F7, #75) · [#186](https://github.com/luvchakra/wonder-agent/pull/186)
 - ✅ **QA-P0-07** Connector contract tests · [#185](https://github.com/luvchakra/wonder-agent/pull/185)
 - ✅ **QA-P0-02.1** Full cross-tenant sweep · [#168](https://github.com/luvchakra/wonder-agent/pull/168)
