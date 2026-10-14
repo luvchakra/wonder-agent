@@ -123,6 +123,15 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
             </Link>
           ))}
         </nav>
+        {view === "waiting" ? (
+          // ACCESS-P0-23: hand your approvals to someone while you are away.
+          <p className="mt-2 text-xs text-muted-foreground">
+            Away?{" "}
+            <Link href="/access/delegations" className="text-primary hover:underline">
+              Delegate your approvals
+            </Link>
+          </p>
+        ) : null}
         {tasks.length ? (
           <section aria-label="Fulfilment tasks for you" className="mt-4">
             <h2 className="text-sm font-semibold text-foreground">Fulfilment tasks</h2>
