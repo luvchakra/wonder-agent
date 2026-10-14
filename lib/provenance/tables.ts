@@ -75,6 +75,8 @@ export const PROVENANCE_TABLES = [
   "entitlement_classification_rules",
   "entitlement_classification_rule_versions",
   "application_onboarding_templates",
+  // 0186: COMPLIANCE-P0-14 part 3.
+  "certification_consultations",
 ] as const;
 
 export type ProvenanceTable = (typeof PROVENANCE_TABLES)[number];

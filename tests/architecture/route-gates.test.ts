@@ -45,6 +45,7 @@ const SELF_SERVICE: Record<string, string> = {
   "app/api/v1/privacy/me/export/route.ts": "the caller's own data export",
   "app/api/v1/privacy/me/consents/route.ts": "the caller's own consents",
   "app/api/v1/privacy/me/requests/route.ts": "the caller's own privacy requests",
+  "app/api/v1/compliance/consultations/[id]/answer/route.ts": "the caller answers a question put to them; the service accepts only the person asked",
 };
 
 /** Called by third parties; each authenticates the call itself. */

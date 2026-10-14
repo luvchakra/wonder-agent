@@ -433,6 +433,7 @@ Findings are raised for:
 - **Decisions:** reviewers keep, revoke or change each piece of access. For people's access and WonderID roles they can also defer (a new due date, at most 30 days away), escalate (to whoever launched the campaign) or make an exception (keep the access until a date, at most 90 days away; it is then removed automatically). An exception is not available for a role that comes from a group, and nobody makes one for their own access.
 - **Overdue items:** escalated automatically.
 - **Templates and preview:** a launch can be saved as a template (scope, who reviews, cadence, days to review) and launched again in one click; Preview counts the items, identities, high-risk items and reviewers a campaign would have before it is launched.
+- **Asking someone:** when a reviewer needs more information, they choose "request information" and can name a colleague by email (the person whose access it is, its owner, anyone who knows). That person is notified, answers once on their own page, and the question and answer stay with the item as evidence. The reviewer still decides.
 - **Evidence:** each decision is captured as evidence.
 - **Who can review:** reviewers can't review their own access.
 - **People's access:** a campaign can cover the application access people, contractors and service accounts hold (all of it, one application, or privileged access only). Each item goes to the person's manager, the application's owner or a named reviewer; the named reviewer takes items nobody else fits. A revoke becomes a removal that is already approved, carried out by a task or the connection, and counted as done only once the system no longer shows it.
@@ -652,6 +653,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Access reviews: a reviewer can ask a colleague about an item; the answer is kept with the item. |
 | 14 Oct 2026 | Two control-evidence reports: revocation closure (is each revoked access really gone?) and leaver removal SLA (were leavers' removals done in time?). Correction: switching inside one installed app works on a computer only; on phones it opens in the browser's overlay. |
 | 14 Oct 2026 | Access review templates: save a campaign's settings and launch it again in one click; Preview shows what a campaign will hold before it starts. |
 | 14 Oct 2026 | One installed app for every organization and environment: install from the main address, and switching stays inside the app (Chrome, Edge, Samsung Internet). |

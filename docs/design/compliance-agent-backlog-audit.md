@@ -1428,3 +1428,36 @@ Verified:
   rerun passed 15/15).
 
 Left: consultation (part 3).
+
+### 2026-10-14 — COMPLIANCE-P0-14 part 3: consultation (story Done)
+
+Built:
+- Migration 0186: `certification_consultations` (tenant_id, item with a
+  same-organization foreign key, asked_by, asked_of, question, one answer
+  with its time; nobody asks themselves), RLS read for members, writes only
+  through the service; provenance columns and trigger.
+- `consultations.ts` / `consultationRules.ts`: only the item's reviewer
+  asks, only while the item is pending, only an active person of the
+  organization (never an automation credential); only the person asked
+  answers, once (anyone else: 404). Both audited
+  (`compliance.consultation_requested` / `_answered`, text as typed-text
+  fingerprints) and notified.
+- Routes: GET/POST `/api/v1/compliance/items/:id/consultations`
+  (compliance.read), POST `/api/v1/compliance/consultations/:id/answer`
+  (the person asked). Page `/compliance/consultations/:id` to answer.
+- Decision form: "request information" has an optional "Ask" email; the
+  evidence drawer lists questions and answers. The direct-submit path now
+  shows errors.
+
+Verified:
+- typecheck; eslint; `next build`; Vitest compliance, provenance and
+  architecture 93/93.
+- `tests/compliance/consultations-isolation.sql` against dev: 8/8.
+- Local E2E `role-reviews.spec.ts`: 13/13 (the new test: a non-reviewer
+  403; unknown person 404; another member and another organization 404;
+  the person answers on the page; a second answer 409; the item stays
+  pending; both audit events).
+
+Also in this change: CLAUDE.md §19.12 rule 2, the Claude Code audit
+routine goes through a pull request and never pushes to `main` (owner
+decision, 2026-10-14).

@@ -254,5 +254,49 @@ test.describe.serial("reviews of WonderID role assignments", () => {
     expect((await request.delete(`/api/v1/compliance/campaign-templates/${templateId}`)).status()).toBe(200);
     expect(((await (await request.get("/api/v1/compliance/campaign-templates")).json()).data as { id: string }[]).map((t) => t.id)).not.toContain(templateId);
   });
-});
+  test("COMPLIANCE-P0-14 part 3: the reviewer asks someone; only they answer, once; another organization cannot", async ({ request, browser }) => {
+    test.setTimeout(120_000);
+    const campaignId = await launch(request, `E2E RR ask ${stamp}`, { privilegedOnly: true });
+    const adminIdentity = (await db().from("identities").select("id").eq("tenant_id", tenantId).eq("user_id", await userId(TEST_USERS.adminOne.email)).eq("identity_type", "HUMAN").single()).data!.id as string;
+    const item = (await itemsOf(campaignId)).find((i) => i.identity_id === adminIdentity)!;
+    expect(item).toBeTruthy();
+    const ask = (ctx: APIRequestContext) => ctx.post(`/api/v1/compliance/items/${item.id}/consultations`, { data: { askedOfEmail: TEST_USERS.requester.email, question: "Does this person still need this role?" } });
 
+    // Only the item's reviewer asks.
+    expect((await ask(request)).status()).toBe(403);
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    const asked = await ask(iam.request);
+    expect(asked.status(), await asked.text()).toBe(201);
+    const consultationId = (await asked.json()).data.id as string;
+    expect((await iam.request.post(`/api/v1/compliance/items/${item.id}/consultations`, { data: { askedOfEmail: "nobody@example.test", question: "Anyone?" } })).status()).toBe(404);
+
+    // Someone else, and another organization, cannot answer; the question is not found for them.
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    expect((await ro.request.post(`/api/v1/compliance/consultations/${consultationId}/answer`, { data: { answer: "Not mine" } })).status()).toBe(404);
+    await ro.close();
+    const two = await browser.newContext({ storageState: authFile("adminTwo") });
+    expect((await two.request.post(`/api/v1/compliance/consultations/${consultationId}/answer`, { data: { answer: "Not ours" } })).status()).toBe(404);
+    expect((await (await two.request.get(`/api/v1/compliance/items/${item.id}/consultations`)).json()).data ?? []).toEqual([]);
+    await two.close();
+
+    // The person asked answers on their page, once.
+    const requester = await browser.newContext({ storageState: authFile("requester") });
+    const page = await requester.newPage();
+    await page.goto(`/compliance/consultations/${consultationId}`);
+    await expect(page.getByText("Does this person still need this role?")).toBeVisible();
+    await page.getByLabel("Your answer").fill("Yes, until the audit closes");
+    await page.getByRole("button", { name: "Send answer" }).click();
+    await expect(page.getByText("Yes, until the audit closes")).toBeVisible();
+    const again = await requester.request.post(`/api/v1/compliance/consultations/${consultationId}/answer`, { data: { answer: "Again" } });
+    expect(again.status()).toBe(409);
+    await requester.close();
+
+    // The reviewer sees the answer with the item, and still decides.
+    const list = (await (await iam.request.get(`/api/v1/compliance/items/${item.id}/consultations`)).json()).data as { answer: string | null }[];
+    expect(list.map((c) => c.answer)).toEqual(["Yes, until the audit closes"]);
+    expect((await db().from("certification_items").select("status").eq("id", item.id).single()).data!.status).toBe("pending");
+    await iam.close();
+    const { data: audit } = await db().from("audit_logs").select("action").eq("tenant_id", tenantId).eq("object_id", item.id);
+    expect((audit ?? []).map((a) => a.action)).toEqual(expect.arrayContaining(["compliance.consultation_requested", "compliance.consultation_answered"]));
+  });
+});

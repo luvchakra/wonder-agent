@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { EvidenceDrawer, useEvidenceDrawerParam, Button, Badge } from "@/modules/ui";
 import type { CertificationSnapshot } from "@/lib/shared/types/compliance";
 
@@ -16,6 +17,40 @@ export function EvidenceTrigger({ itemId }: { itemId: string }) {
     <Button variant="ghost" size="sm" onClick={() => open(itemId)}>
       View evidence
     </Button>
+  );
+}
+
+type ConsultationRow = { id: string; question: string; answer: string | null; answeredAt: string | null; createdAt: string };
+
+/** COMPLIANCE-P0-14 part 3: the questions the reviewer asked about this item, and their answers. */
+function Consultations({ itemId }: { itemId: string }) {
+  const [rows, setRows] = useState<ConsultationRow[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let live = true;
+    fetch(`/api/v1/compliance/items/${itemId}/consultations`)
+      .then((r) => r.json())
+      .then((b) => live && (b.ok ? setRows(b.data) : setFailed(true)))
+      .catch(() => live && setFailed(true));
+    return () => {
+      live = false;
+    };
+  }, [itemId]);
+  if (failed) return <p className="text-sm text-muted-foreground">Questions unavailable.</p>;
+  if (rows === null) return <p className="text-sm text-muted-foreground">Loading questions…</p>;
+  if (rows.length === 0) return null;
+  return (
+    <div className="text-sm">
+      <p className="text-xs text-muted-foreground">Questions asked</p>
+      <ul className="mt-1 space-y-1">
+        {rows.map((c) => (
+          <li key={c.id} className="rounded-md border border-border bg-muted p-2">
+            <p className="text-foreground">{c.question}</p>
+            <p className="text-muted-foreground">{c.answer ? `Answer: ${c.answer}` : "Not answered yet"}</p>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -86,6 +121,7 @@ export function EvidenceDrawerClient({ items }: { items: ItemForEvidence[] }) {
           </div>
         </div>
       )}
+      {item && <Consultations itemId={item.id} />}
     </EvidenceDrawer>
   );
 }
