@@ -432,6 +432,7 @@ Findings are raised for:
 - **Campaigns:** each campaign covers a chosen set of identities, applications or agents.
 - **Decisions:** reviewers keep, revoke or change each piece of access. For people's access and WonderID roles they can also defer (a new due date, at most 30 days away), escalate (to whoever launched the campaign) or make an exception (keep the access until a date, at most 90 days away; it is then removed automatically). An exception is not available for a role that comes from a group, and nobody makes one for their own access.
 - **Overdue items:** escalated automatically.
+- **Templates and preview:** a launch can be saved as a template (scope, who reviews, cadence, days to review) and launched again in one click; Preview counts the items, identities, high-risk items and reviewers a campaign would have before it is launched.
 - **Evidence:** each decision is captured as evidence.
 - **Who can review:** reviewers can't review their own access.
 - **People's access:** a campaign can cover the application access people, contractors and service accounts hold (all of it, one application, or privileged access only). Each item goes to the person's manager, the application's owner or a named reviewer; the named reviewer takes items nobody else fits. A revoke becomes a removal that is already approved, carried out by a task or the connection, and counted as done only once the system no longer shows it.
@@ -649,6 +650,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Access review templates: save a campaign's settings and launch it again in one click; Preview shows what a campaign will hold before it starts. |
 | 14 Oct 2026 | Vendor console access now comes only from the platform administrators list. An address set in the hosting environment can only open Platform Admins to add someone (or itself) to that list; every grant is audited. |
 | 14 Oct 2026 | Access reviews of people and WonderID roles can defer an item, escalate it to whoever launched the campaign, or keep the access as an exception until a date, after which it is removed. |
 | 14 Oct 2026 | Access reviews can cover the WonderID roles members hold, directly or through a group, privileged roles first; nobody certifies their own role, and a revoke removes it at once. |

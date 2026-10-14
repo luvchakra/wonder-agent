@@ -4072,3 +4072,14 @@ Compliance's review exception on a person's application access calls the
 published `recordApprovedAfterwards` with the exception's end date, so the
 access is kept as a fulfilled, time-bound request and the daily expiry
 sweep turns it into removal work at the end. No change in this module.
+
+## 2026-10-14 — Record provenance on four object tables (§19.10)
+
+The high-risk register's 14 Oct 09:06 review noted (Low) that
+`application_entitlement_types`, `entitlement_classification_rules`,
+`entitlement_classification_rule_versions` and
+`application_onboarding_templates` (#175–#177) lacked the four provenance
+columns and the `record_provenance` trigger. Compliance's migration 0185
+adds them with the same loop as 0115; `lib/provenance/tables.ts` lists
+them, and its unit test now reads every provenance migration, not only
+0115. Checked on dev: the trigger exists on all four.

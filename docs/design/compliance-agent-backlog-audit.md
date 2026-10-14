@@ -1364,3 +1364,44 @@ Verified:
 Left for later: owner reviews of applications, roles and packages;
 templates, calendar and analytics (COMPLIANCE-P0-14); a reviewer inbox
 across campaigns.
+
+### 2026-10-14 — COMPLIANCE-P0-14 part 1: campaign templates and preview
+
+Built:
+- **Migration `0185_compliance_campaign_templates.sql`** (applied to dev):
+  `certification_campaign_templates` (tenant_id not null, RLS select for
+  members, no client write path; unique name per organization among those
+  in use; archived, never deleted; provenance trigger).
+- **Rules** (`templateRules.ts`, pure): `validateTemplate` keeps only known
+  fields (scope: privilegedOnly, applicationId, entitlementId, criticality,
+  minRiskScore) with the launch's own constraints on reviewer kind;
+  `launchFromTemplateInput` dates the name and sets the due date.
+- **Service** (`templates.ts`): list (as the user), save, archive, launch
+  from a template (validated again; audited `compliance.template_saved`,
+  `_archived`, `_launched`).
+- **Preview** (`previewCampaign`): campaign population was split into
+  "build the rows" and "insert them" (`buildItems` / `insertItems`), so the
+  preview runs exactly the launch's reads and writes nothing; it returns
+  items, identities, high-risk or privileged items, reviewers and how many
+  fell back to the named reviewer.
+- **API:** `GET/POST /api/v1/compliance/campaign-templates`,
+  `DELETE /…/[id]` (archive), `POST /…/[id]/launch`,
+  `POST /api/v1/compliance/campaigns/preview`. Reading needs
+  `compliance.read`; everything else `compliance.manage`.
+- **UI:** the launch form is defined once (it was written twice), with
+  "Also save as a template" and a Preview button; a Templates card lists
+  each template with one action, Launch.
+
+Verified:
+- `npm run typecheck`; eslint on the changed files; `next build`.
+- Vitest compliance, operations, provenance and architecture: 168/168
+  (templateRules 3/3).
+- `tests/compliance/campaign-templates-isolation.sql` against dev: 7/7.
+- Local E2E `role-reviews.spec.ts` (new: preview count equals the items
+  the template's launch creates; duplicate name 409; read-only 403;
+  another organization neither sees nor launches it, 404; page shows the
+  template and the preview) and `compliance.spec.ts`: 22/22.
+
+Left for part 2: consultation (reviewer asks the person or owner), the
+closed-loop revocation report, the termination SLA report. Archiving a
+template is API-only for now (one action per list item, §19.5).

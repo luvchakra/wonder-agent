@@ -1,6 +1,6 @@
 /**
  * The tables whose records carry provenance (created_by/updated_by,
- * created_at/updated_at; migration 0115), i.e. the objects a page may show
+ * created_at/updated_at; migration 0115 and later), i.e. the objects a page may show
  * it for. Kept in step with the migration by lib/provenance/tables.test.ts.
  */
 export const PROVENANCE_TABLES = [
@@ -69,6 +69,12 @@ export const PROVENANCE_TABLES = [
   "reports",
   "notification_preferences",
   "billing_profiles",
+  // 0185: COMPLIANCE-P0-14 and the four object tables of #175–#177.
+  "certification_campaign_templates",
+  "application_entitlement_types",
+  "entitlement_classification_rules",
+  "entitlement_classification_rule_versions",
+  "application_onboarding_templates",
 ] as const;
 
 export type ProvenanceTable = (typeof PROVENANCE_TABLES)[number];
