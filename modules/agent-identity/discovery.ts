@@ -3,7 +3,8 @@ import "server-only";
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AgentIdentityType, DiscoveryInboxEntry } from "@/lib/shared/types/agent-identity";
-import { listIntegrations, listIntegrationTypes, getNormalizedObjectsForTenant, listLatestCompletedSyncStarts } from "@/modules/integrations/service";
+import { listIntegrations, listIntegrationTypes, getNormalizedObjectsForTenant, listLatestCompletedSyncStarts, getMcpInventory } from "@/modules/integrations/service";
+import { mcpToolAgentEntry } from "./mcpToolAgents";
 import { computeDuplicateScore, listDiscoveryDecisions } from "./duplicates";
 import { classifyAgentSignal } from "./detection";
 import { toAgent } from "./mappers";
@@ -62,7 +63,7 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
   // Every read is tenant-wide and runs in one parallel wave: a fixed
   // number of queries however many integrations the tenant has (§15; it
   // used to be two sequential queries per integration).
-  const [integrations, integrationTypes, decisions, supabase, unregistered, identityObjects, latestCompletedSync] = await Promise.all([
+  const [integrations, integrationTypes, decisions, supabase, unregistered, identityObjects, latestCompletedSync, mcpServers] = await Promise.all([
     listIntegrations(tenantId),
     listIntegrationTypes(),
     listDiscoveryDecisions(tenantId),
@@ -70,6 +71,7 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
     listUnregisteredAgentActivity(tenantId),
     getNormalizedObjectsForTenant(tenantId, "identity"),
     listLatestCompletedSyncStarts(tenantId),
+    getMcpInventory(tenantId),
   ]);
   if (integrations.length === 0 && unregistered.length === 0) return [];
   const objectsByIntegration = new Map<string, typeof identityObjects>();
@@ -158,6 +160,18 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
         lastSeenAt: obj.importedAt,
         raw: obj.raw,
       });
+    }
+  }
+
+  // Owner feedback 2026-10-14: a tool an MCP server declares that is itself
+  // an AI agent (it drafts, answers, generates) is a candidate to register.
+  const refById = new Map(integrations.map((i) => [i.id, i.ref ?? null]));
+  for (const server of mcpServers) {
+    for (const tool of server.tools) {
+      if (tool.kind !== "ai_agent") continue;
+      const key = `${server.integrationId}::${tool.name}`;
+      if (linkedExternalRefs.has(key)) continue;
+      entries.push(mcpToolAgentEntry(server, tool, decisions.get(key), refById.get(server.integrationId) ?? null));
     }
   }
 

@@ -30,3 +30,24 @@ export function classifyToolOperation(name: string, annotations: unknown): { ope
   if (WRITE_VERBS.has(verb)) return { operation: "write", basis: "name", destructive: verb === "delete" || verb === "drop" || verb === "remove" };
   return { operation: "unknown", basis: "none", destructive: false };
 }
+
+/**
+ * Owner feedback 2026-10-14: a tool can itself be an AI agent (it drafts,
+ * answers or generates with a model behind it), not just an operation on
+ * data. Decided deterministically (#9) from what the server declared: the
+ * description naming AI, or the name starting with a generative verb. The
+ * reason is returned, so a reviewer sees why. It is a signal for the agent
+ * discovery inbox, where a person decides; it changes no access.
+ */
+const AI_VERBS = new Set(["draft", "generate", "summarize", "summarise", "ask", "chat", "compose", "translate", "rewrite", "paraphrase", "answer", "suggest"]);
+const AI_DESCRIPTION = /\b(AI|A\.I\.|LLM|GPT|language model|generative|machine learning|AI[- ]powered|AI assistant|chatbot)\b/i;
+
+export type McpToolKind = { kind: "ai_agent" | "tool"; reason: string | null };
+
+export function classifyToolKind(name: string, description: string | null): McpToolKind {
+  const m = description ? AI_DESCRIPTION.exec(description) : null;
+  if (m) return { kind: "ai_agent", reason: `Description mentions "${m[0]}"` };
+  const verb = firstVerb(name);
+  if (AI_VERBS.has(verb)) return { kind: "ai_agent", reason: `Name starts with "${verb}"` };
+  return { kind: "tool", reason: null };
+}

@@ -2051,3 +2051,17 @@ gateway-enforcement, policy-publish, investigations, emergency-controls,
 runtime-gateway, mcp-bridge — 115 tests passed in total across the runs (an earlier run without
 `E2E_SLOW_MACHINE` timed out on registration under load and left a blocking
 SoD policy in tenant two, which was disabled before the rerun).
+
+### 2026-10-14 — AI tools on MCP servers are discovery candidates
+
+Following the Integration change above, `buildDiscoveryInbox` reads the MCP
+inventory through Integration's published `getMcpInventory`. Each tool
+classified as an AI agent becomes a "new" candidate (`mcpToolAgentEntry`,
+pure). It is keyed `<connection>::<tool name>` like the connection's other
+objects, so register / link / ignore record their decision as usual, and a
+linked tool leaves the inbox. It is PROBABLE_AGENT, with signals: MCP source,
+the AI reason, and "acts, not only reads" for a write tool. The owner is
+never guessed. Nothing is registered automatically: a person decides.
+
+Verified: Vitest mcpToolAgents 2/2 (candidate shape; linked, ignored and
+stale states); local E2E mcp-inventory 3/3.
