@@ -174,6 +174,7 @@ export type { AccessCounts } from "./connectorAccessRules";
 export { openApprovalLink } from "./approvalLinks";
 export { listDelegations, createDelegation, revokeDelegation, requestsActingFor, type Delegation } from "./delegations";
 export { listGovernanceChanges, decideGovernanceChange, type GovernanceChange } from "./governanceChanges";
+export { listIdentityGrantsForReview, requestCertifiedRemoval, type ReviewableGrant } from "./certificationSupport";
 export { listRequestDrafts, saveRequestDraft, deleteRequestDraft, type RequestDraft } from "./requestDrafts";
 export { LINK_MESSAGE, type LinkState } from "./approvalLinkRules";
 export { submitRequestBasket, modelAfter, listBasketRequests, type BasketResult, type BasketRequest } from "./requestBaskets";

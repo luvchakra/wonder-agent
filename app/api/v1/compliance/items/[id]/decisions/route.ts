@@ -7,7 +7,9 @@ import { refuseAutomationCaller } from "@/lib/security/automationCredentials";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const ctx = await requirePermission("compliance.manage");
+    // COMPLIANCE-P0-10: the item's assigned reviewer decides (a manager or an
+    // application owner reviewing people's access); agent items still need compliance.manage (service).
+    const ctx = await requirePermission("compliance.read");
     // WID-H06: certifying is a person's decision.
     await refuseAutomationCaller("A certification decision");
     const { id } = await params;
@@ -17,6 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       justification: String(body.justification ?? ""),
       delegateToUserId: body.delegateToUserId,
       overrideSoD: body.overrideSoD === true,
+      canManageCompliance: ctx.permissions.includes("compliance.manage"),
     });
     return NextResponse.json({ ok: true, data: decision });
   } catch (err) {

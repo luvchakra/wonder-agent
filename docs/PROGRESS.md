@@ -14,18 +14,18 @@ Generated 2026-10-14 from 11 module backlogs.
 
 ## Overall
 
-**229 of 274 tracked stories complete — 84%**
+**230 of 274 tracked stories complete — 84%**
 
 ```
-█████████████████████████████████░░░░░░░  84%
+██████████████████████████████████░░░░░░  84%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 229 |
+| Done | 230 |
 | Partial | 26 |
 | Deferred | 1 |
-| Not Started | 18 |
+| Not Started | 17 |
 | **Total tracked** | **274** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
@@ -44,11 +44,11 @@ and are deliberately excluded from the counts above.
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
-| 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
+| 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 1 | 0 | 1 | 17 | `████████████████░░` 88% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 28 | 3 | 0 | 6 | 37 | `██████████████░░░░` 76% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 19 | 10 | 0 | 2 | 31 | `███████████░░░░░░░` 61% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 20 | 9 | 0 | 2 | 31 | `████████████░░░░░░` 65% |
 
 ---
 
@@ -269,7 +269,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Certification, Controls & Compliance  
 **Backlog status:** DORMANT — do not start until the user says "Run Compliance Agent"  
-**Stories:** 15 done · 0 partial · 0 deferred · 2 not started (17 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 15 done · 1 partial · 0 deferred · 1 not started (17 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -286,7 +286,7 @@ and are deliberately excluded from the counts above.
 | COMPLIANCE-P0-07 | Governance Posture (composite score, distinct from risk) | Done — computed read-model across 12 dimensions, `getGovernancePosture()`, `GET /api/v1/compliance/agents/[id]/posture` |
 | COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
-| COMPLIANCE-P0-10 | Certification campaigns for every identity type | Not Started — 2026-09-26, WonderID |
+| COMPLIANCE-P0-10 | Certification campaigns for every identity type | Partial — 2026-10-14 part 1 (0180, 0181): people's application access (human, external, service account); reviewer by manager, application owner or named; certify (never one's own) and revoke as an approved, verified removal. Left: defer/escalate/exception decisions, owner reviews of applications/roles/packages, templates, calendar and analytics |
 | COMPLIANCE-P0-11 | Access certification of WonderID users' role assignments | Not Started — 2026-09-26, WonderID Phase 4b |
 | COMPLIANCE-P0-12 | Privacy programme: GDPR / UK GDPR / DPDP / CCPA rights requests, consent, RoPA, retention, legal holds, breach register (2026-10-01 user request) | Done — 2026-10-01 (`0103`, `modules/privacy`, `/settings/privacy`, `/my-privacy`, `/api/v1/privacy/*`, daily `/api/cron/privacy`; 12 rule tests; live isolation proof 28/28) |
 | COMPLIANCE-P0-13 | Financial and privacy control frameworks (SOX ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF, CERT-In, GDPR, DPDP) | Done — 2026-10-01 (`0105`, 10 frameworks / 55 controls; shown on `/audit/integrity`) |
@@ -391,7 +391,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 19 done · 10 partial · 0 deferred · 2 not started (31 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 20 done · 9 partial · 0 deferred · 2 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -422,7 +422,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
 | QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
-| QA-P0-22 | Brownfield migration fixture | Partial — 2026-10-14: `brownfield.spec.ts` covers HR import to verified and removed access for legitimate, privileged, stale, orphan, ambiguous, service, agent and external cases, conflicting sources and legacy access; certification waits for COMPLIANCE-P0-10 |
+| QA-P0-22 | Brownfield migration fixture | Done — 2026-10-14: `brownfield.spec.ts` covers HR import to verified and removed access for legitimate, privileged, stale, orphan, ambiguous, service, agent and external cases, conflicting sources, legacy access, and an application-owner certification that certifies and revokes |
 | QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Done — 2026-10-11: person, service account and agent to verified; removal and expiry revoked; approver ≠ requester; isolation SQL for 0123/0124; repeated reconciliation changes nothing |
 | QA-P0-26 | Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification (F3) | Done — 2026-10-12: the write mass-change guard (`integration.maxWritesPerHour`, default 100 per connection per hour) built and tested; read-only connection types cannot be turned on; no attempt key reaches a system twice; verification of every operation in `connector-provisioning.spec.ts` |

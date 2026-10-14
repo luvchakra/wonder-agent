@@ -4,7 +4,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 ✅ done · 🔶 partly done · ⬜ not started · progress counts partly done as half
 
-**Overall: 55%** `██████░░░░`
+**Overall: 56%** `██████░░░░`
 
 | # | Phase | Progress |
 |---|---|---|
@@ -14,13 +14,13 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 4 | [Provisioning](#4-provisioning) | `██████░░░░` 55% |
 | 5 | [AI agents](#5-ai-agents) | `██████████` 100% |
 | 6 | [Risk, reviews and compliance](#6-risk-reviews-and-compliance) | `██████████` 100% |
-| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `████░░░░░░` 45% |
+| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `█████░░░░░` 50% |
 | 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `██░░░░░░░░` 20% |
 | 9 | [Agent ID and trusted credentials](#9-agent-id-and-trusted-credentials) | `░░░░░░░░░░` 0% |
 | 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `████░░░░░░` 35% |
 | 11 | [Advanced governance](#11-advanced-governance) | `░░░░░░░░░░` 0% |
 | 12 | [Intelligence and experience](#12-intelligence-and-experience) | `█░░░░░░░░░` 6% |
-| 13 | [Release readiness](#13-release-readiness) | `██░░░░░░░░` 25% |
+| 13 | [Release readiness](#13-release-readiness) | `█████░░░░░` 50% |
 
 ## 1. Foundation, sign-in and identity — 88%
 
@@ -98,14 +98,14 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Ready-made reports and exports
 - ✅ Billing (Stripe, Razorpay)
 
-## 7. Lifecycle and reviews for everyone — 45%
+## 7. Lifecycle and reviews for everyone — 50%
 
 - ✅ Shared rule engine
 - 🔶 Attribute rules
 - ✅ Lifecycle rules
 - ✅ Identity detail pages
 - ✅ Entitlement types and classification
-- ⬜ Reviews for every identity type
+- 🔶 Reviews for every identity type
 - ⬜ Reviews of administrators
 - ⬜ Review templates and SLA reporting
 - ⬜ Merging duplicate people
@@ -168,10 +168,10 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ⬜ Owner queues
 - ⬜ Governed AI assistant
 
-## 13. Release readiness — 25%
+## 13. Release readiness — 50%
 
 - ⬜ Security hardening pass
-- 🔶 Brownfield customer rehearsal
+- ✅ Brownfield customer rehearsal
 
 ---
 Updated with every merge: change an item's mark, run `npm run roadmap` to recompute the percentages, and commit both in the same pull request.

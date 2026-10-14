@@ -12,7 +12,9 @@ import type { ShouldCanDidComparison } from "./runtime";
 import type { RiskFinding } from "./risk";
 import type { AuditLogEntry } from "./operations";
 
-export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent";
+export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent" | "identity_access";
+/** COMPLIANCE-P0-10: who reviews a people's-access item (the named reviewer is the fallback). */
+export type CampaignReviewerKind = "named" | "manager" | "application_owner";
 export type CampaignCadence = "one_time" | "periodic" | "event_driven";
 export type CampaignStatus = "draft" | "active" | "completed" | "cancelled";
 
@@ -31,6 +33,7 @@ export type CertificationCampaign = {
   buildStatus?: "building" | "ready" | "failed";
   buildError?: string | null;
   itemsTotal?: number | null;
+  reviewerKind?: CampaignReviewerKind;
 };
 
 export type UsageAtReview = "used" | "never" | "unknown";
@@ -58,13 +61,21 @@ export type CertificationSnapshot = {
   policyEvaluations: { policyId: string; policyVersion: number; result: string }[];
   riskAtReview: string | null;
   usageAtReview: UsageAtReview | null;
+  /** COMPLIANCE-P0-10: for a person's access, whose it is and on which account (no agent contract then). */
+  person?: { id: string; displayName: string; identityType: string };
+  account?: { id: string; ref: string };
+  privilegeLevel?: string;
+  reviewer?: { kind: string; fallback: boolean };
 };
 
 export type CertificationItem = {
   id: string;
   tenantId: string;
   campaignId: string;
-  agentId: string;
+  /** An item is about exactly one agent or (COMPLIANCE-P0-10) one identity's access. */
+  agentId: string | null;
+  identityId: string | null;
+  accountId: string | null;
   accessGrantId: string | null;
   reviewerId: string;
   riskAtReview: string | null;

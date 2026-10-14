@@ -17,9 +17,9 @@ import { accessFindings, entitlementIdByRef, grantsOf, ledgerFor } from "./suppo
  * it → verified → stale access is removed the same way → another
  * organization sees none of it.
  *
- * Certification is the one step not covered: campaigns over people's
- * application access are COMPLIANCE-P0-10, not built yet (campaigns today
- * certify AI agents' access only). Recorded in the QA audit log.
+ * Then the people's access is certified (COMPLIANCE-P0-10): a campaign over
+ * the application, reviewed by its owner; certified access stays, revoked
+ * access becomes an approved removal followed like any other.
  */
 
 const stamp = Date.now();
@@ -73,6 +73,7 @@ let extId = "";
 let agentId = "";
 let twinIds: string[] = [];
 let opsRequestId = "";
+let campaignId = "";
 type Account = { id: string; externalAccountRef: string; identityId: string | null; agentId: string | null; correlation: string; accountType: string };
 const accounts: Record<string, Account> = {};
 
@@ -312,12 +313,54 @@ test.describe.serial("brownfield: HR to verified access", () => {
     expect((await requestView(request, id)).fulfilment).toBe("verified");
   });
 
+  test("certify: the application owner reviews the people's access; certified stays, revoked becomes an approved removal", async ({ request, browser }) => {
+    test.setTimeout(120_000);
+    const { data: adminUser } = await db().from("users").select("id").eq("email", TEST_USERS.adminOne.email).single();
+    const launched = await request.post("/api/v1/compliance/campaigns", {
+      data: { name: `E2E BF Review ${stamp}`, scopeType: "identity_access", scope: { applicationId: appId }, cadence: "one_time", reviewerKind: "application_owner", reviewerId: adminUser!.id },
+    });
+    expect(launched.status(), await launched.text()).toBe(200);
+    campaignId = (await launched.json()).data.id;
+    type Item = { id: string; identityId: string | null; accountId: string | null; reviewerId: string; snapshot: { accessGrant: { entitlementName: string } } };
+    let items: Item[] = [];
+    await expect
+      .poll(async () => {
+        items = (await (await request.get(`/api/v1/compliance/campaigns/${campaignId}/items`)).json()).data as Item[];
+        return items.length;
+      }, { timeout: 30_000 })
+      .toBe(5);
+    // Bea's three grants, the contractor's and the service account's; not the orphan, the revoked one or the agent's.
+    const { data: iamUser } = await db().from("users").select("id").eq("email", TEST_USERS.iamAdminOne.email).single();
+    expect(items.every((i) => i.reviewerId === iamUser!.id && i.identityId)).toBe(true);
+    expect(items.map((i) => i.accountId)).not.toContain(accounts.ghost.id);
+    expect(items.map((i) => i.accountId)).not.toContain(accounts.olu.id);
+
+    const decide = (ctx: APIRequestContext, id: string, decision: string) => ctx.post(`/api/v1/compliance/items/${id}/decisions`, { data: { decision, justification: "QA-P0-22 review" } });
+    const bea = items.find((i) => i.accountId === accounts.bea.id && i.snapshot.accessGrant.entitlementName === "Finance")!;
+    const ext = items.find((i) => i.accountId === accounts.ext.id)!;
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    expect((await decide(ro.request, bea.id, "approve")).status()).toBe(403);
+    await ro.close();
+
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    expect((await decide(iam.request, bea.id, "approve")).status()).toBe(200);
+    const revoked = await decide(iam.request, ext.id, "revoke");
+    expect(revoked.status(), await revoked.text()).toBe(200);
+    const removalId = (await revoked.json()).data.remediationId as string;
+    await iam.close();
+    const removal = await requestView(request, removalId);
+    expect(removal.request.status).toBe("approved");
+    expect(removal.tasks.map((t) => t.kind)).toEqual(["remove"]);
+  });
+
   test("another organization sees none of it", async ({ browser }) => {
     const two = await browser.newContext({ storageState: authFile("adminTwo") });
     const listed = await two.request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`);
     expect(listed.status() === 200 ? (await listed.json()).data : []).toEqual([]);
     expect((await two.request.get(`/api/v1/access/requests/${opsRequestId}`)).status()).toBe(404);
     expect((await two.request.get(`/api/v1/identities/${beaId}`)).status()).toBe(404);
+    const theirItems = await two.request.get(`/api/v1/compliance/campaigns/${campaignId}/items`);
+    expect(theirItems.status() === 200 ? (await theirItems.json()).data : []).toEqual([]);
     await two.close();
   });
 });

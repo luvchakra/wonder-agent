@@ -4022,3 +4022,21 @@ Either way, every applied change becomes a numbered version.
   - another organization neither seeing nor deciding the change, and a read-only member refused.
 
 **Left (later parts).** Roles, SoD rules, lifecycle rules and workflows through the same tables, and a version history view.
+
+## 2026-10-14 — Certification support for COMPLIANCE-P0-10
+
+Published two services for Compliance's reviews of people's access
+(`modules/access-governance/certificationSupport.ts`, exported from
+`service.ts`):
+- `listIdentityGrantsForReview(tenantId, { applicationId, privilegedOnly })`:
+  live grants (not revoked or missing, fulfilment none or verified) on
+  accounts that belong to an identity and not an agent.
+- `requestCertifiedRemoval(tenantId, actorId, { grantId,
+  certificationItemId, justification })`: records an approved `remove`
+  request (the reviewer's decision is the approval), reuses an open one
+  for the same grant, audits `access.certified_removal_requested`, and
+  hands it to `pendRequest` so it is fulfilled and verified like any other
+  removal.
+
+Verified through Compliance's checks (unit 483/483, E2E brownfield revoke
+reaching a `remove` task). No schema change in this module.

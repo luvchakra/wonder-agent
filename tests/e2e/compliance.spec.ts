@@ -9,7 +9,7 @@ import { authFile } from "./support/testUsers";
 // "entitlement" selected always fails scope validation before this UI
 // gains those fields — asserting that today, not "no error", so this
 // test breaks the day someone adds the missing inputs (a welcome break).
-const SCOPE_TYPES_THAT_SUCCEED = ["agent", "privileged_access", "high_risk_agent"] as const;
+const SCOPE_TYPES_THAT_SUCCEED = ["agent", "privileged_access", "high_risk_agent", "identity_access"] as const;
 const SCOPE_TYPES_THAT_FAIL_VALIDATION = ["application", "entitlement"] as const;
 
 test.describe("Compliance module", () => {

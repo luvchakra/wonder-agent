@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
@@ -288,6 +288,39 @@ export async function getIdentityNames(tenantId: string, ids: string[]): Promise
   const { data, error } = await supabase.from("identities").select("id, display_name, identity_type").eq("tenant_id", tenantId).in("id", unique);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   for (const r of data ?? []) out.set(r.id as string, { displayName: r.display_name as string, identityType: r.identity_type as IdentityType });
+  return out;
+}
+
+/**
+ * COMPLIANCE-P0-10: what an access review needs about the identities whose
+ * access it covers (who they are, their sign-in user, manager and owner),
+ * in batches. Service-role read filtered to the caller's tenant (§14); it
+ * may run after the response, when no user session is at hand.
+ */
+export async function getIdentityReviewInfo(
+  tenantId: string,
+  ids: string[],
+): Promise<Map<string, { displayName: string; identityType: IdentityType; userId: string | null; managerIdentityId: string | null; ownerIdentityId: string | null }>> {
+  const unique = [...new Set(ids.filter((id) => UUID_RE.test(id)))];
+  const out = new Map<string, { displayName: string; identityType: IdentityType; userId: string | null; managerIdentityId: string | null; ownerIdentityId: string | null }>();
+  for (let i = 0; i < unique.length; i += 500) {
+    const { data, error } = await supabaseServiceRole()
+      .from("identities")
+      .select("id, tenant_id, display_name, identity_type, user_id, manager_identity_id, owner_identity_id")
+      .eq("tenant_id", tenantId)
+      .in("id", unique.slice(i, i + 500));
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    for (const r of data ?? []) {
+      if (r.tenant_id !== tenantId) continue;
+      out.set(r.id as string, {
+        displayName: r.display_name as string,
+        identityType: r.identity_type as IdentityType,
+        userId: (r.user_id as string | null) ?? null,
+        managerIdentityId: (r.manager_identity_id as string | null) ?? null,
+        ownerIdentityId: (r.owner_identity_id as string | null) ?? null,
+      });
+    }
+  }
   return out;
 }
 

@@ -133,7 +133,7 @@ Exit test: not run.
 | IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Done | Birthright (0151), mover review (0153), leaver removal (WID-C02), four-eyes rules (IDENTITY-P0-21); 2026-10-14: expiry sweep (0168) and the manager's "disable all access" (My Team) |
 | IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Done | 2026-10-14: entitlement types per application (0169): how each is requested, certifiable, default and maximum duration; entitlement type, requestable and SOX flags with provenance; enforced on requests. Classification rules (0170) on the shared rule runtime: simulate, four-eyes publish, report-only then enforce (applied to existing entitlements), never over a person's value, run log. Owner: ownerless entitlements stay requestable |
-| COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Not started | Backlog: Not Started |
+| COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Partial | 2026-10-14 part 1 (0180, 0181): campaigns over people's application access, reviewed by the manager, the application owner or a named reviewer; certify (never one's own) or revoke as an approved removal verified at the source. Left: defer/escalate/exception, owner reviews, templates, calendar, analytics |
 | COMPLIANCE-P0-11 Certification of administrators | Compliance | | Not started | Backlog: Not Started |
 | COMPLIANCE-P0-14 † Templates, preview, consultation, closed loop, SLA report | Compliance | | Not started | |
 | IDENTITY-P0-23 † Human identity merge | Identity | | Not started | |
@@ -229,3 +229,4 @@ Exit test: not run.
 - 2026-10-14: ACCESS-P0-23 part 2, request delegation (migration 0177).
 - 2026-10-14: ACCESS-P0-23 part 3, administration delegation (migration 0178).
 - 2026-10-14: ACCESS-P0-35 part 1, approved request policy changes (migration 0179).
+- 2026-10-14: COMPLIANCE-P0-10 part 1, reviews of people's application access (migrations 0180, 0181).

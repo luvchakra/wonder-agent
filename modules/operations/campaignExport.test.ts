@@ -11,6 +11,8 @@ function makePackage(): EvidenceExportPackage {
         id: "item-1",
         tenantId: "tenant-a",
         campaignId: "campaign-1",
+        identityId: null,
+        accountId: null,
         agentId: "agent-1",
         accessGrantId: "grant-1",
         reviewerId: "user-2",

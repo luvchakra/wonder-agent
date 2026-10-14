@@ -8,7 +8,10 @@ import type { RiskSeverity } from "@/lib/shared/types/risk";
 
 type CampaignItemRow = {
   id: string;
-  agentId: string;
+  agentId: string | null;
+  identityId?: string | null;
+  /** COMPLIANCE-P0-10: whose access and which, from the item's snapshot. */
+  snapshot?: { person?: { displayName: string }; accessGrant?: { application?: string; entitlementName?: string } | null } | null;
   riskAtReview: string | null;
   usageAtReview: string | null;
   recommendation: string | null;
@@ -20,7 +23,26 @@ type CampaignItemRow = {
 export function CampaignItemsTable({ items, totalCount, currentUserId }: { items: CampaignItemRow[]; totalCount: number; currentUserId: string }) {
   const state = useTableState("items", { sortKey: "status", pageSize: 25 });
   const columns: DataTableColumn<CampaignItemRow>[] = [
-    { key: "agentId", header: "Agent", sortable: true, render: (i) => <Link href={`/agents/${i.agentId}`} className="text-primary hover:underline">{i.agentId}</Link> },
+    {
+      key: "agentId",
+      header: "Whose access",
+      sortable: true,
+      render: (i) =>
+        i.identityId ? (
+          <span className="min-w-0">
+            <Link href={`/identities/${i.identityId}`} className="text-primary hover:underline">
+              {i.snapshot?.person?.displayName ?? "Identity"}
+            </Link>
+            <span className="block text-xs text-muted-foreground">
+              {i.snapshot?.accessGrant?.application ?? "?"} · {i.snapshot?.accessGrant?.entitlementName ?? "?"}
+            </span>
+          </span>
+        ) : (
+          <Link href={`/agents/${i.agentId}`} className="text-primary hover:underline">
+            {i.agentId}
+          </Link>
+        ),
+    },
     { key: "riskAtReview", header: "Risk", sortable: true, render: (i) => (i.riskAtReview ? <SeverityBadge severity={i.riskAtReview as RiskSeverity} /> : "—") },
     { key: "usageAtReview", header: "Usage", render: (i) => i.usageAtReview ?? "—" },
     {

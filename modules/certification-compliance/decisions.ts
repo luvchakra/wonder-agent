@@ -3,9 +3,10 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { revokeAccessGrant, getAccessGrant, getEntitlement, createAccessRequest } from "@/modules/access-governance/service";
-import { listOwners } from "@/modules/agent-identity/service";
-import type { CertificationDecision, CertificationItemDetail, DecisionType } from "@/lib/shared/types/compliance";
+import { revokeAccessGrant, getAccessGrant, getEntitlement, createAccessRequest, requestCertifiedRemoval } from "@/modules/access-governance/service";
+import { getIdentityReviewInfo, listOwners } from "@/modules/agent-identity/service";
+import { IDENTITY_ITEM_DECISIONS, selfCertificationRefused } from "./identityReviewRules";
+import type { CertificationDecision, CertificationItem, CertificationItemDetail, DecisionType } from "@/lib/shared/types/compliance";
 import { toCertificationDecision, toCertificationItem } from "./mappers";
 import { buildFreshSnapshot } from "./snapshot";
 
@@ -21,6 +22,8 @@ export type RecordDecisionInput = {
    * itself.
    */
   overrideSoD?: boolean;
+  /** COMPLIANCE-P0-10: agent items still need compliance.manage; a person's access needs only the assigned reviewer. Defaults to true for callers that already required it. */
+  canManageCompliance?: boolean;
 };
 
 /**
@@ -62,7 +65,63 @@ export async function recordDecision(
     });
     throw new ApiError(403, "NOT_ASSIGNED_REVIEWER", "Only the item's assigned reviewer may record a decision on it");
   }
+  if (item.agentId && input.canManageCompliance === false) throw new ApiError(403, "FORBIDDEN", "Deciding an agent's certification needs compliance.manage");
 
+  let snapshot: unknown;
+  let remediationId: string | null = null;
+  if (item.identityId) {
+    ({ snapshot, remediationId } = await identityItemDecision(tenantId, actorId, item, input));
+  } else {
+    ({ snapshot, remediationId } = await agentItemDecision(tenantId, actorId, item as CertificationItem & { agentId: string }, input));
+  }
+
+  const { data: decisionRow, error: decisionError } = await supabase
+    .from("certification_decisions")
+    .insert({
+      item_id: itemId,
+      decision: input.decision,
+      justification: input.justification,
+      decided_by: actorId,
+      remediation_id: remediationId,
+      snapshot,
+    })
+    .select()
+    .single();
+  if (decisionError || !decisionRow) throw new ApiError(500, "CREATE_FAILED", decisionError?.message ?? "Failed to record decision");
+
+  if (input.decision === "delegate") {
+    const { error: updateError } = await supabase.from("certification_items").update({ reviewer_id: input.delegateToUserId }).eq("id", itemId);
+    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  } else if (input.decision !== "request_information") {
+    const { error: updateError } = await supabase.from("certification_items").update({ status: "decided" }).eq("id", itemId);
+    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  }
+  // 'request_information' leaves status='pending' — a notification-worthy
+  // event for Operations Agent to consume once it exists; the audit_logs
+  // row below is that event in the meantime.
+
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "compliance.decision_recorded",
+    objectType: "certification_decision",
+    objectId: decisionRow.id,
+    outcome: "success",
+    metadata: { itemId, decision: input.decision },
+  });
+
+  return toCertificationDecision(decisionRow);
+}
+
+/** The agent path (COMPLIANCE-P0-01..04): SoD on approve, revoke the grant, modify as a request. */
+async function agentItemDecision(
+  tenantId: string,
+  actorId: string,
+  item: CertificationItem & { agentId: string },
+  input: RecordDecisionInput,
+): Promise<{ snapshot: unknown; remediationId: string | null }> {
+  const itemId = item.id;
   // COMPLIANCE-P0-04 — Segregation of Duties: a reviewer must not approve
   // (certify) an agent whose access they themselves own. Scoped to
   // 'approve' — the decision that actually affirms the access as correct —
@@ -168,44 +227,31 @@ export async function recordDecision(
       });
     }
   }
+  return { snapshot, remediationId };
+}
 
-  const { data: decisionRow, error: decisionError } = await supabase
-    .from("certification_decisions")
-    .insert({
-      item_id: itemId,
-      decision: input.decision,
-      justification: input.justification,
-      decided_by: actorId,
-      remediation_id: remediationId,
-      snapshot,
-    })
-    .select()
-    .single();
-  if (decisionError || !decisionRow) throw new ApiError(500, "CREATE_FAILED", decisionError?.message ?? "Failed to record decision");
-
-  if (input.decision === "delegate") {
-    const { error: updateError } = await supabase.from("certification_items").update({ reviewer_id: input.delegateToUserId }).eq("id", itemId);
-    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
-  } else if (input.decision !== "request_information") {
-    const { error: updateError } = await supabase.from("certification_items").update({ status: "decided" }).eq("id", itemId);
-    if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+/**
+ * COMPLIANCE-P0-10: a person's access. Nobody certifies their own access;
+ * a revoke opens an approved removal in Access (the decision is the human
+ * approval, #15), followed to verification at the source like any other.
+ */
+async function identityItemDecision(tenantId: string, actorId: string, item: CertificationItem, input: RecordDecisionInput): Promise<{ snapshot: unknown; remediationId: string | null }> {
+  if (!(IDENTITY_ITEM_DECISIONS as readonly string[]).includes(input.decision)) {
+    throw new ApiError(400, "INVALID_INPUT", "For a person's access: approve, revoke, delegate or request_information");
   }
-  // 'request_information' leaves status='pending' — a notification-worthy
-  // event for Operations Agent to consume once it exists; the audit_logs
-  // row below is that event in the meantime.
-
-  await writeAudit({
-    tenantId,
-    actorId,
-    actorType: "user",
-    action: "compliance.decision_recorded",
-    objectType: "certification_decision",
-    objectId: decisionRow.id,
-    outcome: "success",
-    metadata: { itemId, decision: input.decision },
-  });
-
-  return toCertificationDecision(decisionRow);
+  const subject = (await getIdentityReviewInfo(tenantId, [item.identityId!])).get(item.identityId!) ?? null;
+  if (selfCertificationRefused(input.decision, actorId, subject?.userId ?? null)) {
+    await writeAudit({ tenantId, actorId, actorType: "user", action: "compliance.sod_conflict_blocked", objectType: "certification_item", objectId: item.id, outcome: "failure", metadata: { reason: "self-certification" } });
+    throw new ApiError(409, "SELF_CERTIFICATION", "Nobody certifies their own access");
+  }
+  let remediationId: string | null = null;
+  if (input.decision === "revoke") {
+    if (!item.accessGrantId) throw new ApiError(409, "NO_SPECIFIC_GRANT", "This item names no specific access to remove");
+    const request = await requestCertifiedRemoval(tenantId, actorId, { grantId: item.accessGrantId, certificationItemId: item.id, justification: input.justification });
+    remediationId = request.id;
+  }
+  const snapshot = { ...(item.snapshot as Record<string, unknown> | null), decidedAt: new Date().toISOString(), subject: subject ? { displayName: subject.displayName, identityType: subject.identityType } : null };
+  return { snapshot, remediationId };
 }
 
 export async function listDecisionsForItem(tenantId: string, itemId: string): Promise<CertificationDecision[]> {

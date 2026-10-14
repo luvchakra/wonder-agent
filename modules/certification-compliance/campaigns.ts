@@ -8,7 +8,9 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { getAgentContract, listAgents } from "@/modules/agent-identity/service";
-import { getEffectiveAccess, listPolicyEvaluations, getApplication, getEntitlement } from "@/modules/access-governance/service";
+import { getEffectiveAccess, listPolicyEvaluations, getApplication, getEntitlement, listIdentityGrantsForReview } from "@/modules/access-governance/service";
+import { getIdentityReviewInfo } from "@/modules/agent-identity/service";
+import { REVIEWER_KINDS, resolveReviewer, type ReviewerKind } from "./identityReviewRules";
 import { getFindings } from "@/modules/risk/service";
 import { getDid } from "@/modules/runtime-assurance/service";
 import type { CampaignCadence, CampaignScopeType, CampaignMetrics, CertificationCampaign, CertificationItem } from "@/lib/shared/types/compliance";
@@ -24,6 +26,8 @@ export type LaunchCampaignInput = {
   cadence: CampaignCadence;
   dueDate?: string;
   reviewerId: string;
+  /** COMPLIANCE-P0-10: for scope 'identity_access', who reviews each item (the named reviewer is the fallback). */
+  reviewerKind?: ReviewerKind;
 };
 
 // RISK-P0-02.2 added an `info` tier below `low` to RiskSeverity (Risk Agent's
@@ -145,6 +149,67 @@ async function scopeTargets(tenantId: string, input: LaunchCampaignInput, ids: {
   return { agents: [] };
 }
 
+/**
+ * COMPLIANCE-P0-10: a people's-access campaign has one item per live grant
+ * on an account linked to a person, contractor or service account
+ * (optionally one application, or privileged access only). Each item goes
+ * to the identity's manager, the application's owner or the named
+ * reviewer, never to the person whose access it is, and keeps a snapshot
+ * of what the reviewer is shown.
+ */
+async function populateIdentityItems(tenantId: string, campaignId: string, input: LaunchCampaignInput, applicationId: string | null): Promise<number> {
+  const grants = await listIdentityGrantsForReview(tenantId, { applicationId, privilegedOnly: input.scope?.privilegedOnly === true });
+  const ids = [...new Set(grants.flatMap((g) => [g.identityId, g.applicationOwnerIdentityId].filter((x): x is string => Boolean(x))))];
+  const info = await getIdentityReviewInfo(tenantId, ids);
+  const managers = await getIdentityReviewInfo(tenantId, [...new Set([...info.values()].map((p) => p.managerIdentityId).filter((x): x is string => Boolean(x)))]);
+  const kind = input.reviewerKind ?? "named";
+  const now = new Date().toISOString();
+  const rows = grants.map((g) => {
+    const person = info.get(g.identityId);
+    const managerId = person?.managerIdentityId ?? null;
+    const reviewer = resolveReviewer(
+      kind,
+      {
+        subjectUserId: person?.userId ?? null,
+        managerUserId: managerId ? (managers.get(managerId)?.userId ?? info.get(managerId)?.userId ?? null) : null,
+        applicationOwnerUserId: g.applicationOwnerIdentityId ? (info.get(g.applicationOwnerIdentityId)?.userId ?? null) : null,
+      },
+      input.reviewerId,
+    );
+    return {
+      tenant_id: tenantId,
+      campaign_id: campaignId,
+      identity_id: g.identityId,
+      account_id: g.accountId,
+      access_grant_id: g.grantId,
+      reviewer_id: reviewer.reviewerId,
+      risk_at_review: g.privilegeLevel === "admin" || g.privilegeLevel === "elevated" ? "high" : null,
+      usage_at_review: "unknown",
+      recommendation: g.privilegeLevel === "admin" || g.privilegeLevel === "elevated" ? "review" : "keep",
+      due_date: input.dueDate ?? null,
+      snapshot: {
+        capturedAt: now,
+        agentContractId: null,
+        agentContractVersion: null,
+        accessGrant: { id: g.grantId, application: g.applicationName, entitlementName: g.entitlementName },
+        policyEvaluations: [],
+        riskAtReview: null,
+        usageAtReview: "unknown",
+        person: { id: g.identityId, displayName: person?.displayName ?? "Unknown identity", identityType: person?.identityType ?? "HUMAN" },
+        account: { id: g.accountId, ref: g.accountRef },
+        privilegeLevel: g.privilegeLevel,
+        reviewer: { kind, fallback: reviewer.fallback },
+      },
+    };
+  });
+  const svc = supabaseServiceRole();
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
+    if (error) throw new ApiError(500, "CREATE_FAILED", error.message);
+  }
+  return rows.length;
+}
+
 /** A build error as it may be shown and stored: short, and never a stack or a secret. */
 function buildErrorText(err: unknown): string {
   return err instanceof ApiError ? err.message.slice(0, 300) : "The items could not be built. Launch the campaign again.";
@@ -160,8 +225,13 @@ function buildErrorText(err: unknown): string {
 async function buildCampaign(tenantId: string, actorId: string, campaignId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<void> {
   const svc = supabaseServiceRole();
   try {
-    const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
-    const total = await populateCertificationItems(tenantId, campaignId, agents, input, grantFilter);
+    let total: number;
+    if (input.scopeType === "identity_access") {
+      total = await populateIdentityItems(tenantId, campaignId, input, ids.applicationId);
+    } else {
+      const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
+      total = await populateCertificationItems(tenantId, campaignId, agents, input, grantFilter);
+    }
     const { error } = await svc
       .from("certification_campaigns")
       .update({ build_status: "ready", items_total: total, built_at: new Date().toISOString(), build_error: null })
@@ -226,6 +296,11 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     applicationId = typeof input.scope?.applicationId === "string" ? input.scope.applicationId : null;
     if (!applicationId) throw new ApiError(400, "INVALID_INPUT", "scope.applicationId is required for scope_type 'application'");
     if (!(await getApplication(tenantId, applicationId))) throw new ApiError(404, "APPLICATION_NOT_FOUND");
+  } else if (input.scopeType === "identity_access") {
+    // COMPLIANCE-P0-10: optionally one application; reviewer kind from a closed list.
+    applicationId = typeof input.scope?.applicationId === "string" && input.scope.applicationId ? input.scope.applicationId : null;
+    if (applicationId && !(await getApplication(tenantId, applicationId))) throw new ApiError(404, "APPLICATION_NOT_FOUND");
+    if (input.reviewerKind !== undefined && !(REVIEWER_KINDS as readonly string[]).includes(input.reviewerKind)) throw new ApiError(400, "INVALID_INPUT", "reviewerKind: named, manager or application_owner");
   } else if (input.scopeType === "entitlement") {
     entitlementId = typeof input.scope?.entitlementId === "string" ? input.scope.entitlementId : null;
     if (!entitlementId) throw new ApiError(400, "INVALID_INPUT", "scope.entitlementId is required for scope_type 'entitlement'");
@@ -245,6 +320,7 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
       due_date: input.dueDate ?? null,
       created_by: actorId,
       build_status: "building",
+      reviewer_kind: input.scopeType === "identity_access" ? (input.reviewerKind ?? "named") : "named",
     })
     .select()
     .single();
@@ -263,7 +339,7 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     objectType: "certification_campaign",
     objectId: campaign.id,
     outcome: "success",
-    metadata: { scopeType: input.scopeType, scope: input.scope ?? {} },
+    metadata: { scopeType: input.scopeType, scope: input.scope ?? {}, ...(input.scopeType === "identity_access" ? { reviewerKind: input.reviewerKind ?? "named" } : {}) },
   });
 
   return campaign;
