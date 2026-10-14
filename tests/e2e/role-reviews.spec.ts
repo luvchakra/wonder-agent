@@ -155,4 +155,53 @@ test.describe.serial("reviews of WonderID role assignments", () => {
     expect((await decide(two.request, other.id, "approve")).status()).toBe(404);
     await two.close();
   });
+
+  test("part 2: an exception keeps a direct role until a date; defer moves the due date; escalate goes to whoever launched the campaign", async ({ request, browser }) => {
+    test.setTimeout(120_000);
+    // The previous test removed both; give them back.
+    expect((await request.post(`/api/v1/users/${requesterId}/roles`, { data: { role: privRole } })).status()).toBe(200);
+    expect((await request.post(`/api/v1/groups/${groupId}/members`, { data: { userId: requesterId } })).status()).toBeLessThan(300);
+    const campaignId = await launch(request, `E2E RR part2 ${stamp}`, {});
+    const items = await itemsOf(campaignId);
+    const priv = items.find((i) => i.snapshot.role.name === privRole)!;
+    const std = items.find((i) => i.snapshot.role.name === stdRole)!;
+    const adminId = await userId(TEST_USERS.adminOne.email);
+    const adminIdentity = (await db().from("identities").select("id").eq("tenant_id", tenantId).eq("user_id", adminId).eq("identity_type", "HUMAN").single()).data!.id as string;
+    const others = items.filter((i) => i.identity_id === adminIdentity);
+    expect(others.length).toBeGreaterThan(0);
+
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    const decideUntil = (id: string, decision: string, days: number) =>
+      iam.request.post(`/api/v1/compliance/items/${id}/decisions`, { data: { decision, justification: "COMPLIANCE-P0-10 part 2", until: new Date(Date.now() + days * 86_400_000).toISOString() } });
+
+    // Exception: at most 90 days; a direct role then ends on that date.
+    expect((await decideUntil(priv.id, "exception", 120)).status()).toBe(400);
+    const kept = await decideUntil(priv.id, "exception", 30);
+    expect(kept.status(), await kept.text()).toBe(200);
+    expect((await kept.json()).data.until).toBeTruthy();
+    const { data: role } = await db().from("user_roles").select("expires_at").eq("tenant_id", tenantId).eq("user_id", requesterId).eq("role_id", await roleId(privRole)).single();
+    expect(Math.abs(new Date(role!.expires_at as string).getTime() - (Date.now() + 30 * 86_400_000))).toBeLessThan(120_000);
+    // A role that comes from a group cannot end for one person.
+    const group = await decideUntil(std.id, "exception", 30);
+    expect(group.status()).toBe(409);
+    expect((await group.json()).error.code).toBe("GROUP_ROLE");
+
+    // Defer: still open, due later.
+    const deferred = await decideUntil(std.id, "defer", 7);
+    expect(deferred.status(), await deferred.text()).toBe(200);
+    const { data: stdRow } = await db().from("certification_items").select("status, due_date").eq("id", std.id).single();
+    expect(stdRow!.status).toBe("pending");
+    expect(Math.abs(new Date(stdRow!.due_date as string).getTime() - (Date.now() + 7 * 86_400_000))).toBeLessThan(120_000);
+    expect((await decideUntil(std.id, "defer", 45)).status()).toBe(400);
+
+    // Escalate: to whoever launched the campaign (adminOne), who cannot escalate it further.
+    const escalated = await iam.request.post(`/api/v1/compliance/items/${others[0].id}/decisions`, { data: { decision: "escalate", justification: "Needs the campaign owner" } });
+    expect(escalated.status(), await escalated.text()).toBe(200);
+    const { data: escRow } = await db().from("certification_items").select("status, reviewer_id, escalated_to").eq("id", others[0].id).single();
+    expect(escRow).toMatchObject({ status: "pending", reviewer_id: adminId, escalated_to: adminId });
+    await iam.close();
+    const again = await request.post(`/api/v1/compliance/items/${others[0].id}/decisions`, { data: { decision: "escalate", justification: "again" } });
+    expect(again.status()).toBe(409);
+    expect((await again.json()).error.code).toBe("NO_ESCALATION_TARGET");
+  });
 });

@@ -3428,3 +3428,13 @@ with whether the role is privileged (any permission with sensitivity
 `privileged`). Service role, every query filtered by `tenant_id`. Revokes
 go through the existing `removeRole` and `removeGroupMember`; no change to
 either. No schema change in this module.
+
+## 2026-10-14 — Role assignment end date for review exceptions (COMPLIANCE-P0-10 part 2)
+
+Published `setRoleAssignmentEnd(tenantId, actorId, targetUserId, roleId,
+expiresAt)` (`lib/rbac/roles.ts`): sets only `expires_at` on a member's
+direct assignment (never a delegation's copy), keeping its scope and other
+terms; refuses the actor's own role (`SELF_ESCALATION`) and automation
+members (`assertTenantMember`); 409 `NO_ASSIGNMENT` when the role is no
+longer held directly. Service role, filtered by tenant; audited
+`role.assignment_changed`. Used by Compliance's review exceptions.

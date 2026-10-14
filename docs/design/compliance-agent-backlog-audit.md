@@ -1313,3 +1313,54 @@ Left out: a delegation's time-bound role copies are not reviewed (they end
 with the delegation); automation credentials are reviewed on their own
 page. A group revoke removes the person from the whole group, which can
 take away more than the one role; the evidence drawer says which group.
+
+### 2026-10-14 — COMPLIANCE-P0-10 part 2: defer, escalate and exception
+
+Three more decisions on reviews of people's access and WonderID roles
+(agent items keep their five decisions).
+
+Built:
+- **Migration `0184_compliance_defer_escalate_exception.sql`** (applied to
+  dev): the decision list gains `defer`, `escalate` and `exception`;
+  `certification_decisions.until` is set exactly for defer and exception
+  (check constraint).
+- **Rules** (`identityReviewRules.ts`, pure): `validateUntil` (future;
+  defer at most 30 days, exception at most 90), `escalationTarget` (the
+  campaign's launcher, never the person escalating); nobody makes an
+  exception for their own access (`selfCertificationRefused`).
+- **Defer:** the item stays pending with the new due date (escalation
+  cleared, so it can escalate again once that passes).
+- **Escalate:** the item goes to whoever launched the campaign
+  (`reviewer_id`, `escalated_at`, `escalated_to`); 409
+  `NO_ESCALATION_TARGET` when that is the person escalating.
+- **Exception:** the access is kept until the date, then removed:
+  - application access: Access's `recordApprovedAfterwards` with the end
+    date, so the daily expiry sweep (ACCESS-P0-32) turns it into removal
+    work; the decision's `remediationId` is that request;
+  - a direct WonderID role: Foundation's new `setRoleAssignmentEnd` sets
+    only the assignment's end date (the authorization engine honours it);
+  - a group's role: refused (409 `GROUP_ROLE`), it cannot end for one
+    person.
+  Audited as `compliance.access_exception` (roles) or
+  `access.request_approved_afterwards` (application access), plus the
+  decision event.
+- **UI:** the decision form lists the person decisions (certify, revoke,
+  exception, defer, escalate, delegate, request information) with a date
+  field for defer and exception; the revoke confirmation now says what
+  actually happens for a person or a role (it described an agent before;
+  §19.3).
+
+Verified:
+- `npm run typecheck`; eslint on the changed files; `next build`.
+- Vitest compliance, operations, rbac and architecture: 206/206, including
+  `identityReviewRules.test.ts` 6/6 (3 new).
+- Local E2E `role-reviews.spec.ts` (new part 2 test: exception on a direct
+  role sets its end date, over 90 days 400, group role 409, defer keeps it
+  pending with the new due date, escalate goes to the launcher who cannot
+  escalate again), `brownfield.spec.ts` (exception on the service
+  account's access: a fulfilled, time-bound request) and
+  `compliance.spec.ts`: 29/29.
+
+Left for later: owner reviews of applications, roles and packages;
+templates, calendar and analytics (COMPLIANCE-P0-14); a reviewer inbox
+across campaigns.

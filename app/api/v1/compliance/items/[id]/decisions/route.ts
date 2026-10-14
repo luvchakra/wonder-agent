@@ -19,6 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       justification: String(body.justification ?? ""),
       delegateToUserId: body.delegateToUserId,
       overrideSoD: body.overrideSoD === true,
+      until: typeof body.until === "string" ? body.until : undefined,
       canManageCompliance: ctx.permissions.includes("compliance.manage"),
     });
     return NextResponse.json({ ok: true, data: decision });

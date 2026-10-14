@@ -351,6 +351,18 @@ test.describe.serial("brownfield: HR to verified access", () => {
     const removal = await requestView(request, removalId);
     expect(removal.request.status).toBe("approved");
     expect(removal.tasks.map((t) => t.kind)).toEqual(["remove"]);
+
+    // COMPLIANCE-P0-10 part 2: an exception keeps the service account's access until a date, then the expiry sweep removes it.
+    const svc = items.find((i) => i.accountId === accounts["svc-batch"].id)!;
+    const iam2 = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    const until = new Date(Date.now() + 30 * 86_400_000).toISOString();
+    const kept = await iam2.request.post(`/api/v1/compliance/items/${svc.id}/decisions`, { data: { decision: "exception", justification: "Batch job until migration", until } });
+    expect(kept.status(), await kept.text()).toBe(200);
+    const keptId = (await kept.json()).data.remediationId as string;
+    await iam2.close();
+    const { data: keptRequest } = await db().from("access_requests").select("status, requested_expiry, subject_identity_id").eq("id", keptId).single();
+    expect(keptRequest).toMatchObject({ status: "fulfilled", subject_identity_id: svc.identityId });
+    expect(new Date(keptRequest!.requested_expiry as string).toISOString()).toBe(until);
   });
 
   test("another organization sees none of it", async ({ browser }) => {

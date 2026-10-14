@@ -4065,3 +4065,10 @@ Verified:
   `automation-credentials` + `approval-delegation` + `platform-admin`: 32/32.
 
 Tracker: `docs/WonderID/FINDINGS-REMEDIATION.md`, WID-H06.
+
+## 2026-10-14 — Review exceptions reuse "approved afterwards" (COMPLIANCE-P0-10 part 2)
+
+Compliance's review exception on a person's application access calls the
+published `recordApprovedAfterwards` with the exception's end date, so the
+access is kept as a fulfilled, time-bound request and the daily expiry
+sweep turns it into removal work at the end. No change in this module.

@@ -71,7 +71,7 @@ export function CampaignItemsTable({ items, totalCount, currentUserId }: { items
       render: (i) => {
         if (i.status !== "pending") return null;
         if (i.reviewerId !== currentUserId) return <span className="text-xs text-muted-foreground">Assigned reviewer only</span>;
-        return <DecisionForm itemId={i.id} />;
+        return <DecisionForm itemId={i.id} subject={i.agentId ? "agent" : i.snapshot?.role ? "role" : "person"} />;
       },
     },
   ];

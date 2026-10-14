@@ -12,7 +12,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 
 ## Completed recently
 
-- ✅ **COMPLIANCE-P0-11** Access certification of WonderID users' role assignments
+- ✅ **COMPLIANCE-P0-11** Access certification of WonderID users' role assignments · [#195](https://github.com/luvchakra/wonder-agent/pull/195)
 - ✅ **QA-P0-22** Brownfield migration fixture · [#193](https://github.com/luvchakra/wonder-agent/pull/193)
 - ✅ **EXPERIENCE-P0-30** Guided connector definition editor (F7, #75) · [#186](https://github.com/luvchakra/wonder-agent/pull/186)
 - ✅ **QA-P0-07** Connector contract tests · [#185](https://github.com/luvchakra/wonder-agent/pull/185)

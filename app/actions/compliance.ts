@@ -36,6 +36,7 @@ export async function recordDecisionAction(campaignId: string, itemId: string, f
     justification: String(formData.get("justification") ?? ""),
     delegateToUserId: String(formData.get("delegateToUserId") ?? "") || undefined,
     overrideSoD: formData.get("overrideSoD") === "on",
+    until: String(formData.get("until") ?? "") || undefined,
     canManageCompliance: ctx.permissions.includes("compliance.manage"),
   });
   redirect(`/compliance/campaigns/${campaignId}`);
