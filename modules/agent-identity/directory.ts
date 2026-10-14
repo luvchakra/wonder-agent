@@ -370,19 +370,29 @@ export async function listOwnedIdentities(tenantId: string, userId: string, iden
 }
 
 /** EXPERIENCE-P0-29: the active people a person manages, for requesting on their behalf. Read as the user (RLS), filtered by tenant. */
-export async function listDirectReports(tenantId: string, identityId: string | null): Promise<{ id: string; displayName: string; email: string | null }[]> {
+export async function listDirectReports(
+  tenantId: string,
+  identityId: string | null,
+): Promise<{ id: string; displayName: string; email: string | null; title: string | null; lifecycleState: Identity["lifecycleState"]; endDate: string | null }[]> {
   if (!identityId || !UUID_RE.test(identityId)) return [];
   const supabase = await supabaseServer();
   const { data, error } = await supabase
     .from("identities")
-    .select("id, display_name, email")
+    .select("id, display_name, email, title, lifecycle_state, end_date")
     .eq("tenant_id", tenantId)
     .eq("manager_identity_id", identityId)
     .eq("status", "active")
     .order("display_name")
     .limit(100);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  return (data ?? []).map((r) => ({ id: r.id as string, displayName: r.display_name as string, email: (r.email as string | null) ?? null }));
+  return (data ?? []).map((r) => ({
+    id: r.id as string,
+    displayName: r.display_name as string,
+    email: (r.email as string | null) ?? null,
+    title: (r.title as string | null) ?? null,
+    lifecycleState: (r.lifecycle_state as Identity["lifecycleState"]) ?? null,
+    endDate: (r.end_date as string | null) ?? null,
+  }));
 }
 
 /** People who can be named owner, sponsor or manager: the tenant's active humans. */

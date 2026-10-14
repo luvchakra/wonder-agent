@@ -129,3 +129,30 @@ export function tasksForEvent(eventType: LifecycleEventType, ctx: { hasSignIn: b
 export function opensBirthright(d: Pick<DetectedEvent, "eventType" | "toState">): boolean {
   return (d.eventType === "joiner" || d.eventType === "rehire" || d.eventType === "mover") && d.toState === "ACTIVE";
 }
+
+/**
+ * IDENTITY-P0-18 (finish), expiry: a person's end date is their last day, so
+ * it has passed once today is later. Only working people are swept; anyone
+ * already leaving or gone is left alone.
+ */
+export function endDatePassed(p: { lifecycleState: HumanLifecycleState | null; endDate: string | null }, today: string): boolean {
+  return p.lifecycleState === "ACTIVE" && !!p.endDate && p.endDate.slice(0, 10) < today;
+}
+
+/**
+ * IDENTITY-P0-18 (finish), the manager's "disable all access": who may stop a
+ * person's access at once. An identity administrator, or the person's own
+ * current manager; never on themselves. Returns why not, or null.
+ */
+export function whyCannotDisableAll(input: {
+  actorIdentityId: string | null;
+  canManageIdentities: boolean;
+  subject: { id: string; identityType: string; lifecycleState: HumanLifecycleState | null; managerIdentityId: string | null };
+}): { status: 403 | 409 | 400; message: string } | null {
+  const { actorIdentityId, canManageIdentities, subject } = input;
+  if (subject.identityType !== "HUMAN" && subject.identityType !== "EXTERNAL") return { status: 400, message: "Only people have access to disable this way" };
+  if (actorIdentityId && actorIdentityId === subject.id) return { status: 403, message: "You cannot disable your own access" };
+  if (!canManageIdentities && (!actorIdentityId || subject.managerIdentityId !== actorIdentityId)) return { status: 403, message: "Only their manager or an identity administrator can do this" };
+  if (subject.lifecycleState !== "ACTIVE" && subject.lifecycleState !== "LEAVE_PENDING") return { status: 409, message: "This person is not working; there is no access to stop" };
+  return null;
+}

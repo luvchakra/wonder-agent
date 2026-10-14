@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedTransitions, detectLifecycleEvents, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent } from "./humanLifecycle";
+import { allowedTransitions, detectLifecycleEvents, endDatePassed, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, whyCannotDisableAll } from "./humanLifecycle";
 
 describe("human lifecycle transitions", () => {
   it("allows the governed path and rehire, never skipping to terminated from active", () => {
@@ -89,5 +89,27 @@ describe("opensBirthright (owner decision, 13 October 2026)", () => {
     expect(opensBirthright({ eventType: "joiner", toState: "PRE_JOIN" })).toBe(false);
     expect(opensBirthright({ eventType: "mover", toState: "LEAVE_PENDING" })).toBe(false);
     expect(opensBirthright({ eventType: "leaver", toState: "LEAVE_PENDING" })).toBe(false);
+  });
+});
+
+describe("IDENTITY-P0-18 (finish): expiry and the manager's disable", () => {
+  it("an end date has passed only after the day itself, and only for working people", () => {
+    expect(endDatePassed({ lifecycleState: "ACTIVE", endDate: "2026-10-13" }, "2026-10-14")).toBe(true);
+    expect(endDatePassed({ lifecycleState: "ACTIVE", endDate: "2026-10-14" }, "2026-10-14")).toBe(false);
+    expect(endDatePassed({ lifecycleState: "ACTIVE", endDate: null }, "2026-10-14")).toBe(false);
+    expect(endDatePassed({ lifecycleState: "LEAVE_PENDING", endDate: "2026-01-01" }, "2026-10-14")).toBe(false);
+    expect(endDatePassed({ lifecycleState: "PRE_JOIN", endDate: "2026-01-01" }, "2026-10-14")).toBe(false);
+  });
+
+  it("their manager or an identity administrator may disable all access; nobody may disable their own", () => {
+    const subject = { id: "p1", identityType: "HUMAN", lifecycleState: "ACTIVE" as const, managerIdentityId: "m1" };
+    expect(whyCannotDisableAll({ actorIdentityId: "m1", canManageIdentities: false, subject })).toBeNull();
+    expect(whyCannotDisableAll({ actorIdentityId: "a1", canManageIdentities: true, subject })).toBeNull();
+    expect(whyCannotDisableAll({ actorIdentityId: "x9", canManageIdentities: false, subject })?.status).toBe(403);
+    expect(whyCannotDisableAll({ actorIdentityId: null, canManageIdentities: false, subject })?.status).toBe(403);
+    expect(whyCannotDisableAll({ actorIdentityId: "p1", canManageIdentities: true, subject })?.status).toBe(403);
+    expect(whyCannotDisableAll({ actorIdentityId: "m1", canManageIdentities: false, subject: { ...subject, lifecycleState: "DISABLED" } })?.status).toBe(409);
+    expect(whyCannotDisableAll({ actorIdentityId: "m1", canManageIdentities: false, subject: { ...subject, lifecycleState: "LEAVE_PENDING" } })).toBeNull();
+    expect(whyCannotDisableAll({ actorIdentityId: "a1", canManageIdentities: true, subject: { ...subject, identityType: "SERVICE_ACCOUNT" } })?.status).toBe(400);
   });
 });

@@ -1889,3 +1889,73 @@ setting attributes (packages, groups, tasks, lifecycle transitions).
   keys reordered, so every published rule showed unpublished changes and
   "already published" could never be detected. They are now compared
   regardless of key order.
+
+## 2026-10-14 — IDENTITY-P0-18 (finish): expiry and the manager's "disable all access"
+
+The finish row lists birthright, mover, leaver, expiry, four-eyes publish and
+the manager's "disable all access". Birthright on join, rehire and move (0151,
+four-eyes), the mover review (WID-H09, 0153) and leaver removal (WID-C02) were
+already built. Four-eyes publishing of configurable rules came with
+IDENTITY-P0-21. This entry adds the two pieces that were missing.
+
+- **Expiry.**
+  - **The sweep:** `sweepEndDates` moves every working person (HUMAN or
+    EXTERNAL, ACTIVE) whose end date has passed to LEAVE_PENDING. An end date
+    is the last day, so it has passed only once today is later.
+  - **What it opens:** a leaver event with origin `schedule` and the note
+    "End date YYYY-MM-DD reached", which opens the usual leaver tasks
+    (ownership transfer, access removal, and sign-in when the person has
+    one), and their manager is told.
+  - **What it doesn't do:** revoke anything itself. Removal opens when a
+    person disables them (WID-C02).
+  - **When it runs:** daily via `/api/cron/identity-lifecycle` at 04:45 UTC,
+    before access governance's 05:00 sweep, and on viewing Joiner-Mover-Leaver
+    for that organization (the existing "views sweep their own tenant"
+    pattern).
+  - **Safety:** every write is filtered by the row's tenant and only while
+    the person is still ACTIVE, so it runs once.
+  - **Migration 0168:**
+    - widens `identity_lifecycle_events.origin` with `schedule`, which is
+      additive;
+    - indexes active people's end dates.
+  - **Before deploying:** nobody in any organization had a passed end date,
+    so the first run moves no one in bulk.
+- **The manager's "disable all access".**
+  - **Who:** `disableAllAccess` lets a person's own current manager, or an
+    identity administrator, disable a working or leaving person with a reason.
+    Never themselves, and only people.
+  - **What it does:** DISABLED opens the leaver removal work: every grant
+    becomes a governed removal, and accounts are disabled through their
+    connectors.
+  - **How authority is checked:** the manager link is read from the database,
+    never from the request. A manager need not hold `identity.manage`, so the
+    write uses the service role, filtered on tenant and on the state that was
+    read.
+  - **Audit:** `identity.access_disabled`, saying whether the actor acted as
+    manager or administrator, with the reason as typed text.
+  - **Route:** `POST /api/v1/identities/:id/disable-access`, gated by
+    `requireAnyPermission(["identity.manage", "access.request"])`.
+  - **UI:** a new **My Team** page (My Access › My Team, `access.read`) lists
+    the viewer's direct reports, with "Disable all access" folded on each
+    working or leaving one.
+  - **Small changes elsewhere:** `listDirectReports` returns title, lifecycle
+    state and end date too, which is additive. The identity page labels
+    scheduled events "on schedule".
+
+**Left out:** configurable lifecycle-rule effects (packages, groups, tasks,
+transitions on lifecycle triggers) stay under IDENTITY-P0-21. The built-in
+policies above cover the finish row.
+
+**Verified.**
+- Unit tests: `humanLifecycle.test.ts`, 13 passed, including the end-date
+  rule and who may disable.
+- Local E2E: `lifecycle-expiry-disable.spec.ts` with `human-lifecycle.spec.ts`,
+  18/18 including setup. The new spec covers:
+  - refused for someone who is not your report, yourself, a blank reason,
+    read-only (403) and another organization (404), with nothing changed;
+  - the requester (a manager) disables their report from My Team; the event
+    records "disabled" with the reason, the audit records "as manager", and
+    a second attempt gets 409;
+  - an external whose end date passed yesterday becomes LEAVE_PENDING with a
+    `schedule` leaver event and its tasks, and viewing again adds nothing.
+- Typecheck, eslint and `next build` are clean.

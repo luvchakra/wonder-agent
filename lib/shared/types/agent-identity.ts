@@ -463,7 +463,7 @@ export type IdentityLifecycleEvent = {
   fromState: HumanLifecycleState | null;
   toState: HumanLifecycleState | null;
   changedFields: string[];
-  origin: "manual" | "source";
+  origin: "manual" | "source" | "schedule";
   sourceId: string | null;
   runId: string | null;
   actorId: string | null;

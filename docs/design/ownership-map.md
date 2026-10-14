@@ -307,7 +307,7 @@ consume and persist into their own tables.
 |---|---|
 | `/api/v1/auth`, `/api/v1/users` (incl. `/api/v1/users/invitations`, FOUNDATION-P0-32), `/api/v1/roles`, `/api/v1/tenant`, `/api/v1/sso` | FA |
 | `/api/v1/agents`, `/api/v1/agents/:id` | IA |
-| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `:id/lifecycle`, `relationships/:id`, `attributes`, `lifecycle-tasks`, `rules`, `rules/:id`, `rules/:id/simulate`, `rules/:id/publish`, `rules/:id/retire`, `rules/:id/runs`) | IA |
+| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `:id/lifecycle`, `relationships/:id`, `attributes`, `lifecycle-tasks`, `rules`, `rules/:id`, `rules/:id/simulate`, `rules/:id/publish`, `rules/:id/retire`, `rules/:id/runs`, `:id/disable-access`) and `/api/cron/identity-lifecycle` (daily end-date sweep, 2026-10-14) | IA |
 | `/api/v1/integrations` (incl. `identity-sources`, `correlations`, `connectors`, `:id/connector-credentials`) | INT |
 | `/api/v1/access`, `/api/v1/policies` | AA |
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |

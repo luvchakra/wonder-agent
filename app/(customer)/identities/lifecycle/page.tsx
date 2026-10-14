@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listLifecycleTasks } from "@/modules/agent-identity/service";
+import { listLifecycleTasks, sweepEndDates } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
@@ -25,6 +25,8 @@ export default async function LifecycleWorkPage({ searchParams }: { searchParams
   }
   const { status } = await searchParams;
   const view = status === "all" ? "all" : "open";
+  // IDENTITY-P0-18 (finish): this organization's passed end dates are swept on view too, so the work shows today, not at the next daily run.
+  await sweepEndDates(ctx.tenantId!);
   const tasks = await listLifecycleTasks(ctx.tenantId!, view === "open" ? { status: "open" } : {}, 200);
 
   return (

@@ -78,6 +78,8 @@ export {
   getOwnershipFootprint,
   completeLifecycleTask,
   transferOwnership,
+  disableAllAccess,
+  sweepEndDates,
   type LifecycleTaskView,
 } from "./humanLifecycleService";
 export { allowedTransitions, HUMAN_TRANSITIONS } from "./humanLifecycle";

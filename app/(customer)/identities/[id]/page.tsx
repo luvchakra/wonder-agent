@@ -317,7 +317,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
                           <span className="text-xs text-muted-foreground">({e.changedFields.filter((f) => f !== "lifecycleState").join(", ")})</span>
                         ) : null}
                         <span className="text-xs text-muted-foreground">
-                          · {e.origin === "source" ? "from an identity source" : "by a person"} ·{" "}
+                          · {e.origin === "source" ? "from an identity source" : e.origin === "schedule" ? "on schedule" : "by a person"} ·{" "}
                           {new Date(e.createdAt).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
                         </span>
                         {e.note ? <span className="w-full text-xs text-foreground">“{e.note}”</span> : null}

@@ -159,6 +159,7 @@ export const SHELL_NAV: ShellNavItem[] = [
       link("My Requests", "/access/requests?view=mine", "ClipboardList", "access.read"),
       link("Approvals", "/access/requests?view=waiting", "ClipboardCheck", "access.read"),
       link("My Tasks", "/access/fulfilment", "Clock", "access.read"),
+      link("My Team", "/my-team", "Users", "access.read"),
       link("My Privacy", "/my-privacy", "Fingerprint"),
       link("Sign-in Security", "/settings/security", "KeyRound"),
     ],
