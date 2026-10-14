@@ -52,6 +52,7 @@ for every row is in `docs/design/experience-agent-backlog-audit.md`.
 | EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
 | EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Done — 2026-10-11: built across INTEGRATION-P0-18/19 and ACCESS-P0-27/25 pages; this story adds what each run marked missing, the last access reconciliation and last seen at source per access row |
 | EXPERIENCE-P0-29 | Request tracking per line; one inbox for approvals and tasks; subject picker (F2, #55) | Done — 2026-10-11: each line's real state; tasks in "Waiting for you"; For lists people you manage and what you own |
+| EXPERIENCE-P0-30 | Guided connector definition editor (F7, #75) | Done — 2026-10-14: a Form tab beside the JSON on Write a connection type (basics, settings, authentication, one resource at a time); both edit one text, so validation and publishing are identical; field paths are picked from a "Try it" sample |
 | EXPERIENCE-P0-32 | Language picker in the header (owner request 2026-10-13) | Not started |
 
 ---

@@ -3,13 +3,19 @@
 import { useActionState, useMemo, useState } from "react";
 import { previewDefinitionAction, publishDefinitionAction, type ConnectorFormState, type PreviewState } from "@/app/actions/connectors";
 import { validateDefinition } from "@/modules/integrations/framework/validate";
-import { RESOURCE_KINDS } from "@/modules/integrations/framework/types";
-import { PendingSubmitButton, SelectField, TextareaField } from "@/modules/ui";
+import { RESOURCE_KINDS, type ConnectorDefinition, type ResourceKind } from "@/modules/integrations/framework/types";
+import { PendingSubmitButton, SelectField, TabPanel, Tabs, TextareaField } from "@/modules/ui";
+import { samplePaths } from "@/modules/ui/connectorEditor";
+import { GuidedForm } from "./GuidedForm";
 
 const IDLE: ConnectorFormState = { status: "idle" };
 const PREVIEW_IDLE: PreviewState = { status: "idle" };
 
-/** Checks a definition as it is typed (the same rules the server applies), tries it, and publishes it. */
+/**
+ * Checks a definition as it is typed (the same rules the server applies),
+ * tries it, and publishes it. EXPERIENCE-P0-30: the form and the JSON edit
+ * the same text, so what is published is the same either way.
+ */
 export function AuthorForm({ initial }: { initial: string }) {
   const [text, setText] = useState(initial);
   const [published, publish] = useActionState(publishDefinitionAction, IDLE);
@@ -22,32 +28,49 @@ export function AuthorForm({ initial }: { initial: string }) {
     }
   }, [text]);
   const kinds = check.definition ? RESOURCE_KINDS.filter((k) => check.definition!.resources[k]) : [];
+  // The form needs the JSON to parse; it may still have issues to fix.
+  const parsed = useMemo(() => {
+    try {
+      const v = JSON.parse(text);
+      return v && typeof v === "object" && v.resources && typeof v.resources === "object" && v.auth && Array.isArray(v.settings) ? (v as ConnectorDefinition) : null;
+    } catch {
+      return null;
+    }
+  }, [text]);
+  const [chosenKind, setKind] = useState<ResourceKind | null>(null);
+  const formKinds = parsed ? RESOURCE_KINDS.filter((k) => parsed.resources[k]) : [];
+  const kind = chosenKind && formKinds.includes(chosenKind) ? chosenKind : (formKinds[0] ?? null);
+  const samples = preview.status === "done" && preview.result.samples.length ? samplePaths(preview.result.samples[0]) : [];
 
   return (
     <div className="space-y-4">
+      <Tabs ariaLabel="Edit as" tabs={[{ value: "form", label: "Form" }, { value: "json", label: "JSON" }]}>
+        <TabPanel value="form" className="pt-4">
+          {parsed ? (
+            <GuidedForm def={parsed} onChange={(next) => setText(JSON.stringify(next, null, 2))} kind={kind} onKind={setKind} samples={samples} />
+          ) : (
+            <p className="text-sm text-muted-foreground">Fix the JSON to use the form.</p>
+          )}
+        </TabPanel>
+        <TabPanel value="json" className="space-y-3 pt-4">
+          <label className="block text-sm text-muted-foreground">
+            {/* INTEGRATION-P0-21: a definition exported elsewhere opens here, to check and publish as usual. */}
+            Open a definition file{" "}
+            <input
+              type="file"
+              accept="application/json,.json"
+              className="mt-1 block text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1 file:text-sm file:text-secondary-foreground"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (file && file.size <= 512_000) setText(await file.text());
+              }}
+            />
+          </label>
+          <TextareaField label="Definition (JSON)" name="definition-json" rows={22} spellCheck={false} className="font-mono text-xs" value={text} onChange={(e) => setText(e.target.value)} />
+        </TabPanel>
+      </Tabs>
       <form action={publish} className="space-y-3">
-        <label className="block text-sm text-muted-foreground">
-          {/* INTEGRATION-P0-21: a definition exported elsewhere opens here, to check and publish as usual. */}
-          Open a definition file{" "}
-          <input
-            type="file"
-            accept="application/json,.json"
-            className="mt-1 block text-sm text-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-secondary file:px-3 file:py-1 file:text-sm file:text-secondary-foreground"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (file && file.size <= 512_000) setText(await file.text());
-            }}
-          />
-        </label>
-        <TextareaField
-          label="Definition (JSON)"
-          name="definition"
-          rows={22}
-          spellCheck={false}
-          className="font-mono text-xs"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-        />
+        <input type="hidden" name="definition" value={text} />
         {check.issues.length ? (
           <ul role="alert" className="list-disc space-y-0.5 pl-5 text-sm text-destructive">
             {check.issues.slice(0, 8).map((i, n) => (
@@ -84,7 +107,7 @@ export function AuthorForm({ initial }: { initial: string }) {
             className="font-mono text-xs"
             hint="Used for this one request and never stored"
           />
-          <SelectField label="Resource" name="resource" disabled={kinds.length === 0}>
+          <SelectField label="Resource" name="resource" disabled={kinds.length === 0} value={kind && kinds.includes(kind) ? kind : kinds[0]} onChange={(e) => setKind(e.target.value as ResourceKind)}>
             {kinds.map((k) => (
               <option key={k} value={k}>
                 {k}

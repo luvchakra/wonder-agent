@@ -14,7 +14,7 @@ Generated 2026-10-14 from 11 module backlogs.
 
 ## Overall
 
-**228 of 273 tracked stories complete — 84%**
+**229 of 274 tracked stories complete — 84%**
 
 ```
 █████████████████████████████████░░░░░░░  84%
@@ -22,11 +22,11 @@ Generated 2026-10-14 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 228 |
+| Done | 229 |
 | Partial | 25 |
 | Deferred | 1 |
 | Not Started | 19 |
-| **Total tracked** | **273** |
+| **Total tracked** | **274** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -45,7 +45,7 @@ and are deliberately excluded from the counts above.
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
-| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 27 | 3 | 0 | 6 | 36 | `██████████████░░░░` 75% |
+| 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 28 | 3 | 0 | 6 | 37 | `██████████████░░░░` 76% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
 | 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 19 | 10 | 0 | 2 | 31 | `███████████░░░░░░░` 61% |
@@ -295,7 +295,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Customer UI/UX & Product Experience  
 **Backlog status:** DORMANT — do not start until the user says "Run Experience Agent"  
-**Stories:** 27 done · 3 partial · 0 deferred · 6 not started (36 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 28 done · 3 partial · 0 deferred · 6 not started (37 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -334,6 +334,7 @@ and are deliberately excluded from the counts above.
 | EXPERIENCE-P0-27 | Sidebar areas, collapsible rail and the Control Center overview | Done — 2026-10-10 (owner decisions); see audit log |
 | EXPERIENCE-P0-28 | Reconciliation console (F1, #47) | Done — 2026-10-11: built across INTEGRATION-P0-18/19 and ACCESS-P0-27/25 pages; this story adds what each run marked missing, the last access reconciliation and last seen at source per access row |
 | EXPERIENCE-P0-29 | Request tracking per line; one inbox for approvals and tasks; subject picker (F2, #55) | Done — 2026-10-11: each line's real state; tasks in "Waiting for you"; For lists people you manage and what you own |
+| EXPERIENCE-P0-30 | Guided connector definition editor (F7, #75) | Done — 2026-10-14: a Form tab beside the JSON on Write a connection type (basics, settings, authentication, one resource at a time); both edit one text, so validation and publishing are identical; field paths are picked from a "Try it" sample |
 | EXPERIENCE-P0-32 | Language picker in the header (owner request 2026-10-13) | Not started |
 
 ### 09 — Platform Agent

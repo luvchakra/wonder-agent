@@ -4047,3 +4047,28 @@ the menu at 1280px.
 - **New story EXPERIENCE-P0-32** (Medium, owner request): a language picker in the header, beside notifications and help. Open question for the owner: which languages ship first.
 
 **Verified.** Typecheck and eslint clean. Local E2E: help, navigation-smoke and shell 84/84, plus first-organization and tenant-address in the 34/34 run recorded in the Platform audit log.
+
+## 2026-10-14 — EXPERIENCE-P0-30: guided connector definition editor
+
+**What was built.** Write a connection type (`/integrations/types/new`) now opens on a **Form** tab beside the **JSON** tab.
+- **One shared text.** Both tabs edit the same text, which is what the page validates (`validateDefinition`, on every change) and what Publish and Try it send. A definition built in the form therefore validates and publishes exactly like one pasted as JSON.
+- **What the form edits** (`GuidedForm.tsx`):
+  - basics: name, key, version, category and description;
+  - settings;
+  - authentication: none, bearer, basic, header, query and OAuth client credentials, each starting from a preset that references `{secret.<key>}`, plus the connection test path;
+  - one resource at a time: method, path, where the records are, pagination (none, page, offset, cursor, Link header, SCIM) and field paths.
+- **What stays in JSON.** Anything else is kept untouched and labelled "edit in JSON": other drivers, other auth types, templates, constants, path lists, transforms, writes and receiving. A kind with several requests is edited by its first request.
+- **Field picker.** Once Try it returns, each field input offers the first sample record's paths (`profile.email`, `groups[].name`) with an example value. The preview already shows the mapped records.
+- **Minimal UI (§19.5).**
+  - A resource shows its required fields and the ones already mapped; the rest sit behind "Map another field".
+  - Sections are collapsible.
+  - Publish stays the single primary action.
+- **Pure helpers.** `modules/ui/connectorEditor.ts`: presets, path reading and setting (transforms kept), first-request editing, and sample paths, bounded to 200.
+
+**Verified.**
+- `modules/ui/connectorEditor.test.ts` 5/5, including a check that every auth and pagination preset passes the server's validation.
+- `integrations.spec.ts` 15/15 against a local production build. It includes the new spec: form edits reach the JSON and back, and the form's definition publishes. The existing "checks a definition as it is typed" spec now opens the JSON tab first.
+- Screenshots at 1280 (light) and 390 (dark) show no horizontal overflow.
+- Typecheck, eslint and `next build` are clean.
+
+**Left.** The field picker is unit-tested, but not driven end to end against a live system: a preview needs a reachable API. The form does not edit writes or receiving channels; those stay in JSON.
