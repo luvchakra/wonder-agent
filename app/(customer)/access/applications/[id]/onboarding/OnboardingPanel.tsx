@@ -6,6 +6,7 @@ import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard } from "@/module
 import { cn } from "@/lib/utils";
 import type { CatalogRow } from "@/modules/access-governance/service";
 import { ONBOARDING_STAGE_LABEL } from "../../labels";
+import { TENANT_ADMIN_ROLE } from "@/lib/rbac/delegatedRoleRules";
 import { ConfigureOnboardingForm, DecisionForm, QuestionnaireForm, StartOnboardingForm, StepForm } from "./OnboardingForms";
 import { ProposalCard } from "./ProposalCard";
 import { ProposalRequestForm } from "./ProposalForms";
@@ -52,7 +53,7 @@ function Stepper({ o }: { o: ApplicationOnboarding }) {
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : null);
 
-export async function OnboardingPanel({ app, ctx }: { app: CatalogRow; ctx: { tenantId: string; userId: string; permissions: string[] } }) {
+export async function OnboardingPanel({ app, ctx }: { app: CatalogRow; ctx: { tenantId: string; userId: string; permissions: string[]; roles?: string[] } }) {
   const id = app.id;
   const tenantId = ctx.tenantId;
   const canManage = ctx.permissions.includes("access.manage");
@@ -278,7 +279,7 @@ export async function OnboardingPanel({ app, ctx }: { app: CatalogRow; ctx: { te
               <CardBody>
                 {o.status === "WAITING_FOR_APPROVAL" ? (
                   canManage ? (
-                    <DecisionForm applicationId={id} ownSubmission={o.submittedBy === ctx.userId} />
+                    <DecisionForm applicationId={id} ownSubmission={o.submittedBy === ctx.userId} canSelfApprove={(ctx.roles ?? []).includes(TENANT_ADMIN_ROLE)} />
                   ) : (
                     <p className="text-sm text-muted-foreground">Waiting for approval.</p>
                   )

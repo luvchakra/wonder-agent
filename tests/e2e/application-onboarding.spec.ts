@@ -107,10 +107,10 @@ test.describe.serial("application onboarding", () => {
     const after = await (await request.get(`/api/v1/access/applications/${appId}/entitlements`)).json();
     expect(after.data).toEqual(before.data);
     expect((await application(request, appId)).onboardingStatus).toBe("READY_FOR_APPROVAL");
-    // The submitter cannot approve their own submission.
+    // Owner decision 2026-10-14: an administrator (adminOne) may approve their own submission, but only saying why.
     const own = await step(request, appId, { action: "approve" });
-    expect(own.status).toBe(409);
-    expect(own.error?.message).toMatch(/other than the submitter/);
+    expect(own.status).toBe(400);
+    expect(own.error?.message).toMatch(/approve your own submission/);
     // A rejection needs a reason.
     expect((await step(request, appId, { action: "reject" })).status).toBe(400);
   });

@@ -1135,7 +1135,7 @@ What the full code review found before the work, and what now holds:
    that must remove audit rows goes through `purge_audit_logs()`. Changing this needs
    explicit user approval.
 2. **Segregation of duties is enforced in the database, not only the UI.** Keep the
-   existing four-eyes constraints, including approvals, onboarding, billing adjustments
+   existing four-eyes constraints, including approvals, onboarding (except that an administrator may approve their own onboarding submission, with a note, recorded as self-approved; owner decision 2026-10-14), billing adjustments
    and privacy erasure, whenever new consequential workflows are added.
 3. **Configuration and policy changes are versioned and audited** (SOX ITGC PC-01).
    Access reviews and certifications keep their evidence snapshots.

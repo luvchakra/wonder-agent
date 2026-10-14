@@ -248,19 +248,19 @@ export function StepForm({
 }
 
 /** Approve or reject what someone else submitted. */
-export function DecisionForm({ applicationId, ownSubmission }: { applicationId: string; ownSubmission: boolean }) {
+export function DecisionForm({ applicationId, ownSubmission, canSelfApprove = false }: { applicationId: string; ownSubmission: boolean; canSelfApprove?: boolean }) {
   const [state, action, pending] = useActionState(onboardingStepAction.bind(null, applicationId), IDLE);
   return (
     <form action={action} className="space-y-3">
-      <TextareaField label="Note" name="note" rows={2} maxLength={2000} hint="Required to reject" />
+      <TextareaField label="Note" name="note" rows={2} maxLength={2000} hint={ownSubmission && canSelfApprove ? "Required: you submitted this, so say why you approve it" : "Required to reject"} />
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" name="step" value="approve" disabled={pending || ownSubmission}>
+        <Button type="submit" name="step" value="approve" disabled={pending || (ownSubmission && !canSelfApprove)}>
           <Pending pending={pending} idle="Approve" busy="Recording…" />
         </Button>
         <Button type="submit" name="step" value="reject" variant="outline" disabled={pending}>
           Reject
         </Button>
-        {ownSubmission && state.status === "idle" ? (
+        {ownSubmission && !canSelfApprove && state.status === "idle" ? (
           <span className="text-xs text-muted-foreground">You submitted this; someone else must approve it.</span>
         ) : (
           <Result state={state} />

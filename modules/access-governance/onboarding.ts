@@ -427,19 +427,23 @@ export async function decideOnboarding(
   actorId: string,
   applicationId: string,
   decision: { approve: boolean; note?: unknown },
+  actorIsAdmin = false,
 ): Promise<ApplicationOnboarding> {
   const { o, row } = await requireOnboarding(tenantId, applicationId);
-  const reason = blockReason(decision.approve ? "approve" : "reject", stateOf(o, row), actorId);
+  const reason = blockReason(decision.approve ? "approve" : "reject", stateOf(o, row), actorId, { actorIsAdmin });
   if (reason) throw new ApiError(409, "INVALID_STAGE", reason);
   const note = typeof decision.note === "string" && decision.note.trim() ? decision.note.trim().slice(0, 2000) : null;
   if (!decision.approve && !note) throw new ApiError(400, "VALIDATION_FAILED", "note: say why it is rejected");
+  // Owner decision 2026-10-14: an administrator approving their own submission says why; it is marked and audited as such.
+  const selfApproved = decision.approve && o.submittedBy === actorId;
+  if (selfApproved && !note) throw new ApiError(400, "VALIDATION_FAILED", "note: say why you approve your own submission");
   const now = new Date().toISOString();
   const updated = await transition(
     tenantId,
     applicationId,
     { status: ["WAITING_FOR_APPROVAL"], configHash: o.configHash },
     decision.approve
-      ? { status: "APPROVED", approved_by: actorId, approved_at: now, approved_hash: o.configHash, approved_config: o.config, decision_note: note }
+      ? { status: "APPROVED", approved_by: actorId, approved_at: now, approved_hash: o.configHash, approved_config: o.config, decision_note: note, self_approved: selfApproved }
       : { status: "REJECTED", decision_note: note, submitted_by: null, submitted_at: null },
   );
   await syncCatalogStatus(tenantId, applicationId, decision.approve ? "APPROVED" : "REJECTED", Boolean(o.config.integrationId));
@@ -448,7 +452,7 @@ export async function decideOnboarding(
     actorId,
     applicationId,
     decision.approve ? "approved" : "rejected",
-    { configVersion: o.configVersion, configHash: o.configHash, templateId: o.templateId, answered: Object.keys(o.answers) },
+    { configVersion: o.configVersion, configHash: o.configHash, templateId: o.templateId, answered: Object.keys(o.answers), ...(selfApproved ? { selfApproved: true } : {}) },
     { note },
   );
   return updated;

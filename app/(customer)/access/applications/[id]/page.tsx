@@ -194,7 +194,7 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
         </TabPanel>
         <TabPanel value="onboarding" className="space-y-4 pt-4">
           <Suspense fallback={<p className="text-sm text-muted-foreground">Loading onboarding…</p>}>
-            <OnboardingPanel app={app} ctx={{ tenantId, userId: ctx.userId, permissions: ctx.permissions }} />
+            <OnboardingPanel app={app} ctx={{ tenantId, userId: ctx.userId, permissions: ctx.permissions, roles: ctx.roles }} />
           </Suspense>
           <Card>
             <CardHeader title="Fulfilment" description="Who carries out this application's access changes that are done by hand." />

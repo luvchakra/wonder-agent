@@ -3469,3 +3469,25 @@ For the one installed app (Experience audit log, same date): `/install`
 joins `PUBLIC_PATHS` in `proxy.ts` and `MAIN_ADDRESS_PATHS` in
 `lib/tenant/host.ts`. It shows only install guidance, reads no data. Local
 E2E `auth`, `org-address-required`, `tenant-address`: 42 passed, 1 skipped.
+
+### 2026-10-14 — Add user from an identity (owner test feedback 8, part 1)
+
+Owner feedback: a person added under Identities did not appear under
+Users, and there was no way to give them a sign-in from there. Identities
+are the people the organization governs; Users are the people who can sign
+in to WonderID. Now:
+- Add user has a "From an identity (optional)" picker of active person
+  identities with an e-mail and no membership (Identity's
+  `listPeopleWithoutAccess`, read under RLS, membership read by tenant);
+  choosing one fills name, e-mail, title and department. The invitation
+  itself is unchanged (`inviteUser`: no role escalation, audited).
+- A person's identity page has "Give WonderID access" (users.invite or
+  users.create), opening Add user with that person chosen.
+
+Next (part 2, owner decision in chat): a default role in the HR import
+(identity source) settings, and an "ID Role" (WonderID platform role)
+option on each person's page.
+
+Verified: typecheck; eslint; `next build`; local E2E `users` (new test:
+identity → Give WonderID access → form filled) with
+`application-onboarding`, 26/26.

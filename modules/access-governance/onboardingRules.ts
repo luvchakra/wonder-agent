@@ -275,7 +275,12 @@ export type OnboardingState = {
 const CLOSED = new Set<OnboardingStatus>(["PROMOTED", "ARCHIVED"]);
 
 /** Why an action is not allowed now, or null when it is. */
-export function blockReason(action: "configure" | "validate" | "simulate" | "approve" | "reject" | "promote", s: OnboardingState, actorId: string): string | null {
+export function blockReason(
+  action: "configure" | "validate" | "simulate" | "approve" | "reject" | "promote",
+  s: OnboardingState,
+  actorId: string,
+  opts: { actorIsAdmin?: boolean } = {},
+): string | null {
   if (CLOSED.has(s.status) && action !== "configure") return `Onboarding is ${s.status.toLowerCase()}`;
   switch (action) {
     case "configure":
@@ -289,7 +294,8 @@ export function blockReason(action: "configure" | "validate" | "simulate" | "app
     case "reject":
       if (s.status !== "WAITING_FOR_APPROVAL") return "Nothing is waiting for approval";
       if (s.simulatedHash !== s.configHash || s.validatedHash !== s.configHash) return "The configuration changed after it was submitted";
-      if (action === "approve" && s.submittedBy === actorId) return "Someone other than the submitter must approve";
+      // Owner decision 2026-10-14: an administrator may approve their own submission (with a note, audited).
+      if (action === "approve" && s.submittedBy === actorId && !opts.actorIsAdmin) return "Someone other than the submitter must approve";
       return null;
     case "promote":
       if (s.status !== "APPROVED") return "Only an approved configuration can be promoted";

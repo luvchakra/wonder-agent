@@ -133,6 +133,9 @@ describe("stages", () => {
     expect(blockReason("approve", base, "u2")).toBeNull();
     expect(blockReason("approve", { ...base, configHash: "changed" }, "u2")).toMatch(/changed/);
     expect(blockReason("reject", base, "u1")).toBeNull();
+    // Owner decision 2026-10-14: an administrator may approve their own submission.
+    expect(blockReason("approve", base, "u1", { actorIsAdmin: true })).toBeNull();
+    expect(blockReason("approve", { ...base, configHash: "changed" }, "u1", { actorIsAdmin: true })).toMatch(/changed/);
   });
 
   it("promotes exactly the approved version", () => {
