@@ -1,5 +1,6 @@
 import "server-only";
 
+import { accountDisplayName } from "./accountNameRules";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { getTenantConfig } from "@/lib/config/tenantConfig";
@@ -89,7 +90,7 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
     applicationId: r.application_id as string,
     applicationName: ((app?.display_name as string | null) ?? (app?.name as string | null)) ?? null,
     entitlementName: (((grant?.entitlements as Row | null)?.name as string | undefined) ?? null) as string | null,
-    accountName: ((account?.account_name as string | null) ?? (account?.external_account_ref as string | null)) ?? null,
+    accountName: accountDisplayName(account?.account_name as string | null, account?.external_account_ref as string | null),
     assigneeIdentityId: (r.assignee_identity_id as string | null) ?? null,
     assigneeName: (assignee?.display_name as string | null) ?? null,
     assigneeGroupId: (r.assignee_group_id as string | null) ?? null,

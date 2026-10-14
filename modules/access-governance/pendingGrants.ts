@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { chooseAccount, endedRemoval, placeholderRef, requestProgress, type FulfilmentState, type RemovalState } from "./pendingGrantRules";
 import { closeTasksForAccounts, closeTasksForGrants, completeTasksForRequest, openFulfilmentTask } from "./fulfilmentTasks";
 import { resumeConnectorGrants } from "./connectorFulfilment";
+import { accountNameCandidates, agentAccountName, formatAccountName, uniqueAccountName } from "./accountNameRules";
 
 /**
  * ACCESS-P0-28 — an approved request (or package assignment) becomes a
@@ -35,6 +36,40 @@ async function isPrivilegedEntitlement(tenantId: string, entitlementId: string):
   return data.privilege_level !== "standard";
 }
 
+/**
+ * The human-readable name for a subject's new account on the application:
+ * the live onboarding's account name format applied to the identity (an
+ * agent's is its name as a slug), made unique among the application's
+ * accounts with -2, -3. Null when nothing names the subject; the account is
+ * still created, and reads "to be created".
+ */
+async function placeholderName(tenantId: string, applicationId: string, subject: Subject): Promise<string | null> {
+  const admin = supabaseServiceRole();
+  let q = admin.from("identities").select("tenant_id, display_name, email, username").eq("tenant_id", tenantId);
+  q = subject.agentId ? q.eq("agent_id", subject.agentId) : q.eq("id", subject.identityId!);
+  const [{ data: identity }, { data: onboarding }] = await Promise.all([
+    q.limit(1).maybeSingle(),
+    admin.from("application_onboardings").select("tenant_id, promoted_config").eq("tenant_id", tenantId).eq("application_id", applicationId).maybeSingle(),
+  ]);
+  if (!identity || identity.tenant_id !== tenantId) return null;
+  const format = onboarding && onboarding.tenant_id === tenantId ? ((onboarding.promoted_config as { accountNameFormat?: string } | null)?.accountNameFormat ?? null) : null;
+  const base = subject.agentId
+    ? agentAccountName((identity.display_name as string | null) ?? null)
+    : formatAccountName(format, { displayName: (identity.display_name as string | null) ?? null, email: (identity.email as string | null) ?? null, username: (identity.username as string | null) ?? null });
+  if (!base) return null;
+  const candidates = accountNameCandidates(base);
+  const [byName, byRef] = await Promise.all([
+    admin.from("accounts").select("tenant_id, account_name").eq("tenant_id", tenantId).eq("application_id", applicationId).in("account_name", candidates),
+    admin.from("accounts").select("tenant_id, external_account_ref").eq("tenant_id", tenantId).eq("application_id", applicationId).in("external_account_ref", candidates),
+  ]);
+  if (byName.error || byRef.error) return null;
+  const taken = [
+    ...((byName.data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => r.account_name as string),
+    ...((byRef.data ?? []) as Row[]).filter((r) => r.tenant_id === tenantId).map((r) => r.external_account_ref as string),
+  ];
+  return uniqueAccountName(base, taken);
+}
+
 async function accountFor(tenantId: string, applicationId: string, subject: Subject, entitlementId: string | null = null): Promise<string | null> {
   const admin = supabaseServiceRole();
   let q = admin.from("accounts").select("id, tenant_id, status, account_type").eq("tenant_id", tenantId).eq("application_id", applicationId).neq("status", "disabled");
@@ -45,7 +80,10 @@ async function accountFor(tenantId: string, applicationId: string, subject: Subj
   const choice = chooseAccount(accounts, { privilegedEntitlement: accounts.length > 1 && entitlementId ? await isPrivilegedEntitlement(tenantId, entitlementId) : false });
   if (choice.kind === "ambiguous") return null;
   if (choice.kind === "existing") return choice.accountId;
+  // The reference stays internal and unique per subject (it is how a retry finds the row);
+  // the name is what people read, and what the account should be called on the system.
   const ref = placeholderRef(subject);
+  const accountName = await placeholderName(tenantId, applicationId, subject);
   const { data: created, error: createError } = await admin
     .from("accounts")
     .insert({
@@ -54,6 +92,7 @@ async function accountFor(tenantId: string, applicationId: string, subject: Subj
       identity_id: subject.identityId,
       agent_id: subject.agentId,
       external_account_ref: ref,
+      account_name: accountName,
       status: "pending",
       source: "request",
       correlation: "correlated",

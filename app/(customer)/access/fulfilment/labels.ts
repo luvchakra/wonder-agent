@@ -22,8 +22,8 @@ export function taskLabel(t: Pick<FulfilmentTask, "kind" | "entitlementName" | "
   return `${what} in ${t.applicationName ?? "an application"}`;
 }
 
-/** The task's account: a placeholder (ACCESS-P0-28) is an account not created yet, never its internal reference. */
+/** The task's account: a placeholder (ACCESS-P0-28) without a name is an account not created yet, never its internal reference. */
 export function accountLabel(name: string | null): string {
   if (!name) return "—";
-  return name.startsWith("pending:") ? "none yet" : name;
+  return name.startsWith("pending:") ? "to be created" : name;
 }

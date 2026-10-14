@@ -86,6 +86,7 @@ const CONFIG_FIELDS = [
   "entitlementSource",
   "requestPolicy",
   "certificationPolicy",
+  "accountNameFormat",
 ] as const;
 const CONFIG_FLAGS = ["createAccount", "updateAccount", "disableAccount", "deleteAccount", "grantAccess", "revokeAccess", "provenanceEnabled"] as const;
 

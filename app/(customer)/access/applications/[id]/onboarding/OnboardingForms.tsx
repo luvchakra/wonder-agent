@@ -121,6 +121,7 @@ export type OnboardingConfigView = {
   requestPolicy: keyof typeof REQUEST_POLICY_LABEL | null;
   certificationPolicy: keyof typeof CERTIFICATION_POLICY_LABEL | null;
   provenanceEnabled: boolean;
+  accountNameFormat?: string;
 };
 
 export function ConfigureOnboardingForm({
@@ -174,6 +175,14 @@ export function ConfigureOnboardingForm({
             ))}
           </SelectField>
         </div>
+        <TextField
+          label="Account name format"
+          name="accountNameFormat"
+          maxLength={100}
+          defaultValue={config.accountNameFormat ?? ""}
+          placeholder="{firstName:lower}.{lastName:lower}"
+          hint="Names new accounts: {firstName} {lastName} {email} {emailName} {username}; add :lower to lowercase. Empty: the username or email name"
+        />
         <SelectField label="Request policy" name="requestPolicy" defaultValue={config.requestPolicy ?? ""}>
           <option value="">Choose…</option>
           {Object.entries(REQUEST_POLICY_LABEL).map(([v, l]) => (

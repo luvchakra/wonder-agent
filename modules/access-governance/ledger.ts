@@ -1,5 +1,6 @@
 import "server-only";
 
+import { accountDisplayName } from "./accountNameRules";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RogueAccess } from "@/lib/shared/types/risk";
@@ -504,7 +505,7 @@ async function readLedgerEntries(tenantId: string, column: "identity_id" | "acco
       id: r.id as string,
       applicationId: r.application_id as string,
       applicationName: app?.name ?? null,
-      accountName: acc?.account_name ?? acc?.external_account_ref ?? null,
+      accountName: accountDisplayName(acc?.account_name, acc?.external_account_ref),
       entitlementId: (r.entitlement_id as string | null) ?? null,
       entitlementName: ent?.name ?? null,
       source: r.source as LedgerSource,
