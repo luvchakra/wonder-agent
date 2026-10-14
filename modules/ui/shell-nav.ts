@@ -302,17 +302,6 @@ export function searchNav(nav: ShellNavItem[], query: string, limit = 12): NavMa
 }
 
 /**
- * The four destinations the mobile tab bar exposes. "More" is not a route
- * — it opens the drawer, which carries the full list above.
- */
-export const MOBILE_TABS: ShellNavItem[] = [
-  { label: "Home", href: "/", icon: "Home" },
-  { label: "Agents", href: "/agents", icon: "Bot" },
-  { label: "Discover", href: "/agents/discovery", icon: "Radar", badge: "discovery", match: ["/agents/discovery", "/agents/duplicates"] },
-  { label: "Risk", href: "/risk", icon: "ShieldAlert", badge: "risk" },
-];
-
-/**
  * The sidebar's collapsed/expanded choice, remembered per viewer. Defined
  * here (a plain module) rather than in the client sidebar, because a
  * constant imported from a "use client" module into a Server Component

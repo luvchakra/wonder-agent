@@ -192,7 +192,7 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
                   return (
                     <Tr key={r.id}>
                       <Td>
-                        <Link href={`/access/requests/${r.id}`} className="font-medium text-foreground hover:underline">
+                        <Link href={`/access/requests/${r.ref ?? r.id}`} className="font-medium text-foreground hover:underline">
                           {r.packageName ?? r.applicationName ?? "Application"}
                         </Link>
                         <span className="block text-xs text-muted-foreground">

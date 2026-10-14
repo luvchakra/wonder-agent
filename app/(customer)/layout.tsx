@@ -183,7 +183,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
         </main>
       </div>
 
-      <MobileTabBar badges={badges} />
+      <MobileTabBar />
     </div>
   );
 }

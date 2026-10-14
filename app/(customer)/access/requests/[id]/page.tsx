@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
@@ -103,8 +104,9 @@ export default async function AccessRequestDetailPage({ params, searchParams }: 
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the request's number; an old UUID link is redirected.
+  const id = await pageRef(tenantId, "access_requests", (await params).id, (ref) => `/access/requests/${ref}`, await searchParams);
   const canApprove = ctx.permissions.includes("access.approve");
   await Promise.all([sweepApprovalTimeouts(tenantId), sweepAccessExpiry(tenantId)]);
   const [found, awaiting, provenance, grants, tasks, me] = await Promise.all([

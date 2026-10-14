@@ -4238,3 +4238,16 @@ Specs changed: `custom-roles`, `users`, `groups`, `authorization`,
 `shell`, `navigation-smoke`, `identities` (renamed text, plus the new ID
 roles test). Verified: local E2E 19/19 `identities`, 92/92 for the rest;
 typecheck, eslint, vitest 153/153, `next build`.
+
+### 2026-10-14 — Mobile bottom bar: only "More" (owner request)
+
+The owner crossed out the four shortcut tabs (Home, Agents, Discover,
+Risk) in a phone screenshot: "remove the crossed out part, keep the more
+button intact". `MobileTabBar` now holds only More, at the right, which
+opens the full navigation drawer as before; `MOBILE_TABS` is removed. The
+design-review E2E expects one target in the bar.
+
+Verified: typecheck; eslint; Vitest modules/ui + lib/refs 121/121; local
+E2E shell + design-review mobile/rail tests 13/13. Separately, a full
+design-review run showed `/agents` 8px too wide at 1280px with the E2E
+data (a page this change does not touch); left for its own fix.

@@ -3528,3 +3528,36 @@ person page, sees it, removes it; read-only sees no "Add ID role"), and
 
 Left out: nothing of this request. (The default ID role in the HR import
 settings, part 2's other half, shipped separately in #208.)
+
+### 2026-10-14 — FOUNDATION-P0-34 part 1: short number keys in URLs
+
+Owner: "all the keys displayed in url should be integers, not the really
+long alphanumeric strings; add this to claude.md" (CLAUDE.md §19.13).
+
+- Migration 0192 (the MCP apply was cancelled twice, so the owner ran the
+  file in the SQL editor): `ref bigint not null` on 22 object tables with
+  pages, numbered per organization oldest first (each table's own triggers
+  paused for the backfill, so no provenance changed), unique
+  `(tenant_id, ref)`, `assign_object_ref` (next number from
+  `object_ref_counters`, RLS read-own, trigger-only writes) and
+  `keep_object_ref` (a number never changes, 23514). Access requests: `ref`
+  is the number of their REQ number (0190's trigger sets both). Roles:
+  built-in roles 1–16, each organization's own roles continue after them
+  (`assign_role_ref`). Organizations: a global sequence (platform console).
+- `lib/refs/objectRef.ts`: `parseRefParam` (a positive whole number, or a
+  UUID from an old link), `resolveRef` (as the user, filtered by tenant,
+  RLS applies), `pageRef` (404, or redirect an old UUID link keeping the
+  query string), `platformTenantRef` (vendor console).
+- Access requests converted: the request page takes the number; the
+  requests list, the barcode after submitting and basket results link by
+  number; e-mailed approval links (UUID) redirect with their `?link=`.
+
+Verified: live `tests/foundation/object-refs.sql` 10/10; typecheck; eslint;
+Vitest lib/refs + access-governance 340/340; local E2E request-catalog,
+approval-links-drafts and request-baskets 25/25 (a request row opens at
+/access/requests/<number>; e-mailed UUID approval links redirect with their
+token).
+
+Next: the other object pages (identities, agents, applications, accounts,
+packages, integrations and sources, policies, risk, compliance, settings,
+privacy, platform tenants), and their links.

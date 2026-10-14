@@ -165,6 +165,10 @@ test.describe.serial("request catalog", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Access Requests" })).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(`E2E Req App ${stamp}`) }).first()).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(number) })).toBeVisible();
+    // FOUNDATION-P0-34: the request's page is at its number.
+    await page.getByRole("row", { name: new RegExp(number) }).getByRole("link").first().click();
+    await expect(page).toHaveURL(new RegExp(`/access/requests/${Number(number.slice(3))}$`));
+    await expect(page.getByRole("navigation").getByText(number)).toBeVisible();
 
     await page.goto("/access/request-policies");
     await expect(page.getByRole("row", { name: new RegExp(`E2E Req Policy ${stamp}`) })).toBeVisible();

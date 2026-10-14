@@ -250,6 +250,8 @@ export type AccessRequest = {
   id: string;
   /** The number people quote, REQ and nine digits, drawn by the database (migration 0190). */
   requestNumber?: string | null;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   /** Null for a request for a person or other identity (ACCESS-P0-18); see subjectIdentityId. */
   agentId: string | null;

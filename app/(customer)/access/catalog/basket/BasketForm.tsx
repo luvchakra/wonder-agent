@@ -56,7 +56,7 @@ export function BasketForm({ people, items, drafts = [] }: { people: { id: strin
                 {!r.ok && r.message ? <span className="block text-xs text-destructive">{r.message}</span> : null}
               </span>
               {r.ok && r.requestId ? (
-                <Link href={`/access/requests/${r.requestId}`} className="text-xs text-primary hover:underline">
+                <Link href={`/access/requests/${r.requestNumber ? Number(r.requestNumber.slice(3)) : r.requestId}`} className="text-xs text-primary hover:underline">
                   <Badge tone={r.duplicate ? "neutral" : r.status === "approved" ? "success" : "warning"}>
                     {r.duplicate ? "Already open" : r.status === "approved" ? "Approved" : "Waiting for approval"}
                   </Badge>
