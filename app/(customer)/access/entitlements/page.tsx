@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listEntitlementInventory } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Button, Card, EmptyState, LinkButton, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { EntitlementGovernanceEdit } from "./EntitlementGovernanceEdit";
 
 // Admin › Entitlements (owner request, 2026-10-10): every entitlement in
 // the organization, across applications, paged at the database (§15).
@@ -23,6 +24,7 @@ export default async function EntitlementsPage({ searchParams }: { searchParams:
   const q = (sp.q ?? "").slice(0, 100);
   const page = Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1);
   const { rows, total } = await listEntitlementInventory(ctx.tenantId!, { q, page, pageSize: PAGE_SIZE });
+  const canManage = ctx.permissions.includes("access.manage");
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const href = (p: number) => {
     const u = new URLSearchParams();
@@ -36,7 +38,7 @@ export default async function EntitlementsPage({ searchParams }: { searchParams:
     <div className="space-y-5">
       <div>
         <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Entitlements</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Every entitlement in every application. Open the application to change one.</p>
+        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Every entitlement in every application.</p>
       </div>
 
       <Card className="p-4">
@@ -73,6 +75,14 @@ export default async function EntitlementsPage({ searchParams }: { searchParams:
                   <Tr key={e.id}>
                     <Td>
                       <span className="font-medium text-foreground">{e.name}</span>
+                      <span className="mt-0.5 flex flex-wrap gap-1">
+                        {e.entitlementType ? <Badge tone="info">{e.entitlementType}</Badge> : null}
+                        {e.requestable === false ? <Badge tone="neutral">Not requestable</Badge> : null}
+                        {e.soxRelevant ? <Badge tone="warning">SOX</Badge> : null}
+                      </span>
+                      {canManage ? (
+                        <EntitlementGovernanceEdit id={e.id} name={e.name} entitlementType={e.entitlementType ?? null} requestable={e.requestable !== false} soxRelevant={Boolean(e.soxRelevant)} />
+                      ) : null}
                     </Td>
                     <Td>
                       <Link href={`/access/applications/${e.applicationId}`} className="text-primary hover:underline">

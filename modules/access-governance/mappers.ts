@@ -65,6 +65,9 @@ export function toEntitlement(row: any): Entitlement {
     createdAt: row.created_at,
     dataSourceId: row.data_source_id ?? null,
     ownerIdentityId: row.owner_identity_id ?? null,
+    entitlementType: row.entitlement_type ?? null,
+    requestable: row.requestable ?? true,
+    soxRelevant: row.sox_relevant ?? false,
   };
 }
 

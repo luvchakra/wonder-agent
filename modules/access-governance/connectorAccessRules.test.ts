@@ -23,11 +23,23 @@ describe("planEntitlements", () => {
       staged: [staged("cn=fin", { name: "Finance", privilegeLevel: "admin" }), staged("cn=hr", { name: "HR" }), staged("cn=ops", { name: "Ops" })],
       existing: [ent({ id: "e1", name: "Finance", externalRef: "cn=fin" }), ent({ id: "e2", name: "HR", externalRef: "cn=hr" })],
     });
-    expect(plan.creates).toEqual([{ ref: "cn=ops", name: "Ops", privilegeLevel: "standard", dataClassification: null }]);
+    expect(plan.creates).toEqual([{ ref: "cn=ops", name: "Ops", privilegeLevel: "standard", dataClassification: null, entitlementType: null }]);
     expect(plan.updates).toEqual([{ id: "e1", ref: "cn=fin", name: "Finance", changes: [{ field: "privilegeLevel", from: "standard", to: "admin" }], set: { privilege_level: "admin" } }]);
     expect(plan.unchanged).toBe(1);
     expect(plan.byRef.get("cn=ops")).toBe("new:cn=ops");
     expect(plan.byRef.get("cn=fin")).toBe("e1");
+  });
+
+  it("ACCESS-P0-33: takes the connector's type, but never over a type a person set", () => {
+    const plan = planEntitlements({
+      integrationId: INT,
+      mode: "full",
+      staged: [staged("cn=new", { name: "New", type: "group" }), staged("cn=a", { name: "A", type: "role" }), staged("cn=b", { name: "B", type: "role" })],
+      existing: [ent({ id: "ea", name: "A", externalRef: "cn=a", entitlementType: "group" }), ent({ id: "eb", name: "B", externalRef: "cn=b", entitlementType: "license", typeSetByPerson: true })],
+    });
+    expect(plan.creates[0]).toMatchObject({ ref: "cn=new", entitlementType: "group" });
+    expect(plan.updates).toEqual([{ id: "ea", ref: "cn=a", name: "A", changes: [{ field: "type", from: "group", to: "role" }], set: { entitlement_type: "role" } }]);
+    expect(plan.unchanged).toBe(1);
   });
 
   it("adopts a hand-made entitlement with the same unique name instead of duplicating it", () => {

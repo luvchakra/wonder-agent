@@ -75,7 +75,8 @@ excluded (list in the migration's header).
 | `access_baselines` | AA | ACCESS-P0-25: when an application's accounts, and its entitlements and access, were first reconciled; access present then is legacy, later access without approval is rogue. Members read only; the service writes |
 | `application_discoveries` | INT | INTEGRATION-P0-10: applications found by connectors, OpenAPI documents, SCIM metadata or manual reports; matched to the catalog or UNRECOGNIZED until a person registers (through Access's `registerApplication`), links, excepts or ignores with a reason. Members read only; the service writes |
 | `onboarding_proposals` | INT | INTEGRATION-P0-12: proposals from an OpenAPI document or sample account (schema, identifier, correlation, entitlements, operations with evidence, risk, policies, assumptions, questions, destructive actions, tests) with AI provenance; the input is not stored (hash and size only). Applying writes only an onboarding draft. Members read only; the service writes |
-| `entitlements` | AA | Roles/permissions/entitlements on an application; since ACCESS-P0-19 an optional owner (an identity) who approves requests for it |
+| `entitlements` | AA | Roles/permissions/entitlements on an application; since ACCESS-P0-19 an optional owner (an identity) who approves requests for it; since ACCESS-P0-33 a type, `requestable`, `sox_relevant` and per-field provenance (0169) |
+| `application_entitlement_types` | AA | An application's entitlement types and how each is requested, certified and timed (ACCESS-P0-33, 0169); registered from the connector or added by hand; member reads, service-role writes |
 | `access_grants` | AA | Effective grants (direct, inherited, group, delegated, etc.) |
 | `access_paths` | AA | Materialized/explainable path from agent → data |
 | `policies` | AA | Identity/Access/Runtime/Agent/Lifecycle policy definitions |

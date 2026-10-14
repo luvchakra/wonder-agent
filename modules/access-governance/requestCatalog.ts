@@ -11,6 +11,8 @@ import { startApprovalChain } from "./approvals";
 import { approvalOutcome, assessRisk, evaluateRequest, resolvePolicy, validatePolicyInput, type RequestPolicy, type RiskLevel } from "./requestRules";
 import { pendRequest } from "./pendingGrants";
 import { enforceSoD } from "./sod";
+import { entitlementRequestRules } from "./entitlementTypeRules";
+import { typeForRequest } from "./entitlementTypes";
 
 /**
  * ACCESS-P0-18 — the self-service request catalog (spec §11): request
@@ -231,7 +233,7 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
     getIdentity(tenantId, subjectId),
     supabase.from("applications").select("id, name, display_name, onboarding_status, risk_level, data_classification").eq("tenant_id", tenantId).eq("id", applicationId).maybeSingle(),
     entitlementId
-      ? supabase.from("entitlements").select("id, application_id, privilege_level, data_classification").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle()
+      ? supabase.from("entitlements").select("id, application_id, privilege_level, data_classification, requestable, entitlement_type").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     listRequestPolicies(tenantId),
   ]);
@@ -271,7 +273,20 @@ export async function submitAccessRequest(tenantId: string, actor: RequestActor,
         : withinContract(contract, [appRes.data.name, appRes.data.display_name], entRes.data?.data_classification ?? null)
           ? "within"
           : "outside";
-  const durationRaw = !timed || input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
+  let durationRaw = !timed || input.durationDays === undefined || input.durationDays === null || input.durationDays === "" ? null : Number(input.durationDays);
+  // ACCESS-P0-33: an entitlement not requestable (itself or by its type) is refused; its type's default and maximum duration apply.
+  if (timed && entRes.data) {
+    const typeRules = entitlementRequestRules(
+      { requestable: entRes.data.requestable !== false },
+      await typeForRequest(tenantId, applicationId, (entRes.data.entitlement_type as string | null) ?? null),
+      durationRaw !== null && Number.isFinite(durationRaw) ? durationRaw : null,
+    );
+    if (!typeRules.ok) {
+      await writeAudit({ tenantId, actorId: actor.userId, actorType: "user", action: "access.request_refused", objectType: "application", objectId: applicationId, outcome: "failure", metadata: { subjectIdentityId: subject.id, entitlementId, code: typeRules.code } });
+      throw new ApiError(typeRules.status, typeRules.code, typeRules.message);
+    }
+    if (durationRaw === null || Number.isFinite(durationRaw)) durationRaw = typeRules.durationDays;
+  }
   const decision = evaluateRequest({
     policy,
     appActive: appRes.data.onboarding_status === "ACTIVE",

@@ -35,6 +35,9 @@ export type ExistingEntitlement = {
   sourceIntegrationId: string | null;
   externalRef: string | null;
   missingFromSourceAt: string | null;
+  /** ACCESS-P0-33: its type, and whether a person set it (the import then leaves it alone). */
+  entitlementType?: string | null;
+  typeSetByPerson?: boolean;
 };
 
 export type ExistingGrant = {
@@ -53,7 +56,7 @@ export type ExistingGrant = {
 export type FieldChange = { field: string; from: string | null; to: string | null };
 
 export type EntitlementPlan = {
-  creates: { ref: string; name: string; privilegeLevel: string; dataClassification: string | null }[];
+  creates: { ref: string; name: string; privilegeLevel: string; dataClassification: string | null; entitlementType?: string | null }[];
   updates: { id: string; ref: string; name: string; changes: FieldChange[]; set: Record<string, unknown> }[];
   removed: { id: string; ref: string; name: string }[];
   restored: { id: string; ref: string; name: string }[];
@@ -136,6 +139,8 @@ export function planEntitlements(input: {
     const privilegeRaw = lower(text(s.values.privilegeLevel, 40));
     const privilege = PRIVILEGE_LEVELS.includes(privilegeRaw) ? privilegeRaw : null;
     const classification = text(s.values.dataClassification, 100);
+    // ACCESS-P0-33: the connector's type (group, role, permission, ...).
+    const entitlementType = text(s.values.type, 100);
 
     let current = ours.get(ref);
     let adopt = false;
@@ -151,7 +156,7 @@ export function planEntitlements(input: {
       }
     }
     if (!current) {
-      plan.creates.push({ ref, name, privilegeLevel: privilege ?? "standard", dataClassification: classification });
+      plan.creates.push({ ref, name, privilegeLevel: privilege ?? "standard", dataClassification: classification, entitlementType });
       plan.byRef.set(ref, `new:${ref}`);
       continue;
     }
@@ -174,6 +179,10 @@ export function planEntitlements(input: {
     if (classification && classification !== current.dataClassification) {
       changes.push({ field: "dataClassification", from: current.dataClassification, to: classification });
       set.data_classification = classification;
+    }
+    if (entitlementType && entitlementType !== (current.entitlementType ?? null) && !current.typeSetByPerson) {
+      changes.push({ field: "type", from: current.entitlementType ?? null, to: entitlementType });
+      set.entitlement_type = entitlementType;
     }
     if (current.missingFromSourceAt) plan.restored.push({ id: current.id, ref, name });
     if (changes.length) plan.updates.push({ id: current.id, ref, name, changes, set });
@@ -276,7 +285,7 @@ export function countsOf(ents: EntitlementPlan, grants: GrantPlan): AccessCounts
 export function planFingerprint(ents: EntitlementPlan, grants: GrantPlan): string {
   const sorted = (xs: string[]) => [...xs].sort();
   return JSON.stringify({
-    ec: sorted(ents.creates.map((c) => `${c.ref}|${c.name}|${c.privilegeLevel}|${c.dataClassification ?? ""}`)),
+    ec: sorted(ents.creates.map((c) => `${c.ref}|${c.name}|${c.privilegeLevel}|${c.dataClassification ?? ""}|${c.entitlementType ?? ""}`)),
     eu: sorted(ents.updates.map((u) => `${u.id}|${JSON.stringify(Object.entries(u.set).sort())}`)),
     er: sorted(ents.removed.map((r) => r.id)),
     es: sorted(ents.restored.map((r) => r.id)),
