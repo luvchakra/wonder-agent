@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { getRogueFinding, remediationLabel } from "@/modules/risk/service";
+import { listAssignments } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader, SeverityBadge } from "@/modules/ui";
 import { RemoveRogueAccessButton } from "../../../access/accounts/[id]/RemoveRogueAccessButton";
@@ -41,6 +42,15 @@ export default async function RogueFindingPage({ params }: { params: Promise<{ f
   const canManage = ctx.permissions.includes("risk.manage");
   const [finding, members] = await Promise.all([getRogueFinding(tenantId, findingId), canManage ? listTenantMembersWithRoles(tenantId) : Promise.resolve([])]);
   if (!finding) notFound();
+  // Packages the identity holds, to cover the access by one (needs access.manage too).
+  const packages =
+    canManage && ctx.permissions.includes("access.manage") && finding.identityId && OPEN.includes(finding.status)
+      ? [
+          ...new Map(
+            (await listAssignments(tenantId, { identityId: finding.identityId, live: true, pageSize: 50 })).rows.map((a) => [a.packageId, { id: a.packageId, name: a.packageName ?? "Package" }]),
+          ).values(),
+        ]
+      : [];
 
   const isOpen = OPEN.includes(finding.status);
   const remediation = remediationLabel(finding.remediationRequestStatus);
@@ -93,7 +103,9 @@ export default async function RogueFindingPage({ params }: { params: Promise<{ f
           <CardHeader title="Outcome" />
           <CardBody className="space-y-1 text-sm">
             <p className="font-medium text-foreground">
-              {finding.status === "exception" ? `Accepted as an exception${finding.exceptionUntil ? ` until ${finding.exceptionUntil.slice(0, 10)}` : ""}` : (RESOLUTION[finding.resolutionType ?? ""] ?? finding.status.replace(/_/g, " "))}
+              {finding.status === "exception"
+                ? `Accepted as an exception${finding.exceptionUntil ? ` until ${finding.exceptionUntil.slice(0, 10)}` : ""}`
+                : (RESOLUTION[finding.resolutionType ?? ""] ?? finding.status.replace(/_/g, " "))}
             </p>
             {finding.resolutionReason || finding.decisionReason ? <p className="text-muted-foreground">{finding.resolutionReason ?? finding.decisionReason}</p> : null}
             {finding.resolvedAt ? <p className="text-xs text-muted-foreground">{fmt(finding.resolvedAt)}</p> : null}
@@ -131,7 +143,7 @@ export default async function RogueFindingPage({ params }: { params: Promise<{ f
           <CardHeader title="Work on it" description="Assign an owner, escalate into an investigation, or decide another outcome." />
           <CardBody className="space-y-4">
             <FindingOwnerActions findingId={finding.id} assignedTo={finding.assignedTo} members={memberOptions} />
-            <CloseRogueFinding findingId={finding.id} />
+            <CloseRogueFinding findingId={finding.id} packages={packages} />
           </CardBody>
         </Card>
       ) : null}

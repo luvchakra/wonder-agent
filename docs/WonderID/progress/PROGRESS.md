@@ -118,7 +118,7 @@ Exit test: not run.
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | |
-| RISK-P0-13 Rogue access remediation | Risk | | In progress | Core (2026-10-12, migration 0130): "Remove access" on a rogue-access finding raises an ordinary request under the application's policy; connector, verification, finding resolves verified fixed. `connector-provisioning.spec.ts` runs the F3 exit scenario. Other remediation actions, severity factors and trend remain |
+| RISK-P0-13 Rogue access remediation | Risk | | Partial | Every remediation action, severity, trend and the finding page; the last, adding access to a package the identity holds, 2026-10-14 (#169). Done once its E2E passes in the nightly run |
 | QA-P0-26 Provisioning safety suite | QA | | Done | 2026-10-12, no migration. The mass-change guard on writes: at most `integration.maxWritesPerHour` (default 100) changes per connection per hour; past it nothing is sent and the task goes to its owner with the reason. Tests in `connector-provisioning.spec.ts`: read-only types cannot be turned on, the guard, Try again once the limit allows, no attempt key sent twice, every operation verified |
 
 ## F4: Lifecycle and certification

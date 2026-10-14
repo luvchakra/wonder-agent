@@ -3215,3 +3215,11 @@ access is under review: 403 `SELF_KEEP` (`keepRefusal`, pure, in
 - Nothing is provisioned. An end date makes the daily expiry sweep remove the access then.
 - Service role, every statement filtered on the tenant, audited as `access.request_approved_afterwards`. Risk calls it after its own checks (`risk.manage`, never the account's owner).
 - Verified through the RISK-P0-13 E2E (see the Risk audit log).
+
+## 2026-10-14 — Package resources from rogue-access remediation (RISK-P0-13)
+
+Risk's `authorizeRogueFinding` now calls the published `listAssignments` and
+`addPackageResource` to add rogue access to a package the identity already
+holds. No Access code changed. Adding a resource leaves existing assignments
+as they are, and a birthright package goes back to review as it always has.
+The Risk log has the verification.

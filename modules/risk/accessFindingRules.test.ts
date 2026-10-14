@@ -81,13 +81,17 @@ describe("validateRogueAuthorization (RISK-P0-13)", () => {
 
   it("refuses a missing reason, an unknown kind, a past date and more than ten years", () => {
     expect(validateRogueAuthorization({ reason: " " }, now)).toEqual({ error: "reason: say why this access is approved" });
-    expect(validateRogueAuthorization({ kind: "approve", reason: "x" }, now)).toEqual({ error: "kind: authorize or legacy" });
+    expect(validateRogueAuthorization({ kind: "approve", reason: "x" }, now)).toEqual({ error: "kind: authorize, legacy or package" });
     expect(validateRogueAuthorization({ reason: "x", until: "2026-10-01" }, now)).toEqual({ error: "until: a date in the future" });
+    const pkg = "7d3f8a2e-1b4c-4d5e-8f60-0123456789ab";
+    expect(validateRogueAuthorization({ kind: "package", reason: "Part of the role", packageId: pkg, until: "2027-01-01" }, now)).toEqual({ kind: "package", reason: "Part of the role", until: null, packageId: pkg });
+    expect(validateRogueAuthorization({ kind: "package", reason: "x", packageId: "pkg-1" }, now)).toEqual({ error: "packageId: choose a package the identity holds" });
     expect(validateRogueAuthorization({ reason: "x", until: "2037-01-01" }, now)).toEqual({ error: "until: at most ten years from today" });
   });
 
   it("writes what was decided into the request's justification, with the ticket", () => {
     expect(authorizationJustification({ kind: "authorize", reason: "Needed", until: null }, "RA-000007")).toBe("Approved afterwards (RA-000007): Needed");
     expect(authorizationJustification({ kind: "legacy", reason: "Old", until: null }, null)).toBe("Recognized as legacy access: Old");
+    expect(authorizationJustification({ kind: "package", reason: "Part of the role", until: null }, "RA-000002", "Finance basics")).toBe("Added to the access package Finance basics (RA-000002): Part of the role");
   });
 });

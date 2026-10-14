@@ -1407,3 +1407,48 @@ scoped to the page.
   - rogue access is assigned, escalated, refused without a reason or beyond ten years, then approved afterwards from the page for 30 days;
   - a fulfilled grant request with that end date is attached to the grant, and nothing is written to the system;
   - the next read raises no new finding, and a second approval is refused.
+
+## 2026-10-14 — RISK-P0-13: covering rogue access with a package the identity holds
+
+The last remediation action of the story. "Other outcomes" on a finding's
+page now offers **Add to a package they hold**. It appears only when the
+identity holds a live package and the viewer has both `risk.manage` and
+`access.manage`.
+
+- **Rules.** `validateRogueAuthorization` accepts `kind: "package"` with a
+  `packageId`. `authorizationJustification` names the package.
+- **Service.** `authorizeRogueFinding` does the following:
+  - it refuses a package the identity does not hold (409 `PACKAGE_NOT_HELD`);
+  - it adds the entitlement to that package through Access's
+    `addPackageResource`, and an entry already there is fine;
+  - it records the approval through `recordApprovedAfterwards`, ending when
+    the package assignment ends.
+- **Effects.** Adding the entitlement to the package gives nobody new access:
+  existing assignments keep their items and nothing is written to the system.
+  The finding resolves as approved afterwards, and the reason names the
+  package. Evidence and audit carry the package id.
+- **Route.** `/api/v1/findings/[id]/authorize` also requires `access.manage`
+  for `kind: "package"`, through `requirePermission`.
+
+**Verified.**
+- Unit tests: `modules/risk` and `tests/architecture`, 15 files, 125 tests
+  passed.
+- Typecheck and eslint are clean.
+- E2E, **not yet passed**. `connector-provisioning.spec.ts` has a new test covering
+  refusing a package not held, the page offering only the held package,
+  resolution with the package-named reason, the package's resources gaining
+  Finance while the other package is unchanged, no system writes, a
+  fulfilled request, and no new finding on the next read.
+- `syncAndWait` now also waits for the post-sync pipeline. A run under load
+  showed the old helper returning before the rogue finding was raised: the
+  finding appeared after the test's 60-second poll ended.
+- Local runs, five in all:
+  - Run 1: the new test failed on its own locator (fixed); 16 other tests
+    passed.
+  - Run 3: the existing approved-afterwards test failed on the pipeline race
+    (fixed in `syncAndWait`); 15 other tests passed.
+  - Runs 2 and 4: stopped at sign-in, which looks like Supabase's sign-in
+    rate limit.
+  - Run 5: stopped on the owner's instruction to kill long-pending E2E.
+
+The story stays Partial until the nightly run passes this spec.

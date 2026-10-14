@@ -11,13 +11,15 @@ import { Button } from "@/modules/ui/Button";
  * accepted exception ends on a date at most 90 days away and the finding
  * reopens then; a false positive closes it. RISK-P0-13 adds approving the
  * access afterwards, or recognizing it as legacy access, optionally until a
- * date (it is removed then). Each needs a reason; the server refuses the
- * account's owner and shows its own result.
+ * date (it is removed then), or adding it to a package the identity holds
+ * (offered only when there is one). Each needs a reason; the server refuses
+ * the account's owner and shows its own result.
  */
-export function CloseRogueFinding({ findingId }: { findingId: string }) {
+export function CloseRogueFinding({ findingId, packages = [] }: { findingId: string; packages?: { id: string; name: string }[] }) {
   const router = useRouter();
-  const [outcome, setOutcome] = useState<"authorize" | "legacy" | "exception" | "false_positive">("authorize");
-  const approving = outcome === "authorize" || outcome === "legacy";
+  const [outcome, setOutcome] = useState<"authorize" | "legacy" | "package" | "exception" | "false_positive">("authorize");
+  const approving = outcome === "authorize" || outcome === "legacy" || outcome === "package";
+  const [packageId, setPackageId] = useState(packages[0]?.id ?? "");
   const [reason, setReason] = useState("");
   const [until, setUntil] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -36,7 +38,7 @@ export function CloseRogueFinding({ findingId }: { findingId: string }) {
               ? await fetch(`/api/v1/findings/${findingId}/authorize`, {
                   method: "POST",
                   headers: { "content-type": "application/json" },
-                  body: JSON.stringify({ kind: outcome, reason, until: until || undefined }),
+                  body: JSON.stringify(outcome === "package" ? { kind: outcome, reason, packageId } : { kind: outcome, reason, until: until || undefined }),
                 })
               : await fetch(`/api/v1/findings/${findingId}/decision`, {
                   method: "POST",
@@ -58,6 +60,7 @@ export function CloseRogueFinding({ findingId }: { findingId: string }) {
           <select value={outcome} onChange={(e) => setOutcome(e.target.value as typeof outcome)} className={field}>
             <option value="authorize">Approve it afterwards</option>
             <option value="legacy">Recognize as legacy access</option>
+            {packages.length ? <option value="package">Add to a package they hold</option> : null}
             <option value="exception">Accept as an exception</option>
             <option value="false_positive">Not rogue (false positive)</option>
           </select>
@@ -66,6 +69,17 @@ export function CloseRogueFinding({ findingId }: { findingId: string }) {
           <label>
             <span className="block text-xs font-medium text-muted-foreground">Until (90 days at most)</span>
             <input type="date" required value={until} onChange={(e) => setUntil(e.target.value)} className={field} />
+          </label>
+        ) : outcome === "package" ? (
+          <label>
+            <span className="block text-xs font-medium text-muted-foreground">Package</span>
+            <select required value={packageId} onChange={(e) => setPackageId(e.target.value)} className={field}>
+              {packages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </label>
         ) : approving ? (
           <label>
