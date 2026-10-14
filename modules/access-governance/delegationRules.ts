@@ -63,3 +63,20 @@ export function actingFor(
 ): string[] {
   return [...new Set(delegations.filter((d) => (d.scope ?? "approvals") === scope && d.delegateUserId === userId && isActive(d, now)).map((d) => d.delegatorUserId))];
 }
+
+/**
+ * WID-H06: an automation credential's power is its backing member's roles,
+ * changed only on the credential's own page (escalation check, four-eyes).
+ * No delegation, of any scope, names an automation member on either side.
+ */
+export function delegationMemberRefusal(
+  members: { user_id: string; status: string; account_type?: string | null }[],
+  ids: { delegator: string; delegate: string },
+): { status: number; code: string; error: string } | null {
+  for (const [id, field] of [[ids.delegator, "delegatorUserId"], [ids.delegate, "delegateUserId"]] as const) {
+    const m = members.find((x) => x.user_id === id && x.status === "active");
+    if (!m) return { status: 404, code: "NOT_FOUND", error: `${field}: not an active member of this organization` };
+    if (m.account_type === "automation") return { status: 409, code: "AUTOMATION_MEMBER", error: `${field}: an automation credential cannot delegate or be delegated to` };
+  }
+  return null;
+}

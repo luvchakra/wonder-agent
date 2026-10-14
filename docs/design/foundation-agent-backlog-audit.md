@@ -3395,3 +3395,23 @@ Administration delegation is approved by the owner, and Access's delegations cal
 - `assignRole` turns a copy into an ordinary assignment when an administrator sets its terms.
 
 **Verified.** Detail in the Access audit log of the same date: unit tests, isolation SQL 10/10, and the authorization, custom-roles, users and permission-catalog E2E specs.
+
+## 2026-10-14 — WID-H10: the listed-email vendor path proves the mailbox
+
+The high-risk register's WID-H10: `PLATFORM_ADMIN_EMAILS` opened the
+vendor console for any confirmed account with a listed email, whatever
+signed it in. Done, pending the owner's decision on keeping the path:
+- `isListedPlatformAdmin` (`lib/rbac/platformAdminEmails.ts`) now also
+  refuses an SSO user or an `sso:` identity, and needs an identity from
+  `PROVEN_EMAIL_PROVIDERS` (email, Google, LinkedIn). Microsoft-only is
+  refused (its email claim is not verified).
+- `isPlatformAdmin` reads the account's identities from Auth and, on the
+  first admission through the variable, writes the platform audit record
+  `platform.admin_access_via_env`.
+- The `platform_admins` table path is unchanged. The owner's own account
+  (Google) still passes; checked read-only before the change.
+
+Verified: typecheck; eslint; `platformAdminEmails.test.ts` 3/3 (1 new,
+"WID-H10"); local E2E `platform-admin.spec.ts` with the delegation and
+automation specs: 32/32. Left for the owner: keep the variable, or retire it for the
+table. Tracker: `docs/WonderID/FINDINGS-REMEDIATION.md`, WID-H10.
