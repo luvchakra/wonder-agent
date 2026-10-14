@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
-import { Badge, Button, SelectField, TextareaField } from "@/modules/ui";
+import { Badge, Button, RequestNumberBarcode, SelectField, TextareaField } from "@/modules/ui";
 
 /**
  * ACCESS-P0-38 — the basket form. "Same access as" asks the server which of
@@ -11,7 +11,7 @@ import { Badge, Button, SelectField, TextareaField } from "@/modules/ui";
  * nothing). Sending shows each request's real outcome (§17.5).
  */
 
-type Result = { subjectIdentityId: string; line: number; ok: boolean; requestId?: string; status?: string; duplicate?: boolean; code?: string; message?: string };
+type Result = { subjectIdentityId: string; line: number; ok: boolean; requestId?: string; requestNumber?: string | null; status?: string; duplicate?: boolean; code?: string; message?: string };
 type Sent = { basketId: string; results: Result[]; summary: { created: number; existing: number; refused: number } };
 
 async function call<T>(url: string, init?: RequestInit): Promise<{ data?: T; error?: string }> {
@@ -39,8 +39,10 @@ export function BasketForm({ people, items, drafts = [] }: { people: { id: strin
   const label = (id: string) => people.find((p) => p.id === id)?.label ?? "Someone";
 
   if (sent) {
+    const created = sent.results.filter((r) => r.ok && !r.duplicate && r.requestNumber);
     return (
       <div className="space-y-3">
+        {created.length === 1 ? <RequestNumberBarcode number={created[0].requestNumber!} /> : null}
         <p role="status" className="text-sm text-foreground">
           {sent.summary.created} sent{sent.summary.existing ? `, ${sent.summary.existing} already open` : ""}
           {sent.summary.refused ? `, ${sent.summary.refused} refused` : ""}.
@@ -49,6 +51,7 @@ export function BasketForm({ people, items, drafts = [] }: { people: { id: strin
           {sent.results.map((r) => (
             <li key={`${r.subjectIdentityId}-${r.line}`} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span className="min-w-0">
+                {r.requestNumber ? <span className="font-mono text-xs text-muted-foreground">{r.requestNumber} · </span> : null}
                 {label(r.subjectIdentityId)} · {items.find((i) => i.value === chosen[r.line])?.label ?? `Item ${r.line + 1}`}
                 {!r.ok && r.message ? <span className="block text-xs text-destructive">{r.message}</span> : null}
               </span>

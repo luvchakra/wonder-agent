@@ -150,7 +150,7 @@ export default async function AccessRequestDetailPage({ params, searchParams }: 
           Access Requests
         </Link>
         <span aria-hidden> / </span>
-        <span className="text-foreground">Request</span>
+        <span className="font-mono text-foreground">{r.requestNumber ?? "Request"}</span>
       </nav>
       {linkState ? (
         <p role="status" className={`rounded-md border px-3 py-2 text-sm ${linkState === "valid" ? "border-primary/30 bg-primary/5 text-foreground" : "border-border bg-muted text-muted-foreground"}`}>

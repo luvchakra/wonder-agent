@@ -127,8 +127,12 @@ test.describe.serial("request baskets and model-after", () => {
     };
     const res = await request.post("/api/v1/access/requests/basket", { data: body });
     expect(res.status(), await res.text()).toBe(200);
-    const sent = (await res.json()).data as { basketId: string; results: { subjectIdentityId: string; line: number; ok: boolean; code?: string; status?: string }[]; summary: Record<string, unknown> };
+    const sent = (await res.json()).data as { basketId: string; results: { subjectIdentityId: string; line: number; ok: boolean; code?: string; status?: string; requestNumber?: string }[]; summary: Record<string, unknown> };
     basketId = sent.basketId;
+    // Each request sent has its own number, REQ and nine digits.
+    const numbers = sent.results.filter((r) => r.ok).map((r) => r.requestNumber);
+    numbers.forEach((n) => expect(n).toMatch(/^REQ\d{9}$/));
+    expect(new Set(numbers).size).toBe(numbers.length);
     expect(sent.summary).toMatchObject({ created: 2, existing: 0, refused: 2, byCode: { NOT_REQUESTABLE: 2 } });
     expect(sent.results.filter((r) => r.ok).map((r) => [r.subjectIdentityId, r.line, r.status])).toEqual([
       [personX, 0, "approved"],

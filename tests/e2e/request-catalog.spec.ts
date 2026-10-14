@@ -157,10 +157,15 @@ test.describe.serial("request catalog", () => {
     await page.getByRole("textbox", { name: /Why you need it/ }).fill("Monthly close reporting from the screen");
     await page.getByRole("button", { name: "Submit request" }).click();
     await expect(page.getByText(/An identical request is already open/)).toBeVisible();
+    // Owner request 2026-10-14: the request's number, REQ and nine digits, with its barcode.
+    await expect(page.getByText("Already open as")).toBeVisible();
+    const number = (await page.locator("figure").getByText(/^REQ\d{9}$/).textContent())!;
+    await expect(page.getByRole("img", { name: `Barcode for ${number}` })).toBeVisible();
 
     await page.goto("/access/requests?view=mine");
     await expect(page.getByRole("heading", { level: 1, name: "Access Requests" })).toBeVisible();
     await expect(page.getByRole("row", { name: new RegExp(`E2E Req App ${stamp}`) }).first()).toBeVisible();
+    await expect(page.getByRole("row", { name: new RegExp(number) })).toBeVisible();
 
     await page.goto("/access/request-policies");
     await expect(page.getByRole("row", { name: new RegExp(`E2E Req Policy ${stamp}`) })).toBeVisible();

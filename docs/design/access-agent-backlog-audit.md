@@ -4223,3 +4223,39 @@ onboardingRules, architecture 52/52; local E2E application-onboarding
 18/18 (new: an administrator approves their own submission on the screen,
 then promotes), request-catalog and application-catalog (with the new
 consistency checks) 31/31 in the combined run.
+
+### 2026-10-14 — Request numbers with a barcode (owner request)
+
+Owner: "when a request is submitted it should create a request number of
+format REQ123456789; it should display with slight animation showing a
+barcode with the request number once created."
+
+- Migration 0190: `access_requests.request_number` (`^REQ[0-9]{9,}$`,
+  unique per tenant), drawn by a BEFORE INSERT trigger from a per-tenant
+  counter row (`access_request_counters`, RLS: members read their own,
+  only the trigger writes), the same pattern as the rogue-access tickets of
+  0131. A caller-supplied number is replaced; a number never changes
+  (trigger, 23514). The 259 existing requests were numbered oldest first
+  per organization, with `record_provenance` paused for that backfill so
+  their "updated by/on" is unchanged.
+- `AccessRequest.requestNumber` (optional, additive); the single-request
+  form action and the basket results carry it.
+- `modules/ui/barcode.ts`: Code 128 set B encoder (start B, characters,
+  mod-103 checksum, stop); its symbol table was checked against
+  python-barcode's for all 106 symbols. `RequestNumberBarcode` draws it as
+  SVG: the card fades up, the bars rise left to right, a scan line passes
+  once, the number settles in; nothing moves under reduced motion; the
+  number is also plain text.
+- Shown after submitting (the barcode links to the request; "Already open
+  as" for a duplicate), after a basket with one new request (each line
+  shows its number), in the requests list and in the request page's
+  breadcrumb.
+
+Verified: typecheck; eslint; `next build`; Vitest access-governance, ui
+and access pages 466/466 (new barcode tests 4/4); live
+`tests/access/request-numbers.sql` 7/7; local E2E request-catalog and
+request-baskets 22/22 (the number and barcode after a screen submission,
+the number in My requests, distinct numbers per basket request); Supabase
+advisors: no new findings.
+
+Left out: searching by request number in the global search.

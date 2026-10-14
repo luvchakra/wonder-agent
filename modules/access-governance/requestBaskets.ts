@@ -49,7 +49,7 @@ export async function submitRequestBasket(tenantId: string, actor: RequestActor,
             },
             { basketId },
           );
-          results.push({ subjectIdentityId: subject, line, ok: true, requestId: request.id, status: request.status, duplicate });
+          results.push({ subjectIdentityId: subject, line, ok: true, requestId: request.id, requestNumber: request.requestNumber ?? null, status: request.status, duplicate });
         } catch (err) {
           results.push({
             subjectIdentityId: subject,
