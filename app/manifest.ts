@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { headers } from "next/headers";
 import { buildManifest, requestOrigin } from "@/modules/ui/install/manifest";
+import { baseAppHost } from "@/lib/tenant/host";
 
 // EXPERIENCE-P0-26 — /manifest.webmanifest. Read per request because the
 // related_applications self-reference must be absolute and each
@@ -9,5 +10,5 @@ import { buildManifest, requestOrigin } from "@/modules/ui/install/manifest";
 // manifest without cookies.
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
   const h = await headers();
-  return buildManifest(requestOrigin(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto")));
+  return buildManifest(requestOrigin(h.get("x-forwarded-host") ?? h.get("host"), h.get("x-forwarded-proto")), baseAppHost());
 }

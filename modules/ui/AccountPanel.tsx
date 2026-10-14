@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import Link from "next/link";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { ChevronDown, LifeBuoy, LogOut, Shield, Sparkles, SunMoon, User, ShieldCheck } from "lucide-react";
+import { ChevronDown, Download, LifeBuoy, LogOut, Shield, Sparkles, SunMoon, User, ShieldCheck } from "lucide-react";
 import { ThemeToggle } from "./theme";
 import { Avatar } from "./Avatar";
 
@@ -33,6 +33,7 @@ export function AccountPanel({
   displayName,
   subtitle,
   isPlatformAdmin,
+  installUrl,
   onSignOut,
 }: {
   email: string;
@@ -40,6 +41,8 @@ export function AccountPanel({
   /** Second line under the name — the user's role in the current tenant. */
   subtitle?: string | null;
   isPlatformAdmin?: boolean;
+  /** Owner request 2026-10-14: the one installable app lives on the main address (its /install page). */
+  installUrl?: string | null;
   onSignOut: (formData: FormData) => void | Promise<void>;
 }) {
   const name = displayName?.trim() || email;
@@ -105,6 +108,15 @@ export function AccountPanel({
             <span className="flex-1 text-sm">Appearance</span>
             <ThemeToggle />
           </div>
+
+          {installUrl ? (
+            <DropdownMenu.Item asChild>
+              <a href={installUrl} className="flex items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent">
+                <Download className="size-4 text-muted-foreground" aria-hidden="true" />
+                Install the app
+              </a>
+            </DropdownMenu.Item>
+          ) : null}
 
           {isPlatformAdmin && (
             <DropdownMenu.Item asChild>
