@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listApplicationsForMatching, listEntitlementsForApplication, listRequestPolicies } from "@/modules/access-governance/service";
+import { listApplicationsForMatching, listEntitlementsForApplication, listGovernanceChanges, listRequestPolicies } from "@/modules/access-governance/service";
+import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Button, Card, CardBody, CardHeader, EmptyState, SelectField, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
 import { PolicyForm } from "./PolicyForm";
+import { ChangeDecision } from "./ChangeDecision";
 
 // ACCESS-P0-18 — request policies (spec §11.4): who may request what, for
 // whom, for how long, with what justification, and when a person must
@@ -24,7 +26,17 @@ export default async function RequestPoliciesPage({ searchParams }: { searchPara
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
   const sp = await searchParams;
-  const [policies, apps] = await Promise.all([listRequestPolicies(tenantId), canManage ? listApplicationsForMatching(tenantId) : Promise.resolve([])]);
+  const [policies, apps, waiting, members] = await Promise.all([
+    listRequestPolicies(tenantId),
+    canManage ? listApplicationsForMatching(tenantId) : Promise.resolve([]),
+    // ACCESS-P0-35: changes waiting for a second person.
+    canManage ? listGovernanceChanges(tenantId) : Promise.resolve([]),
+    canManage ? listTenantMembersWithRoles(tenantId) : Promise.resolve([]),
+  ]);
+  const who = (userId: string) => (userId === ctx.userId ? "you" : (members.find((m) => m.userId === userId)?.displayName ?? members.find((m) => m.userId === userId)?.email ?? "a former member"));
+  const scopeName = (key: { applicationId: string | null; entitlementId: string | null }) =>
+    policies.find((p) => p.applicationId === key.applicationId && p.entitlementId === key.entitlementId)?.name ?? (key.applicationId ? "A new application policy" : "The organization default");
+  const show = (v: unknown) => (v === null || v === undefined || v === "" ? "—" : String(v));
   const selectedApp = apps.find((a) => a.id === sp.app) ?? null;
   const entitlements = selectedApp ? await listEntitlementsForApplication(tenantId, selectedApp.id) : [];
   const existing = policies.find((p) => (selectedApp ? p.applicationId === selectedApp.id && !p.entitlementId : !p.applicationId));
@@ -56,6 +68,34 @@ export default async function RequestPoliciesPage({ searchParams }: { searchPara
         </div>
         <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["request-policies"])} />
       </div>
+
+      {waiting.length ? (
+        <Card>
+          <CardHeader title="Waiting for approval" description="Changes apply once someone other than the proposer approves them." />
+          <CardBody>
+            <ul className="divide-y divide-border text-sm">
+              {waiting.map((c) => (
+                <li key={c.id} className="flex flex-wrap items-start justify-between gap-3 py-3">
+                  <span className="min-w-0">
+                    <span className="font-medium text-foreground">{scopeName(c.objectKey)}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Proposed by {who(c.requestedBy)} · {new Date(c.requestedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span className="mt-1 block space-y-0.5 text-xs">
+                      {c.changes.map((f) => (
+                        <span key={f.field} className="block">
+                          <code>{f.field}</code>: {show(f.before)} → <span className="text-foreground">{show(f.after)}</span>
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                  {c.requestedBy === ctx.userId ? <Badge tone="neutral">Waiting for another administrator</Badge> : <ChangeDecision id={c.id} />}
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card className="p-4">
         {policies.length === 0 ? (

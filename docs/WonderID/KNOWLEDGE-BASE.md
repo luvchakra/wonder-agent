@@ -308,6 +308,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
   - how long access may last;
   - whether a reason is required.
 - Nobody can approve a request they made, or one that is for them.
+- **Changing a policy:** in an organization with two or more Tenant Administrators, a change to a request policy waits, showing each field's old and new value, until someone else who manages access approves it (Request policies → Waiting for approval). Approved, it applies as the policy's next version; rejected, nothing changes. With one administrator a change applies at once. Every applied change is kept as a numbered version.
 - Approvers get a message with a link straight to the request when it reaches them.
 - **Away?** Hand your approvals or your requests to a colleague until a date (Approvals → Delegate your approvals). They act on your behalf, every decision records both of you, and either of you (or an access manager) can end it.
 - **Administration:** someone who manages roles can also hand a person's administration to a colleague. The colleague gets copies of that person's roles until the end date; ending it early removes them at once. The Tenant Administrator role is never handed over, and roles the colleague already holds are left as they are.
@@ -648,6 +649,7 @@ Newest first.
 | Date | What changed |
 |---|---|
 | 14 Oct 2026 | Access reviews cover people's application access too: reviewed by the manager, the application owner or a named reviewer; a revoke becomes an approved removal, verified at the source. |
+| 14 Oct 2026 | In organizations with two or more Tenant Administrators, a change to a request policy waits for someone else to approve it, showing what it changes; every applied change is kept as a numbered version. |
 | 14 Oct 2026 | Administration can be handed to a colleague for a time: they get copies of the person's roles until the end date, removed at once if it ends early. Tenant Administrator is never handed over. |
 | 14 Oct 2026 | Your request rights can be handed to a colleague for a time: they ask for access on your behalf, both of you are recorded, and neither of you approves it. |
 | 14 Oct 2026 | Connection types can be written in a guided form beside the JSON, with field paths picked from a sample response. |

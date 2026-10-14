@@ -3980,6 +3980,49 @@ The authorization engine is unchanged: it treats the copies like any other assig
 
 Item 1 is open, for the next Access pass.
 
+## 2026-10-14 — ACCESS-P0-35 part 1: approved changes to request policies
+
+**Rule (owner decision, 14 October).** A change needs a second person only in an organization with two or more active Tenant Administrators. Those are counted directly or through an active group by Foundation's new `countActiveTenantAdministrators`.
+- **Two or more:** saving a request policy proposes the change instead of applying it.
+- **One:** the change applies at once, as before.
+
+Either way, every applied change becomes a numbered version.
+
+**Migration 0179.**
+- `governance_changes` holds an object's type, id or key, base version, previous and proposed values, status, and who proposed and decided it.
+  - Only one change per object can wait at a time (partial unique index).
+  - The database refuses a decision by the proposer, and every decided change must carry a decision time.
+- `governance_object_versions` keeps each applied version's full snapshot with its change, proposer and approver.
+- `access_request_policies.version` is new.
+- Both tables are readable by those who manage access (`has_tenant_permission(access.manage)`); the service writes. The type list holds `request_policy` for now; roles, SoD rules, lifecycle rules and workflows join by adding theirs.
+
+**Service.**
+- `saveRequestPolicy` returns either `applied` with the policy (HTTP 200, unchanged contract) or `pending` with the change (HTTP 202, `{ pendingChange }`).
+  - A proposal checks up front that the application and entitlement belong to the organization.
+  - A proposal that changes nothing applies nothing.
+  - A second proposal while one waits is refused with 409 `CHANGE_PENDING`.
+- `decideGovernanceChange` is for someone with `access.manage` who did not propose it; otherwise `SELF_APPROVAL`.
+  - It claims the change first, so two people deciding at once cannot both act.
+  - Approving applies the change through `applyRequestPolicy` as the next version, refusing with `STALE_CHANGE` if the policy moved on. A change that cannot be applied goes back to waiting.
+  - Rejecting changes nothing. Both outcomes are audited, with any note as typed text.
+- Routes: `GET /api/v1/access/governance-changes` and `POST …/[id]/decision`, both `access.manage`.
+
+**UI.** Request policies has a "Waiting for approval" card, shown only when something waits. Each change lists its fields before and after, with Approve and Reject; the proposer sees "Waiting for another administrator". The policy form says "Proposed: another administrator approves it before it applies" rather than "Saved".
+
+**Verified.**
+- Unit tests in `modules/access-governance` and `tests/architecture`: 348 passed, including the four-eyes rules and the route-gate and RLS sweeps over the new routes and tables.
+- `tests/access/governance-changes-isolation.sql`: 10 of 10, rolled back.
+- Local E2E, one worker: 33 passed across `governance-changes`, `request-catalog`, `approval-engine` and `request-baskets`. The new spec runs in Tenant Two, which has two administrators. It covers:
+  - proposed and not applied;
+  - a second proposal refused;
+  - the proposer refused;
+  - the page;
+  - approved by the other administrator, applied as version 1 with the approver recorded;
+  - a rejected change leaving the policy as it was;
+  - another organization neither seeing nor deciding the change, and a read-only member refused.
+
+**Left (later parts).** Roles, SoD rules, lifecycle rules and workflows through the same tables, and a version history view.
+
 ## 2026-10-14 — Certification support for COMPLIANCE-P0-10
 
 Published two services for Compliance's reviews of people's access

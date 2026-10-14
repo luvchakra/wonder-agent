@@ -14,6 +14,8 @@ import { pendRequest } from "./pendingGrants";
 import { enforceSoD } from "./sod";
 import { entitlementRequestRules } from "./entitlementTypeRules";
 import { typeForRequest } from "./entitlementTypes";
+import { countActiveTenantAdministrators } from "@/lib/rbac/permissionHolders";
+import { diffFields, fourEyesRequired, isStale, type FieldChange } from "./governanceChangeRules";
 
 /**
  * ACCESS-P0-18 — the self-service request catalog (spec §11): request
@@ -69,31 +71,128 @@ export async function listRequestPolicies(tenantId: string): Promise<PolicyRow[]
 }
 
 /** Creates a policy for a scope, or updates the one that scope already has. */
-export async function saveRequestPolicy(tenantId: string, actorId: string, input: Record<string, unknown>): Promise<RequestPolicy> {
+/** ACCESS-P0-35: a saved policy, or the change waiting for a second person. */
+export type PolicySaveResult = { status: "applied"; policy: RequestPolicy } | { status: "pending"; change: PendingPolicyChange };
+export type PendingPolicyChange = { id: string; objectId: string | null; changes: FieldChange[]; requestedAt: string };
+
+type PolicyKey = { applicationId: string | null; entitlementId: string | null };
+
+async function existingPolicy(tenantId: string, key: PolicyKey): Promise<Record<string, unknown> | null> {
+  let q = supabaseServiceRole().from("access_request_policies").select().eq("tenant_id", tenantId);
+  q = key.applicationId ? q.eq("application_id", key.applicationId) : q.is("application_id", null);
+  q = key.entitlementId ? q.eq("entitlement_id", key.entitlementId) : q.is("entitlement_id", null);
+  const { data, error } = await q.maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return data && data.tenant_id === tenantId ? (data as Record<string, unknown>) : null;
+}
+
+/**
+ * Saves the policy for a scope (tenant default, an application, or one of
+ * its entitlements). ACCESS-P0-35 (owner decision): in an organization with
+ * two or more active Tenant Administrators the change waits for someone
+ * else who manages access (governanceChanges.ts); otherwise it applies at
+ * once. Either way an applied change becomes a numbered version.
+ */
+export async function saveRequestPolicy(tenantId: string, actorId: string, input: Record<string, unknown>): Promise<PolicySaveResult> {
   const applicationId = typeof input.applicationId === "string" && input.applicationId ? input.applicationId : null;
   const entitlementId = typeof input.entitlementId === "string" && input.entitlementId ? input.entitlementId : null;
   if ((applicationId && !UUID_RE.test(applicationId)) || (entitlementId && !UUID_RE.test(entitlementId))) throw new ApiError(400, "VALIDATION_FAILED", "applicationId / entitlementId: ids");
   if (entitlementId && !applicationId) throw new ApiError(400, "VALIDATION_FAILED", "applicationId: required with an entitlement");
-  const admin = supabaseServiceRole();
-  let existingQuery = admin.from("access_request_policies").select("id").eq("tenant_id", tenantId);
-  existingQuery = applicationId ? existingQuery.eq("application_id", applicationId) : existingQuery.is("application_id", null);
-  existingQuery = entitlementId ? existingQuery.eq("entitlement_id", entitlementId) : existingQuery.is("entitlement_id", null);
-  const { data: existing, error: exError } = await existingQuery.maybeSingle();
-  if (exError) throw new ApiError(500, "QUERY_FAILED", exError.message);
+  const key = { applicationId, entitlementId };
+  const existing = await existingPolicy(tenantId, key);
   const fields = validatePolicyInput(input, Boolean(existing));
+  if (!fourEyesRequired(await countActiveTenantAdministrators(tenantId))) {
+    return { status: "applied", policy: await applyRequestPolicy(tenantId, actorId, key, fields, { createdBy: actorId }) };
+  }
+  // A proposal names only this organization's application and entitlement (what the keys check on apply).
+  const admin = supabaseServiceRole();
+  if (applicationId) {
+    const { data: app } = await admin.from("applications").select("id, tenant_id").eq("tenant_id", tenantId).eq("id", applicationId).maybeSingle();
+    if (!app || app.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "That application or entitlement is not in this organization");
+  }
+  if (entitlementId) {
+    const { data: ent } = await admin.from("entitlements").select("id, tenant_id, application_id").eq("tenant_id", tenantId).eq("id", entitlementId).maybeSingle();
+    if (!ent || ent.tenant_id !== tenantId || ent.application_id !== applicationId) throw new ApiError(404, "NOT_FOUND", "That application or entitlement is not in this organization");
+  }
+  const previous = existing ? Object.fromEntries(Object.keys(fields).map((k) => [k, existing[k] ?? null])) : null;
+  const changes = diffFields(previous, fields);
+  if (existing && !changes.length) return { status: "applied", policy: toPolicy(existing) };
+  const { data, error } = await admin
+    .from("governance_changes")
+    .insert({
+      tenant_id: tenantId,
+      object_type: "request_policy",
+      object_id: (existing?.id as string | undefined) ?? null,
+      object_key: key,
+      base_version: (existing?.version as number | undefined) ?? null,
+      previous,
+      proposed: fields,
+      requested_by: actorId,
+    })
+    .select("id, object_id, requested_at")
+    .single();
+  if (error?.code === "23505") throw new ApiError(409, "CHANGE_PENDING", "A change to this policy is already waiting for approval; decide it first");
+  if (error || !data) throw new ApiError(500, "WRITE_FAILED", error?.message ?? "Could not save the change");
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "access.request_policy_change_proposed",
+    objectType: "governance_change",
+    objectId: data.id as string,
+    outcome: "success",
+    metadata: { policyId: existing?.id ?? null, applicationId, entitlementId, changes },
+  });
+  return { status: "pending", change: { id: data.id as string, objectId: (data.object_id as string | null) ?? null, changes, requestedAt: data.requested_at as string } };
+}
+
+/** Writes the policy and its next version. Called directly with one administrator, or when a change is approved. */
+export async function applyRequestPolicy(
+  tenantId: string,
+  actorId: string,
+  key: PolicyKey,
+  fields: Record<string, unknown>,
+  opts: { createdBy: string; changeId?: string; approvedBy?: string; baseVersion?: number | null },
+): Promise<RequestPolicy> {
+  const admin = supabaseServiceRole();
+  const existing = await existingPolicy(tenantId, key);
+  if (opts.changeId && isStale(opts.baseVersion ?? null, (existing?.version as number | undefined) ?? null)) {
+    throw new ApiError(409, "STALE_CHANGE", "The policy changed after this was proposed; reject it and propose again");
+  }
   const now = new Date().toISOString();
+  const version = existing ? (existing.version as number) + 1 : 1;
   const { data, error } = existing
-    ? await admin.from("access_request_policies").update({ ...fields, updated_at: now }).eq("tenant_id", tenantId).eq("id", existing.id).select().single()
+    ? await admin
+        .from("access_request_policies")
+        .update({ ...fields, version, updated_at: now })
+        .eq("tenant_id", tenantId)
+        .eq("id", existing.id as string)
+        .eq("version", existing.version as number)
+        .select()
+        .maybeSingle()
     : await admin
         .from("access_request_policies")
-        .insert({ tenant_id: tenantId, application_id: applicationId, entitlement_id: entitlementId, ...fields, created_by: actorId })
+        .insert({ tenant_id: tenantId, application_id: key.applicationId, entitlement_id: key.entitlementId, ...fields, version, created_by: opts.createdBy })
         .select()
         .single();
   // Same-tenant keys refuse another organization's application or entitlement.
   if (error?.code === "23503") throw new ApiError(404, "NOT_FOUND", "That application or entitlement is not in this organization");
   if (error?.code === "23514") throw new ApiError(400, "VALIDATION_FAILED", error.message);
-  if (error || !data) throw new ApiError(500, "WRITE_FAILED", error?.message ?? "Could not save the policy");
+  if (error?.code === "23505") throw new ApiError(409, "CONFLICT", "The policy was just created; reload");
+  if (error) throw new ApiError(500, "WRITE_FAILED", error.message);
+  if (!data) throw new ApiError(409, "CONFLICT", "The policy changed meanwhile; reload");
   const policy = toPolicy(data);
+  const { error: versionError } = await admin.from("governance_object_versions").insert({
+    tenant_id: tenantId,
+    object_type: "request_policy",
+    object_id: policy.id,
+    version,
+    snapshot: data,
+    change_id: opts.changeId ?? null,
+    created_by: opts.createdBy,
+    approved_by: opts.approvedBy ?? null,
+  });
+  if (versionError) throw new ApiError(500, "WRITE_FAILED", versionError.message);
   await writeAudit({
     tenantId,
     actorId,
@@ -102,7 +201,7 @@ export async function saveRequestPolicy(tenantId: string, actorId: string, input
     objectType: "access_request_policy",
     objectId: policy.id,
     outcome: "success",
-    metadata: { applicationId, entitlementId, ...fields },
+    metadata: { applicationId: key.applicationId, entitlementId: key.entitlementId, version, ...(opts.changeId ? { changeId: opts.changeId, requestedBy: opts.createdBy } : {}), ...fields },
   });
   return policy;
 }
