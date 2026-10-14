@@ -251,7 +251,9 @@ export async function runConnectorFulfilment(tenantId: string, plan: ConnectorPl
       })
       .eq("tenant_id", tenantId)
       .eq("id", plan.taskId)
-      .eq("connector_status", "running");
+      .eq("connector_status", "running")
+      // A read may have verified it meanwhile: never take a verified task back to completed.
+      .neq("status", "verified");
     if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
     if (claimed.kind === "grant") {
       const { error: grantError } = await admin

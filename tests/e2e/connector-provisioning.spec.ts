@@ -599,7 +599,10 @@ test.describe.serial("connector provisioning", () => {
   });
 
   test("slice 2: no account yet: the connector creates it, the next read brings it in, then the access is added and verified", async ({ request }) => {
-    test.setTimeout(180_000);
+    // Two writes and two full reads of the system in a chain, each read followed by
+    // two organization-wide ledger refreshes. The budget covers both 90 s waits below
+    // (180 s did not: the nightly of 2026-10-14 ran out in the second one).
+    test.setTimeout(240_000);
     const ops = (await entitlementIdByRef(tenantId, appId, "g-ops"))!;
     const before = system.writes.length;
     const res = await request.post("/api/v1/access/requests", { data: { subjectIdentityId: people.eve, applicationId: appId, entitlementId: ops, requestType: "grant", justification: "INTEGRATION-P0-13 create then grant" } });

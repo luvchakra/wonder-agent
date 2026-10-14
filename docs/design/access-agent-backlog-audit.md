@@ -3966,6 +3966,20 @@ The authorization engine is unchanged: it treats the copies like any other assig
     - ended early, the copy is gone and so is the right.
   - `permission-catalog` 9/9 after its fix.
 
+## 2026-10-14 — Handed over by the nightly investigation (QA): two Access items
+
+1. **Performance (§15).** After each connector read, the account step (`accounts.ts:500`) and the access step (`connectorAccess.ts:242`) each rebuild the access ledger for the whole organization, including the rogue-findings sync.
+   - That costs 8–10 s per rebuild unloaded and 20–23 s with two workers, and the access step waits for the account step's rebuild.
+   - It made the 14 October nightly's connector-provisioning chain overrun, and the first half exceed its 35 minutes.
+   - Fix direction: rebuild per application, or once per read, after both steps. This touches Integration's pipeline and Risk's findings sync, so it is not done here.
+2. **Race (correctness).** In `connectorFulfilment.ts`, the update that marks a connector task completed checks only that the connector is still running.
+   - If a read verifies the task between the write and that update, the task returns to `completed` and the request shows `fulfilled_unverified` for good.
+   - It was not seen in this nightly; it was found by reading the code.
+   - Fixed in the same pull request: the update now also requires the task not to be `verified` (`.neq("status", "verified")`).
+     The grant updates beside it already only move from their pending states.
+
+Item 1 is open, for the next Access pass.
+
 ## 2026-10-14 — ACCESS-P0-35 part 1: approved changes to request policies
 
 **Rule (owner decision, 14 October).** A change needs a second person only in an organization with two or more active Tenant Administrators. Those are counted directly or through an active group by Foundation's new `countActiveTenantAdministrators`.

@@ -15,7 +15,6 @@ import { getTenantIdBySlug } from "./support/seedFinanceBotAccess";
 
 const stamp = Date.now();
 const mail = (who: string) => `e2e-bulk-${who}-${stamp}@e2e.wonderagent.test`;
-const created: string[] = [];
 let tenantId = "";
 
 function db(): SupabaseClient {
@@ -47,7 +46,18 @@ test.describe.serial("bulk invitation", () => {
   });
 
   test.afterAll(async () => {
-    for (const id of [...new Set([...created, ...(await invitedIds(""))])]) await db().auth.admin.deleteUser(id);
+    // Some 46 invited people. Each deletion cascades through the user tables
+    // and took about 3.5 s each from a remote runner (46 in 21 s, eight at a time,
+    // 2026-10-14), so one after another overran the hook's 60 s: a few at a time.
+    test.setTimeout(180_000);
+    const admin = db();
+    const ids = await invitedIds("");
+    const failed: string[] = [];
+    for (let i = 0; i < ids.length; i += 8) {
+      const results = await Promise.all(ids.slice(i, i + 8).map(async (id) => ({ id, error: (await admin.auth.admin.deleteUser(id)).error })));
+      for (const r of results) if (r.error) failed.push(`${r.id}: ${r.error.message}`);
+    }
+    expect(failed, "invited people left behind").toEqual([]);
   });
 
   test("a 50-row CSV: the preview shows new, already-member and invalid rows; Confirm invites exactly the new ones, once", async ({ page }) => {
