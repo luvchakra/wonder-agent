@@ -20,6 +20,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/identity-lifecycle",
+      "schedule": "45 4 * * *"
+    },
+    {
       "path": "/api/cron/access-governance",
       "schedule": "0 5 * * *"
     },

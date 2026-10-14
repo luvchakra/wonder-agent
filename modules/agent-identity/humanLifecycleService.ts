@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { notify } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -14,7 +14,7 @@ import type {
   LifecycleTaskStatus,
   LifecycleTaskType,
 } from "@/lib/shared/types/agent-identity";
-import { HUMAN_TRANSITIONS, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, type DetectedEvent } from "./humanLifecycle";
+import { endDatePassed, HUMAN_TRANSITIONS, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, whyCannotDisableAll, type DetectedEvent } from "./humanLifecycle";
 import { assignOwner, removeOwner } from "./owners";
 
 /**
@@ -55,7 +55,7 @@ function toEvent(r: Row): IdentityLifecycleEvent {
     fromState: (r.from_state as HumanLifecycleState | null) ?? null,
     toState: (r.to_state as HumanLifecycleState | null) ?? null,
     changedFields: (r.changed_fields as string[]) ?? [],
-    origin: r.origin as "manual" | "source",
+    origin: r.origin as "manual" | "source" | "schedule",
     sourceId: (r.source_id as string | null) ?? null,
     runId: (r.run_id as string | null) ?? null,
     actorId: (r.actor_id as string | null) ?? null,
@@ -92,7 +92,7 @@ export async function recordLifecycleEvents(
   tenantId: string,
   subject: LifecycleSubject,
   detected: DetectedEvent[],
-  meta: { origin: "manual" | "source"; actorId: string | null; sourceId?: string | null; runId?: string | null; note?: string | null },
+  meta: { origin: "manual" | "source" | "schedule"; actorId: string | null; sourceId?: string | null; runId?: string | null; note?: string | null },
 ): Promise<IdentityLifecycleEvent[]> {
   const recorded: IdentityLifecycleEvent[] = [];
   for (const d of detected) {
@@ -193,7 +193,7 @@ export async function recordLifecycleEvents(
     await writeAudit({
       tenantId,
       actorId: meta.actorId,
-      actorType: meta.origin === "source" ? "integration" : "user",
+      actorType: meta.origin === "source" ? "integration" : meta.origin === "schedule" ? "system" : "user",
       action: "identity.lifecycle_event",
       objectType: "identity",
       objectId: subject.id,
@@ -309,6 +309,136 @@ export async function transitionHumanLifecycle(
     { origin: "manual", actorId, note: reason },
   );
   return event;
+}
+
+/**
+ * IDENTITY-P0-18 (finish): the manager's "disable all access". Their own
+ * current manager, or an identity administrator, stops a working person's
+ * access at once: the person is disabled, which opens the leaver removal
+ * work (every grant becomes a removal, accounts are disabled through their
+ * connectors, WID-C02). Removal itself is governed and verified as always;
+ * nothing is deleted here. Needs a reason; audited as the actor.
+ *
+ * The caller's authority is checked here from the database (the manager
+ * link on the person), never from what the client sent. The write uses the
+ * service role because a manager need not hold identity.manage; every
+ * statement is filtered on the tenant and on the state that was read.
+ */
+export async function disableAllAccess(
+  tenantId: string,
+  actorId: string,
+  identityId: string,
+  input: { reason?: unknown; canManageIdentities: boolean },
+): Promise<IdentityLifecycleEvent> {
+  if (!UUID_RE.test(identityId)) throw new ApiError(404, "NOT_FOUND", "No such person in this organization");
+  const reason = typeof input.reason === "string" ? input.reason.trim().slice(0, 2000) : "";
+  if (!reason) throw new ApiError(400, "VALIDATION_FAILED", "reason: say why their access is being stopped");
+  const admin = supabaseServiceRole();
+  const [{ data: row, error }, { data: me, error: meError }] = await Promise.all([
+    admin.from("identities").select("id, tenant_id, identity_type, display_name, user_id, manager_identity_id, status, lifecycle_state").eq("tenant_id", tenantId).eq("id", identityId).maybeSingle(),
+    admin.from("identities").select("id").eq("tenant_id", tenantId).eq("user_id", actorId).eq("identity_type", "HUMAN").limit(1).maybeSingle(),
+  ]);
+  if (error || meError) throw new ApiError(500, "QUERY_FAILED", (error ?? meError)!.message);
+  if (!row || row.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "No such person in this organization");
+  const from = (row.lifecycle_state as HumanLifecycleState | null) ?? null;
+  const refused = whyCannotDisableAll({
+    actorIdentityId: (me?.id as string | undefined) ?? null,
+    canManageIdentities: input.canManageIdentities,
+    subject: { id: identityId, identityType: row.identity_type as string, lifecycleState: from, managerIdentityId: (row.manager_identity_id as string | null) ?? null },
+  });
+  if (refused) {
+    // A manager who is not this person's manager learns nothing more than "not yours".
+    throw new ApiError(refused.status, refused.status === 403 ? "FORBIDDEN" : refused.status === 409 ? "INVALID_TRANSITION" : "VALIDATION_FAILED", refused.message);
+  }
+
+  const { data: updated, error: updateError } = await admin
+    .from("identities")
+    .update({ lifecycle_state: "DISABLED", status: statusForState("DISABLED", row.status as IdentityStatus), updated_at: new Date().toISOString() })
+    .eq("tenant_id", tenantId)
+    .eq("id", identityId)
+    .eq("lifecycle_state", from as string)
+    .select("id");
+  if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  if (!updated?.length) throw new ApiError(409, "CONFLICT", "Someone else changed this person's lifecycle; reload and try again");
+
+  const [event] = await recordLifecycleEvents(
+    admin,
+    tenantId,
+    { id: identityId, displayName: row.display_name as string, userId: (row.user_id as string | null) ?? null, managerIdentityId: (row.manager_identity_id as string | null) ?? null },
+    [{ eventType: "disabled", changedFields: ["lifecycleState"], fromState: from, toState: "DISABLED" }],
+    { origin: "manual", actorId, note: reason },
+  );
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "identity.access_disabled",
+    objectType: "identity",
+    objectId: identityId,
+    outcome: "success",
+    metadata: { fromState: from, eventId: event.id, as: input.canManageIdentities ? "identity_administrator" : "manager" },
+    typedText: { reason },
+  });
+  return event;
+}
+
+/**
+ * IDENTITY-P0-18 (finish), expiry: every working person whose end date has
+ * passed becomes a leaver (LEAVE_PENDING), which opens the leaver work:
+ * ownership transfer, access removal and sign-in tasks for people to do.
+ * Nothing is revoked by the sweep itself. Run daily by
+ * /api/cron/identity-lifecycle; service role, each write filtered by the
+ * row's own tenant and only while the person is still active.
+ */
+export async function sweepEndDates(tenantId: string | null, now = new Date()): Promise<{ leavers: number; failed: number }> {
+  const today = now.toISOString().slice(0, 10);
+  const admin = supabaseServiceRole();
+  let query = admin
+    .from("identities")
+    .select("id, tenant_id, display_name, user_id, manager_identity_id, lifecycle_state, end_date")
+    .eq("lifecycle_state", "ACTIVE")
+    .in("identity_type", ["HUMAN", "EXTERNAL"])
+    .lt("end_date", today);
+  if (tenantId) query = query.eq("tenant_id", tenantId);
+  const { data, error } = await query.order("end_date").limit(500);
+  if (error) throw new Error(`sweepEndDates: ${error.message}`);
+  let leavers = 0;
+  let failed = 0;
+  for (const r of (data ?? []) as Row[]) {
+    if (!endDatePassed({ lifecycleState: r.lifecycle_state as HumanLifecycleState, endDate: (r.end_date as string | null) ?? null }, today)) continue;
+    const tenant = r.tenant_id as string;
+    try {
+      const { data: moved, error: moveError } = await admin
+        .from("identities")
+        .update({ lifecycle_state: "LEAVE_PENDING", updated_at: now.toISOString() })
+        .eq("tenant_id", tenant)
+        .eq("id", r.id as string)
+        .eq("lifecycle_state", "ACTIVE")
+        .select("id");
+      if (moveError) throw new Error(moveError.message);
+      if (!moved?.length) continue;
+      await recordLifecycleEvents(
+        admin,
+        tenant,
+        { id: r.id as string, displayName: r.display_name as string, userId: (r.user_id as string | null) ?? null, managerIdentityId: (r.manager_identity_id as string | null) ?? null },
+        [{ eventType: "leaver", changedFields: ["lifecycleState", "endDate"], fromState: "ACTIVE", toState: "LEAVE_PENDING" }],
+        { origin: "schedule", actorId: null, note: `End date ${String(r.end_date).slice(0, 10)} reached` },
+      );
+      leavers++;
+    } catch (err) {
+      failed++;
+      await writeAudit({
+        tenantId: tenant,
+        actorType: "system",
+        action: "identity.end_date_reached",
+        objectType: "identity",
+        objectId: r.id as string,
+        outcome: "failure",
+        metadata: { error: err instanceof Error ? err.message.slice(0, 200) : "unknown" },
+      });
+    }
+  }
+  return { leavers, failed };
 }
 
 // ---------------------------------------------------------------- reads

@@ -127,7 +127,7 @@ Exit test: not run.
 |---|---|---|---|---|
 | OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Done | Condition language, evaluation, simulation, run log stored (`rule_runs`, 0167); first used by IDENTITY-P0-21 |
 | IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Partial | 2026-10-14: attribute rules (created, imported, attribute changed), report-only, simulation, four-eyes publish, run log (0166). Lifecycle triggers and effects with IDENTITY-P0-18 (finish) |
-| IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Partial | Backlog: events, tasks, transitions, ownership transfer built; rules not |
+| IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Done | Birthright (0151), mover review (0153), leaver removal (WID-C02), four-eyes rules (IDENTITY-P0-21); 2026-10-14: expiry sweep (0168) and the manager's "disable all access" (My Team) |
 | IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Not started | |
 | COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Not started | Backlog: Not Started |
