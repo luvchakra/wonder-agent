@@ -54,6 +54,8 @@ excluded (list in the migration's header).
 | `agent_relationships` | IA | Agent-to-agent / agent-to-tool relationships |
 | `identities` | IA | WonderID common identity reference, one row per identity of any type (IDENTITY-P0-15). AI_AGENT rows mirror `agents` 1:1 by trigger (`agents` stays canonical); HUMAN rows for members are created by trigger on `tenant_memberships` (FA's table, read only) |
 | `identity_attribute_definitions` | IA | Tenant-defined, typed identity attributes (IDENTITY-P0-16) |
+| `lifecycle_rules` | IA | The organization's identity rules (IDENTITY-P0-21, migration 0166): attribute rules now, lifecycle rules with IDENTITY-P0-18's finish. A working copy and the published copy that runs; four-eyes publishing. Evaluated by OA's shared rule runtime (D12). Member reads; service-role writes from IA's `identityRulesService` |
+| `lifecycle_rule_versions` | IA | Every published version of an identity rule, with who asked and who approved; append-only (migration 0166) |
 | `identity_relationships` | IA | Relationships between identities (manager_of, owns, sponsors, …) with validity windows (IDENTITY-P0-16) |
 | `identity_lifecycle_events` | IA | Human lifecycle events (joiner, mover, leaver, rehire, …), from sources or people (IDENTITY-P0-18) |
 | `identity_lifecycle_tasks` | IA | Governed work each lifecycle event opens; closed by people with a note (IDENTITY-P0-18) |
@@ -125,6 +127,7 @@ excluded (list in the migration's header).
 | `connector_definitions` | INT | An organization's own connector definitions (immutable versions; built-in definitions live in `modules/integrations/framework/definitions`) |
 | `connector_traffic` | INT | The Connector Gateway's traffic ledger: per connection, per minute, requests, errors, blocked, bytes and duration by host only (service-role writes, member reads; migration 0110) |
 | `notifications` | OA | In-app/email notification records |
+| `rule_runs` | OA | The automation run log of every module's rules (OPERATIONS-P0-11, D12, migration 0167): each evaluation's outcome, planned effects and the rule version; written by the owning module through OA's `recordRuleRuns()`, read by members; append-only |
 | `reports` | OA | Saved/scheduled report definitions |
 | `platform_tenants` | PA | Platform-admin view/metadata of tenants (subscription, limits, status) |
 | `environment_orders` | PA | Paid environments an organization's owner bought (migration 0161; test-mode payments while no provider is configured) |
@@ -304,7 +307,7 @@ consume and persist into their own tables.
 |---|---|
 | `/api/v1/auth`, `/api/v1/users` (incl. `/api/v1/users/invitations`, FOUNDATION-P0-32), `/api/v1/roles`, `/api/v1/tenant`, `/api/v1/sso` | FA |
 | `/api/v1/agents`, `/api/v1/agents/:id` | IA |
-| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `:id/lifecycle`, `relationships/:id`, `attributes`, `lifecycle-tasks`) | IA |
+| `/api/v1/identities` (list/create, `:id`, `:id/relationships`, `:id/lifecycle`, `relationships/:id`, `attributes`, `lifecycle-tasks`, `rules`, `rules/:id`, `rules/:id/simulate`, `rules/:id/publish`, `rules/:id/retire`, `rules/:id/runs`) | IA |
 | `/api/v1/integrations` (incl. `identity-sources`, `correlations`, `connectors`, `:id/connector-credentials`) | INT |
 | `/api/v1/access`, `/api/v1/policies` | AA |
 | `/api/v1/runtime` (events, agents/:id/compare, agents/:id/did, data-quality, quarantine) | RA |

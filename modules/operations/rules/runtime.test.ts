@@ -84,6 +84,15 @@ describe("evaluateRules", () => {
     expect(evaluateRules(rules, created, subject, ctx).log[0].effects[0].params.value).toBe("Lovelace");
   });
 
+  it("builds a value from a template; a missing part is left out, an empty result is null", () => {
+    const template = (t: string) =>
+      evaluateRules([rule({ effects: [{ type: "set_attribute", params: { attribute: "displayName", value: { template: t } } }] })], created, subject, ctx).log[0].effects[0].params.value;
+    expect(template("{identity.firstName} {identity.lastName}")).toBe("Ada Lovelace");
+    expect(template("{identity.firstName} {identity.middleName} {identity.lastName}")).toBe("Ada Lovelace");
+    expect(template("{identity.nickname}")).toBeNull();
+    expect(template("{identity.lastName}-{identity.department}")).toBe("Lovelace-Finance");
+  });
+
   it("a granting effect goes through a request unless the rule was approved under four-eyes", () => {
     const effects: Rule["effects"] = [
       { type: "assign_package", params: { package: "p" } },
@@ -109,6 +118,25 @@ describe("validateRule", () => {
     expect(
       validateRule(rule({ condition: 'identity.department = "Finance"', effects: [{ type: "set_attribute", params: { attribute: "region", value: { ref: "identity.lastName" } } }] }), known),
     ).toEqual([]);
+  });
+
+  it("checks the references inside a template", () => {
+    const problems = validateRule(
+      {
+        trigger: { type: "identity.created" },
+        condition: "true",
+        priority: 1,
+        effects: [{ type: "set_attribute", params: { attribute: "region", value: { template: "{identity.lastName} {identity.shoeSize}" } } }],
+      },
+      known,
+    );
+    expect(problems.map((p) => p.field)).toEqual(["effects.0.value"]);
+    expect(
+      validateRule(
+        { trigger: { type: "identity.created" }, condition: "true", priority: 1, effects: [{ type: "set_attribute", params: { attribute: "region", value: { template: "x".repeat(501) } } }] },
+        known,
+      )[0].message,
+    ).toMatch(/at most 500/);
   });
 
   it("names every problem", () => {

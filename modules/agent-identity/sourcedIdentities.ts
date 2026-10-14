@@ -1,6 +1,8 @@
 import "server-only";
 
 import { supabaseServiceRole } from "@/lib/db/supabaseServer";
+import type { RuleEvent } from "@/modules/operations/service";
+import { applyIdentityRules, loadLiveIdentityRules } from "./identityRulesService";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import {
   IDENTITY_STATUSES,
@@ -99,6 +101,9 @@ export type SourcedResult = {
   lifecycleError?: string;
   /** WID-H01: why this person's source disagreements could not be updated (the change itself applied). */
   conflictsError?: string;
+  /** IDENTITY-P0-21: attribute rules wrote to the identity after this change, or why they could not run (the change itself applied). */
+  rulesApplied?: boolean;
+  rulesError?: string;
 };
 
 const COLUMN: Record<SourcedIdentityField, string> = {
@@ -321,6 +326,9 @@ export async function applySourcedIdentities(
     if (error) throw new Error(`recording the change history: ${error.message}`);
   };
 
+  // IDENTITY-P0-21: attribute rules run on each created or changed identity once the batch is written.
+  const ruleEvents: { result: SourcedResult; event: RuleEvent; before: Record<string, unknown> | null }[] = [];
+
   for (const op of ops) {
     try {
       if (op.op === "create") {
@@ -351,6 +359,7 @@ export async function applySourcedIdentities(
         const created: SourcedResult = { ref: op.ref, identityId: data.id as string, action: "created", changed: Object.keys(op.fields) as SourcedIdentityField[], skipped: [] };
         if (Object.keys(attributes).length) created.attributesChanged = Object.keys(attributes);
         results.push(created);
+        ruleEvents.push({ result: created, event: { type: "identity.imported", source: source.sourceName, changedAttributes: [...Object.keys(op.fields), ...Object.keys(attributes)] }, before: null });
         await audit("identity.created", data.id as string, { identityType: op.identityType, fields: Object.keys(op.fields), ...(created.attributesChanged ? { attributes: created.attributesChanged } : {}) });
         if (PERSON_TYPES.has(op.identityType)) {
           const state = lifecycleFor(status, op.fields.startDate ?? null, today) as HumanLifecycleState;
@@ -452,6 +461,9 @@ export async function applySourcedIdentities(
         ...(conflictsError ? { conflictsError } : {}),
       };
       results.push(updated);
+      if (changed.length || attributesChanged.length) {
+        ruleEvents.push({ result: updated, event: { type: "identity.attribute_changed", source: source.sourceName, changedAttributes: [...changed, ...attributesChanged] }, before: row });
+      }
       if (changed.length && PERSON_TYPES.has(row.identity_type as IdentityType)) {
         const beforeState = (row.lifecycle_state as HumanLifecycleState | null) ?? null;
         const afterState = ((update.lifecycle_state as HumanLifecycleState | undefined) ?? beforeState) as HumanLifecycleState | null;
@@ -494,6 +506,22 @@ export async function applySourcedIdentities(
         skipped: [],
         error: err instanceof Error ? err.message.slice(0, 300) : "unknown error",
       });
+    }
+  }
+
+  if (ruleEvents.length) {
+    let rules: Record<string, unknown>[] | null = null;
+    try {
+      rules = await loadLiveIdentityRules(tenantId);
+    } catch (err) {
+      for (const r of ruleEvents) r.result.rulesError = err instanceof Error ? err.message.slice(0, 300) : "rules could not be read";
+    }
+    if (rules?.length) {
+      for (const { result, event, before } of ruleEvents) {
+        const outcome = await applyIdentityRules(tenantId, result.identityId!, event, { rules, before, correlationId: source.runId });
+        if (outcome.changed) result.rulesApplied = true;
+        if (outcome.error) result.rulesError = outcome.error;
+      }
     }
   }
   return results;
