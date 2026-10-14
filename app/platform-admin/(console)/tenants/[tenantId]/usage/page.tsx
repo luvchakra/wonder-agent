@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTenant, getUsageSummary } from "@/modules/platform-admin/service";
 import { Card, StatusBadge, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
-import { PageHeading } from "../../../PageHeading";
+import { PageHeading } from "@/app/platform-admin/PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";

@@ -1326,3 +1326,13 @@ Announcements now has **End now** on every notice still running. It sets the not
 - Local E2E platform-admin and manage-organizations 20/20.
 
 **Noted, not changed.** Changing an environment's type to production in the console (`set_tenant_environment`, 0157) still clears its link to the organization. That is now unnecessary; it's left for a follow-up if wanted.
+
+## 2026-10-14 — Platform Admins is the bootstrap page (WID-H10)
+
+Owner decision: the console is for `platform_admins` entries only. The
+Platform Admins page also serves a `PLATFORM_ADMIN_EMAILS` session (the
+bootstrap): the navigation shows only that page, a short line explains
+it, and the grant form fills in the session's own id. Every other console
+page moved into `app/platform-admin/(console)` (same URLs) behind a
+table-only layout. Detail and verification: Foundation audit log, same
+date.

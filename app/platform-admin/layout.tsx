@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
+import { requirePlatformAdminOrBootstrap } from "@/lib/rbac/requirePlatformAdmin";
 import { WonderIDLogo } from "@/modules/ui";
 import { PlatformNav } from "./PlatformNav";
 
@@ -13,8 +13,12 @@ import { PlatformNav } from "./PlatformNav";
 // page — never a partial render, never navigation that reveals this
 // console's structure to a non-platform-admin caller.
 export default async function PlatformAdminLayout({ children }: { children: React.ReactNode }) {
+  // WID-H10: a PLATFORM_ADMIN_EMAILS address (the bootstrap) reaches only
+  // Platform Admins; the rest of the console is in (console), which needs a
+  // platform_admins entry.
+  let bootstrap = false;
   try {
-    await requirePlatformAdmin();
+    ({ bootstrap } = await requirePlatformAdminOrBootstrap());
   } catch {
     notFound();
   }
@@ -26,7 +30,7 @@ export default async function PlatformAdminLayout({ children }: { children: Reac
             <WonderIDLogo size={26} />
             <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Platform</span>
           </div>
-          <PlatformNav />
+          <PlatformNav bootstrap={bootstrap} />
         </nav>
       </aside>
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8">

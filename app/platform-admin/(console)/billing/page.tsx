@@ -5,7 +5,7 @@ import { formatMoney } from "@/modules/billing/rules";
 import { decideAdjustmentAction, requestAdjustmentAction, updatePriceAction } from "@/app/actions/platformBilling";
 import { Badge, Button, Card, CardBody, CardHeader, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
-import { PageHeading } from "../PageHeading";
+import { PageHeading } from "@/app/platform-admin/PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";

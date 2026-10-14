@@ -6,7 +6,7 @@ import Link from "next/link";
 import { CircleHelp } from "lucide-react";
 import { getProfile, getSessionUser } from "@/lib/tenant/session";
 import { getMyMemberships, getTenantContext } from "@/lib/tenant/getTenantContext";
-import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
+import { platformConsoleAccess } from "@/lib/rbac/requirePlatformAdmin";
 import { selectTenantAction, signOutAction } from "@/app/actions/tenant";
 import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
 import { countOpenAccessFindings, countOpenAgentFindings } from "@/modules/risk/service";
@@ -74,7 +74,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
     // Already resolved by getTenantContext() above — the cache hands back
     // the same promise, so this costs nothing.
     getMyMemberships(),
-    isPlatformAdmin(),
+    platformConsoleAccess().then((access) => access !== null),
     // PLATFORM-P0-05.4 — Experience Agent's half of Platform's already-
     // published getActiveAnnouncements(): every customer page sees any
     // active global/tenant-scoped maintenance/notice banner.

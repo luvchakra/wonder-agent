@@ -1,7 +1,7 @@
 import { getPlatformHealth, getWonderappsDashboardAccess } from "@/modules/platform-admin/service";
 import { setWonderappsAccessAction } from "@/app/actions/platform";
 import { Card, CardBody, CardHeader, PendingSubmitButton, StatusBadge } from "@/modules/ui";
-import { HealthSignals, PageHeading } from "../PageHeading";
+import { HealthSignals, PageHeading } from "@/app/platform-admin/PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";

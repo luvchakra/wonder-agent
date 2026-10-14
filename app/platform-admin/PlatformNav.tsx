@@ -16,11 +16,13 @@ const NAV = [
 ];
 
 /** The vendor console's own navigation (never the customer shell's, non-negotiable #3). */
-export function PlatformNav() {
+export function PlatformNav({ bootstrap = false }: { bootstrap?: boolean }) {
   const pathname = usePathname();
+  // WID-H10: the PLATFORM_ADMIN_EMAILS bootstrap opens only Platform Admins.
+  const items = bootstrap ? NAV.filter((item) => item.href === "/platform-admin/admins") : NAV;
   return (
     <ul className="flex gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0">
-      {NAV.map((item) => {
+      {items.map((item) => {
         const active = item.href === "/platform-admin" ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
         return (
           <li key={item.href} className="shrink-0">

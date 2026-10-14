@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/tenant/session";
 import { getHostTenant, urlForTenant } from "@/lib/tenant/hostTenant";
 import { TENANT_COOKIE_NAME, getMyMemberships } from "@/lib/tenant/getTenantContext";
-import { isPlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
+import { platformConsoleAccess } from "@/lib/rbac/requirePlatformAdmin";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,7 @@ export default async function OrganizationsPage() {
   const host = await getHostTenant();
   if (host.target.kind === "subdomain") redirect("/");
 
-  const [memberships, admin, cookieStore] = await Promise.all([getMyMemberships(), isPlatformAdmin(), cookies()]);
+  const [memberships, admin, cookieStore] = await Promise.all([getMyMemberships(), platformConsoleAccess().then((access) => access !== null), cookies()]);
   const mine = memberships.filter((m) => !m.automation && m.slug);
   if (!mine.length) redirect(admin ? "/platform-admin" : "/onboarding");
 

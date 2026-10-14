@@ -20,7 +20,7 @@ import { baseAppHost, tenantUrl } from "@/lib/tenant/host";
 import type { PlatformTenant } from "@/lib/shared/types/platform";
 import { Badge, Button, Card, CardBody, CardHeader, EnvironmentBadge, ENVIRONMENT_COLOR, StatCard, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
-import { PageHeading } from "../../PageHeading";
+import { PageHeading } from "@/app/platform-admin/PageHeading";
 import { AddressForm, EnvironmentForm, NotesForm, OrganizationNameForm, OrganizationProfileForm, PlanForm } from "./TenantSettingsForms";
 
 // See app/platform-admin/page.tsx for why this is forced.
