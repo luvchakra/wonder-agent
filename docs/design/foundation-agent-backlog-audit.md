@@ -3438,3 +3438,27 @@ terms; refuses the actor's own role (`SELF_ESCALATION`) and automation
 members (`assertTenantMember`); 409 `NO_ASSIGNMENT` when the role is no
 longer held directly. Service role, filtered by tenant; audited
 `role.assignment_changed`. Used by Compliance's review exceptions.
+
+## 2026-10-14 — WID-H10: vendor access only from platform_admins (owner decision)
+
+The owner clarified the WID-H10 decision: vendor access comes only from
+the audited `platform_admins` table, and `PLATFORM_ADMIN_EMAILS` only
+bootstraps it.
+- `isPlatformAdmin` and `requirePlatformAdmin` read only the table.
+- `isPlatformAdminBootstrap` (the earlier proven-mailbox check, first use
+  audited) and `requirePlatformAdminOrBootstrap` allow only Platform Admins
+  and granting an entry; `platformConsoleAccess()` returns full, bootstrap
+  or none for the console layouts and the customer "Admin console" link.
+- Every other console page moved into the route group
+  `app/platform-admin/(console)` (URLs unchanged), whose layout sends a
+  bootstrap session to Platform Admins and anyone else to a 404.
+- `tests/architecture/route-gates.test.ts` recognises
+  `requirePlatformAdminOrBootstrap` as a gate.
+
+Before the change, 3 accounts were in `platform_admins`; the owner's
+account was not, so the owner adds it once through Platform Admins (the
+form fills in their own id).
+
+Verified: typecheck; eslint; Vitest rbac and architecture 64/64; `next
+build`; local E2E with `PLATFORM_ADMIN_EMAILS` set to the IAM admin:
+`platform-admin`, `manage-organizations`, `first-organization` 24/24.

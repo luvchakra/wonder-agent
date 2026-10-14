@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requirePlatformAdmin } from "@/lib/rbac/requirePlatformAdmin";
+import { requirePlatformAdmin, requirePlatformAdminOrBootstrap } from "@/lib/rbac/requirePlatformAdmin";
 import {
   activateTenant,
   createAnnouncement,
@@ -142,7 +142,8 @@ export async function updateBrandingAction(formData: FormData) {
 }
 
 export async function grantPlatformAdminAction(formData: FormData) {
-  const { userId } = await requirePlatformAdmin();
+  // WID-H10: the one thing a PLATFORM_ADMIN_EMAILS address may do is add an entry to platform_admins (audited).
+  const { userId } = await requirePlatformAdminOrBootstrap();
   await grantPlatformAdmin(userId, String(formData.get("targetUserId") ?? ""));
   revalidatePath("/platform-admin/admins");
 }

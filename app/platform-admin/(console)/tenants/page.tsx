@@ -5,7 +5,7 @@ import { createTenantAction } from "@/app/actions/platform";
 import type { Subscription } from "@/lib/shared/types/platform";
 import { Badge, Button, Card, CardBody, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
-import { PageHeading } from "../PageHeading";
+import { PageHeading } from "@/app/platform-admin/PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";

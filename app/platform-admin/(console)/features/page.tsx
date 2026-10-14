@@ -2,7 +2,7 @@ import { listFlagCatalog, listTenants, listTenantFlagOverrides, listConfigVersio
 import { setFeatureFlagAction, updateFeatureFlagDefaultAction, rollbackConfigVersionAction } from "@/app/actions/platform";
 import { Badge, Button, Card, CardHeader, TableContainer, Td, Th, Thead, Tr, fieldInputClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
-import { PageHeading } from "../PageHeading";
+import { PageHeading } from "@/app/platform-admin/PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";

@@ -20,6 +20,33 @@ test.describe("Platform-admin authorization boundary (non-negotiable #3)", () =>
   });
 });
 
+/**
+ * WID-H10, owner decision 2026-10-14: a PLATFORM_ADMIN_EMAILS address only
+ * bootstraps the platform_admins table. Runs when the server under test
+ * lists the IAM admin's address in PLATFORM_ADMIN_EMAILS (set the same
+ * value for Playwright); nothing is granted, so the run leaves no access.
+ */
+test.describe("PLATFORM_ADMIN_EMAILS bootstrap (WID-H10)", () => {
+  test.skip(!(process.env.PLATFORM_ADMIN_EMAILS ?? "").toLowerCase().includes(TEST_USERS.iamAdminOne.email.toLowerCase()), "PLATFORM_ADMIN_EMAILS does not list the IAM admin");
+  test.use({ storageState: authFile("iamAdminOne") });
+
+  test("opens only Platform Admins, with its own id filled in; every other console page and API is closed", async ({ page }) => {
+    await page.goto("/platform-admin");
+    await expect(page).toHaveURL(/\/platform-admin\/admins$/);
+    await expect(page.getByRole("heading", { name: "Platform Admins" })).toBeVisible();
+    const nav = page.getByRole("navigation", { name: "Platform" });
+    await expect(nav.getByRole("link")).toHaveText(["Platform Admins"]);
+    await expect(page.getByText("can only add administrators here")).toBeVisible();
+    await expect(page.getByLabel("User id")).not.toHaveValue("");
+    for (const path of ["/platform-admin/tenants", "/platform-admin/billing", "/platform-admin/features"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/platform-admin\/admins$/);
+    }
+    expect((await page.request.get("/api/platform/v1/tenants")).status()).toBe(403);
+    expect((await page.request.get("/api/platform/v1/admins")).status()).toBe(403);
+  });
+});
+
 test.describe("Platform-admin console", () => {
   test.use({ storageState: authFile("platformAdmin") });
 

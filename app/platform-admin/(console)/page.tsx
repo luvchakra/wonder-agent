@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listTenants, getPlatformHealth } from "@/modules/platform-admin/service";
 import { Card, CardHeader, StatCard } from "@/modules/ui";
-import { HealthSignals, PageHeading } from "./PageHeading";
+import { HealthSignals, PageHeading } from "@/app/platform-admin/PageHeading";
 
 // Not statically analyzable as dynamic (the requirePlatformAdmin() auth
 // check lives in the enclosing layout, not this page) — force it, or a

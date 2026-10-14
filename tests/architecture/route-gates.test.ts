@@ -159,7 +159,7 @@ const PUBLIC_ACTIONS = new Set([
   "app/actions/tenant.ts#signOutAction",
 ]);
 
-const ACTION_GATE = /requirePermission(For)?\(|requireAnyPermission(For)?\(|requirePlatformAdmin\(|getSessionUser\(|getTenantContext\(/;
+const ACTION_GATE = /requirePermission(For)?\(|requireAnyPermission(For)?\(|requirePlatformAdmin(OrBootstrap)?\(|getSessionUser\(|getTenantContext\(/;
 
 describe("QA-P0-02.2: every server action is gated", () => {
   const actionFiles = files(join(ROOT, "app", "actions"), (f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));

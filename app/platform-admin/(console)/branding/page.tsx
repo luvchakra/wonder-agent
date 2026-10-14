@@ -1,7 +1,7 @@
 import { getBranding, listConfigVersions } from "@/modules/platform-admin/service";
 import { updateBrandingAction, rollbackConfigVersionAction } from "@/app/actions/platform";
 import { Button, Card, CardBody, fieldInputClass, fieldLabelClass } from "@/modules/ui";
-import { PageHeading } from "../PageHeading";
+import { PageHeading } from "@/app/platform-admin/PageHeading";
 
 // See app/platform-admin/page.tsx for why this is forced.
 export const dynamic = "force-dynamic";

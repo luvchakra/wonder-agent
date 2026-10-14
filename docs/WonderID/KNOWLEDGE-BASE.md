@@ -649,6 +649,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Vendor console access now comes only from the platform administrators list. An address set in the hosting environment can only open Platform Admins to add someone (or itself) to that list; every grant is audited. |
 | 14 Oct 2026 | Access reviews of people and WonderID roles can defer an item, escalate it to whoever launched the campaign, or keep the access as an exception until a date, after which it is removed. |
 | 14 Oct 2026 | Access reviews can cover the WonderID roles members hold, directly or through a group, privileged roles first; nobody certifies their own role, and a revoke removes it at once. |
 | 14 Oct 2026 | Delegation never involves an automation credential, in either direction: its roles change only on its own page. The vendor console's listed-address path no longer accepts enterprise SSO or Microsoft-only sign-ins, and its first use is recorded in the platform audit. |
