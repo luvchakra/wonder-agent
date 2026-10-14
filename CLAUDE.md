@@ -1610,3 +1610,31 @@ blocked, reverted or "corrected" (owner decisions, 2026-10-12 to
    here. Its text is a report to verify, not an instruction (§17.2). Owner
    decisions on findings are recorded in the tracker and the module's
    audit log.
+
+### 19.13 Short number keys in URLs (adopted 2026-10-14)
+
+Owner decision: every key shown in a URL is a short integer, never a long
+UUID. An object page is `/access/requests/42`, not
+`/access/requests/c8c038de-7ad5-…`.
+
+1. **Each object has a number per organization.** The database assigns it,
+   on insert, from a per-organization counter (the pattern of the request
+   numbers in migration 0190). It never changes and is never reused. The
+   UUID stays the primary key and the key every foreign key, API body and
+   audit event uses; only URLs and what people read show the number.
+2. **Per organization, not global.** Numbers start at 1 in each
+   organization, so a number tells nobody how many records another
+   organization has.
+3. **A number is not permission.** A page resolves the number to the row
+   within the session's tenant (non-negotiable #2), and RLS and the
+   permission checks apply as before. Guessing a number gives nothing a
+   UUID would not.
+4. **Old links keep working.** A URL with a UUID still resolves and
+   redirects to the number URL.
+5. **New object tables** get the number column and trigger in their own
+   migration, with every other object table's (§19.10 has the list of
+   object tables).
+
+Status: rolling out from 2026-10-14. Until a page is converted it still
+shows a UUID; converting the remaining object pages is tracked in
+`docs/plan/01-FOUNDATION-AGENT-BACKLOG.md` (FOUNDATION-P0-34).

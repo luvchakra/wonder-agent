@@ -160,7 +160,6 @@ test.describe.serial("request catalog", () => {
     // Owner request 2026-10-14: the request's number, REQ and nine digits, with its barcode.
     await expect(page.getByText("Already open as")).toBeVisible();
     const number = (await page.locator("figure").getByText(/^REQ\d{9}$/).textContent())!;
-    await expect(page.getByRole("img", { name: `Barcode for ${number}` })).toBeVisible();
 
     await page.goto("/access/requests?view=mine");
     await expect(page.getByRole("heading", { level: 1, name: "Access Requests" })).toBeVisible();

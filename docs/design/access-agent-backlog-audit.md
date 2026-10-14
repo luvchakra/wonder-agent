@@ -4259,3 +4259,16 @@ the number in My requests, distinct numbers per basket request); Supabase
 advisors: no new findings.
 
 Left out: searching by request number in the global search.
+
+### 2026-10-14 — The request barcode is a picture, not a code (owner)
+
+Owner: "a fake barcode display, just for showing, with animation; no need
+of real barcode." The Code 128 encoder (`modules/ui/barcode.ts` and its
+test) is removed; `RequestNumberBarcode` draws a fixed decorative bar
+pattern (aria-hidden) with the same animation, and the number underneath
+is what people read. The E2E check for the barcode's accessible name is
+dropped; the number check stays. Same pull request: CLAUDE.md §19.13
+(short number keys in URLs, owner decision) and FOUNDATION-P0-34 added to
+the Foundation backlog to roll it out.
+
+Verified: typecheck; eslint; Vitest modules/ui 118/118.
