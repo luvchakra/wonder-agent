@@ -33,47 +33,42 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
     overdue: counts.get(c.id)?.overdueItems ?? 0,
   }));
 
-  const launchCard = (
-    <Card>
-            <CardHeader title="Launch a new campaign" />
-            <CardBody>
-              <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <TextField label="Campaign name" name="name" required autoFocus={launching} />
-                </div>
-                <SelectField label="Scope type" name="scopeType" defaultValue="agent">
-                  <option value="agent">agent</option>
-                  <option value="application">application</option>
-                  <option value="entitlement">entitlement</option>
-                  <option value="privileged_access">privileged_access</option>
-                  <option value="high_risk_agent">high_risk_agent</option>
-                  <option value="identity_access">people&apos;s access</option>
-                  <option value="role_assignments">WonderID roles</option>
-                </SelectField>
-                <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
-                <SelectField label="Cadence" name="cadence" defaultValue="one_time">
-                  <option value="one_time">one_time</option>
-                  <option value="periodic">periodic</option>
-                  <option value="event_driven">event_driven</option>
-                </SelectField>
-                <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
-                {/* COMPLIANCE-P0-10: for people's access; the reviewer above takes items nobody else fits. */}
-                <SelectField label="Reviewed by (people's access)" name="reviewerKind" defaultValue="named">
-                  <option value="named">the reviewer</option>
-                  <option value="manager">each person&apos;s manager</option>
-                  <option value="application_owner">the application&apos;s owner</option>
-                </SelectField>
-                <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
-                  <input type="checkbox" name="saveTemplate" /> Also save as a template
-                </label>
-                <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                  <Button type="submit">Launch</Button>
-                  {/* COMPLIANCE-P0-14: what it would hold, before launching. */}
-                  <CampaignPreviewButton />
-                </div>
-              </form>
-            </CardBody>
-          </Card>
+  const launchForm = (
+    <form action={launchCampaignAction} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <div className="sm:col-span-2">
+        <TextField label="Campaign name" name="name" required autoFocus={launching} />
+      </div>
+      <SelectField label="Scope type" name="scopeType" defaultValue="agent">
+        <option value="agent">agent</option>
+        <option value="application">application</option>
+        <option value="entitlement">entitlement</option>
+        <option value="privileged_access">privileged_access</option>
+        <option value="high_risk_agent">high_risk_agent</option>
+        <option value="identity_access">people&apos;s access</option>
+        <option value="role_assignments">WonderID roles</option>
+      </SelectField>
+      <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
+      <SelectField label="Cadence" name="cadence" defaultValue="one_time">
+        <option value="one_time">one_time</option>
+        <option value="periodic">periodic</option>
+        <option value="event_driven">event_driven</option>
+      </SelectField>
+      <TextField label="Reviewer" name="reviewerId" placeholder="reviewer user id (uuid, defaults to you)" />
+      {/* COMPLIANCE-P0-10: for people's access; the reviewer above takes items nobody else fits. */}
+      <SelectField label="Reviewed by (people's access)" name="reviewerKind" defaultValue="named">
+        <option value="named">the reviewer</option>
+        <option value="manager">each person&apos;s manager</option>
+        <option value="application_owner">the application&apos;s owner</option>
+      </SelectField>
+      <label className="flex items-center gap-2 text-sm text-muted-foreground sm:col-span-2">
+        <input type="checkbox" name="saveTemplate" /> Also save as a template
+      </label>
+      <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+        <Button type="submit">Launch</Button>
+        {/* COMPLIANCE-P0-14: what it would hold, before launching. */}
+        <CampaignPreviewButton />
+      </div>
+    </form>
   );
 
   return (
@@ -85,13 +80,20 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
             Campaigns that put a named human behind every agent&rsquo;s access.
           </p>
         </div>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["campaigns"])} />
+        <ObjectActionsMenu
+          {...objectActionsFor(ctx.permissions, ["campaigns"])}
+          create={launching ? undefined : { label: "Launch campaign…", title: "Launch a new campaign", content: launchForm }}
+        />
       </div>
 
-      {launching ? launchCard : null}
+      {launching ? (
+        <Card>
+          <CardHeader title="Launch a new campaign" />
+          <CardBody>{launchForm}</CardBody>
+        </Card>
+      ) : null}
       {templates.length ? <CampaignTemplatesList templates={templates} /> : null}
       <CampaignsList campaigns={rows} />
-      {launching ? null : launchCard}
     </div>
   );
 }

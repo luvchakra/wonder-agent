@@ -124,6 +124,8 @@ test.describe.serial("application discovery", () => {
   test("the screens record a report and ignore it with a reason", async ({ page }) => {
     await page.goto("/integrations/discovery");
     await expect(page.getByRole("heading", { level: 1, name: "Application discovery" })).toBeVisible();
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Add discovery…" }).click();
     await page.getByRole("combobox", { name: "From" }).selectOption("manual");
     await page.getByRole("textbox", { name: /Application name/ }).fill(`E2E Disc UI ${stamp}`);
     await page.getByRole("button", { name: "Record discovery" }).click();

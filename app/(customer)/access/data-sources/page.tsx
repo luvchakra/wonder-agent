@@ -59,7 +59,18 @@ export default async function DataSourcesPage() {
             that open it.
           </p>
         </div>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["data-sources"])} />
+        <ObjectActionsMenu
+          {...objectActionsFor(ctx.permissions, ["data-sources"])}
+          create={
+            canManage
+              ? {
+                  label: "Add data source…",
+                  title: "Add a data source",
+                  content: <CreateDataSourceForm applications={applications.map((a) => ({ id: a.id, name: a.name }))} />,
+                }
+              : undefined
+          }
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -134,30 +145,22 @@ export default async function DataSourcesPage() {
       </Card>
 
       {canManage ? (
-        <div className="grid grid-cols-1 gap-5 2xl:grid-cols-2">
-          <Card>
-            <CardHeader title="Add a data source" description="Recorded in the audit log. A data source is retired, never deleted." />
-            <CardBody>
-              <CreateDataSourceForm applications={applications.map((a) => ({ id: a.id, name: a.name }))} />
-            </CardBody>
-          </Card>
-          <Card>
-            <CardHeader
-              title="Link an entitlement"
-              description="Say which data source an entitlement opens. Every agent holding it can then reach that data, and its classification applies."
-            />
-            <CardBody>
-              {active.length === 0 || entitlements.length === 0 ? (
-                <EmptyState title="Nothing to link yet" description="You need at least one data source and one entitlement." />
-              ) : (
-                <LinkEntitlementForm
-                  entitlements={entitlements.map((e) => ({ id: e.id, label: `${e.applicationName} · ${e.name}` }))}
-                  dataSources={active.map((d) => ({ id: d.id, name: d.name }))}
-                />
-              )}
-            </CardBody>
-          </Card>
-        </div>
+        <Card>
+          <CardHeader
+            title="Link an entitlement"
+            description="Say which data source an entitlement opens. Every agent holding it can then reach that data, and its classification applies."
+          />
+          <CardBody>
+            {active.length === 0 || entitlements.length === 0 ? (
+              <EmptyState title="Nothing to link yet" description="You need at least one data source and one entitlement." />
+            ) : (
+              <LinkEntitlementForm
+                entitlements={entitlements.map((e) => ({ id: e.id, label: `${e.applicationName} · ${e.name}` }))}
+                dataSources={active.map((d) => ({ id: d.id, name: d.name }))}
+              />
+            )}
+          </CardBody>
+        </Card>
       ) : null}
     </div>
   );

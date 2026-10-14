@@ -15,15 +15,19 @@ const SCOPE_TYPES_THAT_FAIL_VALIDATION = ["application", "entitlement"] as const
 test.describe("Compliance module", () => {
   test.use({ storageState: authFile("adminOne") });
 
-  test("list page shows the launch-campaign form", async ({ page }) => {
+  test("list page shows the launch-campaign form under Actions", async ({ page }) => {
     await page.goto("/compliance/campaigns");
     await expect(page.getByRole("heading", { name: "Certification", exact: true })).toBeVisible();
-    await expect(page.getByLabel("Campaign name")).toBeVisible();
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Launch campaign…" }).click();
+    await expect(page.getByRole("dialog", { name: "Launch a new campaign" }).getByLabel("Campaign name")).toBeVisible();
   });
 
   test("launching an agent-scope campaign redirects straight to its detail page with a metrics summary", async ({ page }) => {
     const campaignName = `E2E Campaign ${Date.now()}`;
     await page.goto("/compliance/campaigns");
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Launch campaign…" }).click();
     await page.getByLabel("Campaign name").fill(campaignName);
     await page.getByRole("button", { name: "Launch", exact: true }).click();
 
@@ -40,6 +44,8 @@ test.describe("Compliance module", () => {
   for (const scopeType of SCOPE_TYPES_THAT_SUCCEED) {
     test(`launching a "${scopeType}" scope campaign succeeds from this form`, async ({ page }) => {
       await page.goto("/compliance/campaigns");
+      await page.getByRole("button", { name: "Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Launch campaign…" }).click();
       await page.getByLabel("Campaign name").fill(`E2E ${scopeType} Campaign ${Date.now()}`);
       await page.getByLabel("Scope type").selectOption(scopeType);
       await page.getByRole("button", { name: "Launch", exact: true }).click();
@@ -52,6 +58,8 @@ test.describe("Compliance module", () => {
   for (const scopeType of SCOPE_TYPES_THAT_FAIL_VALIDATION) {
     test(`launching a "${scopeType}" scope campaign from this form fails scope validation (no UI input for it yet)`, async ({ page }) => {
       await page.goto("/compliance/campaigns");
+      await page.getByRole("button", { name: "Actions", exact: true }).click();
+      await page.getByRole("menuitem", { name: "Launch campaign…" }).click();
       await page.getByLabel("Campaign name").fill(`E2E ${scopeType} Campaign ${Date.now()}`);
       await page.getByLabel("Scope type").selectOption(scopeType);
       await page.getByRole("button", { name: "Launch", exact: true }).click();

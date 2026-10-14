@@ -45,6 +45,8 @@ test.describe.serial("groups", () => {
 
     await page.goto("/settings/groups");
     await expect(page.getByRole("heading", { name: "Groups", level: 1 })).toBeVisible();
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "New group…" }).click();
     await page.getByLabel("Group name").fill(groupName);
     await page.getByLabel("Description").fill("People who read the organization's reports.");
     await page.getByRole("button", { name: "Create group" }).click();

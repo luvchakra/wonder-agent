@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, type BadgeTone } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass, ObjectActionsMenu, type BadgeTone } from "@/modules/ui";
 import {
   breachFacts,
   getPrivacySettings,
@@ -90,281 +90,121 @@ export default async function PrivacyPage({ searchParams }: { searchParams: Prom
   const openBreaches = breaches.filter((b) => b.status !== "closed");
   const breachOverdue = openBreaches.filter((b) => breachObligations(breachFacts(b), now).some((o) => o.state === "overdue")).length;
 
-  return (
-    <div className="space-y-5">
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Privacy &amp; Data Protection</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-          Run your GDPR and DPDP obligations for the people whose identity data WonderID governs: rights requests on statutory clocks, records of processing, consent, retention and breach notification.
-        </p>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard icon="FileText" label="Open requests" value={openRequests.length} tone={openRequests.length ? "primary" : "neutral"} />
-        <KpiCard icon="Clock" label="Overdue requests" value={overdue} tone={overdue ? "danger" : "success"} />
-        <KpiCard icon="ShieldAlert" label="Open breaches" value={openBreaches.length} tone={openBreaches.length ? "warning" : "success"} />
-        <KpiCard icon="TriangleAlert" label="Breaches with overdue notices" value={breachOverdue} tone={breachOverdue ? "danger" : "success"} />
-      </div>
-
-      <nav aria-label="Privacy sections" className="-mx-4 flex gap-1 overflow-x-auto border-b border-border px-4">
-        {SECTIONS.map((s) => (
-          <Link
-            key={s.key}
-            href={`/settings/privacy?tab=${s.key}`}
-            aria-current={tab === s.key ? "page" : undefined}
-            className={
-              tab === s.key
-                ? "shrink-0 border-b-2 border-primary px-3 py-2.5 text-sm font-medium text-primary"
-                : "shrink-0 border-b-2 border-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-            }
-          >
-            {s.label}
-          </Link>
-        ))}
-      </nav>
-
-      {tab === "requests" ? (
-        <div className={can("privacy.requests.process") ? "grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}>
-          <Card>
-            <CardHeader title={`${requests.total} request${requests.total === 1 ? "" : "s"}`} description="Soonest deadline first. The clock runs from receipt; GDPR one month, DPDP 90 days, CCPA 45 days." />
-            <CardBody>
-              {requests.requests.length === 0 ? (
-                <EmptyState title="No privacy requests yet" description="Members can raise requests from My privacy; log ones received by email or post here." />
-              ) : (
-                <TableContainer>
-                  <Thead>
-                    <tr>
-                      <Th>Reference</Th>
-                      <Th>Right</Th>
-                      <Th hideBelow="lg">Law</Th>
-                      <Th>Status</Th>
-                      <Th>Due</Th>
-                    </tr>
-                  </Thead>
-                  <tbody>
-                    {requests.requests.map((r) => {
-                      const due = r.extendedDueAt ?? r.dueAt;
-                      const state = deadlineState(r.status, new Date(due), now);
-                      return (
-                        <Tr key={r.id}>
-                          <Td>
-                            <Link href={`/settings/privacy/requests/${r.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
-                              {r.reference}
-                            </Link>
-                          </Td>
-                          <Td>{REQUEST_TYPE_LABEL[r.requestType]}</Td>
-                          <Td hideBelow="lg">{REGIME_LABEL[r.regime]}</Td>
-                          <Td>
-                            <Badge tone={r.status === "completed" ? "success" : r.status === "rejected" ? "danger" : "info"}>{r.status.replace("_", " ")}</Badge>
-                          </Td>
-                          <Td>
-                            <span className="tabular-nums">{fmt(due)}</span> <Badge tone={DEADLINE_TONE[state]}>{DEADLINE_LABEL[state]}</Badge>
-                          </Td>
-                        </Tr>
-                      );
-                    })}
-                  </tbody>
-                </TableContainer>
-              )}
-            </CardBody>
-          </Card>
-          {can("privacy.requests.process") ? (
-            <Card>
-              <CardHeader title="Log a request" description="One received outside WonderID" />
-              <CardBody>
-                <PrivacyForm action={createRequestAction} submitLabel="Log request" pendingLabel="Logging…">
-                  <div>
-                    <label htmlFor="pr-regime" className={fieldLabelClass}>
-                      Law
-                    </label>
-                    <select id="pr-regime" name="regime" className={fieldInputClass} defaultValue={settings.regimes[0] ?? "gdpr"}>
-                      {REGIMES.map((r) => (
-                        <option key={r} value={r}>
-                          {REGIME_LABEL[r]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="pr-type" className={fieldLabelClass}>
-                      Right exercised
-                    </label>
-                    <select id="pr-type" name="requestType" className={fieldInputClass}>
-                      {Object.entries(REQUEST_TYPE_LABEL).map(([k, v]) => (
-                        <option key={k} value={k}>
-                          {v}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <Text name="subjectEmail" label="Requester's email" type="email" required />
-                  <Text name="subjectName" label="Requester's name" />
-                  <div>
-                    <label htmlFor="pr-channel" className={fieldLabelClass}>
-                      Received by
-                    </label>
-                    <select id="pr-channel" name="channel" className={fieldInputClass}>
-                      <option value="email">Email</option>
-                      <option value="web_form">Web form</option>
-                      <option value="phone">Phone</option>
-                      <option value="post">Post</option>
-                      <option value="api">API</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <Text name="receivedAt" label="Received on" type="date" />
-                  <div>
-                    <label htmlFor="pr-desc" className={fieldLabelClass}>
-                      What they asked for
-                    </label>
-                    <textarea id="pr-desc" name="description" rows={3} maxLength={4000} className={fieldInputClass} />
-                  </div>
-                </PrivacyForm>
-              </CardBody>
-            </Card>
-          ) : null}
-        </div>
-      ) : null}
-
-      {tab === "breaches" ? (
-        <div className={can("privacy.incidents.manage") ? "grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}>
-          <Card>
-            <CardHeader title="Personal-data breaches" description="Each with its statutory notices: GDPR authority within 72h; DPDP Board without delay plus a report within 72h, and every affected person." />
-            <CardBody>
-              {breaches.length === 0 ? (
-                <EmptyState title="No breaches recorded" />
-              ) : (
-                <TableContainer>
-                  <Thead>
-                    <tr>
-                      <Th>Reference</Th>
-                      <Th>Incident</Th>
-                      <Th hideBelow="lg">Detected</Th>
-                      <Th>Notices</Th>
-                      <Th>Status</Th>
-                    </tr>
-                  </Thead>
-                  <tbody>
-                    {breaches.map((b) => {
-                      const ob = breachObligations(breachFacts(b), now);
-                      const overdueN = ob.filter((o) => o.state === "overdue").length;
-                      const pendingN = ob.filter((o) => o.state === "pending").length;
-                      return (
-                        <Tr key={b.id}>
-                          <Td>
-                            <Link href={`/settings/privacy/breaches/${b.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
-                              {b.reference}
-                            </Link>
-                          </Td>
-                          <Td>{b.title}</Td>
-                          <Td hideBelow="lg">{fmt(b.detectedAt)}</Td>
-                          <Td>{overdueN ? <Badge tone="danger">{overdueN} overdue</Badge> : pendingN ? <Badge tone="warning">{pendingN} pending</Badge> : <Badge tone="success">Done</Badge>}</Td>
-                          <Td>
-                            <Badge tone={b.status === "closed" ? "neutral" : "warning"}>{b.status}</Badge>
-                          </Td>
-                        </Tr>
-                      );
-                    })}
-                  </tbody>
-                </TableContainer>
-              )}
-            </CardBody>
-          </Card>
-          {can("privacy.incidents.manage") ? (
-            <Card>
-              <CardHeader title="Record a breach" description="Starts the notification clocks from the detection time" />
-              <CardBody>
-                <PrivacyForm action={createBreachAction} submitLabel="Record breach" pendingLabel="Recording…" variant="destructive">
-                  <Text name="title" label="Title" required />
-                  <div>
-                    <label htmlFor="br-desc" className={fieldLabelClass}>
-                      What happened <span className="text-destructive">*</span>
-                    </label>
-                    <textarea id="br-desc" name="description" required minLength={10} rows={3} className={fieldInputClass} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label htmlFor="br-sev" className={fieldLabelClass}>
-                        Severity
-                      </label>
-                      <select id="br-sev" name="severity" className={fieldInputClass} defaultValue="high">
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="critical">Critical</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label htmlFor="br-risk" className={fieldLabelClass}>
-                        Risk to people
-                      </label>
-                      <select id="br-risk" name="riskToIndividuals" className={fieldInputClass} defaultValue="risk">
-                        <option value="unlikely">Unlikely</option>
-                        <option value="risk">A risk</option>
-                        <option value="high_risk">High risk</option>
-                      </select>
-                    </div>
-                  </div>
-                  <fieldset>
-                    <legend className={fieldLabelClass}>Laws covering the affected people</legend>
-                    <div className="flex flex-wrap gap-3 text-sm">
-                      {REGIMES.map((r) => (
-                        <label key={r} className="flex items-center gap-1.5">
-                          <input type="checkbox" name="regimes" value={r} defaultChecked={settings.regimes.includes(r)} /> {REGIME_LABEL[r]}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                  <Text name="detectedAt" label="Detected at (blank = now)" type="datetime-local" />
-                  <Text name="occurredAt" label="Occurred at (if known)" type="datetime-local" />
-                  <Text name="subjectsAffected" label="People affected (estimate)" type="number" />
-                  <Text name="dataCategories" label="Data affected (comma separated)" placeholder="email, name, access entitlements" />
-                </PrivacyForm>
-              </CardBody>
-            </Card>
-          ) : null}
-        </div>
-      ) : null}
-
-      {tab === "ropa" ? (
-        <div className={can("privacy.manage") ? "grid gap-5 lg:grid-cols-[minmax(0,1fr)_24rem]" : ""}>
-          <Card>
-            <CardHeader title="Records of processing activities" description="GDPR Art. 30: what you process, why, on what lawful basis, who receives it, transfers and retention." />
-            <CardBody>
-              {activities.length === 0 ? (
-                <EmptyState title="No records yet" description="Start with identity governance itself: people's identity, access and activity data for access governance and audit." />
-              ) : (
-                <ul className="divide-y divide-border">
-                  {activities.map((a) => (
-                    <li key={a.id} className="space-y-1 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-foreground">{a.name}</span>
-                        <Badge tone="accent">{a.lawfulBasis.replace(/_/g, " ")}</Badge>
-                        {a.specialCategories ? <Badge tone="warning">Special categories</Badge> : null}
-                        {a.dpiaRequired ? <Badge tone={a.dpiaCompletedAt ? "success" : "danger"}>{a.dpiaCompletedAt ? "DPIA done" : "DPIA required"}</Badge> : null}
-                        {a.status === "retired" ? <Badge>Retired</Badge> : null}
-                      </div>
-                      <p className="text-sm text-muted-foreground">{a.purpose}</p>
-                      <p className="text-xs text-muted-foreground">
-                        Data: {a.dataCategories.join(", ") || "—"} · Recipients: {a.recipients.join(", ") || "—"} · Transfers: {a.transferCountries.length ? `${a.transferCountries.join(", ")} (${a.transferMechanism})` : "none"} · Retention: {a.retentionDays ? `${a.retentionDays} days` : "—"}
-                      </p>
-                      {can("privacy.manage") ? (
-                        <form action={setProcessingActivityStatusAction.bind(null, a.id, a.status === "active" ? "retired" : "active")}>
-                          <button type="submit" className="text-xs text-primary hover:underline">
-                            {a.status === "active" ? "Retire" : "Reactivate"}
-                          </button>
-                        </form>
-                      ) : null}
-                    </li>
+  // A list's create form lives in the header's Actions menu (2026-10-14), one per section.
+  const create =
+    tab === "requests" && can("privacy.requests.process")
+      ? {
+          label: "Log request…",
+          title: "Log a request",
+          content: (
+            <PrivacyForm action={createRequestAction} submitLabel="Log request" pendingLabel="Logging…">
+              <div>
+                <label htmlFor="pr-regime" className={fieldLabelClass}>
+                  Law
+                </label>
+                <select id="pr-regime" name="regime" className={fieldInputClass} defaultValue={settings.regimes[0] ?? "gdpr"}>
+                  {REGIMES.map((r) => (
+                    <option key={r} value={r}>
+                      {REGIME_LABEL[r]}
+                    </option>
                   ))}
-                </ul>
-              )}
-            </CardBody>
-          </Card>
-          {can("privacy.manage") ? (
-            <Card>
-              <CardHeader title="Add a record" />
-              <CardBody>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="pr-type" className={fieldLabelClass}>
+                  Right exercised
+                </label>
+                <select id="pr-type" name="requestType" className={fieldInputClass}>
+                  {Object.entries(REQUEST_TYPE_LABEL).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Text name="subjectEmail" label="Requester's email" type="email" required />
+              <Text name="subjectName" label="Requester's name" />
+              <div>
+                <label htmlFor="pr-channel" className={fieldLabelClass}>
+                  Received by
+                </label>
+                <select id="pr-channel" name="channel" className={fieldInputClass}>
+                  <option value="email">Email</option>
+                  <option value="web_form">Web form</option>
+                  <option value="phone">Phone</option>
+                  <option value="post">Post</option>
+                  <option value="api">API</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <Text name="receivedAt" label="Received on" type="date" />
+              <div>
+                <label htmlFor="pr-desc" className={fieldLabelClass}>
+                  What they asked for
+                </label>
+                <textarea id="pr-desc" name="description" rows={3} maxLength={4000} className={fieldInputClass} />
+              </div>
+            </PrivacyForm>
+          ),
+        }
+      : tab === "breaches" && can("privacy.incidents.manage")
+        ? {
+            label: "Record breach…",
+            title: "Record a breach",
+            content: (
+              <PrivacyForm action={createBreachAction} submitLabel="Record breach" pendingLabel="Recording…" variant="destructive">
+                <Text name="title" label="Title" required />
+                <div>
+                  <label htmlFor="br-desc" className={fieldLabelClass}>
+                    What happened <span className="text-destructive">*</span>
+                  </label>
+                  <textarea id="br-desc" name="description" required minLength={10} rows={3} className={fieldInputClass} />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label htmlFor="br-sev" className={fieldLabelClass}>
+                      Severity
+                    </label>
+                    <select id="br-sev" name="severity" className={fieldInputClass} defaultValue="high">
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="critical">Critical</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="br-risk" className={fieldLabelClass}>
+                      Risk to people
+                    </label>
+                    <select id="br-risk" name="riskToIndividuals" className={fieldInputClass} defaultValue="risk">
+                      <option value="unlikely">Unlikely</option>
+                      <option value="risk">A risk</option>
+                      <option value="high_risk">High risk</option>
+                    </select>
+                  </div>
+                </div>
+                <fieldset>
+                  <legend className={fieldLabelClass}>Laws covering the affected people</legend>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    {REGIMES.map((r) => (
+                      <label key={r} className="flex items-center gap-1.5">
+                        <input type="checkbox" name="regimes" value={r} defaultChecked={settings.regimes.includes(r)} /> {REGIME_LABEL[r]}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <Text name="detectedAt" label="Detected at (blank = now)" type="datetime-local" />
+                <Text name="occurredAt" label="Occurred at (if known)" type="datetime-local" />
+                <Text name="subjectsAffected" label="People affected (estimate)" type="number" />
+                <Text name="dataCategories" label="Data affected (comma separated)" placeholder="email, name, access entitlements" />
+              </PrivacyForm>
+            ),
+          }
+        : tab === "ropa" && can("privacy.manage")
+          ? {
+              label: "Add record…",
+              title: "Add a record",
+              content: (
                 <PrivacyForm action={saveProcessingActivityAction} submitLabel="Save record" pendingLabel="Saving…">
                   <Text name="name" label="Processing activity" required />
                   <div>
@@ -413,36 +253,13 @@ export default async function PrivacyPage({ searchParams }: { searchParams: Prom
                     <input type="checkbox" name="dpiaRequired" /> A DPIA is required
                   </label>
                 </PrivacyForm>
-              </CardBody>
-            </Card>
-          ) : null}
-        </div>
-      ) : null}
-
-      {tab === "consent" ? (
-        <div className="space-y-5">
-          <div className={can("privacy.manage") ? "grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]" : ""}>
-            <Card>
-              <CardHeader title="Consent purposes" description="Each purpose is shown to members on My privacy with its notice version. Changing its wording needs a new version." />
-              <CardBody>
-                {purposes.length === 0 ? (
-                  <EmptyState title="No consent purposes" description="Most identity governance relies on legitimate interests or legitimate use; add purposes only for optional processing." />
-                ) : (
-                  <ul className="divide-y divide-border">
-                    {purposes.map((p) => (
-                      <li key={p.id} className="py-2">
-                        <span className="font-medium text-foreground">{p.title}</span> <Badge>{p.noticeVersion}</Badge> {p.active ? null : <Badge tone="neutral">Inactive</Badge>}
-                        <p className="text-sm text-muted-foreground">{p.description}</p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardBody>
-            </Card>
-            {can("privacy.manage") ? (
-              <Card>
-                <CardHeader title="Add a purpose" />
-                <CardBody>
+              ),
+            }
+          : tab === "consent" && can("privacy.manage")
+            ? {
+                label: "Add purpose…",
+                title: "Add a purpose",
+                content: (
                   <PrivacyForm action={saveConsentPurposeAction} submitLabel="Save purpose" pendingLabel="Saving…">
                     <Text name="key" label="Key" placeholder="product_updates" required />
                     <Text name="title" label="Title" required />
@@ -454,10 +271,213 @@ export default async function PrivacyPage({ searchParams }: { searchParams: Prom
                     </div>
                     <Text name="noticeVersion" label="Notice version" defaultValue="v1" required />
                   </PrivacyForm>
-                </CardBody>
-              </Card>
-            ) : null}
-          </div>
+                ),
+              }
+            : tab === "retention" && can("privacy.manage")
+              ? {
+                  label: "Place legal hold…",
+                  title: "Place a legal hold",
+                  content: (
+                    <PrivacyForm action={placeLegalHoldAction} submitLabel="Place hold" pendingLabel="Placing…">
+                      <Text name="name" label="Name" required />
+                      <Text name="reason" label="Reason" required />
+                      <fieldset>
+                        <legend className={fieldLabelClass}>Covers</legend>
+                        <div className="grid grid-cols-2 gap-1 text-sm">
+                          {RETENTION_CATEGORIES.map((c) => (
+                            <label key={c.key} className="flex items-center gap-1.5">
+                              <input type="checkbox" name="categories" value={c.key} /> {c.label}
+                            </label>
+                          ))}
+                        </div>
+                      </fieldset>
+                    </PrivacyForm>
+                  ),
+                }
+              : undefined;
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Privacy &amp; Data Protection</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+            Run your GDPR and DPDP obligations for the people whose identity data WonderID governs: rights requests on statutory clocks, records of processing, consent, retention and breach notification.
+          </p>
+        </div>
+        <ObjectActionsMenu create={create} />
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard icon="FileText" label="Open requests" value={openRequests.length} tone={openRequests.length ? "primary" : "neutral"} />
+        <KpiCard icon="Clock" label="Overdue requests" value={overdue} tone={overdue ? "danger" : "success"} />
+        <KpiCard icon="ShieldAlert" label="Open breaches" value={openBreaches.length} tone={openBreaches.length ? "warning" : "success"} />
+        <KpiCard icon="TriangleAlert" label="Breaches with overdue notices" value={breachOverdue} tone={breachOverdue ? "danger" : "success"} />
+      </div>
+
+      <nav aria-label="Privacy sections" className="-mx-4 flex gap-1 overflow-x-auto border-b border-border px-4">
+        {SECTIONS.map((s) => (
+          <Link
+            key={s.key}
+            href={`/settings/privacy?tab=${s.key}`}
+            aria-current={tab === s.key ? "page" : undefined}
+            className={
+              tab === s.key
+                ? "shrink-0 border-b-2 border-primary px-3 py-2.5 text-sm font-medium text-primary"
+                : "shrink-0 border-b-2 border-transparent px-3 py-2.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            }
+          >
+            {s.label}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "requests" ? (
+        <Card>
+          <CardHeader title={`${requests.total} request${requests.total === 1 ? "" : "s"}`} description="Soonest deadline first. The clock runs from receipt; GDPR one month, DPDP 90 days, CCPA 45 days." />
+          <CardBody>
+            {requests.requests.length === 0 ? (
+              <EmptyState title="No privacy requests yet" description="Members can raise requests from My privacy; log ones received by email or post from Actions." />
+            ) : (
+              <TableContainer>
+                <Thead>
+                  <tr>
+                    <Th>Reference</Th>
+                    <Th>Right</Th>
+                    <Th hideBelow="lg">Law</Th>
+                    <Th>Status</Th>
+                    <Th>Due</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {requests.requests.map((r) => {
+                    const due = r.extendedDueAt ?? r.dueAt;
+                    const state = deadlineState(r.status, new Date(due), now);
+                    return (
+                      <Tr key={r.id}>
+                        <Td>
+                          <Link href={`/settings/privacy/requests/${r.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
+                            {r.reference}
+                          </Link>
+                        </Td>
+                        <Td>{REQUEST_TYPE_LABEL[r.requestType]}</Td>
+                        <Td hideBelow="lg">{REGIME_LABEL[r.regime]}</Td>
+                        <Td>
+                          <Badge tone={r.status === "completed" ? "success" : r.status === "rejected" ? "danger" : "info"}>{r.status.replace("_", " ")}</Badge>
+                        </Td>
+                        <Td>
+                          <span className="tabular-nums">{fmt(due)}</span> <Badge tone={DEADLINE_TONE[state]}>{DEADLINE_LABEL[state]}</Badge>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </TableContainer>
+            )}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {tab === "breaches" ? (
+        <Card>
+          <CardHeader title="Personal-data breaches" description="Each with its statutory notices: GDPR authority within 72h; DPDP Board without delay plus a report within 72h, and every affected person." />
+          <CardBody>
+            {breaches.length === 0 ? (
+              <EmptyState title="No breaches recorded" />
+            ) : (
+              <TableContainer>
+                <Thead>
+                  <tr>
+                    <Th>Reference</Th>
+                    <Th>Incident</Th>
+                    <Th hideBelow="lg">Detected</Th>
+                    <Th>Notices</Th>
+                    <Th>Status</Th>
+                  </tr>
+                </Thead>
+                <tbody>
+                  {breaches.map((b) => {
+                    const ob = breachObligations(breachFacts(b), now);
+                    const overdueN = ob.filter((o) => o.state === "overdue").length;
+                    const pendingN = ob.filter((o) => o.state === "pending").length;
+                    return (
+                      <Tr key={b.id}>
+                        <Td>
+                          <Link href={`/settings/privacy/breaches/${b.id}`} className="font-mono text-xs font-medium text-foreground hover:text-primary">
+                            {b.reference}
+                          </Link>
+                        </Td>
+                        <Td>{b.title}</Td>
+                        <Td hideBelow="lg">{fmt(b.detectedAt)}</Td>
+                        <Td>{overdueN ? <Badge tone="danger">{overdueN} overdue</Badge> : pendingN ? <Badge tone="warning">{pendingN} pending</Badge> : <Badge tone="success">Done</Badge>}</Td>
+                        <Td>
+                          <Badge tone={b.status === "closed" ? "neutral" : "warning"}>{b.status}</Badge>
+                        </Td>
+                      </Tr>
+                    );
+                  })}
+                </tbody>
+              </TableContainer>
+            )}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {tab === "ropa" ? (
+        <Card>
+          <CardHeader title="Records of processing activities" description="GDPR Art. 30: what you process, why, on what lawful basis, who receives it, transfers and retention." />
+          <CardBody>
+            {activities.length === 0 ? (
+              <EmptyState title="No records yet" description="Start with identity governance itself: people's identity, access and activity data for access governance and audit." />
+            ) : (
+              <ul className="divide-y divide-border">
+                {activities.map((a) => (
+                  <li key={a.id} className="space-y-1 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium text-foreground">{a.name}</span>
+                      <Badge tone="accent">{a.lawfulBasis.replace(/_/g, " ")}</Badge>
+                      {a.specialCategories ? <Badge tone="warning">Special categories</Badge> : null}
+                      {a.dpiaRequired ? <Badge tone={a.dpiaCompletedAt ? "success" : "danger"}>{a.dpiaCompletedAt ? "DPIA done" : "DPIA required"}</Badge> : null}
+                      {a.status === "retired" ? <Badge>Retired</Badge> : null}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{a.purpose}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Data: {a.dataCategories.join(", ") || "—"} · Recipients: {a.recipients.join(", ") || "—"} · Transfers: {a.transferCountries.length ? `${a.transferCountries.join(", ")} (${a.transferMechanism})` : "none"} · Retention: {a.retentionDays ? `${a.retentionDays} days` : "—"}
+                    </p>
+                    {can("privacy.manage") ? (
+                      <form action={setProcessingActivityStatusAction.bind(null, a.id, a.status === "active" ? "retired" : "active")}>
+                        <button type="submit" className="text-xs text-primary hover:underline">
+                          {a.status === "active" ? "Retire" : "Reactivate"}
+                        </button>
+                      </form>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {tab === "consent" ? (
+        <div className="space-y-5">
+          <Card>
+            <CardHeader title="Consent purposes" description="Each purpose is shown to members on My privacy with its notice version. Changing its wording needs a new version." />
+            <CardBody>
+              {purposes.length === 0 ? (
+                <EmptyState title="No consent purposes" description="Most identity governance relies on legitimate interests or legitimate use; add purposes only for optional processing." />
+              ) : (
+                <ul className="divide-y divide-border">
+                  {purposes.map((p) => (
+                    <li key={p.id} className="py-2">
+                      <span className="font-medium text-foreground">{p.title}</span> <Badge>{p.noticeVersion}</Badge> {p.active ? null : <Badge tone="neutral">Inactive</Badge>}
+                      <p className="text-sm text-muted-foreground">{p.description}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </CardBody>
+          </Card>
           <Card>
             <CardHeader title="Consent ledger" description={`Latest ${consents.records.length} of ${consents.total}. Each grant is kept with its notice version and language; withdrawal closes it.`} />
             <CardBody>
@@ -558,22 +578,6 @@ export default async function PrivacyPage({ searchParams }: { searchParams: Prom
                   ))}
                 </ul>
               )}
-              {can("privacy.manage") ? (
-                <PrivacyForm action={placeLegalHoldAction} submitLabel="Place hold" pendingLabel="Placing…">
-                  <Text name="name" label="Name" required />
-                  <Text name="reason" label="Reason" required />
-                  <fieldset>
-                    <legend className={fieldLabelClass}>Covers</legend>
-                    <div className="grid grid-cols-2 gap-1 text-sm">
-                      {RETENTION_CATEGORIES.map((c) => (
-                        <label key={c.key} className="flex items-center gap-1.5">
-                          <input type="checkbox" name="categories" value={c.key} /> {c.label}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
-                </PrivacyForm>
-              ) : null}
             </CardBody>
           </Card>
         </div>

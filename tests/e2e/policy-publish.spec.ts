@@ -48,6 +48,8 @@ test.describe.serial("policy targets and publishing", () => {
     };
 
     await page.goto("/policies");
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Create policy…" }).click();
     await page.getByLabel("Policy name").fill(`E2E publish ${Date.now()}`);
     await page.getByLabel("Category", { exact: true }).selectOption("runtime");
     await page.getByLabel("Action", { exact: true }).selectOption("block");

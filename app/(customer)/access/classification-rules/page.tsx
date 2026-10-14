@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listClassificationRules, listLiveApplications } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { ClassificationRuleForm } from "./ClassificationForms";
 
 export const metadata = { title: "Classification rules" };
@@ -34,15 +34,18 @@ export default async function ClassificationRulesPage() {
   const [rules, applications] = await Promise.all([listClassificationRules(tenantId), canManage ? listLiveApplications(tenantId) : Promise.resolve([])]);
   return (
     <div className="space-y-5">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Classification rules</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Classify entitlements as they arrive. A value a person set is never changed by a rule.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Classification rules</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Classify entitlements as they arrive. A value a person set is never changed by a rule.</p>
+        </div>
+        <ObjectActionsMenu create={canManage ? { label: "New rule…", title: "New rule", content: <ClassificationRuleForm applications={applications} /> } : undefined} />
       </div>
       <Card>
         <CardHeader title="Rules" description={`${rules.filter((r) => r.status === "published").length} published`} />
         <CardBody>
           {rules.length === 0 ? (
-            <EmptyState title="No rules yet" description={canManage ? "Create the first one below." : "An access administrator can add them."} />
+            <EmptyState title="No rules yet" description={canManage ? "Create the first one from Actions." : "An access administrator can add them."} />
           ) : (
             <TableContainer label="Classification rules" bare>
               <Thead>
@@ -75,14 +78,6 @@ export default async function ClassificationRulesPage() {
           )}
         </CardBody>
       </Card>
-      {canManage ? (
-        <details className="rounded-lg border border-border bg-card p-4">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">New rule</summary>
-          <div className="mt-4">
-            <ClassificationRuleForm applications={applications} />
-          </div>
-        </details>
-      ) : null}
     </div>
   );
 }

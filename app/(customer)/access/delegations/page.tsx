@@ -4,7 +4,7 @@ import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
 import { listDelegations } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, ObjectActionsMenu } from "@/modules/ui";
 import { DelegationForm, RevokeDelegation } from "./DelegationForms";
 
 export const metadata = { title: "Delegations" };
@@ -35,15 +35,24 @@ export default async function DelegationsPage() {
         <span aria-hidden> / </span>
         <span className="text-foreground">Delegations</span>
       </nav>
-      <div>
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Delegations</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Someone decides your approvals, or asks for access for you, while you are away. Nobody decides a request they made or that is for them.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Delegations</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Someone decides your approvals, or asks for access for you, while you are away. Nobody decides a request they made or that is for them.</p>
+        </div>
+        <ObjectActionsMenu
+          create={{
+            label: "New delegation…",
+            title: "New delegation",
+            content: <DelegationForm people={people.filter((p) => p.id !== ctx.userId)} everyone={canManage ? people : null} canDelegateAdministration={ctx.permissions.includes("role.manage")} />,
+          }}
+        />
       </div>
       <Card>
         <CardHeader title="In place" />
         <CardBody>
           {delegations.length === 0 ? (
-            <EmptyState title="None" description="Add one below." />
+            <EmptyState title="None" description="Add one from Actions." />
           ) : (
             <ul className="divide-y divide-border text-sm">
               {delegations.map((d) => (
@@ -66,12 +75,6 @@ export default async function DelegationsPage() {
           )}
         </CardBody>
       </Card>
-      <details className="rounded-lg border border-border bg-card p-4">
-        <summary className="cursor-pointer text-sm font-medium text-foreground">New delegation</summary>
-        <div className="mt-4">
-          <DelegationForm people={people.filter((p) => p.id !== ctx.userId)} everyone={canManage ? people : null} canDelegateAdministration={ctx.permissions.includes("role.manage")} />
-        </div>
-      </details>
     </div>
   );
 }

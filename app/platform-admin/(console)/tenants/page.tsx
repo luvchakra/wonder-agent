@@ -3,7 +3,7 @@ import { listTenants, getSubscription, testTenantIds, organizationOwners } from 
 import { groupOrganizations, type Organization } from "@/modules/platform-admin/organizations";
 import { createTenantAction } from "@/app/actions/platform";
 import type { Subscription } from "@/lib/shared/types/platform";
-import { Badge, Button, Card, CardBody, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
+import { Badge, Button, Card, CreateDialogForm, ObjectActionsMenu, StatusBadge, TableContainer, Td, Th, Thead, Tr, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { PageHeading } from "@/app/platform-admin/PageHeading";
 
@@ -84,12 +84,35 @@ export default async function PlatformOrganizationsPage({ searchParams }: { sear
   const real = rows.filter((r) => !testIds.has(r.org.id));
   const test = rows.filter((r) => testIds.has(r.org.id));
 
+  const createForm = (
+    <>
+      <CreateDialogForm action={createTenantAction} className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label htmlFor="tenant-name" className={fieldLabelClass}>Name</label>
+          <input id="tenant-name" name="name" placeholder="Acme Corp" required className={fieldInputClass} />
+        </div>
+        <div>
+          <label htmlFor="tenant-slug" className={fieldLabelClass}>Address prefix</label>
+          <input id="tenant-slug" name="slug" placeholder="acme-corp" required className={cn(fieldInputClass, "font-mono")} />
+        </div>
+        <input type="hidden" name="environment" value="production" />
+        <div className="flex justify-end sm:col-span-2">
+          <Button type="submit">Create</Button>
+        </div>
+      </CreateDialogForm>
+      <p className="mt-2 text-xs text-muted-foreground">Created as the production environment; add Dev, Test or Staging from the organization.</p>
+    </>
+  );
+
   return (
     <>
       <PageHeading title="Organizations" description={`${real.length} organization${real.length === 1 ? "" : "s"}, each with its environments${showAll ? "" : "; decommissioned ones hidden"}.`}>
-        <Link href={showAll ? "/platform-admin/tenants" : "/platform-admin/tenants?all=1"} className="text-sm font-medium text-primary hover:underline">
-          {showAll ? "Hide decommissioned" : "Show decommissioned"}
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href={showAll ? "/platform-admin/tenants" : "/platform-admin/tenants?all=1"} className="text-sm font-medium text-primary hover:underline">
+            {showAll ? "Hide decommissioned" : "Show decommissioned"}
+          </Link>
+          <ObjectActionsMenu create={{ label: "Create organization…", title: "Create an organization", content: createForm }} />
+        </div>
       </PageHeading>
 
       <Card>{real.length === 0 ? <p className="px-4 py-3 text-sm text-muted-foreground">No organizations yet.</p> : <OrganizationTable rows={real} label="Organizations" />}</Card>
@@ -103,24 +126,6 @@ export default async function PlatformOrganizationsPage({ searchParams }: { sear
         </details>
       ) : null}
 
-      <details className="group rounded-xl border border-border/60 bg-card">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-card-foreground">Create an organization</summary>
-        <CardBody className="border-t border-border">
-          <form action={createTenantAction} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-            <div>
-              <label htmlFor="tenant-name" className={fieldLabelClass}>Name</label>
-              <input id="tenant-name" name="name" placeholder="Acme Corp" required className={fieldInputClass} />
-            </div>
-            <div>
-              <label htmlFor="tenant-slug" className={fieldLabelClass}>Address prefix</label>
-              <input id="tenant-slug" name="slug" placeholder="acme-corp" required className={cn(fieldInputClass, "font-mono")} />
-            </div>
-            <input type="hidden" name="environment" value="production" />
-            <Button type="submit">Create</Button>
-          </form>
-          <p className="mt-2 text-xs text-muted-foreground">Created as the production environment; add Dev, Test or Staging from the organization.</p>
-        </CardBody>
-      </details>
     </>
   );
 }

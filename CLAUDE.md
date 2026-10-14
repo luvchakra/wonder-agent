@@ -1266,6 +1266,12 @@ Every page stays minimal. Before adding a control, look for one to remove.
 - **Fold, don't show.** Settings, rarely used options, explanations and advanced
   controls go behind a collapsed row (a `<details>` disclosure, as on the agent
   and identity detail pages).
+- **Create lives under Actions (owner decision, 2026-10-14).** A list page's
+  create form opens from its header "Actions" menu (`ObjectActionsMenu`'s
+  `create` prop, a dialog), never as a create card or row at the end of the
+  page. Gate the item as the form is gated; a form that stays on the page
+  closes the dialog after a save (`useCloseCreateDialog()`, or
+  `CreateDialogForm` for a plain server action).
 - **Default instead of asking.** Pick a sensible default from the user's data
   rather than adding a selector.
 - **Short copy.** At most one line of help. No repeated explanations, badges or

@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import {
   createDataSourceAction,
@@ -8,7 +8,7 @@ import {
   reclassifyDataSourceAction,
   type DataSourceFormState,
 } from "@/app/actions/access";
-import { Button, SelectField, TextField } from "@/modules/ui";
+import { Button, SelectField, TextField, useCloseCreateDialog } from "@/modules/ui";
 
 const KIND_LABEL: Record<string, string> = {
   database: "Database",
@@ -40,8 +40,12 @@ function Submit({ pending, idle, busy }: { pending: boolean; idle: string; busy:
 
 export function CreateDataSourceForm({ applications }: { applications: Array<{ id: string; name: string }> }) {
   const [state, action, pending] = useActionState(createDataSourceAction, { status: "idle" } as DataSourceFormState);
+  const closeDialog = useCloseCreateDialog();
+  useEffect(() => {
+    if (state.status === "saved") closeDialog();
+  }, [state, closeDialog]);
   return (
-    <form action={action} className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+    <form action={action} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
       <TextField label="Data source name" name="name" required maxLength={200} placeholder="e.g. Snowflake CustomerDB" />
       <SelectField label="Kind" name="kind" defaultValue="database">
         {Object.entries(KIND_LABEL).map(([value, label]) => (

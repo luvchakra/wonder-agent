@@ -64,7 +64,10 @@ export default async function ApplicationDiscoveryPage({ searchParams }: { searc
             Applications found by connectors, API documents and people, matched to the catalog. An unrecognized application waits for someone to register it, link it, record an exception or ignore it with a reason.
           </p>
         </div>
-        <ObjectActionsMenu {...objectActionsFor(ctx.permissions, ["application-discoveries"])} />
+        <ObjectActionsMenu
+          {...objectActionsFor(ctx.permissions, ["application-discoveries"])}
+          create={canUpdate ? { label: "Add discovery…", title: "Add a discovery", content: <SubmitDiscoveryForm /> } : undefined}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -166,20 +169,12 @@ export default async function ApplicationDiscoveryPage({ searchParams }: { searc
         </Card>
 
         {canUpdate ? (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader title="Discover from a connector" />
-              <CardBody>
-                <DiscoverFromConnectorForm integrations={integrations.map((i) => ({ id: i.id, name: i.name }))} />
-              </CardBody>
-            </Card>
-            <Card>
-              <CardHeader title="Add a discovery" description="From an API document, SCIM metadata, or something someone noticed." />
-              <CardBody>
-                <SubmitDiscoveryForm />
-              </CardBody>
-            </Card>
-          </div>
+          <Card className="h-fit">
+            <CardHeader title="Discover from a connector" />
+            <CardBody>
+              <DiscoverFromConnectorForm integrations={integrations.map((i) => ({ id: i.id, name: i.name }))} />
+            </CardBody>
+          </Card>
         ) : null}
       </div>
     </div>

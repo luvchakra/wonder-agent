@@ -1,10 +1,10 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { createContext, useContext, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ArrowRight, ChevronDown, Download, Loader2, Upload } from "lucide-react";
+import { ArrowRight, ChevronDown, Download, Loader2, Plus, Upload, X } from "lucide-react";
 import { Button } from "./Button";
 import { Badge, type BadgeTone } from "./Badge";
 import {
@@ -25,7 +25,49 @@ import {
 export type ObjectExportItem = { label: string; href: string };
 export type ObjectImportItem = { kind: string; scope: string; label: string; title: string; required: string[]; optional: string[]; templateHref: string };
 
+export type ObjectCreateItem = { label: string; title: string; content: React.ReactNode };
+
 const itemClass = "flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm outline-none hover:bg-accent focus-visible:bg-accent data-[highlighted]:bg-accent";
+
+const CloseCreateDialogContext = createContext<() => void>(() => {});
+
+/**
+ * Closes the Actions menu's create dialog. A create form calls it after a
+ * successful create when it stays on the page; a form that navigates away
+ * closes the dialog by leaving. Outside the dialog it does nothing.
+ */
+export function useCloseCreateDialog(): () => void {
+  return useContext(CloseCreateDialogContext);
+}
+
+/**
+ * A create form for a server action, for use inside the create dialog. It runs
+ * the same action the page's form ran and closes the dialog once the action
+ * returns. An action that redirects navigates away instead, and one that
+ * throws reaches the page's error boundary exactly as before.
+ */
+export function CreateDialogForm({
+  action,
+  className,
+  children,
+}: {
+  action: (formData: FormData) => unknown | Promise<unknown>;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const close = useCloseCreateDialog();
+  return (
+    <form
+      className={className}
+      action={async (formData) => {
+        await action(formData);
+        close();
+      }}
+    >
+      {children}
+    </form>
+  );
+}
 
 /**
  * The object page's one "Actions" menu (2026-10-10): CSV export and, where
@@ -33,11 +75,16 @@ const itemClass = "flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 t
  * sits in the page header beside the page's primary action. Items come from
  * the server (Operations' `objectActionsFor()`), which only decides what to
  * show; the export route and the import endpoint check permissions again.
- * Renders nothing when the viewer has no item.
+ *
+ * A list page's create form lives here too (owner decision, 2026-10-14):
+ * `create` adds a first item that opens the form in a dialog, instead of a
+ * create card at the end of the page. The page passes it only when the viewer
+ * may create. Renders nothing when the viewer has no item.
  */
-export function ObjectActionsMenu({ exports = [], imports = [] }: { exports?: ObjectExportItem[]; imports?: ObjectImportItem[] }) {
+export function ObjectActionsMenu({ exports = [], imports = [], create }: { exports?: ObjectExportItem[]; imports?: ObjectImportItem[]; create?: ObjectCreateItem }) {
   const [importing, setImporting] = useState<ObjectImportItem | null>(null);
-  if (exports.length === 0 && imports.length === 0) return null;
+  const [creating, setCreating] = useState(false);
+  if (exports.length === 0 && imports.length === 0 && !create) return null;
 
   return (
     <>
@@ -50,6 +97,13 @@ export function ObjectActionsMenu({ exports = [], imports = [] }: { exports?: Ob
         </DropdownMenu.Trigger>
         <DropdownMenu.Portal>
           <DropdownMenu.Content align="end" sideOffset={6} className="z-50 min-w-48 rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg">
+            {create ? (
+              <DropdownMenu.Item className={itemClass} onSelect={() => setCreating(true)}>
+                <Plus className="size-4 text-muted-foreground" aria-hidden="true" />
+                {create.label}
+              </DropdownMenu.Item>
+            ) : null}
+            {create && (exports.length > 0 || imports.length > 0) ? <DropdownMenu.Separator className="my-1 h-px bg-border" /> : null}
             {exports.map((e) => (
               <DropdownMenu.Item key={e.href} asChild className={itemClass}>
                 <a href={e.href} download>
@@ -68,8 +122,48 @@ export function ObjectActionsMenu({ exports = [], imports = [] }: { exports?: Ob
           </DropdownMenu.Content>
         </DropdownMenu.Portal>
       </DropdownMenu.Root>
+      {create ? <CreateDialog item={create} open={creating} onClose={() => setCreating(false)} /> : null}
       {importing ? <ImportCsvDialog item={importing} onClose={() => setImporting(null)} /> : null}
     </>
+  );
+}
+
+/**
+ * The create form in a dialog. It scrolls inside the viewport for long forms
+ * and fits a phone. The form keeps its own validation, submit and errors.
+ */
+function CreateDialog({ item, open, onClose }: { item: ObjectCreateItem; open: boolean; onClose: () => void }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  return (
+    <Dialog.Root open={open} onOpenChange={(o) => (o ? null : onClose())}>
+      <Dialog.Portal>
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40" />
+        <Dialog.Content
+          aria-describedby={undefined}
+          onOpenAutoFocus={(e) => {
+            // Start in the form's first field rather than on the close button.
+            const first = bodyRef.current?.querySelector<HTMLElement>("input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled])");
+            if (first) {
+              e.preventDefault();
+              first.focus();
+            }
+          }}
+          className="fixed left-1/2 top-1/2 z-50 flex max-h-[min(48rem,calc(100dvh-2rem))] w-[min(44rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-border bg-popover text-popover-foreground shadow-md focus:outline-none"
+        >
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <Dialog.Title className="text-sm font-semibold">{item.title}</Dialog.Title>
+            <Dialog.Close asChild>
+              <button type="button" aria-label="Close" className="rounded-sm p-1 text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                <X className="size-4" aria-hidden="true" />
+              </button>
+            </Dialog.Close>
+          </div>
+          <div ref={bodyRef} className="min-h-0 flex-1 overflow-y-auto p-4">
+            <CloseCreateDialogContext.Provider value={onClose}>{item.content}</CloseCreateDialogContext.Provider>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

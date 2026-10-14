@@ -42,6 +42,8 @@ test.describe.serial("investigations", () => {
     ]);
 
     await page.goto("/risk/investigations");
+    await page.getByRole("button", { name: "Actions", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Open investigation…" }).click();
     await page.getByLabel("Title").fill(`E2E investigation ${stamp}`);
     for (const t of titles) await page.getByRole("checkbox", { name: new RegExp(t) }).check();
     await page.getByRole("button", { name: "Open investigation" }).click();

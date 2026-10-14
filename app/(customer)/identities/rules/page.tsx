@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listAttributeDefinitions, listIdentityRules, SETTABLE_FIELDS } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
+import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { RuleForm } from "./RuleForms";
 import { ruleStatus, TRIGGER_LABEL } from "./labels";
 
@@ -28,16 +28,19 @@ export default async function IdentityRulesPage() {
 
   return (
     <div className="space-y-5">
-      <div className="min-w-0">
-        <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Identity rules</h1>
-        <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Set an identity&apos;s attributes from its other attributes. A rule never overrides a value a connected source set.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Identity rules</h1>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Set an identity&apos;s attributes from its other attributes. A rule never overrides a value a connected source set.</p>
+        </div>
+        <ObjectActionsMenu create={canManage ? { label: "New rule…", title: "New rule", content: <RuleForm settable={settable} /> } : undefined} />
       </div>
 
       <Card>
         <CardHeader title="Rules" description={`${rules.filter((r) => r.status === "published").length} published`} />
         <CardBody>
           {rules.length === 0 ? (
-            <EmptyState title="No rules yet" description={canManage ? "Create the first one below." : "An identity administrator can add them."} />
+            <EmptyState title="No rules yet" description={canManage ? "Create the first one from Actions." : "An identity administrator can add them."} />
           ) : (
             <TableContainer label="Identity rules" bare>
               <Thead>
@@ -72,15 +75,6 @@ export default async function IdentityRulesPage() {
           )}
         </CardBody>
       </Card>
-
-      {canManage ? (
-        <details className="rounded-lg border border-border bg-card p-4">
-          <summary className="cursor-pointer text-sm font-medium text-foreground">New rule</summary>
-          <div className="mt-4">
-            <RuleForm settable={settable} />
-          </div>
-        </details>
-      ) : null}
     </div>
   );
 }
