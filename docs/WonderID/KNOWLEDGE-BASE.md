@@ -658,6 +658,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | An application's entitlements show "Requestable" only when someone can really request them; without a request policy they show "Needs a request policy", and the request catalog says why. The onboarding Approve button now works for an administrator's own submission. |
 | 14 Oct 2026 | An HR import (identity source) can give new people WonderID access: choose a default ID role on the source's page, and each new person it imports with an email is invited with it. |
 | 14 Oct 2026 | An administrator can approve an application onboarding they submitted (a note is required and it is recorded as self-approved). Add user can start from a person already under Identities, and a person's page has "Give WonderID access". |
 | 14 Oct 2026 | Creating a record from a list page now starts from the page's Actions menu, in a window over the list, instead of a form at the bottom of the page (policies, investigations, groups, data sources, discoveries, attributes, rules, templates, delegations, campaigns, privacy records, single sign-on and more). |

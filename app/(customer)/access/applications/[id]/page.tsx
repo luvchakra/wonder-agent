@@ -11,6 +11,9 @@ import {
   listEntitlementsForApplication,
   listEntitlementTypes,
   listFulfilmentAssignments,
+  listRequestPolicies,
+  entitlementRequestability,
+  resolveRequestPolicy,
   listReconciliationRuns,
 } from "@/modules/access-governance/service";
 import { listGroups } from "@/lib/users/groups";
@@ -56,7 +59,7 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns, entitlementTypes, assignments, groups] = await Promise.all([
+  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns, entitlementTypes, assignments, groups, requestPolicies] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
@@ -71,7 +74,12 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
     // ACCESS-P0-42: who does its fulfilment tasks.
     listFulfilmentAssignments(tenantId, id),
     canManage ? listGroups(tenantId).catch(() => []) : Promise.resolve([]),
+    // Owner feedback 2026-10-14: "Requestable" here means what the request catalog means.
+    listRequestPolicies(tenantId).catch(() => []),
   ]);
+  const requestability = Object.fromEntries(
+    entitlements.map((e) => [e.id, entitlementRequestability(resolveRequestPolicy(requestPolicies, id, e.id), e.requestable !== false && e.status !== "inactive").reason]),
+  );
   const lastRun = runs[0] ?? null;
   const lastAccessRun = accessRuns.find((r) => !r.dryRun) ?? null;
   const lifecycleActions = (
@@ -190,6 +198,7 @@ export default async function ApplicationDetailPage({ params, searchParams }: { 
             types={entitlementTypes}
             canManage={canManage}
             fromConnector={fromConnector}
+            requestability={requestability}
           />
         </TabPanel>
         <TabPanel value="onboarding" className="space-y-4 pt-4">

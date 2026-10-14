@@ -209,7 +209,20 @@ export async function applyRequestPolicy(
 // ---------------------------------------------------------------- catalog
 
 export type Approval = ReturnType<typeof approvalOutcome>;
-export type CatalogEntitlement = { id: string; name: string; privilegeLevel: string; dataClassification: string | null; risk: RiskLevel; requestable: boolean; approval: Approval; policy: RequestPolicy | null };
+import { entitlementRequestability, type NotRequestableReason } from "./requestRules";
+export type { NotRequestableReason };
+export type CatalogEntitlement = {
+  id: string;
+  name: string;
+  privilegeLevel: string;
+  dataClassification: string | null;
+  risk: RiskLevel;
+  requestable: boolean;
+  notRequestableReason: NotRequestableReason | null;
+  approval: Approval;
+  policy: RequestPolicy | null;
+};
+
 export type CatalogItem = {
   applicationId: string;
   name: string;
@@ -256,7 +269,7 @@ export async function listRequestCatalog(tenantId: string, filter: { q?: string;
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   const ids = (apps ?? []).map((a) => a.id as string);
   const { data: ents, error: entError } = ids.length
-    ? await supabase.from("entitlements").select("id, application_id, name, privilege_level, data_classification").eq("tenant_id", tenantId).in("application_id", ids).eq("status", "active").order("name").limit(2000)
+    ? await supabase.from("entitlements").select("id, application_id, name, privilege_level, data_classification, requestable").eq("tenant_id", tenantId).in("application_id", ids).eq("status", "active").order("name").limit(2000)
     : { data: [], error: null };
   if (entError) throw new ApiError(500, "QUERY_FAILED", entError.message);
   const items = (apps ?? []).map((a) => {
@@ -266,13 +279,15 @@ export async function listRequestCatalog(tenantId: string, filter: { q?: string;
       .map((e) => {
         const policy = resolvePolicy(policies, a.id, e.id);
         const risk = assessRisk({ privilegeLevel: e.privilege_level, dataClassification: e.data_classification, appRiskLevel: a.risk_level });
+        const r = entitlementRequestability(policy, e.requestable !== false);
         return {
           id: e.id as string,
           name: e.name as string,
           privilegeLevel: e.privilege_level as string,
           dataClassification: (e.data_classification as string | null) ?? null,
           risk,
-          requestable: Boolean(policy?.requestable),
+          requestable: r.requestable,
+          notRequestableReason: r.reason,
           approval: approvalOutcome(policy, risk),
           policy,
         };

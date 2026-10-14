@@ -241,3 +241,17 @@ export function validatePolicyInput(input: Record<string, unknown>, partial = fa
   }
   return out;
 }
+
+/**
+ * Why an entitlement cannot be requested (owner feedback 2026-10-14): no
+ * request policy decides who approves it; its policy says not requestable;
+ * or the entitlement itself is marked not requestable.
+ */
+export type NotRequestableReason = "no_policy" | "policy" | "entitlement";
+/** Requestable only when a policy allows it and the entitlement itself does. */
+export function entitlementRequestability(policy: RequestPolicy | null, entitlementRequestable: boolean): { requestable: boolean; reason: NotRequestableReason | null } {
+  if (!policy) return { requestable: false, reason: "no_policy" };
+  if (!policy.requestable) return { requestable: false, reason: "policy" };
+  if (!entitlementRequestable) return { requestable: false, reason: "entitlement" };
+  return { requestable: true, reason: null };
+}

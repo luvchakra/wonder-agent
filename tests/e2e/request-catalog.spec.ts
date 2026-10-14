@@ -65,6 +65,14 @@ test.describe.serial("request catalog", () => {
     // Live, but no policy covers it: not requestable.
     const none = await submit(request, { applicationId: appId, entitlementId: readerId, justification: "Monthly close reporting" });
     expect(none.status()).toBe(403);
+    // Owner feedback 2026-10-14: both pages say the same thing, and why.
+    const ui = await browser.newContext({ storageState: authFile("adminOne") });
+    const p = await ui.newPage();
+    await p.goto(`/access/applications/${appId}?tab=entitlements`);
+    await expect(p.getByRole("row").filter({ hasText: "Reader" }).getByText("Needs a request policy")).toBeVisible();
+    await p.goto(`/access/catalog?all=1&q=${encodeURIComponent(`E2E Req App ${stamp}`)}`);
+    await expect(p.getByText("Not requestable yet: no request policy says who approves it").first()).toBeVisible();
+    await ui.close();
 
     expect((await request.post("/api/v1/access/request-policies", { data: { applicationId: appId, name: "x", riskThreshold: "extreme" } })).status()).toBe(400);
     const policy = await request.post("/api/v1/access/request-policies", {

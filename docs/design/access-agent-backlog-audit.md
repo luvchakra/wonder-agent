@@ -4197,3 +4197,29 @@ Verified: typecheck; eslint; `next build`; Vitest onboardingRules +
 architecture 37/37; local E2E `application-onboarding` + `users` 26/26
 (an administrator's own approval without a note is 400; a second person's
 approval still works).
+
+### 2026-10-14 — Owner test feedback 10 and 11
+
+10, "Still not able to approve": the Approve button posts through the
+`onboardingStepAction` server action, which called `decideOnboarding`
+without the administrator flag (only the API route had been changed in
+PR #207), so an administrator's own submission was still refused. The
+action now passes `ctx.roles.includes(TENANT_ADMIN_ROLE)`; the Approve
+card's description mentions the exception.
+
+11, "both entitlements say requestable, but a request says otherwise":
+the application page showed the entitlement's own flag, while a request
+needs a request policy (who approves) and the flag. Now one rule decides
+both (`entitlementRequestability` in requestRules: no policy → not
+requestable, "no_policy"; policy not requestable → "policy"; entitlement
+flag off → "entitlement"). The catalog also honours the entitlement's own
+flag (it ignored it before). The application page shows "Requestable" only
+when it really is, and "Needs a request policy" (linking to Request
+Policies for the application) when no policy covers it; the catalog says
+"Not requestable yet: no request policy says who approves it".
+
+Verified: typecheck; eslint; `next build`; Vitest requestRules,
+onboardingRules, architecture 52/52; local E2E application-onboarding
+18/18 (new: an administrator approves their own submission on the screen,
+then promotes), request-catalog and application-catalog (with the new
+consistency checks) 31/31 in the combined run.

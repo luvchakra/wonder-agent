@@ -376,7 +376,10 @@ export function EntitlementsPanel({
   types,
   canManage,
   fromConnector,
+  requestability = {},
 }: {
+  /** Why each entitlement cannot be requested now (no policy, its policy, itself), or null when it can. */
+  requestability?: Record<string, "no_policy" | "policy" | "entitlement" | null>;
   applicationId: string;
   entitlements: Entitlement[];
   total: number;
@@ -467,7 +470,15 @@ export function EntitlementsPanel({
                       <Td hideBelow="xl">{e.dataClassification ? cap(e.dataClassification) : <span className="text-muted-foreground">—</span>}</Td>
                       <Td hideBelow="lg">
                         <span className="flex flex-wrap gap-1">
-                          {e.requestable === false ? <Badge tone="neutral">Not requestable</Badge> : <Badge tone="neutral">Requestable</Badge>}
+                          {requestability[e.id] === "no_policy" ? (
+                            <a href={`/access/request-policies?app=${applicationId}`} title="No request policy says who approves it" className="rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+                              <Badge tone="warning">Needs a request policy</Badge>
+                            </a>
+                          ) : requestability[e.id] === "policy" || requestability[e.id] === "entitlement" || e.requestable === false ? (
+                            <Badge tone="neutral">Not requestable</Badge>
+                          ) : (
+                            <Badge tone="success">Requestable</Badge>
+                          )}
                           {e.certifiable === false ? <Badge tone="neutral">Not certified</Badge> : null}
                           {e.soxRelevant ? <Badge tone="warning">SOX</Badge> : null}
                         </span>

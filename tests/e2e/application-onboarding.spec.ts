@@ -211,3 +211,23 @@ test.describe("application onboarding — other organizations and roles", () => 
     await ro.close();
   });
 });
+
+test.describe("an administrator approves their own onboarding on the screen (owner feedback 2026-10-14)", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("the Approve button works for an administrator's own submission, with a note", async ({ page, request }) => {
+    const own = await registerApp(request, `E2E Onb Self ${stamp}`);
+    expect((await step(request, own, { action: "start", mode: "assisted" })).status).toBe(200);
+    expect((await step(request, own, { action: "configure", config: COMPLETE })).status).toBe(200);
+    expect((await step(request, own, { action: "validate" })).status).toBe(200);
+    const s = await step(request, own, { action: "simulate" });
+    expect(s.data.status, s.error?.message).toBe("WAITING_FOR_APPROVAL");
+
+    await page.goto(`/access/applications/${own}?tab=onboarding`);
+    await page.getByLabel("Note").fill("I own this application");
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect(page.getByText("Approved by you.")).toBeVisible();
+    const after = await step(request, own, { action: "promote" });
+    expect(after.status, after.error?.message).toBe(200);
+  });
+});

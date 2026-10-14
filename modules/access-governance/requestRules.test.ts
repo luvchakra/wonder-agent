@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { assessRisk, evaluateRequest, resolvePolicy, validatePolicyInput, type RequestContext, type RequestPolicy } from "./requestRules";
+import { assessRisk, entitlementRequestability, evaluateRequest, resolvePolicy, validatePolicyInput, type RequestContext, type RequestPolicy } from "./requestRules";
 
 const policy = (over: Partial<RequestPolicy> = {}): RequestPolicy => ({
   id: "p",
@@ -150,5 +150,15 @@ describe("validatePolicyInput", () => {
     expect(() => validatePolicyInput({ name: "x", allowForOthers: "everyone" })).toThrow(/allowForOthers/);
     expect(() => validatePolicyInput({ name: "x", maxDurationDays: 10, defaultDurationDays: 20 })).toThrow(/exceed/);
     expect(validatePolicyInput({ status: "inactive" }, true)).toEqual({ status: "inactive" });
+  });
+});
+
+describe("entitlementRequestability (owner feedback 2026-10-14)", () => {
+  const allows = (requestable: boolean) => policy({ requestable });
+  it("is requestable only when a policy allows it and the entitlement does, and says why not", () => {
+    expect(entitlementRequestability(null, true)).toEqual({ requestable: false, reason: "no_policy" });
+    expect(entitlementRequestability(allows(false), true)).toEqual({ requestable: false, reason: "policy" });
+    expect(entitlementRequestability(allows(true), false)).toEqual({ requestable: false, reason: "entitlement" });
+    expect(entitlementRequestability(allows(true), true)).toEqual({ requestable: true, reason: null });
   });
 });

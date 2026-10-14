@@ -206,3 +206,6 @@ export {
   type ClassificationSimulation,
 } from "./classificationRulesService";
 export { SETTABLE as CLASSIFICATION_SETTABLE, CLASSIFICATION_TRIGGERS } from "./classificationRules";
+
+export { resolvePolicy as resolveRequestPolicy } from "./requestRules";
+export { entitlementRequestability } from "./requestRules";
