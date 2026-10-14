@@ -3512,3 +3512,103 @@ priority order: onboarding, requests, approvals, provisioning.
   - read-only 403;
   - retired.
 - Typecheck, eslint and `next build` are clean.
+
+## 2026-10-14 — ACCESS-P0-42: internal fulfilment task assignment
+
+This story was added by the owner on 2026-10-14 at High priority, ahead of
+ServiceNow ticketing (INTEGRATION-P0-26, now Low). Before it, a manual task
+went to the application's technical owner, then the business owner, and
+otherwise was left to the access managers.
+
+**Migration 0173.**
+- `application_fulfilment_assignments` names who does an application's
+  tasks: one row for the application and optionally one per entitlement
+  type, unique ignoring case.
+  - Each row names a person (an identity) or a Foundation group, never both
+    and never neither.
+  - Same-organization foreign keys.
+- `access_fulfilment_tasks` gains:
+  - `assignee_group_id` (same-organization; set to null if the group is
+    deleted);
+  - `assigned_by`, `assigned_at` and `assignment_reason`.
+  - A task names a person or a group, never both.
+- Members read; the Access service writes.
+
+**Rules** (pure, `fulfilmentAssignmentRules.ts`).
+- `resolveAssignee`: the entitlement type's row, else the application's
+  row, else the technical owner, then the business owner. With none of
+  them, the task falls to the access managers.
+- `canAct` (`fulfilmentTaskRules.ts`): a group's task belongs to each
+  member of the group. Once one member claims it, only they or an access
+  manager can complete or fail it.
+- `canReassign`: the assignee (a group member for a group's task), whoever
+  claimed it, or an access manager may reassign, while the task is open,
+  claimed or failed.
+- `validateReassignment`: one person or one group, plus a reason.
+- `workload`: tasks still to do per assignee, overdue first.
+
+**Service.**
+- `openFulfilmentTask` routes each new task through `assigneeForNewTask`:
+  - it reads the grant's entitlement type for grant and remove tasks;
+  - it records the route in the audit;
+  - it notifies the person, or each group member.
+- `listFulfilmentTasks(forPerson)` includes the member's groups' tasks.
+  Access managers see tasks with neither a person nor a group.
+- `reassignFulfilmentTask`:
+  - refused while the connector is running, and when the target is
+    unchanged (`UNCHANGED`);
+  - checks the target (an active person or active group of the
+    organization);
+  - releases a claim;
+  - optimistic on `updated_at`;
+  - audited (the reason is typed text; the metadata holds from, to and
+    whether a claim was released);
+  - the new assignee is notified.
+- `fulfilmentWorkload` counts tasks per assignee.
+- Overdue reminders reach group members.
+- `fulfilmentAssignments.ts`: list, set (replaces the same scope),
+  remove, and `activeGroupIdsOf` (Foundation's `groupsOfUser`).
+
+**API.**
+- `/api/v1/access/applications/:id/fulfilment-assignments`: GET with
+  access.read; POST and DELETE with access.manage.
+- `/api/v1/access/fulfilment-tasks/:id/reassign`: access.read; the service
+  decides who may.
+- `/api/v1/access/fulfilment-tasks/workload`.
+
+**UI.**
+- Fulfilment tasks:
+  - each task shows its group or owner;
+  - a folded "Reassign" control (person or group, plus why), shown only to
+    those who may;
+  - a folded "Workload" summary under "Show all".
+- The application page has a folded "Fulfilled by" in the Onboarding card,
+  to set and remove the application's and each type's assignee.
+- My Workspace's inbox includes the member's groups' tasks.
+
+**Left out, recorded.**
+- Automatic balancing (round robin, least loaded) inside a group: members
+  claim from the group's queue.
+- Assignment by request attributes other than the entitlement type.
+- Ticketing (INTEGRATION-P0-26, Low).
+- Out-of-office delegation of tasks, which is ACCESS-P0-23.
+
+**Verified.**
+- Unit tests: `fulfilmentAssignmentRules.test.ts` 5, with the existing
+  fulfilment rule tests (14 in all); `npx vitest run modules
+  tests/architecture lib app` passes, 1573.
+- Database: `tests/access/fulfilment-assignment-isolation.sql`, 9 of 9 as
+  expected, rolled back.
+- Local E2E: `fulfilment-assignment.spec.ts` with `leaver-removals.spec.ts`,
+  `connector-provisioning.spec.ts` and `f1-reconciliation.spec.ts` (task
+  routing, listing and acting changed), 46/46 in 14.5 minutes. The new spec
+  covers:
+  - setting and replacing who fulfils;
+  - routing by type and by application;
+  - a group member claiming, and a non-member refused;
+  - reassignment with a reason (claim released, audited);
+  - an access manager handing a task back;
+  - workload;
+  - the screens;
+  - read-only 403 and another organization 404.
+- Typecheck, eslint and `next build` are clean.

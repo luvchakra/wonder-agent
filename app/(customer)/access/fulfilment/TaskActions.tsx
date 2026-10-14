@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { fulfilmentTaskAction, type TaskFormState } from "@/app/actions/fulfilment";
+import { fulfilmentTaskAction, reassignTaskAction, type TaskFormState } from "@/app/actions/fulfilment";
 import { Button } from "@/modules/ui";
 
 const IDLE: TaskFormState = { status: "idle" };
@@ -65,5 +65,39 @@ export function TaskActions({ taskId, status, mine, label, connectorStatus = nul
       </details>
       {outcome}
     </div>
+  );
+}
+
+/**
+ * ACCESS-P0-42 — hand a task to another person or group, with the reason.
+ * Folded: most tasks are done by whoever they went to.
+ */
+export function ReassignTask({ taskId, label, choices }: { taskId: string; label: string; choices: { value: string; label: string }[] }) {
+  const [state, action, pending] = useActionState(reassignTaskAction.bind(null, taskId), IDLE);
+  return (
+    <details className="text-xs">
+      <summary className="cursor-pointer text-muted-foreground">Reassign</summary>
+      <form action={action} className="mt-1 flex flex-wrap items-center justify-end gap-1.5">
+        <select name="assignee" required aria-label={`Reassign to: ${label}`} className={INPUT} defaultValue="">
+          <option value="" disabled>
+            Person or group
+          </option>
+          {choices.map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <input name="reason" required aria-label={`Why: ${label}`} placeholder="Why" maxLength={2000} className={INPUT} />
+        <Button type="submit" size="sm" variant="outline" disabled={pending} aria-label={`Reassign: ${label}`}>
+          {pending ? "Reassigning…" : "Reassign"}
+        </Button>
+      </form>
+      {state.status === "idle" ? null : (
+        <p role="status" className={`mt-1 text-right ${state.status === "error" ? "text-destructive" : "text-success"}`}>
+          {state.message}
+        </p>
+      )}
+    </details>
   );
 }

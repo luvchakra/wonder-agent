@@ -120,7 +120,7 @@ Exit test: not run.
 | INTEGRATION-P0-24 † Entra ID connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | Low (owner, 2026-10-14) |
-| ACCESS-P0-42 Internal fulfilment task assignment | Access | | Not started | Owner request 2026-10-14, High |
+| ACCESS-P0-42 Internal fulfilment task assignment | Access | | Done | Owner request 2026-10-14, High. Migration 0173: a person or group per application and per entitlement type; new tasks routed (type, application, technical owner, business owner, access managers); group members claim; reassign with a reason (audited, claim released, new assignee notified); workload per assignee; overdue reminders reach group members |
 | RISK-P0-13 Rogue access remediation | Risk | | Partial | Every remediation action, severity, trend and the finding page; the last, adding access to a package the identity holds, 2026-10-14 (#169). Done once its E2E passes in the nightly run |
 | QA-P0-26 Provisioning safety suite | QA | | Done | 2026-10-12, no migration. The mass-change guard on writes: at most `integration.maxWritesPerHour` (default 100) changes per connection per hour; past it nothing is sent and the task goes to its owner with the reason. Tests in `connector-provisioning.spec.ts`: read-only types cannot be turned on, the guard, Try again once the limit allows, no attempt key sent twice, every operation verified |
 

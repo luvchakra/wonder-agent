@@ -23,7 +23,8 @@ export { LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type LedgerSource, type Ledge
 export { createAccessRequest, listAccessRequests, decideAccessRequest } from "./requests";
 export { recordApprovedAfterwards, type ApprovedAfterwardsInput } from "./approvedAfterwards";
 export { grantsForRequest, requestProgressFor } from "./pendingGrants";
-export { listFulfilmentTasks, actOnFulfilmentTask, remindOverdueFulfilmentTasks, type FulfilmentTask } from "./fulfilmentTasks";
+export { listFulfilmentTasks, actOnFulfilmentTask, remindOverdueFulfilmentTasks, reassignFulfilmentTask, fulfilmentWorkload, type FulfilmentTask, type FulfilmentWorkload } from "./fulfilmentTasks";
+export { listFulfilmentAssignments, setFulfilmentAssignment, removeFulfilmentAssignment, activeGroupIdsOf, type FulfilmentAssignment } from "./fulfilmentAssignments";
 export { releaseLostConnectorRuns } from "./connectorFulfilment";
 export { sweepAccessExpiry, remindExpiringAccess } from "./accessExpiry";
 export { openLeaverRemovals } from "./leaverRemovals";
