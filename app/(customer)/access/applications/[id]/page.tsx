@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getAccountSummary, getApplicationDetail, getOnboarding, listAccessReconciliationRuns, listEntitlementsForApplication, listReconciliationRuns } from "@/modules/access-governance/service";
+import { getAccountSummary, getApplicationDetail, getOnboarding, listAccessReconciliationRuns, listEntitlementsForApplication, listEntitlementTypes, listReconciliationRuns } from "@/modules/access-governance/service";
+import { EntitlementTypes } from "./EntitlementTypes";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -41,7 +42,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns] = await Promise.all([
+  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns, entitlementTypes] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
@@ -51,6 +52,8 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     getRecordProvenance(tenantId, "applications", id),
     // EXPERIENCE-P0-28: the last applied entitlement and access reconciliation, if any.
     listAccessReconciliationRuns(tenantId, id, 10).catch(() => []),
+    // ACCESS-P0-33: the application's entitlement types.
+    listEntitlementTypes(tenantId, id),
   ]);
   const lastRun = runs[0] ?? null;
   const lastAccessRun = accessRuns.find((r) => !r.dryRun) ?? null;
@@ -150,11 +153,15 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
                     <span className="flex shrink-0 gap-1">
                       {e.privilegeLevel !== "standard" ? <Badge tone={e.privilegeLevel === "admin" ? "danger" : "warning"}>{e.privilegeLevel}</Badge> : null}
                       {e.dataClassification ? <Badge tone="neutral">{e.dataClassification}</Badge> : null}
+                      {e.entitlementType ? <Badge tone="info">{e.entitlementType}</Badge> : null}
+                      {e.requestable === false ? <Badge tone="neutral">Not requestable</Badge> : null}
+                      {e.soxRelevant ? <Badge tone="warning">SOX</Badge> : null}
                     </span>
                   </li>
                 ))}
               </ul>
             )}
+            <EntitlementTypes applicationId={id} types={entitlementTypes} canManage={canManage} />
           </CardBody>
         </Card>
       </div>

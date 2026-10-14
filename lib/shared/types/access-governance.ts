@@ -97,6 +97,28 @@ export type Entitlement = {
   dataSourceId?: string | null;
   /** ACCESS-P0-19: the identity who approves requests for this entitlement. */
   ownerIdentityId?: string | null;
+  /** ACCESS-P0-33: the connector's type (group, role, permission, license, scope, tool permission...). */
+  entitlementType?: string | null;
+  /** ACCESS-P0-33: false keeps it out of requests. */
+  requestable?: boolean;
+  /** ACCESS-P0-33: drives certification scope and evidence retention. */
+  soxRelevant?: boolean;
+};
+
+/** ACCESS-P0-33: how one type of an application's entitlements is offered and governed. */
+export type EntitlementTypeRequestMode = "single" | "multiple" | "free_text" | "not_requestable";
+export type ApplicationEntitlementType = {
+  id: string;
+  applicationId: string;
+  name: string;
+  requestMode: EntitlementTypeRequestMode;
+  certifiable: boolean;
+  defaultDurationDays: number | null;
+  maxDurationDays: number | null;
+  requestPolicyId: string | null;
+  origin: "manual" | "connector";
+  /** How many of the application's entitlements have this type. */
+  entitlementCount?: number;
 };
 
 /**

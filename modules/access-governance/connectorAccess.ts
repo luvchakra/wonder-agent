@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getNormalizedObjectsAsSystem } from "@/modules/integrations/service";
 import { closeTasksForGrants } from "./fulfilmentTasks";
+import { registerConnectorTypes } from "./entitlementTypes";
 import { accountRefOf } from "./accountRules";
 import { ensureAccessBaseline, refreshAccessLedger } from "./ledger";
 import {
@@ -261,7 +262,7 @@ async function load(admin: Admin, tenantId: string, applicationId: string, integ
       (from, to) =>
         admin
           .from("entitlements")
-          .select("id, tenant_id, name, privilege_level, data_classification, source_integration_id, external_ref, missing_from_source_at")
+          .select("id, tenant_id, name, privilege_level, data_classification, source_integration_id, external_ref, missing_from_source_at, entitlement_type, field_provenance")
           .eq("tenant_id", tenantId)
           .eq("application_id", applicationId)
           .order("id")
@@ -281,6 +282,8 @@ async function load(admin: Admin, tenantId: string, applicationId: string, integ
     sourceIntegrationId: (e.source_integration_id as string | null) ?? null,
     externalRef: (e.external_ref as string | null) ?? null,
     missingFromSourceAt: (e.missing_from_source_at as string | null) ?? null,
+    entitlementType: (e.entitlement_type as string | null) ?? null,
+    typeSetByPerson: ((e.field_provenance as Record<string, { by?: string }> | null) ?? {}).entitlement_type?.by === "person",
   }));
   const accounts = accountRows.filter(own(tenantId));
 
@@ -368,6 +371,7 @@ async function applyEntitlements(admin: Admin, tenantId: string, applicationId: 
           name: c.name,
           privilege_level: c.privilegeLevel,
           data_classification: c.dataClassification,
+          entitlement_type: c.entitlementType ?? null,
           source_integration_id: integrationId,
           external_ref: c.ref,
         })),
@@ -389,6 +393,11 @@ async function applyEntitlements(admin: Admin, tenantId: string, applicationId: 
       if (error) throw new ApiError(500, "WRITE_FAILED", `entitlements: ${error.message}`);
     }
   }
+  // ACCESS-P0-33: every type the connector sent is declared on the application, once, so it can be governed.
+  await registerConnectorTypes(tenantId, applicationId, [
+    ...plan.creates.map((c) => c.entitlementType),
+    ...plan.updates.map((u) => (u.set.entitlement_type as string | undefined) ?? null),
+  ]);
 }
 
 async function applyGrants(admin: Admin, tenantId: string, integrationId: string, plan: GrantPlan, byRef: Map<string, string>): Promise<void> {

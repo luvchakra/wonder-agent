@@ -175,3 +175,67 @@ test.describe.serial("request catalog", () => {
     await ro.close();
   });
 });
+
+test.describe.serial("ACCESS-P0-33: entitlement types shape requests", () => {
+  test.use({ storageState: authFile("adminOne") });
+  let licenceId = "";
+  let typeId = "";
+
+  test("a type is declared on the application when a person names it, and its settings apply to requests", async ({ request }) => {
+    test.skip(!appId, "needs the request catalog's live application");
+    const ent = await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: `Licence ${stamp}`, dataClassification: "internal", privilegeLevel: "standard" } });
+    licenceId = (await ent.json()).data.id;
+    const set = await request.patch(`/api/v1/access/entitlements/${licenceId}/governance`, { data: { entitlementType: "license" } });
+    expect(set.status(), await set.text()).toBe(200);
+    expect((await set.json()).data).toMatchObject({ entitlementType: "license", requestable: true, soxRelevant: false });
+
+    const types = (await (await request.get(`/api/v1/access/applications/${appId}/entitlement-types`)).json()).data as { id: string; name: string; origin: string; entitlementCount: number }[];
+    const license = types.find((t) => t.name === "license")!;
+    expect(license).toMatchObject({ origin: "manual", entitlementCount: 1 });
+    typeId = license.id;
+    expect((await request.patch(`/api/v1/access/applications/${appId}/entitlement-types/${typeId}`, { data: { defaultDurationDays: 20, maxDurationDays: 10 } })).status()).toBe(400);
+    expect((await request.patch(`/api/v1/access/applications/${appId}/entitlement-types/${typeId}`, { data: { defaultDurationDays: 5, maxDurationDays: 10 } })).status()).toBe(200);
+
+    // Longer than the type allows is refused; nothing asked for gets the type's default.
+    const tooLong = await submit(request, { applicationId: appId, entitlementId: licenceId, justification: "Licence for the audit", durationDays: 20 });
+    expect(tooLong.status()).toBe(400);
+    expect((await tooLong.json()).error.code).toBe("DURATION_TOO_LONG");
+    const ok = await submit(request, { applicationId: appId, entitlementId: licenceId, justification: "Licence for the audit" });
+    expect(ok.status(), await ok.text()).toBe(201);
+    expect((await ok.json()).data.durationDays).toBe(5);
+  });
+
+  test("not requestable, by the entitlement or by its type, is refused", async ({ request }) => {
+    test.skip(!licenceId, "needs the previous test");
+    const other = await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: `Licence B ${stamp}`, dataClassification: "internal", privilegeLevel: "standard" } });
+    const otherId = (await other.json()).data.id as string;
+    expect((await request.patch(`/api/v1/access/entitlements/${otherId}/governance`, { data: { requestable: false, soxRelevant: true } })).status()).toBe(200);
+    const refused = await submit(request, { applicationId: appId, entitlementId: otherId, justification: "Licence for the audit" });
+    expect(refused.status()).toBe(403);
+    expect((await refused.json()).error.code).toBe("NOT_REQUESTABLE");
+
+    expect((await request.patch(`/api/v1/access/applications/${appId}/entitlement-types/${typeId}`, { data: { requestMode: "not_requestable" } })).status()).toBe(200);
+    expect((await request.patch(`/api/v1/access/entitlements/${otherId}/governance`, { data: { requestable: true, entitlementType: "license" } })).status()).toBe(200);
+    const byType = await submit(request, { applicationId: appId, entitlementId: otherId, justification: "Licence for the audit" });
+    expect((await byType.json()).error.code).toBe("NOT_REQUESTABLE");
+  });
+
+  test("the application page shows the types; read-only and another organization cannot change them", async ({ page, browser }) => {
+    test.skip(!typeId, "needs the first test");
+    await page.goto(`/access/applications/${appId}`);
+    await page.getByText(/^Entitlement types \(/).click();
+    await expect(page.getByLabel("license: requested as")).toHaveValue("not_requestable");
+
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    expect((await ro.request.get(`/api/v1/access/applications/${appId}/entitlement-types`)).status()).toBe(200);
+    expect((await ro.request.patch(`/api/v1/access/applications/${appId}/entitlement-types/${typeId}`, { data: { requestMode: "single" } })).status()).toBe(403);
+    expect((await ro.request.patch(`/api/v1/access/entitlements/${licenceId}/governance`, { data: { requestable: false } })).status()).toBe(403);
+    await ro.close();
+
+    const two = await browser.newContext({ storageState: authFile("adminTwo") });
+    expect(((await (await two.request.get(`/api/v1/access/applications/${appId}/entitlement-types`)).json()).data as unknown[]).length).toBe(0);
+    expect((await two.request.patch(`/api/v1/access/applications/${appId}/entitlement-types/${typeId}`, { data: { requestMode: "single" } })).status()).toBe(404);
+    expect((await two.request.patch(`/api/v1/access/entitlements/${licenceId}/governance`, { data: { requestable: false } })).status()).toBe(404);
+    await two.close();
+  });
+});

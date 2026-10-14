@@ -165,3 +165,6 @@ export {
   type AccessSamples,
 } from "./connectorAccess";
 export type { AccessCounts } from "./connectorAccessRules";
+// ACCESS-P0-33: entitlement types per application, and the entitlement's governance fields.
+export { listEntitlementTypes, createEntitlementType, updateEntitlementType, setEntitlementGovernance, registerConnectorTypes } from "./entitlementTypes";
+export { REQUEST_MODES } from "./entitlementTypeRules";

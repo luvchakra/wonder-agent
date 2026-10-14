@@ -129,7 +129,7 @@ Exit test: not run.
 | IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Partial | 2026-10-14: attribute rules (created, imported, attribute changed), report-only, simulation, four-eyes publish, run log (0166). Lifecycle triggers and effects with IDENTITY-P0-18 (finish) |
 | IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Done | Birthright (0151), mover review (0153), leaver removal (WID-C02), four-eyes rules (IDENTITY-P0-21); 2026-10-14: expiry sweep (0168) and the manager's "disable all access" (My Team) |
 | IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
-| ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Not started | |
+| ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Partial | 2026-10-14: entitlement types per application (0169): how each is requested, certifiable, default and maximum duration; entitlement type, requestable and SOX flags with provenance; enforced on requests. Classification rules next |
 | COMPLIANCE-P0-10 Certification for every identity type | Compliance | | Not started | Backlog: Not Started |
 | COMPLIANCE-P0-11 Certification of administrators | Compliance | | Not started | Backlog: Not Started |
 | COMPLIANCE-P0-14 † Templates, preview, consultation, closed loop, SLA report | Compliance | | Not started | |

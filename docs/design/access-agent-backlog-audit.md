@@ -3223,3 +3223,76 @@ Risk's `authorizeRogueFinding` now calls the published `listAssignments` and
 holds. No Access code changed. Adding a resource leaves existing assignments
 as they are, and a birthright package goes back to review as it always has.
 The Risk log has the verification.
+
+## 2026-10-14 — ACCESS-P0-33 part 1: entitlement types per application
+
+Design §5.4. Classification rules (part 2) set the same fields.
+
+- **Migration 0169.**
+  - `entitlements` gains `entitlement_type`, `requestable` (default true, as
+    today), `sox_relevant` (default false) and `field_provenance`. All are
+    additive.
+  - New `application_entitlement_types`, with one row per type per
+    application:
+    - how it is requested: one at a time, several, free text, or shown but
+      not requestable;
+    - whether it is certifiable;
+    - its default and maximum duration;
+    - an optional request policy;
+    - its origin (connector or manual).
+  - Same-organization foreign keys; the policy reference is cleared when the
+    policy goes. One name per application, ignoring case. A default above
+    the maximum is refused. Members read; writes go through the service.
+- **Import.**
+  - The connector's `type` lands on each entitlement.
+  - Every type it sends is declared on the application once, keeping
+    existing settings.
+  - A type a person set is never overwritten by an import.
+- **Requests** (`submitAccessRequest`, grant and extend).
+  - Refused with `NOT_REQUESTABLE`: an entitlement not requestable, or of a
+    type shown but not requestable.
+  - The type's default duration applies when none is asked for. Its maximum
+    caps the duration: more is `DURATION_TOO_LONG`, and open-ended becomes
+    the maximum.
+  - The rules are pure, in `entitlementTypeRules.ts`.
+- **Manual changes.** A person sets an entitlement's type, requestable and
+  SOX flags (`PATCH /api/v1/access/entitlements/:id/governance`,
+  access.manage). Each change is recorded as a person's decision in
+  `field_provenance`, which rules will respect. A type a person names is
+  declared on the application.
+- **Types API:** `GET` and `POST /api/v1/access/applications/:id/entitlement-types`
+  (read access.read, write access.manage), and `PATCH …/:typeId`. A
+  connector's type keeps its name.
+- **UI.**
+  - On the application page, entitlements show their type and flags, with
+    "Entitlement types" folded below them and editable by access managers.
+  - Each row on the Entitlements page shows its type and flags, with a
+    folded editor.
+
+**Left out, recorded.**
+- **Certifiability not yet applied:** campaigns don't yet skip types marked
+  not certifiable, because campaign scope is Compliance's (COMPLIANCE-P0-10).
+- **Request modes not yet in the catalog:** "single", "multiple" and "free
+  text" are stored, but the request catalog doesn't yet offer several or free
+  text.
+- **Ownerless entitlements still requestable:** they fall back to the
+  application owner (ACCESS-P0-19); making them not requestable would change
+  existing behaviour and needs a decision.
+- **Classification rules:** these are part 2.
+
+**Verified.**
+- Unit tests: `entitlementTypeRules.test.ts` 5, plus a new
+  `connectorAccessRules` test (the connector's type is taken, never over a
+  type a person set); `modules/access-governance` 292 in all.
+- Database: `tests/access/entitlement-types-isolation.sql`, 7 of 7 as
+  expected.
+- Local E2E: `request-catalog.spec.ts` with `f1-reconciliation.spec.ts`,
+  30/30. The new tests cover:
+  - a type named by a person is declared with a count;
+  - a default above the maximum is refused;
+  - a request longer than the type allows is refused, and one without a
+    duration gets the type's default;
+  - not requestable, by the entitlement or by its type, is refused;
+  - the application page shows the type editor;
+  - read-only gets 403 and another organization 404, or an empty list.
+- Typecheck, eslint and `next build` are clean.
