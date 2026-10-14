@@ -1,33 +1,31 @@
 "use client";
 
-import { code128B } from "./barcode";
-
 /**
- * A request's number with its Code 128 barcode (owner request, 2026-10-14),
- * shown once a request is created. The bars rise in from left to right and a
- * scan line passes over them once; under reduced motion the barcode is simply
- * there. The number is also plain text, so the barcode is never the only way
- * to read it.
+ * A request's number under a barcode-style picture (owner request,
+ * 2026-10-14), shown once a request is created. The bars are decoration
+ * only, a fixed pattern that encodes nothing: the number below is what
+ * people read and quote. The bars rise in from left to right and a scan
+ * line passes over them once; under reduced motion the picture is simply
+ * there.
  */
+const BARS = [2, 1, 1, 3, 1, 2, 3, 1, 1, 1, 2, 2, 1, 3, 2, 1, 1, 2, 1, 1, 3, 1, 2, 1, 1, 2, 2, 3, 1, 1, 2, 1, 3, 2, 1, 1, 1, 2, 1, 3, 2, 1, 2, 1, 1, 3, 1, 2];
+
 export function RequestNumberBarcode({ number, label = "Request number" }: { number: string; label?: string }) {
-  const widths = code128B(number);
-  const quiet = 10;
-  const total = widths.reduce((s, w) => s + w, 0) + quiet * 2;
   const bars: { x: number; w: number }[] = [];
-  let x = quiet;
-  widths.forEach((w, i) => {
+  let x = 0;
+  BARS.forEach((w, i) => {
     if (i % 2 === 0) bars.push({ x, w });
     x += w;
   });
   return (
     <figure className="wa-barcode inline-flex flex-col items-center rounded-lg border border-border bg-card px-4 pb-3 pt-4 text-card-foreground shadow-sm">
-      <div className="relative overflow-hidden rounded-sm bg-white px-1 py-1">
-        <svg viewBox={`0 0 ${total} 60`} preserveAspectRatio="none" className="block h-16 w-64 max-w-full" role="img" aria-label={`Barcode for ${number}`}>
+      <div aria-hidden="true" className="relative overflow-hidden rounded-sm bg-white px-2 py-1">
+        <svg viewBox={`0 0 ${x} 40`} preserveAspectRatio="none" className="block h-14 w-56 max-w-full">
           {bars.map((b, i) => (
-            <rect key={i} x={b.x} y={0} width={b.w} height={60} fill="#000" className="wa-barcode-bar" style={{ animationDelay: `${Math.round((b.x / total) * 450)}ms` }} />
+            <rect key={i} x={b.x} y={0} width={b.w} height={40} fill="#000" className="wa-barcode-bar" style={{ animationDelay: `${Math.round((b.x / x) * 450)}ms` }} />
           ))}
         </svg>
-        <span aria-hidden="true" className="wa-barcode-scan pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary/70 shadow-[0_0_8px_2px] shadow-primary/50" />
+        <span className="wa-barcode-scan pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary/70 shadow-[0_0_8px_2px] shadow-primary/50" />
       </div>
       <figcaption className="mt-2 text-center">
         <span className="block text-xs text-muted-foreground">{label}</span>
