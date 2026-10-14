@@ -21,6 +21,8 @@ import {
   type IdentityInput,
   type ValidIdentityFields,
 } from "./identityRules";
+import { changedFields, rowFromIdentity } from "./attributeRules";
+import { applyIdentityRules } from "./identityRulesService";
 
 /**
  * IDENTITY-P0-15/16/17 — the WonderID identity directory: every identity
@@ -483,7 +485,9 @@ export async function createIdentity(tenantId: string, actorId: string, input: I
     outcome: "success",
     metadata: { identityType: identity.identityType, ownerIdentityId: identity.ownerIdentityId, sponsorIdentityId: identity.sponsorIdentityId },
   });
-  return identity;
+  // IDENTITY-P0-21: the organization's attribute rules, after the identity exists.
+  const rules = await applyIdentityRules(tenantId, identity.id, { type: "identity.created" });
+  return rules.changed ? ((await getIdentity(tenantId, identity.id)) ?? identity) : identity;
 }
 
 export async function updateIdentity(tenantId: string, actorId: string, identityId: string, patch: IdentityInput): Promise<Identity> {
@@ -526,7 +530,12 @@ export async function updateIdentity(tenantId: string, actorId: string, identity
     // Field names only: values can be personal data (#10, §17.7).
     metadata: { identityType: identity.identityType, changed, ...(changed.includes("status") ? { from: current.status, to: identity.status } : {}) },
   });
-  return identity;
+  // IDENTITY-P0-21: attribute rules on what changed. Their own writes start no further rules.
+  const before = rowFromIdentity(current as unknown as Record<string, unknown>);
+  const changedNames = changedFields(before, rowFromIdentity(identity as unknown as Record<string, unknown>));
+  if (!changedNames.length) return identity;
+  const rules = await applyIdentityRules(tenantId, identityId, { type: "identity.attribute_changed", changedAttributes: changedNames }, { before });
+  return rules.changed ? ((await getIdentity(tenantId, identityId)) ?? identity) : identity;
 }
 
 // ---------------------------------------------------------------- relationships

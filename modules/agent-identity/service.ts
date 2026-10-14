@@ -83,3 +83,17 @@ export {
 export { allowedTransitions, HUMAN_TRANSITIONS } from "./humanLifecycle";
 // IDENTITY-P0-20: non-human identities behind imported accounts, and agents' declared identifiers.
 export { ensureAccountIdentities, listAgentIdentifiers, accountSourceSystem, type AccountIdentityInput, type NonHumanType } from "./accountIdentities";
+// IDENTITY-P0-21: attribute rules on the shared rule runtime (D12).
+export {
+  listIdentityRules,
+  getIdentityRule,
+  createIdentityRule,
+  updateIdentityRule,
+  simulateIdentityRule,
+  requestIdentityRulePublish,
+  approveIdentityRulePublish,
+  retireIdentityRule,
+  type IdentityRule,
+  type RuleSimulation,
+} from "./identityRulesService";
+export { ATTRIBUTE_RULE_TRIGGERS, SETTABLE_FIELDS, READABLE_FIELDS } from "./attributeRules";

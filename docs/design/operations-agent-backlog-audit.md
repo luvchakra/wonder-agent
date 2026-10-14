@@ -998,3 +998,24 @@ passed. `npm run typecheck` is clean, and eslint is clean on the new files.
   IDENTITY-P0-21 and ACCESS-P0-33.
 
 The row is Partial in the live phase doc.
+
+### 2026-10-14 — OPERATIONS-P0-11 (runtime part) done: the run log is stored
+
+- **Migration 0167 `rule_runs`:** the automation run log for every module's
+  rule table. It records the rule and version, the subject, the trigger, the
+  mode, the outcome (`applied`, `reported`, `not_matched`, `out_of_scope`,
+  `skipped` or `error`), the planned effects and a detail. Members read it;
+  the owning module writes it through the service role. An update trigger
+  refuses any change, and members cannot insert or delete.
+- **`modules/operations/rules/runLog.ts`:**
+  - `recordRuleRuns` throws on failure, so a rule's effect is never left
+    unlogged silently;
+  - `listRuleRuns` filters by tenant and returns nothing for a malformed id.
+- **Templates.** The runtime gained template values
+  (`{ template: "{identity.firstName} {identity.lastName}" }`), and
+  `validateRule` and `ruleReferences` check and list the references inside
+  them.
+- **Contract.** The runtime, the condition language and the run log are
+  exported from `modules/operations/service.ts`.
+- **First user:** Identity's attribute rules (IDENTITY-P0-21). The rule page
+  shows each rule's recent runs.

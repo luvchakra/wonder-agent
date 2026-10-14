@@ -19,8 +19,22 @@ export type RuleStatus = "draft" | "simulated" | "published" | "retired";
 /** What a rule may touch. An empty or absent list allows everything of that kind. */
 export type RuleScope = { identityTypes?: string[]; organizations?: string[]; sources?: string[]; applications?: string[] };
 
-/** A parameter value: a literal, or `{ ref: "identity.firstName" }` read from the context. */
-export type EffectValue = string | number | boolean | null | { ref: string };
+/**
+ * A parameter value: a literal, `{ ref: "identity.firstName" }` read from
+ * the context, or `{ template: "{identity.firstName} {identity.lastName}" }`
+ * (each `{reference}` replaced by its value; a missing one by nothing).
+ */
+export type EffectValue = string | number | boolean | null | { ref: string } | { template: string };
+
+const MAX_TEMPLATE = 500;
+const PLACEHOLDER = /\{([A-Za-z_][A-Za-z0-9_.]*)\}/g;
+
+/** The references a parameter value reads. */
+function valueRefs(v: EffectValue): string[] {
+  if (v === null || typeof v !== "object") return [];
+  if ("ref" in v) return [v.ref];
+  return [...v.template.matchAll(PLACEHOLDER)].map((m) => m[1]);
+}
 
 export const EFFECT_CATALOGUE = {
   set_attribute: { params: ["attribute", "value"], grants: false },
@@ -102,12 +116,19 @@ function refValue(path: string, ctx: RuleContext): unknown {
   return v;
 }
 
+function scalar(r: unknown): string | number | boolean | null {
+  return r === undefined || r === null ? null : typeof r === "string" || typeof r === "number" || typeof r === "boolean" ? r : String(r);
+}
+
 function resolveParam(v: EffectValue, ctx: RuleContext): string | number | boolean | null {
-  if (v !== null && typeof v === "object") {
-    const r = refValue(v.ref, ctx);
-    return r === undefined ? null : typeof r === "string" || typeof r === "number" || typeof r === "boolean" ? r : r === null ? null : String(r);
-  }
-  return v;
+  if (v === null || typeof v !== "object") return v;
+  if ("ref" in v) return scalar(refValue(v.ref, ctx));
+  if (v.template.length > MAX_TEMPLATE) throw new RuleSyntaxError(`A template is at most ${MAX_TEMPLATE} characters`, 0);
+  const out = v.template
+    .replace(PLACEHOLDER, (_, ref: string) => String(scalar(refValue(ref, ctx)) ?? ""))
+    .replace(/\s+/g, " ")
+    .trim();
+  return out === "" ? null : out;
 }
 
 function inScope(scope: RuleScope | undefined, s: RuleSubject): boolean {
@@ -202,8 +223,12 @@ export function validateRule(rule: Pick<Rule, "trigger" | "condition" | "effects
     if (e.type === "set_attribute" && typeof e.params?.attribute === "string" && !lower.has(e.params.attribute.toLowerCase()))
       problems.push({ field: `effects.${i}.attribute`, message: `Unknown attribute "${e.params.attribute}": define it first` });
     for (const [k, v] of Object.entries(e.params ?? {})) {
-      if (v !== null && typeof v === "object") {
-        const check = validateCondition(`exists ${v.ref}`, { identityFields: fields });
+      if (v !== null && typeof v === "object" && "template" in v && (typeof v.template !== "string" || v.template.length > MAX_TEMPLATE)) {
+        problems.push({ field: `effects.${i}.${k}`, message: `A template is text of at most ${MAX_TEMPLATE} characters` });
+        continue;
+      }
+      for (const ref of valueRefs(v)) {
+        const check = validateCondition(`exists ${ref}`, { identityFields: fields });
         if (!check.ok) problems.push({ field: `effects.${i}.${k}`, message: check.errors[0] });
       }
     }
@@ -277,6 +302,6 @@ export function ruleReferences(rule: Pick<Rule, "condition" | "effects">): strin
   } catch {
     // An invalid condition has no references; validateRule reports it.
   }
-  for (const e of rule.effects) for (const v of Object.values(e.params)) if (v !== null && typeof v === "object") out.add(v.ref);
+  for (const e of rule.effects) for (const v of Object.values(e.params)) for (const ref of valueRefs(v)) out.add(ref);
   return [...out];
 }

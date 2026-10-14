@@ -1788,3 +1788,104 @@ See the Access log for the rest.
 The Access tab already existed (ACCESS-P0-24). Lifecycle events and tasks stay on the Lifecycle tab.
 
 **Verified.** Typecheck, eslint and `next build` clean. Local E2E identities 18/18, including a new test that opens the Groups, Risk and Activity tabs on a person's page. That spec already proves another organization's admin gets a 404 on the page.
+
+## 2026-10-14 — IDENTITY-P0-21: attribute rules on the shared rule runtime
+
+Attribute rules, the "user update rules" of the Saviynt study (design
+§5.2.1), set an identity's attribute from its other attributes. They run when
+the identity is created in WonderID, imported from a source, or when an
+attribute changes. Operations' shared runtime (D12) evaluates them; the rules
+themselves belong to Identity.
+
+- **Migration 0166.**
+  - `lifecycle_rules` (kind `attribute` now, `lifecycle` with IDENTITY-P0-18's
+    finish) holds a working copy and the published copy that runs.
+  - `lifecycle_rule_versions` holds every published version with who asked and
+    who approved, and is append-only.
+  - Members read; service-role writes are filtered by tenant. The database
+    refuses an approval by the person who asked. A publish request clears
+    `published_by`, which then means "approved this request". This lets the
+    previous approver ask for the next version; the version table keeps
+    every approver.
+- **Logic** (`attributeRules.ts`, pure).
+  - **What a rule reads:** the identity's standard fields and custom
+    attributes, its manager's, and for a change the old and new values.
+  - **What a rule sets:** only descriptive standard fields (display name,
+    department, title, business unit, location, employment type,
+    organization, purpose) and that type's custom attributes. It never sets
+    status, lifecycle, ownership or access.
+  - **Values:** fixed, a reference, or a template such as
+    `{identity.firstName} {identity.lastName}`.
+  - **Sources win (NN #7).** A rule never overrides a value a connected
+    source set; the write is skipped and logged.
+  - **Provenance.** A value a rule writes carries `rule:<id>` provenance
+    with the rule version, at the lowest precedence, so the next
+    authoritative import replaces it.
+  - **Unique attributes.** A unique attribute that another identity already
+    holds is skipped.
+- **Service** (`identityRulesService.ts`):
+  - create, edit (the working copy only; it withdraws a pending request and
+    must be simulated again), simulate, request publish, approve publish
+    (four-eyes), retire;
+  - `simulateIdentityRule` runs the working copy over every identity in
+    scope, a page of 1,000 at a time up to 50,000, and reports who would
+    change, from what to what, and what a source's value keeps from changing;
+  - `applyIdentityRules` runs the published copies, writes enforced results
+    with an optimistic check on `updated_at`, logs every rule's outcome to
+    Operations' run log, and audits `identity.rules_applied` with names only.
+    It never throws, and a failure never undoes the change that triggered it;
+  - a rule's own writes start no further rules.
+- **Hooks.**
+  - `createIdentity` fires `identity.created`.
+  - `updateIdentity` fires `identity.attribute_changed` with the changed
+    standard and custom fields.
+  - `applySourcedIdentities` fires `identity.imported` for creations and
+    `identity.attribute_changed` for changes, once the batch is written, with
+    the rules read once per batch. Results carry `rulesApplied` and
+    `rulesError`.
+- **API.** `/api/v1/identities/rules`, `rules/:id`, `rules/:id/simulate`,
+  `rules/:id/publish` (`request` or `approve`), `rules/:id/retire` and
+  `rules/:id/runs`. Reads need `identity.read`, writes `identity.manage`.
+- **Pages.**
+  - `/identities/rules` lists the rules, with "New rule" folded.
+  - `/identities/rules/:id` shows what the rule does and one next step
+    (simulate, ask to publish, approve, or waiting), plus recent runs.
+    Editing and retiring are folded.
+  - The Admin sidebar has "Identity Rules" next to Identity Attributes.
+
+**Left for IDENTITY-P0-18's finish.** Lifecycle rules: the triggers activated,
+manager changed, moved, leaver and end date reached, and the effects beyond
+setting attributes (packages, groups, tasks, lifecycle transitions).
+
+**Verified.**
+- Unit tests: `attributeRules.test.ts`, 14 passed. These cover what a rule
+  sees, writes with rule provenance, a source's value never overridden, its
+  own earlier value replaceable, invalid and unknown attributes skipped, a
+  later rule winning, input shapes, published versus working copies, and
+  definitions compared regardless of key order.
+- Database: `tests/identity/lifecycle-rules-isolation.sql`, 12 of 12 as
+  expected.
+- E2E: `tests/e2e/identity-rules.spec.ts`, 15 of 15. It covers:
+  - unknown attributes, status and package effects refused;
+  - no publishing before a simulation; self-approval refused; another
+    administrator approves;
+  - in report-only mode the run log says "reported" and nothing changes;
+  - after an edit to enforce, the rule must be simulated and approved again;
+    then the value is written with `rule:<id>` provenance at version 2 and
+    logged as "applied", and someone outside the condition is left alone;
+  - the pages work, and a retired rule stops running;
+  - another organization gets 404 on everything and an empty run log;
+    read-only gets 403 on writes.
+- `identities.spec.ts`: 21 of 21 passed in the same run. Creating and editing
+  identities now runs rules.
+- Typecheck, eslint and `next build` are clean.
+
+**Bugs the E2E found before merge.**
+- The simulation read only the first 2,000 identities by id, and the shared
+  E2E organization has 2,291. It now pages through all of them.
+- Approving left the publish request set, so the page still showed "Waiting
+  for approval".
+- Definitions were compared as JSON text, but stored JSON comes back with its
+  keys reordered, so every published rule showed unpublished changes and
+  "already published" could never be detected. They are now compared
+  regardless of key order.

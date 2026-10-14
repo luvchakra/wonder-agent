@@ -427,8 +427,12 @@ export const SOURCED_IDENTITY_FIELDS = [
 export type SourcedIdentityField = (typeof SOURCED_IDENTITY_FIELDS)[number];
 export type SourcedFields = Partial<Record<SourcedIdentityField, string | null>>;
 
-/** Which source set a field, at what precedence (lower number wins). */
-export type FieldProvenance = Record<string, { sourceId: string; priority: number; at: string }>;
+/**
+ * Which source set a field, at what precedence (lower number wins). A value
+ * an attribute rule wrote (IDENTITY-P0-21) has sourceId `rule:<rule id>`,
+ * the lowest precedence of all, and the rule's id and version.
+ */
+export type FieldProvenance = Record<string, { sourceId: string; priority: number; at: string; ruleId?: string; ruleVersion?: number }>;
 
 /** One source's say in a merge. */
 export type SourceAuthority = {

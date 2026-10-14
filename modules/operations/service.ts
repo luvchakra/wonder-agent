@@ -28,3 +28,25 @@ export { saveReportDefinition, listSavedReportDefinitions, type SaveReportDefini
 export { getJobStatusSummary } from "./jobs";
 export { exportGovernanceEvidencePack } from "./evidencePackExport";
 export { exportCampaignEvidencePackage } from "./campaignExport";
+// OPERATIONS-P0-11 (D12): the shared rule runtime and its run log, used by every module's rule tables.
+export { parseCondition, evaluate, references, validateCondition, RuleSyntaxError, REFERENCE_ROOTS, type Expr, type RuleContext } from "./rules/expression";
+export {
+  evaluateRules,
+  simulateRules,
+  validateRule,
+  ruleReferences,
+  EFFECT_CATALOGUE,
+  type Rule,
+  type RuleEffect,
+  type RuleEvent,
+  type RuleMode,
+  type RuleScope,
+  type RuleStatus,
+  type RuleSubject,
+  type EffectValue,
+  type PlannedEffect,
+  type RunLogEntry,
+  type SimulationInput,
+  type SimulationResult,
+} from "./rules/runtime";
+export { recordRuleRuns, listRuleRuns, type RuleRun, type RuleRunRecord, type RuleTable } from "./rules/runLog";

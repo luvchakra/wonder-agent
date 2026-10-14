@@ -125,8 +125,8 @@ Exit test: not run.
 
 | Story | Module | Issue | Status | Notes |
 |---|---|---|---|---|
-| OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Partial | 2026-10-14: condition language, evaluation, simulation and run-log entries (`modules/operations/rules`); storing the run log needs its table |
-| IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Not started | |
+| OPERATIONS-P0-11 (runtime part) Shared rule runtime | Operations | #72 | Done | Condition language, evaluation, simulation, run log stored (`rule_runs`, 0167); first used by IDENTITY-P0-21 |
+| IDENTITY-P0-21 Attribute rules and the rule catalogue | Identity | #70 | Partial | 2026-10-14: attribute rules (created, imported, attribute changed), report-only, simulation, four-eyes publish, run log (0166). Lifecycle triggers and effects with IDENTITY-P0-18 (finish) |
 | IDENTITY-P0-18 (finish) Lifecycle rules | Identity | | Partial | Backlog: events, tasks, transitions, ownership transfer built; rules not |
 | IDENTITY-P0-17 (finish) Identity detail tabs | Identity | | Done | Groups, Risk and Activity tabs, #167 |
 | ACCESS-P0-33 Entitlement types; classification rules | Access | #71 | Not started | |
