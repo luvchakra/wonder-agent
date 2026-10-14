@@ -1637,7 +1637,5 @@ UUID. An object page is `/access/requests/42`, not
    its own page gets `ref`, the `assign_object_ref` trigger and the unique
    `(tenant_id, ref)` index in its own migration, and joins `REF_TABLES`.
 
-Status: rolling out from 2026-10-14. Migration 0192 numbered every object
-table with a page; access requests use their numbers in URLs. Converting
-the remaining object pages is tracked in
-`docs/plan/01-FOUNDATION-AGENT-BACKLOG.md` (FOUNDATION-P0-34).
+Status: done 2026-10-15 (FOUNDATION-P0-34): every object page opens at its
+number. A few links that only hold a UUID still pass it; the page redirects.

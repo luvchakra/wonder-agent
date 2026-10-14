@@ -661,6 +661,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 15 Oct 2026 | Tools found on an MCP server that are themselves AI agents (they draft, answer or generate, like a "draft reply" tool) are labelled **AI agent** on the MCP page, with the reason, and appear in Agent Discovery so you can register them as agents. Every object page now opens at a short number (for example /identities/12), and old links still work. |
 | 14 Oct 2026 | An account that an approved request creates now has a readable name (for example jane.doe) instead of an internal reference. An application's onboarding can set the account name format; older requests' accounts show "to be created". |
 | 14 Oct 2026 | On a phone, the bottom bar is gone: a floating **More** button at the bottom right opens the full menu. Pages now have short addresses: an access request is at its number (/access/requests/42), and old links still work. |
 | 14 Oct 2026 | Every access request now has a number to quote, REQ and nine digits, shown with an animated barcode when you submit it, on the request's page and in the requests list. Earlier requests were numbered in the order they were made. |

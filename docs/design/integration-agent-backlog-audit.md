@@ -3007,3 +3007,28 @@ this and on another agent's main-based server alike), CSV runs still
 `ledger://fy2026` text in `mcp-inventory`; none involves these pages. The
 nightly run is the full check.
 
+
+### 2026-10-14 — MCP tools that are AI agents (owner feedback)
+
+Owner, on WonderArk's MCP server: "draft_whatsapp_reply is actually an AI
+agent". The inventory classified tools only as read, write or unknown.
+
+- `classifyToolKind(name, description)` (mcpNormalize.ts, deterministic,
+  #9): a tool is an AI agent when its description names AI (AI, LLM, GPT,
+  language model, generative, AI assistant, chatbot) or its name starts with a
+  generative verb (draft, generate, summarize, ask, chat, compose, translate,
+  rewrite, paraphrase, answer, suggest). The reason is returned. It is
+  computed when the inventory is read, so tools already discovered are
+  classified without a new sync.
+- `McpTool.kind` / `kindReason`. The MCP page shows "AI agent" and the reason
+  under the tool's name.
+- WonderArk's four tools: `ask_assistant` (description mentions "AI") and
+  `draft_whatsapp_reply` (name starts with "draft") are AI agents; the two
+  record tools stay tools.
+
+Verified: typecheck; eslint; Vitest mcpNormalize + mcpInventory +
+mcpToolAgents + agent-identity 110/110; local E2E mcp-inventory 3/3 (the AI
+tool is labelled, appears in the discovery inbox and its review page opens;
+the other tools do not) and shadow-ai 4/4. The spec's server name and
+resource URI are now unique per run: earlier runs' identical ones had made
+its `getByText` checks ambiguous.

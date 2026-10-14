@@ -4,6 +4,7 @@ import type { Integration, IntegrationObject, McpResource, McpServerInventory, M
 import { listIntegrations } from "./integrations";
 import { getNormalizedObjectsForTenant } from "./objects";
 import { connectionDriver } from "./framework/engine";
+import { classifyToolKind } from "./mcpNormalize";
 
 /**
  * INTEGRATION-P0-06 (master P0-10) — the published MCP inventory: every
@@ -43,10 +44,15 @@ export function buildMcpInventory(integrations: Integration[], objects: Integrat
       .map((o) => {
         const n = o.normalized;
         const operation = OPERATIONS.includes(n.operation as McpToolOperation) ? (n.operation as McpToolOperation) : "unknown";
+        const name = str(n.name) ?? o.externalId;
+        const description = str(n.description);
+        const kind = classifyToolKind(name, description);
         return {
           integrationId: integration.id,
-          name: str(n.name) ?? o.externalId,
-          description: str(n.description),
+          name,
+          description,
+          kind: kind.kind,
+          kindReason: kind.reason,
           operation,
           operationBasis: basisOf(n.operationBasis),
           destructive: n.destructive === true,

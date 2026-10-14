@@ -56,6 +56,12 @@ function ServerCard({ server, canDiscover }: { server: McpServerInventory; canDi
                 <Tr key={t.name}>
                   <Td>
                     <span className="font-mono text-xs text-foreground md:whitespace-nowrap">{t.name}</span>
+                    {t.kind === "ai_agent" ? (
+                      <span className="mt-1 flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+                        <Badge tone="info" className="whitespace-nowrap">AI agent</Badge>
+                        {t.kindReason}
+                      </span>
+                    ) : null}
                   </Td>
                   <Td>
                     <span className="flex flex-wrap gap-1">

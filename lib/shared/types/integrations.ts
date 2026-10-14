@@ -269,6 +269,9 @@ export type McpTool = {
   discoveredAt: string;
   /** False when the latest discovery no longer listed it (kept as evidence, never deleted). */
   stillDeclared: boolean;
+  /** Owner feedback 2026-10-14: an AI agent behind the tool (it drafts, answers, generates), and why. */
+  kind: "ai_agent" | "tool";
+  kindReason: string | null;
 };
 
 export type McpResource = {
