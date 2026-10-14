@@ -2957,3 +2957,53 @@ integrations and lib/users 568/568; local E2E `identity-sources` 21/21 (new
 test: administrator role and unknown role 400; read-only and another
 organization refused; a joiner from the CSV is invited with READ_ONLY,
 audited via the source; cleared, the next joiner gets no access).
+
+## 2026-10-14 — Connection, discovery and source pages open at their numbers (FOUNDATION-P0-34 part 2)
+
+CLAUDE.md §19.13: `/integrations/<number>` (and `/upgrade`),
+`/integrations/discovery/<number>` (`application_discoveries`),
+`/integrations/sources/<number>` (`identity_sources`) and
+`/integrations/sources/<number>/runs/<number>`
+(`identity_reconciliation_runs`, the table the run page reads), never
+UUIDs. `integrations/types/…` and `connectors/…` keep their readable keys.
+
+- Pages resolve with `pageRef`/`resolveRef` within the session's tenant;
+  an old UUID link redirects to the number URL, keeping the query string
+  (the run page redirects when either segment is a UUID).
+- `ref` added (optional, additive) to `Integration`, `IdentitySource`,
+  `ReconciliationRun`, `ApplicationDiscovery` and Operations'
+  `JobStatusSummary.integrationRef`; all their reads already select every
+  column.
+- Links switched: connections table, job status, agent discovery's
+  connection list, global search, discovery list, source list and its last
+  runs, source page runs, the run page's identity links (one names read for
+  the 50 shown), correlations. Server actions redirect to the number
+  (connect, test, sync, sign-in fallback, upgrade, held-sync decisions,
+  new discovery, new source, integration import run) and revalidate the
+  route pattern. The receiving address (`/api/connect/v1/<id>/…`) and the
+  OAuth redirect URI keep the UUID: they are API addresses.
+- Left as UUID links (they redirect): the gateway traffic table (an RPC
+  without the number), the OAuth callback's return to the page
+  (`oauthCode.ts`), and an application's connection link (Access page).
+
+Verified: typecheck clean; eslint on the changed files clean (one
+existing warning in `app/actions/connectors.ts`); Vitest
+`modules/agent-identity`, `modules/integrations`, `modules/operations`,
+`modules/access-governance`, `lib/refs`, `app` 108 files / 1098 tests
+passed (new: a discovery candidate from a connection links by the
+connection's number); `next build` clean.
+Local E2E on port 3300 (`next build`, shared E2E organization, three
+agents' suites running at once): every new URL assertion passed in at least
+one run: identity create → number, old identity UUID → number (also with
+`?tab=lifecycle`), directory links numeric, source page and CSV run URLs,
+connection create/upgrade URLs (`integrations` 12/12 in the last run,
+`connection-upgrade`, `mcp-bridge`), discovery record → number and UUID
+redirect, policy create → number. The rule page, policy and discovery-
+candidate redirects were also checked directly (UUID → `NEXT_REDIRECT` to
+the number; unknown number → 404). Remaining failures in those runs were
+API timeouts under load (e.g. `POST /api/v1/identities` took 13–16 s on
+this and on another agent's main-based server alike), CSV runs still
+`running` at 30 s, sign-in setup timeouts, and one pre-existing duplicate
+`ledger://fy2026` text in `mcp-inventory`; none involves these pages. The
+nightly run is the full check.
+

@@ -126,7 +126,7 @@ export default async function ApplicationDiscoveryPage({ searchParams }: { searc
                   {rows.map((d) => (
                     <Tr key={d.id}>
                       <Td>
-                        <Link href={`/integrations/discovery/${d.id}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/integrations/discovery/${d.ref ?? d.id}`} className="font-medium text-primary hover:underline">
                           {d.name}
                         </Link>
                         <span className="mt-0.5 block max-w-[20rem] truncate text-xs text-muted-foreground">{d.vendor ?? d.url?.replace(/^https:\/\//, "") ?? ""}</span>

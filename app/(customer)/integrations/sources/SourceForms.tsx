@@ -278,7 +278,7 @@ export function SourceForm({ source, integrations, attributes }: { source?: Iden
  * CSV import. Reads the file in the browser and posts it to the runs API
  * (a server action would cap it at 1 MB); the page then follows the run.
  */
-export function CsvImportForm({ sourceId }: { sourceId: string }) {
+export function CsvImportForm({ sourceId, sourceRef }: { sourceId: string; sourceRef: number | null }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -301,7 +301,7 @@ export function CsvImportForm({ sourceId }: { sourceId: string }) {
         setError(body?.error?.message ?? `The import was not started (${res.status}).`);
         return;
       }
-      router.push(`/integrations/sources/${sourceId}/runs/${body.data.id}`);
+      router.push(`/integrations/sources/${sourceRef ?? sourceId}/runs/${body.data.ref ?? body.data.id}`);
     } catch {
       setError("The import could not be sent. Check your connection and try again.");
     } finally {

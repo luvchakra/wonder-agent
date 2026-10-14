@@ -61,7 +61,7 @@ test.describe.serial("MCP inventory", () => {
     // Connecting with a token tests it against the server first.
     await page.getByLabel("Bearer token").fill("e2e-inventory-secret");
     await page.getByRole("button", { name: "Connect" }).click();
-    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/integrations\/\d+$/);
     await expect(page.getByText(/Has credentials: yes/)).toBeVisible();
 
     await page.goto("/integrations/mcp");

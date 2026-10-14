@@ -73,7 +73,7 @@ export default async function PendingCorrelationsPage() {
                       <ul className="mt-1 flex flex-wrap gap-2 text-sm">
                         {p.candidateIdentityIds.map((id) => (
                           <li key={id}>
-                            <Link href={`/identities/${id}`} className="text-primary hover:underline">
+                            <Link href={`/identities/${names.get(id)?.ref ?? id}`} className="text-primary hover:underline">
                               {names.get(id)?.displayName ?? "Unknown identity"} <span className="font-mono text-xs text-muted-foreground">{id.slice(0, 8)}</span>
                             </Link>
                           </li>
@@ -103,7 +103,7 @@ export default async function PendingCorrelationsPage() {
             <ul className="divide-y divide-border text-sm">
               {disagreements.map((d) => (
                 <li key={d.id} className="flex flex-col gap-1 py-2 sm:flex-row sm:items-baseline sm:gap-3">
-                  <Link href={`/identities/${d.identityId}`} className="shrink-0 font-medium text-primary hover:underline">
+                  <Link href={`/identities/${d.identityRef ?? d.identityId}`} className="shrink-0 font-medium text-primary hover:underline">
                     {d.displayName}
                   </Link>
                   <span className="shrink-0 text-muted-foreground">{fieldLabel(d.field)}</span>

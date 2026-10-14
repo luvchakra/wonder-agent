@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { previewConnectionUpgrade } from "@/modules/integrations/framework/catalog";
@@ -21,8 +22,8 @@ const AREA: Record<UpgradeArea, string> = {
  * connection type changes, before it happens. One action: Upgrade.
  */
 export default async function UpgradeConnectionPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ version?: string; failed?: string }> }) {
-  const { id } = await params;
-  const { version, failed } = await searchParams;
+  const [{ id: rawId }, search] = await Promise.all([params, searchParams]);
+  const { version, failed } = search;
   let ctx;
   try {
     ctx = await requirePermission("integration.read");
@@ -30,7 +31,9 @@ export default async function UpgradeConnectionPage({ params, searchParams }: { 
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) || !version) notFound();
+  // FOUNDATION-P0-34: the connection's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "integrations", rawId, (n) => `/integrations/${n}/upgrade`, search);
+  if (!version) notFound();
   let plan;
   try {
     plan = await previewConnectionUpgrade(ctx.tenantId!, id, version);
@@ -43,7 +46,7 @@ export default async function UpgradeConnectionPage({ params, searchParams }: { 
 
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <Link href={`/integrations/${id}`} className="text-sm text-primary hover:underline">
+      <Link href={`/integrations/${rawId}`} className="text-sm text-primary hover:underline">
         ← Connection
       </Link>
       <div>

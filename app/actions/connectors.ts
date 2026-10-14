@@ -50,7 +50,7 @@ export async function connectSystemAction(origin: DefinitionOrigin, key: string,
       settings: prefixed(formData, "setting."),
       secret: Object.keys(secret).length ? secret : undefined,
     });
-    target = `/integrations/${integration.id}${credentialError ? "?credentials=failed" : ""}`;
+    target = `/integrations/${integration.ref ?? integration.id}${credentialError ? "?credentials=failed" : ""}`;
   } catch (err) {
     return formError(err);
   }
@@ -65,7 +65,7 @@ export async function updateConnectorSettingsAction(integrationId: string, _prev
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/integrations/${integrationId}`);
+  revalidatePath("/integrations/[id]", "page");
   revalidatePath("/integrations");
   return { status: "saved", message: "Settings saved." };
 }
@@ -77,7 +77,7 @@ export async function setConnectorCredentialsAction(integrationId: string, _prev
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/integrations/${integrationId}`);
+  revalidatePath("/integrations/[id]", "page");
   return { status: "saved", message: "Connection tested and credentials saved. A field left empty kept its saved value." };
 }
 
@@ -118,7 +118,7 @@ export async function rotateReceiverSecretAction(integrationId: string, _prev: R
   const ctx = await requirePermission("integration.update");
   try {
     const secret = await rotateReceiverSecret(ctx.tenantId!, ctx.userId, integrationId);
-    revalidatePath(`/integrations/${integrationId}`);
+    revalidatePath("/integrations/[id]", "page");
     return { status: "issued", secret };
   } catch (err) {
     const e = formError(err);

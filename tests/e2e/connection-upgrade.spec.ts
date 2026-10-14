@@ -102,8 +102,11 @@ test.describe.serial("connection types: sharing and upgrading", () => {
     expect((await blocked.json()).data.blockers.join(" ")).toMatch(/Organization id/);
     expect((await request.post(`/api/v1/integrations/${integrationId}/upgrade`, { data: { version: "1.2.0" } })).status()).toBe(409);
 
+    // FOUNDATION-P0-34: an old link with the id redirects to the connection's number.
     await page.goto(`/integrations/${integrationId}`);
+    await expect(page).toHaveURL(/\/integrations\/\d+$/);
     await page.getByRole("link", { name: "v1.2.0 available" }).click();
+    await expect(page).toHaveURL(/\/integrations\/\d+\/upgrade\?version=1\.2\.0$/);
     await expect(page.getByRole("heading", { name: "Upgrade to v1.2.0" })).toBeVisible();
     await expect(page.getByText("This upgrade cannot run yet.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Upgrade" })).toHaveCount(0);
@@ -115,7 +118,7 @@ test.describe.serial("connection types: sharing and upgrading", () => {
     await expect(page.getByText(/username is mapped differently/)).toBeVisible();
     await expect(page.getByText(/new field displayName/)).toBeVisible();
     await page.getByRole("button", { name: "Upgrade" }).click();
-    await page.waitForURL(/upgraded=1\.1\.0/);
+    await page.waitForURL(/\/integrations\/\d+\?upgraded=1\.1\.0$/);
     await expect(page.getByText("Upgraded to v1.1.0.")).toBeVisible();
 
     const job = await syncAndWait(request);

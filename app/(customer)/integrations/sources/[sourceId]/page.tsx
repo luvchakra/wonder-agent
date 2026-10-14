@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIdentitySource, listIntegrations, listReconciliationRuns } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -22,8 +23,9 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { sourceId } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the source's number; an old UUID link redirects.
+  const sourceId = await pageRef(tenantId, "identity_sources", (await params).sourceId, (n) => `/integrations/sources/${n}`);
   const [source, runs, integrations, provenance, definitions, idRoles] = await Promise.all([
     getIdentitySource(tenantId, sourceId),
     listReconciliationRuns(tenantId, sourceId),
@@ -56,7 +58,7 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
           {source.authoritative ? <Badge tone="info">Authoritative · precedence {source.priority}</Badge> : <Badge tone="neutral">Precedence {source.priority}</Badge>}
           {source.status === "paused" ? <Badge tone="warning">Paused</Badge> : null}
           {integration ? (
-            <Link href={`/integrations/${integration.id}`} className="text-xs text-primary hover:underline">
+            <Link href={`/integrations/${integration.ref ?? integration.id}`} className="text-xs text-primary hover:underline">
               Reads {integration.name}
             </Link>
           ) : null}
@@ -69,7 +71,7 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
             title="Import"
             description="Full: the file or integration holds everyone, so identities missing from it are leavers. Partial: only the records given are touched."
           />
-          <CardBody>{source.template === "integration" ? <IntegrationImportForm sourceId={source.id} /> : <CsvImportForm sourceId={source.id} />}</CardBody>
+          <CardBody>{source.template === "integration" ? <IntegrationImportForm sourceId={source.id} /> : <CsvImportForm sourceId={source.id} sourceRef={source.ref ?? null} />}</CardBody>
         </Card>
       ) : null}
 
@@ -95,7 +97,7 @@ export default async function IdentitySourcePage({ params }: { params: Promise<{
                 {runs.map((r) => (
                   <Tr key={r.id}>
                     <Td>
-                      <Link href={`/integrations/sources/${source.id}/runs/${r.id}`} className="text-primary hover:underline">
+                      <Link href={`/integrations/sources/${source.ref ?? source.id}/runs/${r.ref ?? r.id}`} className="text-primary hover:underline">
                         {when(r.createdAt)}
                       </Link>
                       <span className="block text-xs text-muted-foreground">

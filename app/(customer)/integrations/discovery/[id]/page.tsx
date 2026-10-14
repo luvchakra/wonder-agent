@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { allowedDecisions, getDiscovery, getIntegration } from "@/modules/integrations/service";
 import { getApplicationDetail, listApplicationsForMatching } from "@/modules/access-governance/service";
@@ -54,8 +55,9 @@ export default async function DiscoveryDetailPage({ params }: { params: Promise<
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the discovery's number; an old UUID link redirects.
+  const id = await pageRef(tenantId, "application_discoveries", (await params).id, (n) => `/integrations/discovery/${n}`);
   const d = await getDiscovery(tenantId, id);
   if (!d) notFound();
   const canUpdate = ctx.permissions.includes("integration.update");
@@ -102,7 +104,7 @@ export default async function DiscoveryDetailPage({ params }: { params: Promise<
               <Detail label="Address">{d.url ? <span className="font-mono text-xs">{d.url}</span> : null}</Detail>
               <Detail label="Found by">
                 {integration ? (
-                  <Link href={`/integrations/${integration.id}`} className="text-primary hover:underline">
+                  <Link href={`/integrations/${integration.ref ?? integration.id}`} className="text-primary hover:underline">
                     {integration.name}
                   </Link>
                 ) : (

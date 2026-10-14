@@ -82,6 +82,8 @@ export type IntegrationStatus = "configured" | "connected" | "error" | "disabled
 
 export type Integration = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   integrationTypeId: string;
   name: string;
@@ -332,6 +334,8 @@ export type CorrelationRule = { kind: (typeof CORRELATION_KINDS)[number]; fields
 
 export type IdentitySource = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   name: string;
   template: IdentitySourceTemplate;
@@ -357,6 +361,8 @@ export type ReconciliationRunStatus = "queued" | "running" | "succeeded" | "part
 
 export type ReconciliationRun = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   sourceId: string;
   trigger: "upload" | "integration" | "manual";
   mode: "full" | "partial";

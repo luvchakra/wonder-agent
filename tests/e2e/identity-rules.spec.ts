@@ -124,6 +124,11 @@ test.describe.serial("identity attribute rules", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Identity rules" })).toBeVisible();
     await page.getByRole("link", { name: `E2E Rule ${stamp}` }).click();
     await expect(page.getByRole("heading", { level: 1, name: `E2E Rule ${stamp}` })).toBeVisible();
+    // FOUNDATION-P0-34: the rule's number is its URL; an old link with its id redirects there.
+    await expect(page).toHaveURL(/\/identities\/rules\/\d+$/);
+    const ruleUrl = page.url();
+    await page.goto(`/identities/rules/${ruleId}`);
+    await expect(page).toHaveURL(ruleUrl);
     await expect(page.getByText("v2 live", { exact: true })).toBeVisible();
     await expect(page.getByText("Applied", { exact: false }).first()).toBeVisible();
   });

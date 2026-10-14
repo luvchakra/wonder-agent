@@ -56,7 +56,7 @@ export default async function IdentityRulesPage() {
                   return (
                     <Tr key={r.id}>
                       <Td>
-                        <Link href={`/identities/rules/${r.id}`} className="font-medium text-primary hover:underline">
+                        <Link href={`/identities/rules/${r.ref ?? r.id}`} className="font-medium text-primary hover:underline">
                           {r.name}
                         </Link>
                         <span className="block text-xs text-muted-foreground">

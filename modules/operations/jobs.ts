@@ -28,6 +28,7 @@ export async function getJobStatusSummary(tenantId: string): Promise<JobStatusSu
 
       return {
         integrationId: integration.id,
+        integrationRef: integration.ref ?? null,
         integrationName: integration.name,
         lastSuccessfulAt: lastSuccessful?.endedAt ?? null,
         lastRunStatus: lastRun?.status ?? null,

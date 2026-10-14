@@ -4,7 +4,7 @@ import Link from "next/link";
 import { StatusBadge, type BadgeTone, SimpleDataTable, type DataTableColumn } from "@/modules/ui";
 
 /** One connection, with the connection type it was created from (linked when the type has a page). */
-export type ConnectionRow = { id: string; name: string; typeName: string; typeHref: string | null; status: string; lastSyncAt: string | null };
+export type ConnectionRow = { id: string; ref?: number | null; name: string; typeName: string; typeHref: string | null; status: string; lastSyncAt: string | null };
 
 const STATUS_TONE: Record<string, BadgeTone> = {
   configured: "neutral",
@@ -15,7 +15,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
 
 export function IntegrationsTable({ rows }: { rows: ConnectionRow[] }) {
   const columns: DataTableColumn<ConnectionRow>[] = [
-    { key: "name", header: "Name", sortable: true, render: (i) => <Link href={`/integrations/${i.id}`} className="text-primary hover:underline">{i.name}</Link> },
+    { key: "name", header: "Name", sortable: true, render: (i) => <Link href={`/integrations/${i.ref ?? i.id}`} className="text-primary hover:underline">{i.name}</Link> },
     {
       key: "typeName",
       header: "Type",

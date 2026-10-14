@@ -70,8 +70,10 @@ export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initi
           }
           setError(null);
           setSaved(true);
-          if (!ruleId) router.push(`/identities/rules/${(r.data as { id: string }).id}`);
-          else router.refresh();
+          if (!ruleId) {
+            const created = r.data as { id: string; ref?: number | null };
+            router.push(`/identities/rules/${created.ref ?? created.id}`);
+          } else router.refresh();
         });
       }}
     >

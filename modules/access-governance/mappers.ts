@@ -126,6 +126,7 @@ export function toAccessRequest(row: any): AccessRequest {
 export function toPolicy(row: any): Policy {
   return {
     id: row.id,
+    ref: row.ref ?? null,
     tenantId: row.tenant_id,
     name: row.name,
     description: row.description,

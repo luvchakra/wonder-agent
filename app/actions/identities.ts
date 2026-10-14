@@ -66,13 +66,13 @@ function identityFields(formData: FormData): Record<string, unknown> {
 
 export async function createIdentityAction(_prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
   const ctx = await requirePermission("identity.manage");
-  let id: string;
+  let id: string | number;
   try {
     const identity = await createIdentity(ctx.tenantId!, ctx.userId, {
       identityType: String(formData.get("identityType") ?? ""),
       ...identityFields(formData),
     });
-    id = identity.id;
+    id = identity.ref ?? identity.id;
   } catch (err) {
     return formError(err);
   }
@@ -87,7 +87,7 @@ export async function updateIdentityAction(identityId: string, _prev: IdentityFo
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/[id]", "page");
   revalidatePath("/identities/unowned");
   return { status: "saved", message: "Saved." };
 }
@@ -107,7 +107,7 @@ export async function addRelationshipAction(identityId: string, _prev: IdentityF
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/[id]", "page");
   return { status: "saved", message: "Relationship added." };
 }
 
@@ -118,7 +118,7 @@ export async function endRelationshipAction(identityId: string, relationshipId: 
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/[id]", "page");
   return { status: "saved", message: "Relationship ended." };
 }
 
@@ -131,7 +131,7 @@ export async function unlinkSourceRecordAction(identityId: string, sourceId: str
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/[id]", "page");
   const parts = [result.kept.length ? `Unlinked. Kept, as they changed since: ${result.kept.join(", ")}.` : "Unlinked; its values were restored."];
   if (result.accountsToRematch) parts.push(`${result.accountsToRematch} account(s) will be matched again at their next sync.`);
   if (result.rematchError) parts.push("Its accounts could not be queued for matching again.");
@@ -182,7 +182,7 @@ export async function transitionLifecycleAction(identityId: string, _prev: Ident
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/identities/${identityId}`);
+  revalidatePath("/identities/[id]", "page");
   revalidatePath("/identities/lifecycle");
   return { status: "saved", message: "Done. Its work is listed below." };
 }

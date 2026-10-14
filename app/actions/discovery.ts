@@ -34,14 +34,15 @@ export async function discoverFromIntegrationAction(_prev: DiscoveryFormState, f
 
 export async function submitDiscoveryAction(_prev: DiscoveryFormState, formData: FormData): Promise<DiscoveryFormState> {
   const ctx = await requirePermission("integration.update");
-  let id: string;
+  let id: string | number;
   try {
     const input: Record<string, unknown> = {};
     for (const k of ["kind", "document", "name", "baseUrl", "metadata", "vendor", "url", "description"]) {
       const v = str(formData, k);
       if (v !== undefined) input[k] = v;
     }
-    id = (await submitDiscovery(ctx.tenantId!, ctx.userId, input)).discovery.id;
+    const { discovery } = await submitDiscovery(ctx.tenantId!, ctx.userId, input);
+    id = discovery.ref ?? discovery.id;
   } catch (err) {
     return formError(err);
   }
@@ -67,7 +68,7 @@ export async function decideDiscoveryAction(discoveryId: string, _prev: Discover
       application,
       connect: formData.get("connect") === "on",
     });
-    revalidatePath(`/integrations/discovery/${discoveryId}`);
+    revalidatePath("/integrations/discovery/[id]", "page");
     revalidatePath("/integrations/discovery");
     revalidatePath("/access");
     const said = { REGISTERED: "Registered in the catalog.", MATCHED: "Linked to the application.", EXCEPTION: "Recorded as an exception.", IGNORED: "Ignored. It stays on record.", UNRECOGNIZED: "Reopened." } as const;

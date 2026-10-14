@@ -50,15 +50,21 @@ test.describe.serial("policy targets and publishing", () => {
     await page.goto("/policies");
     await page.getByRole("button", { name: "Actions", exact: true }).click();
     await page.getByRole("menuitem", { name: "Create policy…" }).click();
-    await page.getByLabel("Policy name").fill(`E2E publish ${Date.now()}`);
+    const policyName = `E2E publish ${Date.now()}`;
+    await page.getByLabel("Policy name").fill(policyName);
     await page.getByLabel("Category", { exact: true }).selectOption("runtime");
     await page.getByLabel("Action", { exact: true }).selectOption("block");
     await page.getByLabel("Applies to", { exact: true }).selectOption("TOOL");
     await page.getByLabel("Target", { exact: true }).fill(tool);
     await page.getByLabel("Status", { exact: true }).selectOption("draft");
     await page.getByRole("button", { name: "Create", exact: true }).click();
-    await expect(page).toHaveURL(/\/policies\/[0-9a-f-]{36}$/);
-    const policyId = page.url().split("/policies/")[1];
+    // FOUNDATION-P0-34: the page is addressed by the policy's number; the API keeps its id.
+    await expect(page).toHaveURL(/\/policies\/\d+$/);
+    const policyUrl = page.url();
+    const policyId = ((await (await page.request.get("/api/v1/policies")).json()).data as Array<{ id: string; name: string }>).find((p) => p.name === policyName)!.id;
+    // An old link with the id still opens it, at its number.
+    await page.goto(`/policies/${policyId}`);
+    await expect(page).toHaveURL(policyUrl);
 
     try {
       await expect(page.getByText("draft", { exact: true })).toBeVisible();

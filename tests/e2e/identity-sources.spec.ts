@@ -180,7 +180,9 @@ test.describe.serial("identity sources", () => {
   });
 
   test("the UI imports a CSV and follows the run", async ({ page }) => {
+    // FOUNDATION-P0-34: an old link with the source's id redirects to its number.
     await page.goto(`/integrations/sources/${hrId}`);
+    await expect(page).toHaveURL(/\/integrations\/sources\/\d+$/);
     await expect(page.getByRole("heading", { level: 1, name: `E2E HR ${stamp}` })).toBeVisible();
     await page.getByLabel("CSV file").setInputFiles({
       name: "hr.csv",
@@ -189,7 +191,7 @@ test.describe.serial("identity sources", () => {
     });
     await page.getByLabel("Contents").selectOption("partial");
     await page.getByRole("button", { name: "Import" }).click();
-    await expect(page).toHaveURL(/\/runs\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/integrations\/sources\/\d+\/runs\/\d+$/);
     await expect(page.getByRole("heading", { level: 1, name: "Reconciliation run" })).toBeVisible();
     await expect(page.getByText("Succeeded")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("link", { name: "H9" })).toBeVisible();

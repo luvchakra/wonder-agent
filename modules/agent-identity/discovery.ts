@@ -137,6 +137,7 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
       entries.push({
         externalId: obj.externalId,
         integrationId: integration.id,
+        integrationRef: integration.ref ?? null,
         integrationName: integration.name,
         sourceSystem: integration.id,
         displayName,
@@ -164,6 +165,7 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
   // agent has been retired (or no longer exists) — surfaced as its own
   // category rather than silently dropped or conflated with new discoveries.
   const integrationNameById = new Map(integrations.map((i) => [i.id, i.name]));
+  const integrationRefById = new Map(integrations.map((i) => [i.id, i.ref ?? null]));
   const agentById = new Map(existingAgents.map((a) => [a.id, a]));
   for (const link of linkedRows ?? []) {
     const owner = agentById.get(link.agent_id);
@@ -171,6 +173,7 @@ export async function buildDiscoveryInbox(tenantId: string): Promise<DiscoveryIn
       entries.push({
         externalId: link.external_reference,
         integrationId: link.source_system,
+        integrationRef: integrationRefById.get(link.source_system) ?? null,
         integrationName: integrationNameById.get(link.source_system) ?? link.source_system,
         sourceSystem: link.source_system,
         displayName: owner ? owner.agentName : "(retired agent)",

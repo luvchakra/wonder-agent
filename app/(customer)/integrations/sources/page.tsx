@@ -68,7 +68,7 @@ export default async function IdentitySourcesPage() {
                 return (
                   <Tr key={s.id}>
                     <Td>
-                      <Link href={`/integrations/sources/${s.id}`} className="font-medium text-primary hover:underline">
+                      <Link href={`/integrations/sources/${s.ref ?? s.id}`} className="font-medium text-primary hover:underline">
                         {s.name}
                       </Link>
                       <span className="mt-0.5 flex flex-wrap gap-1">
@@ -85,7 +85,7 @@ export default async function IdentitySourcesPage() {
                     </Td>
                     <Td>
                       {run ? (
-                        <Link href={`/integrations/sources/${s.id}/runs/${run.id}`} className="inline-flex items-center gap-2 hover:underline">
+                        <Link href={`/integrations/sources/${s.ref ?? s.id}/runs/${run.ref ?? run.id}`} className="inline-flex items-center gap-2 hover:underline">
                           <Badge tone={RUN_STATUS[run.status].tone}>{RUN_STATUS[run.status].label}</Badge>
                           <span className="text-xs text-muted-foreground">{new Date(run.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</span>
                         </Link>

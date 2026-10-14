@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { resolveRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIdentitySource, getReconciliationRun } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { getIdentityNames } from "@/modules/agent-identity/service";
 import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, TableContainer, Td, Th, Thead, Tr } from "@/modules/ui";
 import { RunAutoRefresh } from "../../../SourceForms";
 import { RUN_STATUS, TARGET_LABEL } from "../../../labels";
@@ -32,15 +34,21 @@ export default async function ReconciliationRunPage({ params, searchParams }: { 
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const [{ sourceId, runId }, sp] = await Promise.all([params, searchParams]);
-  const [source, run] = await Promise.all([getIdentitySource(ctx.tenantId!, sourceId), getReconciliationRun(ctx.tenantId!, runId)]);
+  const [{ sourceId: rawSource, runId: rawRun }, sp] = await Promise.all([params, searchParams]);
+  // FOUNDATION-P0-34: both segments are numbers; an old UUID link redirects.
+  const [foundSource, foundRun] = await Promise.all([resolveRef(ctx.tenantId!, "identity_sources", rawSource), resolveRef(ctx.tenantId!, "identity_reconciliation_runs", rawRun)]);
+  if (!foundSource || !foundRun) notFound();
+  if (foundSource.fromUuid || foundRun.fromUuid) redirect(`/integrations/sources/${foundSource.ref}/runs/${foundRun.ref}${sp.page ? `?page=${encodeURIComponent(sp.page)}` : ""}`);
+  const [source, run] = await Promise.all([getIdentitySource(ctx.tenantId!, foundSource.id), getReconciliationRun(ctx.tenantId!, foundRun.id)]);
   if (!source || !run || run.sourceId !== source.id) notFound();
   const active = run.status === "queued" || run.status === "running";
   // The changes are one stored list (at most 500); the page shows them 50 at a time (§15).
   const pageCount = Math.max(1, Math.ceil(run.changes.length / CHANGES_PAGE));
   const page = Math.min(pageCount, Math.max(1, Number.parseInt(sp.page ?? "1", 10) || 1));
   const shown = run.changes.slice((page - 1) * CHANGES_PAGE, page * CHANGES_PAGE);
-  const pageHref = (p: number) => `/integrations/sources/${source.id}/runs/${run.id}${p > 1 ? `?page=${p}` : ""}`;
+  // The identities on this page, by number for their links (one read).
+  const identityRefs = await getIdentityNames(ctx.tenantId!, shown.map((c) => c.identityId).filter((x): x is string => Boolean(x)));
+  const pageHref = (p: number) => `/integrations/sources/${foundSource.ref}/runs/${foundRun.ref}${p > 1 ? `?page=${p}` : ""}`;
 
   return (
     <div className="space-y-5">
@@ -50,7 +58,7 @@ export default async function ReconciliationRunPage({ params, searchParams }: { 
           Identity sources
         </Link>
         <span aria-hidden> / </span>
-        <Link href={`/integrations/sources/${source.id}`} className="hover:text-foreground hover:underline">
+        <Link href={`/integrations/sources/${foundSource.ref}`} className="hover:text-foreground hover:underline">
           {source.name}
         </Link>
         <span aria-hidden> / </span>
@@ -128,7 +136,7 @@ export default async function ReconciliationRunPage({ params, searchParams }: { 
                   <Tr key={`${c.ref}-${i}`}>
                     <Td>
                       {c.identityId ? (
-                        <Link href={`/identities/${c.identityId}`} className="font-mono text-xs text-primary hover:underline">
+                        <Link href={`/identities/${identityRefs.get(c.identityId)?.ref ?? c.identityId}`} className="font-mono text-xs text-primary hover:underline">
                           {c.ref}
                         </Link>
                       ) : (

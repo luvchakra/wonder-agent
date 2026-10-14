@@ -8,7 +8,7 @@ import { setConnectionSchedule, setConnectionWrites } from "@/modules/integratio
 export async function setConnectionScheduleAction(integrationId: string, formData: FormData): Promise<void> {
   const ctx = await requirePermission("integration.update");
   await setConnectionSchedule(ctx.tenantId!, ctx.userId, integrationId, formData.get("schedule"));
-  revalidatePath(`/integrations/${integrationId}`);
+  revalidatePath("/integrations/[id]", "page");
 }
 
 /**
@@ -19,5 +19,5 @@ export async function setConnectionScheduleAction(integrationId: string, formDat
 export async function setConnectionWritesAction(integrationId: string, formData: FormData): Promise<void> {
   const ctx = await requirePermission("integration.update");
   await setConnectionWrites(ctx.tenantId!, ctx.userId, integrationId, formData.get("enabled") === "true");
-  revalidatePath(`/integrations/${integrationId}`);
+  revalidatePath("/integrations/[id]", "page");
 }

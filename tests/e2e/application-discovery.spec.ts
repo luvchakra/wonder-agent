@@ -131,6 +131,12 @@ test.describe.serial("application discovery", () => {
     await page.getByRole("button", { name: "Record discovery" }).click();
     await expect(page.getByRole("heading", { level: 1, name: `E2E Disc UI ${stamp}` })).toBeVisible();
     await expect(page.getByText("Not in the catalog.")).toBeVisible();
+    // FOUNDATION-P0-34: the discovery's number is its URL; an old link with its id redirects there.
+    await expect(page).toHaveURL(/\/integrations\/discovery\/\d+$/);
+    const discoveryUrl = page.url();
+    const recorded = await byName(page.request, `E2E Disc UI ${stamp}`);
+    await page.goto(`/integrations/discovery/${recorded.id}`);
+    await expect(page).toHaveURL(discoveryUrl);
 
     await page.getByRole("radio", { name: "Ignore" }).check();
     await page.getByRole("textbox", { name: /Reason/ }).fill("Duplicate of a report already handled");

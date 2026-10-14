@@ -132,6 +132,8 @@ test.describe.serial("human lifecycle", () => {
 
   test("the Lifecycle tab shows the state and history and closes a task", async ({ page }) => {
     await page.goto(`/identities/${personId}?tab=lifecycle`);
+    // FOUNDATION-P0-34: an old link with the id redirects to the number, keeping the tab.
+    await expect(page).toHaveURL(/\/identities\/\d+\?tab=lifecycle$/);
     await expect(page.getByRole("tab", { name: /Lifecycle/ })).toHaveAttribute("data-state", "active");
     await expect(page.getByRole("heading", { name: "History" })).toBeVisible();
     await expect(page.getByText("Rehire", { exact: true }).first()).toBeVisible();

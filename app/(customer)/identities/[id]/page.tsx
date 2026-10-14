@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
   getIdentity,
@@ -128,8 +129,11 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const [{ id }, { tab: requestedTab }] = await Promise.all([params, searchParams]);
+  const [{ id: rawId }, search] = await Promise.all([params, searchParams]);
+  const requestedTab = search.tab;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the identity's number; an old UUID link redirects.
+  const id = await pageRef(tenantId, "identities", rawId, (n) => `/identities/${n}`, search);
   const canManage = ctx.permissions.includes("identity.manage");
   const canReadAccess = ctx.permissions.includes("access.read");
   const canReadRisk = ctx.permissions.includes("risk.read");
@@ -170,7 +174,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
 
   const ref = (refId: string | null) =>
     refId && refs.get(refId) ? (
-      <Link href={`/identities/${refId}`} className="text-primary hover:underline">
+      <Link href={`/identities/${refs.get(refId)!.ref ?? refId}`} className="text-primary hover:underline">
         {refs.get(refId)!.displayName}
       </Link>
     ) : null;
@@ -530,7 +534,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
               <ul className="divide-y divide-border rounded-lg border border-border">
                 {current.map((r) => {
                   const other = r.other ? (
-                    <Link href={`/identities/${r.other.id}`} className="font-medium text-primary hover:underline">
+                    <Link href={`/identities/${r.other.ref ?? r.other.id}`} className="font-medium text-primary hover:underline">
                       {r.other.displayName}
                     </Link>
                   ) : (

@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
@@ -13,7 +14,7 @@ const RULE_TYPES = ["rbac", "abac", "resource", "time"] as const;
 const RESIDUAL_RISKS = ["low", "medium", "high", "critical"] as const;
 
 export default async function PolicyDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
+  const { id: rawId } = await params;
   let ctx;
   try {
     ctx = await requirePermission("policy.read");
@@ -22,6 +23,8 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
     throw err;
   }
 
+  // FOUNDATION-P0-34: the URL carries the policy's number; an old UUID link redirects.
+  const id = await pageRef(ctx.tenantId!, "policies", rawId, (n) => `/policies/${n}`);
   const policy = await getPolicy(id, ctx.tenantId!);
   if (!policy) notFound();
 

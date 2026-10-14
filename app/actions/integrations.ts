@@ -4,14 +4,21 @@ import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/rbac/requirePermission";
+import { resolveRef } from "@/lib/refs/objectRef";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { upgradeConnection } from "@/modules/integrations/framework/catalog";
 import { createSyncJob, discoverMcpTools, resolveHeldMissing, runSyncJob, startConnectorSignIn, testIntegrationConnection } from "@/modules/integrations/service";
 
+/** FOUNDATION-P0-34: a connection's page is addressed by its number. */
+async function connectionPath(tenantId: string, integrationId: string): Promise<string> {
+  const found = await resolveRef(tenantId, "integrations", integrationId);
+  return `/integrations/${found?.ref ?? integrationId}`;
+}
+
 export async function testConnectionAction(integrationId: string) {
   const ctx = await requirePermission("integration.execute");
   await testIntegrationConnection(ctx.tenantId!, integrationId);
-  redirect(`/integrations/${integrationId}`);
+  redirect(await connectionPath(ctx.tenantId!, integrationId));
 }
 
 export async function triggerSyncAction(integrationId: string) {
@@ -21,7 +28,7 @@ export async function triggerSyncAction(integrationId: string) {
   // (already fire-and-forget by design) sync without awaiting so this
   // action still returns promptly.
   void runSyncJob(ctx.tenantId!, job.id);
-  redirect(`/integrations/${integrationId}`);
+  redirect(await connectionPath(ctx.tenantId!, integrationId));
 }
 
 /**
@@ -48,7 +55,7 @@ export async function connectSignInAction(integrationId: string) {
     location = started.location;
   } catch (err) {
     if (!(err instanceof ApiError) || err.status === 404) throw err;
-    location = `/integrations/${integrationId}?oauth=${err.code === "CREDENTIALS_REQUIRED" ? "needs_credentials" : "failed"}`;
+    location = `${await connectionPath(ctx.tenantId!, integrationId)}?oauth=${err.code === "CREDENTIALS_REQUIRED" ? "needs_credentials" : "failed"}`;
   }
   redirect(location);
 }
@@ -59,12 +66,13 @@ export async function connectSignInAction(integrationId: string) {
  */
 export async function upgradeConnectionAction(integrationId: string, version: string) {
   const ctx = await requirePermission("integration.update");
-  let target = `/integrations/${integrationId}?upgraded=${encodeURIComponent(version)}`;
+  const page = await connectionPath(ctx.tenantId!, integrationId);
+  let target = `${page}?upgraded=${encodeURIComponent(version)}`;
   try {
     await upgradeConnection(ctx.tenantId!, ctx.userId, integrationId, version);
   } catch (err) {
     if (!(err instanceof ApiError) || err.status === 404) throw err;
-    target = `/integrations/${integrationId}/upgrade?version=${encodeURIComponent(version)}&failed=1`;
+    target = `${page}/upgrade?version=${encodeURIComponent(version)}&failed=1`;
   }
   redirect(target);
 }
@@ -84,7 +92,7 @@ export async function resolveHeldMissingAction(integrationId: string, jobId: str
     if (!(err instanceof ApiError)) throw err;
     outcome = err.code === "SUPERSEDED" ? "superseded" : err.code === "NOT_HELD" ? "decided" : "failed";
   }
-  redirect(`/integrations/${integrationId}?held=${outcome}`);
+  redirect(`${await connectionPath(ctx.tenantId!, integrationId)}?held=${outcome}`);
 }
 
 /**

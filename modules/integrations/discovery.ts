@@ -42,6 +42,8 @@ export const DISCOVERY_CAP = 2000;
 
 export type ApplicationDiscovery = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   source: DiscoverySourceKind;
   sourceIntegrationId: string | null;
   name: string;
@@ -66,6 +68,7 @@ type Row = Record<string, unknown>;
 function toDiscovery(r: Row): ApplicationDiscovery {
   return {
     id: r.id as string,
+    ref: r.ref === null || r.ref === undefined ? null : Number(r.ref),
     source: r.source as DiscoverySourceKind,
     sourceIntegrationId: (r.source_integration_id as string | null) ?? null,
     name: r.name as string,
