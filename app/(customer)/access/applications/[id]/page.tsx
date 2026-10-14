@@ -15,10 +15,11 @@ import {
 import { listGroups } from "@/lib/users/groups";
 import { FulfilmentAssignments } from "./FulfilmentAssignments";
 import { EntitlementTypes } from "./EntitlementTypes";
+import { AddEntitlement } from "./AddEntitlement";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton } from "@/modules/ui";
+import { RecordProvenance, Badge, Card, CardBody, CardHeader, EmptyState, KpiCard, LinkButton, Tabs, TabPanel } from "@/modules/ui";
 import { ApplicationForm } from "../ApplicationForm";
 import { APP_TYPE_LABEL, LEVEL_TONE, ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../labels";
 import { LifecycleForm } from "./onboarding/OnboardingForms";
@@ -27,7 +28,8 @@ import { ReconcileAccessForm, ReconcileAccountsForm } from "../../accounts/Accou
 // ACCESS-P0-15 — one application: catalog details, owners, classification,
 // connector, and the access it holds. ACCESS-P0-16 adds its onboarding and
 // the suspend / resume / retire lifecycle; ACCESS-P0-17 its accounts and
-// their reconciliation.
+// their reconciliation. Sections are tabs (owner request, 2026-10-14);
+// ?tab= opens one directly.
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -40,7 +42,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ApplicationDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("access.read");
@@ -48,7 +50,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { id } = await params;
+  const [{ id }, { tab: requestedTab }] = await Promise.all([params, searchParams]);
   const tenantId = ctx.tenantId!;
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
@@ -75,6 +77,18 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     app.onboardingStatus === "ACTIVE" ? ["suspend", "retire"] : app.onboardingStatus === "SUSPENDED" ? ["resume", "retire"] : app.onboardingStatus === "RETIRED" ? [] : ["retire"]
   ) as ("suspend" | "resume" | "retire")[];
   const status = ONBOARDING_LABEL[app.onboardingStatus];
+  const fromConnector = onboarding?.config.entitlementSource === "connector";
+  const tabs = [
+    { value: "details", label: "Details" },
+    {
+      value: "entitlements",
+      label: "Entitlements",
+      count: entitlements.length,
+    },
+    { value: "onboarding", label: "Onboarding" },
+    { value: "accounts", label: "Accounts", count: accountSummary.total },
+    ...(canManage ? [{ value: "settings", label: "Settings" }] : []),
+  ];
 
   return (
     <div className="space-y-5">
@@ -101,187 +115,219 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <KpiCard size="sm" icon="Users" tone="primary" label="Accounts" value={app.accountCount} />
         <KpiCard size="sm" icon="KeyRound" tone="violet" label="Entitlements" value={app.entitlementCount} />
-        <KpiCard size="sm" icon="TriangleAlert" tone={app.riskLevel === "critical" || app.riskLevel === "high" ? "danger" : "neutral"} label="Risk" value={app.riskLevel ? cap(app.riskLevel) : "Not assessed"} />
+        <KpiCard
+          size="sm"
+          icon="TriangleAlert"
+          tone={app.riskLevel === "critical" || app.riskLevel === "high" ? "danger" : "neutral"}
+          label="Risk"
+          value={app.riskLevel ? cap(app.riskLevel) : "Not assessed"}
+        />
         <KpiCard size="sm" icon="ShieldCheck" tone="neutral" label="Data" value={app.dataClassification ? cap(app.dataClassification) : "Not classified"} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
-          <CardHeader title="Details" />
-          <CardBody>
-            <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Detail label="Name">{app.name}</Detail>
-              <Detail label="Vendor">{app.vendor}</Detail>
-              <Detail label="Category">{app.category}</Detail>
-              <Detail label="Business owner">
-                {app.businessOwnerIdentityId ? (
-                  <Link href={`/identities/${app.businessOwnerIdentityId}`} className="text-primary hover:underline">
-                    {app.businessOwnerName ?? "Unknown"}
-                  </Link>
-                ) : null}
-              </Detail>
-              <Detail label="Technical owner">
-                {app.technicalOwnerIdentityId ? (
-                  <Link href={`/identities/${app.technicalOwnerIdentityId}`} className="text-primary hover:underline">
-                    {app.technicalOwnerName ?? "Unknown"}
-                  </Link>
-                ) : null}
-              </Detail>
-              <Detail label="Criticality">{app.criticality ? <Badge tone={LEVEL_TONE[app.criticality]}>{cap(app.criticality)}</Badge> : null}</Detail>
-              <Detail label="Environment">{cap(app.environment)}</Detail>
-              <Detail label="Address">
-                {app.url ? (
-                  <a href={app.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    {app.url.replace(/^https:\/\//, "")}
-                  </a>
-                ) : null}
-              </Detail>
-              <Detail label="Discovered from">{app.discoverySource === "manual" ? "Registered by hand" : cap(app.discoverySource)}</Detail>
-              <Detail label="Connector">
-                {app.sourceIntegrationId ? (
-                  integration ? (
-                    <Link href={`/integrations/${integration.id}`} className="text-primary hover:underline">
-                      {integration.name}
-                    </Link>
-                  ) : (
-                    "Connected"
-                  )
-                ) : (
-                  "Not connected"
-                )}
-              </Detail>
-              <Detail label="Registered">{new Date(app.createdAt).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}</Detail>
-            </dl>
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader title="Entitlements" description={entitlements.length > 20 ? `The first 20 of ${entitlements.length}.` : undefined} />
-          <CardBody>
-            {entitlements.length === 0 ? (
-              <EmptyState title="No entitlements" description="They arrive from the connector, or are added by hand under access governance." />
-            ) : (
-              <ul className="divide-y divide-border text-sm">
-                {entitlements.slice(0, 20).map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-2 py-1.5">
-                    <span className="min-w-0 truncate text-foreground">{e.name}</span>
-                    <span className="flex shrink-0 gap-1">
-                      {e.privilegeLevel !== "standard" ? <Badge tone={e.privilegeLevel === "admin" ? "danger" : "warning"}>{e.privilegeLevel}</Badge> : null}
-                      {e.dataClassification ? <Badge tone="neutral">{e.dataClassification}</Badge> : null}
-                      {e.entitlementType ? <Badge tone="info">{e.entitlementType}</Badge> : null}
-                      {e.requestable === false ? <Badge tone="neutral">Not requestable</Badge> : null}
-                      {e.soxRelevant ? <Badge tone="warning">SOX</Badge> : null}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <EntitlementTypes applicationId={id} types={entitlementTypes} canManage={canManage} />
-          </CardBody>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-        <Card>
-          <CardHeader
-            title="Onboarding"
-            description={
-              onboarding
-                ? `Configuration v${onboarding.configVersion}. ${ONBOARDING_STAGE_LABEL[onboarding.status].label}.`
-                : "Configure, validate, simulate and approve how this application is governed."
-            }
-            actions={
-              app.onboardingStatus !== "RETIRED" || onboarding ? (
-                <LinkButton href={`/access/applications/${id}/onboarding`} size="sm" variant={onboarding ? "outline" : "default"}>
-                  {onboarding ? "Open onboarding" : canManage ? "Start onboarding" : "View onboarding"}
-                </LinkButton>
-              ) : null
-            }
-          />
-          <CardBody>
-            {onboarding ? (
-              <Badge tone={ONBOARDING_STAGE_LABEL[onboarding.status].tone}>{ONBOARDING_STAGE_LABEL[onboarding.status].label}</Badge>
-            ) : (
-              <p className="text-sm text-muted-foreground">Not started.</p>
-            )}
-            <FulfilmentAssignments
-              applicationId={id}
-              assignments={assignments}
-              types={entitlementTypes.map((t) => t.name)}
-              choices={[
-                ...groups.filter((g) => g.status === "active").map((g) => ({ value: `group:${g.id}`, label: `${g.name} (group)` })),
-                ...people.map((p) => ({ value: `identity:${p.id}`, label: p.displayName })),
-              ]}
-              canManage={canManage}
-            />
-          </CardBody>
-        </Card>
-        <Card>
-          <CardHeader
-            title="Accounts"
-            description={
-              lastRun
-                ? `Last reconciled ${new Date(lastRun.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${lastRun.status === "failed" ? ": failed" : ""}.`
-                : "Not reconciled yet."
-            }
-            actions={
-              <LinkButton href={`/access/accounts?app=${id}`} size="sm" variant="outline">
-                View accounts
-              </LinkButton>
-            }
-          />
-          <CardBody className="space-y-3">
-            <dl className="grid grid-cols-3 gap-3 text-sm">
-              <div>
-                <dt className="text-xs text-muted-foreground">Accounts</dt>
-                <dd className="tabular-nums text-foreground">{accountSummary.total}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Orphan</dt>
-                <dd className={accountSummary.orphan ? "tabular-nums text-destructive" : "tabular-nums text-foreground"}>{accountSummary.orphan}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">Dormant</dt>
-                <dd className={accountSummary.dormant ? "tabular-nums text-warning" : "tabular-nums text-foreground"}>{accountSummary.dormant}</dd>
-              </div>
-            </dl>
-            {lastRun?.status === "failed" && lastRun.error ? <p className="text-xs text-destructive">{lastRun.error}</p> : null}
-            {canManage ? (
-              <ReconcileAccountsForm
-                applicationId={id}
-                disabledReason={onboarding?.promotedAt ? null : "Promote an onboarding configuration first"}
-              />
-            ) : null}
-            {canManage && onboarding?.promotedAt && onboarding.config.entitlementSource === "connector" ? (
-              <ReconcileAccessForm applicationId={id} disabledReason={null} />
-            ) : null}
-            {lastAccessRun ? (
-              <p className={lastAccessRun.status === "failed" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
-                Access last reconciled {when(lastAccessRun.startedAt)}
-                {lastAccessRun.status === "failed" ? `: failed. ${lastAccessRun.error ?? ""}` : "."}
-              </p>
-            ) : null}
-          </CardBody>
-        </Card>
-        {canManage && lifecycleActions.length ? (
+      <Tabs tabs={tabs} ariaLabel="Application sections" defaultValue={tabs.some((t) => t.value === requestedTab) ? requestedTab : "details"}>
+        <TabPanel value="details" className="pt-4">
           <Card>
-            <CardHeader title="Lifecycle" description="Suspending or retiring an application needs a reason and is audited." />
             <CardBody>
-              <LifecycleForm applicationId={id} actions={lifecycleActions} />
+              <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <Detail label="Name">{app.name}</Detail>
+                <Detail label="Vendor">{app.vendor}</Detail>
+                <Detail label="Category">{app.category}</Detail>
+                <Detail label="Business owner">
+                  {app.businessOwnerIdentityId ? (
+                    <Link href={`/identities/${app.businessOwnerIdentityId}`} className="text-primary hover:underline">
+                      {app.businessOwnerName ?? "Unknown"}
+                    </Link>
+                  ) : null}
+                </Detail>
+                <Detail label="Technical owner">
+                  {app.technicalOwnerIdentityId ? (
+                    <Link href={`/identities/${app.technicalOwnerIdentityId}`} className="text-primary hover:underline">
+                      {app.technicalOwnerName ?? "Unknown"}
+                    </Link>
+                  ) : null}
+                </Detail>
+                <Detail label="Criticality">{app.criticality ? <Badge tone={LEVEL_TONE[app.criticality]}>{cap(app.criticality)}</Badge> : null}</Detail>
+                <Detail label="Environment">{cap(app.environment)}</Detail>
+                <Detail label="Address">
+                  {app.url ? (
+                    <a href={app.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {app.url.replace(/^https:\/\//, "")}
+                    </a>
+                  ) : null}
+                </Detail>
+                <Detail label="Discovered from">{app.discoverySource === "manual" ? "Registered by hand" : cap(app.discoverySource)}</Detail>
+                <Detail label="Connector">
+                  {app.sourceIntegrationId ? (
+                    integration ? (
+                      <Link href={`/integrations/${integration.id}`} className="text-primary hover:underline">
+                        {integration.name}
+                      </Link>
+                    ) : (
+                      "Connected"
+                    )
+                  ) : (
+                    "Not connected"
+                  )}
+                </Detail>
+                <Detail label="Registered">
+                  {new Date(app.createdAt).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </Detail>
+              </dl>
             </CardBody>
           </Card>
+        </TabPanel>
+        <TabPanel value="entitlements" className="space-y-4 pt-4">
+          <Card>
+            <CardHeader title="Entitlements" description={entitlements.length > 50 ? `The first 50 of ${entitlements.length}.` : undefined} />
+            <CardBody>
+              {entitlements.length === 0 ? (
+                <EmptyState
+                  title="No entitlements"
+                  description={fromConnector ? "They arrive when the connector is read." : "Add the entitlements people can hold in this application. Entitlement types only group them."}
+                />
+              ) : (
+                <ul className="divide-y divide-border text-sm">
+                  {entitlements.slice(0, 50).map((e) => (
+                    <li key={e.id} className="flex items-center justify-between gap-2 py-1.5">
+                      <span className="min-w-0 truncate text-foreground">{e.name}</span>
+                      <span className="flex shrink-0 gap-1">
+                        {e.privilegeLevel !== "standard" ? <Badge tone={e.privilegeLevel === "admin" ? "danger" : "warning"}>{e.privilegeLevel}</Badge> : null}
+                        {e.dataClassification ? <Badge tone="neutral">{e.dataClassification}</Badge> : null}
+                        {e.entitlementType ? <Badge tone="info">{e.entitlementType}</Badge> : null}
+                        {e.requestable === false ? <Badge tone="neutral">Not requestable</Badge> : null}
+                        {e.soxRelevant ? <Badge tone="warning">SOX</Badge> : null}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canManage && !fromConnector ? <AddEntitlement applicationId={id} /> : null}
+            </CardBody>
+          </Card>
+          <Card>
+            <CardBody>
+              <EntitlementTypes applicationId={id} types={entitlementTypes} canManage={canManage} />
+            </CardBody>
+          </Card>
+        </TabPanel>
+        <TabPanel value="onboarding" className="pt-4">
+          <Card>
+            <CardHeader
+              title="Onboarding"
+              description={
+                onboarding
+                  ? `Configuration v${onboarding.configVersion}. ${ONBOARDING_STAGE_LABEL[onboarding.status].label}.`
+                  : "Configure, validate, simulate and approve how this application is governed."
+              }
+              actions={
+                app.onboardingStatus !== "RETIRED" || onboarding ? (
+                  <LinkButton href={`/access/applications/${id}/onboarding`} size="sm" variant={onboarding ? "outline" : "default"}>
+                    {onboarding ? "Open onboarding" : canManage ? "Start onboarding" : "View onboarding"}
+                  </LinkButton>
+                ) : null
+              }
+            />
+            <CardBody>
+              {onboarding ? (
+                <Badge tone={ONBOARDING_STAGE_LABEL[onboarding.status].tone}>{ONBOARDING_STAGE_LABEL[onboarding.status].label}</Badge>
+              ) : (
+                <p className="text-sm text-muted-foreground">Not started.</p>
+              )}
+              <FulfilmentAssignments
+                applicationId={id}
+                assignments={assignments}
+                types={entitlementTypes.map((t) => t.name)}
+                choices={[
+                  ...groups
+                    .filter((g) => g.status === "active")
+                    .map((g) => ({
+                      value: `group:${g.id}`,
+                      label: `${g.name} (group)`,
+                    })),
+                  ...people.map((p) => ({
+                    value: `identity:${p.id}`,
+                    label: p.displayName,
+                  })),
+                ]}
+                canManage={canManage}
+              />
+            </CardBody>
+          </Card>
+        </TabPanel>
+        <TabPanel value="accounts" className="pt-4">
+          <Card>
+            <CardHeader
+              title="Accounts"
+              description={
+                lastRun
+                  ? `Last reconciled ${new Date(lastRun.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}${lastRun.status === "failed" ? ": failed" : ""}.`
+                  : "Not reconciled yet."
+              }
+              actions={
+                <LinkButton href={`/access/accounts?app=${id}`} size="sm" variant="outline">
+                  View accounts
+                </LinkButton>
+              }
+            />
+            <CardBody className="space-y-3">
+              <dl className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Accounts</dt>
+                  <dd className="tabular-nums text-foreground">{accountSummary.total}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Orphan</dt>
+                  <dd className={accountSummary.orphan ? "tabular-nums text-destructive" : "tabular-nums text-foreground"}>{accountSummary.orphan}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">Dormant</dt>
+                  <dd className={accountSummary.dormant ? "tabular-nums text-warning" : "tabular-nums text-foreground"}>{accountSummary.dormant}</dd>
+                </div>
+              </dl>
+              {lastRun?.status === "failed" && lastRun.error ? <p className="text-xs text-destructive">{lastRun.error}</p> : null}
+              {canManage ? <ReconcileAccountsForm applicationId={id} disabledReason={onboarding?.promotedAt ? null : "Promote an onboarding configuration first"} /> : null}
+              {canManage && onboarding?.promotedAt && onboarding.config.entitlementSource === "connector" ? <ReconcileAccessForm applicationId={id} disabledReason={null} /> : null}
+              {lastAccessRun ? (
+                <p className={lastAccessRun.status === "failed" ? "text-xs text-destructive" : "text-xs text-muted-foreground"}>
+                  Access last reconciled {when(lastAccessRun.startedAt)}
+                  {lastAccessRun.status === "failed" ? `: failed. ${lastAccessRun.error ?? ""}` : "."}
+                </p>
+              ) : null}
+            </CardBody>
+          </Card>
+        </TabPanel>
+        {canManage ? (
+          <TabPanel value="settings" className="space-y-4 pt-4">
+            <Card>
+              <CardHeader title="Edit catalog details" description="Onboarding status changes through onboarding, not here." />
+              <CardBody>
+                <ApplicationForm application={app} people={people} />
+              </CardBody>
+            </Card>
+            {lifecycleActions.length ? (
+              <Card>
+                <CardHeader title="Lifecycle" description="Suspending or retiring an application needs a reason and is audited." />
+                <CardBody>
+                  <LifecycleForm applicationId={id} actions={lifecycleActions} />
+                </CardBody>
+              </Card>
+            ) : null}
+          </TabPanel>
         ) : null}
-      </div>
-
-      {canManage ? (
-        <Card>
-          <CardHeader title="Edit catalog details" description="Onboarding status changes through onboarding, not here." />
-          <CardBody>
-            <ApplicationForm application={app} people={people} />
-          </CardBody>
-        </Card>
-      ) : null}
+      </Tabs>
     </div>
   );
 }
 
-const when = (iso: string) => new Date(iso).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const when = (iso: string) =>
+  new Date(iso).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });

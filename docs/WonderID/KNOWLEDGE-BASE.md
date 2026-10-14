@@ -252,6 +252,8 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 
 **Onboarding templates:** an administrator can keep a template per connection type, with a questionnaire, so applications of that kind are onboarded the same way (Admin → Applications → Onboarding Templates).
 
+**An application's page** has tabs: Details, Entitlements, Onboarding, Accounts and, for administrators, Settings (edit and lifecycle). When an application's entitlements don't come from a connector, administrators add them on the Entitlements tab; onboarding's "Entitlement model discovered" step passes once there is at least one. Entitlement types only group entitlements; they are not entitlements themselves.
+
 **Entitlement types and classification rules:** each application can name its kinds of entitlement (role, group, permission set) with their own request rules and durations. Classification rules set an entitlement's privilege level, data classification, type, whether it is requestable and whether it is SOX-relevant, from what is known about it and its application, when it is imported or changes. They never override a value a person set; a rule is simulated first and published by a second person (Admin → Organization Settings → Classification Rules).
 
 **Accounts**
@@ -653,6 +655,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Application pages have tabs (Details, Entitlements, Onboarding, Accounts, Settings); entitlements can be added by hand on the Entitlements tab. |
 | 14 Oct 2026 | Access reviews: a reviewer can ask a colleague about an item; the answer is kept with the item. |
 | 14 Oct 2026 | Two control-evidence reports: revocation closure (is each revoked access really gone?) and leaver removal SLA (were leavers' removals done in time?). Correction: switching inside one installed app works on a computer only; on phones it opens in the browser's overlay. |
 | 14 Oct 2026 | Access review templates: save a campaign's settings and launch it again in one click; Preview shows what a campaign will hold before it starts. |
