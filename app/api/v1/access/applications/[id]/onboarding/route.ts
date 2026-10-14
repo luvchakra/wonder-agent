@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
+  answerOnboarding,
   configureOnboarding,
   decideOnboarding,
   getOnboarding,
@@ -14,7 +15,8 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { refuseAutomationCaller } from "@/lib/security/automationCredentials";
 
 // ACCESS-P0-16 — an application's onboarding (GET; null when not started)
-// and its stages (POST { action }): start, configure, validate, simulate,
+// and its stages (POST { action }): start (optionally from a template,
+// ACCESS-P0-34), configure, answer (the template's questionnaire), validate, simulate,
 // approve, reject, promote. Stage, four-eyes and version checks are the
 // service's; the tenant comes from the session (#2).
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,10 +38,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     let data;
     switch (body.action) {
       case "start":
-        data = await startOnboarding(tenantId, actorId, id, body.mode);
+        data = await startOnboarding(tenantId, actorId, id, body.mode, body.templateId);
         break;
       case "configure":
         data = await configureOnboarding(tenantId, actorId, id, (body.config ?? {}) as Record<string, unknown>);
+        break;
+      case "answer":
+        data = await answerOnboarding(tenantId, actorId, id, body.answers);
         break;
       case "validate":
         data = await validateOnboarding(tenantId, actorId, id);
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data = await promoteOnboarding(tenantId, actorId, id);
         break;
       default:
-        throw new ApiError(400, "VALIDATION_FAILED", "action: start, configure, validate, simulate, approve, reject or promote");
+        throw new ApiError(400, "VALIDATION_FAILED", "action: start, configure, answer, validate, simulate, approve, reject or promote");
     }
     return NextResponse.json({ ok: true, data });
   } catch (err) {

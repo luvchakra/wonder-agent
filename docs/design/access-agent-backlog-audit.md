@@ -3394,3 +3394,121 @@ The owner's Access list is unchanged; the nav test pins it.
   in the metadata, and only a uuid is used as the correlation id. Checked by
   typecheck; the spec does not read audit rows.
 - Typecheck, eslint and `next build` are clean.
+
+## 2026-10-14 — ACCESS-P0-34: application onboarding templates and questionnaire
+
+Design §5.8.2 and §14 (forms). This is the first story in the owner's new
+priority order: onboarding, requests, approvals, provisioning.
+
+**Migrations 0171 and 0172.**
+- `application_onboarding_templates` holds a template's:
+  - name and description;
+  - connection type;
+  - configuration defaults: identifier and correlation fields, entitlement
+    source, operations, and request and certification policy;
+  - default business and technical owners;
+  - entitlement types with their settings;
+  - questions.
+- A template is active or retired. One name per organization, ignoring
+  case. Members read; the service writes.
+- `application_onboardings` gains `template_id` and `answers`:
+  - the template is a same-organization foreign key;
+  - a template in use cannot be deleted.
+- **0172:** templates are typed by the connector definition key
+  (`connection_type_key`, a built-in such as `workday` or a custom key).
+  - This is how connections have been typed since the connector framework.
+    `integration_types` holds only the generic `connector` row.
+  - 0171's `integration_type_id` stays unused (always null). It can be
+    dropped with the owner's approval; it is not dropped here, because that
+    is destructive.
+
+**Rules** (pure, `onboardingTemplateRules.ts`).
+- Defaults go through the onboarding configuration's own validation.
+  - Entitlements "from the connector" need a connection type.
+  - Owners are identities.
+- Entitlement types reuse ACCESS-P0-33's validation. A name may appear only
+  once.
+- Questions:
+  - text, yes/no or a choice of 2–20 options;
+  - required or not;
+  - a key derived from the label;
+  - at most 20.
+- Answers are checked against the questions. An empty answer removes it;
+  "no" is an answer.
+- A typed template fits only an application connected through that type;
+  an untyped one fits any application.
+
+**Service.**
+- `onboardingTemplates.ts`: list, get, create, update (optimistic), retire.
+  Owners must be active people of the organization.
+- `startOnboarding(…, templateId)`:
+  - refuses a template that does not fit (`TEMPLATE_DOES_NOT_FIT`) or is
+    retired (`TEMPLATE_RETIRED`);
+  - fills the draft from the defaults;
+  - fills only the application's empty owners (through `updateApplication`,
+    audited);
+  - declares the template's entitlement types; a type the application
+    already has keeps its own settings.
+  - Re-onboarding keeps its earlier configuration and applies no template.
+- `answerOnboarding` validates answers.
+  - A change returns the onboarding to configuring. It clears validation,
+    simulation, submission and approval.
+  - The audit names the questions answered, not the answers.
+- The checklist gains a blocking "Questionnaire answered" item. It is not
+  applicable without questions.
+- The approval audit records the template and the questions answered.
+- `onboardingTemplatesFor(app)` returns the templates that fit, typed ones
+  first.
+
+**API:**
+- `/api/v1/access/onboarding-templates` (GET with access.read, POST with
+  access.manage), `[templateId]` (GET, PATCH) and `[templateId]/retire`;
+- the onboarding route takes `start` with `templateId` and a new `answer`
+  action.
+
+**UI.**
+- Admin › Applications › Onboarding Templates. The list has a folded "New
+  template" form:
+  - questions are one per line, with `*` for required and `(yes/no)` or
+    `[A | B]` for choices;
+  - entitlement types are one per line, with `: 90` for a maximum.
+- The template page has an edit form and a folded "Retire".
+- The onboarding start form offers the fitting templates. A template made
+  for the application's connection type is the default; a general one is a
+  choice, and "No template" is otherwise the default. The first local run
+  showed why: defaulting to any template changed what an unrelated
+  onboarding started with.
+- The onboarding page shows a Questionnaire card, editable until promotion.
+
+**Left out, recorded.**
+- **Reusable forms and value lists** (§14, OPERATIONS-P0-12). The
+  questionnaire is the template's own list of questions.
+- **Templates for agents and external identities** (IDENTITY-P0-19,
+  IDENTITY-P0-22).
+- **The connection-type lookup** reads `config.definition.key` of the
+  published `Integration` record instead of an Integration export. A
+  `connectionTypeKey()` export from Integration would be cleaner;
+  Integration Agent to consider.
+- **Re-onboarding** does not re-apply a template.
+
+**Verified.**
+- Unit tests:
+  - `onboardingTemplateRules.test.ts` 7;
+  - two new checklist cases in `onboardingRules.test.ts`;
+  - the questionnaire line format, 2;
+  - `npx vitest run modules tests/architecture lib app` passes, 1568.
+- Database: `tests/access/onboarding-templates-isolation.sql`, 8 of 8 as
+  expected, rolled back.
+- Local E2E: `onboarding-templates.spec.ts`, `application-onboarding.spec.ts`
+  and `onboarding-proposals.spec.ts`, 28/28. The new spec covers:
+  - template validation;
+  - a typed template refused for an application without that connection;
+  - defaults, owners and types applied;
+  - the questionnaire blocking validation;
+  - a changed answer after approval sending the onboarding back;
+  - the pages;
+  - another organization 404, and its own application cannot use the
+    template;
+  - read-only 403;
+  - retired.
+- Typecheck, eslint and `next build` are clean.

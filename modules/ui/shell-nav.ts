@@ -97,6 +97,7 @@ export const ADMIN_AREA: ShellNavItem = {
         page("Application Catalog", "/access", "access.read"),
         page("Onboarding Reviews", "/access?status=onboarding", "access.read"),
         page("Discovered Applications", "/integrations/discovery", "integration.read"),
+        page("Onboarding Templates", "/access/onboarding-templates", "access.manage"),
         page("Data Sources", "/access/data-sources", "access.read"),
       ],
       "Box",

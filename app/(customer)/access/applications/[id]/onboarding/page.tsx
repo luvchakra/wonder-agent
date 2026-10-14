@@ -3,13 +3,13 @@ import { notFound, redirect } from "next/navigation";
 import { Check, CircleAlert, CircleMinus, CircleX } from "lucide-react";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
-import { getApplicationDetail, getOnboarding, type ApplicationOnboarding } from "@/modules/access-governance/service";
+import { getApplicationDetail, getOnboarding, getOnboardingTemplate, missingOnboardingAnswers, onboardingTemplatesFor, type ApplicationOnboarding } from "@/modules/access-governance/service";
 import { listIntegrations, listOnboardingProposals } from "@/modules/integrations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader, EmptyState, KpiCard } from "@/modules/ui";
 import { cn } from "@/lib/utils";
 import { ONBOARDING_LABEL, ONBOARDING_STAGE_LABEL } from "../../labels";
-import { ConfigureOnboardingForm, DecisionForm, StartOnboardingForm, StepForm } from "./OnboardingForms";
+import { ConfigureOnboardingForm, DecisionForm, QuestionnaireForm, StartOnboardingForm, StepForm } from "./OnboardingForms";
 import { ProposalCard } from "./ProposalCard";
 import { ProposalRequestForm } from "./ProposalForms";
 
@@ -66,13 +66,17 @@ export default async function ApplicationOnboardingPage({ params }: { params: Pr
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
   const canPropose = ctx.permissions.includes("integration.update");
-  const [app, o, members, integrations, proposals] = await Promise.all([
+  const [app, o, members, integrations, proposals, templates] = await Promise.all([
     getApplicationDetail(tenantId, id),
     getOnboarding(tenantId, id),
     listTenantMembersWithRoles(tenantId),
     canManage && ctx.permissions.includes("integration.read") ? listIntegrations(tenantId) : Promise.resolve([]),
     ctx.permissions.includes("integration.read") ? listOnboardingProposals(tenantId, id, 3) : Promise.resolve([]),
+    canManage ? onboardingTemplatesFor(tenantId, id) : Promise.resolve([]),
   ]);
+  // ACCESS-P0-34: the template it started from, for its questionnaire.
+  const template = o?.templateId ? await getOnboardingTemplate(tenantId, o.templateId) : null;
+  const missing = template ? missingOnboardingAnswers(template.questions, o!.answers) : [];
   const latestProposal = proposals[0] ?? null;
   if (!app) notFound();
   const name = (userId: string | null) => {
@@ -133,7 +137,7 @@ export default async function ApplicationOnboardingPage({ params }: { params: Pr
             {app.onboardingStatus === "RETIRED" ? (
               <EmptyState title="Retired" description="A retired application is not onboarded." />
             ) : canManage ? (
-              <StartOnboardingForm applicationId={id} />
+              <StartOnboardingForm applicationId={id} templates={templates.map((t) => ({ id: t.id, name: t.name, specific: t.connectionTypeKey !== null }))} />
             ) : (
               <EmptyState title="Not started" description="Someone who can manage access starts onboarding." />
             )}
@@ -192,6 +196,29 @@ export default async function ApplicationOnboardingPage({ params }: { params: Pr
               </CardBody>
             </Card>
           </div>
+
+          {template && template.questions.length ? (
+            <Card>
+              <CardHeader
+                title="Questionnaire"
+                description={`From the template “${template.name}”. ${missing.length ? `${missing.length} required ${missing.length === 1 ? "question is" : "questions are"} unanswered.` : "Every required question is answered."}`}
+              />
+              <CardBody>
+                {canManage && o.status !== "PROMOTED" ? (
+                  <QuestionnaireForm applicationId={id} questions={template.questions} answers={o.answers} />
+                ) : (
+                  <dl className="space-y-2 text-sm">
+                    {template.questions.map((q) => (
+                      <div key={q.key}>
+                        <dt className="text-xs text-muted-foreground">{q.label}</dt>
+                        <dd className="text-foreground">{o.answers[q.key] === undefined ? "—" : o.answers[q.key] === true ? "Yes" : o.answers[q.key] === false ? "No" : String(o.answers[q.key])}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                )}
+              </CardBody>
+            </Card>
+          ) : null}
 
           <Card>
             <CardHeader

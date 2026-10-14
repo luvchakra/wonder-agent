@@ -136,7 +136,8 @@ Needs D3; the relay needs D7; connectors need D9. Tracking issue #57.
 | INTEGRATION-P0-23 † | WonderID Relay: outbound job pull, key-bound identity, active–active, monitoring | Integration | |
 | INTEGRATION-P0-24 † | Microsoft Entra ID connector (import and write) | Integration | |
 | INTEGRATION-P0-25 † | HR connector: Workday or SuccessFactors (D9) | Integration | |
-| INTEGRATION-P0-26 † | ServiceNow ticketing connector for manual fulfilment | Integration | |
+| INTEGRATION-P0-26 † | ServiceNow ticketing connector for manual fulfilment (Low, owner 2026-10-14) | Integration | |
+| ACCESS-P0-42 | Internal fulfilment task assignment: a person or group per application (optionally per entitlement type), group queues, reassignment with a reason, workload view (owner request 2026-10-14) | Access | |
 | RISK-P0-13 | Rogue access management: remediation through approval and provisioning | Risk | |
 | QA-P0-26 | Provisioning safety suite: idempotency, mass-change guard, read-only enforcement, verification | QA | |
 

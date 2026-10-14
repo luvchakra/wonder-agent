@@ -11,6 +11,7 @@ import {
   setApplicationLifecycle,
   simulateOnboarding,
   startOnboarding,
+  answerOnboarding,
   updateApplication,
   validateOnboarding,
 } from "@/modules/access-governance/service";
@@ -96,12 +97,26 @@ function revalidateApplication(applicationId: string) {
 export async function startOnboardingAction(applicationId: string, _prev: ApplicationFormState, formData: FormData): Promise<ApplicationFormState> {
   const ctx = await requirePermission("access.manage");
   try {
-    await startOnboarding(ctx.tenantId!, ctx.userId, applicationId, String(formData.get("mode") ?? "assisted"));
+    await startOnboarding(ctx.tenantId!, ctx.userId, applicationId, String(formData.get("mode") ?? "assisted"), String(formData.get("templateId") ?? "") || undefined);
   } catch (err) {
     return formError(err);
   }
   revalidateApplication(applicationId);
   return { status: "saved", message: "Onboarding started." };
+}
+
+/** ACCESS-P0-34: the template's questionnaire; fields are named `answer.<question key>`. */
+export async function answerOnboardingAction(applicationId: string, _prev: ApplicationFormState, formData: FormData): Promise<ApplicationFormState> {
+  const ctx = await requirePermission("access.manage");
+  const answers: Record<string, string> = {};
+  for (const [k, v] of formData.entries()) if (k.startsWith("answer.")) answers[k.slice("answer.".length)] = String(v);
+  try {
+    await answerOnboarding(ctx.tenantId!, ctx.userId, applicationId, answers);
+  } catch (err) {
+    return formError(err);
+  }
+  revalidateApplication(applicationId);
+  return { status: "saved", message: "Answers saved." };
 }
 
 export async function configureOnboardingAction(applicationId: string, _prev: ApplicationFormState, formData: FormData): Promise<ApplicationFormState> {
