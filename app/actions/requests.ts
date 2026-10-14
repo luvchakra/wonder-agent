@@ -10,7 +10,7 @@ import { cancelAccessRequest, decideAccessRequest, decideApprovalStep, saveReque
  * (§17.5): approved at once, waiting for approval, an existing request
  * returned, or why it was refused. The tenant comes from the session (#2).
  */
-export type RequestFormState = { status: "idle" } | { status: "saved"; message: string; requestId?: string } | { status: "error"; message: string };
+export type RequestFormState = { status: "idle" } | { status: "saved"; message: string; requestId?: string; requestNumber?: string | null; duplicate?: boolean } | { status: "error"; message: string };
 
 function formError(err: unknown): RequestFormState {
   const e = err as { message?: string; code?: string };
@@ -53,7 +53,7 @@ export async function submitRequestAction(applicationId: string, _prev: RequestF
         : request.status === "approved"
           ? "Approved automatically under the request policy. It is ready to be fulfilled."
           : "Submitted. It is waiting for approval.";
-    return { status: "saved", message, requestId: request.id };
+    return { status: "saved", message, requestId: request.id, requestNumber: request.requestNumber ?? null, duplicate };
   } catch (err) {
     return formError(err);
   }

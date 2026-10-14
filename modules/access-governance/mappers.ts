@@ -96,6 +96,7 @@ export function toAccessGrant(row: any): AccessGrant {
 export function toAccessRequest(row: any): AccessRequest {
   return {
     id: row.id,
+    requestNumber: row.request_number ?? null,
     tenantId: row.tenant_id,
     agentId: row.agent_id ?? null,
     subjectIdentityId: row.subject_identity_id ?? null,

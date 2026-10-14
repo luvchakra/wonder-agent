@@ -84,7 +84,7 @@ export function modelAfterLines(model: HeldAccess[], subjectHas: Set<string>, su
   return out;
 }
 
-export type BasketItemResult = { subjectIdentityId: string; line: number; ok: boolean; requestId?: string; status?: string; duplicate?: boolean; code?: string; message?: string };
+export type BasketItemResult = { subjectIdentityId: string; line: number; ok: boolean; requestId?: string; requestNumber?: string | null; status?: string; duplicate?: boolean; code?: string; message?: string };
 
 /** How a basket went: requests made, open ones returned, refusals, by code. */
 export function summarizeBasket(results: BasketItemResult[]): { created: number; existing: number; refused: number; byCode: Record<string, number> } {

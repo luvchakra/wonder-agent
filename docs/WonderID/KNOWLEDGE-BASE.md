@@ -291,6 +291,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 **The request catalog**
 - Ask for access to an application or a specific permission, with a reason.
 - You can also ask to **remove access**, **create an account** or **disable an account**.
+- **Request numbers:** every request gets a number to quote, REQ and nine digits (for example REQ000000042), counted per organization. When you submit, the number appears with its barcode; it is also on the request's page and in the requests list.
 
 **Who you can request for**
 - **Yourself:** yes.
@@ -660,6 +661,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Every access request now has a number to quote, REQ and nine digits, shown with an animated barcode when you submit it, on the request's page and in the requests list. Earlier requests were numbered in the order they were made. |
 | 14 Oct 2026 | WonderID's own roles are now called "ID roles" everywhere (the sidebar, the ID Roles page, users, groups and permissions), to tell them apart from roles in your applications. A person's page has an ID Roles tab that shows the ID roles they hold, where an administrator can add or remove one. |
 | 14 Oct 2026 | An application's entitlements show "Requestable" only when someone can really request them; without a request policy they show "Needs a request policy", and the request catalog says why. The onboarding Approve button now works for an administrator's own submission. |
 | 14 Oct 2026 | An HR import (identity source) can give new people WonderID access: choose a default ID role on the source's page, and each new person it imports with an email is invited with it. |

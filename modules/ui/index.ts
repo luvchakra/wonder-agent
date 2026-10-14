@@ -37,6 +37,7 @@ export { AccountPanel, type TenantOption } from "./AccountPanel";
 export { KpiCard, type KpiTone } from "./KpiCard";
 export { Tabs, TabPanel } from "./Tabs";
 export { CountPills, type CountPill } from "./CountPills";
+export { RequestNumberBarcode } from "./RequestNumberBarcode";
 export { DonutChart, TrendChart } from "./charts.lazy";
 export type { Slice, TrendSeries } from "./charts";
 export { CoverageBars } from "./CoverageBars";

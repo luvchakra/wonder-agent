@@ -4,7 +4,7 @@ import { useActionState, useState } from "react";
 import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { submitRequestAction, type RequestFormState } from "@/app/actions/requests";
-import { Badge, Button, SelectField, TextareaField } from "@/modules/ui";
+import { Badge, Button, RequestNumberBarcode, SelectField, TextareaField } from "@/modules/ui";
 import { RISK_TONE, approvalPreview } from "./labels";
 
 // ACCESS-P0-18 — the request form (spec §11.1): who it is for, what, for
@@ -163,6 +163,11 @@ export function RequestForm({
           {state.status === "error" ? <span className="text-destructive">{state.message}</span> : null}
         </p>
       </div>
+      {state.status === "saved" && state.requestNumber ? (
+        <Link key={state.requestNumber} href={`/access/requests/${state.requestId}`} className="inline-block rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring" aria-label={`Open request ${state.requestNumber}`}>
+          <RequestNumberBarcode number={state.requestNumber} label={state.duplicate ? "Already open as" : "Request number"} />
+        </Link>
+      ) : null}
     </form>
   );
 }
