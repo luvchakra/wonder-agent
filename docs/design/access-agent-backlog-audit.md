@@ -3875,3 +3875,49 @@ Access managers can choose whose approvals.
 **Verified.**
 - `pendingGrantRules.test.ts` 14/14, with a new case covering standard plus admin, privileged entitlements and two standard accounts.
 - `brownfield.spec.ts` 7/7 and `f1-reconciliation.spec.ts` 17/17 against a local production build.
+
+## 2026-10-14 — ACCESS-P0-23 part 2: request delegation
+
+**Owner decisions recorded the same day.**
+- **Administration delegation:** build it. It changes Foundation's authorization engine and is approved for that; it comes next, as part 3.
+- **ACCESS-P0-35 (four-eyes publish of request policies and other governance objects):** on only for organizations with two or more administrators. A single-administrator organization keeps publishing at once.
+
+**Migration 0177.**
+- `access_delegations.scope` now allows `requests` as well as `approvals`. The check constraint is widened; existing rows are all `approvals`.
+- `access_requests.requested_on_behalf_of` (nullable, indexed) is new.
+
+**Rules.**
+- `validateDelegation` takes `scope`, defaulting to approvals.
+- `actingFor(…, scope)` counts only delegations of that scope.
+- The approval engine reads approval delegations only. A request delegation never lets anyone decide approvals.
+
+**Requests.** `submitAccessRequest` accepts `onBehalfOf`. A request delegation from that member must be in force; otherwise it is refused with 403 `NO_DELEGATION`. The request is then evaluated as the delegator:
+- their identity as requester, so by default the access is for them;
+- their manager and owner relations;
+- never access-manager rights.
+
+`requested_by` is the delegate and `requested_on_behalf_of` the delegator. The submission audit carries `onBehalfOf`.
+
+**Approvals.**
+- The chain plan routes a step naming the delegator to access managers ("asked for this through a delegate").
+- Deciding refuses the delegator with `SELF_APPROVAL`.
+- The waiting list hides the request from the delegator.
+
+**UI.**
+- **Delegations page:** a "What" choice (deciding approvals, or asking for access), and each row shows its scope.
+- **Request form:** "Asking as" appears only when the member holds a request delegation. Choosing someone hides "For", because the request is for that person.
+
+**Defect found by the E2E.** `requestsActingFor` did not pass its scope to `actingFor`, which defaulted to approvals, so every delegated request was refused. It was fixed before merging, and the spec now covers it.
+
+**Verified.**
+- `modules/access-governance` unit tests: 323 passed. They include scope validation, scope filtering, and routing a step that names the delegator to access managers.
+- `tests/access/delegations-isolation.sql`: 10 of 10 as expected, rolled back. A `requests` row is stored and seen like an approvals row; scope `admin` is refused with 23514; another organization sees none.
+- Local E2E on one worker:
+  - `approval-engine`, `request-catalog` and `approval-links-drafts`: all passed;
+  - `approval-delegation.spec.ts` 12/12 after the fix (7 tests plus sign-in setup). Without a delegation the request is refused; with one it is created for the delegator with both recorded; the delegator cannot approve it, and the step routes to access managers; an access manager approves it; once the delegation ends, it is refused again.
+
+**Left.**
+- Administration delegation (part 3, approved).
+- Agent directions (human→agent, agent→human, agent→agent), which belong with ACCESS-P0-37.
+
+**Docs.** The knowledge base's revision history moved to the end, newest first, at the owner's request, with today's missing entries and body text added. ROADMAP-PROGRESS marks were brought up to date. From now on both are updated in the same pull request as each piece of work.

@@ -28,6 +28,7 @@ export function DelegationForm({ people, everyone }: { people: { id: string; lab
           const err = await call("/api/v1/access/delegations", {
             delegatorUserId: f.get("delegatorUserId") || undefined,
             delegateUserId: f.get("delegateUserId"),
+            scope: f.get("scope"),
             endsAt: until ? new Date(`${until}T23:59:59`).toISOString() : "",
             reason: f.get("reason"),
           });
@@ -38,7 +39,7 @@ export function DelegationForm({ people, everyone }: { people: { id: string; lab
     >
       {everyone ? (
         // An access manager may set one for someone else.
-        <SelectField label="Whose approvals" name="delegatorUserId" defaultValue="">
+        <SelectField label="Whose" name="delegatorUserId" defaultValue="">
           <option value="">Mine</option>
           {everyone.map((p) => (
             <option key={p.id} value={p.id}>
@@ -47,7 +48,11 @@ export function DelegationForm({ people, everyone }: { people: { id: string; lab
           ))}
         </SelectField>
       ) : null}
-      <SelectField label="Decided by" name="delegateUserId" required defaultValue="">
+      <SelectField label="What" name="scope" defaultValue="approvals">
+        <option value="approvals">Deciding approvals</option>
+        <option value="requests">Asking for access</option>
+      </SelectField>
+      <SelectField label="To" name="delegateUserId" required defaultValue="">
         <option value="" disabled>
           Choose
         </option>

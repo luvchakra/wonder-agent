@@ -57,4 +57,14 @@ describe("approver delegation (ACCESS-P0-23)", () => {
     expect(actionableStep(steps, 1, { userId: ME, canApproveAsAccessManager: true, actingFor: [] })?.id).toBe("s-am");
     expect(actionableStep([{ ...steps[0], approverUserId: ME }, steps[0]], 1, { userId: ME, canApproveAsAccessManager: false, actingFor: [SAM] })?.approverUserId).toBe(ME);
   });
+
+  it("part 2: a request delegation has its own scope, and approvals are not requests", () => {
+    const v = validateDelegation({ delegateUserId: ALEX, scope: "requests", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: false }, now);
+    expect(v).toMatchObject({ scope: "requests", delegator_user_id: ME });
+    expect(validateDelegation({ delegateUserId: ALEX, scope: "admin", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: false }, now)).toEqual({ error: "scope: approvals or requests" });
+    const d = { startsAt: "2026-10-14T09:00:00Z", endsAt: "2026-10-15T00:00:00Z", revokedAt: null };
+    const list = [{ delegatorUserId: SAM, delegateUserId: ME, scope: "requests" as const, ...d }];
+    expect(actingFor(list, ME, now, "requests")).toEqual([SAM]);
+    expect(actingFor(list, ME, now)).toEqual([]);
+  });
 });

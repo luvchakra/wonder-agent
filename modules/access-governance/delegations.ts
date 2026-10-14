@@ -3,10 +3,10 @@ import "server-only";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
-import { actingFor, isActive, validateDelegation, type DelegationInput } from "./delegationRules";
+import { actingFor, isActive, validateDelegation, type DelegationInput, type DelegationScope } from "./delegationRules";
 
 /**
- * ACCESS-P0-23 — approver delegation. Reads as the caller (RLS: their own,
+ * ACCESS-P0-23 — approver and (part 2) request delegation. Reads as the caller (RLS: their own,
  * or every one for an access manager); writes with the service role,
  * filtered by the tenant resolved for the request; the engine reads who a
  * member acts for with the service role, by tenant and member.
@@ -19,6 +19,7 @@ export type Delegation = {
   id: string;
   delegatorUserId: string;
   delegateUserId: string;
+  scope: DelegationScope;
   startsAt: string;
   endsAt: string;
   reason: string | null;
@@ -31,6 +32,7 @@ function toDelegation(r: Row, now = new Date()): Delegation {
     id: r.id as string,
     delegatorUserId: r.delegator_user_id as string,
     delegateUserId: r.delegate_user_id as string,
+    scope: ((r.scope as DelegationScope | null) ?? "approvals") as DelegationScope,
     startsAt: r.starts_at as string,
     endsAt: r.ends_at as string,
     reason: (r.reason as string | null) ?? null,
@@ -105,18 +107,19 @@ export async function revokeDelegation(tenantId: string, caller: { userId: strin
     objectType: "access_delegation",
     objectId: delegationId,
     outcome: "success",
-    metadata: { delegatorUserId: row.delegator_user_id, delegateUserId: row.delegate_user_id },
+    metadata: { delegatorUserId: row.delegator_user_id, delegateUserId: row.delegate_user_id, scope: row.scope },
   });
   return toDelegation(data);
 }
 
-async function inForce(tenantId: string, column: "delegate_user_id" | "delegator_user_id", userIds: string[]) {
+async function inForce(tenantId: string, column: "delegate_user_id" | "delegator_user_id", userIds: string[], scope: DelegationScope) {
   if (!userIds.length) return [];
   const now = new Date().toISOString();
   const { data, error } = await supabaseServiceRole()
     .from("access_delegations")
     .select("tenant_id, delegator_user_id, delegate_user_id, starts_at, ends_at, revoked_at")
     .eq("tenant_id", tenantId)
+    .eq("scope", scope)
     .in(column, userIds)
     .is("revoked_at", null)
     .lte("starts_at", now)
@@ -124,17 +127,22 @@ async function inForce(tenantId: string, column: "delegate_user_id" | "delegator
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
   return ((data ?? []) as Row[])
     .filter((r) => r.tenant_id === tenantId)
-    .map((r) => ({ delegatorUserId: r.delegator_user_id as string, delegateUserId: r.delegate_user_id as string, startsAt: r.starts_at as string, endsAt: r.ends_at as string, revokedAt: null }));
+    .map((r) => ({ delegatorUserId: r.delegator_user_id as string, delegateUserId: r.delegate_user_id as string, scope, startsAt: r.starts_at as string, endsAt: r.ends_at as string, revokedAt: null }));
 }
 
 /** The members whose approvals this member may decide now. */
 export async function approvalsActingFor(tenantId: string, userId: string): Promise<string[]> {
-  return actingFor(await inForce(tenantId, "delegate_user_id", [userId]), userId, new Date());
+  return actingFor(await inForce(tenantId, "delegate_user_id", [userId], "approvals"), userId, new Date());
+}
+
+/** Part 2: the members this member may ask for access on behalf of now. */
+export async function requestsActingFor(tenantId: string, userId: string): Promise<string[]> {
+  return actingFor(await inForce(tenantId, "delegate_user_id", [userId], "requests"), userId, new Date(), "requests");
 }
 
 /** The delegates in force now for these approvers, to tell them too. */
 export async function activeDelegatesOf(tenantId: string, approverUserIds: string[]): Promise<Map<string, string[]>> {
   const out = new Map<string, string[]>();
-  for (const d of await inForce(tenantId, "delegator_user_id", approverUserIds)) out.set(d.delegatorUserId, [...(out.get(d.delegatorUserId) ?? []), d.delegateUserId]);
+  for (const d of await inForce(tenantId, "delegator_user_id", approverUserIds, "approvals")) out.set(d.delegatorUserId, [...(out.get(d.delegatorUserId) ?? []), d.delegateUserId]);
   return out;
 }

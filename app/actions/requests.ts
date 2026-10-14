@@ -40,6 +40,7 @@ export async function submitRequestAction(applicationId: string, _prev: RequestF
         durationDays: str(formData, "durationDays"),
         justification: str(formData, "justification") ?? "",
         requestType: str(formData, "requestType"),
+        onBehalfOf: str(formData, "onBehalfOf"),
       },
     );
     revalidatePath("/access/requests");

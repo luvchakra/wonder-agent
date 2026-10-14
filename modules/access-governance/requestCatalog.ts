@@ -6,6 +6,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessRequest } from "@/lib/shared/types/access-governance";
 import { getAgentContract, getIdentity, getIdentityForUser, getIdentityNames, listOwners } from "@/modules/agent-identity/service";
 import { classifyAccessGrant } from "./comparison";
+import { requestsActingFor } from "./delegations";
 import { toAccessRequest } from "./mappers";
 import { startApprovalChain } from "./approvals";
 import { approvalOutcome, assessRisk, evaluateRequest, resolvePolicy, validatePolicyInput, type RequestPolicy, type RiskLevel } from "./requestRules";
@@ -203,7 +204,7 @@ export async function getRequestCatalogItem(tenantId: string, applicationId: str
 
 // ---------------------------------------------------------------- requests
 
-export type RequestInput = { subjectIdentityId?: unknown; applicationId?: unknown; entitlementId?: unknown; durationDays?: unknown; justification?: unknown; requestType?: unknown };
+export type RequestInput = { subjectIdentityId?: unknown; applicationId?: unknown; entitlementId?: unknown; durationDays?: unknown; justification?: unknown; requestType?: unknown; onBehalfOf?: unknown };
 export type RequestActor = { userId: string; canManageAccess: boolean };
 
 /**
@@ -230,7 +231,15 @@ export async function submitAccessRequest(
   if (requestType === "remove" && !entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: the access to remove");
   if (requestType === "extend" && !entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: the access to extend");
   if (requestType === "disable_account" && entitlementId) throw new ApiError(400, "VALIDATION_FAILED", "entitlementId: not used when disabling an account");
-  const requester = await getIdentityForUser(tenantId, actor.userId);
+  // ACCESS-P0-23 part 2: a delegate asks as the member they stand in for, with that member's request rights and never an access manager's.
+  const onBehalfOf = typeof input.onBehalfOf === "string" && input.onBehalfOf ? input.onBehalfOf : null;
+  if (onBehalfOf !== null) {
+    if (!UUID_RE.test(onBehalfOf)) throw new ApiError(400, "VALIDATION_FAILED", "onBehalfOf: a member");
+    if (!(await requestsActingFor(tenantId, actor.userId)).includes(onBehalfOf)) throw new ApiError(403, "NO_DELEGATION", "You have no request delegation from this person in force");
+  }
+  const asUserId = onBehalfOf ?? actor.userId;
+  const asCanManageAccess = onBehalfOf ? false : actor.canManageAccess;
+  const requester = await getIdentityForUser(tenantId, asUserId);
   const subjectId = typeof input.subjectIdentityId === "string" && input.subjectIdentityId ? input.subjectIdentityId : requester?.id;
   if (!subjectId || !UUID_RE.test(subjectId)) throw new ApiError(400, "VALIDATION_FAILED", "subjectIdentityId: who the access is for");
 
@@ -268,7 +277,7 @@ export async function submitAccessRequest(
   const agentId = subject.identityType === "AI_AGENT" ? subject.agentId : null;
   const [owners, contract] = agentId ? await Promise.all([listOwners(tenantId, agentId), getAgentContract(agentId, tenantId)]) : [[], null];
   const requesterOwnsSubject = agentId
-    ? owners.some((o) => o.ownerType === "business_owner" && o.userId === actor.userId)
+    ? owners.some((o) => o.ownerType === "business_owner" && o.userId === asUserId)
     : requester !== null && subject.ownerIdentityId !== null && subject.ownerIdentityId === requester.id;
   const agentContract = !agentId
     ? undefined
@@ -299,7 +308,7 @@ export async function submitAccessRequest(
     risk,
     requesterIdentityId: requester?.id ?? null,
     subject: { id: subject.id, status: subject.status, managerIdentityId: subject.managerIdentityId, identityType: subject.identityType, ownerIdentityId: subject.ownerIdentityId },
-    requesterCanManageAccess: actor.canManageAccess,
+    requesterCanManageAccess: asCanManageAccess,
     requesterOwnsSubject,
     agentContract,
     durationDays: durationRaw,
@@ -339,6 +348,7 @@ export async function submitAccessRequest(
       subject_identity_id: subject.id,
       requester_identity_id: requester?.id ?? null,
       requested_by: actor.userId,
+      requested_on_behalf_of: onBehalfOf,
       application_id: applicationId,
       entitlement_id: entitlementId,
       request_type: requestType,
@@ -372,7 +382,7 @@ export async function submitAccessRequest(
     objectType: "access_request",
     objectId: request.id,
     outcome: "success",
-    metadata: { subjectIdentityId: subject.id, agentId, applicationId, entitlementId, risk, policyId: policy!.id, durationDays: decision.durationDays, checks: decision.checks },
+    metadata: { subjectIdentityId: subject.id, agentId, applicationId, entitlementId, risk, policyId: policy!.id, durationDays: decision.durationDays, checks: decision.checks, ...(onBehalfOf ? { onBehalfOf } : {}) },
   });
   // ACCESS-P0-28: approved by its policy alone, it becomes its pending grant at once.
   if (request.status === "approved") await pendRequest(tenantId, request.id);

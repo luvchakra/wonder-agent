@@ -23,9 +23,9 @@ Generated 2026-10-14 from 11 module backlogs.
 | Status | Stories |
 |---|---|
 | Done | 229 |
-| Partial | 25 |
+| Partial | 26 |
 | Deferred | 1 |
-| Not Started | 19 |
+| Not Started | 18 |
 | **Total tracked** | **274** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
@@ -41,7 +41,7 @@ and are deliberately excluded from the counts above.
 | 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 40 | 3 | 0 | 2 | 45 | `████████████████░░` 89% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 20 | 0 | 0 | 1 | 21 | `█████████████████░` 95% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 26 | 3 | 0 | 0 | 29 | `████████████████░░` 90% |
-| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 0 | 0 | 3 | 33 | `████████████████░░` 91% |
+| 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
 | 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 15 | 0 | 0 | 2 | 17 | `████████████████░░` 88% |
@@ -180,7 +180,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Effective Access & Access Governance (the CAN side, plus policy)  
 **Backlog status:** DORMANT — do not start until the user says "Run Access Agent"  
-**Stories:** 30 done · 0 partial · 0 deferred · 3 not started (33 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 30 done · 1 partial · 0 deferred · 2 not started (33 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -207,7 +207,7 @@ and are deliberately excluded from the counts above.
 | ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later). 2026-10-13: birthright, turned on by two administrators (0151); a mover's birthright packages they no longer qualify for go to a 14-day review, then are removed unless kept (0153, WID-H09) |
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
-| ACCESS-P0-23 | Delegations | Not Started — 2026-09-26, WonderID |
+| ACCESS-P0-23 | Delegations | Partial — 2026-10-14: approval (0176) and request (0177) delegation; administration delegation waits for an owner decision; agent directions not started |
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Done — 2026-10-11: migration 0120 (isolation SQL 12/12); baseline per application; legacy / authorized / unproven / rogue in the ledger and on the account page; one Risk finding per rogue access |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |

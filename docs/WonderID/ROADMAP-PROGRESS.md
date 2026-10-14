@@ -4,25 +4,25 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 ✅ done · 🔶 partly done · ⬜ not started · progress counts partly done as half
 
-**Overall: 46%** `█████░░░░░`
+**Overall: 54%** `█████░░░░░`
 
 | # | Phase | Progress |
 |---|---|---|
-| 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `████████░░` 85% |
+| 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `█████████░` 88% |
 | 2 | [Applications, accounts and connections](#2-applications-accounts-and-connections) | `██████████` 100% |
 | 3 | [Access requests](#3-access-requests) | `██████████` 100% |
-| 4 | [Provisioning](#4-provisioning) | `████░░░░░░` 45% |
+| 4 | [Provisioning](#4-provisioning) | `██████░░░░` 55% |
 | 5 | [AI agents](#5-ai-agents) | `██████████` 100% |
 | 6 | [Risk, reviews and compliance](#6-risk-reviews-and-compliance) | `██████████` 100% |
-| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `█░░░░░░░░░` 10% |
-| 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `░░░░░░░░░░` 0% |
+| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `████░░░░░░` 45% |
+| 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `█░░░░░░░░░` 10% |
 | 9 | [Agent ID and trusted credentials](#9-agent-id-and-trusted-credentials) | `░░░░░░░░░░` 0% |
-| 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `░░░░░░░░░░` 5% |
+| 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `████░░░░░░` 35% |
 | 11 | [Advanced governance](#11-advanced-governance) | `░░░░░░░░░░` 0% |
 | 12 | [Intelligence and experience](#12-intelligence-and-experience) | `█░░░░░░░░░` 6% |
-| 13 | [Release readiness](#13-release-readiness) | `░░░░░░░░░░` 0% |
+| 13 | [Release readiness](#13-release-readiness) | `██░░░░░░░░` 25% |
 
-## 1. Foundation, sign-in and identity — 85%
+## 1. Foundation, sign-in and identity — 88%
 
 - ✅ Organizations, own web addresses and branding
 - ✅ Vendor platform console: organizations, plans, flags, billing, health
@@ -35,7 +35,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Automation credentials for the API
 - ✅ One directory for every identity type
 - ✅ Identity sources and matching
-- 🔶 Joiner, mover and leaver
+- ✅ Joiner, mover and leaver
 - ⬜ Passkeys
 
 ## 2. Applications, accounts and connections — 100%
@@ -61,17 +61,18 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Requests for service accounts and AI agents
 - ✅ Request tracking and one inbox
 
-## 4. Provisioning — 45%
+## 4. Provisioning — 55%
 
 - ✅ Connectors remove access and disable accounts
 - ✅ Connectors grant access and create accounts
 - ✅ Safety guard on automatic changes
 - ✅ Richer connection types (transforms, OAuth, certificates)
 - 🔶 Rogue access removed through connectors
-- ⬜ SCIM, LDAP and HTTP writes
+- 🔶 SCIM, LDAP and HTTP writes
 - ⬜ Relay into private networks
 - ⬜ Microsoft Entra ID connector
 - ⬜ HR system connector
+- ✅ Internal fulfilment task assignment
 - ⬜ ServiceNow ticketing
 
 ## 5. AI agents — 100%
@@ -97,24 +98,24 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Ready-made reports and exports
 - ✅ Billing (Stripe, Razorpay)
 
-## 7. Lifecycle and reviews for everyone — 10%
+## 7. Lifecycle and reviews for everyone — 45%
 
-- ⬜ Shared rule engine
-- ⬜ Attribute rules
-- 🔶 Lifecycle rules
-- 🔶 Identity detail pages
-- ⬜ Entitlement types and classification
+- ✅ Shared rule engine
+- 🔶 Attribute rules
+- ✅ Lifecycle rules
+- ✅ Identity detail pages
+- ✅ Entitlement types and classification
 - ⬜ Reviews for every identity type
 - ⬜ Reviews of administrators
 - ⬜ Review templates and SLA reporting
 - ⬜ Merging duplicate people
 - ⬜ Field-level audit detail
 
-## 8. Roles, separation of duties and delegation — 0%
+## 8. Roles, separation of duties and delegation — 10%
 
 - ⬜ Business and IT roles
 - ⬜ Access-combination SoD
-- ⬜ Delegations
+- 🔶 Delegations
 - ⬜ Approved changes to governance objects
 - ⬜ SoD violation workflow
 
@@ -132,17 +133,17 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ⬜ Agent risk factors and suspension
 - ⬜ Gateway security suite
 
-## 10. Workflow, forms and configuration — 5%
+## 10. Workflow, forms and configuration — 35%
 
 - ⬜ Workflow designer
 - ⬜ Event subscriptions and channels
 - ⬜ Forms and e-mail templates
 - 🔶 Configuration bundles
 - ⬜ Certified connection types
-- ⬜ Onboarding templates
-- ⬜ Request baskets and drafts
+- ✅ Onboarding templates
+- ✅ Request baskets and drafts
 - ⬜ Generated identifiers
-- ⬜ Guided connector editor
+- ✅ Guided connector editor
 - ⬜ Integrator test suite
 
 ## 11. Advanced governance — 0%
@@ -167,10 +168,10 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ⬜ Owner queues
 - ⬜ Governed AI assistant
 
-## 13. Release readiness — 0%
+## 13. Release readiness — 25%
 
 - ⬜ Security hardening pass
-- ⬜ Brownfield customer rehearsal
+- 🔶 Brownfield customer rehearsal
 
 ---
 Updated with every merge: change an item's mark, run `npm run roadmap` to recompute the percentages, and commit both in the same pull request.

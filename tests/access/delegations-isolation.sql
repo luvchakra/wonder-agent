@@ -10,6 +10,14 @@
 -- - the delegator and the delegate see it; another member does not; another
 --   organization does not; nobody writes it directly.
 --
+-- Migration 0177 (part 2) adds the `requests` scope: a request delegation
+-- is stored and seen exactly like an approval one; any other scope is
+-- refused.
+--
+-- Rerun 2026-10-14 after 0177, 10 of 10 as expected: the counts below
+-- are 2 for X and Y (one delegation of each scope), and scope 'admin' is
+-- refused with 23514.
+--
 -- Run 2026-10-14 against the dev project, 9 of 9 as expected:
 -- - a delegate from another organization: 23503;
 -- - to oneself, 181 days, or ending before it starts: 23514 each;
@@ -33,6 +41,11 @@ begin
   insert into users (id, email) values (x, 'fixture-x176@example.test'), (y, 'fixture-y176@example.test'), (w, 'fixture-w176@example.test'), (z, 'fixture-z176@example.test') on conflict (id) do nothing;
   insert into tenant_memberships (tenant_id, user_id, status) values (a, x, 'active'), (a, y, 'active'), (a, w, 'active'), (b, z, 'active');
   insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, starts_at, ends_at) values (a, x, y, now(), now() + interval '7 days');
+  insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, scope, starts_at, ends_at) values (a, x, y, 'requests', now(), now() + interval '7 days');
+  begin
+    insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, scope, starts_at, ends_at) values (a, x, y, 'admin', now(), now() + interval '1 day');
+    results := results || E'\nscope admin (expect denied): ALLOWED';
+  exception when others then results := results || E'\nscope admin (expect denied): denied ' || sqlstate; end;
 
   begin
     insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, starts_at, ends_at) values (a, x, z, now(), now() + interval '1 day');
@@ -53,9 +66,9 @@ begin
 
   execute 'set local role authenticated';
   perform set_config('request.jwt.claims', json_build_object('sub', x, 'role', 'authenticated')::text, true);
-  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nX (delegator) sees (expect 1): ' || c;
+  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nX (delegator) sees (expect 2): ' || c;
   perform set_config('request.jwt.claims', json_build_object('sub', y, 'role', 'authenticated')::text, true);
-  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nY (delegate) sees (expect 1): ' || c;
+  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nY (delegate) sees (expect 2): ' || c;
   perform set_config('request.jwt.claims', json_build_object('sub', w, 'role', 'authenticated')::text, true);
   select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nW (another member) sees (expect 0): ' || c;
   perform set_config('request.jwt.claims', json_build_object('sub', z, 'role', 'authenticated')::text, true);

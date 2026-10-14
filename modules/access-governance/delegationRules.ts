@@ -6,14 +6,18 @@
  * time-limited, never to oneself, and never lets anyone decide a request
  * they made or that is for them (the approval engine checks that for the
  * person deciding, whoever they act for).
+ *
+ * Part 2: a `requests` delegation lets the delegate ask for access on the
+ * delegator's behalf, with the delegator's own request rights (never an
+ * access manager's); neither of them approves such a request.
  */
 
-export const DELEGATION_SCOPES = ["approvals"] as const;
+export const DELEGATION_SCOPES = ["approvals", "requests"] as const;
 export type DelegationScope = (typeof DELEGATION_SCOPES)[number];
 /** The longest a delegation may run. */
 export const MAX_DELEGATION_DAYS = 180;
 
-export type DelegationInput = { delegatorUserId?: unknown; delegateUserId?: unknown; startsAt?: unknown; endsAt?: unknown; reason?: unknown };
+export type DelegationInput = { delegatorUserId?: unknown; delegateUserId?: unknown; scope?: unknown; startsAt?: unknown; endsAt?: unknown; reason?: unknown };
 export type ValidDelegation = { delegator_user_id: string; delegate_user_id: string; scope: DelegationScope; starts_at: string; ends_at: string; reason: string | null };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -25,7 +29,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 export function validateDelegation(input: DelegationInput, caller: { userId: string; canManageAccess: boolean }, now: Date): ValidDelegation | { error: string; status?: number } {
   const delegator = input.delegatorUserId === undefined || input.delegatorUserId === null || input.delegatorUserId === "" ? caller.userId : input.delegatorUserId;
   if (typeof delegator !== "string" || !UUID_RE.test(delegator)) return { error: "delegatorUserId: a member" };
-  if (delegator !== caller.userId && !caller.canManageAccess) return { error: "Only an access manager can delegate someone else's approvals", status: 403 };
+  if (delegator !== caller.userId && !caller.canManageAccess) return { error: "Only an access manager can delegate for someone else", status: 403 };
+  const scope = input.scope === undefined || input.scope === null || input.scope === "" ? "approvals" : input.scope;
+  if (!(DELEGATION_SCOPES as readonly unknown[]).includes(scope)) return { error: "scope: approvals or requests" };
   if (typeof input.delegateUserId !== "string" || !UUID_RE.test(input.delegateUserId)) return { error: "delegateUserId: the member who decides instead" };
   if (input.delegateUserId === delegator) return { error: "delegateUserId: someone other than the person away" };
   const start = input.startsAt ? new Date(String(input.startsAt)) : now;
@@ -35,7 +41,7 @@ export function validateDelegation(input: DelegationInput, caller: { userId: str
   if (end.getTime() <= Math.max(start.getTime(), now.getTime())) return { error: "endsAt: after it starts, and in the future" };
   if (end.getTime() - start.getTime() > MAX_DELEGATION_DAYS * 86_400_000) return { error: `A delegation lasts at most ${MAX_DELEGATION_DAYS} days` };
   const reason = typeof input.reason === "string" && input.reason.trim() ? input.reason.trim().slice(0, 500) : null;
-  return { delegator_user_id: delegator, delegate_user_id: input.delegateUserId, scope: "approvals", starts_at: start.toISOString(), ends_at: end.toISOString(), reason };
+  return { delegator_user_id: delegator, delegate_user_id: input.delegateUserId, scope: scope as DelegationScope, starts_at: start.toISOString(), ends_at: end.toISOString(), reason };
 }
 
 /** In force now: started, not ended, not revoked. */
@@ -43,7 +49,12 @@ export function isActive(d: { startsAt: string; endsAt: string; revokedAt: strin
   return !d.revokedAt && Date.parse(d.startsAt) <= now.getTime() && Date.parse(d.endsAt) > now.getTime();
 }
 
-/** The people whose approvals this member may decide now. */
-export function actingFor(delegations: { delegatorUserId: string; delegateUserId: string; startsAt: string; endsAt: string; revokedAt: string | null }[], userId: string, now: Date): string[] {
-  return [...new Set(delegations.filter((d) => d.delegateUserId === userId && isActive(d, now)).map((d) => d.delegatorUserId))];
+/** The people this member stands in for now, for one scope (a delegation without a scope is for approvals). */
+export function actingFor(
+  delegations: { delegatorUserId: string; delegateUserId: string; scope?: DelegationScope; startsAt: string; endsAt: string; revokedAt: string | null }[],
+  userId: string,
+  now: Date,
+  scope: DelegationScope = "approvals",
+): string[] {
+  return [...new Set(delegations.filter((d) => (d.scope ?? "approvals") === scope && d.delegateUserId === userId && isActive(d, now)).map((d) => d.delegatorUserId))];
 }
