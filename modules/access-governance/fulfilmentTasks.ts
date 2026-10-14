@@ -12,6 +12,8 @@ import { accountToCreateFirst, planConnectorFulfilment, runConnectorFulfilment }
 import { retryWaitsForRead } from "./connectorFulfilmentRules";
 import { readFinishedSince } from "@/modules/integrations/service";
 import { runAfterResponse } from "@/lib/shared/afterResponse";
+import { activeGroupIdsOf, assertAssignee, assigneeForNewTask, notifyAssignee } from "./fulfilmentAssignments";
+import { canReassign, validateReassignment, workload, type Workload } from "./fulfilmentAssignmentRules";
 
 /**
  * ACCESS-P0-29 — fulfilment tasks. Each pending grant (ACCESS-P0-28) is
@@ -51,6 +53,12 @@ export type FulfilmentTask = {
   accountName: string | null;
   assigneeIdentityId: string | null;
   assigneeName: string | null;
+  /** ACCESS-P0-42: the group whose members may claim it, instead of a person. */
+  assigneeGroupId: string | null;
+  assigneeGroupName: string | null;
+  /** ACCESS-P0-42: the last reassignment, if any. */
+  assignedAt: string | null;
+  assignmentReason: string | null;
   claimedBy: string | null;
   claimedAt: string | null;
   completedAt: string | null;
@@ -84,6 +92,10 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
     accountName: ((account?.account_name as string | null) ?? (account?.external_account_ref as string | null)) ?? null,
     assigneeIdentityId: (r.assignee_identity_id as string | null) ?? null,
     assigneeName: (assignee?.display_name as string | null) ?? null,
+    assigneeGroupId: (r.assignee_group_id as string | null) ?? null,
+    assigneeGroupName: ((r.assignee_group as Row | null)?.name as string | null) ?? null,
+    assignedAt: (r.assigned_at as string | null) ?? null,
+    assignmentReason: (r.assignment_reason as string | null) ?? null,
     claimedBy: (r.claimed_by as string | null) ?? null,
     claimedAt: (r.claimed_at as string | null) ?? null,
     completedAt: (r.completed_at as string | null) ?? null,
@@ -97,9 +109,10 @@ function toTask(r: Row, now = new Date()): FulfilmentTask {
 
 const GRANT_FIELDS = "entitlements(name), accounts(account_name, external_account_ref)";
 const SELECT =
-  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, reason, application_id, assignee_identity_id, claimed_by, claimed_at, completed_at, note, failure_reason, connector_status, connector_error, created_at, " +
+  "id, tenant_id, kind, status, due_at, access_grant_id, removal_grant_id, account_id, request_id, reason, application_id, assignee_identity_id, assignee_group_id, assigned_at, assignment_reason, claimed_by, claimed_at, completed_at, note, failure_reason, connector_status, connector_error, created_at, " +
   `applications(name, display_name), grant:access_grants!access_fulfilment_tasks_grant_fkey(${GRANT_FIELDS}), removal:access_grants!access_fulfilment_tasks_removal_grant_fkey(${GRANT_FIELDS}), ` +
-  "account:accounts!access_fulfilment_tasks_account_fkey(account_name, external_account_ref), assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name)";
+  "account:accounts!access_fulfilment_tasks_account_fkey(account_name, external_account_ref), assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name), " +
+  "assignee_group:groups!access_fulfilment_tasks_group_fkey(name)";
 
 const KIND_TITLE: Record<FulfilmentTaskKind, string> = {
   grant: "Access to fulfil",
@@ -136,7 +149,13 @@ export async function openFulfilmentTask(
     ]);
     if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
     if (!app || app.tenant_id !== tenantId) return;
-    const assignee = ((app.technical_owner_identity_id as string | null) ?? (app.business_owner_identity_id as string | null)) ?? null;
+    // ACCESS-P0-42: the person or group set for the application (or the entitlement's type), else its owners.
+    const routed = await assigneeForNewTask(
+      tenantId,
+      { id: line.applicationId, technicalOwnerIdentityId: (app.technical_owner_identity_id as string | null) ?? null, businessOwnerIdentityId: (app.business_owner_identity_id as string | null) ?? null },
+      kind === "grant" || kind === "remove" ? (line.grantId ?? null) : null,
+    );
+    const assignee = routed.identityId;
     const { data, error: insertError } = await admin
       .from("access_fulfilment_tasks")
       .insert({
@@ -148,6 +167,7 @@ export async function openFulfilmentTask(
         request_id: line.requestId,
         application_id: line.applicationId,
         assignee_identity_id: assignee,
+        assignee_group_id: routed.groupId,
         reason: line.reason ?? null,
         due_at: taskDueAt(kind, new Date(), config["access.fulfilmentSlaDays"]),
       })
@@ -155,7 +175,7 @@ export async function openFulfilmentTask(
       .single();
     if (insertError?.code === "23505") return; // a live task for the same grant or account is open already
     if (insertError || !data) throw new ApiError(500, "CREATE_FAILED", insertError?.message ?? "Could not open the task");
-    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { kind, grantId: line.grantId ?? null, accountId: line.accountId ?? null, requestId: line.requestId, assigneeIdentityId: assignee, reason: line.reason ?? null } });
+    await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: "access_fulfilment_task", objectId: data.id as string, outcome: "success", metadata: { kind, grantId: line.grantId ?? null, accountId: line.accountId ?? null, requestId: line.requestId, assigneeIdentityId: assignee, assigneeGroupId: routed.groupId, routedBy: routed.source, reason: line.reason ?? null } });
     // INTEGRATION-P0-13: a connector with writes turned on makes the change; its owner hears only if it cannot.
     const plan = line.manual ? null : await planConnectorFulfilment(tenantId, data.id as string).catch(() => null);
     if (plan) {
@@ -168,10 +188,9 @@ export async function openFulfilmentTask(
       await openFulfilmentTask(tenantId, { kind: "create_account", accountId: createFirst, requestId: line.requestId, applicationId: line.applicationId });
       return;
     }
-    const userId = assignee ? await userOf(tenantId, assignee) : null;
     const appName = ((app.display_name as string | null) ?? (app.name as string)) as string;
-    // No owner who signs in: the tenant's access managers see it in the list (a broadcast would reach everyone).
-    if (userId) await notify({ tenantId, userId, type: "fulfilment_task", title: `${KIND_TITLE[kind]} in ${appName}`, body: "An approved request waits for the change on the target. Open Fulfilment Tasks.", referenceType: "access_fulfilment_task", referenceId: data.id as string });
+    // No assignee who signs in: the tenant's access managers see it in the list (a broadcast would reach everyone).
+    await notifyAssignee(tenantId, { identityId: assignee, groupId: routed.groupId }, { title: `${KIND_TITLE[kind]} in ${appName}`, body: "An approved request waits for the change on the target. Open Fulfilment Tasks.", taskId: data.id as string });
   } catch (err) {
     await writeAudit({ tenantId, actorType: "system", action: "access.fulfilment_task_opened", objectType: line.grantId ? "access_grant" : "account", objectId: (line.grantId ?? line.accountId)!, outcome: "failure", metadata: { kind, error: err instanceof ApiError ? err.code : "UNEXPECTED" } });
   }
@@ -189,7 +208,7 @@ async function userOf(tenantId: string, identityId: string): Promise<string | nu
  */
 export async function listFulfilmentTasks(
   tenantId: string,
-  filter: { view?: "todo" | "all"; requestId?: string; forPerson?: { userId: string; identityId: string | null; canApprove: boolean } } = {},
+  filter: { view?: "todo" | "all"; requestId?: string; forPerson?: { userId: string; identityId: string | null; canApprove: boolean; groupIds?: string[] } } = {},
 ): Promise<FulfilmentTask[]> {
   const supabase = await supabaseServer();
   let q = supabase.from("access_fulfilment_tasks").select(SELECT).eq("tenant_id", tenantId);
@@ -199,7 +218,9 @@ export async function listFulfilmentTasks(
     const mine = [
       UUID_RE.test(p.userId) ? `claimed_by.eq.${p.userId}` : null,
       p.identityId && UUID_RE.test(p.identityId) ? `assignee_identity_id.eq.${p.identityId}` : null,
-      p.canApprove ? "assignee_identity_id.is.null" : null,
+      // ACCESS-P0-42: a group's tasks are waiting for each member.
+      ...(p.groupIds ?? []).filter((g) => UUID_RE.test(g)).map((g) => `assignee_group_id.eq.${g}`),
+      p.canApprove ? "and(assignee_identity_id.is.null,assignee_group_id.is.null)" : null,
     ].filter(Boolean);
     if (!mine.length) return [];
     q = q.or(mine.join(","));
@@ -226,7 +247,7 @@ export async function actOnFulfilmentTask(
   const admin = supabaseServiceRole();
   const { data: task, error } = await admin
     .from("access_fulfilment_tasks")
-    .select("id, tenant_id, kind, status, assignee_identity_id, claimed_by, access_grant_id, removal_grant_id, connector_status, connector_integration_id, connector_uncertain_at")
+    .select("id, tenant_id, kind, status, assignee_identity_id, assignee_group_id, claimed_by, access_grant_id, removal_grant_id, connector_status, connector_integration_id, connector_uncertain_at")
     .eq("tenant_id", tenantId)
     .eq("id", taskId)
     .maybeSingle();
@@ -235,10 +256,15 @@ export async function actOnFulfilmentTask(
   // INTEGRATION-P0-13: never two hands on the target at once.
   if (task.connector_status === "running") throw new ApiError(409, "CONNECTOR_RUNNING", "The connector is making this change now; wait for its result");
   // The task's owner is an identity; the actor is the member signed in, matched to their identity in this organization.
-  const identity = await getIdentityForUser(tenantId, actor.userId);
+  const [identity, groupIds] = await Promise.all([getIdentityForUser(tenantId, actor.userId), task.assignee_group_id ? activeGroupIdsOf(tenantId, actor.userId) : Promise.resolve([] as string[])]);
   const decision = canAct(
-    { status: task.status as FulfilmentTaskStatus, assigneeIdentityId: (task.assignee_identity_id as string | null) ?? null, claimedBy: (task.claimed_by as string | null) ?? null },
-    { ...actor, identityId: identity?.id ?? null },
+    {
+      status: task.status as FulfilmentTaskStatus,
+      assigneeIdentityId: (task.assignee_identity_id as string | null) ?? null,
+      assigneeGroupId: (task.assignee_group_id as string | null) ?? null,
+      claimedBy: (task.claimed_by as string | null) ?? null,
+    },
+    { ...actor, identityId: identity?.id ?? null, groupIds },
     action === "retry_connector" ? "claim" : (action as FulfilmentTaskAction),
   );
   if (!decision.ok) throw new ApiError(decision.code === "FORBIDDEN" ? 403 : 409, decision.code, decision.message);
@@ -300,6 +326,115 @@ export async function actOnFulfilmentTask(
   return fresh;
 }
 
+/**
+ * ACCESS-P0-42: hands a task on to another person or group, with a reason.
+ * The assignee, whoever claimed it, or an access manager may; a claim is
+ * released so the new assignee can take it. Audited; the new assignee is told.
+ */
+export async function reassignFulfilmentTask(
+  tenantId: string,
+  actor: { userId: string; canApprove: boolean },
+  taskId: string,
+  input: { identityId?: unknown; groupId?: unknown; reason?: unknown },
+): Promise<FulfilmentTask> {
+  if (!UUID_RE.test(taskId)) throw new ApiError(404, "NOT_FOUND", "No such task");
+  const target = validateReassignment(input);
+  if ("error" in target) throw new ApiError(400, "VALIDATION_FAILED", target.error);
+  const admin = supabaseServiceRole();
+  const { data: task, error } = await admin
+    .from("access_fulfilment_tasks")
+    .select("id, tenant_id, kind, status, updated_at, assignee_identity_id, assignee_group_id, claimed_by, connector_status, applications(name, display_name)")
+    .eq("tenant_id", tenantId)
+    .eq("id", taskId)
+    .maybeSingle();
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  if (!task || task.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "No such task");
+  if (task.connector_status === "running") throw new ApiError(409, "CONNECTOR_RUNNING", "The connector is making this change now; wait for its result");
+  const [identity, groupIds] = await Promise.all([getIdentityForUser(tenantId, actor.userId), activeGroupIdsOf(tenantId, actor.userId)]);
+  const allowed = canReassign(
+    {
+      status: task.status as FulfilmentTaskStatus,
+      assigneeIdentityId: (task.assignee_identity_id as string | null) ?? null,
+      assigneeGroupId: (task.assignee_group_id as string | null) ?? null,
+      claimedBy: (task.claimed_by as string | null) ?? null,
+    },
+    { userId: actor.userId, identityId: identity?.id ?? null, groupIds, canApprove: actor.canApprove },
+  );
+  if (!allowed.ok) throw new ApiError(allowed.code === "FORBIDDEN" ? 403 : 409, allowed.code, allowed.message);
+  if (target.identityId === task.assignee_identity_id && target.groupId === task.assignee_group_id) throw new ApiError(409, "UNCHANGED", "The task is already assigned there");
+  await assertAssignee(tenantId, target);
+  const now = new Date().toISOString();
+  const { data: updated, error: updateError } = await admin
+    .from("access_fulfilment_tasks")
+    .update({
+      assignee_identity_id: target.identityId,
+      assignee_group_id: target.groupId,
+      assigned_by: actor.userId,
+      assigned_at: now,
+      assignment_reason: target.reason,
+      // A claim was the previous assignee's; the new one claims it again.
+      ...(task.status === "claimed" ? { status: "open", claimed_by: null, claimed_at: null } : {}),
+      updated_at: now,
+    })
+    .eq("tenant_id", tenantId)
+    .eq("id", taskId)
+    .eq("updated_at", task.updated_at as string)
+    .select("id")
+    .maybeSingle();
+  if (updateError) throw new ApiError(500, "UPDATE_FAILED", updateError.message);
+  if (!updated) throw new ApiError(409, "CONFLICT", "The task changed meanwhile; reload");
+  // WID-H07: the reason stays on the task; the audit keeps its fingerprint.
+  await writeAudit({
+    tenantId,
+    actorId: actor.userId,
+    actorType: "user",
+    action: "access.fulfilment_task_reassigned",
+    objectType: "access_fulfilment_task",
+    objectId: taskId,
+    outcome: "success",
+    metadata: {
+      kind: task.kind,
+      from: { identityId: task.assignee_identity_id ?? null, groupId: task.assignee_group_id ?? null },
+      to: { identityId: target.identityId, groupId: target.groupId },
+      releasedClaim: task.status === "claimed",
+    },
+    typedText: { reason: target.reason },
+  });
+  const app = (task.applications as unknown as Row | null) ?? null;
+  const appName = ((app?.display_name as string | null) ?? (app?.name as string | null)) ?? "an application";
+  await notifyAssignee(tenantId, target, { title: `${KIND_TITLE[(task.kind as FulfilmentTaskKind) ?? "grant"]} in ${appName}`, body: "A fulfilment task was handed to you. Open Fulfilment Tasks.", taskId });
+  const [fresh] = await listTaskById(tenantId, taskId);
+  return fresh;
+}
+
+export type FulfilmentWorkload = Workload & { name: string };
+
+/** ACCESS-P0-42: tasks still to do per person or group (and unassigned), overdue first; read as the member. */
+export async function fulfilmentWorkload(tenantId: string): Promise<FulfilmentWorkload[]> {
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase
+    .from("access_fulfilment_tasks")
+    .select("tenant_id, status, due_at, assignee_identity_id, assignee_group_id, assignee:identities!access_fulfilment_tasks_assignee_fkey(display_name), assignee_group:groups!access_fulfilment_tasks_group_fkey(name)")
+    .eq("tenant_id", tenantId)
+    .in("status", ["open", "claimed", "failed"])
+    .limit(5000);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = ((data ?? []) as unknown as Row[]).filter((r) => r.tenant_id === tenantId);
+  const names = new Map<string, string>();
+  for (const r of rows) {
+    if (r.assignee_group_id) names.set(`group:${r.assignee_group_id}`, ((r.assignee_group as Row | null)?.name as string | undefined) ?? "A group");
+    else if (r.assignee_identity_id) names.set(`identity:${r.assignee_identity_id}`, ((r.assignee as Row | null)?.display_name as string | undefined) ?? "A person");
+  }
+  return workload(
+    rows.map((r) => ({
+      status: r.status as FulfilmentTaskStatus,
+      dueAt: r.due_at as string,
+      assigneeIdentityId: (r.assignee_identity_id as string | null) ?? null,
+      assigneeGroupId: (r.assignee_group_id as string | null) ?? null,
+    })),
+  ).map((w) => ({ ...w, name: names.get(w.key) ?? "Access managers (no assignee)" }));
+}
+
 async function listTaskById(tenantId: string, taskId: string): Promise<FulfilmentTask[]> {
   const { data, error } = await supabaseServiceRole().from("access_fulfilment_tasks").select(SELECT).eq("tenant_id", tenantId).eq("id", taskId);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
@@ -336,7 +471,7 @@ export async function closeTasksForGrants(tenantId: string, grantIds: string[], 
 export async function remindOverdueFulfilmentTasks(tenantId: string | null, now = new Date()): Promise<{ reminded: number }> {
   let q = supabaseServiceRole()
     .from("access_fulfilment_tasks")
-    .select("id, tenant_id, status, due_at, reminded_at, assignee_identity_id, applications(name, display_name)")
+    .select("id, tenant_id, status, due_at, reminded_at, assignee_identity_id, assignee_group_id, applications(name, display_name)")
     .in("status", ["open", "claimed", "failed"])
     .lt("due_at", now.toISOString())
     .order("due_at")
@@ -349,10 +484,17 @@ export async function remindOverdueFulfilmentTasks(tenantId: string | null, now 
     const tenant = t.tenant_id as string;
     if (tenantId && tenant !== tenantId) continue;
     if (!needsReminder({ status: t.status as FulfilmentTaskStatus, dueAt: t.due_at as string, remindedAt: (t.reminded_at as string | null) ?? null }, now)) continue;
-    const userId = t.assignee_identity_id ? await userOf(tenant, t.assignee_identity_id as string) : null;
-    if (!userId) continue;
     const app = (t.applications as Row | null) ?? null;
-    await notify({ tenantId: tenant, userId, type: "fulfilment_task", title: `Overdue: access to fulfil in ${(app?.display_name as string | null) ?? (app?.name as string | null) ?? "an application"}`, body: "This approved access is past its fulfilment time. Open Fulfilment Tasks.", referenceType: "access_fulfilment_task", referenceId: t.id as string });
+    const title = `Overdue: access to fulfil in ${(app?.display_name as string | null) ?? (app?.name as string | null) ?? "an application"}`;
+    const body = "This approved access is past its fulfilment time. Open Fulfilment Tasks.";
+    if (t.assignee_group_id) {
+      // ACCESS-P0-42: a group's overdue task reminds each member.
+      if (!(await notifyAssignee(tenant, { identityId: null, groupId: t.assignee_group_id as string }, { title, body, taskId: t.id as string }))) continue;
+    } else {
+      const userId = t.assignee_identity_id ? await userOf(tenant, t.assignee_identity_id as string) : null;
+      if (!userId) continue;
+      await notify({ tenantId: tenant, userId, type: "fulfilment_task", title, body, referenceType: "access_fulfilment_task", referenceId: t.id as string });
+    }
     await supabaseServiceRole().from("access_fulfilment_tasks").update({ reminded_at: now.toISOString() }).eq("tenant_id", tenant).eq("id", t.id as string);
     reminded++;
   }

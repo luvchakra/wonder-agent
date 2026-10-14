@@ -2,7 +2,18 @@ import Link from "next/link";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { notFound, redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getAccountSummary, getApplicationDetail, getOnboarding, listAccessReconciliationRuns, listEntitlementsForApplication, listEntitlementTypes, listReconciliationRuns } from "@/modules/access-governance/service";
+import {
+  getAccountSummary,
+  getApplicationDetail,
+  getOnboarding,
+  listAccessReconciliationRuns,
+  listEntitlementsForApplication,
+  listEntitlementTypes,
+  listFulfilmentAssignments,
+  listReconciliationRuns,
+} from "@/modules/access-governance/service";
+import { listGroups } from "@/lib/users/groups";
+import { FulfilmentAssignments } from "./FulfilmentAssignments";
 import { EntitlementTypes } from "./EntitlementTypes";
 import { listAccountableHumans } from "@/modules/agent-identity/service";
 import { getIntegration } from "@/modules/integrations/service";
@@ -42,7 +53,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
   const app = await getApplicationDetail(tenantId, id);
   if (!app) notFound();
   const canManage = ctx.permissions.includes("access.manage");
-  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns, entitlementTypes] = await Promise.all([
+  const [entitlements, people, integration, onboarding, accountSummary, runs, provenance, accessRuns, entitlementTypes, assignments, groups] = await Promise.all([
     listEntitlementsForApplication(tenantId, id),
     canManage ? listAccountableHumans(tenantId) : Promise.resolve([]),
     app.sourceIntegrationId && ctx.permissions.includes("integration.read") ? getIntegration(tenantId, app.sourceIntegrationId) : Promise.resolve(null),
@@ -54,6 +65,9 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     listAccessReconciliationRuns(tenantId, id, 10).catch(() => []),
     // ACCESS-P0-33: the application's entitlement types.
     listEntitlementTypes(tenantId, id),
+    // ACCESS-P0-42: who does its fulfilment tasks.
+    listFulfilmentAssignments(tenantId, id),
+    canManage ? listGroups(tenantId).catch(() => []) : Promise.resolve([]),
   ]);
   const lastRun = runs[0] ?? null;
   const lastAccessRun = accessRuns.find((r) => !r.dryRun) ?? null;
@@ -189,6 +203,16 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             ) : (
               <p className="text-sm text-muted-foreground">Not started.</p>
             )}
+            <FulfilmentAssignments
+              applicationId={id}
+              assignments={assignments}
+              types={entitlementTypes.map((t) => t.name)}
+              choices={[
+                ...groups.filter((g) => g.status === "active").map((g) => ({ value: `group:${g.id}`, label: `${g.name} (group)` })),
+                ...people.map((p) => ({ value: `identity:${p.id}`, label: p.displayName })),
+              ]}
+              canManage={canManage}
+            />
           </CardBody>
         </Card>
         <Card>

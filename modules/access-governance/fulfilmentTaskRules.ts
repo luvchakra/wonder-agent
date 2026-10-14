@@ -18,17 +18,19 @@ const FROM: Record<FulfilmentTaskAction, { from: FulfilmentTaskStatus[]; to: Ful
 
 /**
  * Whether `actor` may take `action` on a task in `status`. Someone who can
- * approve access may always act; otherwise only the task's assignee. Once
+ * approve access may always act; otherwise only the task's assignee (a
+ * member of its group, ACCESS-P0-42). Once
  * claimed, only the claimer (or an approver) completes or fails it.
  */
 export function canAct(
-  task: { status: FulfilmentTaskStatus; assigneeIdentityId: string | null; claimedBy: string | null },
-  actor: { userId: string; identityId: string | null; canApprove: boolean },
+  task: { status: FulfilmentTaskStatus; assigneeIdentityId: string | null; assigneeGroupId?: string | null; claimedBy: string | null },
+  actor: { userId: string; identityId: string | null; groupIds?: string[]; canApprove: boolean },
   action: FulfilmentTaskAction,
 ): { ok: true; to: FulfilmentTaskStatus } | { ok: false; code: string; message: string } {
   const rule = FROM[action];
   if (!rule.from.includes(task.status)) return { ok: false, code: "INVALID_TRANSITION", message: `A task that is ${task.status} cannot be ${action === "claim" ? "claimed" : action === "complete" ? "completed" : "failed"}` };
-  const assignee = actor.identityId !== null && actor.identityId === task.assigneeIdentityId;
+  // ACCESS-P0-42: a group's task belongs to every member of the group.
+  const assignee = (actor.identityId !== null && actor.identityId === task.assigneeIdentityId) || (!!task.assigneeGroupId && (actor.groupIds ?? []).includes(task.assigneeGroupId));
   if (!actor.canApprove && !assignee) return { ok: false, code: "FORBIDDEN", message: "Only the task's owner or an access manager can work on it" };
   if (task.status === "claimed" && action !== "claim" && task.claimedBy !== actor.userId && !actor.canApprove) {
     return { ok: false, code: "FORBIDDEN", message: "Someone else has claimed this task" };

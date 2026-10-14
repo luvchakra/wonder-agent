@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
   listFulfilmentTasks,
+  activeGroupIdsOf,
   listRequestIdsAwaiting,
   listRequests,
   repairApprovalChains,
@@ -58,10 +59,11 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
     // without a chain get one, before anyone is shown what waits for them.
     await sweepApprovalTimeouts(ctx.tenantId!);
     await repairApprovalChains(ctx.tenantId!, ctx.userId);
-    const me = await getIdentityForUser(ctx.tenantId!, ctx.userId);
+    // ACCESS-P0-42: a group's tasks wait for each member.
+    const [me, groupIds] = await Promise.all([getIdentityForUser(ctx.tenantId!, ctx.userId), activeGroupIdsOf(ctx.tenantId!, ctx.userId)]);
     [awaiting, myTasks] = await Promise.all([
       listRequestIdsAwaiting(ctx.tenantId!, { userId: ctx.userId, canApproveAsAccessManager: canApprove }),
-      listFulfilmentTasks(ctx.tenantId!, { view: "todo", forPerson: { userId: ctx.userId, identityId: me?.id ?? null, canApprove } }),
+      listFulfilmentTasks(ctx.tenantId!, { view: "todo", forPerson: { userId: ctx.userId, identityId: me?.id ?? null, canApprove, groupIds } }),
     ]);
   }
   // Without a choice: what waits for the caller, when anything does (or always for an approver); else their own.
