@@ -175,7 +175,7 @@ export default async function DiscoveryInboxPage({ searchParams }: { searchParam
                 return (
                   <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                     <div>
-                      <Link href={`/integrations/${i.id}`} className="text-sm font-medium text-primary hover:underline">
+                      <Link href={`/integrations/${i.ref ?? i.id}`} className="text-sm font-medium text-primary hover:underline">
                         {i.name}
                       </Link>
                       <p className="text-xs text-muted-foreground">

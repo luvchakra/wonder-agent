@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { resolveRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import {
   createIdentitySource,
@@ -45,9 +46,10 @@ function sourceFields(formData: FormData) {
 
 export async function createIdentitySourceAction(_prev: SourceFormState, formData: FormData): Promise<SourceFormState> {
   const ctx = await requirePermission("integration.create");
-  let id: string;
+  let id: string | number;
   try {
-    id = (await createIdentitySource(ctx.tenantId!, ctx.userId, sourceFields(formData))).id;
+    const source = await createIdentitySource(ctx.tenantId!, ctx.userId, sourceFields(formData));
+    id = source.ref ?? source.id;
   } catch (err) {
     return formError(err);
   }
@@ -63,23 +65,25 @@ export async function updateIdentitySourceAction(sourceId: string, _prev: Source
   } catch (err) {
     return formError(err);
   }
-  revalidatePath(`/integrations/sources/${sourceId}`);
+  revalidatePath("/integrations/sources/[sourceId]", "page");
   return { status: "saved", message: "Saved." };
 }
 
 /** Reads the linked integration's imported identities; the run continues after the response. */
 export async function runIntegrationImportAction(sourceId: string, _prev: SourceFormState, formData: FormData): Promise<SourceFormState> {
   const ctx = await requirePermission("integration.execute");
-  let runId: string;
+  let runPath: string;
   try {
     const mode = formData.get("mode") === "partial" ? "partial" : "full";
     const { run, execute } = await startReconciliation(ctx.tenantId!, ctx.userId, sourceId, { kind: "integration", mode, dryRun: formData.get("dryRun") === "on" });
     after(execute);
-    runId = run.id;
+    // FOUNDATION-P0-34: the run page is addressed by numbers.
+    const source = await resolveRef(ctx.tenantId!, "identity_sources", sourceId);
+    runPath = `/integrations/sources/${source?.ref ?? sourceId}/runs/${run.ref ?? run.id}`;
   } catch (err) {
     return formError(err);
   }
-  redirect(`/integrations/sources/${sourceId}/runs/${runId}`);
+  redirect(runPath);
 }
 
 export async function resolveCorrelationAction(pendingId: string, decision: CorrelationDecision): Promise<SourceFormState> {

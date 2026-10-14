@@ -1975,3 +1975,51 @@ Published `getHumanIdentityIdsForUsers(tenantId, userIds)` (`directory.ts`,
 exported from `service.ts`): each member's HUMAN identity in the
 organization, service role, filtered by `tenant_id`. Compliance uses it to
 make each role-review item about the person. No schema change.
+
+## 2026-10-14 — Identity pages open at their numbers (FOUNDATION-P0-34 part 2)
+
+CLAUDE.md §19.13: an identity's page is `/identities/<number>` and an
+identity rule's is `/identities/rules/<number>` (`ref`, migration 0192),
+never the UUID.
+
+- Pages: `identities/[id]` and `identities/rules/[ruleId]` resolve the
+  number with `pageRef` (within the session's tenant, as the user); an old
+  UUID link redirects to the number, keeping `?tab=`.
+- Data: `Identity.ref` (shared type, optional, additive) from `toIdentity`;
+  `ref` in `listIdentities`' columns, `getIdentityNames` (so relationship,
+  owner/sponsor/manager, correlation and leaver-report links use it),
+  `LifecycleTaskView.identityRef`, `SourceDisagreementRow.identityRef`,
+  `IdentityRule.ref`, `DiscoveryInboxEntry.integrationRef`.
+- Links switched to the number: the directory tables, unowned queue,
+  lifecycle work list, the identity page's own links, a member's page
+  (`settings/users/[userId]`), the leaver-removal report, the rules list
+  and the new-rule redirect. Creating an identity redirects to its number;
+  the identity actions revalidate `/identities/[id]` as a route pattern.
+- The agent discovery candidate page (`agents/discovery/[integrationId]/…`)
+  takes the connection's number; runtime sources keep their own key; an
+  old UUID link redirects.
+- Left as UUID links (they redirect): links from access pages
+  (requests, packages, accounts, applications), certification items and a
+  rule's run list (the run log is Operations', it holds only the UUID).
+
+Verified: typecheck clean; eslint on the changed files clean (one
+existing warning in `app/actions/connectors.ts`); Vitest
+`modules/agent-identity`, `modules/integrations`, `modules/operations`,
+`modules/access-governance`, `lib/refs`, `app` 108 files / 1098 tests
+passed (new: a discovery candidate from a connection links by the
+connection's number); `next build` clean.
+Local E2E on port 3300 (`next build`, shared E2E organization, three
+agents' suites running at once): every new URL assertion passed in at least
+one run: identity create → number, old identity UUID → number (also with
+`?tab=lifecycle`), directory links numeric, source page and CSV run URLs,
+connection create/upgrade URLs (`integrations` 12/12 in the last run,
+`connection-upgrade`, `mcp-bridge`), discovery record → number and UUID
+redirect, policy create → number. The rule page, policy and discovery-
+candidate redirects were also checked directly (UUID → `NEXT_REDIRECT` to
+the number; unknown number → 404). Remaining failures in those runs were
+API timeouts under load (e.g. `POST /api/v1/identities` took 13–16 s on
+this and on another agent's main-based server alike), CSV runs still
+`running` at 30 s, sign-in setup timeouts, and one pre-existing duplicate
+`ledger://fy2026` text in `mcp-inventory`; none involves these pages. The
+nightly run is the full check.
+

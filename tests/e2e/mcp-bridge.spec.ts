@@ -60,9 +60,11 @@ test.describe.serial("MCP events bridge into runtime", () => {
     await page.getByLabel("Name").fill(`E2E MCP ${Date.now()}`);
     await page.getByLabel("MCP endpoint").fill(mcpStubUrl);
     await page.getByRole("button", { name: "Connect" }).click();
-    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}$/);
-    integrationId = page.url().split("/integrations/")[1];
-    await expect(page.getByText(`/api/connect/v1/${integrationId}/events`)).toBeVisible();
+    // FOUNDATION-P0-34: the page is addressed by the connection's number; its receiving address keeps the id.
+    await expect(page).toHaveURL(/\/integrations\/\d+$/);
+    const endpoint = page.getByText(/\/api\/connect\/v1\/[0-9a-f-]{36}\/events/).first();
+    await expect(endpoint).toBeVisible();
+    integrationId = /\/api\/connect\/v1\/([0-9a-f-]{36})\/events/.exec((await endpoint.textContent()) ?? "")![1]!;
     await page.getByRole("button", { name: "Issue secret" }).click();
     // Wait for the real server result: the secret, shown once.
     const shown = page.getByRole("status").locator("code");

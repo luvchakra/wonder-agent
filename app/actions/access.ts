@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { resolveRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { ApiError } from "@/lib/shared/types/foundation";
 import {
@@ -83,7 +84,13 @@ export async function createPolicyAction(formData: FormData) {
     },
     ctx.userId,
   );
-  redirect(`/policies/${policy.id}`);
+  redirect(`/policies/${policy.ref ?? policy.id}`);
+}
+
+/** FOUNDATION-P0-34: a policy's page is addressed by its number. */
+async function policyPath(tenantId: string, policyId: string): Promise<string> {
+  const found = await resolveRef(tenantId, "policies", policyId);
+  return `/policies/${found?.ref ?? policyId}`;
 }
 
 /** ACCESS-P0-12 — publish a draft or disabled policy; returns the real result for the button. */
@@ -91,7 +98,7 @@ export async function publishPolicyAction(policyId: string): Promise<{ ok: boole
   const ctx = await requirePermission("policy.publish");
   try {
     const p = await publishPolicy(ctx.tenantId!, ctx.userId, policyId);
-    revalidatePath(`/policies/${policyId}`);
+    revalidatePath("/policies/[id]", "page");
     return { ok: true, message: `Published as version ${p.version}.` };
   } catch (err) {
     const e = err as { message?: string; code?: string };
@@ -103,7 +110,7 @@ export async function addPolicyRuleAction(policyId: string, formData: FormData) 
   const ctx = await requirePermission("policy.update");
   const condition = JSON.parse(String(formData.get("condition") ?? "{}"));
   await addPolicyRule(ctx.tenantId!, policyId, formData.get("ruleType") as PolicyRuleType, condition);
-  redirect(`/policies/${policyId}`);
+  redirect(await policyPath(ctx.tenantId!, policyId));
 }
 
 // ACCESS-P0-07 — policy_exceptions is now the canonical governance
@@ -118,13 +125,13 @@ export async function addPolicyExceptionAction(policyId: string, formData: FormD
     compensatingControl: String(formData.get("compensatingControl") ?? "") || undefined,
     residualRisk: (formData.get("residualRisk") as "low" | "medium" | "high" | "critical" | null) || undefined,
   });
-  redirect(`/policies/${policyId}`);
+  redirect(await policyPath(ctx.tenantId!, policyId));
 }
 
 export async function revokeExceptionAction(policyId: string, exceptionId: string) {
   const ctx = await requirePermission("policy.update");
   await revokeException(ctx.tenantId!, ctx.userId, exceptionId);
-  redirect(`/policies/${policyId}`);
+  redirect(await policyPath(ctx.tenantId!, policyId));
 }
 
 /**

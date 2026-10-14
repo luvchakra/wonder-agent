@@ -21,7 +21,7 @@ const STATUS_TONE: Record<string, BadgeTone> = {
 };
 
 function candidateHref(e: DiscoveryInboxEntry): string {
-  return `/agents/discovery/${encodeURIComponent(e.integrationId)}/${encodeURIComponent(e.externalId)}`;
+  return `/agents/discovery/${e.integrationRef ?? encodeURIComponent(e.integrationId)}/${encodeURIComponent(e.externalId)}`;
 }
 
 /**

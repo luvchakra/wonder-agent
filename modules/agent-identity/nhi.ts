@@ -90,7 +90,7 @@ export function inventoryFromSources(
       confidenceLevel: e.confidenceLevel,
       owner: e.owner,
       lastSeenAt: e.lastSeenAt,
-      href: `/agents/discovery/${encodeURIComponent(e.integrationId)}/${encodeURIComponent(e.externalId)}`,
+      href: `/agents/discovery/${e.integrationRef ?? encodeURIComponent(e.integrationId)}/${encodeURIComponent(e.externalId)}`,
     });
   }
 

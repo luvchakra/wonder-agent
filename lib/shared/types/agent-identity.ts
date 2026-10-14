@@ -254,6 +254,8 @@ export type DiscoveryDecisionType = "ignored" | "linked";
 export type DiscoveryInboxEntry = {
   externalId: string;
   integrationId: string;
+  /** FOUNDATION-P0-34: the connection's number in URLs, when the source is a connection. */
+  integrationRef?: number | null;
   integrationName: string;
   sourceSystem: string;
   displayName: string;
@@ -329,6 +331,8 @@ export type HumanLifecycleState = (typeof HUMAN_LIFECYCLE_STATES)[number];
 
 export type Identity = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   identityType: IdentityType;
   subtype: string | null;

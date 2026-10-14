@@ -79,7 +79,7 @@ export default async function LifecycleWorkPage({ searchParams }: { searchParams
                 {tasks.map((t) => (
                   <Tr key={t.id}>
                     <Td>
-                      <Link href={`/identities/${t.identityId}?tab=lifecycle`} className="font-medium text-primary hover:underline">
+                      <Link href={`/identities/${t.identityRef ?? t.identityId}?tab=lifecycle`} className="font-medium text-primary hover:underline">
                         {t.identityName}
                       </Link>
                     </Td>

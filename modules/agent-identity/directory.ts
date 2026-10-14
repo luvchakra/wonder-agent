@@ -45,6 +45,7 @@ type Row = Record<string, unknown>;
 function toIdentity(r: Row): Identity {
   return {
     id: r.id as string,
+    ref: r.ref === null || r.ref === undefined ? null : Number(r.ref),
     tenantId: r.tenant_id as string,
     identityType: r.identity_type as IdentityType,
     subtype: (r.subtype as string | null) ?? null,
@@ -162,11 +163,11 @@ export type IdentityListFilter = {
 
 export type IdentityListRow = Pick<
   Identity,
-  "id" | "identityType" | "subtype" | "displayName" | "email" | "status" | "lifecycleState" | "agentId" | "userId" | "department" | "organization" | "endDate" | "privileged" | "sourceSystem" | "riskScore" | "lastSeenAt"
+  "id" | "ref" | "identityType" | "subtype" | "displayName" | "email" | "status" | "lifecycleState" | "agentId" | "userId" | "department" | "organization" | "endDate" | "privileged" | "sourceSystem" | "riskScore" | "lastSeenAt"
 > & { owner: { id: string; displayName: string } | null; sponsor: { id: string; displayName: string } | null };
 
 const LIST_COLUMNS =
-  "id, identity_type, subtype, display_name, email, status, lifecycle_state, agent_id, user_id, department, organization, end_date, privileged, source_system, risk_score, last_seen_at, owner_identity_id, sponsor_identity_id";
+  "id, ref, identity_type, subtype, display_name, email, status, lifecycle_state, agent_id, user_id, department, organization, end_date, privileged, source_system, risk_score, last_seen_at, owner_identity_id, sponsor_identity_id";
 
 /** One page of the tenant's identities, newest name order, with the total. */
 export async function listIdentities(tenantId: string, filter: IdentityListFilter = {}): Promise<{ rows: IdentityListRow[]; total: number }> {
@@ -204,6 +205,7 @@ export async function listIdentities(tenantId: string, filter: IdentityListFilte
       const i = toIdentity({ ...r, tenant_id: tenantId });
       return {
         id: i.id,
+        ref: i.ref,
         identityType: i.identityType,
         subtype: i.subtype,
         displayName: i.displayName,
@@ -280,14 +282,14 @@ export async function getIdentityForUser(tenantId: string, userId: string): Prom
 }
 
 /** Names of the given identities in this tenant (for showing references). */
-export async function getIdentityNames(tenantId: string, ids: string[]): Promise<Map<string, { displayName: string; identityType: IdentityType }>> {
+export async function getIdentityNames(tenantId: string, ids: string[]): Promise<Map<string, { displayName: string; identityType: IdentityType; ref: number | null }>> {
   const unique = [...new Set(ids.filter((id) => UUID_RE.test(id)))];
-  const out = new Map<string, { displayName: string; identityType: IdentityType }>();
+  const out = new Map<string, { displayName: string; identityType: IdentityType; ref: number | null }>();
   if (!unique.length) return out;
   const supabase = await supabaseServer();
-  const { data, error } = await supabase.from("identities").select("id, display_name, identity_type").eq("tenant_id", tenantId).in("id", unique);
+  const { data, error } = await supabase.from("identities").select("id, ref, display_name, identity_type").eq("tenant_id", tenantId).in("id", unique);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  for (const r of data ?? []) out.set(r.id as string, { displayName: r.display_name as string, identityType: r.identity_type as IdentityType });
+  for (const r of data ?? []) out.set(r.id as string, { displayName: r.display_name as string, identityType: r.identity_type as IdentityType, ref: r.ref === null || r.ref === undefined ? null : Number(r.ref) });
   return out;
 }
 
@@ -357,6 +359,8 @@ export type SourceDisagreementRow = {
   otherSourceId: string;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** FOUNDATION-P0-34: the identity's number in URLs. */
+  identityRef?: number | null;
 };
 
 /**
@@ -381,6 +385,7 @@ export async function listSourceDisagreements(tenantId: string, limit = 100): Pr
     id: r.id as string,
     identityId: r.identity_id as string,
     displayName: names.get(r.identity_id as string)?.displayName ?? "Unknown identity",
+    identityRef: names.get(r.identity_id as string)?.ref ?? null,
     field: r.field as string,
     keptValue: (r.kept_value as string | null) ?? null,
     keptSourceId: (r.kept_source_id as string | null) ?? null,
@@ -640,7 +645,7 @@ export async function updateIdentity(tenantId: string, actorId: string, identity
 
 export type RelationshipView = IdentityRelationship & {
   direction: "outgoing" | "incoming";
-  other: { id: string; displayName: string; identityType: IdentityType } | null;
+  other: { id: string; ref: number | null; displayName: string; identityType: IdentityType } | null;
 };
 
 /** Every relationship the identity takes part in, current first. */

@@ -22,6 +22,7 @@ export function toIntegrationType(row: any): IntegrationType {
 export function toIntegration(row: any, hasCredentials: boolean): Integration {
   return {
     id: row.id,
+    ref: row.ref ?? null,
     tenantId: row.tenant_id,
     integrationTypeId: row.integration_type_id,
     name: row.name,

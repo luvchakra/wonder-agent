@@ -4326,3 +4326,36 @@ Left out: onboarding templates cannot preset the format yet
 (`TEMPLATE_CONFIG_KEYS`); a connector's create-account call still sends the
 identity's email/username/display name, not the planned name
 (`newAccountTarget`); uniqueness compares exact case in the database.
+
+## 2026-10-14 — Policy pages open at their numbers (FOUNDATION-P0-34 part 2)
+
+CLAUDE.md §19.13: a governance policy's page is `/policies/<number>`
+(`policies.ref`, migration 0192). `policies/[id]` resolves it with
+`pageRef`; an old UUID link redirects. `Policy.ref` (optional, additive)
+comes from `toPolicy`; the policies table and global search link by it;
+creating a policy redirects to its number, and the rule, exception and
+revoke actions redirect to the number (one tenant-scoped read). Left as
+UUID links (they redirect): the SoD and controls pages and the policy
+match report. No schema change.
+
+Verified: typecheck clean; eslint on the changed files clean (one
+existing warning in `app/actions/connectors.ts`); Vitest
+`modules/agent-identity`, `modules/integrations`, `modules/operations`,
+`modules/access-governance`, `lib/refs`, `app` 108 files / 1098 tests
+passed (new: a discovery candidate from a connection links by the
+connection's number); `next build` clean.
+Local E2E on port 3300 (`next build`, shared E2E organization, three
+agents' suites running at once): every new URL assertion passed in at least
+one run: identity create → number, old identity UUID → number (also with
+`?tab=lifecycle`), directory links numeric, source page and CSV run URLs,
+connection create/upgrade URLs (`integrations` 12/12 in the last run,
+`connection-upgrade`, `mcp-bridge`), discovery record → number and UUID
+redirect, policy create → number. The rule page, policy and discovery-
+candidate redirects were also checked directly (UUID → `NEXT_REDIRECT` to
+the number; unknown number → 404). Remaining failures in those runs were
+API timeouts under load (e.g. `POST /api/v1/identities` took 13–16 s on
+this and on another agent's main-based server alike), CSV runs still
+`running` at 30 s, sign-in setup timeouts, and one pre-existing duplicate
+`ledger://fy2026` text in `mcp-inventory`; none involves these pages. The
+nightly run is the full check.
+

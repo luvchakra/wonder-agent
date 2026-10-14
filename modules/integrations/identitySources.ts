@@ -45,6 +45,7 @@ type Row = Record<string, unknown>;
 function toSource(r: Row): IdentitySource {
   return {
     id: r.id as string,
+    ref: r.ref === null || r.ref === undefined ? null : Number(r.ref),
     tenantId: r.tenant_id as string,
     name: r.name as string,
     template: r.template as IdentitySource["template"],
@@ -69,6 +70,7 @@ function toSource(r: Row): IdentitySource {
 function toRun(r: Row): ReconciliationRun {
   return {
     id: r.id as string,
+    ref: r.ref === null || r.ref === undefined ? null : Number(r.ref),
     sourceId: r.source_id as string,
     trigger: r.trigger as ReconciliationRun["trigger"],
     mode: r.mode as ReconciliationRun["mode"],

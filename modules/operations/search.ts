@@ -171,7 +171,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: p.id,
         title: p.name,
         subtitle: p.policyCategory,
-        href: `/policies/${p.id}`,
+        href: `/policies/${p.ref ?? p.id}`,
         freshness: p.effectiveDate,
       });
     }
@@ -186,7 +186,7 @@ export async function search(tenantId: string, permissions: string[], query: str
         id: i.id,
         title: i.name,
         subtitle: i.status,
-        href: `/integrations/${i.id}`,
+        href: `/integrations/${i.ref ?? i.id}`,
         freshness: i.lastSyncAt ?? i.createdAt,
       });
     }

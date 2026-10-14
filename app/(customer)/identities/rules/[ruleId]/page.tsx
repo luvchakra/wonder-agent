@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getIdentityRule, listAttributeDefinitions, SETTABLE_FIELDS } from "@/modules/agent-identity/service";
 import { listRuleRuns } from "@/modules/operations/service";
@@ -33,8 +34,9 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
   }
-  const { ruleId } = await params;
   const tenantId = ctx.tenantId!;
+  // FOUNDATION-P0-34: the URL carries the rule's number; an old UUID link redirects.
+  const ruleId = await pageRef(tenantId, "lifecycle_rules", (await params).ruleId, (n) => `/identities/rules/${n}`);
   const canManage = ctx.permissions.includes("identity.manage");
   const [rule, runs, definitions] = await Promise.all([
     getIdentityRule(tenantId, ruleId),

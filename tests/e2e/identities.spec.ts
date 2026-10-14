@@ -131,7 +131,7 @@ test.describe.serial("identity directory", () => {
     await page.getByLabel("Email").fill(`e2e-person-${stamp}@example.test`);
     await page.getByLabel("Department").fill("Finance");
     await page.getByRole("button", { name: "Create identity" }).click();
-    await expect(page).toHaveURL(/\/identities\/[0-9a-f-]{36}$/);
+    await expect(page).toHaveURL(/\/identities\/\d+$/);
     await expect(page.getByRole("heading", { level: 1, name })).toBeVisible();
     await expect(page.getByText("Finance")).toBeVisible();
     // Every object's page says who created it and when (migration 0115).
@@ -150,11 +150,13 @@ test.describe.serial("identity directory", () => {
     await expect(page).toHaveURL(/\/identities\/machines/);
     // Searched for: the shared E2E organization keeps every run's machine identities, so this one may not be on the first page.
     await page.goto(`/identities/machines?q=${encodeURIComponent(`svc-e2e-${stamp}`)}`);
-    await expect(page.getByRole("link", { name: `svc-e2e-${stamp}` })).toBeVisible();
+    await expect(page.getByRole("link", { name: `svc-e2e-${stamp}` })).toHaveAttribute("href", /^\/identities\/\d+$/);
   });
 
   test("IDENTITY-P0-17: a person's page shows their groups, findings and activity", async ({ page }) => {
     await page.goto(`/identities/${adminPersonId}`);
+    // FOUNDATION-P0-34: an old link with the id redirects to the identity's number.
+    await expect(page).toHaveURL(/\/identities\/\d+$/);
     const tabs = page.getByRole("tablist", { name: "Identity sections" });
     for (const name of [/^Groups/, /^Risk/, /^Activity/]) await expect(tabs.getByRole("tab", { name })).toBeVisible();
     await tabs.getByRole("tab", { name: /^Groups/ }).click();

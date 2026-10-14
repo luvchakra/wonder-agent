@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { Badge, SeverityBadge, SimpleDataTable, type DataTableColumn } from "@/modules/ui";
 
-type PolicyRow = { id: string; name: string; policyCategory: string; severity: string; action: string; status: string };
+type PolicyRow = { id: string; ref?: number | null; name: string; policyCategory: string; severity: string; action: string; status: string };
 
 export function PoliciesTable({ policies }: { policies: PolicyRow[] }) {
   const columns: DataTableColumn<PolicyRow>[] = [
-    { key: "name", header: "Policy", sortable: true, render: (p) => <Link href={`/policies/${p.id}`} className="text-primary hover:underline">{p.name}</Link> },
+    { key: "name", header: "Policy", sortable: true, render: (p) => <Link href={`/policies/${p.ref ?? p.id}`} className="text-primary hover:underline">{p.name}</Link> },
     { key: "policyCategory", header: "Category", sortable: true, render: (p) => <Badge tone="neutral">{p.policyCategory}</Badge> },
     { key: "severity", header: "Severity", sortable: true, render: (p) => <SeverityBadge severity={p.severity} /> },
     { key: "action", header: "Action", sortable: true, render: (p) => p.action },

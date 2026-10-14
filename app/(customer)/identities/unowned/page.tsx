@@ -42,7 +42,7 @@ export default async function UnownedIdentitiesPage() {
               {rows.map((r) => (
                 <li key={r.id} className="flex flex-wrap items-center gap-3 py-2">
                   <div className="min-w-0 flex-1">
-                    <Link href={`/identities/${r.id}`} className="font-medium text-foreground hover:underline">
+                    <Link href={`/identities/${r.ref ?? r.id}`} className="font-medium text-foreground hover:underline">
                       {r.displayName}
                     </Link>
                     <p className="text-xs text-muted-foreground">

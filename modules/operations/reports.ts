@@ -202,7 +202,7 @@ export async function generateLeaverRemovalSlaReport(tenantId: string): Promise<
     "leaver_removal_sla",
     tasks.map((t) => ({
       id: t.taskId,
-      href: t.identityId ? `/identities/${t.identityId}` : "/access/fulfilment",
+      href: t.identityId ? `/identities/${names.get(t.identityId)?.ref ?? t.identityId}` : "/access/fulfilment",
       fields: { person: t.identityId ? (names.get(t.identityId)?.displayName ?? "Unknown") : "Unknown", application: t.applicationName, change: t.kind === "remove" ? "remove access" : "disable account", opened: t.openedAt, due: t.dueAt, done: t.doneAt, outcome: t.outcome },
     })),
   );

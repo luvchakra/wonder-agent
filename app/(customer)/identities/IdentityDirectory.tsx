@@ -108,7 +108,7 @@ export async function IdentityDirectory({ view, searchParams }: { view: Director
                 {rows.map((r) => (
                   <Tr key={r.id}>
                     <Td>
-                      <Link href={`/identities/${r.id}`} className="font-medium text-primary hover:underline">
+                      <Link href={`/identities/${r.ref ?? r.id}`} className="font-medium text-primary hover:underline">
                         {r.displayName}
                       </Link>
                       {r.email ? <span className="block truncate text-xs text-muted-foreground">{r.email}</span> : null}

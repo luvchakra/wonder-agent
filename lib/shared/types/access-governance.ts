@@ -286,6 +286,8 @@ export type PolicyStatus = "draft" | "active" | "disabled";
 
 export type Policy = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   tenantId: string;
   name: string;
   description: string | null;

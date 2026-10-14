@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { parseRefParam, resolveRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { getDiscoveryCandidate } from "@/modules/agent-identity/service";
 import { linkDiscoveryCandidateAction, registerDiscoveryCandidateAction } from "@/app/actions/agents";
@@ -25,13 +26,27 @@ export default async function DiscoveryCandidatePage({
 }: {
   params: Promise<{ integrationId: string; externalId: string }>;
 }) {
-  const { integrationId, externalId } = await params;
+  const { integrationId: rawIntegrationId, externalId } = await params;
   let ctx;
   try {
     ctx = await requirePermission("agent.read");
   } catch (err) {
     if (err instanceof ApiError && err.status === 401) redirect("/sign-in");
     throw err;
+  }
+
+  // FOUNDATION-P0-34: a connection is addressed by its number (an old UUID
+  // link redirects). Other sources (runtime telemetry) keep their own key.
+  let integrationId = rawIntegrationId;
+  const param = parseRefParam(rawIntegrationId);
+  if (param) {
+    const found = await resolveRef(ctx.tenantId!, "integrations", rawIntegrationId);
+    if (param.kind === "ref") {
+      if (!found) notFound();
+      integrationId = found.id;
+    } else if (found) {
+      redirect(`/agents/discovery/${found.ref}/${encodeURIComponent(externalId)}`);
+    }
   }
 
   const candidate = await getDiscoveryCandidate(ctx.tenantId!, integrationId, externalId);

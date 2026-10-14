@@ -61,7 +61,7 @@ export default async function JobStatusPage() {
                 {summary.map((s) => (
                   <Tr key={s.integrationId}>
                     <Td>
-                      <Link href={`/integrations/${s.integrationId}`} className="text-primary hover:underline">
+                      <Link href={`/integrations/${s.integrationRef ?? s.integrationId}`} className="text-primary hover:underline">
                         {s.integrationName}
                       </Link>
                     </Td>

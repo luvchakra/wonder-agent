@@ -184,6 +184,8 @@ export type SavedReportDefinition = {
 /** OPERATIONS-P0-06.1 — per-integration sync/job health, tenant-wide. */
 export type JobStatusSummary = {
   integrationId: string;
+  /** FOUNDATION-P0-34: the connection's number in URLs. */
+  integrationRef?: number | null;
   integrationName: string;
   lastSuccessfulAt: string | null;
   lastRunStatus: string | null;

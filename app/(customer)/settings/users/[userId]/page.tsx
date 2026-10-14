@@ -147,7 +147,7 @@ export default async function UserDetailPage({
               <Fact label="Last active" value={relativeTime(user.lastSignInAt)} />
             </dl>
             {identity ? (
-              <Link href={`/identities/${identity.id}`} className="block text-sm text-primary hover:underline">
+              <Link href={`/identities/${identity.ref ?? identity.id}`} className="block text-sm text-primary hover:underline">
                 View their identity
               </Link>
             ) : null}

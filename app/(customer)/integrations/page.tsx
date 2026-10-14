@@ -21,6 +21,7 @@ export default async function ConnectionsPage() {
     const type = connectionTypeOf(i);
     return {
       id: i.id,
+      ref: i.ref,
       name: i.name,
       typeName: type.version ? `${type.name} v${type.version}` : type.name,
       typeHref: type.href,

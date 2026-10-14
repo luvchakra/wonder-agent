@@ -457,7 +457,7 @@ export async function listHumanLifecycleEvents(tenantId: string, identityId: str
   return (data ?? []).map(toEvent);
 }
 
-export type LifecycleTaskView = IdentityLifecycleTask & { identityName: string; assigneeName: string | null; eventType: LifecycleEventType };
+export type LifecycleTaskView = IdentityLifecycleTask & { identityName: string; identityRef: number | null; assigneeName: string | null; eventType: LifecycleEventType };
 
 export async function listLifecycleTasks(
   tenantId: string,
@@ -480,15 +480,20 @@ export async function listLifecycleTasks(
   const rows = (data ?? []) as Row[];
   const ids = [...new Set(rows.flatMap((r) => [r.identity_id, r.assignee_identity_id]).filter(Boolean) as string[])];
   const names = new Map<string, string>();
+  const refs = new Map<string, number>();
   if (ids.length) {
-    const { data: people, error: namesError } = await supabase.from("identities").select("id, display_name").eq("tenant_id", tenantId).in("id", ids);
+    const { data: people, error: namesError } = await supabase.from("identities").select("id, ref, display_name").eq("tenant_id", tenantId).in("id", ids);
     if (namesError) throw new ApiError(500, "QUERY_FAILED", namesError.message);
-    for (const p of people ?? []) names.set(p.id as string, p.display_name as string);
+    for (const p of people ?? []) {
+      names.set(p.id as string, p.display_name as string);
+      if (p.ref !== null && p.ref !== undefined) refs.set(p.id as string, Number(p.ref));
+    }
   }
   return rows.map((r) => ({
     ...toTask(r),
     eventType: (r.identity_lifecycle_events as { event_type: LifecycleEventType }).event_type,
     identityName: names.get(r.identity_id as string) ?? "Unknown identity",
+    identityRef: refs.get(r.identity_id as string) ?? null,
     assigneeName: r.assignee_identity_id ? (names.get(r.assignee_identity_id as string) ?? null) : null,
   }));
 }

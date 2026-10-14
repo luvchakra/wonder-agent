@@ -41,7 +41,7 @@ test.describe("Integration module", () => {
     await page.getByRole("textbox", { name: "Organization" }).fill("acme");
     await page.getByLabel("Access token").fill("not-a-real-token");
     await page.getByRole("button", { name: "Connect", exact: true }).click();
-    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}\?credentials=failed/);
+    await expect(page).toHaveURL(/\/integrations\/\d+\?credentials=failed/);
     await expect(page.getByText("The connection test failed", { exact: false })).toBeVisible();
   });
 
@@ -103,7 +103,7 @@ test.describe("Integration module", () => {
     await page.getByLabel("Access token").fill("e2e-fake-secret-value");
     await page.getByRole("button", { name: "Connect", exact: true }).click();
 
-    await expect(page).toHaveURL(/\/integrations\/[0-9a-f-]{36}/);
+    await expect(page).toHaveURL(/\/integrations\/\d+(\?|$)/);
     await expect(page.getByRole("heading", { name: integrationName })).toBeVisible();
 
     await page.getByLabel("Access token").fill("e2e-fake-secret-value");

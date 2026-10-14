@@ -44,6 +44,8 @@ const SIMULATION_PAGE = 1000;
 
 export type IdentityRule = {
   id: string;
+  /** FOUNDATION-P0-34: its number in URLs (migration 0192). */
+  ref?: number | null;
   kind: string;
   name: string;
   description: string | null;
@@ -70,6 +72,7 @@ function toRule(r: Row): IdentityRule {
   const working = workingDefinition(r);
   return {
     id: r.id as string,
+    ref: r.ref === null || r.ref === undefined ? null : Number(r.ref),
     kind: r.kind as string,
     name: r.name as string,
     description: (r.description as string | null) ?? null,

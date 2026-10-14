@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { pageRef } from "@/lib/refs/objectRef";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import { headers } from "next/headers";
 import Link from "next/link";
@@ -106,8 +107,8 @@ export default async function IntegrationDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ credentials?: string; held?: string; oauth?: string; upgraded?: string }>;
 }) {
-  const { id } = await params;
-  const { credentials, held, oauth, upgraded } = await searchParams;
+  const [{ id: rawId }, search] = await Promise.all([params, searchParams]);
+  const { credentials, held, oauth, upgraded } = search;
   let ctx;
   try {
     ctx = await requirePermission("integration.read");
@@ -116,8 +117,9 @@ export default async function IntegrationDetailPage({
     throw err;
   }
 
-  // Not a connection id at all (e.g. /integrations/new): not found, not an error.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
+  // FOUNDATION-P0-34: the URL carries the connection's number; an old UUID
+  // link redirects, and anything else (e.g. /integrations/new) is not found.
+  const id = await pageRef(ctx.tenantId!, "integrations", rawId, (n) => `/integrations/${n}`, search);
   const integration = await getIntegration(ctx.tenantId!, id);
   if (!integration) notFound();
   const connector = connectorDefinition(integration);
@@ -169,7 +171,7 @@ export default async function IntegrationDetailPage({
           {newer ? (
             <>
               {" · "}
-              <Link href={`/integrations/${id}/upgrade?version=${newer}`} className="text-primary hover:underline">
+              <Link href={`/integrations/${integration.ref ?? id}/upgrade?version=${newer}`} className="text-primary hover:underline">
                 v{newer} available
               </Link>
             </>
