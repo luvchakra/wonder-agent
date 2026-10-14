@@ -204,4 +204,51 @@ test.describe.serial("reviews of WonderID role assignments", () => {
     expect(again.status()).toBe(409);
     expect((await again.json()).error.code).toBe("NO_ESCALATION_TARGET");
   });
+
+  test("COMPLIANCE-P0-14: a saved template launches the campaign its preview counted", async ({ request, browser, page }) => {
+    test.setTimeout(120_000);
+    const scope = { privilegedOnly: true };
+    const preview = await request.post("/api/v1/compliance/campaigns/preview", { data: { scopeType: "role_assignments", scope, reviewerId: iamId } });
+    expect(preview.status(), await preview.text()).toBe(200);
+    const counted = (await preview.json()).data as { items: number; subjects: number; privileged: number; reviewers: number };
+    expect(counted.items).toBeGreaterThan(0);
+    expect(counted.privileged).toBe(counted.items);
+
+    const name = `E2E RR template ${stamp}`;
+    const saved = await request.post("/api/v1/compliance/campaign-templates", { data: { name, scopeType: "role_assignments", scope, reviewerId: iamId, dueInDays: 14 } });
+    expect(saved.status(), await saved.text()).toBe(201);
+    const templateId = (await saved.json()).data.id as string;
+    expect((await request.post("/api/v1/compliance/campaign-templates", { data: { name: name.toUpperCase(), scopeType: "agent" } })).status()).toBe(409);
+
+    // Only someone who manages compliance saves or launches one; another organization cannot see or launch it.
+    const ro = await browser.newContext({ storageState: authFile("readOnly") });
+    expect((await ro.request.post("/api/v1/compliance/campaign-templates", { data: { name: "nope", scopeType: "agent" } })).status()).toBe(403);
+    await ro.close();
+    const two = await browser.newContext({ storageState: authFile("adminTwo") });
+    expect(((await (await two.request.get("/api/v1/compliance/campaign-templates")).json()).data as { id: string }[]).map((t) => t.id)).not.toContain(templateId);
+    expect((await two.request.post(`/api/v1/compliance/campaign-templates/${templateId}/launch`)).status()).toBe(404);
+    await two.close();
+
+    const launched = await request.post(`/api/v1/compliance/campaign-templates/${templateId}/launch`);
+    expect(launched.status(), await launched.text()).toBe(200);
+    const campaign = (await launched.json()).data as { id: string; name: string; dueDate: string | null };
+    expect(campaign.name).toBe(`${name} — ${new Date().toISOString().slice(0, 10)}`);
+    expect(Math.abs(new Date(campaign.dueDate!).getTime() - (Date.now() + 14 * 86_400_000))).toBeLessThan(120_000);
+    await expect
+      .poll(async () => (await db().from("certification_campaigns").select("build_status").eq("id", campaign.id).single()).data?.build_status, { timeout: 60_000 })
+      .toBe("ready");
+    expect((await itemsOf(campaign.id)).length).toBe(counted.items);
+
+    // The page lists the template with its one action; the launch form previews.
+    await page.goto("/compliance/campaigns");
+    const row = page.getByRole("listitem").filter({ hasText: name });
+    await expect(row.getByRole("button", { name: "Launch" })).toBeVisible();
+    await page.getByRole("combobox", { name: "Scope type" }).first().selectOption("role_assignments");
+    await page.getByRole("button", { name: "Preview" }).first().click();
+    await expect(page.getByRole("status").filter({ hasText: /items? for/ }).first()).toBeVisible();
+
+    expect((await request.delete(`/api/v1/compliance/campaign-templates/${templateId}`)).status()).toBe(200);
+    expect(((await (await request.get("/api/v1/compliance/campaign-templates")).json()).data as { id: string }[]).map((t) => t.id)).not.toContain(templateId);
+  });
 });
+

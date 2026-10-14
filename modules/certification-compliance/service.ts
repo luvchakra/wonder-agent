@@ -7,7 +7,8 @@ import "server-only";
  * control_mappings/etc. directly.
  */
 
-export { launchCampaign, getCampaign, listCampaigns, listCampaignItems, listCampaignItemsPage, getCampaignMetrics, campaignItemCounts, failStaleCampaignBuilds, type LaunchCampaignInput } from "./campaigns";
+export { launchCampaign, getCampaign, listCampaigns, listCampaignItems, listCampaignItemsPage, getCampaignMetrics, campaignItemCounts, failStaleCampaignBuilds, previewCampaign, type CampaignPreview, type LaunchCampaignInput } from "./campaigns";
+export { listCampaignTemplates, saveCampaignTemplate, archiveCampaignTemplate, launchCampaignFromTemplate, type CampaignTemplate } from "./templates";
 export {
   recordDecision,
   listDecisionsForItem,

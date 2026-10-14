@@ -1,13 +1,16 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PROVENANCE_TABLES } from "./tables";
 
 describe("PROVENANCE_TABLES", () => {
-  it("lists exactly the tables migration 0115 gives provenance to", () => {
-    const sql = readFileSync(join(process.cwd(), "supabase/migrations/0115_foundation_record_provenance.sql"), "utf8");
-    const block = sql.slice(sql.indexOf("foreach t in array array["), sql.indexOf("] loop"));
-    const inMigration = [...block.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  it("lists exactly the tables the provenance migrations (0115 and later) give provenance to", () => {
+    const dir = join(process.cwd(), "supabase/migrations");
+    const inMigration = readdirSync(dir)
+      .filter((f) => f.endsWith(".sql"))
+      .map((f) => readFileSync(join(dir, f), "utf8"))
+      .filter((sql) => sql.includes("create trigger record_provenance") && sql.includes("foreach t in array array["))
+      .flatMap((sql) => [...sql.slice(sql.indexOf("foreach t in array array["), sql.indexOf("] loop")).matchAll(/'([a-z_]+)'/g)].map((m) => m[1]));
     expect([...PROVENANCE_TABLES].sort()).toEqual([...inMigration].sort());
     expect(new Set(inMigration).size).toBe(inMigration.length);
   });

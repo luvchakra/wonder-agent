@@ -2,13 +2,13 @@
 
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { launchCampaign, recordDecision } from "@/modules/certification-compliance/service";
+import { launchCampaign, launchCampaignFromTemplate, recordDecision, saveCampaignTemplate } from "@/modules/certification-compliance/service";
 import type { CampaignCadence, CampaignScopeType, DecisionType } from "@/lib/shared/types/compliance";
 
 export async function launchCampaignAction(formData: FormData) {
   const ctx = await requirePermission("compliance.manage");
   const criticalityRaw = String(formData.get("criticality") ?? "");
-  const campaign = await launchCampaign(ctx.tenantId!, ctx.userId, {
+  const input = {
     name: String(formData.get("name") ?? ""),
     scopeType: (formData.get("scopeType") as CampaignScopeType) || "agent",
     scope: {
@@ -25,7 +25,19 @@ export async function launchCampaignAction(formData: FormData) {
     // this form 500'd AFTER leaving an orphaned active campaign with zero
     // items behind it.
     reviewerId: String(formData.get("reviewerId") ?? "").trim() || ctx.userId,
-  });
+  };
+  const campaign = await launchCampaign(ctx.tenantId!, ctx.userId, input);
+  // COMPLIANCE-P0-14: optionally kept as a template for the next launch (the reviewer stays as typed; blank means whoever launches).
+  if (formData.get("saveTemplate") === "on") {
+    await saveCampaignTemplate(ctx.tenantId!, ctx.userId, { ...input, reviewerId: String(formData.get("reviewerId") ?? "").trim() || null });
+  }
+  redirect(`/compliance/campaigns/${campaign.id}`);
+}
+
+/** COMPLIANCE-P0-14: an ordinary campaign from a saved template. */
+export async function launchFromTemplateAction(templateId: string) {
+  const ctx = await requirePermission("compliance.manage");
+  const campaign = await launchCampaignFromTemplate(ctx.tenantId!, ctx.userId, templateId);
   redirect(`/compliance/campaigns/${campaign.id}`);
 }
 

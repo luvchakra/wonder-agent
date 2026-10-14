@@ -69,14 +69,15 @@ const HIGH_RISK_SCORE_THRESHOLD = 50;
  */
 const AGENT_BATCH = 16;
 
-async function populateCertificationItems(
+type ItemRow = Record<string, unknown>;
+
+async function buildAgentItems(
   tenantId: string,
   campaignId: string,
   agents: { id: string }[],
   input: LaunchCampaignInput,
   grantFilter?: (grant: Awaited<ReturnType<typeof getEffectiveAccess>>[number]) => boolean,
-): Promise<number> {
-  const svc = supabaseServiceRole();
+): Promise<ItemRow[]> {
   // Agents are read AGENT_BATCH at a time and the items written in bulk:
   // one agent after another made a launch take about half a second per
   // agent (28 s for 56), past what a person waits for (§15).
@@ -119,15 +120,20 @@ async function populateCertificationItems(
     );
     for (const items of batch) rows.push(...items);
   }
-  // Everything is read first and written last, so a failed read writes nothing.
+  return rows;
+}
+
+/** Everything is read first and written last, so a failed read writes nothing. */
+async function insertItems(rows: ItemRow[]): Promise<number> {
+  const svc = supabaseServiceRole();
   for (let i = 0; i < rows.length; i += 500) {
-    const { error: itemError } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
-    if (itemError) throw new ApiError(500, "CREATE_FAILED", itemError.message);
+    const { error } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
+    if (error) throw new ApiError(500, "CREATE_FAILED", error.message);
   }
   return rows.length;
 }
 
-type ScopeTargets = { agents: { id: string }[]; grantFilter?: Parameters<typeof populateCertificationItems>[4] };
+type ScopeTargets = { agents: { id: string }[]; grantFilter?: Parameters<typeof buildAgentItems>[4] };
 
 /** The agents (and, for some scopes, the grants) a campaign covers. */
 async function scopeTargets(tenantId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<ScopeTargets> {
@@ -158,7 +164,7 @@ async function scopeTargets(tenantId: string, input: LaunchCampaignInput, ids: {
  * reviewer, never to the person whose access it is, and keeps a snapshot
  * of what the reviewer is shown.
  */
-async function populateIdentityItems(tenantId: string, campaignId: string, input: LaunchCampaignInput, applicationId: string | null): Promise<number> {
+async function buildIdentityItems(tenantId: string, campaignId: string, input: LaunchCampaignInput, applicationId: string | null): Promise<ItemRow[]> {
   const grants = await listIdentityGrantsForReview(tenantId, { applicationId, privilegedOnly: input.scope?.privilegedOnly === true });
   const ids = [...new Set(grants.flatMap((g) => [g.identityId, g.applicationOwnerIdentityId].filter((x): x is string => Boolean(x))))];
   const info = await getIdentityReviewInfo(tenantId, ids);
@@ -203,12 +209,7 @@ async function populateIdentityItems(tenantId: string, campaignId: string, input
       },
     };
   });
-  const svc = supabaseServiceRole();
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
-    if (error) throw new ApiError(500, "CREATE_FAILED", error.message);
-  }
-  return rows.length;
+  return rows;
 }
 
 /**
@@ -217,7 +218,7 @@ async function populateIdentityItems(tenantId: string, campaignId: string, input
  * member's person identity; it goes to their manager or the named
  * reviewer, never to the member.
  */
-async function populateRoleItems(tenantId: string, campaignId: string, input: LaunchCampaignInput): Promise<number> {
+async function buildRoleItems(tenantId: string, campaignId: string, input: LaunchCampaignInput): Promise<ItemRow[]> {
   const assignments = await listRoleAssignmentsForReview(tenantId, { privilegedOnly: input.scope?.privilegedOnly === true });
   const identityOf = await getHumanIdentityIdsForUsers(tenantId, assignments.map((a) => a.userId));
   const info = await getIdentityReviewInfo(tenantId, [...identityOf.values()]);
@@ -270,12 +271,15 @@ async function populateRoleItems(tenantId: string, campaignId: string, input: La
   });
   // Privileged first.
   rows.sort((x, y) => Number(y.snapshot.role.privileged) - Number(x.snapshot.role.privileged));
-  const svc = supabaseServiceRole();
-  for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await svc.from("certification_items").insert(rows.slice(i, i + 500));
-    if (error) throw new ApiError(500, "CREATE_FAILED", error.message);
-  }
-  return rows.length;
+  return rows;
+}
+
+/** The items a campaign of this scope would hold, read and not written (launch writes them; preview counts them). */
+async function buildItems(tenantId: string, campaignId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<ItemRow[]> {
+  if (input.scopeType === "identity_access") return buildIdentityItems(tenantId, campaignId, input, ids.applicationId);
+  if (input.scopeType === "role_assignments") return buildRoleItems(tenantId, campaignId, input);
+  const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
+  return buildAgentItems(tenantId, campaignId, agents, input, grantFilter);
 }
 
 /** A build error as it may be shown and stored: short, and never a stack or a secret. */
@@ -293,15 +297,7 @@ function buildErrorText(err: unknown): string {
 async function buildCampaign(tenantId: string, actorId: string, campaignId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<void> {
   const svc = supabaseServiceRole();
   try {
-    let total: number;
-    if (input.scopeType === "identity_access") {
-      total = await populateIdentityItems(tenantId, campaignId, input, ids.applicationId);
-    } else if (input.scopeType === "role_assignments") {
-      total = await populateRoleItems(tenantId, campaignId, input);
-    } else {
-      const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
-      total = await populateCertificationItems(tenantId, campaignId, agents, input, grantFilter);
-    }
+    const total = await insertItems(await buildItems(tenantId, campaignId, input, ids));
     const { error } = await svc
       .from("certification_campaigns")
       .update({ build_status: "ready", items_total: total, built_at: new Date().toISOString(), build_error: null })
@@ -342,24 +338,8 @@ export async function failStaleCampaignBuilds(now = new Date()): Promise<number>
   return data?.length ?? 0;
 }
 
-/**
- * COMPLIANCE-P0-01.2. All five `scope_type`s populate real items:
- * - `agent` — optionally narrowed by `scope.criticality` (an array).
- * - `application` — every agent's grants on `scope.applicationId`.
- * - `entitlement` — every agent's grants of `scope.entitlementId`.
- * - `privileged_access` — every agent's grants whose entitlement is
- *   `elevated`/`admin` privilege level.
- * - `high_risk_agent` — every agent whose current `agents.risk_score` (set
- *   by Risk Agent's `evaluateAgentRisk()`) is at/above `scope.minRiskScore`
- *   or the `high` severity band default; all of that agent's grants.
- * Scope input is validated before the campaign row is created, so an
- * invalid scope never leaves behind an empty, orphaned campaign.
- */
-export async function launchCampaign(tenantId: string, actorId: string, input: LaunchCampaignInput): Promise<CertificationCampaign> {
-  // PLATFORM-P0-12: certification campaigns are a flag-gated capability (on by default).
-  await requireFeature(tenantId, "certifications");
-  if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
-
+/** Validates a launch's scope (before any row is written) and resolves the application or entitlement it names. */
+async function resolveLaunchScope(tenantId: string, input: LaunchCampaignInput): Promise<{ applicationId: string | null; entitlementId: string | null }> {
   let applicationId: string | null = null;
   let entitlementId: string | null = null;
   if (input.scopeType === "application") {
@@ -379,6 +359,49 @@ export async function launchCampaign(tenantId: string, actorId: string, input: L
     if (!entitlementId) throw new ApiError(400, "INVALID_INPUT", "scope.entitlementId is required for scope_type 'entitlement'");
     if (!(await getEntitlement(tenantId, entitlementId))) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
   }
+
+  return { applicationId, entitlementId };
+}
+
+/**
+ * COMPLIANCE-P0-14: what a campaign would hold, before it is launched: the
+ * same reads as the launch, nothing written. Counts only.
+ */
+export type CampaignPreview = { items: number; subjects: number; privileged: number; reviewers: number; reviewerFallbacks: number };
+
+const PREVIEW_SCOPES = ["agent", "application", "entitlement", "privileged_access", "high_risk_agent", "identity_access", "role_assignments"] as const;
+
+export async function previewCampaign(tenantId: string, input: LaunchCampaignInput): Promise<CampaignPreview> {
+  await requireFeature(tenantId, "certifications");
+  if (!(PREVIEW_SCOPES as readonly string[]).includes(input.scopeType)) throw new ApiError(400, "INVALID_INPUT", "scopeType: one of the campaign scopes");
+  const ids = await resolveLaunchScope(tenantId, input);
+  const rows = await buildItems(tenantId, "00000000-0000-0000-0000-000000000000", input, ids);
+  const subjects = new Set(rows.map((r) => (r.identity_id ?? r.agent_id) as string));
+  const reviewers = new Set(rows.map((r) => r.reviewer_id as string));
+  const privileged = rows.filter((r) => r.risk_at_review === "high" || r.risk_at_review === "critical").length;
+  const reviewerFallbacks = rows.filter((r) => (r.snapshot as { reviewer?: { fallback?: boolean } } | null)?.reviewer?.fallback === true).length;
+  return { items: rows.length, subjects: subjects.size, privileged, reviewers: reviewers.size, reviewerFallbacks };
+}
+
+/**
+ * COMPLIANCE-P0-01.2. All five `scope_type`s populate real items:
+ * - `agent` — optionally narrowed by `scope.criticality` (an array).
+ * - `application` — every agent's grants on `scope.applicationId`.
+ * - `entitlement` — every agent's grants of `scope.entitlementId`.
+ * - `privileged_access` — every agent's grants whose entitlement is
+ *   `elevated`/`admin` privilege level.
+ * - `high_risk_agent` — every agent whose current `agents.risk_score` (set
+ *   by Risk Agent's `evaluateAgentRisk()`) is at/above `scope.minRiskScore`
+ *   or the `high` severity band default; all of that agent's grants.
+ * Scope input is validated before the campaign row is created, so an
+ * invalid scope never leaves behind an empty, orphaned campaign.
+ */
+export async function launchCampaign(tenantId: string, actorId: string, input: LaunchCampaignInput): Promise<CertificationCampaign> {
+  // PLATFORM-P0-12: certification campaigns are a flag-gated capability (on by default).
+  await requireFeature(tenantId, "certifications");
+  if (!input.name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
+
+  const { applicationId, entitlementId } = await resolveLaunchScope(tenantId, input);
 
   const supabase = await supabaseServer();
   const { data: campaignRow, error: campaignError } = await supabase
