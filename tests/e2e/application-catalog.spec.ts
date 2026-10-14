@@ -49,7 +49,7 @@ test.describe.serial("application catalog", () => {
     expect((await ok.json()).data).toMatchObject({ technicalOwnerIdentityId: ownerId, criticality: "critical", onboardingStatus: "DISCOVERED" });
   });
 
-  test("the inventory filters and the detail page shows the catalog", async ({ page }) => {
+  test("the inventory filters and the detail page shows the catalog", async ({ page, request }) => {
     await page.goto(`/access?q=${encodeURIComponent(`E2E Cat ${stamp}`)}&risk=high`);
     await expect(page.getByRole("heading", { level: 1, name: "Applications" })).toBeVisible();
     const row = page.getByRole("row", { name: new RegExp(`E2E Cat ${stamp}`) });
@@ -68,12 +68,19 @@ test.describe.serial("application catalog", () => {
     await page.getByRole("tab", { name: "Details" }).click();
     await expect(page.getByText("Acme Corp").first()).toBeVisible();
 
-    // An entitlement added by hand, on the Entitlements tab.
+    // An entitlement added by hand, on the Entitlements tab, always under a type.
     await page.getByRole("tab", { name: "Entitlements" }).click();
+    await expect(page.getByText("To add an entitlement, first add an entitlement type below.")).toBeVisible();
+    expect((await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: "Untyped", entitlementType: "No such type" } })).status()).toBe(400);
+    await page.getByLabel("New entitlement type").fill("Role");
+    await page.getByRole("button", { name: "Add type" }).click();
+    await page.getByLabel("Type of the new entitlement").selectOption("Role");
     await page.getByLabel("New entitlement", { exact: true }).fill(`E2E Cat Ent ${stamp}`);
     await page.getByLabel("New entitlement privilege").selectOption("admin");
     await page.getByRole("button", { name: "Add entitlement" }).click();
     await expect(page.getByText(`E2E Cat Ent ${stamp}`)).toBeVisible();
+    const added = ((await (await request.get(`/api/v1/access/applications/${appId}/entitlements`)).json()).data as { name: string; entitlementType: string | null }[]).find((e) => e.name === `E2E Cat Ent ${stamp}`);
+    expect(added?.entitlementType).toBe("Role");
   });
 });
 

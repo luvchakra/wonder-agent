@@ -14,9 +14,20 @@ export async function createEntitlement(
   name: string,
   dataClassification?: string,
   privilegeLevel: PrivilegeLevel = "standard",
+  entitlementType?: unknown,
 ): Promise<Entitlement> {
   if (!name.trim()) throw new ApiError(400, "INVALID_INPUT", "name is required");
   const supabase = await supabaseServer();
+  // Owner feedback 2026-10-14: an entitlement added under a type names one of
+  // the application's own entitlement types (read as the caller, under RLS).
+  let typeName: string | null = null;
+  if (entitlementType !== undefined && entitlementType !== null && entitlementType !== "") {
+    const wanted = typeof entitlementType === "string" ? entitlementType.trim().toLowerCase() : "";
+    const { data: types, error: typeError } = await supabase.from("application_entitlement_types").select("name").eq("tenant_id", tenantId).eq("application_id", applicationId).limit(200);
+    if (typeError) throw new ApiError(500, "QUERY_FAILED", typeError.message);
+    typeName = ((types ?? []) as { name: string }[]).find((t) => t.name.toLowerCase() === wanted)?.name ?? null;
+    if (!typeName) throw new ApiError(400, "VALIDATION_FAILED", "entitlementType: one of this application's entitlement types");
+  }
   const { data, error } = await supabase
     .from("entitlements")
     .insert({
@@ -25,6 +36,7 @@ export async function createEntitlement(
       name,
       data_classification: dataClassification ?? null,
       privilege_level: privilegeLevel,
+      ...(typeName ? { entitlement_type: typeName } : {}),
     })
     .select()
     .single();
