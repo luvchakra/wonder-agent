@@ -662,7 +662,7 @@ Newest first.
 | Date | What changed |
 |---|---|
 | 14 Oct 2026 | An account that an approved request creates now has a readable name (for example jane.doe) instead of an internal reference. An application's onboarding can set the account name format; older requests' accounts show "to be created". |
-| 14 Oct 2026 | On a phone, the bottom bar now has only **More**, which opens the full menu; the Home, Agents, Discover and Risk shortcuts are gone. Pages now have short addresses: an access request is at its number (/access/requests/42), and old links still work. |
+| 14 Oct 2026 | On a phone, the bottom bar is gone: a floating **More** button at the bottom right opens the full menu. Pages now have short addresses: an access request is at its number (/access/requests/42), and old links still work. |
 | 14 Oct 2026 | Every access request now has a number to quote, REQ and nine digits, shown with an animated barcode when you submit it, on the request's page and in the requests list. Earlier requests were numbered in the order they were made. |
 | 14 Oct 2026 | WonderID's own roles are now called "ID roles" everywhere (the sidebar, the ID Roles page, users, groups and permissions), to tell them apart from roles in your applications. A person's page has an ID Roles tab that shows the ID roles they hold, where an administrator can add or remove one. |
 | 14 Oct 2026 | An application's entitlements show "Requestable" only when someone can really request them; without a request policy they show "Needs a request policy", and the request catalog says why. The onboarding Approve button now works for an administrator's own submission. |

@@ -321,7 +321,7 @@ test.describe("design review — structure and theming", () => {
 
     const tabs = page.getByRole("navigation", { name: "Primary" });
     const targets = await tabs.locator("a, button").all();
-    expect(targets.length, "the bar holds only More (owner request 2026-10-14)").toBe(1);
+    expect(targets.length, "only the floating More button (owner request 2026-10-14)").toBe(1);
 
     for (const target of targets) {
       const box = await target.boundingBox();

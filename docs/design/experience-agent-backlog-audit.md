@@ -4251,3 +4251,14 @@ Verified: typecheck; eslint; Vitest modules/ui + lib/refs 121/121; local
 E2E shell + design-review mobile/rail tests 13/13. Separately, a full
 design-review run showed `/agents` 8px too wide at 1280px with the E2E
 data (a page this change does not touch); left for its own fix.
+
+### 2026-10-14 — Mobile "More" is a floating button (owner)
+
+Owner: "I meant just a floating more button, not entire navbar." The bar
+(full-width strip with a border) is gone; `MobileTabBar` is now a round
+56px button at the bottom right, above the home indicator, opening the
+same navigation drawer. Its accessible name stays "More", so the shell and
+design-review tests are unchanged apart from a message.
+
+Verified: typecheck; eslint; local E2E shell + design-review mobile/rail
+tests 13/13; a 390px screenshot shows the round button over the content, bottom right.
