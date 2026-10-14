@@ -2919,3 +2919,12 @@ Verified:
 ## 2026-10-13 — Demo kit instructions follow organization addresses (owner question)
 
 The Planet Express kit (`demo-org/`) needed one change. Its machines, systems and connection details call nothing in WonderID, so they are unaffected by today's address and environment work. Its README told people to open WonderID and pick **Integrations → Connect a system**. It now says to sign in at the organization's own address (`<org>[-env].id.wonderapps.biz`; the main address only lists organizations), that each environment holds its own connections, and that connectors are picked from **Integrations → Connector Library**.
+
+## 2026-10-14 — Contract-test gaps handed over by QA-P0-07
+
+QA-P0-07 (`modules/integrations/framework/contract.test.ts`) pins the connectors' current behaviour and lists what they do not do. Three items are worth a story:
+1. **Receivers.** The `/api/connect/v1/<connection>/…` receivers have no per-connection rate limit, only body-size caps and 500 events per request.
+2. **Reads.** A transient 5xx or network error is not retried within a run, and a 429's `Retry-After` is not honoured. The next scheduled sync is the retry.
+3. **Gateway.** `gateway.ts:253` does not pass an LDAP or SQL driver's read-completeness report through. That is harmless today, because neither driver reports one.
+
+No code changed.
