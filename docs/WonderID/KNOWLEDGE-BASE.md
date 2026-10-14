@@ -243,7 +243,7 @@ All information from your systems reaches WonderID through **connections**. Ther
 - **Application discovery:** applications found in connected systems but not yet in the catalog are listed for review.
 
 **Onboarding an application**
-1. **Configure:** choose its connection and how its accounts match identities.
+1. **Configure:** choose its connection and how its accounts match identities, and optionally an **account name format** for the accounts that approved requests create, such as `{firstName:lower}.{lastName:lower}` (placeholders: first name, last name, email, the email's name, username). Without one, a new account is named by the person's username or the name part of their email; an AI agent's by its name. If the name is taken in the application, -2, -3 is added.
 2. **Validate:** WonderID checks the configuration.
 3. **Simulate:** see what it would import before anything changes.
 4. **Approve:** a second person approves.
@@ -661,6 +661,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | An account that an approved request creates now has a readable name (for example jane.doe) instead of an internal reference. An application's onboarding can set the account name format; older requests' accounts show "to be created". |
 | 14 Oct 2026 | Every access request now has a number to quote, REQ and nine digits, shown with an animated barcode when you submit it, on the request's page and in the requests list. Earlier requests were numbered in the order they were made. |
 | 14 Oct 2026 | WonderID's own roles are now called "ID roles" everywhere (the sidebar, the ID Roles page, users, groups and permissions), to tell them apart from roles in your applications. A person's page has an ID Roles tab that shows the ID roles they hold, where an administrator can add or remove one. |
 | 14 Oct 2026 | An application's entitlements show "Requestable" only when someone can really request them; without a request policy they show "Needs a request policy", and the request catalog says why. The onboarding Approve button now works for an administrator's own submission. |

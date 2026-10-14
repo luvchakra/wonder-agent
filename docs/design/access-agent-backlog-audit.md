@@ -4272,3 +4272,57 @@ dropped; the number check stays. Same pull request: CLAUDE.md §19.13
 the Foundation backlog to roll it out.
 
 Verified: typecheck; eslint; Vitest modules/ui 118/118.
+
+### 2026-10-14 — Human-readable names for accounts a request creates (owner request)
+
+Owner: "the account id should be a human readable id, format normally
+defined during application onboarding phase". An approved request for a
+person with no account on the application showed its placeholder account
+as `pending:<identity uuid>` on the identity's Access tab.
+
+- **Account name format (ACCESS-P0-16).** The onboarding configuration has an
+  optional `accountNameFormat`, e.g. `{firstName:lower}.{lastName:lower}`.
+  Placeholders come from the identity's own fields: `{firstName}` and
+  `{lastName}` (first and last word of the display name), `{email}`,
+  `{emailName}` (local part), `{username}`; `:lower` lowercases. Validated by
+  `validateAccountNameFormat` (`accountNameRules.ts`, pure): known
+  placeholders only, at least one, literals limited to letters, digits and
+  `. _ @ -`, at most 100 characters. Saved through the existing configure
+  path (`app/actions/applications.ts` CONFIG_FIELDS, the API's configure
+  step), so it is versioned, invalidates approval and is audited as
+  `application.onboarding_configured` like every other field. The key is
+  absent when unset, so existing configuration hashes are unchanged. One
+  field on the configure form, one line of help. No migration: the format
+  lives in the onboarding configuration (jsonb) and is used once promoted,
+  like the rest of the live configuration; migration 0191 was not needed.
+- **Naming the placeholder (ACCESS-P0-28).** `pendingGrants.accountFor` sets
+  `account_name` from the promoted format applied to the subject identity
+  (`formatAccountName`); default without a format: username, else email
+  local part, else first.last; a placeholder the identity has no value for
+  falls back to the default (never half a name). An agent's account is its
+  name as a slug. Uniqueness within the tenant's application: candidates
+  `name`, `name-2` … `name-20` checked against `account_name` and
+  `external_account_ref` (two `.in()` queries, tenant-filtered, service role).
+- **Unchanged on purpose.** `external_account_ref` stays `pending:<id>`: it is
+  the unique key a concurrent insert re-reads by, and reconciliation upserts
+  real accounts on `(tenant, application, external_account_ref)`, so a
+  human-readable ref could merge another person's real "jane.doe" into the
+  placeholder. Pending is still recognised by `status = 'pending'`, and
+  `replacePlaceholders` still matches the real account by identity.
+- **Display.** `accountDisplayName` (name, else reference, but a legacy
+  `pending:` reference reads "to be created") used by the ledger (identity
+  Access tab), fulfilment tasks and the account inventory; the fulfilment
+  `accountLabel` says "to be created" too. Existing rows are not updated.
+
+Verified: typecheck clean; eslint on changed files clean; Vitest
+`modules/access-governance`, `tests/architecture`, `app/(customer)/access`
+43 files / 374 tests passed (new `accountNameRules.test.ts` 8 tests, an
+onboardingRules case); local E2E (`next build`, port 3200)
+application-onboarding, f1-reconciliation (now asserts the placeholder is
+named by the email's local part), fulfilment-assignment,
+connector-provisioning, onboarding-templates: 61/61 passed.
+
+Left out: onboarding templates cannot preset the format yet
+(`TEMPLATE_CONFIG_KEYS`); a connector's create-account call still sends the
+identity's email/username/display name, not the planned name
+(`newAccountTarget`); uniqueness compares exact case in the database.

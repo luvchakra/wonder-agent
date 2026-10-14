@@ -1,5 +1,6 @@
 import "server-only";
 
+import { accountDisplayName } from "./accountNameRules";
 import { getTenantConfig } from "@/lib/config/tenantConfig";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
@@ -77,7 +78,8 @@ function toAccount(r: Row, names: Map<string, { displayName: string; identityTyp
   const a = {
     id: r.id as string,
     externalAccountRef: r.external_account_ref as string,
-    accountName: (r.account_name as string | null) ?? null,
+    // A request's placeholder from before account name formats reads "to be created", never its internal reference.
+    accountName: (r.account_name as string | null) ?? ((r.external_account_ref as string).startsWith("pending:") ? accountDisplayName(null, r.external_account_ref as string) : null),
     applicationId: r.application_id as string,
     applicationName: r.applications?.display_name ?? r.applications?.name ?? "Unknown application",
     agentId: (r.agent_id as string | null) ?? null,

@@ -45,6 +45,16 @@ describe("configuration", () => {
     expect(configHash(reordered)).toBe(configHash(full));
     expect(configHash({ ...full, requestPolicy: "owner_approval" })).not.toBe(configHash(full));
   });
+
+  it("an account name format is validated, cleared when emptied, and leaves unset hashes unchanged", () => {
+    const named = validateOnboardingConfig({ accountNameFormat: "{firstName:lower}.{lastName:lower}" }, full);
+    expect(named.accountNameFormat).toBe("{firstName:lower}.{lastName:lower}");
+    expect(configHash(named)).not.toBe(configHash(full));
+    expect(err(() => validateOnboardingConfig({ accountNameFormat: "{badge}" }))).toMatch(/accountNameFormat/);
+    const cleared = validateOnboardingConfig({ accountNameFormat: "" }, named);
+    expect("accountNameFormat" in cleared).toBe(false);
+    expect(configHash(cleared)).toBe(configHash(full));
+  });
 });
 
 describe("checklist (spec §8.5)", () => {

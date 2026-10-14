@@ -228,8 +228,9 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(pending.fulfilment).toBe("pending_fulfilment");
     expect(pending.grants).toHaveLength(1);
     const placeholder = pending.grants[0].accountId;
-    const listed = (await (await request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`)).json()).data as { id: string; status: string; externalAccountRef: string }[];
-    expect(listed.find((a) => a.id === placeholder)).toMatchObject({ status: "pending", externalAccountRef: `pending:${caraId}` });
+    const listed = (await (await request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`)).json()).data as { id: string; status: string; externalAccountRef: string; accountName: string | null }[];
+    // Named for people (no format set: the email's local part); the reference stays internal.
+    expect(listed.find((a) => a.id === placeholder)).toMatchObject({ status: "pending", externalAccountRef: `pending:${caraId}`, accountName: mail("cara").split("@")[0] });
 
     // ACCESS-P0-29: a fulfilment task waits for the application's owner (Ana); an access manager may work it too.
     const tasks = async () => (await (await request.get(`/api/v1/access/fulfilment-tasks?requestId=${req.id}`)).json()).data as { id: string; status: string; assigneeIdentityId: string | null; dueAt: string }[];

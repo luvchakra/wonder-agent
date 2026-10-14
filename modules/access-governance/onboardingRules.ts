@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { validateAccountNameFormat } from "./accountNameRules";
 
 /**
  * ACCESS-P0-16 — application onboarding, pure (#9): the configuration and
@@ -26,6 +27,12 @@ export type OnboardingConfig = {
   requestPolicy: (typeof REQUEST_POLICIES)[number] | null;
   certificationPolicy: (typeof CERTIFICATION_POLICIES)[number] | null;
   provenanceEnabled: boolean;
+  /**
+   * How a request's new account is named (accountNameRules.ts). Absent
+   * means the default, and an absent key leaves existing configuration
+   * hashes unchanged.
+   */
+  accountNameFormat?: string;
 };
 
 export const EMPTY_CONFIG: OnboardingConfig = {
@@ -75,6 +82,11 @@ export function validateOnboardingConfig(input: Record<string, unknown>, current
   if (has("requestPolicy")) next.requestPolicy = oneOf(input.requestPolicy, "requestPolicy", REQUEST_POLICIES);
   if (has("certificationPolicy")) next.certificationPolicy = oneOf(input.certificationPolicy, "certificationPolicy", CERTIFICATION_POLICIES);
   if (has("provenanceEnabled")) next.provenanceEnabled = flag(input.provenanceEnabled);
+  if (has("accountNameFormat")) {
+    const format = validateAccountNameFormat(input.accountNameFormat);
+    if (format) next.accountNameFormat = format;
+    else delete next.accountNameFormat;
+  }
   if (next.entitlementSource === "connector" && !next.integrationId) fail("entitlementSource: entitlements from the connector need an integration");
   return next;
 }

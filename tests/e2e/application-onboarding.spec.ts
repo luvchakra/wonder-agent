@@ -78,6 +78,8 @@ test.describe.serial("application onboarding", () => {
   test("a missing account identifier fails validation, and nothing can be simulated or promoted", async ({ request }) => {
     const { accountIdentifierField: _omit, ...partial } = COMPLETE;
     void _omit;
+    // An account name format with an unknown placeholder is refused, and nothing changes.
+    expect((await step(request, appId, { action: "configure", config: { accountNameFormat: "{badge}" } })).status).toBe(400);
     expect((await step(request, appId, { action: "configure", config: partial })).status).toBe(200);
     const v = await step(request, appId, { action: "validate" });
     expect(v.data.status).toBe("FAILED");
