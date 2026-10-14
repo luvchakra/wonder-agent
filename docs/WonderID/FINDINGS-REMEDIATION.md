@@ -2,8 +2,8 @@
 
 What WonderID is doing about each finding in
 [`HIGH-RISK-FINDINGS.md`](HIGH-RISK-FINDINGS.md). That register is
-maintained by the hourly audit (ChatGPT, or the Claude Code audit routine,
-both authorised by the owner), which updates it freely. Sessions fixing
+maintained by the Claude Code hourly audit routine, authorised by the
+owner, which updates it through register-only pull requests. Sessions fixing
 findings read it and record their work here, never there (CLAUDE.md
 §19.12). This tracker
 holds:

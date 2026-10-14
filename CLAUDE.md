@@ -1548,21 +1548,22 @@ columns and are out of scope.
 
 `docs/WonderID/HIGH-RISK-FINDINGS.md` lists the Critical and High findings
 of the hourly audit of the knowledge base (owner decision, 2026-10-12). The
-owner has authorised ChatGPT and, since 2026-10-13, the Claude Code hourly
-audit routine to maintain it. Their updates, including direct commits of the
-register to `main`, are expected and must never be blocked, reverted or
-"corrected" (owner decisions, 2026-10-12 and 2026-10-13).
+Claude Code hourly audit routine maintains it; it is the only maintainer
+(owner decision, 2026-10-14; ChatGPT no longer takes part). Its updates,
+through the pull requests of rule 2, are expected and must never be
+blocked, reverted or "corrected" (owner decisions, 2026-10-12 to
+2026-10-14).
 
 1. **After every merge to `main`**, read the register on the latest `main`.
    Check every finding marked `OPEN`, `CHANGED` or `REOPENED`, not only new
    ones.
 2. **Who edits the register (owner decision, 2026-10-13, replacing the
    2026-10-12 rule that Claude Code never edits it).**
-   - The hourly audit edits it: ChatGPT, or a Claude Code session running
-     the scheduled audit routine. Change only the register, and commit only
+   - Only the hourly audit edits it: a Claude Code session running the
+     scheduled audit routine. Change only the register, and commit only
      when a status, finding or piece of evidence changed: each merge is a
      deployment (§19.9).
-   - A Claude Code audit session never pushes to `main` and never
+   - The audit session never pushes to `main` and never
      force-pushes (owner decision, 2026-10-14, after a run pushed to `main`
      from a stale checkout). It runs `git fetch origin main` and branches
      from `origin/main` before any change, fetches and rebases again right
@@ -1571,8 +1572,6 @@ register to `main`, are expected and must never be blocked, reverted or
      It squash-merges that register-only pull request itself once CI is
      green, without waiting for "merge now" (owner decision, 2026-10-13; an
      exception to §19.9 rule 0 for this routine).
-   - ChatGPT may commit only the register directly to `main`, after
-     re-fetching its blob SHA.
    - Keep the audit independent. A session that fixes findings records its
      work in the tracker (rule 4), not the register, and never marks its own
      fix `FIXED` there.
