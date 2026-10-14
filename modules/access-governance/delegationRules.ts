@@ -10,9 +10,13 @@
  * Part 2: a `requests` delegation lets the delegate ask for access on the
  * delegator's behalf, with the delegator's own request rights (never an
  * access manager's); neither of them approves such a request.
+ *
+ * Part 3: an `administration` delegation gives the delegate time-bound
+ * copies of the delegator's roles (Foundation's delegatedRoles); only
+ * someone who manages roles sets one up, and never to themselves.
  */
 
-export const DELEGATION_SCOPES = ["approvals", "requests"] as const;
+export const DELEGATION_SCOPES = ["approvals", "requests", "administration"] as const;
 export type DelegationScope = (typeof DELEGATION_SCOPES)[number];
 /** The longest a delegation may run. */
 export const MAX_DELEGATION_DAYS = 180;
@@ -26,12 +30,13 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * A new delegation: by default the caller's own approvals, from now; only
  * someone who manages access may set one for another person.
  */
-export function validateDelegation(input: DelegationInput, caller: { userId: string; canManageAccess: boolean }, now: Date): ValidDelegation | { error: string; status?: number } {
+export function validateDelegation(input: DelegationInput, caller: { userId: string; canManageAccess: boolean; canManageRoles?: boolean }, now: Date): ValidDelegation | { error: string; status?: number } {
   const delegator = input.delegatorUserId === undefined || input.delegatorUserId === null || input.delegatorUserId === "" ? caller.userId : input.delegatorUserId;
   if (typeof delegator !== "string" || !UUID_RE.test(delegator)) return { error: "delegatorUserId: a member" };
   if (delegator !== caller.userId && !caller.canManageAccess) return { error: "Only an access manager can delegate for someone else", status: 403 };
   const scope = input.scope === undefined || input.scope === null || input.scope === "" ? "approvals" : input.scope;
-  if (!(DELEGATION_SCOPES as readonly unknown[]).includes(scope)) return { error: "scope: approvals or requests" };
+  if (!(DELEGATION_SCOPES as readonly unknown[]).includes(scope)) return { error: "scope: approvals, requests or administration" };
+  if (scope === "administration" && !caller.canManageRoles) return { error: "Only someone who manages roles can delegate administration", status: 403 };
   if (typeof input.delegateUserId !== "string" || !UUID_RE.test(input.delegateUserId)) return { error: "delegateUserId: the member who decides instead" };
   if (input.delegateUserId === delegator) return { error: "delegateUserId: someone other than the person away" };
   const start = input.startsAt ? new Date(String(input.startsAt)) : now;

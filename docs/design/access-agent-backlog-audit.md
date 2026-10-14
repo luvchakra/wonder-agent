@@ -3921,3 +3921,47 @@ Access managers can choose whose approvals.
 - Agent directions (human→agent, agent→human, agent→agent), which belong with ACCESS-P0-37.
 
 **Docs.** The knowledge base's revision history moved to the end, newest first, at the owner's request, with today's missing entries and body text added. ROADMAP-PROGRESS marks were brought up to date. From now on both are updated in the same pull request as each piece of work.
+
+## 2026-10-14 — ACCESS-P0-23 part 3: administration delegation
+
+Built on the owner's decision of the same day.
+
+**How it works.** An `administration` delegation gives the delegate time-bound copies of the delegator's directly assigned roles. The copies are written by Foundation's new `lib/rbac/delegatedRoles.ts` as ordinary `user_roles` assignments. Each copy:
+- keeps its original scope and MFA condition;
+- lasts no longer than the delegation or the original assignment;
+- carries `delegation_id`.
+
+The authorization engine is unchanged: it treats the copies like any other assignment.
+
+**Rules** (`lib/rbac/delegatedRoleRules.ts`, pure). These roles are never copied:
+- Tenant Administrator, which is always permanent (migration 0100);
+- a role the delegate already holds, so their own assignment is never altered;
+- a role held only by delegation, so there is no re-delegation;
+- an inactive role, or an assignment that has ended.
+
+**Service** (`delegations.ts`).
+- Only a caller with `role.manage` creates one, and never to themselves: the database's no-self-grant check stands.
+- A delegation that would copy nothing is ended at once and refused with `NOTHING_TO_DELEGATE`.
+- Ending early deletes exactly that delegation's copies. Ending again finishes an interrupted removal.
+- Every copy and every removal is audited as `role.assigned` / `role.removed` with the `delegationId`.
+- Foundation's `assignRole` clears `delegation_id` when an administrator sets a copy's terms. It then becomes an ordinary assignment and stays.
+
+**Migration 0178.**
+- The scope list gains `administration`.
+- `user_roles.delegation_id` is added: nullable, indexed, cascading on the delegation.
+
+**UI.** Delegations › What › "Administration (their roles)" appears only for someone with `role.manage`.
+
+**Also fixed.** `permission-catalog.spec.ts` looked for the "Administration" heading anywhere on the page. The Admin sidebar has had its own since the new navigation (13 October), so the spec now looks only in the page body. It was a test-only fault, red on main too.
+
+**Verified.**
+- Unit tests in `lib/rbac` and `modules/access-governance`: 365 passed. They include the copy planner (scope and MFA kept, every exclusion, never past the original's expiry) and the scope validation.
+- `tests/access/delegations-isolation.sql`: 10 of 10, rolled back, with all three scopes.
+- Local E2E on one worker:
+  - `approval-delegation`, `authorization`, `custom-roles` and `users` passed (34 tests). The new case covers:
+    - only a role manager sets one up;
+    - Tenant Administrator alone gives nothing (409);
+    - the copy is IAM_ADMIN until the end date;
+    - the delegate can then manage access for someone else;
+    - ended early, the copy is gone and so is the right.
+  - `permission-catalog` 9/9 after its fix.

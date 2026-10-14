@@ -13,7 +13,7 @@ async function call(url: string, body?: unknown): Promise<string | null> {
   return !res.ok || !json.ok ? (json.error?.message ?? "It could not be saved") : null;
 }
 
-export function DelegationForm({ people, everyone }: { people: { id: string; label: string }[]; everyone: { id: string; label: string }[] | null }) {
+export function DelegationForm({ people, everyone, canDelegateAdministration = false }: { people: { id: string; label: string }[]; everyone: { id: string; label: string }[] | null; canDelegateAdministration?: boolean }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -51,6 +51,8 @@ export function DelegationForm({ people, everyone }: { people: { id: string; lab
       <SelectField label="What" name="scope" defaultValue="approvals">
         <option value="approvals">Deciding approvals</option>
         <option value="requests">Asking for access</option>
+        {/* Part 3: their roles, as copies until the end date; only for someone who manages roles. */}
+        {canDelegateAdministration ? <option value="administration">Administration (their roles)</option> : null}
       </SelectField>
       <SelectField label="To" name="delegateUserId" required defaultValue="">
         <option value="" disabled>

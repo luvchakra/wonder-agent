@@ -50,7 +50,7 @@ export default async function DelegationsPage() {
                 <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
                   <span className="min-w-0">
                     {name(d.delegatorUserId)} → {name(d.delegateUserId)}
-                    <span className="text-muted-foreground"> · {d.scope === "requests" ? "asking for access" : "approvals"}</span>
+                    <span className="text-muted-foreground"> · {d.scope === "requests" ? "asking for access" : d.scope === "administration" ? "administration" : "approvals"}</span>
                     <span className="block text-xs text-muted-foreground">
                       {day(d.startsAt)} – {day(d.endsAt)}
                       {d.reason ? ` · ${d.reason}` : ""}
@@ -69,7 +69,7 @@ export default async function DelegationsPage() {
       <details className="rounded-lg border border-border bg-card p-4">
         <summary className="cursor-pointer text-sm font-medium text-foreground">New delegation</summary>
         <div className="mt-4">
-          <DelegationForm people={people.filter((p) => p.id !== ctx.userId)} everyone={canManage ? people : null} />
+          <DelegationForm people={people.filter((p) => p.id !== ctx.userId)} everyone={canManage ? people : null} canDelegateAdministration={ctx.permissions.includes("role.manage")} />
         </div>
       </details>
     </div>

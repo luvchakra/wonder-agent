@@ -14,6 +14,9 @@
 -- is stored and seen exactly like an approval one; any other scope is
 -- refused.
 --
+-- Migration 0178 (part 3) adds `administration`; rerun 2026-10-14 after
+-- it, 10 of 10 as expected with X and Y seeing 3 (one of each scope).
+--
 -- Rerun 2026-10-14 after 0177, 10 of 10 as expected: the counts below
 -- are 2 for X and Y (one delegation of each scope), and scope 'admin' is
 -- refused with 23514.
@@ -42,6 +45,7 @@ begin
   insert into tenant_memberships (tenant_id, user_id, status) values (a, x, 'active'), (a, y, 'active'), (a, w, 'active'), (b, z, 'active');
   insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, starts_at, ends_at) values (a, x, y, now(), now() + interval '7 days');
   insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, scope, starts_at, ends_at) values (a, x, y, 'requests', now(), now() + interval '7 days');
+  insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, scope, starts_at, ends_at) values (a, x, y, 'administration', now(), now() + interval '7 days');
   begin
     insert into access_delegations (tenant_id, delegator_user_id, delegate_user_id, scope, starts_at, ends_at) values (a, x, y, 'admin', now(), now() + interval '1 day');
     results := results || E'\nscope admin (expect denied): ALLOWED';
@@ -66,9 +70,9 @@ begin
 
   execute 'set local role authenticated';
   perform set_config('request.jwt.claims', json_build_object('sub', x, 'role', 'authenticated')::text, true);
-  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nX (delegator) sees (expect 2): ' || c;
+  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nX (delegator) sees (expect 3): ' || c;
   perform set_config('request.jwt.claims', json_build_object('sub', y, 'role', 'authenticated')::text, true);
-  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nY (delegate) sees (expect 2): ' || c;
+  select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nY (delegate) sees (expect 3): ' || c;
   perform set_config('request.jwt.claims', json_build_object('sub', w, 'role', 'authenticated')::text, true);
   select count(*) into c from access_delegations where tenant_id = a; results := results || E'\nW (another member) sees (expect 0): ' || c;
   perform set_config('request.jwt.claims', json_build_object('sub', z, 'role', 'authenticated')::text, true);

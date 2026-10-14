@@ -40,7 +40,7 @@ for every non-"Done" row is in `docs/design/access-agent-backlog-audit.md`.
 | ACCESS-P0-20 | Access packages | Done — 2026-09-26, migration 0094 (provisioning by INTEGRATION-P0-13; extension and package certification later). 2026-10-13: birthright, turned on by two administrators (0151); a mover's birthright packages they no longer qualify for go to a 14-day review, then are removed unless kept (0153, WID-H09) |
 | ACCESS-P0-21 | Business and IT roles | Not Started — 2026-09-26, WonderID |
 | ACCESS-P0-22 | Preventive SoD on entitlement combinations | Not Started — 2026-09-26, WonderID |
-| ACCESS-P0-23 | Delegations | Partial — 2026-10-14: approval (0176) and request (0177) delegation; administration delegation waits for an owner decision; agent directions not started |
+| ACCESS-P0-23 | Delegations | Partial — 2026-10-14: approval (0176), request (0177) and administration (0178) delegation; agent directions not started |
 | ACCESS-P0-24 | Access ledger and provenance | Done — 2026-10-10, migration 0114 (role, lifecycle, emergency and legacy sources wait for those features; connectors' entitlements reach it once they are reconciled) |
 | ACCESS-P0-25 | Imported access classification and drift findings | Done — 2026-10-11: migration 0120 (isolation SQL 12/12); baseline per application; legacy / authorized / unproven / rogue in the ledger and on the account page; one Risk finding per rogue access |
 | ACCESS-P0-26 | SoD rules and conflicts pages; organization-wide entitlement list | Done — 2026-10-10 (owner request) |

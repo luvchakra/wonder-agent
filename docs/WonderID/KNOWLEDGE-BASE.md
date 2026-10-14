@@ -310,6 +310,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 - Nobody can approve a request they made, or one that is for them.
 - Approvers get a message with a link straight to the request when it reaches them.
 - **Away?** Hand your approvals or your requests to a colleague until a date (Approvals → Delegate your approvals). They act on your behalf, every decision records both of you, and either of you (or an access manager) can end it.
+- **Administration:** someone who manages roles can also hand a person's administration to a colleague. The colleague gets copies of that person's roles until the end date; ending it early removes them at once. The Tenant Administrator role is never handed over, and roles the colleague already holds are left as they are.
 - A request policy can approve low- and medium-risk requests automatically; these are recorded as approved automatically. High-risk requests always wait for a person.
 - Separation-of-duties rules can block a request that would give a conflicting combination of access.
 
@@ -645,6 +646,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 14 Oct 2026 | Administration can be handed to a colleague for a time: they get copies of the person's roles until the end date, removed at once if it ends early. Tenant Administrator is never handed over. |
 | 14 Oct 2026 | Your request rights can be handed to a colleague for a time: they ask for access on your behalf, both of you are recorded, and neither of you approves it. |
 | 14 Oct 2026 | Connection types can be written in a guided form beside the JSON, with field paths picked from a sample response. |
 | 14 Oct 2026 | Approved access for someone with both an everyday and an admin account on an application goes to their everyday account; admin access still waits for a person to choose. |

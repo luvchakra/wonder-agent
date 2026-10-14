@@ -61,7 +61,10 @@ describe("approver delegation (ACCESS-P0-23)", () => {
   it("part 2: a request delegation has its own scope, and approvals are not requests", () => {
     const v = validateDelegation({ delegateUserId: ALEX, scope: "requests", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: false }, now);
     expect(v).toMatchObject({ scope: "requests", delegator_user_id: ME });
-    expect(validateDelegation({ delegateUserId: ALEX, scope: "admin", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: false }, now)).toEqual({ error: "scope: approvals or requests" });
+    expect(validateDelegation({ delegateUserId: ALEX, scope: "admin", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: false }, now)).toEqual({ error: "scope: approvals, requests or administration" });
+    // Part 3: administration only from someone who manages roles.
+    expect(validateDelegation({ delegateUserId: ALEX, scope: "administration", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: true }, now)).toMatchObject({ status: 403 });
+    expect(validateDelegation({ delegateUserId: ALEX, scope: "administration", endsAt: "2026-10-20T00:00:00Z" }, { userId: ME, canManageAccess: false, canManageRoles: true }, now)).toMatchObject({ scope: "administration" });
     const d = { startsAt: "2026-10-14T09:00:00Z", endsAt: "2026-10-15T00:00:00Z", revokedAt: null };
     const list = [{ delegatorUserId: SAM, delegateUserId: ME, scope: "requests" as const, ...d }];
     expect(actingFor(list, ME, now, "requests")).toEqual([SAM]);

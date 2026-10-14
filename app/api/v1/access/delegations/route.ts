@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   try {
     const ctx = await requirePermission("access.read");
     const body = ((await request.json().catch(() => null)) ?? {}) as Record<string, unknown>;
-    const data = await createDelegation(ctx.tenantId!, { userId: ctx.userId, canManageAccess: ctx.permissions.includes("access.manage") }, body);
+    const data = await createDelegation(ctx.tenantId!, { userId: ctx.userId, canManageAccess: ctx.permissions.includes("access.manage"), canManageRoles: ctx.permissions.includes("role.manage") }, body);
     return NextResponse.json({ ok: true, data }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

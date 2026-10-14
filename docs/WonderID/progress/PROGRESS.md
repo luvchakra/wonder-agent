@@ -145,7 +145,7 @@ Exit test: not run.
 |---|---|---|---|---|
 | ACCESS-P0-21 Business and IT roles | Access | | Not started | Backlog: Not Started |
 | ACCESS-P0-22 Entitlement SoD | Access | | Not started | Backlog: Not Started |
-| ACCESS-P0-23 Delegations | Access | | Partial | 2026-10-14 part 1 (0176): approver delegation: time-limited, never to oneself, at most 180 days; the delegate decides named steps on the approver's behalf (both recorded and audited) and is notified; ended by either person or an access manager. Part 2 (0177): request delegation, where the delegate asks with the person's own request rights (never an access manager's), both are recorded, and neither approves it. Left: administration rights (owner decision) and agent directions |
+| ACCESS-P0-23 Delegations | Access | | Partial | 2026-10-14 part 1 (0176): approver delegation: time-limited, never to oneself, at most 180 days; the delegate decides named steps on the approver's behalf (both recorded and audited) and is notified; ended by either person or an access manager. Part 2 (0177): request delegation, where the delegate asks with the person's own request rights (never an access manager's), both are recorded, and neither approves it. Part 3 (0178): administration delegation, where the delegate gets time-bound copies of the person's roles (never Tenant Administrator) through Foundation's assignments, removed at once when ended early. Left: agent directions |
 | ACCESS-P0-35 † Approved changes to governance objects | Access | | Not started | |
 | ACCESS-P0-36 † SoD violation workflow; import guardrail | Access | | Not started | |
 
@@ -227,3 +227,4 @@ Exit test: not run.
 - 2026-10-14: QA-P0-22 partial (brownfield E2E to verified access). It found that approval opened no fulfilment task for a person with a standard and an admin account; standard access now goes to the one standard account.
 - 2026-10-14: QA-P0-07 done (connector contract tests, #185). EXPERIENCE-P0-30 done (guided connector editor).
 - 2026-10-14: ACCESS-P0-23 part 2, request delegation (migration 0177).
+- 2026-10-14: ACCESS-P0-23 part 3, administration delegation (migration 0178).
