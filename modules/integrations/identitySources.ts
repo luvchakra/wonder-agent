@@ -125,6 +125,16 @@ export async function listIdentitySources(tenantId: string): Promise<IdentitySou
   return (data ?? []).map(toSource);
 }
 
+/** The names of the given sources, for labels; however many sources the organization has. */
+export async function getIdentitySourceNames(tenantId: string, sourceIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(sourceIds)].filter((id) => UUID_RE.test(id));
+  if (!ids.length) return new Map();
+  const supabase = await supabaseServer();
+  const { data, error } = await supabase.from("identity_sources").select("id, name").eq("tenant_id", tenantId).in("id", ids);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return new Map((data ?? []).map((r) => [r.id as string, r.name as string]));
+}
+
 export async function getIdentitySource(tenantId: string, sourceId: string): Promise<IdentitySource | null> {
   if (!UUID_RE.test(sourceId)) return null;
   const supabase = await supabaseServer();
@@ -907,7 +917,7 @@ export async function listSourceLinksForIdentity(tenantId: string, identityId: s
     .eq("identity_id", identityId)
     .limit(50);
   if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
-  const sources = new Map((await listIdentitySources(tenantId)).map((s) => [s.id, s.name]));
+  const sources = await getIdentitySourceNames(tenantId, (data ?? []).map((l) => l.source_id as string));
   return (data ?? []).map((l) => ({
     sourceId: l.source_id as string,
     sourceName: sources.get(l.source_id as string) ?? "A source",

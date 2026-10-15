@@ -3072,3 +3072,15 @@ declared agent under "AI agents" with "Declared by the server", "Drafts only"
 and "AI-generated output". A `draft_…` tool declared "tool" stays in the
 tools table. The live WonderArk server needs its stored bearer token, so it
 is confirmed by rediscovering it in the app after the merge.
+
+## 2026-10-15 — Source names beyond the first 200 sources
+
+`getIdentitySourceNames(tenantId, ids)` (`identitySources.ts`) reads the
+names of the given sources by id, filtered by tenant. It replaces
+`listIdentitySources()` as the name lookup on two pages, because that call
+reads at most 200 sources:
+- the pending-matches page and its source disagreements;
+- `listSourceLinksForIdentity`, the identity page.
+
+Found by the 15 Oct E2E run: the E2E organization has 296 sources. See the
+QA entry of the same date.
