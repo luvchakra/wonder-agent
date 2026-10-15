@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listPermissionCatalog } from "./permissionCatalog";
 import { validatePolicy } from "./policyRules";
@@ -141,7 +142,14 @@ export async function updateAuthorizationPolicy(tenantId: string, actorId: strin
     objectType: "authorization_policy",
     objectId: id,
     outcome: "success",
-    metadata: { before: { effect: before.effect, permissions: before.permissions, scopeType: before.scopeType, scopeValues: before.scopeValues, exemptRoleIds: before.exemptRoleIds }, after: afterRow },
+    metadata: {
+      before: { effect: before.effect, permissions: before.permissions, scopeType: before.scopeType, scopeValues: before.scopeValues, exemptRoleIds: before.exemptRoleIds },
+      after: afterRow,
+      changes: fieldChanges(
+        { name: before.name, description: before.description, effect: before.effect, permissions: before.permissions, scope_type: before.scopeType, scope_values: before.scopeValues, exempt_role_ids: before.exemptRoleIds },
+        toRow(v.value),
+      ),
+    },
     typedText: { description: (description as string | null) ?? null },
   });
   return { ok: true, id };

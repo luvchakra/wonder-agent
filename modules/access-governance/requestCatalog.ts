@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessRequest } from "@/lib/shared/types/access-governance";
 import { getAgentContract, getIdentity, getIdentityForUser, getIdentityNames, listOwners } from "@/modules/agent-identity/service";
@@ -201,7 +202,14 @@ export async function applyRequestPolicy(
     objectType: "access_request_policy",
     objectId: policy.id,
     outcome: "success",
-    metadata: { applicationId: key.applicationId, entitlementId: key.entitlementId, version, ...(opts.changeId ? { changeId: opts.changeId, requestedBy: opts.createdBy } : {}), ...fields },
+    metadata: {
+      applicationId: key.applicationId,
+      entitlementId: key.entitlementId,
+      version,
+      ...(opts.changeId ? { changeId: opts.changeId, requestedBy: opts.createdBy } : {}),
+      ...fields,
+      ...(existing ? { changes: fieldChanges(existing, fields) } : {}),
+    },
   });
   return policy;
 }

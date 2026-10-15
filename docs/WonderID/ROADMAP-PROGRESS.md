@@ -17,7 +17,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `███████░░░` 70% |
 | 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `██░░░░░░░░` 20% |
 | 9 | [Agent ID and trusted credentials](#9-agent-id-and-trusted-credentials) | `░░░░░░░░░░` 0% |
-| 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `█████░░░░░` 54% |
+| 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `██████░░░░` 57% |
 | 11 | [Advanced governance](#11-advanced-governance) | `░░░░░░░░░░` 0% |
 | 12 | [Intelligence and experience](#12-intelligence-and-experience) | `█░░░░░░░░░` 6% |
 | 13 | [Release readiness](#13-release-readiness) | `█████░░░░░` 50% |
@@ -133,7 +133,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ⬜ Agent risk factors and suspension
 - ⬜ Gateway security suite
 
-## 10. Workflow, forms and configuration — 54%
+## 10. Workflow, forms and configuration — 57%
 
 - ⬜ Workflow designer
 - ⬜ Event subscriptions and channels
@@ -146,6 +146,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Short number keys in URLs
 - ✅ AI agents found among MCP tools
 - ✅ AI agents declared by MCP servers
+- ✅ Old and new values in the audit trail for configuration changes
 - ⬜ Generated identifiers
 - ✅ Guided connector editor
 - ⬜ Integrator test suite

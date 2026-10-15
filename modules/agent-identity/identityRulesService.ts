@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentityAttributeDefinition, IdentityType } from "@/lib/shared/types/agent-identity";
 import { evaluateRules, recordRuleRuns, validateRule, type RuleEvent, type RuleRunRecord } from "@/modules/operations/service";
@@ -245,7 +246,7 @@ export async function updateIdentityRule(tenantId: string, actorId: string, rule
     objectType: "lifecycle_rule",
     objectId: ruleId,
     outcome: "success",
-    metadata: { fields: Object.keys(input) },
+    metadata: { fields: Object.keys(input), changes: fieldChanges(row, v) },
   });
   return toRule(data);
 }

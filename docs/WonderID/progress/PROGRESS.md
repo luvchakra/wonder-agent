@@ -137,7 +137,7 @@ Exit test: not run.
 | COMPLIANCE-P0-11 Certification of administrators | Compliance | | Done | 2026-10-14 (0183): campaigns over WonderID role assignments, direct and through a group, privileged first; reviewed by the manager or a named reviewer, never one's own; a revoke removes the role or the group membership through Foundation's services |
 | COMPLIANCE-P0-14 † Templates, preview, consultation, closed loop, SLA report | Compliance | | Done | 2026-10-14 part 1 (0185): campaign templates (save, launch, archive) and a preview that counts a campaign before launch. Part 2: reports "Revocation closure" (closed loop) and "Leaver removal SLA" (termination SLA). Part 3 (0186): consultation, a reviewer asks a member about an item; that member answers once; the answer stays with the item |
 | IDENTITY-P0-23 † Human identity merge | Identity | | Not started | |
-| FOUNDATION-P0-33 † Attribute-level audit detail | Foundation + Operations | | Not started | |
+| FOUNDATION-P0-33 † Attribute-level audit detail | Foundation + Operations | | Done | 2026-10-15: old and new values per field on configuration edits, shown on the Audit Trail |
 
 ## F5: Roles, separation of duties and delegation
 

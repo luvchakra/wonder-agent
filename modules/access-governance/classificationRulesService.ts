@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { evaluateRules, recordRuleRuns, ruleReferences, sameRuleDefinition, validateRule, type Rule, type RuleEvent, type RuleRunRecord } from "@/modules/operations/service";
 import {
@@ -201,7 +202,7 @@ export async function updateClassificationRule(tenantId: string, actorId: string
     objectType: "classification_rule",
     objectId: ruleId,
     outcome: "success",
-    metadata: { fields: Object.keys(input) },
+    metadata: { fields: Object.keys(input), changes: fieldChanges(row, v) },
   });
   return toRule(data);
 }

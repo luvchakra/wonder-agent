@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { ApplicationEntitlementType, Entitlement } from "@/lib/shared/types/access-governance";
 import { toEntitlement } from "./mappers";
@@ -125,7 +126,7 @@ export async function updateEntitlementType(tenantId: string, actorId: string, a
     objectType: "application",
     objectId: applicationId,
     outcome: "success",
-    metadata: { typeId, changed: v },
+    metadata: { typeId, changed: v, changes: fieldChanges(current, v) },
   });
   return toType(data);
 }

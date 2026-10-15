@@ -8,13 +8,13 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-10-14 from 11 module backlogs.
+Generated 2026-10-15 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**233 of 276 tracked stories complete — 84%**
+**234 of 277 tracked stories complete — 84%**
 
 ```
 ██████████████████████████████████░░░░░░  84%
@@ -22,11 +22,11 @@ Generated 2026-10-14 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 233 |
+| Done | 234 |
 | Partial | 26 |
 | Deferred | 1 |
 | Not Started | 16 |
-| **Total tracked** | **276** |
+| **Total tracked** | **277** |
 
 Beyond these, the backlogs list **53 P1** and **32 P2** forward-looking items.
 Those are prose scope bullets rather than tracked stories, so they carry no status
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 41 | 3 | 0 | 2 | 46 | `████████████████░░` 89% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 42 | 3 | 0 | 2 | 47 | `████████████████░░` 89% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 20 | 0 | 0 | 1 | 21 | `█████████████████░` 95% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 27 | 3 | 0 | 0 | 30 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 41 done · 3 partial · 0 deferred · 2 not started (46 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 42 done · 3 partial · 0 deferred · 2 not started (47 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -107,6 +107,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-30 | IT security hardening: headers, cross-site write guard, key rotation, redaction, security.txt, CI | Done — 2026-10-01 (HSTS/COOP/CORP/CSP; `isCrossSiteApiWrite()`; `SECRET_ENCRYPTION_KEY_PREVIOUS`; `.github/workflows/security.yml`. Supabase leaked-password protection needs the owner, see audit log) |
 | FOUNDATION-P0-31 | Automation credentials for the administration API; Global Configuration and schedule API routes; Configuration administrator role template (F1, #67; D11 approved 2026-10-12) | Done — 2026-10-12: migrations 0126–0127; `wa_ac_` bearer on /api/v1/* through a backing automation member (RLS and the engine unchanged); four-eyes create/extend; expiry, CIDR, rate limit, rotate, revoke; per-call audit with on-behalf-of; /api/v1/tenant/configuration; CONFIGURATION_ADMIN template |
 | FOUNDATION-P0-32 | Bulk invitation by CSV and an invitation API (F2, #68) | Done — 2026-10-11: CSV via the framework (member kind, 0125) with preview; POST /api/v1/users/invitations (session; automation credential with P0-31); expiry, re-send, revoke; no role escalation |
+| FOUNDATION-P0-33 | Attribute-level old and new values in audit detail for configuration objects | Done — 2026-10-15: `lib/audit/changes.ts` (`fieldChanges`) writes `metadata.changes` (field, from, to) on edits of roles, groups, authorization policies, policies, request policies, identity and classification rules, onboarding templates, entitlement types, applications, packages, data sources, identity sources and connection names; typed text and secrets are listed as changed without values (WID-H07, #10); the Audit Trail folds them under the action |
 | FOUNDATION-P0-34 | Short number keys in URLs: a per-organization number on every object table, number URLs on every object page, UUID links redirect (owner decision 2026-10-14, CLAUDE.md §19.13) | Done — 2026-10-15: migration 0192 (run by the owner), `lib/refs/objectRef.ts`; requests (#214), identities/integrations/policies (#217), compliance/risk/settings/platform (#218), access objects and agent pages (#219). A few cross-area links still pass a UUID and redirect |
 
 ### 02 — Identity Agent

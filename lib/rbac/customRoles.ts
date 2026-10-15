@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { listPermissionCatalog } from "./permissionCatalog";
 import { escalationIn, permissionDiff, validateRoleInput, type RoleInput } from "./roleRules";
@@ -282,7 +283,12 @@ export async function updateRole(tenantId: string, actor: Actor, roleId: string,
     objectType: "role",
     objectId: r.id,
     outcome: "success",
-    metadata: { name: v.name, renamedFrom: r.name !== v.name ? r.name : null, ...diff },
+    metadata: {
+      name: v.name,
+      renamedFrom: r.name !== v.name ? r.name : null,
+      ...diff,
+      changes: fieldChanges({ name: r.name, description: r.description, permissions: [...previous].sort() }, { name: v.name, description: v.description, permissions: [...v.permissions].sort() }),
+    },
   });
   return { ok: true, roleId: r.id, roleRef: r.ref };
 }
