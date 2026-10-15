@@ -46,7 +46,7 @@ which should generally be last, per `docs/RUN_ORDER.md`.
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
-| QA-P0-21 | WonderID security hardening pass | Not Started — 2026-09-26, WonderID |
+| QA-P0-21 | WonderID security hardening pass | Partial — 2026-10-15 part 1: database review (every table has RLS; advisors reviewed; migration 0195 indexes 50 foreign keys and makes 7 RLS policies evaluate auth.uid() once per query, to be run by the owner). Left: the 37A test matrix (ID tampering, SSRF, webhook replay, prompt injection, audit completeness) and the PDP performance budget |
 | QA-P0-22 | Brownfield migration fixture | Done — 2026-10-14: `brownfield.spec.ts` covers HR import to verified and removed access for legitimate, privileged, stale, orphan, ambiguous, service, agent and external cases, conflicting sources, legacy access, and an application-owner certification that certifies and revokes |
 | QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Done — 2026-10-11: person, service account and agent to verified; removal and expiry revoked; approver ≠ requester; isolation SQL for 0123/0124; repeated reconciliation changes nothing |

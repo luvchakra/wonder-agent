@@ -2133,3 +2133,46 @@ accept `e2e/nightly-3`. `scripts/e2e-on-vercel.sh` deals the spec files
 round-robin over three parts, slow specs first. CLAUDE.md §19.8, §19.9 and
 RUN-ORDER are updated. Verified: `bash -n` on the scripts. Tonight's nightly
 run is the check.
+
+## 2026-10-15 — QA-P0-21 part 1: database security and performance review
+
+**Checked against the dev database (Supabase advisors and the catalog):**
+
+- **RLS on every table.** No table in `public` has RLS disabled. The tables
+  without `tenant_id` fall into three groups, each expected:
+  - global catalogs: `permissions`, `controls`, `control_frameworks`,
+    `integration_types`, `billing_prices`;
+  - child tables whose policies go through their parent: `certification_decisions`,
+    `policy_rules`, `policy_versions`, `integration_mappings`, `risk_evidence`,
+    `role_permissions`;
+  - vendor-only platform tables.
+- **RLS on with no policy (17 tables, advisor INFO).** All are service-role only
+  by design: the platform tables, integration credentials, connector
+  receivers and files, agent API keys, billing internals and the auth rate
+  limiter. With RLS on and no policy, a signed-in user reads none of their
+  rows. No change.
+- **SECURITY DEFINER functions callable by signed-in users (16, advisor
+  WARN).** These are the membership helpers that RLS itself relies on, and the
+  owner and organization functions, each of which checks its caller. No
+  change.
+- **`resolve_tenant_host` callable by anonymous users.** This is deliberate
+  (migration 0095): the proxy resolves an organization's address before
+  sign-in. It returns only the name, address and status that the sign-in
+  page shows anyway.
+- **Leaked-password protection.** Off by owner decision (CLAUDE.md §18.1).
+
+**Fixed, migration `0195_qa_hardening_fk_indexes_rls_initplan.sql`:**
+
+- Seven RLS policies (notifications, notification preferences, privacy
+  consent and requests) now call `auth.uid()` once per query, as
+  `(select auth.uid())`. Each is recreated with the same meaning.
+- 50 indexes are added for foreign keys that had none, generated from the
+  catalog.
+- The migration is not applied yet. Applying it through the Supabase tool was
+  cancelled, because it drops and recreates policies. It waits for the owner
+  to run it in the SQL editor, as with 0192. Until then nothing changes, and
+  the file is idempotent (`if not exists`).
+
+**Left in QA-P0-21:** the 37A test matrix across the new surface (ID
+tampering, SSRF, webhook replay, prompt injection, audit completeness) and the
+PDP performance budget.
