@@ -210,7 +210,7 @@ Exit test: not run.
 
 | Story | Module | Status |
 |---|---|---|
-| QA-P0-21 Security hardening pass | QA | Not started (backlog: Not Started) |
+| QA-P0-21 Security hardening pass | QA | Done: database review (migration 0195) and the security test matrix (`docs/security/SECURITY-TEST-MATRIX.md`) |
 | QA-P0-22 Brownfield fixture | QA | Done: HR to verified and removed access end to end, and its certification (`brownfield.spec.ts`) |
 
 ## History

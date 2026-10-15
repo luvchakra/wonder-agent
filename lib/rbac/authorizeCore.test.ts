@@ -145,3 +145,39 @@ describe("tenantWidePermissions and helpers", () => {
     expect(scopeCovers("environment", ["production"], { type: "agent", id: "x" })).toBe(false);
   });
 });
+
+describe("authorize — performance budget (QA-P0-21)", () => {
+  // getTenantContext() computes every tenant-wide permission on each request, so
+  // the engine must stay cheap for a large organization: 40 roles of 150
+  // permissions each, half scoped, and 30 policies.
+  const keys = Array.from({ length: 300 }, (_, i) => `module${i % 12}.action${i}`);
+  const grants = Array.from({ length: 40 }, (_, i) =>
+    grant({
+      roleId: `r${i}`,
+      permissions: keys.slice((i * 7) % 150, ((i * 7) % 150) + 150),
+      scopeType: i % 2 ? "application" : "tenant",
+      scopeValues: i % 2 ? [`app-${i}`] : [],
+      requiresMfa: i % 5 === 0,
+    }),
+  );
+  const policies = Array.from({ length: 30 }, (_, i) =>
+    policy({ id: `p${i}`, effect: i % 3 ? "DENY" : "REQUIRE_APPROVAL", permissions: [`module${i % 12}.*`], scopeType: "application", scopeValues: [`app-${i}`] }),
+  );
+
+  function timeMs(fn: () => void, runs: number): number {
+    fn(); // warm up
+    const start = performance.now();
+    for (let i = 0; i < runs; i++) fn();
+    return (performance.now() - start) / runs;
+  }
+
+  it("decides one action on a resource well under a millisecond", () => {
+    const ms = timeMs(() => authorize(grants, policies, { permission: keys[120]!, resource: { type: "application", id: "app-3" }, now, aal: "aal2" }), 2000);
+    expect(ms).toBeLessThan(1);
+  });
+
+  it("lists every tenant-wide permission of a large role set within 50 ms", () => {
+    const ms = timeMs(() => tenantWidePermissions(grants, policies, now, "aal1"), 20);
+    expect(ms).toBeLessThan(50);
+  });
+});

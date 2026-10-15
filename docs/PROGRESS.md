@@ -14,16 +14,16 @@ Generated 2026-10-15 from 11 module backlogs.
 
 ## Overall
 
-**234 of 277 tracked stories complete — 84%**
+**235 of 277 tracked stories complete — 85%**
 
 ```
-██████████████████████████████████░░░░░░  84%
+██████████████████████████████████░░░░░░  85%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 234 |
-| Partial | 27 |
+| Done | 235 |
+| Partial | 26 |
 | Deferred | 1 |
 | Not Started | 15 |
 | **Total tracked** | **277** |
@@ -48,7 +48,7 @@ and are deliberately excluded from the counts above.
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 28 | 3 | 0 | 6 | 37 | `██████████████░░░░` 76% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 20 | 10 | 0 | 1 | 31 | `████████████░░░░░░` 65% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 21 | 9 | 0 | 1 | 31 | `████████████░░░░░░` 68% |
 
 ---
 
@@ -394,7 +394,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 20 done · 10 partial · 0 deferred · 1 not started (31 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 21 done · 9 partial · 0 deferred · 1 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -424,7 +424,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-18 | Runtime Gateway security suite (master §24) | Not Started — 2026-09-25, master stories |
 | QA-P0-19 | Harden the FinanceBot scenario's final step | Done — 2026-09-25: each server action now awaits its own response before the next step; passes under two workers (22/22) and in the full suite; see audit log |
 | QA-P0-20 | WonderID baseline lock, contract amendment and roadmap | Done — 2026-09-26: baseline in `docs/implementation/wonderid-baseline.json`; CLAUDE.md amended; spec and mockups in `docs/requirements/`; `docs/plan/WONDERID-ROADMAP.md`; 36 stories added across 10 backlogs |
-| QA-P0-21 | WonderID security hardening pass | Partial — 2026-10-15 part 1: database review (every table has RLS; advisors reviewed; migration 0195 indexes 50 foreign keys and makes 7 RLS policies evaluate auth.uid() once per query, to be run by the owner). Left: the 37A test matrix (ID tampering, SSRF, webhook replay, prompt injection, audit completeness) and the PDP performance budget |
+| QA-P0-21 | WonderID security hardening pass | Done — 2026-10-15: part 1, database review and migration 0195 (applied); part 2, the 37A/S15 test matrix (`docs/security/SECURITY-TEST-MATRIX.md`), with the runtime cursor validated against filter injection, an architecture test on every PostgREST `or()` filter, prompt-injection, replay and ID-tampering tests, and the authorization engine budget (0.05 ms per decision, 4 ms per request) |
 | QA-P0-22 | Brownfield migration fixture | Done — 2026-10-14: `brownfield.spec.ts` covers HR import to verified and removed access for legitimate, privileged, stale, orphan, ambiguous, service, agent and external cases, conflicting sources, legacy access, and an application-owner certification that certifies and revokes |
 | QA-P0-23 | Reconciliation suite (F1, #48) | Done |
 | QA-P0-24 | Request-to-verified suite (F2, #56) | Done — 2026-10-11: person, service account and agent to verified; removal and expiry revoked; approver ≠ requester; isolation SQL for 0123/0124; repeated reconciliation changes nothing |
