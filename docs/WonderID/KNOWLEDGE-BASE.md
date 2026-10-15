@@ -118,6 +118,7 @@ The everyday cycle looks like this:
 - A person makes each of these removals, even where a connection could; it counts as removed only when a later read of the system no longer finds it.
 - Where a connection can disable accounts and has changes turned on, it disables the person's account there at once. The next read confirms it. If it fails, the application's owner gets the task with the reason.
 - When a person leaves, what they owned is transferred to someone else, never left without an owner.
+- Identity rules (Identities › Rules) can also run on these moments: when a person becomes active, moves, gets a new manager, leaves, or reaches their end date. Today such a rule sets one of the person's details.
 
 **Identity sources**
 - An HR system or directory can be the source of people's details.
@@ -662,6 +663,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 15 Oct 2026 | Identity rules can run when a person becomes active, moves, gets a new manager, leaves or reaches their end date, not only when they are created, imported or an attribute changes. |
 | 15 Oct 2026 | The audit trail now shows what a configuration change changed: each field with its old and new value, under "N changes" beside the action. Typed text and secrets show only that they changed. |
 | 15 Oct 2026 | When an MCP server says which of its tools are AI agents, WonderID believes it: those tools are listed under **AI agents** on the MCP page, marked "Declared by the server", with what the server says they may do ("Answers only" or "Drafts only") and whether their output is AI-generated. Servers that say nothing are judged by the tool's name and description, as before. |
 | 15 Oct 2026 | Tools found on an MCP server that are themselves AI agents (they draft, answer or generate, like a "draft reply" tool) are labelled **AI agent** on the MCP page, with the reason, and appear in Agent Discovery so you can register them as agents. Every object page now opens at a short number (for example /identities/12), and old links still work. |

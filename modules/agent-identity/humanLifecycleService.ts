@@ -16,6 +16,8 @@ import type {
 } from "@/lib/shared/types/agent-identity";
 import { endDatePassed, HUMAN_TRANSITIONS, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, whyCannotDisableAll, type DetectedEvent } from "./humanLifecycle";
 import { assignOwner, removeOwner } from "./owners";
+import { lifecycleRuleTriggers } from "./attributeRules";
+import { applyIdentityRules } from "./identityRulesService";
 
 /**
  * IDENTITY-P0-18 — recording the human lifecycle and its governed work.
@@ -218,6 +220,17 @@ export async function recordLifecycleEvents(
           referenceType: "identity",
           referenceId: subject.id,
         });
+      }
+    }
+  }
+  // IDENTITY-P0-21: identity rules on the lifecycle triggers these events fire, after the change itself.
+  // A rule failure is recorded in the rule run log by applyIdentityRules; it never undoes the event.
+  for (const d of detected) {
+    for (const type of lifecycleRuleTriggers(d, meta.origin)) {
+      try {
+        await applyIdentityRules(tenantId, subject.id, { type, ...(d.changedFields.length ? { changedAttributes: d.changedFields } : {}) });
+      } catch (err) {
+        console.error("identity rules on a lifecycle event failed", { type, err: err instanceof Error ? err.message : err });
       }
     }
   }

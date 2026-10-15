@@ -2065,3 +2065,40 @@ never guessed. Nothing is registered automatically: a person decides.
 
 Verified: Vitest mcpToolAgents 2/2 (candidate shape; linked, ignored and
 stale states); local E2E mcp-inventory 3/3.
+
+## 2026-10-15 — IDENTITY-P0-21: lifecycle triggers for identity rules
+
+The bold lifecycle triggers of the design's §5.2.1 catalogue now start
+identity rules, next to created, imported and attribute changed:
+
+- **Triggers:** `identity.activated` (joiner, rehire or leaver cancelled to
+  ACTIVE), `identity.moved` (mover), `identity.manager_changed`,
+  `identity.leaver`, and `identity.end_date_reached` (a leaver found by the
+  end-date sweep, which also fires `identity.leaver`).
+- **Mapping** is pure: `lifecycleRuleTriggers(event, origin)` in
+  `attributeRules.ts`, unit-tested.
+- **Where they fire:** at the end of `recordLifecycleEvents`, the one place
+  every lifecycle event is recorded (source imports, manual transitions,
+  "disable all access", the end-date sweep). This runs after the change
+  itself. `applyIdentityRules` does the work (published rules only, its run
+  log, sources win, optimistic write). A rule failure is logged and never
+  undoes the event.
+- **Editor:** the trigger list comes from `TRIGGER_LABEL`, so the form and
+  the pages name the new triggers. Validation accepts them;
+  `triggerAttribute` stays only for "attribute changed".
+
+**Verified.**
+- typecheck and eslint pass.
+- Vitest `modules/agent-identity`: 104/104, including the trigger mapping.
+- Local E2E `identity-rules.spec.ts` + `human-lifecycle.spec.ts`: 23/23,
+  including setup. A new test publishes an enforced "a person leaves" rule
+  under four-eyes. It then marks a matching person LEAVE_PENDING and checks
+  that the attribute is set and the run log records "applied".
+
+**Left out.**
+- Effects beyond setting an attribute: add to a group, open a task, assign a
+  package. These are the rest of IDENTITY-P0-21.
+- Manual edits of department or manager on the identity page record no
+  mover or manager-change lifecycle event today, so these triggers fire only
+  where such an event is recorded (source imports and lifecycle actions).
+  The attribute-changed trigger still covers manual edits.

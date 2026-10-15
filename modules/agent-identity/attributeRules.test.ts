@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sameDefinition, changedFields, identityView, planAttributeWrites, RULE_PRIORITY, rowFromIdentity, ruleContext, shapeRuleInput, toRuntimeRule } from "./attributeRules";
+import { lifecycleRuleTriggers, sameDefinition, changedFields, identityView, planAttributeWrites, RULE_PRIORITY, rowFromIdentity, ruleContext, shapeRuleInput, toRuntimeRule } from "./attributeRules";
 
 const defs = [
   { name: "region", displayName: "Region", identityType: null, dataType: "enum", required: false, allowedValues: ["EMEA", "AMER"], validationRegex: null, active: true },
@@ -165,5 +165,18 @@ describe("sameDefinition", () => {
     expect(sameDefinition({ mode: "enforce" }, { mode: "report_only" })).toBe(false);
     expect(sameDefinition({ a: [1, 2] }, { a: [2, 1] })).toBe(false);
     expect(sameDefinition(null, { mode: "enforce" })).toBe(false);
+  });
+});
+
+describe("lifecycleRuleTriggers", () => {
+  it("maps each lifecycle event to the rule triggers it fires", () => {
+    expect(lifecycleRuleTriggers({ eventType: "joiner", toState: "ACTIVE" }, "source")).toEqual(["identity.activated"]);
+    expect(lifecycleRuleTriggers({ eventType: "joiner", toState: "PRE_JOIN" }, "source")).toEqual([]);
+    expect(lifecycleRuleTriggers({ eventType: "rehire", toState: "ACTIVE" }, "manual")).toEqual(["identity.activated"]);
+    expect(lifecycleRuleTriggers({ eventType: "mover", toState: "ACTIVE" }, "source")).toEqual(["identity.moved"]);
+    expect(lifecycleRuleTriggers({ eventType: "manager_change", toState: "ACTIVE" }, "source")).toEqual(["identity.manager_changed"]);
+    expect(lifecycleRuleTriggers({ eventType: "leaver", toState: "LEAVE_PENDING" }, "manual")).toEqual(["identity.leaver"]);
+    expect(lifecycleRuleTriggers({ eventType: "leaver", toState: "LEAVE_PENDING" }, "schedule")).toEqual(["identity.leaver", "identity.end_date_reached"]);
+    expect(lifecycleRuleTriggers({ eventType: "terminated", toState: "TERMINATED" }, "manual")).toEqual([]);
   });
 });

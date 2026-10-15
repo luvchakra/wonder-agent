@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { Button, SelectField, TextField, TextareaField } from "@/modules/ui";
+import { TRIGGER_LABEL } from "./labels";
 
 /**
  * IDENTITY-P0-21 — the attribute rule editor and its actions. Every call
@@ -22,11 +23,7 @@ export type RuleFormValues = {
   mode: "report_only" | "enforce";
 };
 
-const TRIGGERS = [
-  { value: "identity.created", label: "Created in WonderID" },
-  { value: "identity.imported", label: "Imported from a source" },
-  { value: "identity.attribute_changed", label: "An attribute changed" },
-];
+const TRIGGERS = Object.entries(TRIGGER_LABEL).map(([value, label]) => ({ value, label }));
 
 async function call(url: string, method: string, body?: unknown): Promise<{ ok: boolean; data?: unknown; message?: string }> {
   const res = await fetch(url, { method, headers: { "content-type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
