@@ -7,6 +7,7 @@ import { getSessionUser } from "@/lib/tenant/session";
 import { getHostTenant } from "@/lib/tenant/hostTenant";
 import { mfaStepUpNeeded } from "@/lib/tenant/mfaRequired";
 import type { TenantContext } from "@/lib/shared/types/foundation";
+import { safeErrorMessage } from "@/lib/security/redact";
 import { grantActive, tenantWidePermissions, type AuthorizationPolicy, type Grant, type ScopeType } from "@/lib/rbac/authorizeCore";
 
 export const TENANT_COOKIE_NAME = "wa_tenant";
@@ -20,6 +21,16 @@ export type Membership = {
   /** FOUNDATION-P0-27: the organization requires MFA (Global Configuration `security.mfaRequired`). */
   mfaRequired?: boolean;
 };
+
+/**
+ * Observability only (no behaviour change): a failed read here is otherwise
+ * indistinguishable from "no grants". Logs the operation and a redacted error
+ * category, never row data.
+ */
+function logReadError(operation: string, error: { code?: string; message?: string } | null): void {
+  if (!error) return;
+  console.error("getTenantContext read failed", { operation, category: error.code ?? "unknown", error: safeErrorMessage(error.message ?? "unknown") });
+}
 
 type MembershipRow = { tenant_id: string; name: string; slug: string; account_type: string; mfa_required: boolean };
 
@@ -48,7 +59,8 @@ export const getMyMemberships = cache(async (): Promise<Membership[]> => {
   const user = await getSessionUser();
   if (!user) return [];
   const supabase = await supabaseServer();
-  const { data } = await supabase.rpc("my_memberships");
+  const { data, error } = await supabase.rpc("my_memberships");
+  logReadError("my_memberships", error);
   return ((data ?? []) as MembershipRow[]).map((m) => ({
     tenantId: m.tenant_id,
     name: m.name ?? m.tenant_id,
@@ -75,11 +87,12 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
   const user = await getSessionUser();
   if (!user) return [];
   const supabase = await supabaseServer();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("user_roles")
     .select(`tenant_id, ${TERMS_SELECT}, ${ROLE_SELECT}`)
     .eq("user_id", user.id)
     .returns<RoleRow[]>();
+  logReadError("user_roles", error);
   return data ?? [];
 });
 
@@ -99,11 +112,12 @@ const getMyGroupRoleRows = cache(async (): Promise<GroupRoleRow[]> => {
   const user = await getSessionUser();
   if (!user) return [];
   const supabase = await supabaseServer();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("group_members")
     .select(`tenant_id, groups(name, status, group_roles(${TERMS_SELECT}, ${ROLE_SELECT}))`)
     .eq("user_id", user.id)
     .returns<GroupRoleRow[]>();
+  logReadError("group_members", error);
   return data ?? [];
 });
 
@@ -132,6 +146,7 @@ const getMyPolicyRows = cache(async (): Promise<PolicyRow[] | null> => {
     .select("id, tenant_id, name, effect, permissions, scope_type, scope_values, exempt_role_ids")
     .eq("status", "active")
     .returns<PolicyRow[]>();
+  logReadError("authorization_policies", error);
   return error ? null : (data ?? []);
 });
 
@@ -241,6 +256,9 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
   // Roles and permissions in effect across the whole tenant; scoped grants
   // count only where a resource is named (lib/rbac/authorize.ts).
   const permissions = tenantWidePermissions(grants, policies, now, user.aal);
+  if (permissions.length === 0) {
+    console.error("getTenantContext resolved no permissions for a member", { tenantId, directRoleRows: directRoleRows.length, groupRoleRows: groupRoleRows.length, grants: grants.length, policies: policies.length });
+  }
   const roles = [...new Set(grants.filter((g) => g.scopeType === "tenant" && isLive(g, now, user.aal)).map((g) => g.role))];
 
   return {

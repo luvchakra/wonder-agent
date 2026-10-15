@@ -52,9 +52,14 @@ type Account = { id: string; externalAccountRef: string; identityId: string | nu
 const accounts: Record<string, Account> = {};
 
 async function loadAccounts(request: APIRequestContext) {
-  const res = await request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`);
-  expect(res.status()).toBe(200);
-  for (const a of (await res.json()).data as Account[]) accounts[a.externalAccountRef] = a;
+  for (const a of await getData<Account[]>(request, `/api/v1/access/accounts?applicationId=${appId}&view=all`)) accounts[a.externalAccountRef] = a;
+}
+
+// GET a JSON `data` payload, failing with the real status and body (not a TypeError on a missing `data`).
+async function getData<T>(request: APIRequestContext, url: string): Promise<T> {
+  const res = await request.get(url);
+  expect(res.status(), `GET ${url}: ${await res.text()}`).toBe(200);
+  return (await res.json()).data as T;
 }
 
 async function reconcileAccess(request: APIRequestContext) {
@@ -221,19 +226,19 @@ test.describe.serial("F1 reconciliation chain", () => {
     expect(submitted.status(), await submitted.text()).toBe(201);
     const req = (await submitted.json()).data as { id: string; status: string };
     expect(req.status).toBe("approved");
-    const view = async () => (await (await request.get(`/api/v1/access/requests/${req.id}`)).json()).data as { fulfilment: string; grants: { accountId: string; fulfilmentStatus: string }[] };
+    const view = () => getData<{ fulfilment: string; grants: { accountId: string; fulfilmentStatus: string }[] }>(request, `/api/v1/access/requests/${req.id}`);
 
     // Approved: a pending grant on a placeholder account (Cara has no account yet); not access yet.
     const pending = await view();
     expect(pending.fulfilment).toBe("pending_fulfilment");
     expect(pending.grants).toHaveLength(1);
     const placeholder = pending.grants[0].accountId;
-    const listed = (await (await request.get(`/api/v1/access/accounts?applicationId=${appId}&view=all`)).json()).data as { id: string; status: string; externalAccountRef: string; accountName: string | null }[];
+    const listed = await getData<{ id: string; status: string; externalAccountRef: string; accountName: string | null }[]>(request, `/api/v1/access/accounts?applicationId=${appId}&view=all`);
     // Named for people (no format set: the email's local part); the reference stays internal.
     expect(listed.find((a) => a.id === placeholder)).toMatchObject({ status: "pending", externalAccountRef: `pending:${caraId}`, accountName: mail("cara").split("@")[0] });
 
     // ACCESS-P0-29: a fulfilment task waits for the application's owner (Ana); an access manager may work it too.
-    const tasks = async () => (await (await request.get(`/api/v1/access/fulfilment-tasks?requestId=${req.id}`)).json()).data as { id: string; status: string; assigneeIdentityId: string | null; dueAt: string }[];
+    const tasks = () => getData<{ id: string; status: string; assigneeIdentityId: string | null; dueAt: string }[]>(request, `/api/v1/access/fulfilment-tasks?requestId=${req.id}`);
     const [task] = await tasks();
     expect(task).toMatchObject({ status: "open", assigneeIdentityId: anaId });
     expect(Date.parse(task.dueAt)).toBeGreaterThan(Date.now());
@@ -279,7 +284,7 @@ test.describe.serial("F1 reconciliation chain", () => {
       expect(res.status(), await res.text()).toBe(201);
       return (await res.json()).data as { id: string; status: string };
     };
-    const view = async (id: string) => (await (await request.get(`/api/v1/access/requests/${id}`)).json()).data as View;
+    const view = (id: string) => getData<View>(request, `/api/v1/access/requests/${id}`);
     const done = async (taskId: string) => expect((await request.post(`/api/v1/access/fulfilment-tasks/${taskId}`, { data: { action: "complete" } })).status()).toBe(200);
     const caraAccount = { externalId: "uid=cara", raw: { id: "cara", username: "cara", email: mail("cara") } };
 
@@ -521,7 +526,7 @@ test.describe.serial("F1 reconciliation chain", () => {
     test.setTimeout(180_000);
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { autoRefreshToken: false, persistSession: false } });
     type View = { request: { status: string }; fulfilment: string; grants: { id: string; accountId: string }[]; tasks: { id: string; kind: string; status: string }[] };
-    const view = async (id: string) => (await (await request.get(`/api/v1/access/requests/${id}`)).json()).data as View;
+    const view = (id: string) => getData<View>(request, `/api/v1/access/requests/${id}`);
     const owner = await browser.newContext({ storageState: authFile("requester") });
     const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
     try {

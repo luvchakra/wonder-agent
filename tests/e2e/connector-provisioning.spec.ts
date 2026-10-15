@@ -119,10 +119,17 @@ async function syncAndWait(request: APIRequestContext) {
   const res = await request.post(`/api/v1/integrations/${integrationId}/sync`);
   expect(res.status(), await res.text()).toBe(202);
   const jobId = (await res.json()).data.id as string;
-  const job = async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string; pipelineStatus?: string }[]).find((j) => j.id === jobId);
+  const job = async () => ((await (await request.get(`/api/v1/integrations/${integrationId}/jobs`)).json()).data as { id: string; status: string; pipelineStatus?: string; pipeline?: unknown }[]).find((j) => j.id === jobId);
+  const started = Date.now();
   await expect.poll(async () => (await job())?.status, { timeout: 60_000 }).toMatch(/succeeded|partial/);
   // The steps after the read (reconciliation, classification, rogue findings) run on: wait for them too.
-  await expect.poll(async () => (await job())?.pipelineStatus, { timeout: 120_000 }).not.toBe("running");
+  try {
+    await expect.poll(async () => (await job())?.pipelineStatus, { timeout: 120_000 }).not.toBe("running");
+  } catch (error) {
+    // Make a stalled pipeline diagnosable: which step was running, and for how long.
+    const last = await job().catch(() => undefined);
+    throw new Error(`Pipeline of job ${jobId} still ${last?.pipelineStatus} after ${Date.now() - started} ms. Steps: ${JSON.stringify(last?.pipeline)}\n${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 const verificationJobs = async (request: APIRequestContext) =>
@@ -190,6 +197,11 @@ test.describe.serial("connector provisioning", () => {
   test("setup: a writing connection, synced, its application onboarded and reconciled; writes start off", async ({ request, browser }) => {
     test.setTimeout(180_000);
     tenantId = await getTenantIdBySlug(TENANT_ONE.slug);
+    // The hourly write limit is shared by the whole test organization. A run cut off inside the
+    // mass-change test (its finally never runs) left it at 7 on 15 Oct, which then refused the leaver's
+    // disable in every later run: start from the default (100) whatever an earlier run left behind.
+    const limit = await request.patch("/api/v1/tenant/configuration", { data: { "integration.maxWritesPerHour": 100 } });
+    expect([200, 409], await limit.text()).toContain(limit.status()); // 409: already the default
     for (const who of ["ana", "bob", "cy", "dee", "eve"]) {
       const res = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `E2E Prov ${who} ${stamp}`, email: mail(who) } });
       expect(res.status(), await res.text()).toBe(201);
@@ -418,7 +430,8 @@ test.describe.serial("connector provisioning", () => {
   });
 
   test("WID-H04: rogue access accepted as an exception (90 days at most), then closed as a false positive, is not flagged again", async ({ request, page }) => {
-    test.setTimeout(180_000);
+    // Three syncs, each waiting for the whole post-sync pipeline (up to 3 min on a shared 2-core machine), plus two UI flows.
+    test.setTimeout(300_000);
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
     // Ana is put back in Finance directly on the system: rogue again.
     system.members["g-fin"].push("u-ana");

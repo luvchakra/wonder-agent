@@ -50,7 +50,9 @@ test.describe.serial("request catalog", () => {
   test.use({ storageState: authFile("adminOne") });
 
   test("setup: a live application with a standard and an admin entitlement, under request policies", async ({ request, browser }) => {
-    test.setTimeout(120_000);
+    // About 25 sequential API calls (the onboarding promote flow included) come before two cold
+    // application pages, whose first server render is slow when the build box's 2 cores are shared.
+    test.setTimeout(180_000);
     appId = await registerApp(request, `E2E Req App ${stamp}`);
     const reader = await request.post(`/api/v1/access/applications/${appId}/entitlements`, { data: { name: "Reader", dataClassification: "internal", privilegeLevel: "standard" } });
     readerId = (await reader.json()).data.id;
@@ -69,9 +71,9 @@ test.describe.serial("request catalog", () => {
     const ui = await browser.newContext({ storageState: authFile("adminOne") });
     const p = await ui.newPage();
     await p.goto(`/access/applications/${appId}?tab=entitlements`);
-    await expect(p.getByRole("row").filter({ hasText: "Reader" }).getByText("Needs a request policy")).toBeVisible();
+    await expect(p.getByRole("row").filter({ hasText: "Reader" }).getByText("Needs a request policy")).toBeVisible({ timeout: 45_000 });
     await p.goto(`/access/catalog?all=1&q=${encodeURIComponent(`E2E Req App ${stamp}`)}`);
-    await expect(p.getByText("Not requestable yet: no request policy says who approves it").first()).toBeVisible();
+    await expect(p.getByText("Not requestable yet: no request policy says who approves it").first()).toBeVisible({ timeout: 45_000 });
     await ui.close();
 
     expect((await request.post("/api/v1/access/request-policies", { data: { applicationId: appId, name: "x", riskThreshold: "extreme" } })).status()).toBe(400);

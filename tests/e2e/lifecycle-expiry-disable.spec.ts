@@ -17,6 +17,12 @@ const db = () => createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env
 
 type Lifecycle = { events: { eventType: string; fromState: string; toState: string; origin: string; note: string | null }[]; tasks: { eventType: string; taskType: string }[] };
 
+async function getLifecycle(request: APIRequestContext, id: string): Promise<Lifecycle> {
+  const res = await request.get(`/api/v1/identities/${id}/lifecycle`);
+  expect(res.status(), await res.text()).toBe(200);
+  return (await res.json()).data as Lifecycle;
+}
+
 async function personId(request: APIRequestContext, email: string): Promise<string> {
   const rows = (await (await request.get(`/api/v1/identities?type=HUMAN&q=${encodeURIComponent(email)}`)).json()).data as { id: string; email: string | null }[];
   const row = rows.find((r) => r.email === email);
@@ -81,7 +87,7 @@ test.describe.serial("manager's disable all access", () => {
     await expect(row.getByRole("status")).toContainText("is disabled", { timeout: 30_000 });
     await requester.close();
 
-    const life = (await (await request.get(`/api/v1/identities/${report}/lifecycle`)).json()).data as Lifecycle;
+    const life = await getLifecycle(request, report);
     expect(life.events[0]).toMatchObject({ eventType: "disabled", fromState: "ACTIVE", toState: "DISABLED", origin: "manual", note: "Contract terminated today" });
     const { data: audit } = await db().from("audit_logs").select("metadata").eq("object_id", report).eq("action", "identity.access_disabled");
     expect(audit?.[0]?.metadata).toMatchObject({ fromState: "ACTIVE", as: "manager" });
@@ -107,13 +113,15 @@ test.describe.serial("expiry", () => {
 
     const { data } = await db().from("identities").select("lifecycle_state").eq("id", contractor).single();
     expect(data!.lifecycle_state).toBe("LEAVE_PENDING");
-    const life = (await (await request.get(`/api/v1/identities/${contractor}/lifecycle`)).json()).data as Lifecycle;
+    const life = await getLifecycle(request, contractor);
     expect(life.events[0]).toMatchObject({ eventType: "leaver", fromState: "ACTIVE", toState: "LEAVE_PENDING", origin: "schedule", note: `End date ${yesterday} reached` });
     expect(life.tasks.filter((t) => t.eventType === "leaver").map((t) => t.taskType)).toEqual(expect.arrayContaining(["transfer_ownership", "revoke_access"]));
 
     // The sweep runs once: viewing again records nothing new.
     await page.goto("/identities/lifecycle");
-    const after = (await (await request.get(`/api/v1/identities/${contractor}/lifecycle`)).json()).data as Lifecycle;
+    // Wait for the render (and its sweep) to finish before reading back.
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    const after = await getLifecycle(request, contractor);
     expect(after.events.length).toBe(life.events.length);
   });
 });
