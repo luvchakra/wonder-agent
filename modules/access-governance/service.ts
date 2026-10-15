@@ -15,7 +15,9 @@ export {
   listEntitlementInventory,
   getEntitlement,
   setEntitlementOwner,
+  listApplicationsForReview,
   type EntitlementWithContext,
+  type EntitlementForReview,
 } from "./entitlements";
 export { getEffectiveAccess, getEffectiveAccessAsOf, explainAccessPath, createManualAccessGrant, revokeAccessGrant, getAccessGrant } from "./grants";
 export { refreshAccessLedger, refreshAccessLedgerForAllTenants, getIdentityAccessLedger, getAccountAccessLedger, type IdentityAccessEntry } from "./ledger";

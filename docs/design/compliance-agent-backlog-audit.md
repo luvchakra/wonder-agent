@@ -1527,3 +1527,50 @@ access.
 
 **Left out:** owner reviews of applications and of business roles (roles
 need ACCESS's role model, F5), the review calendar and analytics.
+
+## 2026-10-15 — COMPLIANCE-P0-10 part 4: owner reviews of applications
+
+A campaign of scope `application_contents` reviews the catalogue of active
+applications (all, or one through `scope.applicationId`).
+
+**How it works:**
+- There is one item per active, certifiable entitlement.
+- The reviewer is the entitlement's owner, else the application's business
+  owner, else the named reviewer. The snapshot records which one
+  (`catalogEntitlement.owner`), and the preview counts the fallbacks.
+- **Certify** keeps the entitlement.
+- **Revoke** disables it through Access's `updateEntitlement`
+  (`status: inactive`), so nobody can request it. Nobody's current access
+  changes; that is an access review's decision.
+- The revoke runs before the decision is recorded, so a failed change
+  records nothing.
+- No exception is offered, as for package contents.
+- The revocations list shows these items as `entitlement_disabled`.
+
+**Built:**
+- Migration `0196`:
+  - the scope lists gain `application_contents`;
+  - `certification_items.entitlement_id`, with no foreign key: evidence
+    outlives a deleted entitlement, the same pattern as
+    `package_resource_id`;
+  - the subject check now also covers entitlement items.
+- Access: `listApplicationsForReview`, a service-role read filtered by
+  tenant.
+- Compliance: `buildApplicationItems`, `catalogItemDecision`, and the
+  mapper, types, revocations and template rules.
+- UI: the launch option, the items table, the decision form (revoke copy)
+  and the evidence drawer.
+
+**Verified:**
+- Migration applied to dev.
+- `tests/compliance/application-reviews-isolation.sql`: 7 of 7 as expected.
+- Typecheck and eslint: clean.
+- Vitest, compliance and the campaign export: 72 passed.
+- `next build` passed.
+- Local E2E: `application-reviews.spec.ts` (new) and `package-reviews.spec.ts`,
+  15 passed.
+
+**Left:**
+- Owner reviews of business roles. ACCESS-P0-21 (business and IT roles) is
+  not built yet.
+- The campaign calendar and analytics.

@@ -12,12 +12,13 @@ const PERSON_DECISIONS: DecisionType[] = ["approve", "revoke", "exception", "def
 const PACKAGE_DECISIONS: DecisionType[] = ["approve", "revoke", "defer", "escalate", "delegate", "request_information"];
 const LABEL: Partial<Record<DecisionType, string>> = { approve: "certify", exception: "exception (keep until)", defer: "defer (review later)", request_information: "request information" };
 
-export type DecisionSubject = "agent" | "person" | "role" | "package";
+export type DecisionSubject = "agent" | "person" | "role" | "package" | "entitlement";
 
 const REVOKE_COPY: Record<DecisionSubject, { description: string; scope: string }> = {
   agent: { description: "This calls revokeAccessGrant() for this item's access grant — the agent loses this access immediately.", scope: "1 access grant revoked." },
   person: { description: "This approves the removal of this access. It is carried out by a task or the connection, and counted as done once the system no longer shows it.", scope: "1 approved removal." },
   role: { description: "The role is removed now (or the person leaves the group it comes from).", scope: "1 role assignment removed." },
+  entitlement: { description: "The entitlement is disabled now: nobody can request it. People who hold it keep it until an access review removes it.", scope: "1 entitlement disabled." },
   package: { description: "It is removed from the package now. People who already hold the package keep their access; a birthright package waits for approval again.", scope: "1 resource removed from the package." },
 };
 
@@ -28,7 +29,7 @@ const REVOKE_COPY: Record<DecisionSubject, { description: string; scope: string 
  * POST /api/v1/compliance/items/:id/decisions route (unchanged).
  */
 export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; subject?: DecisionSubject }) {
-  const decisions = subject === "agent" ? AGENT_DECISIONS : subject === "package" ? PACKAGE_DECISIONS : PERSON_DECISIONS;
+  const decisions = subject === "agent" ? AGENT_DECISIONS : subject === "package" || subject === "entitlement" ? PACKAGE_DECISIONS : PERSON_DECISIONS;
   const router = useRouter();
   const [decision, setDecision] = useState<DecisionType>("approve");
   const [justification, setJustification] = useState("");
