@@ -20,8 +20,43 @@ import { validateAttributes } from "./identityRules";
  *   the next import from an authoritative source replaces it.
  */
 
-export const ATTRIBUTE_RULE_TRIGGERS = ["identity.created", "identity.imported", "identity.attribute_changed"] as const;
+export const ATTRIBUTE_RULE_TRIGGERS = [
+  "identity.created",
+  "identity.imported",
+  "identity.attribute_changed",
+  // Lifecycle triggers (design §5.2.1, F4): fired where a person's lifecycle event is recorded.
+  "identity.activated",
+  "identity.moved",
+  "identity.manager_changed",
+  "identity.leaver",
+  "identity.end_date_reached",
+] as const;
 export type AttributeRuleTrigger = (typeof ATTRIBUTE_RULE_TRIGGERS)[number];
+
+/**
+ * The rule triggers a recorded lifecycle event fires. "Activated" is a
+ * person becoming ACTIVE (joiner, rehire, leaver cancelled); a leaver the
+ * end-date sweep found (origin "schedule") is also "end date reached".
+ */
+export function lifecycleRuleTriggers(
+  event: { eventType: string; toState: string | null },
+  origin: "manual" | "source" | "schedule",
+): AttributeRuleTrigger[] {
+  switch (event.eventType) {
+    case "joiner":
+    case "rehire":
+    case "leaver_cancelled":
+      return event.toState === "ACTIVE" ? ["identity.activated"] : [];
+    case "mover":
+      return ["identity.moved"];
+    case "manager_change":
+      return ["identity.manager_changed"];
+    case "leaver":
+      return origin === "schedule" ? ["identity.leaver", "identity.end_date_reached"] : ["identity.leaver"];
+    default:
+      return [];
+  }
+}
 
 /** Standard fields a condition may read, by their database column. */
 export const READABLE_FIELDS: Record<string, string> = {

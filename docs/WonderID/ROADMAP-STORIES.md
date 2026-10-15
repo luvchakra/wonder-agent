@@ -12,7 +12,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 
 ## Completed recently
 
-- ✅ **FOUNDATION-P0-33** Attribute-level old and new values in audit detail for configuration objects · this change
+- ✅ **FOUNDATION-P0-33** Attribute-level old and new values in audit detail for configuration objects · [#224](https://github.com/luvchakra/wonder-agent/pull/224)
 - ✅ **INTEGRATION-P0-31** MCP tools that are AI agents: the server's own `_meta` declaration first, then the name/description guess; listed as AI agents and offered to Agent Discovery (owner requests 2026-10-14/15) · [#221](https://github.com/luvchakra/wonder-agent/pull/221)
 - ✅ **FOUNDATION-P0-34** Short number keys in URLs: a per-organization number on every object table, number URLs on every object page, UUID links redirect (owner decision 2026-10-14, CLAUDE.md §19.13) · [#220](https://github.com/luvchakra/wonder-agent/pull/220)
 - ✅ **COMPLIANCE-P0-11** Access certification of WonderID users' role assignments · [#195](https://github.com/luvchakra/wonder-agent/pull/195)

@@ -4,6 +4,11 @@ export const TRIGGER_LABEL: Record<string, string> = {
   "identity.created": "Created in WonderID",
   "identity.imported": "Imported from a source",
   "identity.attribute_changed": "An attribute changed",
+  "identity.activated": "A person becomes active",
+  "identity.moved": "A person moves (department, title, business unit, location)",
+  "identity.manager_changed": "A person's manager changes",
+  "identity.leaver": "A person leaves",
+  "identity.end_date_reached": "A person's end date is reached",
 };
 
 /** One status a person can act on: what runs, and what waits. */

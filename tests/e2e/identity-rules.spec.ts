@@ -139,6 +139,33 @@ test.describe.serial("identity attribute rules", () => {
     expect((p.attributes as Record<string, unknown>)[attr]).toBeUndefined();
     expect((await request.patch(`/api/v1/identities/rules/${ruleId}`, { data: { name: "again" } })).status()).toBe(409);
   });
+
+  test("a lifecycle trigger: a rule on \"a person leaves\" runs when someone is marked as leaving", async ({ request, browser }) => {
+    const created = await request.post("/api/v1/identities/rules", {
+      data: {
+        name: `E2E Leaver Rule ${stamp}`,
+        triggerType: "identity.leaver",
+        condition: `identity.department = "${dept}"`,
+        mode: "enforce",
+        effects: [{ type: "set_attribute", params: { attribute: attr, value: "left" } }],
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    ruleId = ((await created.json()) as Json).data!.id;
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    expect(await publish(request, iam.request)).toMatchObject({ publishedVersion: 1, mode: "enforce" });
+    await iam.close();
+
+    const p = await person(request, "Rule Leaver");
+    expect((p.attributes as Record<string, unknown>)[attr]).toBeUndefined();
+    const left = await request.post(`/api/v1/identities/${p.id}/lifecycle`, { data: { toState: "LEAVE_PENDING", note: "Resigned" } });
+    expect(left.status(), await left.text()).toBe(201);
+    const { data: row } = await db().from("identities").select("attributes").eq("id", p.id).single();
+    expect((row!.attributes as Record<string, unknown>)[attr]).toBe("left");
+    const runs = ((await (await request.get(`/api/v1/identities/rules/${ruleId}/runs`)).json()) as { data: { subjectId: string; outcome: string }[] }).data;
+    expect(runs.find((r) => r.subjectId === p.id)).toMatchObject({ outcome: "applied" });
+    expect((await request.post(`/api/v1/identities/rules/${ruleId}/retire`)).status()).toBe(200);
+  });
 });
 
 test.describe("identity rules — other organizations and roles", () => {
