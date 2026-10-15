@@ -2095,3 +2095,30 @@ Concurrent sign-ins by other sessions running E2E against the same test
 users made the auth setup fail locally at times (the sign-in rate limit), so
 the design-review run used `--no-deps` with the saved adminOne session.
 Tonight's nightly is the full check.
+
+## 2026-10-15 — Nightly E2E of 15 October: causes and fixes
+
+The run (started 23:59 UTC on 14 Oct) was red in both halves. Half 1:
+200 passed, 1 failed, 65 not run. Half 2: 261 passed, 1 failed.
+
+- **Half 1 ran out of its 35 minutes.** Playwright's `--shard` splits the
+  suite by test order, and the slow specs (connector-provisioning,
+  f1-reconciliation, design-review, bulk-invitations, access-packages,
+  account-inventory, automation-credentials) all sort early, so they all
+  landed in half 1. Half 2 finished in about 20 minutes. Fix:
+  `scripts/e2e-on-vercel.sh` now gives each half its own list of spec files.
+  The slow specs alternate between the halves first, then every other spec
+  file does (38 files each). No third nightly build is added.
+- **WID-H08 failed only on Vercel.** The Vercel build environment sets
+  `VERCEL=1`. The local test server inherited it, so `trustedClientIp()`
+  believed the test's spoofed `x-vercel-forwarded-for`, which only Vercel's
+  edge may set. The production check passes. Fix: the local server starts
+  with `env -u VERCEL`. The rule itself is unchanged.
+- **leaver-removals expected a UUID link.** The termination SLA report now
+  links to the identity's number URL (FOUNDATION-P0-34). The test reads the
+  identity's `ref` and expects `/identities/<ref>`.
+
+Verified: leaver-removals 9/9 locally (with setup); automation-credentials
+passed 14/14 locally against production ingress earlier; `bash -n` on the
+script, and the split printed 38 + 38 files; typecheck and eslint pass.
+Tonight's nightly run is the full check.

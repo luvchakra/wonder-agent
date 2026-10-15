@@ -78,7 +78,9 @@ test.describe.serial("a leaver's access becomes removal work", () => {
     const rows = (await report.json()).data.rows as { href: string; fields: Record<string, unknown> }[];
     const row = rows.find((r) => r.fields.application === `e2e-leaver-app-${stamp}`);
     expect(row?.fields).toMatchObject({ change: "remove access", outcome: "open" });
-    expect(row?.href).toBe(`/identities/${personId}`);
+    // FOUNDATION-P0-34: the link is the identity's number URL, not its UUID.
+    const { data: person } = await db().from("identities").select("ref").eq("tenant_id", tenantId).eq("id", personId).single();
+    expect(row?.href).toBe(`/identities/${person?.ref}`);
   });
 
   test("a later step does not open the removals again", async ({ request }) => {
