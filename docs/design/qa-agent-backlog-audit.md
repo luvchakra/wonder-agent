@@ -2122,3 +2122,14 @@ Verified: leaver-removals 9/9 locally (with setup); automation-credentials
 passed 14/14 locally against production ingress earlier; `bash -n` on the
 script, and the split printed 38 + 38 files; typecheck and eslint pass.
 Tonight's nightly run is the full check.
+
+## 2026-10-15 — Nightly suite in three parts (owner decision)
+
+The owner changed the rule to three nightly builds. Two balanced halves came
+to about 30 minutes each against the 35-minute budget. `e2e.yml` now moves
+`e2e/nightly-1`, `-2` and `-3` (marker "part N of 3"), and waits up to
+150 minutes in all. `scripts/vercel-build.sh` and `vercel-ignore-build.sh`
+accept `e2e/nightly-3`. `scripts/e2e-on-vercel.sh` deals the spec files
+round-robin over three parts, slow specs first. CLAUDE.md §19.8, §19.9 and
+RUN-ORDER are updated. Verified: `bash -n` on the scripts. Tonight's nightly
+run is the check.

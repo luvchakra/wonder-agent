@@ -12,7 +12,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 
 ## Completed recently
 
-- ✅ **INTEGRATION-P0-31** MCP tools that are AI agents: the server's own `_meta` declaration first, then the name/description guess; listed as AI agents and offered to Agent Discovery (owner requests 2026-10-14/15) · this change
+- ✅ **INTEGRATION-P0-31** MCP tools that are AI agents: the server's own `_meta` declaration first, then the name/description guess; listed as AI agents and offered to Agent Discovery (owner requests 2026-10-14/15) · [#221](https://github.com/luvchakra/wonder-agent/pull/221)
 - ✅ **FOUNDATION-P0-34** Short number keys in URLs: a per-organization number on every object table, number URLs on every object page, UUID links redirect (owner decision 2026-10-14, CLAUDE.md §19.13) · [#220](https://github.com/luvchakra/wonder-agent/pull/220)
 - ✅ **COMPLIANCE-P0-11** Access certification of WonderID users' role assignments · [#195](https://github.com/luvchakra/wonder-agent/pull/195)
 - ✅ **QA-P0-22** Brownfield migration fixture · [#193](https://github.com/luvchakra/wonder-agent/pull/193)
@@ -32,7 +32,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 - ⬜ **IDENTITY-P0-23 †** Human identity merge over existing records (attribute-level, audited, reversible) · High · F4
 - ⬜ **FOUNDATION-P0-33 †** Attribute-level old and new values in audit detail for configuration objects · High · F4
 - ⬜ **QA-P0-21** Security hardening pass, including the threats in the design's §18; the tenant-isolation suite over every new table; advisor checks; the PDP performance budget (p95 ≤ 50 ms cached) · High · F10
-- ⬜ **Full Playwright suite** Green on the nightly, both halves · High · F10
+- ⬜ **Full Playwright suite** Green on the nightly, all three parts · High · F10
 - 🔶 **ACCESS-P0-23** Delegations: approval, request, administration · Medium · F5 · partial
 - 🔶 **ACCESS-P0-35 †** Approved changes to governance objects: four-eyes publish with a version diff for roles, SoD rules, lifecycle rules, request policies, workflows · Medium · F5 · partial
 
@@ -216,7 +216,7 @@ Later: 26 unfinished stories are low priority, including all 11 unfinished INTEG
 |---|---|---|---|---|---|
 | ⬜ | QA-P0-21 | Security hardening pass, including the threats in the design's §18; the tenant-isolation suite over every new table; advisor checks; the PDP performance budget (p95 ≤ 50 ms cached) | QA | High | 0% |
 | ✅ | QA-P0-22 | Brownfield fixture: HR → lifecycle → request → provision → certify → revoke → verify | QA | High | 100% |
-| ⬜ | Full Playwright suite | Green on the nightly, both halves | QA | High | 0% |
+| ⬜ | Full Playwright suite | Green on the nightly, all three parts | QA | High | 0% |
 
 ## Product base, by module
 

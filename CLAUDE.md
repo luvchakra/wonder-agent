@@ -1386,8 +1386,9 @@ beats exhaustive pre-push verification.
     demand. Since 2026-10-10 (user decision) the suite runs inside Vercel
     builds (`scripts/e2e-on-vercel.sh`), where the project's Sensitive
     variables are available.
-    - The full suite runs as two halves, on the `e2e/nightly-1` and
-      `e2e/nightly-2` branches.
+    - The full suite runs in three parts, on the `e2e/nightly-1`,
+      `e2e/nightly-2` and `e2e/nightly-3` branches (owner decision,
+      2026-10-15; two halves ran too close to the 35-minute budget).
     - Chosen specs run on `e2e/nightly`.
     - The workflow moves those branches and waits for Vercel's results. It
       needs no GitHub secrets.
@@ -1437,9 +1438,9 @@ budget, with production first.
 
    This holds even when CI is green and the change is small or docs-only. A
    docs-only merge still creates a deployment. The scheduled nightly suite
-   is not covered by this rule: it runs on its own, both halves, two Vercel
-   builds a night, so every test runs every night (owner decision,
-   2026-10-10).
+   is not covered by this rule: it runs on its own, all three parts, three
+   Vercel builds a night, so every test runs every night (owner decisions,
+   2026-10-10 and 2026-10-15).
 1. **Create no deployment you don't need.**
    - Working branches (`claude/**`, `module/**`) never deploy
      (`git.deploymentEnabled` in `vercel.json`). Previews stay off.
@@ -1454,7 +1455,7 @@ budget, with production first.
      or about to open; add the docs to it.
    - A docs-only change that cannot wait is still one deployment.
 3. **E2E on Vercel costs one deployment per run.**
-   - The nightly suite is two (one per half).
+   - The nightly suite is three (one per part).
    - Pre-merge spec runs follow §17.8: only for security-related or major
      changes, and locally (`E2E_CHROMIUM_PATH`, see `playwright.config.ts`) when that
      is possible, before using a Vercel run.
