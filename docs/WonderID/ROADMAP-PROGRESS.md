@@ -4,7 +4,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 ✅ done · 🔶 partly done · ⬜ not started · progress counts partly done as half
 
-**Overall: 59%** `██████░░░░`
+**Overall: 60%** `██████░░░░`
 
 | # | Phase | Progress |
 |---|---|---|
@@ -20,7 +20,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `██████░░░░` 57% |
 | 11 | [Advanced governance](#11-advanced-governance) | `░░░░░░░░░░` 0% |
 | 12 | [Intelligence and experience](#12-intelligence-and-experience) | `█░░░░░░░░░` 6% |
-| 13 | [Release readiness](#13-release-readiness) | `█████░░░░░` 50% |
+| 13 | [Release readiness](#13-release-readiness) | `██████████` 100% |
 
 ## 1. Foundation, sign-in and identity — 88%
 
@@ -173,9 +173,9 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ⬜ Owner queues
 - ⬜ Governed AI assistant
 
-## 13. Release readiness — 50%
+## 13. Release readiness — 100%
 
-- ⬜ Security hardening pass
+- ✅ Security hardening pass
 - ✅ Brownfield customer rehearsal
 
 ---

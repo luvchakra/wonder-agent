@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { computeDedupeKey, inferEventType, isWithinReplayWindow, REPLAY_WINDOW_MAX_FUTURE_MS, REPLAY_WINDOW_MAX_PAST_MS } from "./events";
+import { computeDedupeKey, decodeCursor, inferEventType, isWithinReplayWindow, REPLAY_WINDOW_MAX_FUTURE_MS, REPLAY_WINDOW_MAX_PAST_MS } from "./events";
 import type { RuntimeEventInput } from "@/lib/shared/types/runtime";
 
 describe("computeDedupeKey — RUNTIME-P0-01.2", () => {
@@ -85,5 +85,28 @@ describe("event types — RUNTIME-P0-16", () => {
     expect(computeDedupeKey({ ...base })).toBe(legacy);
     expect(computeDedupeKey({ ...base, eventType: "TOOL_REQUEST" })).not.toBe(computeDedupeKey({ ...base, eventType: "TOOL_EXECUTED" }));
     expect(computeDedupeKey({ ...base, eventType: "TOOL_REQUEST" })).not.toBe(legacy);
+  });
+});
+
+describe("decodeCursor — QA-P0-21 (37A.34 INJECTION)", () => {
+  const cursor = (text: string) => Buffer.from(text, "utf8").toString("base64url");
+  const id = "6f1c2b9e-0a4d-4c1e-9b7a-2d3e4f5a6b7c";
+
+  it("reads back the cursor a page handed out", () => {
+    expect(decodeCursor(cursor(`2026-10-15T07:00:00.123456+00:00|${id}`))).toEqual({ eventTime: "2026-10-15T07:00:00.123456+00:00", id });
+    expect(decodeCursor(cursor(`2026-10-15T07:00:00Z|${id}`)).id).toBe(id);
+  });
+
+  it("refuses a cursor that would add a clause to the or() filter", () => {
+    for (const text of [
+      `2026-10-15T07:00:00Z,tenant_id.neq.0|${id}`,
+      `2026-10-15T07:00:00Z|${id}),or(id.not.is.null`,
+      `2026-10-15T07:00:00Z|${id}|extra`,
+      `not-a-date|${id}`,
+      "2026-10-15T07:00:00Z",
+      "",
+    ]) {
+      expect(() => decodeCursor(cursor(text)), text).toThrow(expect.objectContaining({ status: 400, code: "INVALID_CURSOR" }));
+    }
   });
 });

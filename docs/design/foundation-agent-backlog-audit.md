@@ -3639,3 +3639,13 @@ Trail row shows "permissions:" with `report.read` in the new value.
 
 **Left out.** User profile edits (personal data, not configuration) and the
 platform console (it already records old and new values).
+
+## 2026-10-15 — AI summary: external data is not instructions (QA-P0-21)
+
+`lib/ai/summarize.ts`'s system prompt now states that instructions written
+inside the data are content to describe, never instructions (CLAUDE.md
+§17.2). New test in `summarize.test.ts`: injected text stays JSON-quoted in
+the user message, never in the system prompt, and the result is prose only.
+`authorizeCore.test.ts` gains a performance budget: one decision under 1 ms,
+and the tenant-wide permission list under 50 ms, for 40 roles and 30
+policies (measured 0.05 ms and 4 ms). See the QA entry of the same date.

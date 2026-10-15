@@ -19,6 +19,7 @@ const sharedName = `E2E MultiOrg Twin ${stamp}`;
 let agentOneId = "";
 let agentTwoId = "";
 let policyTwoId = "";
+let tenantOneId = "";
 
 /** Selects an organization through the sidebar switcher, then waits for the switch to land. */
 async function selectOrganization(page: Page, name: string) {
@@ -37,6 +38,7 @@ test.describe.serial("a member of two organizations", () => {
     const res = await one.request.post("/api/v1/agents", { data: { agentName: sharedName, agentType: "automation", purpose: "QA-P0-17" } });
     expect(res.status()).toBe(201);
     agentOneId = (await res.json()).data.id;
+    tenantOneId = (await (await one.request.get("/api/v1/tenant")).json()).data.id;
     await one.close();
 
     const two = await browser.newContext({ storageState: authFile("adminTwo") });
@@ -61,6 +63,21 @@ test.describe.serial("a member of two organizations", () => {
     expect(listed.map((a) => a.id)).toContain(agentTwoId);
     expect(listed.map((a) => a.id)).not.toContain(agentOneId);
     expect((await page.request.get(`/api/v1/policies/${policyTwoId}`)).status()).toBe(200);
+  });
+
+  test("in Tenant Two, a Tenant One id in the request body is ignored (QA-P0-21, ID tampering)", async ({ page, browser }) => {
+    await selectOrganization(page, TENANT_TWO.name);
+    const name = `E2E MultiOrg Tampered ${stamp}`;
+    const res = await page.request.post("/api/v1/agents", {
+      data: { agentName: name, agentType: "automation", purpose: "QA-P0-21", tenant_id: tenantOneId, tenantId: tenantOneId },
+    });
+    expect(res.status()).toBe(201);
+    const created = (await res.json()).data.id as string;
+    // It lands in the organization the session selected, never the one the body named.
+    expect((await page.request.get(`/api/v1/agents/${created}`)).status()).toBe(200);
+    const one = await browser.newContext({ storageState: authFile("adminOne") });
+    expect((await one.request.get(`/api/v1/agents/${created}`)).status()).toBe(404);
+    await one.close();
   });
 
   test("selected into Tenant One, it sees Tenant One only, by list or by id", async ({ page }) => {

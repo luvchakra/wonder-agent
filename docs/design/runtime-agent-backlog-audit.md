@@ -958,3 +958,13 @@ Verified:
 ### 2026-10-12 — WID-H07 (owner decision)
 
 Typed text out of audit records: emergency control engage and lift reasons are passed as `typedText` (kept on `runtime_emergency_controls`). See the Foundation entry for the mechanism.
+
+### 2026-10-15 — Page cursor validated (QA-P0-21)
+
+`decodeCursor` (`events.ts`) accepts only an ISO timestamp and a UUID. The
+cursor comes back from the browser and goes into a PostgREST `or()` filter,
+so a crafted cursor could add clauses (within the caller's tenant; RLS and
+the tenant filter still applied). Anything else gets 400 `INVALID_CURSOR`.
+Tests: `events.test.ts` "decodeCursor"; `mcp-bridge.spec.ts`, which covers
+the forged cursor and replay-window quarantine. See the QA entry of the same
+date.

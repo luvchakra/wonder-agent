@@ -2176,3 +2176,57 @@ run is the check.
 **Left in QA-P0-21:** the 37A test matrix across the new surface (ID
 tampering, SSRF, webhook replay, prompt injection, audit completeness) and the
 PDP performance budget.
+
+## 2026-10-15 — QA-P0-21 part 2: security test matrix (done)
+
+The specification's security test taxonomy (37A.34) and matrix (S15) are now
+mapped to the tests that cover them, in `docs/security/SECURITY-TEST-MATRIX.md`.
+The gaps the mapping found were closed as follows:
+
+- **Injection, a real gap fixed.** The runtime events list decoded the page
+  cursor sent by the browser and put its parts into a PostgREST `or()` filter
+  unchecked. The tenant and RLS filters still applied, so it could not cross
+  organizations, but a crafted cursor could add clauses of its own.
+  `decodeCursor` (`modules/runtime-assurance/events.ts`) now accepts only a
+  timestamp and a UUID, and refuses anything else with 400 `INVALID_CURSOR`.
+- **Injection guard.** `tests/architecture/postgrest-filters.test.ts` checks
+  every `or()` filter in `lib`, `modules` and `app`. A value may be a server
+  value (tenant, user, a UUID the function checks, a computed timestamp) or a
+  search term cleaned in the same file. All seven search boxes already
+  cleaned their term; the test keeps it that way.
+- **Prompt injection.** The AI summary's system prompt now says that
+  instructions inside the data are content, not instructions. A test in
+  `lib/ai/summarize.test.ts` shows that injected text stays JSON-quoted
+  inside the data, never in the system prompt, and that the result is prose
+  only.
+- **Replay.** `mcp-bridge.spec.ts`: an event 31 days old, or one dated a day
+  ahead, is quarantined (`quarantined_replay_window`) and never recorded as
+  activity. A forged cursor gets 400.
+- **ID tampering.** `multi-org-isolation.spec.ts`: an agent created in
+  Tenant Two with Tenant One's id in `tenant_id` and `tenantId` lands in
+  Tenant Two. Tenant One's administrator gets 404 for it.
+- **Authorization engine budget** (RUN-ORDER: p95 ≤ 50 ms).
+  `authorizeCore.test.ts` times 40 roles of 150 permissions with 30
+  policies. One decision takes 0.05 ms (budget 1 ms). The full tenant-wide
+  permission list, which `getTenantContext()` builds on every request, takes
+  4 ms (budget 50 ms). Measured here.
+
+The design's §7.2 threats are covered by existing tests: the mass-change
+guard (`connector-provisioning.spec.ts`), connector template escaping
+(`ldapWrite.test.ts`), approval links that need the signed-in approver
+(`approval-links-drafts.spec.ts`), and four-eyes and self-approval
+(`sod.spec.ts`, `delegatedRoleRules.test.ts`). Agent token replay (DPoP)
+applies once agent tokens are built.
+
+**Verified:**
+- Typecheck and eslint on the changed files: clean.
+- Vitest, the touched files: `authorizeCore.test.ts`, `summarize.test.ts`,
+  `events.test.ts` and `postgrest-filters.test.ts`, 42 passed.
+- `next build` passed.
+- Local E2E: `mcp-bridge.spec.ts` and `multi-org-isolation.spec.ts`,
+  19 passed (including setup).
+
+**Left, recorded in the matrix as known gaps:**
+- no generic check that every sensitive mutation writes an audit event;
+- the Razorpay replay path (unique event id) has no test;
+- no E2E sends an oversized body to the import route.

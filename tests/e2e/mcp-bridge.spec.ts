@@ -104,6 +104,16 @@ test.describe.serial("MCP events bridge into runtime", () => {
     const events = (await (await page.request.get(`/api/v1/runtime/events?agentId=${agentId}`)).json()).data as Array<{ source: string; resource: string }>;
     expect(events.filter((e) => e.source === "mcp" && e.resource === "CustomerDB")).toHaveLength(1);
 
+    // QA-P0-21 (replay): an old or future-dated event is quarantined, never recorded as activity.
+    const day = 24 * 60 * 60 * 1000;
+    expect((await (await post({ externalId: `old-${Date.now()}`, agentIdentityRef: ref, resource: "ReplayDB", eventTime: new Date(Date.now() - 31 * day).toISOString() })).json()).data.runtime).toBe("quarantined_replay_window");
+    expect((await (await post({ externalId: `future-${Date.now()}`, agentIdentityRef: ref, resource: "ReplayDB", eventTime: new Date(Date.now() + day).toISOString() })).json()).data.runtime).toBe("quarantined_replay_window");
+    const replayed = (await (await page.request.get(`/api/v1/runtime/events?agentId=${agentId}`)).json()).data as Array<{ resource: string }>;
+    expect(replayed.filter((e) => e.resource === "ReplayDB")).toHaveLength(0);
+    // A forged page cursor cannot add a clause to the query (37A.34 INJECTION).
+    const forged = Buffer.from("2026-10-15T07:00:00Z,tenant_id.neq.0|x", "utf8").toString("base64url");
+    expect((await page.request.get(`/api/v1/runtime/events?agentId=${agentId}&cursor=${forged}`)).status()).toBe(400);
+
     // It counts as DID for that agent.
     const did = (await (await page.request.get(`/api/v1/runtime/agents/${agentId}/did`)).json()).data;
     expect(JSON.stringify(did)).toContain("CustomerDB");
