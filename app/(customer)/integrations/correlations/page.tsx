@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listIdentitySources, listPendingCorrelations } from "@/modules/integrations/service";
+import { getIdentitySourceNames, listPendingCorrelations } from "@/modules/integrations/service";
 import { getIdentityNames, listSourceDisagreements } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, EmptyState } from "@/modules/ui";
@@ -22,9 +22,10 @@ export default async function PendingCorrelationsPage() {
     throw err;
   }
   const tenantId = ctx.tenantId!;
-  const [pending, sources, disagreements] = await Promise.all([listPendingCorrelations(tenantId), listIdentitySources(tenantId), listSourceDisagreements(tenantId)]);
-  const names = await getIdentityNames(tenantId, pending.flatMap((p) => p.candidateIdentityIds));
-  const sourceName = new Map(sources.map((s) => [s.id, s.name]));
+  const [pending, disagreements] = await Promise.all([listPendingCorrelations(tenantId), listSourceDisagreements(tenantId)]);
+  // Names for the sources shown here only: an organization may have more sources than one list page holds.
+  const sourceIds = [...pending.map((p) => p.sourceId), ...disagreements.flatMap((d) => [d.otherSourceId, ...(d.keptSourceId ? [d.keptSourceId] : [])])];
+  const [names, sourceName] = await Promise.all([getIdentityNames(tenantId, pending.flatMap((p) => p.candidateIdentityIds)), getIdentitySourceNames(tenantId, sourceIds)]);
   const canResolve = ctx.permissions.includes("identity.manage");
   const fieldLabel = (f: string) => (f.startsWith("attributes.") ? f.slice("attributes.".length) : (TARGET_LABEL[f as keyof typeof TARGET_LABEL] ?? f));
 

@@ -38,6 +38,7 @@ export { CONNECTION_SCHEDULES, type ConnectionSchedule } from "./connectorSchedu
 export {
   listIdentitySources,
   getIdentitySource,
+  getIdentitySourceNames,
   createIdentitySource,
   updateIdentitySource,
   setSourceDefaultIdRole,

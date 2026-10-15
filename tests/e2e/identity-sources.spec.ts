@@ -251,6 +251,8 @@ test.describe.serial("identity sources — custom attributes (INTEGRATION-P0-20)
   ];
 
   test("a mapping must name an existing attribute of the source's identity type; values are typed, unique and carry provenance", async ({ request }) => {
+    // Four imports and their reads: about 30 s locally and up to a minute on the Vercel builder.
+    test.setTimeout(150_000);
     for (const data of [
       { name: cc, displayName: `E2E Cost centre ${stamp}`, dataType: "string", identityType: "HUMAN", uniqueValue: true },
       { name: grade, displayName: `E2E Grade ${stamp}`, dataType: "number", identityType: "HUMAN" },

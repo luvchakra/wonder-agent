@@ -2230,3 +2230,50 @@ applies once agent tokens are built.
 - no generic check that every sensitive mutation writes an audit event;
 - the Razorpay replay path (unique event id) has no test;
 - no E2E sends an oversized body to the import route.
+
+## 2026-10-15 — Full E2E run by hand (owner request): causes and fixes
+
+The owner asked for the full suite now rather than at night (workflow run
+38708923443, three parts on Vercel, three deployments).
+
+**Results:**
+- Part 1: 206 passed, 0 failed, 3 flaky. It hit the 35-minute cap and two
+  tests were cut off.
+- Part 2: 178 passed, 2 flaky, 22 minutes.
+- Part 3: 140 passed, 2 failed, 1 flaky, 24 minutes.
+
+**Causes and fixes:**
+- **`identity-sources.spec.ts:115`, a product bug.** The pending-matches
+  page looked up source names in `listIdentitySources()`, which reads at
+  most 200 sources. The E2E organization has 296, so a newer source showed
+  as "a source". The same lookup named the sources on an identity's page.
+  - Both now use `getIdentitySourceNames(tenantId, ids)`, which reads the
+    sources actually shown, by id, filtered by tenant.
+- **`mcp-bridge.spec.ts:91`.** The replay and cursor checks added by #229
+  pushed it past the 60-second limit on the Vercel builder. They are now a
+  test of their own.
+- **Part 1 over time.** The round robin gave part 1 three slow specs
+  (connector provisioning, design review, automation credentials).
+  `scripts/e2e-on-vercel.sh` now gives connector provisioning part 1 alone
+  among the slow specs; the other six alternate between parts 2 and 3. The
+  file counts are 25, 26 and 26.
+- **`identity-sources.spec.ts:253`.** It took 58 seconds locally on the
+  slow-machine setting, against a 60-second limit. It is four imports, so
+  it gets 150 seconds.
+
+**Verified:**
+- Local E2E, `mcp-bridge` and `identity-sources`: 26 passed, plus the
+  custom-attributes test passed alone.
+- Typecheck and eslint on the changed files: clean.
+- `next build` passed.
+
+**Left:** six tests passed only on retry:
+- connector provisioning WID-H04, which waits for the import pipeline;
+- the request catalog setup;
+- lifecycle expiry;
+- the approval engine;
+- identity rules;
+- F1 reconciliation.
+
+They pass on retry, so the run is green, but each still needs its root cause
+found.
