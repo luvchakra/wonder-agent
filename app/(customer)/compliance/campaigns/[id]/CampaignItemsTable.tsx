@@ -18,6 +18,8 @@ type CampaignItemRow = {
     role?: { displayName: string; privileged: boolean; group: { name: string } | null };
     /** COMPLIANCE-P0-10 part 3: one resource of an access package, for its owner's review. */
     package?: { ref: number | null; name: string; birthright: boolean; resource: { applicationName: string; entitlementName: string | null } };
+    /** COMPLIANCE-P0-10 part 4: one entitlement of an application, for its owner's review. */
+    catalogEntitlement?: { name: string; privilegeLevel: string | null; application: { id: string; ref: number | null; name: string } };
   } | null;
   riskAtReview: string | null;
   usageAtReview: string | null;
@@ -35,7 +37,17 @@ export function CampaignItemsTable({ items, totalCount, currentUserId }: { items
       header: "Whose access",
       sortable: true,
       render: (i) =>
-        i.snapshot?.package ? (
+        i.snapshot?.catalogEntitlement ? (
+          <span className="min-w-0">
+            <Link href={`/access/applications/${i.snapshot.catalogEntitlement.application.ref ?? i.snapshot.catalogEntitlement.application.id}`} className="text-primary hover:underline">
+              {i.snapshot.catalogEntitlement.application.name}
+            </Link>
+            <span className="block text-xs text-muted-foreground">
+              {i.snapshot.catalogEntitlement.name}
+              {i.snapshot.catalogEntitlement.privilegeLevel && i.snapshot.catalogEntitlement.privilegeLevel !== "standard" ? ` · ${i.snapshot.catalogEntitlement.privilegeLevel}` : ""}
+            </span>
+          </span>
+        ) : i.snapshot?.package ? (
           <span className="min-w-0">
             <Link href={`/access/packages/${i.snapshot.package.ref ?? ""}`} className="text-primary hover:underline">
               {i.snapshot.package.name}
@@ -84,7 +96,7 @@ export function CampaignItemsTable({ items, totalCount, currentUserId }: { items
       render: (i) => {
         if (i.status !== "pending") return null;
         if (i.reviewerId !== currentUserId) return <span className="text-xs text-muted-foreground">Assigned reviewer only</span>;
-        return <DecisionForm itemId={i.id} subject={i.agentId ? "agent" : i.snapshot?.package ? "package" : i.snapshot?.role ? "role" : "person"} />;
+        return <DecisionForm itemId={i.id} subject={i.agentId ? "agent" : i.snapshot?.catalogEntitlement ? "entitlement" : i.snapshot?.package ? "package" : i.snapshot?.role ? "role" : "person"} />;
       },
     },
   ];

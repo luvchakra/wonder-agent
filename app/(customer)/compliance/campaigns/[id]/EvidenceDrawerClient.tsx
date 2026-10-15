@@ -66,7 +66,15 @@ export function EvidenceDrawerClient({ items }: { items: ItemForEvidence[] }) {
       {snapshot && (
         <div className="space-y-3 text-sm">
           <p className="text-xs text-muted-foreground">Captured {snapshot.capturedAt}</p>
-          {snapshot.package ? (
+          {snapshot.catalogEntitlement ? (
+            <div>
+              <p className="text-xs text-muted-foreground">Application entitlement</p>
+              <p className="text-foreground">
+                {snapshot.catalogEntitlement.application.name}: {snapshot.catalogEntitlement.name}
+                {snapshot.catalogEntitlement.privilegeLevel ? ` · ${snapshot.catalogEntitlement.privilegeLevel}` : ""}
+              </p>
+            </div>
+          ) : snapshot.package ? (
             <div>
               <p className="text-xs text-muted-foreground">Access package</p>
               <p className="text-foreground">

@@ -46,6 +46,7 @@ export function toCertificationItem(row: any): CertificationItem {
     groupId: row.group_id ?? null,
     packageId: row.package_id ?? null,
     packageResourceId: row.package_resource_id ?? null,
+    entitlementId: row.entitlement_id ?? null,
     accessGrantId: row.access_grant_id,
     reviewerId: row.reviewer_id,
     riskAtReview: row.risk_at_review,

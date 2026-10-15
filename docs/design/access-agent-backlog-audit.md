@@ -4398,3 +4398,15 @@ f1-reconciliation all passed (66 in one run, the three that timed out under
 load passed on a rerun, 32/32); agent specs in the Identity Agent entry.
 f1-reconciliation's expiry sweep now requests the access request's number URL:
 a UUID link only redirects, so the sweep on the page did not run (from part 1).
+
+## 2026-10-15 — listApplicationsForReview (for COMPLIANCE-P0-10 part 4)
+
+`listApplicationsForReview(tenantId, applicationId?)` (`entitlements.ts`,
+published in `service.ts`) returns:
+- active applications, with their business owner;
+- their active, certifiable entitlements, with each entitlement's owner.
+
+It is a service-role read, because a campaign builds after the response,
+and it filters every query and row by tenant. Compliance revokes an
+entitlement through the existing `updateEntitlement(…, { status: "inactive" })`.
+See the Compliance entry of the same date.

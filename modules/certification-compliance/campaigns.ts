@@ -8,7 +8,7 @@ import { writeAudit } from "@/lib/audit/writeAudit";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { getAgentContract, listAgents } from "@/modules/agent-identity/service";
-import { getEffectiveAccess, listPolicyEvaluations, getApplication, getEntitlement, listIdentityGrantsForReview, listPackagesForReview } from "@/modules/access-governance/service";
+import { getEffectiveAccess, listPolicyEvaluations, getApplication, getEntitlement, listIdentityGrantsForReview, listPackagesForReview, listApplicationsForReview } from "@/modules/access-governance/service";
 import { getHumanIdentityIdsForUsers, getIdentityReviewInfo } from "@/modules/agent-identity/service";
 import { listRoleAssignmentsForReview } from "@/lib/rbac/roleAssignmentReview";
 import { REVIEWER_KINDS, resolveReviewer, type ReviewerKind } from "./identityReviewRules";
@@ -324,11 +324,65 @@ async function buildPackageItems(tenantId: string, campaignId: string, input: La
   });
 }
 
+/**
+ * COMPLIANCE-P0-10 part 4: an owner review of applications. One item per
+ * active, certifiable entitlement of an active application (one
+ * application, or all), reviewed by the entitlement's owner, else the
+ * application's business owner, else the named reviewer. Certify keeps the
+ * entitlement; revoke disables it. Nobody's current access changes here.
+ */
+async function buildApplicationItems(tenantId: string, campaignId: string, input: LaunchCampaignInput, applicationId: string | null): Promise<ItemRow[]> {
+  const apps = await listApplicationsForReview(tenantId, applicationId);
+  const ownerIds = apps.flatMap((a) => [a.ownerIdentityId, ...a.entitlements.map((e) => e.ownerIdentityId)]).filter((x): x is string => Boolean(x));
+  const owners = await getIdentityReviewInfo(tenantId, [...new Set(ownerIds)]);
+  const userOf = (identityId: string | null) => (identityId ? (owners.get(identityId)?.userId ?? null) : null);
+  const now = new Date().toISOString();
+  return apps.flatMap((a) =>
+    a.entitlements.map((e) => {
+      const entitlementOwner = userOf(e.ownerIdentityId);
+      const applicationOwner = userOf(a.ownerIdentityId);
+      const owner = entitlementOwner ? ("entitlement_owner" as const) : applicationOwner ? ("application_owner" as const) : ("named" as const);
+      const reviewerId = entitlementOwner ?? applicationOwner ?? input.reviewerId;
+      const privileged = e.privilegeLevel === "admin" || e.privilegeLevel === "elevated" || e.riskLevel === "high" || e.riskLevel === "critical";
+      return {
+        tenant_id: tenantId,
+        campaign_id: campaignId,
+        entitlement_id: e.id,
+        reviewer_id: reviewerId,
+        risk_at_review: privileged ? "high" : null,
+        usage_at_review: "unknown",
+        recommendation: privileged ? "review" : "keep",
+        due_date: input.dueDate ?? null,
+        snapshot: {
+          capturedAt: now,
+          agentContractId: null,
+          agentContractVersion: null,
+          accessGrant: null,
+          policyEvaluations: [],
+          riskAtReview: null,
+          usageAtReview: "unknown",
+          catalogEntitlement: {
+            id: e.id,
+            name: e.displayName || e.name,
+            privilegeLevel: e.privilegeLevel,
+            riskLevel: e.riskLevel,
+            application: { id: a.id, ref: a.ref, name: a.name },
+            owner,
+          },
+          privilegeLevel: privileged ? "privileged" : "standard",
+          reviewer: { kind: owner, fallback: owner === "named" },
+        },
+      };
+    }),
+  );
+}
+
 /** The items a campaign of this scope would hold, read and not written (launch writes them; preview counts them). */
 async function buildItems(tenantId: string, campaignId: string, input: LaunchCampaignInput, ids: { applicationId: string | null; entitlementId: string | null }): Promise<ItemRow[]> {
   if (input.scopeType === "identity_access") return buildIdentityItems(tenantId, campaignId, input, ids.applicationId);
   if (input.scopeType === "role_assignments") return buildRoleItems(tenantId, campaignId, input);
   if (input.scopeType === "package_contents") return buildPackageItems(tenantId, campaignId, input);
+  if (input.scopeType === "application_contents") return buildApplicationItems(tenantId, campaignId, input, ids.applicationId);
   const { agents, grantFilter } = await scopeTargets(tenantId, input, ids);
   return buildAgentItems(tenantId, campaignId, agents, input, grantFilter);
 }
@@ -405,6 +459,11 @@ async function resolveLaunchScope(tenantId: string, input: LaunchCampaignInput):
   } else if (input.scopeType === "role_assignments") {
     // COMPLIANCE-P0-11: the manager or the named reviewer (roles have no application owner).
     if (input.reviewerKind !== undefined && input.reviewerKind !== "named" && input.reviewerKind !== "manager") throw new ApiError(400, "INVALID_INPUT", "reviewerKind: named or manager");
+  } else if (input.scopeType === "application_contents") {
+    // COMPLIANCE-P0-10 part 4: optionally one application; its owners review it (the named reviewer as fallback).
+    applicationId = typeof input.scope?.applicationId === "string" && input.scope.applicationId ? input.scope.applicationId : null;
+    if (applicationId && !(await listApplicationsForReview(tenantId, applicationId)).length) throw new ApiError(404, "APPLICATION_NOT_FOUND", "No such active application");
+    if (input.reviewerKind !== undefined && input.reviewerKind !== "named") throw new ApiError(400, "INVALID_INPUT", "reviewerKind: an application's owners review it; the named reviewer is the fallback");
   } else if (input.scopeType === "package_contents") {
     // COMPLIANCE-P0-10 part 3: optionally one package; the reviewer is its owner (the named reviewer as fallback).
     const packageId = typeof input.scope?.packageId === "string" && input.scope.packageId ? input.scope.packageId : null;
@@ -425,14 +484,14 @@ async function resolveLaunchScope(tenantId: string, input: LaunchCampaignInput):
  */
 export type CampaignPreview = { items: number; subjects: number; privileged: number; reviewers: number; reviewerFallbacks: number };
 
-const PREVIEW_SCOPES = ["agent", "application", "entitlement", "privileged_access", "high_risk_agent", "identity_access", "role_assignments", "package_contents"] as const;
+const PREVIEW_SCOPES = ["agent", "application", "entitlement", "privileged_access", "high_risk_agent", "identity_access", "role_assignments", "package_contents", "application_contents"] as const;
 
 export async function previewCampaign(tenantId: string, input: LaunchCampaignInput): Promise<CampaignPreview> {
   await requireFeature(tenantId, "certifications");
   if (!(PREVIEW_SCOPES as readonly string[]).includes(input.scopeType)) throw new ApiError(400, "INVALID_INPUT", "scopeType: one of the campaign scopes");
   const ids = await resolveLaunchScope(tenantId, input);
   const rows = await buildItems(tenantId, "00000000-0000-0000-0000-000000000000", input, ids);
-  const subjects = new Set(rows.map((r) => (r.identity_id ?? r.agent_id ?? r.package_id) as string));
+  const subjects = new Set(rows.map((r) => (r.identity_id ?? r.agent_id ?? r.package_id ?? r.entitlement_id) as string));
   const reviewers = new Set(rows.map((r) => r.reviewer_id as string));
   const privileged = rows.filter((r) => r.risk_at_review === "high" || r.risk_at_review === "critical").length;
   const reviewerFallbacks = rows.filter((r) => (r.snapshot as { reviewer?: { fallback?: boolean } } | null)?.reviewer?.fallback === true).length;

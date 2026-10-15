@@ -12,7 +12,7 @@ import type { ShouldCanDidComparison } from "./runtime";
 import type { RiskFinding } from "./risk";
 import type { AuditLogEntry } from "./operations";
 
-export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent" | "identity_access" | "role_assignments" | "package_contents";
+export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent" | "identity_access" | "role_assignments" | "package_contents" | "application_contents";
 /** COMPLIANCE-P0-10: who reviews a people's-access item (the named reviewer is the fallback). */
 export type CampaignReviewerKind = "named" | "manager" | "application_owner";
 export type CampaignCadence = "one_time" | "periodic" | "event_driven";
@@ -78,6 +78,15 @@ export type CertificationSnapshot = {
     birthright: boolean;
     resource: { id: string; applicationName: string; entitlementName: string | null; privilegeLevel: string | null; risk: string };
   };
+  /** COMPLIANCE-P0-10 part 4: one entitlement of an application's catalog, for its owner's review. */
+  catalogEntitlement?: {
+    id: string;
+    name: string;
+    privilegeLevel: string | null;
+    riskLevel: string | null;
+    application: { id: string; ref: number | null; name: string };
+    owner: "entitlement_owner" | "application_owner" | "named";
+  };
 };
 
 export type CertificationItem = {
@@ -95,6 +104,8 @@ export type CertificationItem = {
   /** COMPLIANCE-P0-10 part 3: for an owner review of a package, the package and the resource reviewed. */
   packageId: string | null;
   packageResourceId: string | null;
+  /** COMPLIANCE-P0-10 part 4: for an owner review of an application, the entitlement reviewed. */
+  entitlementId: string | null;
   accessGrantId: string | null;
   reviewerId: string;
   riskAtReview: string | null;

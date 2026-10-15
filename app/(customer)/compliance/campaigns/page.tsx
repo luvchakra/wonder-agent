@@ -48,6 +48,7 @@ export default async function CampaignsPage({ searchParams }: { searchParams: Pr
         <option value="identity_access">people&apos;s access</option>
         <option value="role_assignments">WonderID roles</option>
         <option value="package_contents">access packages (owner review)</option>
+        <option value="application_contents">applications (owner review)</option>
       </SelectField>
       <TextField label="Criticality filter" name="criticality" placeholder="e.g. high,critical" />
       <SelectField label="Cadence" name="cadence" defaultValue="one_time">

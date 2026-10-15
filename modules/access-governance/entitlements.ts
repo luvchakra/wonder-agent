@@ -1,6 +1,6 @@
 import "server-only";
 
-import { supabaseServer } from "@/lib/db/supabaseServer";
+import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { getIdentity } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
@@ -157,4 +157,66 @@ export async function setEntitlementOwner(tenantId: string, actorId: string, ent
   if (!data) throw new ApiError(404, "ENTITLEMENT_NOT_FOUND");
   await writeAudit({ tenantId, actorId, actorType: "user", action: "access.entitlement_owner_set", objectType: "entitlement", objectId: entitlementId, outcome: "success", metadata: { ownerIdentityId } });
   return toEntitlement(data);
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export type EntitlementForReview = {
+  id: string;
+  name: string;
+  displayName: string | null;
+  privilegeLevel: string | null;
+  riskLevel: string | null;
+  ownerIdentityId: string | null;
+};
+
+/**
+ * COMPLIANCE-P0-10 part 4: the active applications (or one) with their
+ * business owner and their active, certifiable entitlements, for an owner
+ * review of each application's catalog. Service role (a campaign builds
+ * after the response), filtered by tenant on every read (§14).
+ */
+export async function listApplicationsForReview(
+  tenantId: string,
+  applicationId: string | null = null,
+): Promise<{ id: string; ref: number | null; name: string; ownerIdentityId: string | null; entitlements: EntitlementForReview[] }[]> {
+  if (applicationId && !UUID.test(applicationId)) throw new ApiError(404, "APPLICATION_NOT_FOUND", "No such application");
+  const admin = supabaseServiceRole();
+  let query = admin.from("applications").select("id, tenant_id, ref, name, display_name, business_owner_identity_id").eq("tenant_id", tenantId).eq("onboarding_status", "ACTIVE");
+  if (applicationId) query = query.eq("id", applicationId);
+  const { data: apps, error } = await query.order("name").limit(500);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = (apps ?? []).filter((a) => a.tenant_id === tenantId);
+  if (!rows.length) return [];
+  const { data: ents, error: entError } = await admin
+    .from("entitlements")
+    .select("id, tenant_id, application_id, name, display_name, privilege_level, risk_level, owner_identity_id")
+    .eq("tenant_id", tenantId)
+    .in("application_id", rows.map((a) => a.id as string))
+    .eq("status", "active")
+    .eq("certifiable", true)
+    .order("name")
+    .limit(5000);
+  if (entError) throw new ApiError(500, "QUERY_FAILED", entError.message);
+  const byApp = new Map<string, EntitlementForReview[]>();
+  for (const e of ents ?? []) {
+    if (e.tenant_id !== tenantId) continue;
+    const list = byApp.get(e.application_id as string) ?? [];
+    list.push({
+      id: e.id as string,
+      name: e.name as string,
+      displayName: (e.display_name as string | null) ?? null,
+      privilegeLevel: (e.privilege_level as string | null) ?? null,
+      riskLevel: (e.risk_level as string | null) ?? null,
+      ownerIdentityId: (e.owner_identity_id as string | null) ?? null,
+    });
+    byApp.set(e.application_id as string, list);
+  }
+  return rows.map((a) => ({
+    id: a.id as string,
+    ref: (a.ref as number | null) ?? null,
+    name: ((a.display_name as string | null) || (a.name as string)) ?? "",
+    ownerIdentityId: (a.business_owner_identity_id as string | null) ?? null,
+    entitlements: byApp.get(a.id as string) ?? [],
+  }));
 }
