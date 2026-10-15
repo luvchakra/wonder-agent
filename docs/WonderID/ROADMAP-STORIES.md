@@ -30,7 +30,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 - 🔶 **COMPLIANCE-P0-10** Certification campaigns for every identity type, with population evidence · High · F4 · partial
 - 🔶 **QA-P0-06** Authentication suite (SAML/OIDC/session) · High · QA · partial
 - ⬜ **IDENTITY-P0-23 †** Human identity merge over existing records (attribute-level, audited, reversible) · High · F4
-- ⬜ **Full Playwright suite** Green on the nightly, all three parts · High · F10
+- ⬜ **Full Playwright suite** Green on the nightly, all four parts · High · F10
 - 🔶 **ACCESS-P0-23** Delegations: approval, request, administration · Medium · F5 · partial
 - 🔶 **ACCESS-P0-35 †** Approved changes to governance objects: four-eyes publish with a version diff for roles, SoD rules, lifecycle rules, request policies, workflows · Medium · F5 · partial
 - 🔶 **PLATFORM-P0-13 (finish)** Configuration bundles: signed export, diff, import with approval · Medium · F7 · partial
@@ -216,7 +216,7 @@ Later: 26 unfinished stories are low priority, including all 11 unfinished INTEG
 |---|---|---|---|---|---|
 | ✅ | QA-P0-21 | Security hardening pass, including the threats in the design's §18; the tenant-isolation suite over every new table; advisor checks; the PDP performance budget (p95 ≤ 50 ms cached) | QA | High | 100% |
 | ✅ | QA-P0-22 | Brownfield fixture: HR → lifecycle → request → provision → certify → revoke → verify | QA | High | 100% |
-| ⬜ | Full Playwright suite | Green on the nightly, all three parts | QA | High | 0% |
+| ⬜ | Full Playwright suite | Green on the nightly, all four parts | QA | High | 0% |
 
 ## Product base, by module
 

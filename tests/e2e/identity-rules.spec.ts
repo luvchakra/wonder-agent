@@ -28,7 +28,8 @@ async function person(request: APIRequestContext, name: string) {
 }
 
 async function publish(admin: APIRequestContext, approver: APIRequestContext) {
-  expect((await admin.post(`/api/v1/identities/rules/${ruleId}/simulate`)).status()).toBe(200);
+  const simulated = await admin.post(`/api/v1/identities/rules/${ruleId}/simulate`);
+  expect(simulated.status(), await simulated.text()).toBe(200);
   const asked = await admin.post(`/api/v1/identities/rules/${ruleId}/publish`, { data: { action: "request" } });
   expect(asked.status(), await asked.text()).toBe(200);
   const approved = await approver.post(`/api/v1/identities/rules/${ruleId}/publish`, { data: { action: "approve" } });
@@ -72,7 +73,7 @@ test.describe.serial("identity attribute rules", () => {
 
     const target = await person(request, "Rule Sim");
     const sim = await request.post(`/api/v1/identities/rules/${ruleId}/simulate`);
-    expect(sim.status()).toBe(200);
+    expect(sim.status(), await sim.text()).toBe(200);
     const result = ((await sim.json()) as { data: { changes: { identityId: string; after: unknown }[]; wouldChange: number } }).data;
     expect(result.changes.find((c) => c.identityId === target.id)).toMatchObject({ after: `${dept}/Analyst` });
     // A simulation changes nothing.

@@ -450,7 +450,7 @@ async function rowsById(tenantId: string, ids: (string | null | undefined)[]): P
       .select(IDENTITY_COLUMNS)
       .eq("tenant_id", tenantId)
       .in("id", unique.slice(i, i + 200));
-    if (error) throw new Error(error.message);
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
     for (const r of (data ?? []) as unknown as Row[]) if (r.tenant_id === tenantId) out.set(r.id as string, r);
   }
   return out;

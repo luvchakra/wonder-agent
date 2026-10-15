@@ -2277,3 +2277,94 @@ The owner asked for the full suite now rather than at night (workflow run
 
 They pass on retry, so the run is green, but each still needs its root cause
 found.
+
+## 2026-10-15 — Nightly suite in four parts (owner decision)
+
+The owner asked for four parts instead of three, so each part keeps a margin
+under the 35-minute budget as the suite grows. Today's run took 35+ minutes
+for part 1, against 22 and 24 for the others.
+
+**Changes:**
+- `scripts/e2e-on-vercel.sh` adds `e2e/nightly-4`:
+  - connector provisioning has part 1 to itself among the slow specs;
+  - the other six slow specs take turns between parts 2, 3 and 4;
+  - every other spec is dealt round-robin over the four parts;
+  - files per part: 19, 20, 20 and 19, all 78 dealt once.
+- `scripts/vercel-build.sh` and `vercel-ignore-build.sh` accept
+  `e2e/nightly-4`.
+- `.github/workflows/e2e.yml`:
+  - it marks four branches;
+  - the job limit goes from 130 to 230 minutes, and the wait from 150 to
+    220 minutes. The free plan builds one deployment at a time, so the
+    parts run one after another; three parts took about 85 minutes on
+    15 Oct.
+
+**Cost:** one more Vercel deployment a night, four of the 100 a day.
+
+**Not changed:** CLAUDE.md §19.8 and §19.9 still say "three parts". The
+owner asked for no CLAUDE.md change for now, so the contract text waits for
+the owner's word.
+
+## 2026-10-15 — The six retried E2E tests, and a leftover hourly limit
+
+**The six tests that passed only on retry** (from the afternoon run) were
+investigated by a multi-agent workflow. The owner asked to try the approach.
+For each test:
+1. an agent pulled the first attempt's error from the Vercel log and
+   proposed a cause;
+2. an independent agent tried to refute it;
+3. a fix was written in an isolated worktree;
+4. each diff was reviewed here before being applied.
+
+**What the workflow found:**
+- Each first-attempt error, which the logs had not been read for:
+  - WID-H04: a 180 s test timeout while waiting for the sync pipeline;
+  - request catalog: the page was still loading after 20 s;
+  - lifecycle expiry: a response with no `data`;
+  - identity rules: simulate returned 500;
+  - F1 reconciliation: a response with no `data`, with a 502 from the
+    database API at the same time;
+  - approval engine: FORBIDDEN on a second decision.
+- No cause could be proven: the logs do not capture response bodies. The
+  refuters rejected 5 of 6 diagnoses as unproven, including one change that
+  would have narrowed tenant-wide rogue-access detection on a guess.
+
+**Applied (making failures diagnosable, not fixes of unproven causes):**
+- Tests now print the status and body on failure:
+  - `lifecycle-expiry-disable` has `getLifecycle`;
+  - `f1-reconciliation` has `getData`;
+  - `identity-rules` prints its simulate responses.
+- `syncAndWait` reports the pipeline's steps when it times out.
+- Longer limits only where the work is legitimately long, each with its
+  reason in a comment:
+  - WID-H04: 300 s, for three syncs;
+  - the request catalog setup: 180 s, with 45 s for its page checks.
+- Product code:
+  - `rowsById` throws `ApiError(500, QUERY_FAILED)`, so the cause reaches
+    the response;
+  - `getTenantContext` logs a failed membership, role, group or policy read
+    (redacted) and a member resolved to no permissions. Logging only;
+    refusals still fail closed.
+
+**Found while verifying: a leftover hourly write limit.**
+- Symptom: `connector-provisioning.spec.ts:751` (WID-C02 leaver) failed in
+  both local runs, with the disable refused by the mass-change guard
+  ("8 changes in the last hour (limit 7)").
+- Cause: the afternoon's part 1 was cut off inside the QA-P0-26 mass-change
+  test, which had set `integration.maxWritesPerHour` to 7. Its `finally`
+  block never ran (`tenant_config_versions` v91, 09:30 UTC). Every later
+  run read 7 as the "original" value and restored it.
+- Fix: the file's setup now resets the limit to the registry default (100)
+  first, so a killed run cannot affect later ones.
+
+**Verified, locally (E2E_SLOW_MACHINE):**
+- the six specs: 68 of 69 passed; the one failure was the leaver test
+  above;
+- `connector-provisioning.spec.ts` after the reset: 25 of 25 passed.
+- Typecheck and eslint: clean.
+
+**Owner decision open:** `getTenantContext` turns a failed database read into
+"no permissions", so under load a person sees 403 FORBIDDEN instead of
+"temporarily unavailable". It fails closed, which is safe, but the message
+is misleading (§17.5). Changing it touches tenant resolution and needs the
+owner's say.

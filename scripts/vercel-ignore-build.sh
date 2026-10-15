@@ -15,7 +15,7 @@
 # Only in this project (wonder-id): another Vercel project connected to the
 # same repository has none of the suite's variables and must skip them.
 case "$VERCEL_GIT_COMMIT_REF" in
-  e2e/nightly|e2e/nightly-1|e2e/nightly-2|e2e/nightly-3)
+  e2e/nightly|e2e/nightly-1|e2e/nightly-2|e2e/nightly-3|e2e/nightly-4)
     if [ "${VERCEL_PROJECT_ID:-}" = "prj_lHTAkZq0hRDN8mWqHm5AW9GCxtD8" ] \
       || { [ -z "${VERCEL_PROJECT_ID:-}" ] && [ -n "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; }; then
       echo "Nightly E2E run; building."

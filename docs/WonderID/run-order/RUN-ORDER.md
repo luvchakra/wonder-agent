@@ -269,7 +269,7 @@ Tracking issue #64.
 |---|---|---|
 | QA-P0-21 | Security hardening pass, including the threats in the design's §18; the tenant-isolation suite over every new table; advisor checks; the PDP performance budget (p95 ≤ 50 ms cached) | QA |
 | QA-P0-22 | Brownfield fixture: HR → lifecycle → request → provision → certify → revoke → verify | QA |
-| Full Playwright suite | Green on the nightly, all three parts | QA |
+| Full Playwright suite | Green on the nightly, all four parts | QA |
 
 ---
 
