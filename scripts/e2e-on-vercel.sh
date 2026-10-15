@@ -58,16 +58,18 @@ specs_line=$(printf '%s\n' "${VERCEL_GIT_COMMIT_MESSAGE:-}" | grep -m1 '^specs:'
 for s in $specs_line; do
   if [[ "$s" =~ ^tests/e2e/[A-Za-z0-9._/-]+\.spec\.ts$ ]] && [ -f "$s" ]; then SPECS="$SPECS $s"; fi
 done
-# The full suite is split in two: e2e/nightly-1 and e2e/nightly-2 each run
-# half of the spec files. A run of chosen specs uses e2e/nightly and is not
+# The full suite is split in three: e2e/nightly-1, -2 and -3 each run a
+# third of the spec files (owner decision, 15 Oct 2026; two halves came to
+# about 30 minutes each against a 35-minute budget). A run of chosen specs uses e2e/nightly and is not
 # split. Playwright's --shard split by test order, which put every slow spec
 # (they sort early) in half 1: on 15 Oct half 1 hit the 35-minute budget
 # with 65 tests unrun while half 2 finished in about 20. So the slow specs
-# alternate between the halves first, then every other spec file does.
+# take turns between the parts first, then every other spec file does.
 HALF=""
 case "${VERCEL_GIT_COMMIT_REF:-}" in
   e2e/nightly-1) HALF=1 ;;
   e2e/nightly-2) HALF=2 ;;
+  e2e/nightly-3) HALF=3 ;;
 esac
 if [ -z "$SPECS" ] && [ -n "$HALF" ]; then
   SLOW="connector-provisioning f1-reconciliation design-review bulk-invitations access-packages account-inventory automation-credentials"
@@ -78,7 +80,7 @@ if [ -z "$SPECS" ] && [ -n "$HALF" ]; then
   done
   i=0
   for f in $ordered; do
-    [ $((i % 2 + 1)) = "$HALF" ] && SPECS="$SPECS $f"
+    [ $((i % 3 + 1)) = "$HALF" ] && SPECS="$SPECS $f"
     i=$((i + 1))
   done
 fi
@@ -96,7 +98,7 @@ RECORD=""
 if [ -n "$SPECS" ] && printf '%s\n' "${VERCEL_GIT_COMMIT_MESSAGE:-}" | grep -qx 'record-baselines: yes'; then
   RECORD="--update-snapshots=missing"
 fi
-log "Running: ${HALF:+half $HALF: }${SPECS:-the full suite} ${RECORD:+(recording missing baselines)} on $(nproc) cores"
+log "Running: ${HALF:+part $HALF of 3: }${SPECS:-the full suite} ${RECORD:+(recording missing baselines)} on $(nproc) cores"
 
 PORT=3100
 # The local server runs without VERCEL: the build sets VERCEL=1, and with it

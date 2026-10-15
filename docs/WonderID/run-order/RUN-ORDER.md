@@ -48,7 +48,7 @@ F10 gates release after F9
   Docs ride along with code; no docs-only merges.
 - Before a push: typecheck, eslint on changed files, the touched unit tests;
   for a migration, apply it to the dev project and re-check advisories.
-- The nightly Playwright suite runs on Vercel in two halves; a red nightly is
+- The nightly Playwright suite runs on Vercel in three parts; a red nightly is
   fixed before anything else merges.
 - Record before you stop: the module's audit log entry and the Progress
   Tracker row, plus `../progress/PROGRESS.md`.
@@ -269,7 +269,7 @@ Tracking issue #64.
 |---|---|---|
 | QA-P0-21 | Security hardening pass, including the threats in the design's §18; the tenant-isolation suite over every new table; advisor checks; the PDP performance budget (p95 ≤ 50 ms cached) | QA |
 | QA-P0-22 | Brownfield fixture: HR → lifecycle → request → provision → certify → revoke → verify | QA |
-| Full Playwright suite | Green on the nightly, both halves | QA |
+| Full Playwright suite | Green on the nightly, all three parts | QA |
 
 ---
 

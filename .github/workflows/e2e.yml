@@ -9,9 +9,10 @@ name: E2E (Playwright on Vercel)
 # key, cron secret), which never leave Vercel. This workflow only:
 #   1. moves the test branches to the tip of main, each with one marker
 #      commit so Vercel always sees a new commit to build:
-#      - the full suite: `e2e/nightly-1` and `e2e/nightly-2`, one half each
-#        (a Vercel build has 45 minutes and 2 cores; the whole suite needs
-#        about 40 minutes there);
+#      - the full suite: `e2e/nightly-1`, `e2e/nightly-2` and `e2e/nightly-3`,
+#        one third each (a Vercel build has 45 minutes and 2 cores; the
+#        whole suite needs about 60 minutes there; three parts since
+#        15 Oct 2026, owner decision);
 #      - chosen specs: `e2e/nightly`;
 #   2. waits for Vercel's status on each marker commit. Each build runs its
 #      part (scripts/vercel-build.sh → scripts/e2e-on-vercel.sh) and fails
@@ -77,8 +78,9 @@ jobs:
             if [ "$RECORD" = "true" ]; then body="$body"$'\n'"record-baselines: yes"; fi
             mark e2e/nightly "E2E run on Vercel ($stamp)" "$body"
           else
-            mark e2e/nightly-1 "Nightly E2E run on Vercel, half 1 of 2 ($stamp)"
-            mark e2e/nightly-2 "Nightly E2E run on Vercel, half 2 of 2 ($stamp)"
+            mark e2e/nightly-1 "Nightly E2E run on Vercel, part 1 of 3 ($stamp)"
+            mark e2e/nightly-2 "Nightly E2E run on Vercel, part 2 of 3 ($stamp)"
+            mark e2e/nightly-3 "Nightly E2E run on Vercel, part 3 of 3 ($stamp)"
           fi
           echo "shas=${shas# }" >> "$GITHUB_OUTPUT"
 
@@ -87,11 +89,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHAS: ${{ steps.push.outputs.shas }}
         run: |
-          # Vercel reports each build as a commit status. The halves build one
-          # after the other; up to 120 minutes in all.
+          # Vercel reports each build as a commit status. The parts build one
+          # after the other; up to 150 minutes in all.
           failed=0
           start=$(date +%s)
-          deadline=$(( start + 7200 ))
+          deadline=$(( start + 9000 ))
           first=${SHAS%% *}
           for sha in $SHAS; do
             seen=0
@@ -108,7 +110,7 @@ jobs:
                 exit 1
               fi
               if [ "$(date +%s)" -gt "$deadline" ]; then
-                echo "::error::No result from Vercel for ${sha:0:7} within 120 minutes."
+                echo "::error::No result from Vercel for ${sha:0:7} within 150 minutes."
                 exit 1
               fi
               sleep 30
