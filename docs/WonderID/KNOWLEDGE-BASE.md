@@ -443,6 +443,7 @@ Findings are raised for:
 - **Who can review:** reviewers can't review their own access.
 - **People's access:** a campaign can cover the application access people, contractors and service accounts hold (all of it, one application, or privileged access only). Each item goes to the person's manager, the application's owner or a named reviewer; the named reviewer takes items nobody else fits. A revoke becomes a removal that is already approved, carried out by a task or the connection, and counted as done only once the system no longer shows it.
 - **WonderID roles:** a campaign can cover the roles members hold in WonderID itself, directly or through a group (all of them, or privileged roles only, which are listed first). Each item shows the person, the role and where it comes from, and goes to the person's manager or a named reviewer. A revoke takes effect at once: the role is removed, or the person leaves the group the role comes from. Automation credentials are reviewed on their own page.
+- **Access packages (owner review):** a campaign can cover what each active access package contains (all packages, or one). Each item is one application or entitlement in a package and goes to the package's owner, or the named reviewer when the package has none. Certify keeps it; revoke removes it from the package at once. People who already hold the package keep their access, and a birthright package waits for its approval again.
 
 **Policies**
 - Access and agent policies have targets and a priority.
@@ -663,6 +664,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 15 Oct 2026 | Access reviews can cover what access packages contain: each package's owner certifies or removes each application and entitlement in it. |
 | 15 Oct 2026 | Identity rules can run when a person becomes active, moves, gets a new manager, leaves or reaches their end date, not only when they are created, imported or an attribute changes. |
 | 15 Oct 2026 | The audit trail now shows what a configuration change changed: each field with its old and new value, under "N changes" beside the action. Typed text and secrets show only that they changed. |
 | 15 Oct 2026 | When an MCP server says which of its tools are AI agents, WonderID believes it: those tools are listed under **AI agents** on the MCP page, marked "Declared by the server", with what the server says they may do ("Answers only" or "Drafts only") and whether their output is AI-generated. Servers that say nothing are judged by the tool's name and description, as before. |

@@ -4,7 +4,7 @@
  * reviewers get. Only known fields are kept; nothing typed reaches a query.
  */
 
-const SCOPE_TYPES = ["agent", "application", "entitlement", "privileged_access", "high_risk_agent", "identity_access", "role_assignments"] as const;
+const SCOPE_TYPES = ["agent", "application", "entitlement", "privileged_access", "high_risk_agent", "identity_access", "role_assignments", "package_contents"] as const;
 const REVIEWER_KINDS = ["named", "manager", "application_owner"] as const;
 const CADENCES = ["one_time", "periodic", "event_driven"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

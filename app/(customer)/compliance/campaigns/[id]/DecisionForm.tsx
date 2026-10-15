@@ -8,14 +8,17 @@ import type { DecisionType } from "@/lib/shared/types/compliance";
 const AGENT_DECISIONS: DecisionType[] = ["approve", "revoke", "modify", "delegate", "request_information"];
 /** COMPLIANCE-P0-10 part 2: a person's access or WonderID role. */
 const PERSON_DECISIONS: DecisionType[] = ["approve", "revoke", "exception", "defer", "escalate", "delegate", "request_information"];
+/** COMPLIANCE-P0-10 part 3: a resource in an access package (no exception: it stays or goes). */
+const PACKAGE_DECISIONS: DecisionType[] = ["approve", "revoke", "defer", "escalate", "delegate", "request_information"];
 const LABEL: Partial<Record<DecisionType, string>> = { approve: "certify", exception: "exception (keep until)", defer: "defer (review later)", request_information: "request information" };
 
-export type DecisionSubject = "agent" | "person" | "role";
+export type DecisionSubject = "agent" | "person" | "role" | "package";
 
 const REVOKE_COPY: Record<DecisionSubject, { description: string; scope: string }> = {
   agent: { description: "This calls revokeAccessGrant() for this item's access grant — the agent loses this access immediately.", scope: "1 access grant revoked." },
   person: { description: "This approves the removal of this access. It is carried out by a task or the connection, and counted as done once the system no longer shows it.", scope: "1 approved removal." },
   role: { description: "The role is removed now (or the person leaves the group it comes from).", scope: "1 role assignment removed." },
+  package: { description: "It is removed from the package now. People who already hold the package keep their access; a birthright package waits for approval again.", scope: "1 resource removed from the package." },
 };
 
 /**
@@ -25,7 +28,7 @@ const REVOKE_COPY: Record<DecisionSubject, { description: string; scope: string 
  * POST /api/v1/compliance/items/:id/decisions route (unchanged).
  */
 export function DecisionForm({ itemId, subject = "agent" }: { itemId: string; subject?: DecisionSubject }) {
-  const decisions = subject === "agent" ? AGENT_DECISIONS : PERSON_DECISIONS;
+  const decisions = subject === "agent" ? AGENT_DECISIONS : subject === "package" ? PACKAGE_DECISIONS : PERSON_DECISIONS;
   const router = useRouter();
   const [decision, setDecision] = useState<DecisionType>("approve");
   const [justification, setJustification] = useState("");
