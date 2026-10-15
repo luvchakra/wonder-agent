@@ -66,6 +66,9 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
     triggerType: rule.triggerType,
     triggerAttribute: rule.triggerAttribute ?? "",
     condition: rule.condition === "true" ? "" : rule.condition,
+    effectType: effect?.type === "open_task" ? "open_task" : "set_attribute",
+    taskTitle: effect?.type === "open_task" ? String(effect.params.title ?? "") : "",
+    taskFor: effect?.params.assignee === "identity_admins" ? "identity_admins" : "manager",
     attribute: String(effect?.params.attribute ?? ""),
     valueKind: effect && typeof effect.params.value === "object" && effect.params.value && "template" in effect.params.value ? "template" : "fixed",
     value:
@@ -104,12 +107,19 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
               <code className="text-xs">{rule.condition}</code>
             </p>
           ) : null}
-          {rule.effects.map((e, i) => (
-            <p key={i}>
-              <span className="text-muted-foreground">Set </span>
-              {String(e.params.attribute)} <span className="text-muted-foreground">to</span> <code className="text-xs">{value(e.params.value)}</code>
-            </p>
-          ))}
+          {rule.effects.map((e, i) =>
+            e.type === "open_task" ? (
+              <p key={i}>
+                <span className="text-muted-foreground">Open a task for {e.params.assignee === "manager" ? "the manager" : "identity administrators"}: </span>
+                {value(e.params.title)}
+              </p>
+            ) : (
+              <p key={i}>
+                <span className="text-muted-foreground">Set </span>
+                {String(e.params.attribute)} <span className="text-muted-foreground">to</span> <code className="text-xs">{value(e.params.value)}</code>
+              </p>
+            ),
+          )}
           {step !== "none" ? (
             <div className="pt-2">
               <RuleNextStep ruleId={rule.id} step={step} />

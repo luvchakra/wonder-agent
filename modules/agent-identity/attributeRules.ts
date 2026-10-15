@@ -235,7 +235,16 @@ export function shapeRuleInput(input: RuleInput, current?: ValidRuleInput): Vali
   for (const [i, e] of (merged.effects as unknown[]).entries()) {
     const o = (e ?? {}) as Record<string, unknown>;
     const params = (o.params ?? {}) as Record<string, unknown>;
-    if (o.type !== "set_attribute") return { error: `effects.${i}: attribute rules set attributes (set_attribute)` };
+    if (o.type === "open_task") {
+      // A task about the identity, for its manager or for identity administrators. It grants nothing.
+      if (params.assignee !== "manager" && params.assignee !== "identity_admins") return { error: `effects.${i}.assignee: manager or identity_admins` };
+      const title = effectValue(params.title);
+      const titleText = typeof title === "string" ? title : title && typeof title === "object" && "template" in title ? title.template : null;
+      if (!titleText || titleText.trim().length < 3 || titleText.length > 200) return { error: `effects.${i}.title: what to do, 3 to 200 characters` };
+      effects.push({ type: "open_task", params: { assignee: params.assignee, title: title as EffectValue } });
+      continue;
+    }
+    if (o.type !== "set_attribute") return { error: `effects.${i}: a rule sets an attribute (set_attribute) or opens a task (open_task)` };
     if (typeof params.attribute !== "string" || !params.attribute) return { error: `effects.${i}.attribute: which attribute to set` };
     const value = effectValue(params.value);
     if (value === undefined) return { error: `effects.${i}.value: a value, { ref } or { template }` };

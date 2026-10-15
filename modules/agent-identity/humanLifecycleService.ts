@@ -69,7 +69,8 @@ function toEvent(r: Row): IdentityLifecycleEvent {
 function toTask(r: Row): IdentityLifecycleTask {
   return {
     id: r.id as string,
-    eventId: r.event_id as string,
+    eventId: (r.event_id as string | null) ?? null,
+    ruleId: (r.rule_id as string | null) ?? null,
     identityId: r.identity_id as string,
     taskType: r.task_type as LifecycleTaskType,
     status: r.status as LifecycleTaskStatus,
@@ -470,7 +471,7 @@ export async function listHumanLifecycleEvents(tenantId: string, identityId: str
   return (data ?? []).map(toEvent);
 }
 
-export type LifecycleTaskView = IdentityLifecycleTask & { identityName: string; identityRef: number | null; assigneeName: string | null; eventType: LifecycleEventType };
+export type LifecycleTaskView = IdentityLifecycleTask & { identityName: string; identityRef: number | null; assigneeName: string | null; eventType: LifecycleEventType | null };
 
 export async function listLifecycleTasks(
   tenantId: string,
@@ -480,9 +481,9 @@ export async function listLifecycleTasks(
   const supabase = await supabaseServer();
   let query = supabase
     .from("identity_lifecycle_tasks")
-    .select("*, identity_lifecycle_events!inner(event_type)")
-    .eq("tenant_id", tenantId)
-    .eq("identity_lifecycle_events.tenant_id", tenantId);
+    // A rule's task has no lifecycle event (IDENTITY-P0-21); the embed's key is tenant-composite.
+    .select("*, identity_lifecycle_events(event_type)")
+    .eq("tenant_id", tenantId);
   if (filter.identityId) {
     if (!UUID_RE.test(filter.identityId)) return [];
     query = query.eq("identity_id", filter.identityId);
@@ -504,7 +505,7 @@ export async function listLifecycleTasks(
   }
   return rows.map((r) => ({
     ...toTask(r),
-    eventType: (r.identity_lifecycle_events as { event_type: LifecycleEventType }).event_type,
+    eventType: (r.identity_lifecycle_events as { event_type: LifecycleEventType } | null)?.event_type ?? null,
     identityName: names.get(r.identity_id as string) ?? "Unknown identity",
     identityRef: refs.get(r.identity_id as string) ?? null,
     assigneeName: r.assignee_identity_id ? (names.get(r.assignee_identity_id as string) ?? null) : null,

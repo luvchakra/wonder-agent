@@ -31,7 +31,7 @@ import { describeTerms, termsCurrent } from "@/lib/rbac/assignmentRules";
 import { loadScopeOptions } from "../../settings/roles/scopeOptions";
 import { RemoveRoleButton } from "../../settings/roles/RemoveRoleButton";
 import { AssignRoleForm } from "../../settings/users/[userId]/UserActions";
-import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
+import { IDENTITY_TYPE_LABEL, LIFECYCLE_EVENT_LABEL, LIFECYCLE_STATE_LABEL, LIFECYCLE_TASK_LABEL, lifecycleTaskTitle, RELATIONSHIP_LABEL, STATUS_LABEL, STATUS_TONE, TRANSITION_LABEL } from "../labels";
 
 // IDENTITY-P0-15/16/17 — one identity: its details, accountable people,
 // relationships and attributes. An AI agent's identity shows the agent's
@@ -376,9 +376,9 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
                     {openTasks.map((t) => (
                       <li key={t.id} className="grid grid-cols-1 gap-3 px-3 py-3 lg:grid-cols-[1fr_22rem]">
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-foreground">{LIFECYCLE_TASK_LABEL[t.taskType]?.title ?? t.taskType}</p>
+                          <p className="text-sm font-medium text-foreground">{lifecycleTaskTitle(t)}</p>
                           <p className="text-xs text-muted-foreground">
-                            {LIFECYCLE_EVENT_LABEL[t.eventType] ?? t.eventType} · {LIFECYCLE_TASK_LABEL[t.taskType]?.help}
+                            {t.eventType ? (LIFECYCLE_EVENT_LABEL[t.eventType] ?? t.eventType) : "Identity rule"} · {LIFECYCLE_TASK_LABEL[t.taskType]?.help}
                             {t.assigneeName ? ` · for ${t.assigneeName}` : ""}
                           </p>
                           {t.taskType === "transfer_ownership" && footprint ? (

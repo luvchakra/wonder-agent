@@ -2102,3 +2102,48 @@ identity rules, next to created, imported and attribute changed:
   mover or manager-change lifecycle event today, so these triggers fire only
   where such an event is recorded (source imports and lifecycle actions).
   The attribute-changed trigger still covers manual edits.
+
+## 2026-10-15 — IDENTITY-P0-21: the "open a task" effect
+
+An identity rule can now open a task about the identity, for its manager or
+for identity administrators. This is the "Work" entry of the design's effect
+catalogue, and it grants nothing.
+
+- **Migration `0194_identity_rule_tasks.sql`** (applied to dev):
+  - `identity_lifecycle_tasks` gains `rule_id` (tenant-composite foreign key
+    to `lifecycle_rules`; rules are retired, never deleted) and
+    `rule_version`, and the type `rule_task`;
+  - `event_id` becomes optional, but only a rule task may leave it empty and
+    a rule task must name its rule (check constraint);
+  - one open task per rule per identity (a unique partial index).
+- **Rules** (`shapeRuleInput`):
+  - `open_task` takes `assignee` (`manager` or `identity_admins`) and
+    `title` (3 to 200 characters, fixed text or a template);
+  - other effects (group, package) are still refused;
+  - the service's settable-attribute check now applies only to
+    `set_attribute`.
+- **Running** (`applyIdentityRules`):
+  - after the attribute write, each enforced `open_task` inserts a task with
+    the rule and version, assigned to the manager or left for identity
+    administrators;
+  - an already-open task (23505) is not an error;
+  - audited as `identity.rule_task_opened`;
+  - report-only rules record what they would do, as before.
+- **Task lists** (`listLifecycleTasks`) join the lifecycle event optionally;
+  a rule's task shows its own title and "Identity rule". The editor gains a
+  "Then" choice: set an attribute or open a task (for, task).
+
+**Verified.**
+- typecheck and eslint pass.
+- Vitest `modules/agent-identity`: 105/105, including the new effect shape.
+- Local E2E:
+  - `identity-rules.spec.ts`: 10/10. A new test publishes an enforced rule
+    that opens a task when a Finance person is created. It checks for exactly
+    one open `rule_task` with the rule, no event, no assignee and the title,
+    and that the title shows on the lifecycle tasks page;
+  - `human-lifecycle.spec.ts` + `lifecycle-expiry-disable.spec.ts`: passed in
+    the same run.
+
+**Left out:** "add to a group" and "assign a package". Both grant access
+(groups carry WonderID roles), so they wait for the owner's decision on that
+automation path.

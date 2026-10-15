@@ -17,6 +17,10 @@ export type RuleFormValues = {
   triggerType: string;
   triggerAttribute: string;
   condition: string;
+  /** IDENTITY-P0-21: what the rule does: set an attribute, or open a task about the identity. */
+  effectType: "set_attribute" | "open_task";
+  taskTitle: string;
+  taskFor: "manager" | "identity_admins";
   attribute: string;
   valueKind: "fixed" | "template";
   value: string;
@@ -39,14 +43,29 @@ function toBody(v: RuleFormValues) {
     triggerAttribute: v.triggerType === "identity.attribute_changed" ? v.triggerAttribute || null : null,
     condition: v.condition || "true",
     mode: v.mode,
-    effects: [{ type: "set_attribute", params: { attribute: v.attribute, value: v.valueKind === "template" ? { template: v.value } : v.value === "" ? null : v.value } }],
+    effects:
+      v.effectType === "open_task"
+        ? [{ type: "open_task", params: { assignee: v.taskFor, title: v.taskTitle } }]
+        : [{ type: "set_attribute", params: { attribute: v.attribute, value: v.valueKind === "template" ? { template: v.value } : v.value === "" ? null : v.value } }],
   };
 }
 
 export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initial?: RuleFormValues; settable: string[] }) {
   const router = useRouter();
   const [v, setV] = useState<RuleFormValues>(
-    initial ?? { name: "", triggerType: "identity.created", triggerAttribute: "", condition: "", attribute: settable[0] ?? "", valueKind: "template", value: "", mode: "report_only" },
+    initial ?? {
+      name: "",
+      triggerType: "identity.created",
+      triggerAttribute: "",
+      condition: "",
+      effectType: "set_attribute",
+      taskTitle: "",
+      taskFor: "manager",
+      attribute: settable[0] ?? "",
+      valueKind: "template",
+      value: "",
+      mode: "report_only",
+    },
   );
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -101,32 +120,50 @@ export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initi
           hint='For example identity.department = "Finance" and not exists identity.region'
         />
       </div>
-      <SelectField name="ruleAttribute" label="Set" value={v.attribute} onChange={(e) => set("attribute", e.target.value)}>
-        {settable.map((a) => (
-          <option key={a} value={a}>
-            {a}
-          </option>
-        ))}
+      <SelectField name="ruleEffect" label="Then" value={v.effectType} onChange={(e) => set("effectType", e.target.value as RuleFormValues["effectType"])}>
+        <option value="set_attribute">Set an attribute</option>
+        <option value="open_task">Open a task</option>
       </SelectField>
-      <SelectField name="ruleValueKind" label="To" value={v.valueKind} onChange={(e) => set("valueKind", e.target.value as RuleFormValues["valueKind"])}>
-        <option value="template">A value built from other fields</option>
-        <option value="fixed">A fixed value</option>
-      </SelectField>
-      <div className="md:col-span-2">
-        <TextField
-          name="ruleValue"
-          label="Value"
-          value={v.value}
-          onChange={(e) => set("value", e.target.value)}
-          hint={v.valueKind === "template" ? "For example {identity.firstName} {identity.lastName}" : "Leave empty to clear it"}
-        />
-      </div>
+      {v.effectType === "open_task" ? (
+        <>
+          <SelectField name="ruleTaskFor" label="For" value={v.taskFor} onChange={(e) => set("taskFor", e.target.value as RuleFormValues["taskFor"])}>
+            <option value="manager">The person&apos;s manager</option>
+            <option value="identity_admins">Identity administrators</option>
+          </SelectField>
+          <div className="md:col-span-2">
+            <TextField name="ruleTaskTitle" label="Task" maxLength={200} value={v.taskTitle} onChange={(e) => set("taskTitle", e.target.value)} hint="For example Check the laptop is returned" />
+          </div>
+        </>
+      ) : (
+        <>
+          <SelectField name="ruleAttribute" label="Set" value={v.attribute} onChange={(e) => set("attribute", e.target.value)}>
+            {settable.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField name="ruleValueKind" label="To" value={v.valueKind} onChange={(e) => set("valueKind", e.target.value as RuleFormValues["valueKind"])}>
+            <option value="template">A value built from other fields</option>
+            <option value="fixed">A fixed value</option>
+          </SelectField>
+          <div className="md:col-span-2">
+            <TextField
+              name="ruleValue"
+              label="Value"
+              value={v.value}
+              onChange={(e) => set("value", e.target.value)}
+              hint={v.valueKind === "template" ? "For example {identity.firstName} {identity.lastName}" : "Leave empty to clear it"}
+            />
+          </div>
+        </>
+      )}
       <SelectField name="ruleMode" label="Mode" value={v.mode} onChange={(e) => set("mode", e.target.value as RuleFormValues["mode"])} hint="Report only records what the rule would do">
         <option value="report_only">Report only</option>
         <option value="enforce">Enforce</option>
       </SelectField>
       <div className="flex items-end gap-3 md:col-span-2">
-        <Button type="submit" disabled={pending || !v.name.trim() || !v.attribute}>
+        <Button type="submit" disabled={pending || !v.name.trim() || (v.effectType === "open_task" ? v.taskTitle.trim().length < 3 : !v.attribute)}>
           {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
           {ruleId ? "Save changes" : "Create rule"}
         </Button>

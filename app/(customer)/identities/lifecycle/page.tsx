@@ -5,7 +5,7 @@ import { listLifecycleTasks, sweepEndDates } from "@/modules/agent-identity/serv
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
-import { LIFECYCLE_EVENT_LABEL, LIFECYCLE_TASK_LABEL } from "../labels";
+import { LIFECYCLE_EVENT_LABEL, lifecycleTaskTitle } from "../labels";
 
 // IDENTITY-P0-18 — the organization's lifecycle work: what joiners,
 // movers, leavers and rehires still need, and who it is waiting on.
@@ -83,8 +83,8 @@ export default async function LifecycleWorkPage({ searchParams }: { searchParams
                         {t.identityName}
                       </Link>
                     </Td>
-                    <Td>{LIFECYCLE_TASK_LABEL[t.taskType]?.title ?? t.taskType}</Td>
-                    <Td hideBelow="lg">{LIFECYCLE_EVENT_LABEL[t.eventType] ?? t.eventType}</Td>
+                    <Td>{lifecycleTaskTitle(t)}</Td>
+                    <Td hideBelow="lg">{t.eventType ? (LIFECYCLE_EVENT_LABEL[t.eventType] ?? t.eventType) : "Identity rule"}</Td>
                     <Td hideBelow="xl">{t.assigneeName ?? <span className="text-muted-foreground">Identity administrators</span>}</Td>
                     <Td>
                       <Badge tone={t.status === "open" ? "warning" : t.status === "done" ? "success" : "neutral"}>

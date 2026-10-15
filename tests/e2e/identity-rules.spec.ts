@@ -166,6 +166,31 @@ test.describe.serial("identity attribute rules", () => {
     expect(runs.find((r) => r.subjectId === p.id)).toMatchObject({ outcome: "applied" });
     expect((await request.post(`/api/v1/identities/rules/${ruleId}/retire`)).status()).toBe(200);
   });
+
+  test("open a task: a rule opens one task about the identity, shown on the lifecycle tasks page", async ({ request, browser, page }) => {
+    const created = await request.post("/api/v1/identities/rules", {
+      data: {
+        name: `E2E Task Rule ${stamp}`,
+        triggerType: "identity.created",
+        condition: `identity.department = "${dept}"`,
+        mode: "enforce",
+        effects: [{ type: "open_task", params: { assignee: "identity_admins", title: `Order a badge ${stamp}` } }],
+      },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    ruleId = ((await created.json()) as Json).data!.id;
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    expect(await publish(request, iam.request)).toMatchObject({ publishedVersion: 1, mode: "enforce" });
+    await iam.close();
+
+    const p = await person(request, "Rule Task");
+    const { data: tasks } = await db().from("identity_lifecycle_tasks").select("task_type, rule_id, event_id, status, assignee_identity_id, detail").eq("identity_id", p.id);
+    expect(tasks).toEqual([{ task_type: "rule_task", rule_id: ruleId, event_id: null, status: "open", assignee_identity_id: null, detail: { title: `Order a badge ${stamp}` } }]);
+
+    await page.goto("/identities/lifecycle");
+    await expect(page.getByText(`Order a badge ${stamp}`).first()).toBeVisible();
+    expect((await request.post(`/api/v1/identities/rules/${ruleId}/retire`)).status()).toBe(200);
+  });
 });
 
 test.describe("identity rules — other organizations and roles", () => {
