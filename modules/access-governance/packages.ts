@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AccessRequest } from "@/lib/shared/types/access-governance";
 import { getIdentity, getIdentityForUser, getIdentityNames } from "@/modules/agent-identity/service";
@@ -271,6 +272,8 @@ export async function updatePackage(tenantId: string, actorId: string, packageId
     }
     fields.status = input.status;
   }
+  // FOUNDATION-P0-33: the values before the change, for the audit record.
+  const { data: before } = await supabaseServiceRole().from("access_packages").select("*").eq("tenant_id", tenantId).eq("id", packageId).maybeSingle();
   const { data, error } = await supabaseServiceRole()
     .from("access_packages")
     .update({ ...fields, updated_at: new Date().toISOString() })
@@ -281,7 +284,7 @@ export async function updatePackage(tenantId: string, actorId: string, packageId
   if (error?.code === "23505") throw new ApiError(409, "DUPLICATE", "A package with this name already exists");
   if (error) throw new ApiError(500, "UPDATE_FAILED", error.message);
   if (!data) throw new ApiError(404, "NOT_FOUND", "No such package");
-  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_updated", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { fields: Object.keys(fields) } });
+  await writeAudit({ tenantId, actorId, actorType: "user", action: "access.package_updated", objectType: "access_package", objectId: packageId, outcome: "success", metadata: { fields: Object.keys(fields), changes: fieldChanges(before, fields) } });
   const reset = birthrightNeedsReapproval(toPackage(data).birthrightStatus, { fields: Object.keys(fields) }) ? await birthrightBackToPending(tenantId, actorId, packageId, "eligibility") : null;
   const [p] = await withOwners(tenantId, [reset ?? toPackage(data)]);
   return p;

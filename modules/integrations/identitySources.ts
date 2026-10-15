@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { IdentitySource, PendingCorrelation, ReconciliationRun } from "@/lib/shared/types/integrations";
 import type { IdentityType, SourcedFields } from "@/lib/shared/types/agent-identity";
@@ -132,6 +133,23 @@ export async function getIdentitySource(tenantId: string, sourceId: string): Pro
   return data ? toSource(data) : null;
 }
 
+/** The settings a person edits, for the audit record's changes (FOUNDATION-P0-33). */
+function sourceFields(s: IdentitySource): Record<string, unknown> {
+  return {
+    name: s.name,
+    identityType: s.identityType,
+    authoritative: s.authoritative,
+    priority: s.priority,
+    authoritativeFields: s.authoritativeFields,
+    attributeMappings: s.attributeMappings,
+    correlationRules: s.correlationRules,
+    leaverStrategy: s.leaverStrategy,
+    leaverThresholdPercent: s.leaverThresholdPercent,
+    schedule: s.schedule,
+    status: s.status,
+  };
+}
+
 function configRow(c: ReturnType<typeof validateSourceConfig>) {
   return {
     name: c.name,
@@ -203,6 +221,7 @@ export async function updateIdentitySource(tenantId: string, actorId: string, so
       authoritativeFields: source.authoritativeFields,
       leaverStrategy: source.leaverStrategy,
       status: source.status,
+      changes: fieldChanges(sourceFields(current), sourceFields(source)),
     },
   });
   return source;

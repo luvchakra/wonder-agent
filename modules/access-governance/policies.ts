@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { notify, wasRecentlyNotified } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
@@ -193,7 +194,15 @@ export async function updatePolicy(
     objectType: "policy",
     objectId: policyId,
     outcome: "success",
-    metadata: { fromVersion: current.version, toVersion: current.version + 1, changedFields: Object.keys(patch) },
+    metadata: {
+      fromVersion: current.version,
+      toVersion: current.version + 1,
+      changedFields: Object.keys(patch),
+      changes: fieldChanges(
+        { name: current.name, description: current.description, scope: current.scope, severity: current.severity, action: current.action, exception_process: current.exceptionProcess, owner_id: current.ownerId, expiry_date: current.expiryDate, status: current.status, priority: current.priority },
+        update,
+      ),
+    },
   });
 
   return toPolicy(data);

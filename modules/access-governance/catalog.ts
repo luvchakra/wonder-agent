@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DISCOVERY_SOURCES, type Application, type ApplicationOnboardingStatus, type ApplicationType, type CatalogLevel, type DiscoverySource } from "@/lib/shared/types/access-governance";
 import { getIdentity, getIdentityNames } from "@/modules/agent-identity/service";
@@ -191,6 +192,8 @@ export async function updateApplication(tenantId: string, actorId: string, appli
   if (!Object.keys(row).length) throw new ApiError(400, "VALIDATION_FAILED", "Nothing to change");
   await assertOwners(tenantId, row);
   const supabase = await supabaseServer();
+  // FOUNDATION-P0-33: the values before the change, for the audit record.
+  const { data: before } = await supabase.from("applications").select(Object.keys(row).join(", ")).eq("tenant_id", tenantId).eq("id", applicationId).maybeSingle();
   const { data, error } = await supabase
     .from("applications")
     .update({ ...row, updated_at: new Date().toISOString() })
@@ -209,7 +212,7 @@ export async function updateApplication(tenantId: string, actorId: string, appli
     objectType: "application",
     objectId: app.id,
     outcome: "success",
-    metadata: { changed: Object.keys(row) },
+    metadata: { changed: Object.keys(row), changes: fieldChanges(before as Record<string, unknown> | null, row) },
   });
   return app;
 }

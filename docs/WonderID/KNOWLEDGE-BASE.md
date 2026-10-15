@@ -497,6 +497,7 @@ Findings are raised for:
 - **How long by default:** 1 year on Free and Pro, 3 years on Max, 7 years on Enterprise. Never less than a year.
 - **Identifiers, not people:** audit records name people and accounts by their ids, never by email, name or login; values from outside systems that may identify someone are kept as fingerprints.
 - **What people type stays out of it:** reasons, comments, notes and justifications are kept on the request, task or finding they belong to, where privacy erasure can reach them. The audit record keeps a fingerprint, which proves what was written without revealing it.
+- **What changed, field by field:** when someone edits a role, group, policy, rule, application, package, template, data source or identity source, the record lists each field that changed with its old and new value. On the Audit Trail, open "N changes" under the action. Typed text and secrets show only that they changed.
 - **Integrity check:** Audit → Integrity proves the chain is intact.
 
 **Reports and exports**
@@ -661,6 +662,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 15 Oct 2026 | The audit trail now shows what a configuration change changed: each field with its old and new value, under "N changes" beside the action. Typed text and secrets show only that they changed. |
 | 15 Oct 2026 | When an MCP server says which of its tools are AI agents, WonderID believes it: those tools are listed under **AI agents** on the MCP page, marked "Declared by the server", with what the server says they may do ("Answers only" or "Drafts only") and whether their output is AI-generated. Servers that say nothing are judged by the tool's name and description, as before. |
 | 15 Oct 2026 | Tools found on an MCP server that are themselves AI agents (they draft, answer or generate, like a "draft reply" tool) are labelled **AI agent** on the MCP page, with the reason, and appear in Agent Discovery so you can register them as agents. Every object page now opens at a short number (for example /identities/12), and old links still work. |
 | 14 Oct 2026 | An account that an approved request creates now has a readable name (for example jane.doe) instead of an internal reference. An application's onboarding can set the account name format; older requests' accounts show "to be created". |

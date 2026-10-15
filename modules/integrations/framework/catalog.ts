@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { AuthType, Integration } from "@/lib/shared/types/integrations";
 import { OutboundBlockedError, checkOutboundUrl, outboundPolicyFromEnv } from "../outboundPolicy";
@@ -320,7 +321,7 @@ export async function updateConnectorSettings(tenantId: string, actorId: string,
     objectType: "integration",
     objectId: integrationId,
     outcome: "success",
-    metadata: { renamed: row.name !== name, changedSettings: changed },
+    metadata: { renamed: row.name !== name, changedSettings: changed, changes: fieldChanges({ name: row.name }, { name }) },
   });
 }
 

@@ -148,6 +148,15 @@ test.describe.serial("custom roles", () => {
     await expect(page.getByText("Saved. People who hold the ID role get the change on their next request.")).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText("report.read")).toBeVisible();
 
+    // FOUNDATION-P0-33: the audit trail shows the permission list before and after.
+    const audit = await ctx.newPage();
+    await audit.goto(`/audit?action=role.updated&objectType=role`);
+    const row = audit.getByRole("row").filter({ hasText: roleId.slice(0, 8) }).first();
+    await row.getByText(/^\d+ changes?$/).click();
+    await expect(row.getByText("permissions:")).toBeVisible();
+    await expect(row.getByText(/→ .*report\.read/)).toBeVisible();
+    await audit.close();
+
     await page.getByRole("button", { name: "Delete" }).click();
     await page.getByRole("button", { name: "Delete ID role" }).click();
     await expect(page).toHaveURL(/\/settings\/roles\?deleted=1/);

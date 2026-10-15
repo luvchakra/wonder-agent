@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { DEFAULT_LIST_LIMIT } from "@/lib/shared/pagination";
 import { DATA_SOURCE_KINDS, type DataSource, type DataSourceKind, type DataSourceWithReach } from "@/lib/shared/types/access-governance";
@@ -139,7 +140,7 @@ export async function updateDataSource(
   change: { classification?: string | null; status?: "active" | "retired"; owner?: string | null },
 ): Promise<DataSource> {
   const supabase = await supabaseServer();
-  const { data: before, error: readError } = await supabase.from("data_sources").select("classification, status").eq("id", dataSourceId).eq("tenant_id", tenantId).maybeSingle();
+  const { data: before, error: readError } = await supabase.from("data_sources").select("classification, status, owner").eq("id", dataSourceId).eq("tenant_id", tenantId).maybeSingle();
   if (readError) throw new ApiError(500, "QUERY_FAILED", readError.message);
   if (!before) throw new ApiError(404, "DATA_SOURCE_NOT_FOUND");
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -171,7 +172,7 @@ export async function updateDataSource(
     objectType: "data_source",
     objectId: dataSourceId,
     outcome: "success",
-    metadata: { before, after: { classification: data.classification, status: data.status } },
+    metadata: { before: { classification: before.classification, status: before.status }, after: { classification: data.classification, status: data.status }, changes: fieldChanges(before, patch) },
   });
   return toDataSource(data);
 }

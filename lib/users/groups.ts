@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { TENANT_WIDE, termsToRow, type AssignmentTerms } from "@/lib/rbac/assignmentRules";
 
@@ -305,7 +306,7 @@ export async function updateGroup(tenantId: string, actorId: string, groupId: st
     objectType: "group",
     objectId: g.id,
     outcome: "success",
-    metadata: { name: v.name, renamedFrom: g.name !== v.name ? g.name : null },
+    metadata: { name: v.name, renamedFrom: g.name !== v.name ? g.name : null, changes: fieldChanges(g, { name: v.name, description: v.description }) },
   });
   return { ok: true, groupId: g.id, groupRef: g.ref };
 }

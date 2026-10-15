@@ -2,6 +2,7 @@ import "server-only";
 
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
+import { fieldChanges } from "@/lib/audit/changes";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { ApplicationOnboardingTemplate } from "@/lib/shared/types/access-governance";
 import { getIdentity } from "@/modules/agent-identity/service";
@@ -145,7 +146,7 @@ export async function updateOnboardingTemplate(tenantId: string, actorId: string
     objectType: "onboarding_template",
     objectId: templateId,
     outcome: "success",
-    metadata: { fields: Object.keys(input) },
+    metadata: { fields: Object.keys(input), changes: fieldChanges(row, v) },
   });
   return toTemplate(data);
 }

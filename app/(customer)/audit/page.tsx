@@ -5,6 +5,7 @@ import { listAuditLogs } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Card, CardBody, Badge, Button, EmptyState, TextField, TableContainer, Thead, Th, Td, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { objectActionsFor } from "@/modules/operations/exportRegistry";
+import { AuditChanges } from "@/modules/ui/AuditChanges";
 
 /** First 8 characters of a UUID-like id, enough to tell rows apart at a glance. */
 function shortId(id: string): string {
@@ -81,7 +82,10 @@ export default async function AuditPage({ searchParams }: { searchParams: Promis
                         {e.actorId ? <span className="font-mono text-xs text-muted-foreground"> {shortId(e.actorId)}</span> : null}
                       </span>
                     </Td>
-                    <Td className="font-mono text-xs">{e.action}</Td>
+                    <Td className="font-mono text-xs">
+                      {e.action}
+                      <AuditChanges metadata={e.metadata} />
+                    </Td>
                     <Td hideBelow="lg">
                       <span title={e.objectId ?? undefined}>
                         {e.objectType}

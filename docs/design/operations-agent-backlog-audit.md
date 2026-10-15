@@ -1043,3 +1043,11 @@ person's name from Identity) join the registry: the type, the three lists
 of valid types (page, JSON and CSV routes) and the Reports page. Same
 live-computation model and per-row drill-through as the others. Verified
 by the E2E named in the Compliance audit log, same date.
+
+## 2026-10-15 — Audit Trail shows attribute-level changes (FOUNDATION-P0-33)
+
+The Audit Trail (`/audit`) shows, under an event's action, a folded
+"N changes" list read from `metadata.changes` (`readFieldChanges`, which
+drops malformed entries): each field with old → new, or why its values are
+not shown. No new controls beyond the fold. Details and verification are in
+the Foundation audit log's entry of the same date.

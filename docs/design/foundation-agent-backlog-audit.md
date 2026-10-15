@@ -3605,3 +3605,37 @@ bulk-invitations): 65/69 passed in the full run. The 4 failures were 3
 compliance launches whose dialog never submitted and one role-review answer
 that was not saved, all while other agents' E2E runs loaded the machine.
 compliance + role-reviews then passed 23/23 when run again on their own.
+
+## 2026-10-15 — FOUNDATION-P0-33: attribute-level old and new values in audit detail (done)
+
+**What.** `lib/audit/changes.ts`: `fieldChanges(before, after)` returns the
+fields an edit changed as `{ field, from, to }`, stored as
+`metadata.changes` on the audit event. It ignores bookkeeping columns,
+compares objects and arrays by value, and never stores two kinds of value:
+typed text (description, notes, reason, justification, comment, exception
+process) is listed as `omitted: "text"` (WID-H07 keeps it on the record),
+and secret-shaped fields as `omitted: "secret"` (#10). Values over 2,000
+characters are `omitted: "too_long"`; at most 50 changes per event.
+
+Wired into the update paths of configuration objects: roles (name,
+description, permission list), groups, authorization policies, policies,
+request policies, identity rules, classification rules, onboarding
+templates, entitlement types, applications, access packages, data sources,
+identity sources and connection names. Connection setting values stay out,
+as before (only their names). Applications and packages read the row before
+writing it (as the user under RLS for applications; service role filtered
+by tenant for packages, the path that already writes them). Existing
+metadata keys are kept, so exports and readers are unchanged.
+
+**UI (Operations' Audit Trail).** `modules/ui/AuditChanges.tsx` folds
+"N changes" under the action (§19.5): each field, old → new.
+
+**Verified.** typecheck and eslint pass; Vitest on the changed areas
+725/725, including `lib/audit/changes.test.ts` (7 cases: values,
+order-independent comparison, null handling, text and secret omission,
+bookkeeping, long values, malformed metadata). Local E2E
+`custom-roles.spec.ts` 12/12, with a new step: after a role edit, the Audit
+Trail row shows "permissions:" with `report.read` in the new value.
+
+**Left out.** User profile edits (personal data, not configuration) and the
+platform console (it already records old and new values).
