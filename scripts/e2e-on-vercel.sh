@@ -59,14 +59,29 @@ for s in $specs_line; do
   if [[ "$s" =~ ^tests/e2e/[A-Za-z0-9._/-]+\.spec\.ts$ ]] && [ -f "$s" ]; then SPECS="$SPECS $s"; fi
 done
 # The full suite is split in two: e2e/nightly-1 and e2e/nightly-2 each run
-# one half (about 20 minutes on a Vercel build machine). A run of chosen
-# specs uses e2e/nightly and is not split.
-SHARD=""
+# half of the spec files. A run of chosen specs uses e2e/nightly and is not
+# split. Playwright's --shard split by test order, which put every slow spec
+# (they sort early) in half 1: on 15 Oct half 1 hit the 35-minute budget
+# with 65 tests unrun while half 2 finished in about 20. So the slow specs
+# alternate between the halves first, then every other spec file does.
+HALF=""
 case "${VERCEL_GIT_COMMIT_REF:-}" in
-  e2e/nightly-1) SHARD="--shard=1/2" ;;
-  e2e/nightly-2) SHARD="--shard=2/2" ;;
+  e2e/nightly-1) HALF=1 ;;
+  e2e/nightly-2) HALF=2 ;;
 esac
-[ -n "$SPECS" ] && SHARD=""
+if [ -z "$SPECS" ] && [ -n "$HALF" ]; then
+  SLOW="connector-provisioning f1-reconciliation design-review bulk-invitations access-packages account-inventory automation-credentials"
+  ordered=""
+  for n in $SLOW; do [ -f "tests/e2e/$n.spec.ts" ] && ordered="$ordered tests/e2e/$n.spec.ts"; done
+  for f in $(ls tests/e2e/*.spec.ts | sort); do
+    case " $ordered " in *" $f "*) ;; *) ordered="$ordered $f" ;; esac
+  done
+  i=0
+  for f in $ordered; do
+    [ $((i % 2 + 1)) = "$HALF" ] && SPECS="$SPECS $f"
+    i=$((i + 1))
+  done
+fi
 
 # Screenshot baselines for this machine are `*-vercel.png` (playwright.config.ts).
 export E2E_SNAPSHOT_ENV=vercel
@@ -81,10 +96,14 @@ RECORD=""
 if [ -n "$SPECS" ] && printf '%s\n' "${VERCEL_GIT_COMMIT_MESSAGE:-}" | grep -qx 'record-baselines: yes'; then
   RECORD="--update-snapshots=missing"
 fi
-log "Running: ${SPECS:-the full suite} ${SHARD} ${RECORD:+(recording missing baselines)} on $(nproc) cores"
+log "Running: ${HALF:+half $HALF: }${SPECS:-the full suite} ${RECORD:+(recording missing baselines)} on $(nproc) cores"
 
 PORT=3100
-OUTBOUND_ALLOW_PRIVATE_NETWORKS=true BASE_APP_HOST=localhost npx next start -p "$PORT" >/tmp/e2e-server.log 2>&1 &
+# The local server runs without VERCEL: the build sets VERCEL=1, and with it
+# trustedClientIp() believes x-vercel-forwarded-for, which only Vercel's edge
+# may set. Locally that header comes straight from the test, so WID-H08's
+# spoofing test failed here and nowhere else.
+env -u VERCEL OUTBOUND_ALLOW_PRIVATE_NETWORKS=true BASE_APP_HOST=localhost npx next start -p "$PORT" >/tmp/e2e-server.log 2>&1 &
 server=$!
 for _ in $(seq 1 60); do
   curl -s -o /dev/null "http://localhost:$PORT/" && break
@@ -100,7 +119,7 @@ touch "$REPORT.start"
 E2E_INGRESS_URL="${E2E_INGRESS_URL:-https://id.wonderapps.biz}" \
   E2E_BASE_URL="http://localhost:$PORT" E2E_SLOW_MACHINE=1 \
   PLAYWRIGHT_JSON_OUTPUT_FILE="$REPORT" PLAYWRIGHT_JSON_OUTPUT_NAME="$REPORT" \
-  timeout -s INT -k 60 2100 npx playwright test $SPECS $SHARD $RECORD --reporter=line,json
+  timeout -s INT -k 60 2100 npx playwright test $SPECS $RECORD --reporter=line,json
 status=$?
 kill "$server" 2>/dev/null
 
