@@ -107,6 +107,15 @@ describe("shapeRuleInput", () => {
     effects: [{ type: "set_attribute", params: { attribute: "region", value: "EMEA" } }],
   };
 
+  it("accepts an open-a-task effect for the manager or identity administrators, and nothing else", () => {
+    const task = (params: Record<string, unknown>) => shapeRuleInput({ ...base, effects: [{ type: "open_task", params }] });
+    expect(task({ assignee: "manager", title: "Check the laptop is returned" })).toMatchObject({ effects: [{ type: "open_task", params: { assignee: "manager", title: "Check the laptop is returned" } }] });
+    expect(task({ assignee: "identity_admins", title: { template: "Badge for {identity.displayName}" } })).not.toHaveProperty("error");
+    expect(task({ assignee: "someone", title: "Check it" })).toHaveProperty("error");
+    expect(task({ assignee: "manager", title: "ab" })).toHaveProperty("error");
+    expect(shapeRuleInput({ ...base, effects: [{ type: "add_to_group", params: { group: "x" } }] })).toHaveProperty("error");
+  });
+
   it("accepts a rule and starts it as written", () => {
     expect(shapeRuleInput(base)).toMatchObject({ name: "Region from cost centre", trigger_type: "identity.created", mode: "report_only", priority: 100, scope: {} });
     expect(shapeRuleInput({ ...base, effects: [{ type: "set_attribute", params: { attribute: "displayName", value: { template: "{identity.firstName} {identity.lastName}" } } }] })).not.toHaveProperty(
@@ -124,7 +133,7 @@ describe("shapeRuleInput", () => {
     expect(err({ priority: 1.5 })).toMatch(/^priority/);
     expect(err({ scope: { organizations: ["x"] } })).toMatch(/identityTypes and sources only/);
     expect(err({ effects: [] })).toMatch(/one to twenty/);
-    expect(err({ effects: [{ type: "assign_package", params: { package: "p" } }] })).toMatch(/set attributes/);
+    expect(err({ effects: [{ type: "assign_package", params: { package: "p" } }] })).toMatch(/sets an attribute/);
     expect(err({ effects: [{ type: "set_attribute", params: { attribute: "region", value: { ref: "identity.x", extra: 1 } } }] })).toMatch(/a value/);
   });
 

@@ -88,7 +88,14 @@ export const LIFECYCLE_TASK_LABEL: Record<string, { title: string; help: string 
   transfer_ownership: { title: "Transfer ownership", help: "Hand everything this person owns, sponsors or manages to someone else." },
   revoke_access: { title: "Revoke access", help: "Remove this person's access in every connected system." },
   disable_sign_in: { title: "Disable sign-in", help: "Suspend their WonderID membership under Administration → Organization." },
+  rule_task: { title: "Task from a rule", help: "An identity rule asked for this." },
 };
+
+/** A task's title: a rule's task says what to do in its own words (IDENTITY-P0-21). */
+export function lifecycleTaskTitle(t: { taskType: string; detail: Record<string, unknown> }): string {
+  if (t.taskType === "rule_task" && typeof t.detail.title === "string" && t.detail.title) return t.detail.title;
+  return LIFECYCLE_TASK_LABEL[t.taskType]?.title ?? t.taskType;
+}
 
 /** The step each transition takes, as a person would say it. */
 export const TRANSITION_LABEL: Record<string, string> = {

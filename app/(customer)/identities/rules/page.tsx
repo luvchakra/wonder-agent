@@ -60,7 +60,7 @@ export default async function IdentityRulesPage() {
                           {r.name}
                         </Link>
                         <span className="block text-xs text-muted-foreground">
-                          Sets {r.effects.map((e) => String(e.params.attribute)).join(", ")} · {r.mode === "enforce" ? "Enforce" : "Report only"}
+                          {r.effects.map((e) => (e.type === "open_task" ? "Opens a task" : `Sets ${String(e.params.attribute)}`)).join(", ")} · {r.mode === "enforce" ? "Enforce" : "Report only"}
                         </span>
                       </Td>
                       <Td hideBelow="lg">{TRIGGER_LABEL[r.triggerType] ?? r.triggerType}</Td>

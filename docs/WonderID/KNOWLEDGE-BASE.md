@@ -118,7 +118,7 @@ The everyday cycle looks like this:
 - A person makes each of these removals, even where a connection could; it counts as removed only when a later read of the system no longer finds it.
 - Where a connection can disable accounts and has changes turned on, it disables the person's account there at once. The next read confirms it. If it fails, the application's owner gets the task with the reason.
 - When a person leaves, what they owned is transferred to someone else, never left without an owner.
-- Identity rules (Identities › Rules) can also run on these moments: when a person becomes active, moves, gets a new manager, leaves, or reaches their end date. Today such a rule sets one of the person's details.
+- Identity rules (Identities › Rules) can also run on these moments: when a person becomes active, moves, gets a new manager, leaves, or reaches their end date. Such a rule sets one of the person's details, or opens a task about the person for their manager or for identity administrators (for example "Order a badge"). A rule opens one task at a time per person; the task appears with the other lifecycle tasks.
 
 **Identity sources**
 - An HR system or directory can be the source of people's details.
@@ -664,6 +664,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 15 Oct 2026 | Identity rules can open a task about a person, for their manager or identity administrators, instead of only setting a detail. |
 | 15 Oct 2026 | Access reviews can cover what access packages contain: each package's owner certifies or removes each application and entitlement in it. |
 | 15 Oct 2026 | Identity rules can run when a person becomes active, moves, gets a new manager, leaves or reaches their end date, not only when they are created, imported or an attribute changes. |
 | 15 Oct 2026 | The audit trail now shows what a configuration change changed: each field with its old and new value, under "N changes" beside the action. Typed text and secrets show only that they changed. |

@@ -141,7 +141,7 @@ async function validated(tenantId: string, input: RuleInput, current?: ValidRule
   );
   const settable = new Set(settableFor(definitions).map((f) => f.toLowerCase()));
   shaped.effects.forEach((e, i) => {
-    if (!settable.has(String(e.params.attribute).toLowerCase())) problems.push({ field: `effects.${i}.attribute`, message: `"${e.params.attribute}" cannot be set by a rule` });
+    if (e.type === "set_attribute" && !settable.has(String(e.params.attribute).toLowerCase())) problems.push({ field: `effects.${i}.attribute`, message: `"${e.params.attribute}" cannot be set by a rule` });
   });
   if (problems.length) throw new ApiError(400, "VALIDATION_FAILED", problems.map((p) => `${p.field}: ${p.message}`).join("; "));
   return shaped;
@@ -530,6 +530,30 @@ export async function applyIdentityRules(
       else if (!data?.length) writeError = "the identity changed meanwhile; the rules run again on that change";
     }
 
+    // IDENTITY-P0-21: "open a task" effects of enforced rules, after the attribute write. One open task per
+    // rule per identity (a unique index): a rule that fires again finds its task already open.
+    const opened: string[] = [];
+    if (!writeError) {
+      for (const run of applied) {
+        for (const e of run.effects.filter((x) => x.type === "open_task")) {
+          const title = String(e.params.title ?? "").trim().slice(0, 200);
+          const { error } = await supabaseServiceRole()
+            .from("identity_lifecycle_tasks")
+            .insert({
+              tenant_id: tenantId,
+              identity_id: identityId,
+              task_type: "rule_task",
+              rule_id: run.ruleId,
+              rule_version: run.ruleVersion,
+              assignee_identity_id: e.params.assignee === "manager" ? ((identity.manager_identity_id as string | null) ?? null) : null,
+              detail: { title },
+            });
+          if (error && error.code !== "23505") writeError = `opening a task: ${error.message}`;
+          else if (!error) opened.push(run.ruleId);
+        }
+      }
+    }
+
     const records: RuleRunRecord[] = log.map((entry) => {
       if (entry.outcome !== "applied") return entry;
       if (writeError) return { ...entry, outcome: "error" as const, detail: writeError };
@@ -553,6 +577,9 @@ export async function applyIdentityRules(
         // Names only, never values (#10, §17.7).
         metadata: { trigger: event.type, rules: [...new Set(plan.written.map((w) => w.ruleId))], attributes: plan.written.map((w) => w.attribute) },
       });
+    }
+    if (opened.length) {
+      await writeAudit({ tenantId, actorId: null, actorType: "system", action: "identity.rule_task_opened", objectType: "identity", objectId: identityId, outcome: "success", correlationId: opts.correlationId ?? undefined, metadata: { trigger: event.type, rules: opened } });
     }
     return writeError ? { changed: false, error: writeError } : { changed: plan.written.length > 0 };
   } catch (err) {
