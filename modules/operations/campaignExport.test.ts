@@ -16,6 +16,8 @@ function makePackage(): EvidenceExportPackage {
         roleId: null,
         roleSource: null,
         groupId: null,
+        packageId: null,
+        packageResourceId: null,
         agentId: "agent-1",
         accessGrantId: "grant-1",
         reviewerId: "user-2",

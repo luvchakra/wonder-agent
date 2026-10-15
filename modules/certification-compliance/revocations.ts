@@ -14,7 +14,12 @@ import { removalOutcomes } from "@/modules/access-governance/service";
  */
 
 type Row = Record<string, unknown>;
-type Snapshot = { person?: { displayName?: string }; role?: { displayName?: string }; accessGrant?: { application?: string; entitlementName?: string } | null };
+type Snapshot = {
+  person?: { displayName?: string };
+  role?: { displayName?: string };
+  accessGrant?: { application?: string; entitlementName?: string } | null;
+  package?: { name?: string; resource?: { applicationName?: string; entitlementName?: string | null } };
+};
 
 export type RevocationRow = {
   itemId: string;
@@ -23,7 +28,7 @@ export type RevocationRow = {
   subject: string;
   access: string;
   decidedAt: string;
-  how: "removal_request" | "role_removed" | "grant_revoked";
+  how: "removal_request" | "role_removed" | "grant_revoked" | "package_resource_removed";
   outcome: "verified" | "removed_unverified" | "pending" | "failed" | "removed";
   dueAt: string | null;
   verifiedAt: string | null;
@@ -33,7 +38,7 @@ export async function listRevocations(tenantId: string, limit = 1000): Promise<R
   const admin = supabaseServiceRole();
   const { data: items, error } = await admin
     .from("certification_items")
-    .select("id, tenant_id, campaign_id, agent_id, identity_id, role_source, snapshot, certification_campaigns(name)")
+    .select("id, tenant_id, campaign_id, agent_id, identity_id, role_source, package_resource_id, snapshot, certification_campaigns(name)")
     .eq("tenant_id", tenantId)
     .eq("status", "decided")
     .order("updated_at", { ascending: false })
@@ -53,16 +58,19 @@ export async function listRevocations(tenantId: string, limit = 1000): Promise<R
   const requestIds = picked
     .filter((d) => {
       const item = byId.get(d.item_id as string)!;
-      return !item.agent_id && !item.role_source && d.remediation_id;
+      return !item.agent_id && !item.role_source && !item.package_resource_id && d.remediation_id;
     })
     .map((d) => d.remediation_id as string);
   const outcomes = await removalOutcomes(tenantId, requestIds);
   return picked.map((d) => {
     const item = byId.get(d.item_id as string)!;
     const snap = ((item.snapshot as Snapshot | null) ?? {}) as Snapshot;
-    const subject = snap.person?.displayName ?? (item.agent_id as string | null) ?? "";
-    const access = snap.role?.displayName ?? [snap.accessGrant?.application, snap.accessGrant?.entitlementName].filter(Boolean).join(" · ");
+    const subject = snap.person?.displayName ?? snap.package?.name ?? (item.agent_id as string | null) ?? "";
+    const access =
+      snap.role?.displayName ??
+      (snap.package?.resource ? [snap.package.resource.applicationName, snap.package.resource.entitlementName].filter(Boolean).join(" · ") : [snap.accessGrant?.application, snap.accessGrant?.entitlementName].filter(Boolean).join(" · "));
     const base = { itemId: item.id as string, campaignId: item.campaign_id as string, campaignName: (item.certification_campaigns as { name?: string } | null)?.name ?? "", subject, access, decidedAt: d.decided_at as string };
+    if (item.package_resource_id) return { ...base, how: "package_resource_removed" as const, outcome: "removed" as const, dueAt: null, verifiedAt: d.decided_at as string };
     if (item.role_source) return { ...base, how: "role_removed" as const, outcome: "removed" as const, dueAt: null, verifiedAt: d.decided_at as string };
     if (item.agent_id) return { ...base, how: "grant_revoked" as const, outcome: "removed" as const, dueAt: null, verifiedAt: d.decided_at as string };
     const o = d.remediation_id ? outcomes.get(d.remediation_id as string) : undefined;

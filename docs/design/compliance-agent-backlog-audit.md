@@ -1471,3 +1471,59 @@ number), and privacy requests and breaches at
 The campaign list, search and the campaign report link by number;
 `toCertificationCampaign`, `toRequest` and `toBreach` map `ref`. Detail and
 verification: Foundation audit log, same date.
+
+### 2026-10-15 — COMPLIANCE-P0-10 part 3: owner reviews of access packages
+
+A campaign can now review what access packages contain, not only who holds
+access.
+
+- **Migration `0193_compliance_package_reviews.sql`** (applied to dev):
+  - campaign and template scope `package_contents`;
+  - `certification_items` gains `package_id` (tenant-composite foreign key,
+    set null when the package is deleted; the snapshot keeps the names) and
+    `package_resource_id` (no foreign key: a revoke deletes that row, and the
+    item keeps the id as evidence);
+  - the subject check now allows a package item, which names a package
+    resource and no agent or identity. Every other item still names exactly
+    one agent or one identity.
+- **Launch:** Access's new `listPackagesForReview` returns active packages
+  (one, or all), read with the service role and filtered by tenant. It gives
+  one item per application or entitlement in a package. The reviewer is the
+  package owner's user, or the named reviewer when the owner has none (a
+  fallback, counted by Preview). Elevated, admin or high-risk resources are
+  marked high and "review". Any other reviewer kind is refused (400).
+- **Decisions** (`packageItemDecision`):
+  - allowed: certify, revoke, defer, escalate, delegate, request
+    information;
+  - not offered: exception;
+  - a revoke calls Access's `removePackageResource` before the decision is
+    recorded. That function audits `access.package_resource_removed` and
+    sends a birthright package back to approval. People who hold the package
+    keep what they have;
+  - audited `compliance.access_certified` / `compliance.access_revoked`;
+  - revocation closure lists these as removed when decided.
+- **UI:** a scope option "access packages (owner review)"; the items show the
+  package (link) and what it contains; the decision form and evidence drawer
+  name the package. No other new controls.
+
+**Verified.**
+- `tests/compliance/package-reviews-isolation.sql` against dev: 7/7.
+- typecheck and eslint pass.
+- Vitest `modules/certification-compliance` + `modules/operations`: 147/147.
+- Local E2E:
+  - new `package-reviews.spec.ts`: 4/4. Preview counts 2 items, 1 high and
+    no fallback, and a manager reviewer is refused. The items go to the
+    owner. Exception is refused, certify works, and a revoke removes the
+    entitlement from the package and audits it. The campaign page names the
+    package.
+  - `role-reviews.spec.ts`: 6/6 after a test fix. The "answers once" step
+    checked for text the typed textarea also matched, so it called the API a
+    second time before the first answer was saved. It now waits for the form
+    to give way to the saved answer.
+  - `compliance.spec.ts`: passed in the combined run.
+  - In one combined run (with compliance.spec) a role-reviews preview
+    returned 500 once. It did not recur in two later runs, and the server log
+    named no error; noted, not explained.
+
+**Left out:** owner reviews of applications and of business roles (roles
+need ACCESS's role model, F5), the review calendar and analytics.

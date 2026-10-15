@@ -290,6 +290,8 @@ test.describe.serial("reviews of WonderID role assignments", () => {
     await expect(page.getByText("Does this person still need this role?")).toBeVisible();
     await page.getByLabel("Your answer").fill("Yes, until the audit closes");
     await page.getByRole("button", { name: "Send answer" }).click();
+    // Saved: the form gives way to the answer (the typed text alone also matched before the save finished).
+    await expect(page.getByLabel("Your answer")).toBeHidden({ timeout: 30_000 });
     await expect(page.getByText("Yes, until the audit closes")).toBeVisible();
     const again = await requester.request.post(`/api/v1/compliance/consultations/${consultationId}/answer`, { data: { answer: "Again" } });
     expect(again.status()).toBe(409);

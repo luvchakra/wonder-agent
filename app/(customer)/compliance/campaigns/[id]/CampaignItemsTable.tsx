@@ -16,6 +16,8 @@ type CampaignItemRow = {
     accessGrant?: { application?: string; entitlementName?: string } | null;
     /** COMPLIANCE-P0-11: a WonderID role, directly or through a group. */
     role?: { displayName: string; privileged: boolean; group: { name: string } | null };
+    /** COMPLIANCE-P0-10 part 3: one resource of an access package, for its owner's review. */
+    package?: { ref: number | null; name: string; birthright: boolean; resource: { applicationName: string; entitlementName: string | null } };
   } | null;
   riskAtReview: string | null;
   usageAtReview: string | null;
@@ -33,7 +35,18 @@ export function CampaignItemsTable({ items, totalCount, currentUserId }: { items
       header: "Whose access",
       sortable: true,
       render: (i) =>
-        i.identityId ? (
+        i.snapshot?.package ? (
+          <span className="min-w-0">
+            <Link href={`/access/packages/${i.snapshot.package.ref ?? ""}`} className="text-primary hover:underline">
+              {i.snapshot.package.name}
+            </Link>
+            <span className="block text-xs text-muted-foreground">
+              {i.snapshot.package.resource.applicationName}
+              {i.snapshot.package.resource.entitlementName ? ` · ${i.snapshot.package.resource.entitlementName}` : " · the application"}
+              {i.snapshot.package.birthright ? " · birthright" : ""}
+            </span>
+          </span>
+        ) : i.identityId ? (
           <span className="min-w-0">
             <Link href={`/identities/${i.identityId}`} className="text-primary hover:underline">
               {i.snapshot?.person?.displayName ?? "Identity"}
@@ -71,7 +84,7 @@ export function CampaignItemsTable({ items, totalCount, currentUserId }: { items
       render: (i) => {
         if (i.status !== "pending") return null;
         if (i.reviewerId !== currentUserId) return <span className="text-xs text-muted-foreground">Assigned reviewer only</span>;
-        return <DecisionForm itemId={i.id} subject={i.agentId ? "agent" : i.snapshot?.role ? "role" : "person"} />;
+        return <DecisionForm itemId={i.id} subject={i.agentId ? "agent" : i.snapshot?.package ? "package" : i.snapshot?.role ? "role" : "person"} />;
       },
     },
   ];

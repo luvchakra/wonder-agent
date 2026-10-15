@@ -12,7 +12,7 @@ import type { ShouldCanDidComparison } from "./runtime";
 import type { RiskFinding } from "./risk";
 import type { AuditLogEntry } from "./operations";
 
-export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent" | "identity_access" | "role_assignments";
+export type CampaignScopeType = "agent" | "application" | "entitlement" | "privileged_access" | "high_risk_agent" | "identity_access" | "role_assignments" | "package_contents";
 /** COMPLIANCE-P0-10: who reviews a people's-access item (the named reviewer is the fallback). */
 export type CampaignReviewerKind = "named" | "manager" | "application_owner";
 export type CampaignCadence = "one_time" | "periodic" | "event_driven";
@@ -70,6 +70,14 @@ export type CertificationSnapshot = {
   reviewer?: { kind: string; fallback: boolean };
   /** COMPLIANCE-P0-11: a WonderID role the person holds, directly or through a group. */
   role?: { id: string; name: string; displayName: string; privileged: boolean; source: "direct" | "group"; group: { id: string; name: string } | null; scopeType: string | null; expiresAt: string | null };
+  /** COMPLIANCE-P0-10 part 3: one application or entitlement an access package contains, for its owner's review. */
+  package?: {
+    id: string;
+    ref: number | null;
+    name: string;
+    birthright: boolean;
+    resource: { id: string; applicationName: string; entitlementName: string | null; privilegeLevel: string | null; risk: string };
+  };
 };
 
 export type CertificationItem = {
@@ -84,6 +92,9 @@ export type CertificationItem = {
   roleId: string | null;
   roleSource: "direct" | "group" | null;
   groupId: string | null;
+  /** COMPLIANCE-P0-10 part 3: for an owner review of a package, the package and the resource reviewed. */
+  packageId: string | null;
+  packageResourceId: string | null;
   accessGrantId: string | null;
   reviewerId: string;
   riskAtReview: string | null;

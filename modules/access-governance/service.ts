@@ -133,6 +133,7 @@ export {
 } from "./approvals";
 export type { ApproverKind, StepStatus } from "./approvalRules";
 export {
+  listPackagesForReview,
   listPackages,
   getPackage,
   createPackage,

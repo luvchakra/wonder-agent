@@ -2,7 +2,7 @@ import { launchFromTemplateAction } from "@/app/actions/compliance";
 import { Button, Card, CardHeader } from "@/modules/ui";
 import type { CampaignTemplate } from "@/modules/certification-compliance/service";
 
-const SCOPE_LABEL: Record<string, string> = { identity_access: "people's access", role_assignments: "WonderID roles" };
+const SCOPE_LABEL: Record<string, string> = { identity_access: "people's access", role_assignments: "WonderID roles", package_contents: "access packages" };
 
 /** COMPLIANCE-P0-14: saved launches; one action each (§19.5). */
 export function CampaignTemplatesList({ templates }: { templates: CampaignTemplate[] }) {

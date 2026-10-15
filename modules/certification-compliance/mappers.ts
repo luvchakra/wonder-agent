@@ -44,6 +44,8 @@ export function toCertificationItem(row: any): CertificationItem {
     roleId: row.role_id ?? null,
     roleSource: row.role_source ?? null,
     groupId: row.group_id ?? null,
+    packageId: row.package_id ?? null,
+    packageResourceId: row.package_resource_id ?? null,
     accessGrantId: row.access_grant_id,
     reviewerId: row.reviewer_id,
     riskAtReview: row.risk_at_review,

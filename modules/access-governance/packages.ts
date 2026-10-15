@@ -523,6 +523,22 @@ export async function addPackageResource(tenantId: string, actorId: string, pack
   return toResource(data as unknown as ResourceRow);
 }
 
+/**
+ * COMPLIANCE-P0-10 part 3: the active packages (or one) with their owner and
+ * contents, for an owner review. Service role (a campaign builds after the
+ * response), filtered by tenant on every read (§14).
+ */
+export async function listPackagesForReview(tenantId: string, packageId: string | null = null): Promise<{ id: string; ref: number | null; name: string; ownerIdentityId: string | null; birthright: boolean; resources: PackageResource[] }[]> {
+  if (packageId && !UUID_RE.test(packageId)) throw new ApiError(404, "NOT_FOUND", "No such package");
+  let query = supabaseServiceRole().from("access_packages").select("*").eq("tenant_id", tenantId).eq("status", "active");
+  if (packageId) query = query.eq("id", packageId);
+  const { data, error } = await query.order("name").limit(500);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const rows = (data ?? []).filter((r) => r.tenant_id === tenantId).map(toPackage);
+  const resources = await resourcesOf(tenantId, rows.map((r) => r.id), "service");
+  return rows.map((p) => ({ id: p.id, ref: p.ref, name: p.name, ownerIdentityId: p.ownerIdentityId, birthright: p.birthrightStatus !== "off", resources: resources.get(p.id) ?? [] }));
+}
+
 export async function removePackageResource(tenantId: string, actorId: string, packageId: string, resourceId: string): Promise<void> {
   if (!UUID_RE.test(packageId) || !UUID_RE.test(resourceId)) throw new ApiError(404, "NOT_FOUND", "No such resource");
   const admin = supabaseServiceRole();
