@@ -2368,3 +2368,37 @@ For each test:
 "temporarily unavailable". It fails closed, which is safe, but the message
 is misleading (§17.5). Changing it touches tenant resolution and needs the
 owner's say.
+
+## 2026-10-16 — Nightly of 16 Oct: two fixes
+
+The scheduled run (03:00 IST) failed in two parts:
+- **Part 1:** 133 passed, 1 flaky. It was cut off at 35 minutes with one
+  test interrupted and one not run.
+- **Part 2:** 151 passed, 1 failed, 3 flaky (22 min).
+- **Parts 3 and 4:** passed (16 and 17 min).
+
+**Part 1 over time again.** Part 1 held connector-provisioning plus a quarter
+of the other specs. `scripts/e2e-on-vercel.sh` now gives part 1
+connector-provisioning alone, and deals every other spec over parts 2, 3 and
+4 (26, 26 and 25 files).
+
+**`users.spec.ts:211` failed: product bug.** "Give WonderID access" opens
+Add user with `?identity=`. The form looked the person up in
+`listPeopleWithoutAccess()`, which reads the first 500 people by name. The
+E2E organization has about 3,000, so a person named "E2E From Identity…"
+was not in the list and the form came up empty. The function now also reads
+the linked person by id, with the same tenant and eligibility filters (owned
+by Identity; recorded in its audit log too).
+
+**Verified:** typecheck and eslint clean, `next build` passed, local E2E
+`users.spec.ts` 16 of 16 passed, and the new split was simulated (part 1
+holds one file).
+
+**Still flaky, not changed here:**
+- the WID-C02 leaver test, `connector-provisioning.spec.ts:756`;
+- `users.spec.ts:102`;
+- navigation-smoke `/controls`;
+- auth.setup `iamAdminOne`.
+
+All of these run in an organization holding thousands of leftover test
+rows. The cleanup SQL waits on the owner.

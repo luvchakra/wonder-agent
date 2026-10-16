@@ -23,7 +23,7 @@
 
 [Revision history](#revision-history) is at the end, newest first.
 
-**Last updated:** 14 October 2026
+**Last updated:** 16 October 2026
 
 A plain-language guide to what WonderID does, how its parts fit together and where to find each feature. It is kept current as the product changes.
 
@@ -665,6 +665,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 16 Oct 2026 | "Give WonderID access" on a person's page now fills in their details in organizations with more than 500 people too. |
 | 15 Oct 2026 | Access reviews can cover an application's entitlements: each entitlement's owner, or else the application's owner, keeps it or disables it so nobody can request it. |
 | 15 Oct 2026 | Identity rules can open a task about a person, for their manager or identity administrators, instead of only setting a detail. |
 | 15 Oct 2026 | Access reviews can cover what access packages contain: each package's owner certifies or removes each application and entitlement in it. |

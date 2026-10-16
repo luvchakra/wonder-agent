@@ -476,18 +476,29 @@ export async function listAccountableHumans(tenantId: string): Promise<{ id: str
  * the caller (RLS) with an explicit tenant filter; the membership read is
  * the service role, filtered by this tenant, and returns ids and e-mails only.
  */
-export async function listPeopleWithoutAccess(tenantId: string): Promise<{ id: string; displayName: string; email: string; title: string | null; department: string | null }[]> {
+export async function listPeopleWithoutAccess(
+  tenantId: string,
+  includeId: string | null = null,
+): Promise<{ id: string; displayName: string; email: string; title: string | null; department: string | null }[]> {
   const supabase = await supabaseServer();
-  const { data, error } = await supabase
-    .from("identities")
-    .select("id, display_name, email, title, department, user_id")
-    .eq("tenant_id", tenantId)
-    .eq("identity_type", "HUMAN")
-    .eq("status", "active")
-    .not("email", "is", null)
-    .order("display_name")
-    .limit(500);
-  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  const people = () =>
+    supabase
+      .from("identities")
+      .select("id, display_name, email, title, department, user_id")
+      .eq("tenant_id", tenantId)
+      .eq("identity_type", "HUMAN")
+      .eq("status", "active")
+      .not("email", "is", null);
+  // The list stops at 500 by name; the person a link names is read by id so
+  // it is there even in a larger organization.
+  const wanted = includeId && /^[0-9a-f-]{36}$/i.test(includeId) ? includeId : null;
+  const [listed, named] = await Promise.all([
+    people().order("display_name").limit(500),
+    wanted ? people().eq("id", wanted).limit(1) : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (listed.error) throw new ApiError(500, "QUERY_FAILED", listed.error.message);
+  if (named.error) throw new ApiError(500, "QUERY_FAILED", named.error.message);
+  const data = [...(named.data ?? []), ...(listed.data ?? []).filter((r) => r.id !== wanted)];
   const { data: members, error: memberError } = await supabaseServiceRole()
     .from("tenant_memberships")
     .select("tenant_id, user_id, users(email)")

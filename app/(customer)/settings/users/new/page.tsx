@@ -23,10 +23,10 @@ export default async function NewUserPage({ searchParams }: { searchParams: Prom
     throw err;
   }
   // Owner feedback 2026-10-14: start from a person the organization already governs.
-  const [roles, people, { identity }] = await Promise.all([
+  const { identity } = await searchParams;
+  const [roles, people] = await Promise.all([
     listAssignableRoles(ctx.tenantId!),
-    ctx.permissions.includes("identity.read") ? listPeopleWithoutAccess(ctx.tenantId!).catch(() => []) : Promise.resolve([]),
-    searchParams,
+    ctx.permissions.includes("identity.read") ? listPeopleWithoutAccess(ctx.tenantId!, identity ?? null).catch(() => []) : Promise.resolve([]),
   ]);
   return (
     <div className="space-y-5">
