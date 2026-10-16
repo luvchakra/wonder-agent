@@ -186,6 +186,49 @@ export async function pruneThrowawayIntegrationsAndQuarantine(tenantIds: string[
 }
 
 /**
+ * Same reasoning again (2026-10-16): review campaigns, access packages and
+ * identity sources named "E2E …", and people nobody signs in as. By 16 Oct
+ * Tenant One held about 3,350 identities, 466 campaigns, 144 packages and 322
+ * sources. Lists capped at 500 or 200 rows then missed what a spec had just
+ * created, and the suite slowed. Only rows older than two hours go, so
+ * another run in progress keeps its own. Agent identities and anyone with a
+ * sign-in stay. Scoped to the two `e2e-*` tenants only.
+ */
+export async function pruneThrowawayGovernanceData(tenantIds: string[]): Promise<void> {
+  const supabase = adminClient();
+  const cut = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+  for (const tenantId of tenantIds) {
+    // Campaign items cascade.
+    const campaigns = await supabase.from("certification_campaigns").delete().eq("tenant_id", tenantId).like("name", "E2E %").lt("created_at", cut);
+    if (campaigns.error) throw new Error(`prune throwaway campaigns(${tenantId}) failed: ${campaigns.error.message}`);
+    // A package's assignments and requests go first (those keys do not cascade).
+    const { data: pkgs, error: pkgsError } = await supabase.from("access_packages").select("id").eq("tenant_id", tenantId).like("name", "E2E %").lt("created_at", cut);
+    if (pkgsError) throw new Error(`list throwaway packages(${tenantId}) failed: ${pkgsError.message}`);
+    const pkgIds = (pkgs ?? []).map((p) => p.id as string);
+    for (let i = 0; i < pkgIds.length; i += 100) {
+      const batch = pkgIds.slice(i, i + 100);
+      const assignments = await supabase.from("access_package_assignments").delete().eq("tenant_id", tenantId).in("package_id", batch);
+      if (assignments.error) throw new Error(`prune package assignments(${tenantId}) failed: ${assignments.error.message}`);
+      const requests = await supabase.from("access_requests").delete().eq("tenant_id", tenantId).in("access_package_id", batch);
+      if (requests.error) throw new Error(`prune package requests(${tenantId}) failed: ${requests.error.message}`);
+      const deleted = await supabase.from("access_packages").delete().eq("tenant_id", tenantId).in("id", batch);
+      if (deleted.error) throw new Error(`prune throwaway packages(${tenantId}) failed: ${deleted.error.message}`);
+    }
+    // Source links, runs and changes cascade.
+    const sources = await supabase.from("identity_sources").delete().eq("tenant_id", tenantId).like("name", "E2E %").lt("created_at", cut);
+    if (sources.error) throw new Error(`prune throwaway identity sources(${tenantId}) failed: ${sources.error.message}`);
+    const people = await supabase
+      .from("identities")
+      .delete()
+      .eq("tenant_id", tenantId)
+      .is("user_id", null)
+      .neq("identity_type", "AI_AGENT")
+      .lt("created_at", cut);
+    if (people.error) throw new Error(`prune throwaway identities(${tenantId}) failed: ${people.error.message}`);
+  }
+}
+
+/**
  * Generates a real Supabase Auth recovery link for `email` without sending
  * any mail — bypasses the project's built-in-SMTP quota entirely (see the
  * "fresh, valid email" sign-up test's own comment on that quota), and lets
