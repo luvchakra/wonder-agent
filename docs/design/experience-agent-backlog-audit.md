@@ -4269,3 +4269,67 @@ The design-review sweep found `/agents` 8px wider than its card at 1280px with
 long owner names (Owner was `whitespace-nowrap`, 265px). Owner names now wrap,
 and the table is 926px in 926px. Verified: the design-review spec passes 7/7
 locally.
+
+
+## 2026-10-16 — Help centre behind sign-in; guide brought up to date (owner request)
+
+**Before:** `/help` and `POST /api/v1/help/ask` were public (since
+2026-09-18). The landing page's menu and footer, and "Need help?" on the
+auth screens, linked to them. There was no sitemap, robots file or service
+worker, and no email linked to help.
+
+**Part 1, sign-in required:**
+- `proxy.ts`: `/help` left `PUBLIC_PATHS` and `UNENFORCED_PATHS`, so idle
+  and absolute session expiry apply there too. A signed-out help request
+  goes to `/sign-in?next=<path>`.
+- `lib/auth/returnTo.ts`: `safeReturnTo()` accepts only same-site help
+  paths, so `next` cannot become an open redirect. `SignInForm` uses it
+  after a password sign-in. Social and SSO sign-in still land on `/`.
+- `app/help/layout.tsx` and `page.tsx` both check `getSessionUser()`; the
+  page check matters because a client navigation can fetch the page without
+  its layout. The pages are `force-dynamic`, with robots `noindex,
+  nofollow`, so they are never prerendered or publicly cached.
+- The help assistant's route answers 401 without a session, with no guide
+  text and `Cache-Control: no-store`.
+- Public links:
+  - the landing page's menu and footer lost their Help links;
+  - `AuthShell`'s "Need help?" became a mailto, "Need help? Email us".
+- Stays public: the landing page (with the contact mailto), sign-in,
+  sign-up, forgot and update password, `/auth/*`, `security.txt`, install,
+  and the error pages. The app has no privacy or terms pages.
+
+**Part 2, content:**
+- An inventory taken from `shell-nav.ts`, the routes, the settings registry
+  and the reports list found:
+  - 30 sections still on the menu from before 13 Oct;
+  - factual errors:
+    - campaigns "agents only";
+    - organization-wide MFA "not built";
+    - Reports "eight";
+    - the Home overview;
+    - the mobile tab bar;
+    - the organization switcher's place;
+    - the Add user steps and buttons;
+    - "Review ownership";
+    - an incomplete settings list;
+  - pages with no help at all.
+- Rewritten in the UI's own words, after checking each label against the
+  code.
+- New sections: Rogue accounts, Provisioning tasks, Delegations and My
+  Team, Identity rules, API clients.
+- Every section has an `updated` date, shown as "Last updated".
+- What's new now lists the newest features.
+- `modules/ui/help/links.test.ts` fails when a section's link, an in-app
+  path in its text, a `/help#` anchor or a What's new item points at a page
+  or section that does not exist. Routes are read from the `page.tsx`
+  files.
+- `content.test.ts` checks the dates, rejects the old menu names and
+  requires the new sections.
+
+**Verified:**
+- unit tests (help, proxy, `returnTo`, `helpAnswer`): 57/57;
+- typecheck and eslint clean; `next build` passed, with `/help` dynamic;
+- local E2E `help`, `welcome`, `auth` and `tenant-address`: 64/64;
+- by hand on the production build: signed out, `/help`, `/help?q=x` and
+  `/help/anything` answer 307 to sign-in with no guide text in the body;
+  the API answers 401; the landing page has no `/help` link.

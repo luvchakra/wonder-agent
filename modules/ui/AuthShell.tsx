@@ -49,9 +49,10 @@ export function AuthShell({
           <div className="mt-6 text-center text-sm text-muted-foreground">{footer}</div>
 
           <div className="mt-4 text-center text-xs text-muted-foreground">
-            <Link href="/help" className="hover:text-foreground hover:underline">
-              Need help?
-            </Link>
+            {/* The guide needs a session (2026-10-16); signed out, help is the contact address. */}
+            <a href="mailto:connect@wonderapps.biz" className="hover:text-foreground hover:underline">
+              Need help? Email us
+            </a>
           </div>
         </div>
       </main>

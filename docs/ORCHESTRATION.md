@@ -73,12 +73,10 @@ Before starting agents in parallel, the lead:
 through a pull request.**
 - One branch per task, created from the latest `main`.
 - Commit, push the branch, open a pull request, and share its link.
-- Squash-merge once CI (`security.yml`) is green **and** the owner's message
-  says "merge now", which covers every pull request open and waiting at that
-  moment. Any other Vercel build (a redeploy, an E2E run on
-  Vercel) waits for "build now" (`CLAUDE.md` §19.9, rule 0, owner decision
-  2026-10-10). The full Playwright suite (`e2e.yml`) runs nightly, not per
-  change.
+- Squash-merge as soon as CI (`security.yml`) is green, without asking
+  (`CLAUDE.md` §19.9, rule 0, owner decision 2026-10-16; it replaced the
+  "merge now" rule of 2026-10-10). The full Playwright suite (`e2e.yml`)
+  runs nightly at 03:00 IST in four parts, not per change.
 - Then confirm the production deploy is ready, and move to the next story.
 - **Never push directly to `main`.** This replaces the earlier auto-merge and
   "also fast-forward `main` after every push" instructions.

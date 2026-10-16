@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { getSessionUser } from "@/lib/tenant/session";
 import { ArrowUpRight } from "lucide-react";
-import { GUIDE_CATEGORIES, GUIDE_SECTIONS, sectionsByCategory } from "@/modules/ui/help/content";
+import { GUIDE_CATEGORIES, GUIDE_SECTIONS, WHATS_NEW, sectionsByCategory } from "@/modules/ui/help/content";
 import { HelpAssistant } from "@/modules/ui/help/HelpAssistant";
 
 export const metadata = {
@@ -15,20 +17,19 @@ export const metadata = {
  * the help assistant retrieves against exactly what is rendered here — one
  * source, so an answer can never link to a section that isn't on the page.
  *
- * Needs no permission of its own: it is product documentation, identical
- * for every tenant, and contains no customer data.
+ * Needs a session (owner request, 2026-10-16), checked here as well as in
+ * the layout: a client-side navigation can fetch the page without its
+ * layout. No module permission: it is product documentation with no
+ * customer data.
  */
-/** The latest additions, each pointing at the guide section that explains it. */
-const WHATS_NEW = [
-  { id: "billing", label: "Billing and invoices", note: "Choose a plan and pay with Stripe or Razorpay; invoices carry GST or VAT details." },
-  { id: "privacy", label: "Privacy: GDPR and DPDP", note: "Rights requests on statutory deadlines, consent, retention and breach clocks." },
-  { id: "audit-integrity", label: "Tamper-evident audit trail", note: "Verify the audit chain; control libraries for SOX, PCI DSS and more." },
-  { id: "access-requests", label: "Access requests, approvals and packages", note: "Request policies, staged approvals, no self-approval, and bundles of access." },
-  { id: "applications", label: "Application onboarding and accounts", note: "Onboard apps step by step; find orphaned and dormant accounts." },
-  { id: "scoped-assignments", label: "Scoped roles and authorization policies", note: "Limit a role to an environment, application or agent, dates or MFA; deny or hold actions." },
-] as const;
 
-export default function HelpPage() {
+/** "16 Oct 2026" from a section's YYYY-MM-DD date, independent of the server's time zone. */
+function lastUpdated(date: string): string {
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+}
+
+export default async function HelpPage() {
+  if (!(await getSessionUser())) redirect("/sign-in?next=%2Fhelp");
   const faq = sectionsByCategory("FAQ");
   const guideCategories = GUIDE_CATEGORIES.filter((c) => c !== "FAQ");
 
@@ -114,7 +115,9 @@ export default function HelpPage() {
                       </p>
                     ))}
                   </div>
-                </article>
+                  <p className="mt-3 text-xs text-muted-foreground">Last updated {lastUpdated(s.updated)}</p>
+                  <p className="mt-3 text-xs text-muted-foreground">Last updated {lastUpdated(s.updated)}</p>
+            </article>
               ))}
             </div>
           </section>
@@ -141,6 +144,7 @@ export default function HelpPage() {
                   </p>
                 ))}
               </div>
+              <p className="mt-3 text-xs text-muted-foreground">Last updated {lastUpdated(s.updated)}</p>
             </article>
           ))}
         </div>

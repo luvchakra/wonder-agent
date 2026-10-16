@@ -15,7 +15,6 @@ const NAV = [
   { href: "#trust", label: "Compliance", wide: true },
   { href: "#how-it-works", label: "How it works", wide: true },
   { href: "#pricing", label: "Pricing" },
-  { href: "/help", label: "Help" },
 ] as const;
 
 export default function WelcomeLayout({ children }: { children: React.ReactNode }) {

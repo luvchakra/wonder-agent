@@ -46,7 +46,7 @@ describe("proxy when the auth server cannot be reached (fail closed, truthfully)
   });
 
   it("a public page still passes through", async () => {
-    const res = await proxy(withSession("/help"));
+    const res = await proxy(withSession("/sign-in"));
     expect(res.status).toBe(200);
     expect(res.headers.get("x-middleware-rewrite")).toBeNull();
   });
@@ -60,6 +60,21 @@ describe("proxy when the auth server rejects the session (unchanged)", () => {
     expect(page.headers.get("location")).toMatch(/\/sign-in\?reason=expired$/);
     const api = await proxy(withSession("/api/v1/access/accounts"));
     expect(api.status).toBe(401);
+  });
+});
+
+describe("the help guide needs a session (owner request, 2026-10-16)", () => {
+  it("signed out, a help page goes to sign-in and names the page to come back to", async () => {
+    const plain = await proxy(new NextRequest("http://localhost/help"));
+    expect(plain.status).toBe(307);
+    expect(plain.headers.get("location")).toMatch(/\/sign-in\?next=%2Fhelp$/);
+    const withQuery = await proxy(new NextRequest("http://localhost/help?q=reviews"));
+    expect(withQuery.headers.get("location")).toMatch(/\/sign-in\?next=%2Fhelp%3Fq%3Dreviews$/);
+  });
+
+  it("other protected pages do not carry a return address", async () => {
+    const res = await proxy(new NextRequest("http://localhost/access"));
+    expect(res.headers.get("location")).toMatch(/\/sign-in$/);
   });
 });
 
@@ -89,7 +104,7 @@ describe("proxy on tenant addresses (FOUNDATION-P0-22)", () => {
     const first = await proxy(at("acme-corp.wonderid.example", "/sign-in"));
     expect(first.status).toBe(200);
     expect(first.headers.get("x-middleware-rewrite")).toBeNull();
-    await proxy(at("acme-corp.wonderid.example", "/help"));
+    await proxy(at("acme-corp.wonderid.example", "/forgot-password"));
     expect(rpc).toHaveBeenCalledTimes(1);
   });
 
@@ -110,8 +125,8 @@ describe("proxy on tenant addresses (FOUNDATION-P0-22)", () => {
   });
 
   it("the bare host and hosts outside the scheme are unchanged", async () => {
-    expect((await proxy(at("wonderid.example", "/help"))).status).toBe(200);
-    expect((await proxy(at("preview.vercel.app", "/help"))).status).toBe(200);
+    expect((await proxy(at("wonderid.example", "/sign-in"))).status).toBe(200);
+    expect((await proxy(at("preview.vercel.app", "/sign-in"))).status).toBe(200);
     expect(rpc).not.toHaveBeenCalled();
   });
 });

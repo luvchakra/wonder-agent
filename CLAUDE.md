@@ -58,6 +58,15 @@ that each object page may also import and export CSV directly, through the frame
 Reference: `docs/integrations/CONNECTOR-FRAMEWORK.md`; the boundary is enforced by
 `tests/architecture/connector-boundary.test.ts`.
 
+**2026-10-16 — merges without asking, nightly at 03:00 IST (explicit user
+decision).** A pull request is squash-merged as soon as its CI is green; the
+owner is not asked and "merge now" is no longer needed. The full end-to-end
+suite runs every night at 03:00 IST in four parts. While the app is not live,
+the E2E runs may create test users, organizations and data freely, and every
+test may run. The help guide needs a session, and a change that adds,
+removes or renames a user-facing feature updates the help guide in the same
+pull request. §4, §12, §19.6, §19.7, §19.8 and §19.9 were amended to match.
+
 **2026-10-09 — working rules adopted (explicit user decision).** The user supplied a
 general "working rules for Claude" template and chose to adopt it, including its
 workflow. Work now ships through a branch, a pull request and a squash merge once
@@ -391,8 +400,7 @@ Each agent works one story at a time from its own backlog doc:
    [`docs/ORCHESTRATION.md`](docs/ORCHESTRATION.md):
    - push the task branch;
    - open a pull request and share its link;
-   - squash-merge only when the owner's message says **"merge now"**, and CI
-     is green (§19.9, rule 0);
+   - squash-merge as soon as CI is green, without asking (§19.9, rule 0);
    - confirm the production deploy is ready;
    - read the high-risk findings register and plan what the next pull
      request can fix (§19.12).
@@ -644,8 +652,7 @@ A feature is complete only when:
   in §17.8), the nightly full Playwright run after the merge is green too, or a
   hand-started run of the affected specs passed before the merge.
 - The change is committed with a focused message on its own branch and
-  squash-merged through a pull request once CI is green and the owner has said
-  "merge now" (§19.9, rule 0).
+  squash-merged through a pull request once CI is green (§19.9, rule 0).
 
 ---
 
@@ -1291,8 +1298,7 @@ beats exhaustive pre-push verification.
   1. Commit and push the task branch.
   2. Open a pull request and share its link (working branches have no Vercel
      preview, §19.9).
-  3. Squash-merge once CI is green and the owner's message says "merge now"
-     (§19.9, rule 0). Until then the pull request waits, ready.
+  3. Squash-merge as soon as CI is green, without asking (§19.9, rule 0).
   4. Confirm the production deploy on `id.wonderapps.biz` is ready.
 - **Before pushing, run only fast, relevant checks:**
   - `npm run typecheck`;
@@ -1358,8 +1364,12 @@ beats exhaustive pre-push verification.
     it knowledge-base style, with no story IDs or phase names, the table of
     contents at the very top and the revision history right after it.
 
-  Don't update the user-facing help guide (`modules/ui/help/content.ts`,
-  `/help`) unless asked.
+  - the help guide (`modules/ui/help/content.ts`, `/help`, signed-in only
+    since 2026-10-16): a change that adds, removes or renames a user-facing
+    feature updates it in the same pull request, in the UI's own words, and
+    sets that section's `updated` date. `modules/ui/help/links.test.ts`
+    fails when a help link points at a page or section that no longer
+    exists.
 - **CI red:** root-cause it. "Flake" is not a cause. Never skip or disable a test
   to get green. A failure caused by infrastructure (e.g. a hosting rate limit or a
   Supabase outage) gets one pull request comment saying so; it isn't fixed in
@@ -1386,9 +1396,13 @@ beats exhaustive pre-push verification.
     demand. Since 2026-10-10 (user decision) the suite runs inside Vercel
     builds (`scripts/e2e-on-vercel.sh`), where the project's Sensitive
     variables are available.
-    - The full suite runs in three parts, on the `e2e/nightly-1`,
-      `e2e/nightly-2` and `e2e/nightly-3` branches (owner decision,
-      2026-10-15; two halves ran too close to the 35-minute budget).
+    - The full suite runs every night at 03:00 IST in four parts, on the
+      `e2e/nightly-1` to `e2e/nightly-4` branches (owner decisions,
+      2026-10-15 and 2026-10-16). Part 1 runs connector provisioning alone;
+      the other specs are dealt over parts 2 to 4.
+    - Each run first removes the throwaway data earlier runs left in the
+      two E2E organizations (`auth.setup.ts`). While the app is not live,
+      the runs may create test users, organizations and data freely.
     - Chosen specs run on `e2e/nightly`.
     - The workflow moves those branches and waits for Vercel's results. It
       needs no GitHub secrets.
@@ -1415,32 +1429,19 @@ reached at 13:16 UTC. 68 of those 100 were cancelled builds, and production
 could not deploy until the window cleared. Treat deployments as a scarce
 budget, with production first.
 
-0. **Build on Vercel only when the owner says so (owner decision,
-   2026-10-10).** Anything that makes Vercel build happens only when the
-   owner's message contains **"merge now"** or **"build now"**:
-   - **"merge now"** covers **every** pull request that is open and waiting at
-     that moment, not only the latest one:
-     - bring each up to date with `main`;
-     - merge every one whose CI is green, one after another;
-     - report any that cannot merge (red CI, a conflict needing a decision)
-       with the reason, and leave those open.
+0. **Merge without asking (owner decision, 2026-10-16, replacing the
+   2026-10-10 "merge now" rule).** A pull request is squash-merged as soon as
+   its CI is green:
+   - bring it up to date with `main` first;
+   - report one that cannot merge (red CI, a conflict needing a decision)
+     with the reason, and leave it open;
+   - send the merge notification (§19.6).
 
-     Each merge to `main` is a production build, so keep pull requests few
-     and combine related work into one.
-   - **"build now"** likewise covers every Vercel build waiting at that
-     moment, such as a production redeploy or an E2E run on Vercel
-     (`e2e/nightly`). Start each once.
-
-   Without either phrase:
-   - push branches and open pull requests (they cost nothing, rule 1);
-   - run checks locally, including E2E specs with `E2E_CHROMIUM_PATH`;
-   - say which pull requests are ready to merge, and stop there.
-
-   This holds even when CI is green and the change is small or docs-only. A
-   docs-only merge still creates a deployment. The scheduled nightly suite
-   is not covered by this rule: it runs on its own, all three parts, three
-   Vercel builds a night, so every test runs every night (owner decisions,
-   2026-10-10 and 2026-10-15).
+   Each merge to `main` is a production build, so keep pull requests few and
+   combine related work into one. The scheduled nightly suite runs on its
+   own at 03:00 IST, all four parts, four Vercel builds a night. A Vercel E2E
+   run by hand (`e2e/nightly`) is started when the owner asks, or for a
+   change §17.8 says needs one; prefer a local run when one is possible.
 1. **Create no deployment you don't need.**
    - Working branches (`claude/**`, `module/**`) never deploy
      (`git.deploymentEnabled` in `vercel.json`). Previews stay off.

@@ -13,6 +13,7 @@ import {
 import { TENANT_COOKIE_NAME } from "@/lib/tenant/getTenantContext";
 import { baseAppHost, mainAddressRedirect, orgAddressRequired, parseTenantHost } from "@/lib/tenant/host";
 import { isCrossSiteApiWrite } from "@/lib/security/origin";
+import { isHelpPath } from "@/lib/auth/returnTo";
 
 /**
  * Session limits per user, from their organizations' Global Configuration
@@ -49,12 +50,11 @@ async function sessionLimitsFor(supabase: ReturnType<typeof createServerClient>,
  * if the proxy lets the unauthenticated request through to it instead of
  * redirecting to /sign-in first.
  *
- * /help is public too (2026-09-18): the user guide and FAQ are product
- * documentation, identical for every visitor and containing no customer
- * data, so there is no reason to gate them behind a session — see
- * app/help/layout.tsx.
+ * /help needs a session (owner request, 2026-10-16; it was public from
+ * 2026-09-18). A signed-out visitor goes to sign-in and comes back to the
+ * help page asked for (`next`, accepted only for /help by the sign-in form).
  */
-const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/help", "/install", "/service-unavailable", "/tenant-not-found"];
+const PUBLIC_PATHS = ["/sign-in", "/sign-up", "/auth/", "/welcome", "/forgot-password", "/update-password", "/install", "/service-unavailable", "/tenant-not-found"];
 /** Paths the idle/absolute session-expiry clock does not run on. */
 const UNENFORCED_PATHS = [
   "/sign-in",
@@ -63,7 +63,6 @@ const UNENFORCED_PATHS = [
   "/welcome",
   "/forgot-password",
   "/update-password",
-  "/help",
 ];
 
 /**
@@ -266,6 +265,7 @@ export async function proxy(request: NextRequest) {
     if (!isApi && !isPublicPage) {
       const signIn = new URL("/sign-in", request.url);
       if (presentedSession) signIn.searchParams.set("reason", "expired");
+      if (isHelpPath(pathname)) signIn.searchParams.set("next", pathname + request.nextUrl.search);
       return NextResponse.redirect(signIn);
     }
   }

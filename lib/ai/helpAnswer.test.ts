@@ -52,7 +52,7 @@ describe("retrieveSections — deterministic guide retrieval", () => {
   });
 
   it("returns nothing for a question the guide does not cover", () => {
-    expect(retrieveSections("kubernetes helm chart rollout strategy")).toEqual([]);
+    expect(retrieveSections("zebra giraffe hippopotamus")).toEqual([]);
   });
 
   it("returns nothing for an empty or stopword-only question", () => {
@@ -123,7 +123,7 @@ describe("answerHelpQuestion — degradation without an AI provider", () => {
 
   it("says so plainly when the guide does not cover the question, with no sections", async () => {
     mockResolve.mockResolvedValue(null);
-    const result = await answerHelpQuestion("tenant-1", "kubernetes helm chart rollout");
+    const result = await answerHelpQuestion("tenant-1", "zebra giraffe hippopotamus");
     expect(result.sections).toEqual([]);
     expect(result.answer).toMatch(/couldn't find/i);
   });

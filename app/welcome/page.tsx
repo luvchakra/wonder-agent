@@ -1053,9 +1053,6 @@ export default async function WelcomePage() {
             IGA for human and non-human identities · Govern every identity. Verify every access.
           </p>
           <div className="flex items-center gap-5 text-sm">
-            <Link href="/help" className="text-muted-foreground hover:text-foreground">
-              Help
-            </Link>
             <Link href="/sign-in" className="text-muted-foreground hover:text-foreground">
               Sign in
             </Link>

@@ -1,26 +1,29 @@
+import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { LinkButton, ThemeToggle, WonderIDLogo } from "@/modules/ui";
 import { getSessionUser } from "@/lib/tenant/session";
 
 /**
- * Public chrome for the help centre — no login required (EXPERIENCE, 2026-
- * 09-18: the guide and FAQ are product documentation, identical for every
- * visitor and containing no customer data, so there is no reason to gate
- * them behind a session).
+ * Chrome for the help guide. It needs a session (owner request, 2026-10-16;
+ * the guide was public from 2026-09-18). proxy.ts sends a signed-out visitor
+ * to sign-in with `next` set to the page asked for; this check is the
+ * server-side enforcement behind it, so the content never renders without a
+ * session even if the proxy is bypassed.
  *
- * Deliberately its own layout rather than the `(customer)` shell: it calls
- * only `getSessionUser()`, which returns null instead of redirecting, so
- * this renders correctly for a signed-out visitor. It never calls
- * `getTenantContext()` or anything that assumes a membership.
- *
- * The one auth-aware bit is the header's call to action — a signed-in
- * visitor gets "Back to app" instead of "Log in" / "Get started" — which is
- * why this can't just reuse `app/welcome/layout.tsx` (that layout is for
- * signed-out visitors only; proxy.ts redirects a signed-in user away from
- * `/welcome`, but `/help` stays reachable either way).
+ * Its own layout rather than the `(customer)` shell: someone signed in but
+ * not yet in an organization can still read it. It calls only
+ * `getSessionUser()`, never `getTenantContext()`.
  */
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default async function HelpLayout({ children }: { children: React.ReactNode }) {
   const user = await getSessionUser();
+  if (!user) redirect("/sign-in?next=%2Fhelp");
 
   return (
     <div className="min-h-screen bg-background">
@@ -41,20 +44,9 @@ export default async function HelpLayout({ children }: { children: React.ReactNo
             <span className="hidden sm:inline-flex">
               <ThemeToggle />
             </span>
-            {user ? (
-              <LinkButton href="/" size="sm" className="shrink-0 rounded-full px-4">
-                Back to app
-              </LinkButton>
-            ) : (
-              <>
-                <LinkButton href="/sign-in" variant="ghost" size="sm" className="hidden sm:inline-flex">
-                  Log in
-                </LinkButton>
-                <LinkButton href="/sign-up" size="sm" className="shrink-0 rounded-full px-4">
-                  Get started
-                </LinkButton>
-              </>
-            )}
+            <LinkButton href="/" size="sm" className="shrink-0 rounded-full px-4">
+              Back to app
+            </LinkButton>
           </div>
         </div>
       </header>

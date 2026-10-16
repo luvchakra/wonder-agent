@@ -91,8 +91,31 @@ describe("user guide content", () => {
   });
 
   it("never invents a support address or response-time promise", () => {
-    const text = GUIDE_SECTIONS.flatMap((s) => [s.summary, ...s.body]).join("\n");
+    // "Leaver Removal SLA" is a report's name, not a promise.
+    const text = GUIDE_SECTIONS.flatMap((s) => [s.summary, ...s.body]).join("\n").replace(/Leaver Removal SLA/g, "");
     expect(text).not.toMatch(/@/);
     expect(text).not.toMatch(/\b(24\/7|SLA)\b|we (will )?(reply|respond)/);
+  });
+});
+
+describe("help guide maintenance (owner request, 2026-10-16)", () => {
+  it("gives every section a real last-updated date, not in the future", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    for (const s of GUIDE_SECTIONS) {
+      expect(s.updated, s.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(Number.isNaN(Date.parse(s.updated)), s.id).toBe(false);
+      expect(s.updated <= today, s.id).toBe(true);
+    }
+  });
+
+  it("uses today's menu names, not the menu before 13 Oct 2026", () => {
+    const text = GUIDE_SECTIONS.flatMap((s) => [s.title, s.summary, ...s.body]).join("\n");
+    for (const old of ["Admin →", "Intelligence →", "Onboarding →", "Home → My Access", "Home → Access Governance", "Certifications →", "SOD →", "Control Center →", "Global Configuration", "Connection Types"]) {
+      expect(text, old).not.toContain(old);
+    }
+  });
+
+  it("documents the pages added since the last rewrite", () => {
+    for (const id of ["rogue-accounts", "fulfilment", "delegations", "identity-rules", "api-clients"]) expect(getSection(id), id).toBeDefined();
   });
 });

@@ -3649,3 +3649,19 @@ the user message, never in the system prompt, and the result is prose only.
 `authorizeCore.test.ts` gains a performance budget: one decision under 1 ms,
 and the tenant-wide permission list under 50 ms, for 40 roles and 30
 policies (measured 0.05 ms and 4 ms). See the QA entry of the same date.
+
+
+## 2026-10-16 — `/help` needs a session (owner request)
+
+- `proxy.ts`: `/help` is no longer a public or unenforced path.
+- `lib/auth/returnTo.ts`: sign-in returns only to a same-site help path
+  (`next`), refusing other sites, other pages and backslash tricks; unit
+  tested.
+- `proxy.test.ts` covers the redirect with and without a query, and that
+  other protected pages carry no return address.
+- Detail is in the Experience audit log of the same date.
+- CLAUDE.md was amended the same day by owner decision:
+  - merges happen without asking once CI is green;
+  - the nightly runs at 03:00 IST in four parts;
+  - the E2E runs may create test data freely while the app is not live;
+  - the help guide is updated with each feature change.
