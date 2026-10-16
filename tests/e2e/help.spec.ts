@@ -1,103 +1,73 @@
 import { test, expect } from "@playwright/test";
-import { authFile } from "./support/testUsers";
+import { authFile, TEST_USERS } from "./support/testUsers";
 
 /**
  * The user guide, FAQ and help assistant at /help.
  *
- * /help is public (2026-09-18): reachable from the account menu's "Get
- * Help" when signed in, but also from the landing page nav/footer and the
- * auth screens' "Need help?" link with no session at all — it is product
- * documentation, identical for every visitor, containing no customer data.
- * The signed-out describe block below covers that directly; the signed-in
- * block covers the in-app entry point and is otherwise identical, since
- * the page itself does not vary by auth state.
+ * Since 2026-10-16 (owner request) the guide needs a session: signed out,
+ * every help route goes to sign-in and comes back after it, and the
+ * assistant's API answers 401 with no guide text. The landing page and the
+ * sign-in screens link to the contact address instead, and the public pages
+ * still load without a session.
  *
  * The assistant is exercised for real against the running app — with no
  * AI provider configured on this deployment it answers from the guide
- * text, which is the fallback path this suite deliberately covers (the AI
- * path is unit-tested in lib/ai/helpAnswer.test.ts, where the provider can
- * be mocked).
+ * text (the AI path is unit-tested in lib/ai/helpAnswer.test.ts, where the
+ * provider can be mocked).
  */
 test.describe("help centre (signed out)", () => {
   test.use({ storageState: { cookies: [], origins: [] } });
 
-  test("/help is reachable with no session — no redirect to sign-in", async ({ page }) => {
+  test("/help goes to sign-in, and signing in comes back to the guide", async ({ page }) => {
     await page.goto("/help");
-    await expect(page).toHaveURL(/\/help/);
+    await expect(page).toHaveURL(/\/sign-in\?next=%2Fhelp/);
+    await page.getByLabel("Email").fill(TEST_USERS.readOnly.email);
+    await page.getByRole("textbox", { name: "Password" }).fill(TEST_USERS.readOnly.password);
+    await page.getByRole("button", { name: "Sign in", exact: true }).click();
+    await expect(page).toHaveURL(/\/help$/);
     await expect(page.getByRole("heading", { name: "Get Help", level: 1 })).toBeVisible();
   });
 
-  test("the landing page nav and footer link to /help", async ({ page }) => {
+  test("no guide text reaches a signed-out browser: a redirect, not the page", async ({ request }) => {
+    for (const path of ["/help", "/help?q=reviews"]) {
+      const res = await request.get(path, { maxRedirects: 0 });
+      expect(res.status(), path).toBeGreaterThanOrEqual(300);
+      expect(res.status(), path).toBeLessThan(400);
+      expect(res.headers()["location"], path).toContain("/sign-in");
+      expect(await res.text(), path).not.toContain("Connecting source systems");
+    }
+  });
+
+  test("the assistant's API answers 401 with no guide text", async ({ request }) => {
+    const res = await request.post("/api/v1/help/ask", { data: { question: "how do I connect Saviynt?" } });
+    expect(res.status()).toBe(401);
+    const body = await res.text();
+    expect(body).toContain("UNAUTHENTICATED");
+    expect(body).not.toContain("/help#");
+  });
+
+  test("the landing page and the sign-in screen no longer link to the guide", async ({ page }) => {
     await page.goto("/");
-    await page.getByRole("link", { name: "Help", exact: true }).first().click();
-    await expect(page).toHaveURL(/\/help/);
-    await expect(page.getByRole("heading", { name: "Get Help", level: 1 })).toBeVisible();
-  });
-
-  test("the sign-in screen's \"Need help?\" link reaches the guide", async ({ page }) => {
+    await expect(page.locator('a[href^="/help"]')).toHaveCount(0);
     await page.goto("/sign-in");
-    await page.getByRole("link", { name: "Need help?" }).click();
-    await expect(page).toHaveURL(/\/help/);
+    await expect(page.locator('a[href^="/help"]')).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Need help? Email us" })).toHaveAttribute("href", /^mailto:/);
   });
 
-  test("renders the guide sections and the FAQ", async ({ page }) => {
-    await page.goto("/help");
-    await expect(page.getByRole("heading", { name: "Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Connecting source systems" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Why do I have no findings?" })).toBeVisible();
-  });
-
-  test("covers the newer areas: the Home overview, the agent lifecycle and troubleshooting", async ({ page }) => {
-    await page.goto("/help");
-    await expect(page.getByRole("heading", { name: "The Home overview" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Agent lifecycle and approval" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Something isn't working — what should I do?" })).toBeVisible();
-  });
-
-  test("does not promise social sign-in is switched on", async ({ page }) => {
-    await page.goto("/help");
-    const section = page.locator("#sso-security");
-    await expect(section).toContainText(/only once that provider has been enabled/i);
-  });
-
-  test("offers the WonderID team's email link without printing the address", async ({ page }) => {
-    await page.goto("/help");
-    const link = page.getByRole("link", { name: "email the WonderID team" });
-    await expect(link).toBeVisible();
-    await expect(link).toHaveAttribute("href", /^mailto:/);
-    await expect(page.locator("main")).not.toContainText("@");
-  });
-
-  test("a suggested question about access requests lands on that section", async ({ page }) => {
-    await page.goto("/help");
-    await page.getByRole("button", { name: "How do I request access?" }).click();
-    const answers = page.getByRole("list", { name: "Assistant answers" });
-    const link = answers.getByRole("link", { name: "Requesting and approving access" });
-    await expect(link).toBeVisible({ timeout: 15_000 });
-    await expect(link).toHaveAttribute("href", "/help#access-requests");
-  });
-
-  test("the assistant answers a question anonymously, retrieval-only", async ({ page }) => {
-    await page.goto("/help");
-    await page.getByLabel("Ask a question about WonderID").fill("how do I connect Saviynt?");
-    await page.getByRole("button", { name: "Ask", exact: true }).click();
-
-    const answers = page.getByRole("list", { name: "Assistant answers" });
-    const sectionLink = answers.getByRole("link", { name: "Connecting source systems" });
-    await expect(sectionLink).toBeVisible({ timeout: 15_000 });
-    await expect(sectionLink).toHaveAttribute("href", "/help#integrations");
-
-    // No tenant to resolve a provider for — a signed-out caller always gets
-    // the retrieval-only path (app/api/v1/help/ask/route.ts), never an AI
-    // provider call.
-    await expect(page.getByText("Answered straight from the guide text, not AI-generated.")).toBeVisible();
-  });
-
-  test("the header offers Log in / Get started, not app chrome", async ({ page }) => {
-    await page.goto("/help");
-    await expect(page.getByRole("link", { name: "Log in" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Get started" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Back to app" })).toHaveCount(0);
+  test("the pages that stay public still load with no session", async ({ page, request }) => {
+    for (const [path, heading] of [
+      ["/sign-in", "Sign in to WonderID"],
+      ["/sign-up", null],
+      ["/forgot-password", null],
+    ] as const) {
+      await page.goto(path);
+      await expect(page, path).toHaveURL(new RegExp(path));
+      if (heading) await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+    }
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/$/);
+    const securityTxt = await request.get("/.well-known/security.txt");
+    expect(securityTxt.status()).toBe(200);
   });
 });
 
@@ -117,6 +87,20 @@ test.describe("help centre (signed in)", () => {
     await page.getByRole("link", { name: "Get Help" }).click();
     await expect(page).toHaveURL(/\/help/);
     await expect(page.getByRole("heading", { name: "Get Help", level: 1 })).toBeVisible();
+  });
+
+  test("is not indexed or publicly cached", async ({ page }) => {
+    const res = await page.goto("/help");
+    expect(res?.headers()["cache-control"] ?? "").not.toMatch(/public|s-maxage/);
+    await expect(page.locator('meta[name="robots"]')).toHaveAttribute("content", /noindex/);
+  });
+
+  test("offers the WonderID team's email link without printing the address", async ({ page }) => {
+    await page.goto("/help");
+    const link = page.getByRole("link", { name: "email the WonderID team" });
+    await expect(link).toBeVisible();
+    await expect(link).toHaveAttribute("href", /^mailto:/);
+    await expect(page.locator("main")).not.toContainText("@");
   });
 
   test("the header offers Back to app, not the signed-out CTAs", async ({ page }) => {
@@ -172,7 +156,7 @@ test.describe("help centre (signed in)", () => {
 
   test("a question the guide doesn't cover says so instead of inventing an answer", async ({ page }) => {
     await page.goto("/help");
-    await page.getByLabel("Ask a question about WonderID").fill("kubernetes helm chart rollout");
+    await page.getByLabel("Ask a question about WonderID").fill("zebra giraffe hippopotamus");
     await page.getByRole("button", { name: "Ask", exact: true }).click();
     await expect(page.getByText(/couldn't find anything in the user guide/i)).toBeVisible({
       timeout: 15_000,

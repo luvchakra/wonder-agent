@@ -7,9 +7,12 @@
  * the assistant picks from these entries and links their anchors, rather
  * than inventing a link.
  *
- * Content rule: describe only what is actually built. Where a capability is
- * planned but not shipped, say so in `body` explicitly — a guide that
- * promises a missing screen is worse than no guide.
+ * Content rule: describe only what is actually built, in the UI's own words
+ * (menu paths as the sidebar shows them, exact button labels). Never describe
+ * a planned feature as available. A change that adds, removes or renames a
+ * user-facing feature updates the section here in the same pull request and
+ * sets its `updated` date (CLAUDE.md §19.7); `links.test.ts` fails when a
+ * section links to a page or section that no longer exists.
  */
 
 export type GuideCategory =
@@ -40,6 +43,8 @@ export type GuideSection = {
   keywords: string[];
   /** The in-app screen this section describes, when there is one. */
   href?: string;
+  /** When this section was last checked against the app (YYYY-MM-DD); shown as "Last updated". */
+  updated: string;
 };
 
 export const GUIDE_SECTIONS: GuideSection[] = [
@@ -48,6 +53,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "what-is-wonderid",
     title: "What WonderID is",
     category: "Getting started",
+    updated: "2026-10-16",
     summary:
       "WonderID is an identity governance and security platform for people, external users, machine identities and AI agents: who holds access, why, who approved it, and whether it is still appropriate.",
     body: [
@@ -61,16 +67,17 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "first-steps",
     title: "Your first 15 minutes",
     category: "Getting started",
+    updated: "2026-10-16",
     summary:
       "Create an organization, invite your team, bring in identities and access from your source systems, give agents an owner and a contract, then review the findings.",
     body: [
-      "1. Create your organization when you first sign up, or accept the invitation waiting for you on the organization screen. Everything in WonderID is scoped to one organization — data is never shared between organizations.",
-      "2. Invite your colleagues under Admin → Users & Permissions → Users and give them roles (or put them in groups that carry roles).",
-      "3. Add your sources under Integrations: identity sources for people (an HR export or a connected system), connectors for IAM data, and MCP runtime events.",
-      "4. Review what arrived: Admin → Identities for people and machine identities, Admin → Applications and Admin → Accounts for the catalog and accounts, and Onboarding → Agent Discovery for agents found in your systems.",
-      "5. Give each agent an owner and a contract — its approved applications, data and actions. That is what Approved (SHOULD) means for it.",
-      "6. Open Intelligence → Risk Overview. Findings appear wherever access or behaviour goes beyond what was approved.",
-      "Before people can request access, someone who manages access has to set a request policy — without one, nothing is requestable (see “Requesting and approving access”).",
+      "1. Create your organization when you first sign up, or accept the invitation waiting for you on the organization screen. Everything in WonderID is scoped to one organization; data is never shared between organizations.",
+      "2. Invite your colleagues under Administration › Users & Roles › Users and give them ID roles, or put them in groups that carry roles.",
+      "3. Connect your systems under Administration › Integrations: Authoritative Sources for people (an HR export or a connected system), Connections for applications and identity providers, and MCP servers for agent activity.",
+      "4. Review what arrived: Administration › Identities for people, external and non-human identities and accounts, Administration › Applications › Application Catalog for applications, and AI Agents › Agent Discovery for agents found in your systems.",
+      "5. Give each agent an owner and a contract: its approved applications, data and actions. That is what Approved (SHOULD) means for it.",
+      "6. Open Risk & Detection › Risk Dashboard. Findings appear wherever access or behaviour goes beyond what was approved, and Rogue Accounts lists access nothing in WonderID explains.",
+      "Before people can request access, someone who manages access has to set a request policy. Without one, nothing is requestable (see “Requesting and approving access”).",
     ],
     keywords: ["setup", "start", "onboarding", "quick start", "begin", "first", "walkthrough", "getting started"],
     href: "/",
@@ -79,12 +86,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "home-overview",
     title: "The Home overview",
     category: "Getting started",
+    updated: "2026-10-16",
     summary:
-      "Home summarizes your AI agents: how many there are, how many are approved, high-risk or unregistered, failed actions, the agent lifecycle, a risk trend and recent activity.",
+      "Home (the Security Overview) summarizes the whole organization: identities, lifecycle work, applications, orphaned and rogue accounts, waiting requests and open reviews, then your AI agents.",
     body: [
-      "The five cards at the top count total agents, approved agents, high-risk agents (those with an open critical or high finding), unregistered agents (discovered but not yet registered) and failed actions in the period. Each card opens the page behind it.",
-      "Below them: the agent lifecycle as a ring, findings detected per day by severity, the most recent agent activity and the agents with the highest risk scores.",
-      "Use the reporting period at the top to switch between the last 7, 30 and 90 days. Home is about AI agents; people, applications and access requests have their own pages in the sidebar.",
+      "The first row counts Identities, Lifecycle work open, Live applications, Orphaned accounts, Requests waiting, Rogue accounts and Review items open. Each opens the page behind it.",
+      "The agent cards count total agents, approved agents, high-risk agents (with an open critical or high finding), unregistered agents (discovered but not yet registered) and failed actions in the period. Below them: the agent lifecycle as a ring, findings per day by severity, recent agent activity and the agents with the highest risk scores.",
+      "Use the reporting period at the top to switch between the last 7, 30 and 90 days. Every number is counted from your organization's own records.",
     ],
     keywords: ["home", "dashboard", "overview", "summary", "kpi", "cards", "risk trend", "lifecycle ring", "top risky agents", "reporting period"],
     href: "/",
@@ -93,17 +101,18 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "navigating",
     title: "Finding your way around",
     category: "Getting started",
+    updated: "2026-10-16",
     summary:
-      "The sidebar lists WonderID's areas: Home, Intelligence, Onboarding, Control Center, SOD, Certifications, AI Agents and Admin. Each opens its own menu, and you only see what your role can use.",
+      "The sidebar lists WonderID's areas: Home, My Workspace, Access, AI Agents, Access Reviews, Risk & Detection, Self Service and Administration. Each opens its own menu, and you only see what your roles can use.",
     body: [
-      "The sidebar starts with the list of areas. Choose one to open its menu; the arrow at the top goes back to the list. A page always opens with its own area's menu, and the page you are on is marked.",
-      "Home is your day-to-day work: My Access (request access, your privacy, sign-in security) and Access Governance (access requests and packages). Intelligence holds risk, investigations, rogue agents, reports and the audit trail. Onboarding is where new applications and agents come in: new applications, application and agent discovery, duplicate review and pending identity matches. Control Center summarises the controls in force. SOD lists the separation-of-duties rules and the conflicts they caught. Certifications runs access reviews. AI Agents lists your agents, their non-human identities and runtime activity.",
-      "Admin is always last. It opens with Accounts, Entitlements, Roles, User Groups and Global Configuration, then groups for Identities, Applications, Policies, Organization, Users & Permissions, Authentication, Integrations and Compliance.",
-      "The search box at the top of the sidebar finds menu items only (type “sync” to find Sync Jobs, with where it lives). To search your data, use the box in the header, or Ctrl+K / ⌘K: it finds agents, owners, applications, entitlements, findings, investigations, policies, campaigns, integrations and runtime decisions that your role can read, in your organization. To find a person, use Admin → Identities.",
-      "The toggle at the top right of the sidebar collapses it to a narrow strip of icons: the toggle, a search icon that opens the sidebar straight into its search box, then one icon per area, whose menu opens beside it. WonderID remembers your choice. On a phone the sidebar is a drawer, with a tab bar at the bottom for Home, Agents, Discover, Risk and More. The sidebar's footer shows the WonderID version.",
-      "Under its title, every record's page says who created it and when, and who last changed it and when. Records from before this was recorded show the date alone.",
-      "The bell in the header shows your notifications. The “?” icon, and Get Help in the account menu, open this guide. Light, dark or system theme is under Appearance in the account menu, which also holds Settings, My privacy and Log Out.",
-      "If a page or button you expect is missing, your role probably doesn't include it — see “Why can't I see a page or button?”.",
+      "Choose an area to open its menu; the arrow at the top goes back to the list of areas. A page always opens with its own area's menu, and the page you are on is marked.",
+      "My Workspace is your own work: My Requests, Approvals, My Tasks, My Team, My Privacy and Sign-in Security. Access is for requesting and managing access: Request Access, All Requests, Provisioning Tasks, Access Packages, Entitlements and Request Policies. AI Agents holds the Agent Inventory, Agent Discovery, Duplicate Review, Agent Identities and Agent Activity. Access Reviews has Create Campaigns and Review Campaigns. Risk & Detection has the Risk Dashboard, Rogue Accounts, Rogue Agents, SoD Violations and Investigations. Self Service is where you Onboard Application or Register Agent.",
+      "Administration is always last and opens its own menu: Identities, Applications, Policies & Controls, Reports & Audit, Users & Roles, Integrations, Organization Settings, and Privacy & Audit.",
+      "The search box at the top of the sidebar finds menu items only (type “sync” to find Sync Jobs, with where it lives). To search your data, use the box in the header, or Ctrl+K / ⌘K: it finds agents, owners, applications, entitlements, findings, investigations, policies, campaigns, integrations and runtime decisions that your roles can read, in your organization. To find a person, use Administration › Identities.",
+      "The toggle at the top right of the sidebar collapses it to a strip of icons: the toggle, a search icon that opens the sidebar into its search box, then one icon per area. WonderID remembers your choice. On a phone the sidebar is a drawer, opened by the round More button at the bottom right. The sidebar's footer shows the WonderID version, and its foot holds the organization switcher.",
+      "Under its title, every record's page says who created it and when, and who last changed it and when. Records from before this was recorded show the date alone. Many lists have an Actions menu with Export CSV, and Import CSV… where records can be imported, with a preview before anything is added.",
+      "The bell in the header shows your notifications. The account menu holds Settings, My privacy, WonderID AI (the assistant on this page), Get Help (this guide), Install the app, Appearance (light, dark or system theme) and Log Out.",
+      "If a page or button you expect is missing, your roles probably don't include it. See “Why can't I see a page or button?”.",
     ],
     keywords: ["navigation", "sidebar", "menu", "where is", "find", "area", "areas", "collapse", "hamburger", "admin", "intelligence", "onboarding", "control center", "sod", "menu search", "version", "theme", "dark mode", "light mode", "mobile", "search", "keyboard shortcut", "ctrl k", "bell", "account menu", "appearance", "created by", "updated by", "who changed"],
   },
@@ -111,6 +120,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "install-app",
     title: "Installing WonderID on a phone or tablet",
     category: "Getting started",
+    updated: "2026-10-16",
     summary:
       "On a phone or tablet you can add WonderID to your home screen, so approvals and findings are one tap away and it opens full screen.",
     body: [
@@ -125,6 +135,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "should-can-did",
     title: "Approved (SHOULD) vs Effective Access (CAN) vs Observed (DID)",
     category: "Core model",
+    updated: "2026-10-16",
     summary:
       "Approved (SHOULD) is what an identity is approved to do, Effective Access (CAN) is what its access technically permits, and Observed (DID) is what it actually did — findings come from the gaps between them.",
     body: [
@@ -142,13 +153,14 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "identities",
     title: "The identity directory",
     category: "Identities",
+    updated: "2026-10-16",
     summary:
       "Identities lists every governed identity — people, external identities, machine identities and AI agents — with its type, status, owner and source.",
     body: [
-      "Admin → Identities → Overview counts identities by type and lists what needs attention: open lifecycle work, machine identities without an owner, external access ending within 30 days, and external identities still active past their end date. All Identities, People, External Identities and Machine Identities each list one slice.",
-      "New identity adds a person, an external person or a machine identity (service account, application account, workload or API client). An external identity needs a sponsor, an organization and a future end date; a machine identity needs an accountable owner. To add an AI agent, register it under AI Agents — its identity appears here by itself.",
-      "Open an identity to see its details, source, owner or sponsor and manager, its relationships to other identities, and its attributes; people also have a Lifecycle tab. Where an identity comes from an identity source, a value owned by that source is not silently overwritten here. Changes are recorded in the audit trail.",
-      "AI Agents → Non-human Identities is a separate inventory of the technical identities your connected sources report — service accounts, workload identities, OAuth clients, API keys and MCP server identities. Most are not AI agents, so each unlinked one shows how likely it is to be one; the views are Linked, Not linked, Likely AI agents, Orphaned and Ignored. Admin → Identities → Identity Attributes defines the extra attributes your organization tracks.",
+      "Administration › Identities › Identity Overview counts identities by type and lists what needs attention: open lifecycle work, non-human identities without an owner, external access ending within 30 days, and external identities still active past their end date. All Identities, Workforce, External Identities and Non-Human Identities each list one slice.",
+      "New identity adds a person, an external person or a non-human identity (service account, application account, workload or API client). An external identity needs a sponsor, an organization and a future end date; a non-human identity needs an accountable owner. Orphaned Identities lists the non-human identities nobody owns; access can't be requested for them until they have an owner. To add an AI agent, register it under Self Service › Register Agent; its identity appears here by itself.",
+      "Open an identity to see its details, source, owner or sponsor and manager, its relationships to other identities, and its attributes; people also have a Lifecycle tab. A value owned by an identity source is not silently overwritten here. Changes are recorded in the audit trail.",
+      "AI Agents › Agent Identities is a separate inventory of the technical identities your connected sources report: service accounts, workload identities, OAuth clients, API keys and MCP server identities. Most are not AI agents, so each unlinked one shows how likely it is to be one. Administration › Organization Settings › Identity Attributes defines the extra attributes your organization tracks.",
     ],
     keywords: ["identity", "identities", "people", "person", "employee", "contractor", "external", "sponsor", "end date", "machine", "service account", "directory", "nhi", "non-human", "new identity", "orphaned", "relationships"],
     href: "/identities",
@@ -157,12 +169,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "identity-lifecycle",
     title: "Joiners, movers and leavers",
     category: "Identities",
+    updated: "2026-10-16",
     summary:
-      "Lifecycle Work turns joiner, mover and leaver events into tasks for a person to complete, including transferring what a leaver owned.",
+      "Joiner-Mover-Leaver turns joiner, mover and leaver events into tasks for a person to complete, including transferring what a leaver owned.",
     body: [
-      "A person's lifecycle state is Joining, Active, Leaving, Disabled, Terminated or Archived. On their page, the Lifecycle tab offers the steps allowed from the current state — for example Start work, Start leaving, Cancel the departure, Disable, Terminate, Archive or Rehire. Leaving, Disable, Terminate and cancelling a hire ask for a reason. Changes that arrive from an identity source (a new hire, a department change, a person missing from a full import) create the same events.",
-      "Each event opens tasks: a joiner gets Request baseline access; a mover or a changed employment type gets Review access; a rehire gets both; a leaver gets Transfer ownership, Revoke access and, when they have a sign-in, Disable sign-in. Admin → Identities → Lifecycle Work lists the open tasks (switch the view to include completed ones).",
-      "A task is a person's job, closed with a note — completing it is how you record that the access was removed or granted. Nothing is granted or revoked automatically.",
+      "A person's lifecycle state is Joining, Active, Leaving, Disabled, Terminated or Archived. On their page, the Lifecycle tab offers the steps allowed from the current state, for example Start work, Start leaving, Cancel the departure, Disable, Terminate, Archive or Rehire. Leaving, Disable, Terminate and cancelling a hire ask for a reason. Changes that arrive from an identity source (a new hire, a department change, a person missing from a full import) create the same events.",
+      "Each event opens tasks: a joiner gets Request baseline access; a mover or a changed employment type gets Review access; a rehire gets both; a leaver gets Transfer ownership and, when they have a sign-in, Disable sign-in. Administration › Identities › Joiner-Mover-Leaver lists the open tasks (switch the view to include completed ones).",
+      "When someone actually stops working (disabled, terminated or archived), each access they hold becomes its own removal task under Provisioning Tasks, due within a day, or is removed by a connection that can make the change. Approved access that was never set up is withdrawn. Removal counts as done only when a later sync no longer finds the access.",
       "Transfer ownership shows what the leaver owns, sponsors and manages (including AI agents) and hands it to a named successor; the change is audited.",
     ],
     keywords: ["joiner", "mover", "leaver", "lifecycle", "onboard", "offboard", "termination", "terminate", "rehire", "disable", "archive", "transfer ownership", "tasks", "lifecycle work", "baseline access"],
@@ -172,28 +185,44 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "identity-sources",
     title: "Authoritative identity sources",
     category: "Identities",
+    updated: "2026-10-16",
     summary:
       "Identity sources import people from an HR export or a connected system, with precedence rules when two sources disagree and a review queue for records that match more than one identity.",
     body: [
-      "Admin → Integrations → Identity Sources → New source asks for a name, a source type (CSV file, SCIM, REST API, HR system API or an existing integration), which identities it provides, and how its columns map to WonderID attributes — each type suggests a mapping you can edit. Nothing is imported until you run it. Open the source to upload a CSV file, or, for an existing-integration source, to reconcile from the records that integration has already imported.",
-      "Choose Full when the file or integration holds everyone — identities missing from it are treated as leavers — or Partial to touch only the records given. Tick “Preview only” first to see what would change without changing anything. Each run reports what it created, updated, left pending, flagged as leavers and rejected as invalid, and its page lists every change and problem.",
+      "Administration › Integrations › Authoritative Sources › New source asks for a name, a source type (CSV file, SCIM, REST API, HR system API or an existing connection), which identities it provides, and how its columns map to WonderID attributes. Each type suggests a mapping you can edit. Nothing is imported until you run it. A source read from a connection can run by hand, daily or hourly.",
+      "Choose Full when the file or connection holds everyone (identities missing from it are treated as leavers) or Partial to touch only the records given. Tick “Preview only” first to see what would change without changing anything. A full run that would mark more people as leavers than the source's limit allows waits for a person instead. Each run reports what it created, updated, left pending, flagged as leavers and rejected, and its page lists every change and problem.",
       "When two sources supply the same attribute, the one with the higher precedence wins, and the losing value is kept as provenance rather than discarded.",
-      "A source record that matches more than one existing identity goes to Onboarding → Pending Matches. WonderID never picks one for you: link the record to the right identity, create a new one, or dismiss it.",
+      "A source record that matches more than one existing identity goes to Administration › Identities › Identity Matching. WonderID never picks one for you: link the record to the right identity, create a new one, or dismiss it.",
     ],
     keywords: ["hr", "directory", "source of truth", "authoritative", "import people", "csv", "upload", "full import", "partial import", "preview", "dry run", "precedence", "pending matches", "reconciliation", "correlation", "ambiguous"],
     href: "/integrations/sources",
+  },
+  {
+    id: "identity-rules",
+    title: "Identity rules",
+    category: "Identities",
+    updated: "2026-10-16",
+    summary:
+      "Identity rules set a person's attributes from their other attributes, or open a task about them, when they are created, imported, change or reach a lifecycle moment.",
+    body: [
+      "Administration › Organization Settings › Identity Rules lists them. A rule says when it runs (when an identity is created, imported or an attribute changes, or when a person becomes active, moves, gets a new manager, leaves or reaches their end date), which identities it applies to, and what it does: set one attribute, or open a task for the person's manager or the identity administrators.",
+      "A new rule starts in report-only mode, so its run log shows what it would have done without changing anything. Someone other than its author publishes it, and it changes identities only once it is switched to enforce. A rule never overrides a value a connected source set.",
+    ],
+    keywords: ["identity rules", "attribute rules", "derive", "calculated attribute", "birthright", "automation", "report only", "enforce", "publish"],
+    href: "/identities/rules",
   },
   // --------------------------------------------------------------------- Agents
   {
     id: "register-agents",
     title: "Registering and owning agents",
     category: "Agents",
+    updated: "2026-10-16",
     summary:
       "Register an agent to bring it under governance, then assign accountable owners — unowned agents are themselves a finding.",
     body: [
-      "Onboarding → Register Agent adds one manually: its name and type, purpose, environment and criticality, and optional details such as framework, model, runtime and data classification. If it looks like an agent you already have, it goes to Duplicate Review instead of being created twice. Most agents instead arrive through an integration and are registered from the Discovery Inbox.",
-      "Open an agent from AI Agents → All Agents. Its page has four tabs — Overview, Access (CAN), Runtime (DID) and Risk & Findings. Overview holds the agent's information and key metrics, Approved (SHOULD) against Effective Access (CAN), a governance posture score, its lifecycle, owners, contract, relationships, linked identities and API keys.",
-      "Every agent needs accountable owners. Owner types are business, technical, IAM, application, data, escalation and delegated; assign one by choosing the type and entering the person's user ID. A delegated owner can have an end date. Review ownership confirms the owners are still right. The Lifecycle card flags gaps — a missing owner, an owner who is no longer an active member, one person holding conflicting owner roles, or an expired delegation.",
+      "Self Service › Register Agent adds one by hand: its name and type, purpose, environment and criticality, and optional details such as framework, model, runtime and data classification. If it looks like an agent you already have, it goes to Duplicate Review instead of being created twice. Most agents instead arrive through a connection and are registered from Agent Discovery.",
+      "Open an agent from AI Agents › Agent Inventory. Its page has four tabs: Overview, Access (CAN), Runtime (DID) and Risk & Findings. Overview holds the agent's information and key metrics, Approved (SHOULD) against Effective Access (CAN), a governance posture score, its lifecycle, owners, contract, relationships, linked identities and API keys.",
+      "Every agent needs accountable owners. Owner types are business, technical, IAM, application, data, escalation and delegated; assign one by choosing the type and the person. A delegated owner needs an end date. Confirm ownership records that the owners are still right. The Lifecycle card flags gaps: a missing owner, an owner who is no longer an active member, one person holding conflicting owner roles, or an expired delegation.",
       "Governance posture scores twelve dimensions, such as ownership, purpose, access, certification, runtime monitoring and human oversight, and lists which are governed and which have a gap.",
     ],
     keywords: ["register", "create agent", "owner", "ownership", "owner types", "business owner", "technical owner", "retire", "new agent", "delegated owner", "governance posture", "duplicate"],
@@ -203,6 +232,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "agent-lifecycle",
     title: "Agent lifecycle and approval",
     category: "Agents",
+    updated: "2026-10-16",
     summary:
       "An agent moves from Discovered to Active through recorded steps — registration, optional assessment, approval and provisioning — and can later be restricted, suspended or retired.",
     body: [
@@ -217,6 +247,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "agent-contract",
     title: "Agent contracts (defining Approved (SHOULD))",
     category: "Agents",
+    updated: "2026-10-16",
     summary:
       "An agent contract records the approved purpose, applications, data and actions for one agent — it is the baseline every risk check compares against.",
     body: [
@@ -232,12 +263,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "discovery",
     title: "Agent discovery and Shadow AI",
     category: "Agents",
+    updated: "2026-10-16",
     summary:
       "The Discovery Inbox lists agent-like identities found in your systems so you can register, link or ignore each one; activity from unregistered agents is marked Shadow AI.",
     body: [
-      "Discovery looks through your connected integrations for identities that behave like AI agents and lists them in Onboarding → Agent Discovery with the evidence and a confidence signal. Use Discover Now on a connected integration to run it straight away. The tabs narrow the list to New, Shadow AI, Needs Review, Potential Duplicates, Recently Changed or Ignored candidates.",
-      "Open a candidate to see why it was identified as an agent — the reasons are rule-based and evidence-backed, never a model's guess. Register it as a governed agent, link it to one you already have, or ignore it. Ignoring is recorded, so the same candidate doesn't reappear as noise.",
-      "Onboarding → Duplicate Review lists registrations that matched an agent you already have, with the match score and what matched. Merge discards the pending registration; Confirm distinct completes it as a separate agent. Runtime activity from an agent nobody registered is shown as Shadow AI — on Onboarding → Agent Discovery and as a banner on Risk Overview — with how many events were seen; none of it is governed until the agent is registered.",
+      "Discovery looks through your connections for identities that behave like AI agents and lists them in AI Agents › Agent Discovery with the evidence and a confidence signal. Use Discover Now on a connection to run it straight away. The tabs narrow the list to New, Shadow AI, Needs Review, Potential Duplicates, Recently Changed or Ignored candidates.",
+      "Open a candidate to see why it was identified as an agent. The reasons are rule-based and backed by evidence, never a model's guess. Register it as a governed agent, link it to one you already have, or ignore it. Ignoring is recorded, so the same candidate doesn't come back as noise.",
+      "AI Agents › Duplicate Review lists registrations that matched an agent you already have, with the match score and what matched. Merge discards the pending registration; Confirm distinct completes it as a separate agent. Runtime activity from an agent nobody registered is shown as Shadow AI, on Agent Discovery and as a banner on the Risk Dashboard, with how many events were seen; none of it is governed until the agent is registered.",
     ],
     keywords: ["discovery", "inbox", "candidates", "unregistered", "shadow", "shadow ai", "duplicates", "duplicate review", "merge", "discover now", "ignore", "link"],
     href: "/agents/discovery",
@@ -246,6 +278,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "agent-api-keys",
     title: "Agent API keys",
     category: "Agents",
+    updated: "2026-10-16",
     summary:
       "An agent authenticates to the Runtime Gateway with its own API key; the secret is shown once, can expire, and can be revoked at any time.",
     body: [
@@ -260,14 +293,15 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "applications",
     title: "Applications and onboarding",
     category: "Applications",
+    updated: "2026-10-16",
     summary:
-      "Admin → Applications → Application Inventory is the catalog of every application you govern; new ones are onboarded step by step before they go live.",
+      "Administration › Applications › Application Catalog lists every application you govern; new ones are onboarded step by step before they go live.",
     body: [
-      "Each application has an owner, a type, a risk level and an onboarding status. The inventory counts applications that are active, still onboarding, missing an owner or high risk, and filters by status, type and risk. Register an application there, open it, and choose Onboarding.",
-      "Onboarding has five steps: Configure (the connector its accounts and entitlements are read from, how an account is matched to an identity, its request and certification policy, and which operations the connector fulfils), Validate (checks the configuration against the onboarding checklist), Simulate (plays the configuration against the accounts the connector already imported — nothing is created, changed or removed — and counts matched, orphan, ambiguous and unidentifiable accounts), Approve and Promote.",
-      "A passing simulation submits the exact version that was simulated for approval. Someone other than the person who submitted it approves; only an approved, unchanged version can be promoted, and promoting makes the application active. Change the configuration later and a new version has to be validated and approved again. A failed validation or simulation stops onboarding visibly, with the reason.",
-      "Onboarding suggestions: on the onboarding page you can ask for a proposed configuration from an OpenAPI document or a sample account. It is a proposal to review — applying it only fills the draft, and AI may help draft it, but it is never applied on its own. Suspending or retiring an application needs a reason and is audited.",
-      "Onboarding → Application Discovery lists applications found by connectors, API documents or people. Each is matched to the catalog; an unrecognized one waits for someone to register it, link it to an existing application, record an exception, or ignore it with a reason. Use “Discover from a connector” or “Add a discovery” to bring more in.",
+      "Each application has an owner, a type, a risk level and an onboarding status. The catalog counts applications that are active, still onboarding, missing an owner or high risk, and filters by status, type and risk. Onboarding Reviews lists those still onboarding. Start a new one from Self Service › Onboard Application, then open it and choose Onboarding.",
+      "Onboarding has five steps: Configure (the connection its accounts and entitlements are read from, how an account is matched to an identity, its request and certification policy, and which operations the connection fulfils), Validate (checks the configuration against the onboarding checklist), Simulate (plays the configuration against the accounts already imported; nothing is created, changed or removed), Approve and Promote.",
+      "A passing simulation submits the exact version that was simulated. Someone other than the person who submitted it approves; only an approved, unchanged version can be promoted, and promoting makes the application active. Change the configuration later and the new version is validated and approved again. A failed validation or simulation stops onboarding with the reason.",
+      "Onboarding Templates keeps starting defaults per connection type: owners, entitlement types and a questionnaire, so applications of that kind are onboarded the same way. On the onboarding page you can also ask for a proposed configuration from an OpenAPI document or a sample account. It is a proposal, AI may help draft it, and applying it only fills the draft; it is never applied on its own.",
+      "Administration › Applications › Discovered Applications lists applications found by connections, API documents or people. An unrecognized one waits for someone to register it, link it to an existing application, record an exception, or ignore it with a reason. Suspending or retiring an application needs a reason and is audited.",
     ],
     keywords: ["application", "app", "catalog", "inventory", "onboarding", "onboard application", "configure", "validate", "simulate", "approve", "promote", "unrecognized", "application discovery", "openapi", "proposal", "register application", "retire"],
     href: "/access",
@@ -276,12 +310,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "accounts",
     title: "Accounts and data sources",
     category: "Applications",
+    updated: "2026-10-16",
     summary:
       "The account inventory correlates every application account to an identity and flags orphaned and dormant accounts; data sources record where sensitive data lives.",
     body: [
-      "Admin → Accounts lists every account in a governed application and who it belongs to. Accounts arrive when an onboarded application's connector is reconciled. An orphan account has no owner; a dormant account hasn't been used within the window you choose (“Dormant after”, which starts from your organization's setting in Global Configuration); privileged accounts are counted too. Filter by view or search by account name.",
-      "Admin → Entitlements lists every entitlement in every application, 50 to a page, with its application, privilege level and data classification. Search by name. An entitlement is changed on its application's page.",
-      "Admin → Applications → Data Sources records where your data lives (databases, warehouses and other stores) and how it is classified, and lets you link an entitlement to the data source it opens — every agent holding that entitlement can then reach that data, and its classification applies. That is part of what an agent CAN reach. A data source is retired, never deleted, and changes are audited.",
+      "Administration › Identities › Accounts lists every account in a governed application and who it belongs to. Accounts arrive when an application's connection is synced. An orphan account has no owner; a dormant account hasn't been used within the window you choose (“Dormant after”, which starts from your organization's Governance Settings); privileged accounts are counted too.",
+      "Access › Entitlements lists every entitlement in every application, 50 to a page, with its application, privilege level and data classification. An entitlement is changed on its application's page. Administration › Organization Settings › Classification Rules classifies entitlements as they arrive (privilege, data classification, whether they can be requested); a rule is published by a second person and never changes a value a person set.",
+      "Administration › Applications › Data Sources records where your data lives (databases, warehouses and other stores) and how it is classified, and links an entitlement to the data source it opens. Every agent holding that entitlement can then reach that data, and its classification applies; that is part of what an agent CAN reach. A data source is retired, never deleted, and changes are audited.",
     ],
     keywords: ["entitlement", "entitlements", "all entitlements", "account", "accounts", "orphan", "orphaned", "dormant", "unused", "privileged", "data source", "database", "sensitivity", "classification", "correlate", "reconciliation"],
     href: "/access/accounts",
@@ -291,6 +326,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "effective-access",
     title: "Effective Access (CAN)",
     category: "Access",
+    updated: "2026-10-16",
     summary:
       "An agent's Access (CAN) tab computes what it can technically do today — the access graph, every grant, and the path that explains each one.",
     body: [
@@ -305,26 +341,58 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "access-requests",
     title: "Requesting and approving access",
     category: "Access",
+    updated: "2026-10-16",
     summary:
       "People request access from a catalog; each request follows its request policy through staged approvals, and nobody can decide their own request.",
     body: [
-      "Home → My Access → Request Access lists what can be requested. Pick an application or entitlement, say who it is for (yourself, or someone else if the policy allows it), give a justification when the policy asks for one, choose a duration within its limit and submit. What the request will meet — automatic approval, or approval by your manager and/or the owner — is shown before you submit.",
-      "Admin → Policies → Request Policies set the terms for the organization, an application or one entitlement (the most specific wins; with no policy, nothing is requestable). A policy chooses the approval route — manager, owner, or manager and owner, in order or at the same time — how many days each approver has, and what happens after that: escalate to the access managers once and then expire, or expire. It also sets who may request for others, the longest and default duration, whether a justification is required, and a risk threshold: a policy can approve requests below the threshold automatically, and anything at or above it needs a person. A critical-risk request adds an access-manager review.",
-      "Approvers decide in Home → Access Governance → Access Requests, which has the views Waiting for you, My requests and All requests. A request's page shows its approval chain, step by step. Nobody can approve their own request, and a change to what was requested invalidates earlier approvals so they have to be given again. You can cancel your own request while it is waiting. Statuses are Waiting for approval, Approved, Rejected, Fulfilled, Cancelled and Expired.",
+      "Access › Request Access lists what can be requested. Pick an application, entitlement or package, say who it is for (yourself, or someone else if the policy allows it), give a justification when the policy asks for one, choose a duration within its limit and submit. What the request will meet, automatic approval or approval by your manager and/or the owner, is shown before you submit. Several at once asks for several items for one or more people in one go, or the same access a colleague has; each line becomes its own request, and you can save it as a draft.",
+      "Access › Request Policies set the terms for the organization, an application or one entitlement (the most specific wins; with no policy, nothing is requestable). A policy chooses the approval route (manager, owner, or both, in order or at the same time), how many days each approver has and what happens after that, who may request for others, the longest and default duration, and whether a justification is required. A policy can approve requests below a risk threshold automatically; high-risk access always needs a person, and a critical-risk request adds an access-manager review. A change to a request policy takes effect only once someone other than the proposer approves it.",
+      "Approvers decide under My Workspace › Approvals; your own requests are under My Requests, and Access › All Requests lists everyone's for those who manage access. A request's page shows its approval chain step by step. Nobody can approve their own request, and a change to what was requested means earlier approvals have to be given again. You can cancel your own request while it waits. Statuses are Waiting for approval, Approved, Rejected, Fulfilled, Cancelled and Expired.",
+      "Approved access is then set up by the application's connection, or by a person as a provisioning task (see “Provisioning tasks”). It counts as done only once a sync finds it on the target.",
     ],
     keywords: ["request", "request access", "approve", "approval", "approver", "reject", "four eyes", "no self approval", "request policy", "escalation", "expire", "waiting for you", "justification", "duration", "auto approve", "access manager"],
     href: "/access/catalog",
   },
   {
+    id: "fulfilment",
+    title: "Provisioning tasks",
+    category: "Access",
+    updated: "2026-10-16",
+    summary:
+      "Approved access that no connection sets up becomes a task for a person or a group: claim it, make the change, mark it Done or Failed. It closes when the next sync finds the access.",
+    body: [
+      "My Workspace › My Tasks lists the tasks assigned to you or your groups; Access › Provisioning Tasks lists every task, with a workload view of who has what. An application (or one of its entitlement types) names the person or group its tasks go to.",
+      "Claim a task, make the change in the target system, then choose Done (with an optional note) or Failed (saying what failed). A task can be reassigned with a reason. Tasks are due a set time after approval, from Governance Settings; removals are due within a day, and overdue tasks remind their owner daily.",
+      "Done is your record of the change, not proof of it: the task closes when the next sync finds the access on the target (or no longer finds removed access).",
+    ],
+    keywords: ["fulfilment", "fulfillment", "provisioning", "tasks", "my tasks", "claim", "done", "failed", "reassign", "workload", "manual provisioning"],
+    href: "/access/fulfilment",
+  },
+  {
+    id: "delegations",
+    title: "Delegations and My Team",
+    category: "Access",
+    updated: "2026-10-16",
+    summary:
+      "Hand your approvals or your requests to a colleague while you are away, and see your direct reports under My Team.",
+    body: [
+      "On My Workspace › Approvals, Delegate your approvals hands your approvals, or your requests, to someone until a date. They act on your behalf, every decision records both of you, and either of you (or an access manager) can end it. Nobody decides a request they made or that is for them.",
+      "My Workspace › My Team lists the people who report to you. Under Disable all access, with a reason, a manager can stop a direct report's access in an emergency: the person is disabled and every access they hold becomes removal work. It is audited.",
+    ],
+    keywords: ["delegate", "delegation", "out of office", "away", "on behalf", "my team", "direct reports", "manager", "disable all access"],
+    href: "/access/delegations",
+  },
+  {
     id: "access-packages",
     title: "Access packages",
     category: "Access",
+    updated: "2026-10-16",
     summary:
       "An access package bundles the entitlements a job needs so they can be requested, approved and assigned together, and removed together when they expire.",
     body: [
-      "Home → Access Governance → Access Packages lists the packages you are eligible to see, with their risk and who approves them. People who manage access also see a Manage view with drafts and retired packages, and can create one: what it includes, who it is for, who approves it, for how long, and how often it is certified.",
-      "Open a package to see what it includes and to request it — for yourself or someone else. A package request goes through the same approval engine as any other request, and changing what a package includes means waiting requests need approval again. Once approved, each item is granted as its own work item — one that fails is shown as failed and the assignment as partly failed, rather than hidden.",
-      "Access managers can also assign a package directly, without a request — for example to an AI agent. That is audited. Assignments can expire; expiry opens removal work for every item in the package, and ending an assignment early does the same.",
+      "Access › Access Packages lists the packages you are eligible to see, with their risk and who approves them. People who manage access also see a Manage view with drafts and retired packages, and can create one: what it includes, who it is for, who approves it, for how long, and how often it is certified.",
+      "Open a package to see what it includes and to request it, for yourself or someone else. A package request goes through the same approvals as any other request, and changing what a package includes means waiting requests need approval again. Once approved, each item is set up as its own piece of work; one that fails is shown as failed and the assignment as partly failed, rather than hidden.",
+      "Access managers can also assign a package directly, without a request, for example to an AI agent. That is audited. Assignments can expire; expiry opens removal work for every item in the package, and ending an assignment early does the same.",
     ],
     keywords: ["package", "access package", "bundle", "assignment", "expiry", "provisioning", "assign directly", "partially failed", "retire package"],
     href: "/access/packages",
@@ -333,36 +401,39 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "policies",
     title: "Governance policies",
     category: "Access",
+    updated: "2026-10-16",
     summary:
       "Governance policies express organization-wide rules that agents are evaluated against, independently of any single agent's contract.",
     body: [
-      "Where a contract is per agent, a policy applies across them — for example forbidding write access to a production financial system, or requiring human approval for a class of action. Admin → Policies → Policies creates one with a category (identity, access, runtime, agent or lifecycle), an action (flag, restrict or block), a priority, and optionally what it applies to: a tool, an MCP server, an MCP tool, a data source or resource, or an action.",
+      "Where a contract is per agent, a policy applies across them, for example forbidding write access to a production financial system or requiring human approval for a class of action. Administration › Policies & Controls › Governance Policies creates one with a category (identity, access, runtime, agent or lifecycle), an action (flag, restrict or block), a priority, and optionally what it applies to: a tool, an MCP server, an MCP tool, a data source or resource, or an action.",
       "Policies are versioned: a new policy can be saved as a draft, which has no effect until someone with the publish permission publishes it, and each publish keeps the earlier version. Rules are added on the policy's page. Exceptions are recorded with a reason, who granted them, an optional expiry, a business justification, a compensating control and the residual risk, and can be revoked.",
-      "Separation of duties is a rule in an identity-category policy that lists actions one person must not both perform for the same AI agent — for example requesting and approving its access, or creating a grant. A policy whose action is Block refuses the second action and says why; otherwise it is advisory and lets it through and records the conflict in the audit trail.",
-      "Policy evaluation is deterministic. Violations surface as findings on Intelligence → Risk Overview, and the Runtime Gateway applies the active policies when an agent asks to act. (Rules about who may use WonderID itself are Authorization policies, under Admin → Policies.)",
+      "Separation of duties is a rule in an identity-category policy that lists actions one person must not both perform for the same AI agent, for example requesting and approving its access. A policy whose action is Block refuses the second action and says why; otherwise the action goes through and the conflict is recorded.",
+      "Policy evaluation is deterministic. Violations surface as findings on the Risk Dashboard, and the Runtime Gateway applies the active policies when an agent asks to act. (Rules about who may use WonderID itself are Authorization Policies, under Users & Roles.)",
     ],
     keywords: ["policy", "policies", "rule", "violation", "guardrail", "evaluation", "publish", "draft", "exception", "flag", "restrict", "block", "priority", "separation of duties"],
     href: "/policies",
   },
   {
     id: "separation-of-duties",
-    title: "Separation of duties (SOD)",
+    title: "Separation of duties",
     category: "Access",
-    summary: "SOD → SoD Rules lists the separation-of-duties rules in force, and SoD Conflicts lists every time one caught someone.",
+    updated: "2026-10-16",
+    summary: "Administration › Policies & Controls › Separation of Duties Rules lists the rules in force; Risk & Detection › SoD Violations lists every time one caught someone.",
     body: [
-      "SoD Rules shows each rule: the actions one person must not both perform for the same agent, the policy it belongs to, whether a conflict is refused or allowed and recorded, and whether the policy is in effect. A rule is added or changed on its identity policy (Admin → Policies → Policies); only a policy in effect enforces it.",
-      "SoD Conflicts lists every conflict a rule caught, newest first: when, who, the action they tried and the one they had already done, the agent, and whether it was refused or allowed and recorded. It comes from the audit trail, so it needs permission to read the audit trail. Older conflicts are a page at a time.",
+      "Separation of Duties Rules shows each rule: the actions one person must not both perform for the same agent, the policy it belongs to, whether a conflict is refused or allowed and recorded, and whether the policy is in effect. A rule is added or changed on its identity policy (Governance Policies); only a policy in effect enforces it.",
+      "SoD Violations lists every conflict a rule caught, newest first: when, who, the action they tried and the one they had already done, the agent, and whether it was refused or allowed and recorded. It comes from the audit trail, so it needs permission to read the audit trail.",
     ],
     keywords: ["sod", "separation of duties", "segregation of duties", "conflict", "conflicts", "toxic combination", "maker checker", "four eyes", "refused", "advisory"],
     href: "/sod",
   },
   {
     id: "control-center",
-    title: "Control Center",
+    title: "Controls Dashboard",
     category: "Access",
-    summary: "Control Center → Overview shows the controls governing access in your organization, and what they caught.",
+    updated: "2026-10-16",
+    summary: "Administration › Policies & Controls › Controls Dashboard shows the controls governing access in your organization, and what they caught.",
     body: [
-      "The overview counts the policies in effect, the SoD rules in effect, the SoD conflicts in the period your organization sets (30 days unless changed in Global Configuration), the request policies and the active authorization policies. Each card opens its list. A card you can't open isn't shown.",
+      "It counts the policies in effect, the SoD rules in effect, the SoD conflicts in the period your organization sets (30 days unless changed in Governance Settings), the request policies and the active authorization policies. Each card opens its list; a card you can't open isn't shown.",
       "Below, the policies in effect are counted by what they govern, and the policies not in effect (drafts and disabled ones, which enforce nothing) are listed so they can be published or retired. Every number is counted from your organization's own records.",
     ],
     keywords: ["control center", "controls", "overview", "posture", "policies in effect", "draft policies", "governance summary"],
@@ -373,12 +444,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "runtime",
     title: "Runtime activity — Observed (DID)",
     category: "Runtime",
+    updated: "2026-10-16",
     summary:
       "Runtime shows what each agent actually did — the tools, resources and actions observed — and compares it against SHOULD and CAN.",
     body: [
-      "Runtime events arrive from MCP observation, the Runtime Gateway and other configured sources, and build a timeline per agent of tools invoked, resources touched and actions taken. The Runtime page shows the gateway's recent authorization decisions, the emergency controls and the most recent activity; an agent's Runtime (DID) tab shows its own.",
-      "In activity lists, a gateway decision is labelled as a decision — Allow, Allow restricted, Needs approval or Deny, with “(observed)” when it was only recorded — not as an action that succeeded or failed.",
-      "The comparison on an agent's Runtime (DID) tab puts Approved (SHOULD), Effective Access (CAN), Observed (DID) and Current Request (NOW) side by side — usually the fastest way to explain a finding. Reports & export on the Runtime page leads to the reports.",
+      "Runtime events arrive from MCP observation, the Runtime Gateway and other configured sources, and build a timeline per agent of tools invoked, resources touched and actions taken. AI Agents › Agent Activity shows the gateway's recent authorization decisions, the emergency controls and the most recent activity; an agent's Runtime (DID) tab shows its own.",
+      "In activity lists, a gateway decision is labelled as a decision (Allow, Allow restricted, Needs approval or Deny, with “(observed)” when it was only recorded), not as an action that succeeded or failed.",
+      "The comparison on an agent's Runtime (DID) tab puts Approved (SHOULD), Effective Access (CAN), Observed (DID) and Current Request (NOW) side by side, usually the fastest way to explain a finding.",
       "Events are de-duplicated, and anything that can't be processed is quarantined for review rather than dropped.",
     ],
     keywords: ["runtime", "activity", "events", "did", "timeline", "mcp", "observed", "behaviour", "behavior", "quarantine", "decisions"],
@@ -388,12 +460,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "runtime-gateway",
     title: "The Runtime Gateway",
     category: "Runtime",
+    updated: "2026-10-16",
     summary:
       "Agents can ask the Runtime Gateway before acting; it decides from the agent's contract, effective access and policies. It runs in observe-only mode by default: the decision is recorded but the agent is told to go ahead.",
     body: [
-      "An agent calls the gateway with its API key and the action it intends. The decision — Allow, Allow with restrictions, Require approval or Deny, with the reason — is recorded and appears under Authorization decisions on the Runtime page and in the agent's activity. The decision comes from rules, never from a model.",
+      "An agent calls the gateway with its API key and the action it intends. The decision (Allow, Allow with restrictions, Require approval or Deny, with the reason) is recorded and appears under Authorization decisions on Agent Activity and in the agent's activity. The decision comes from rules, never from a model.",
       "In observe-only mode the gateway records what it would have decided without blocking, except for emergency controls, which always block, and the page marks those decisions “observed”. Enforcement is not a setting on any customer screen; when it is on for an organization, a Deny or Require-approval decision is returned to the agent and the organization is notified.",
-      "Repeating a request id returns the same decision rather than a second one. The tenant and agent always come from the API key, never from the request body.",
+      "Repeating a request id returns the same decision rather than a second one. The organization and agent always come from the API key, never from the request body.",
     ],
     keywords: ["gateway", "runtime gateway", "enforce", "enforcement", "observe mode", "observe only", "observed", "allow", "deny", "require approval", "decision", "authorization decisions"],
     href: "/runtime",
@@ -402,10 +475,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "emergency-controls",
     title: "Emergency controls",
     category: "Runtime",
+    updated: "2026-10-16",
     summary:
       "Incident responders can engage a kill switch, suspend a tool or an MCP server, or terminate a session — each with a reason, each audited, each reversible.",
     body: [
-      "The Emergency controls card on the Runtime page offers four controls: a kill switch (every request from every agent in the organization is decided Deny until it is released), tool suspension, MCP server suspension and session termination. Engaging one requires a confirmation and a reason; lifting it does too.",
+      "The Emergency controls card on AI Agents › Agent Activity offers four controls: a kill switch (every request from every agent in the organization is decided Deny until it is released), tool suspension, MCP server suspension and session termination. Engaging one needs a confirmation and a reason; lifting it does too.",
       "The controls block at once, in observe-only mode too: an agent asking the gateway is told no. To cut off one agent's credentials, use Revoke all keys on that agent's API keys panel.",
       "These actions need the runtime emergency permission, which is deliberately separate from everyday agent administration.",
     ],
@@ -417,26 +491,43 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "findings",
     title: "Risk findings",
     category: "Risk",
+    updated: "2026-10-16",
     summary:
       "Findings are deterministic, evidence-backed risk records — excessive access, unauthorized actions, sensitive-data violations, ownership gaps and behavioural deviation.",
     body: [
-      "Intelligence → Risk Overview (“Risks & alerts”) lists every open finding, most severe first, and a By agent table with each agent's open finding count and worst severity. Open an agent's Risk & Findings tab for the detail: severity, category, risk score, the explanation, the contributing reasons, a recommendation, and an evidence link to the specific access or event behind it.",
+      "Risk & Detection › Risk Dashboard lists every open finding, most severe first, and a By agent table with each agent's open finding count and worst severity. Open an agent's Risk & Findings tab for the detail: severity, category, risk score, the explanation, the contributing reasons, a recommendation, and an evidence link to the specific access or event behind it.",
       "Risk scoring is deterministic and rule-driven. A language model never decides a severity or produces a finding. “Run risk evaluation now” on an agent's Risk & Findings tab re-runs the rules.",
       "Work a finding on that tab: assign it, move it through acknowledged, investigating, mitigated or exception, and resolve it as Verified fixed, Accepted risk or False positive. Accepted risk and False positive need a reason, and a false positive can be given a date after which it is re-checked. A finding can't be resolved as verified fixed while its evidence still triggers the rule.",
-      "Request remediation (with a confirmation) revokes the access grants the finding's evidence names. It is a person's decision, never automatic, and the result tells you whether anything was actually revoked — some kinds of finding name no revocable grant. After the underlying access changes, re-evaluation resolves the finding if it no longer holds.",
+      "Request remediation (with a confirmation) revokes the access grants the finding's evidence names. It is a person's decision, never automatic, and the result tells you whether anything was actually revoked; some kinds of finding name no revocable grant. After the underlying access changes, re-evaluation resolves the finding if it no longer holds.",
     ],
     keywords: ["risk", "finding", "alert", "severity", "critical", "violation", "excessive access", "score", "remediation", "request remediation", "assign", "false positive", "accepted risk", "resolve", "evaluate", "evidence"],
     href: "/risk",
   },
   {
+    id: "rogue-accounts",
+    title: "Rogue accounts",
+    category: "Risk",
+    updated: "2026-10-16",
+    summary:
+      "Risk & Detection › Rogue Accounts lists access found in a connected system that nothing in WonderID explains: no request, package or birthright rule granted it.",
+    body: [
+      "Each account with rogue access gets one ticket, such as RA-000012, numbered in order within your organization; everything rogue on that account belongs to it. The account's page shows the ticket and each piece of rogue access.",
+      "Remove access (or Disable account) raises an ordinary request under the application's rules, quoting the ticket number. Under Other outcomes, someone with risk-management permission, never the account's owner, can instead accept it as an exception until a date at most 90 days away, or close it as a false positive, each with a reason.",
+      "The ticket stays open until all of the account's rogue access is dealt with: removed (confirmed by a later sync) or approved afterwards, with the request attached. The access history keeps the earlier Rogue status either way.",
+    ],
+    keywords: ["rogue", "rogue access", "rogue account", "unexplained access", "unauthorized access", "ticket", "RA-", "remove access", "exception", "false positive"],
+    href: "/risk/rogue-accounts",
+  },
+  {
     id: "investigations",
     title: "Investigations",
     category: "Risk",
+    updated: "2026-10-16",
     summary:
       "An investigation groups related findings into one case with a timeline, notes and an outcome, so a team can work it to a conclusion.",
     body: [
-      "Intelligence → Investigations lists them (Active, Awaiting remediation and others) with priority and assignee. Open one from the form on that page by choosing the open findings that belong together. Assign it, add notes, and change its status; the timeline records who did what.",
-      "Remediation is done from each finding's own page — an investigation only groups them. An investigation can't be resolved while any of its findings is still open.",
+      "Risk & Detection › Investigations lists them (Active, Awaiting remediation and others) with priority and assignee. Open one from the page's Actions menu by choosing the open findings that belong together. Assign it, add notes and change its status; the timeline records who did what.",
+      "Remediation is done from each finding's own page; an investigation only groups them. An investigation can't be resolved while any of its findings is still open.",
     ],
     keywords: ["investigation", "investigations", "case", "incident", "triage", "notes", "timeline", "assign investigation"],
     href: "/risk/investigations",
@@ -445,11 +536,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "rogue-agents",
     title: "Rogue agent detection",
     category: "Risk",
+    updated: "2026-10-16",
     summary:
       "Rogue detection highlights agents with open behavioural-deviation, identity-anomaly, ownership or lifecycle findings — signs they are operating outside governance rather than merely holding too much access.",
     body: [
-      "A single finding rarely means an agent is rogue. Intelligence → Rogue Agents lists the flagged agents; open one to see why it is flagged, the runtime comparison behind the behavioural findings, and who is accountable for it. Access-scope findings are on the agent's Risk & Findings tab instead.",
-      "Use it to prioritize: it answers 'which agent should I look at first'.",
+      "A single finding rarely means an agent is rogue. Risk & Detection › Rogue Agents lists the flagged agents; open one to see why it is flagged, the runtime comparison behind the behavioural findings, and who is accountable for it. Access-scope findings are on the agent's Risk & Findings tab instead.",
+      "Use it to prioritize: it answers “which agent should I look at first”.",
     ],
     keywords: ["rogue", "detection", "anomaly", "deviation", "suspicious", "priority"],
     href: "/risk/rogue",
@@ -457,15 +549,16 @@ export const GUIDE_SECTIONS: GuideSection[] = [
   // ----------------------------------------------------------------- Compliance
   {
     id: "certification",
-    title: "Certification campaigns",
+    title: "Access reviews (certification campaigns)",
     category: "Compliance",
+    updated: "2026-10-16",
     summary:
-      "Campaigns ask reviewers to certify access, recording each decision with a justification and evidence for audit.",
+      "Access reviews ask reviewers to keep or remove access, recording each decision with a justification and evidence for audit.",
     body: [
-      "Certifications → Certification Campaigns launches a round: a name, a scope (agent, application, entitlement, privileged access or high-risk agent), an optional criticality filter, a cadence (one time, periodic or event driven) and a reviewer (you by default). The list shows how many items are pending and overdue. Open a campaign to see its items, each with the evidence a reviewer needs; the counts at the top show pending, decided, overdue and escalated items.",
-      "Only the item's assigned reviewer can decide it. The decisions are Approve, Revoke, Modify, Delegate and Request information, and each needs a justification. Approve certifies the access; Revoke takes the item's access grant away after a confirmation, and Modify opens a change request for it (both need an item tied to a specific grant); Delegate hands the item to another reviewer; Request information leaves it pending. Every decision is recorded once, with who made it, when and what the evidence looked like at that moment.",
-      "A reviewer who owns the agent can't approve its access without an explicit override, which is audited. Items that pass their due date are escalated to the agent's business owner (or the campaign creator) and the owner is notified.",
-      "Campaigns cover AI agents' access today; reviews of people's access and of WonderID role assignments are not built yet.",
+      "Access Reviews › Create Campaigns launches a round: a name, a scope, an optional criticality filter, a cadence (one time, periodic or event driven) and a reviewer. A scope can cover AI agents' access (by agent, application, entitlement, privileged access or high-risk agent), people's access, WonderID roles, what access packages contain (reviewed by each package's owner) or an application's entitlements (reviewed by each entitlement's or the application's owner). People's access can be reviewed by each person's manager or the application's owner. Also save as a template keeps the settings for next time.",
+      "Review Campaigns lists them with how many items are pending and overdue. Open one to see its items, each with the evidence a reviewer needs; the counts at the top show pending, decided, overdue and escalated items.",
+      "Only the item's assigned reviewer can decide it. The decisions are Approve, Revoke, Modify, Delegate and Request information, and each needs a justification. Revoke removes the access through a task or the connection, and counts as done once a sync no longer finds it; Request information can ask a named person, who is told and answers once. Every decision is recorded once, with who made it, when and what the evidence looked like at that moment.",
+      "Nobody certifies their own access or role, and a reviewer who owns the agent can't approve its access without an explicit override, which is audited. Items past their due date are escalated, and the owner is notified.",
     ],
     keywords: ["certification", "campaign", "certify", "certify access", "recertify", "attestation", "review", "reviewer", "recertification", "approve", "revoke", "modify", "delegate", "request information", "overdue", "escalate", "audit", "evidence", "compliance", "control"],
     href: "/compliance/campaigns",
@@ -475,13 +568,14 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "integrations",
     title: "Connecting source systems",
     category: "Integrations",
+    updated: "2026-10-16",
     summary:
       "Connections bring identities, access and runtime events in from your existing systems; their credentials are encrypted and shown masked, and a connection is read-only unless explicitly granted write access.",
     body: [
-      "Every flow of your organization's data into or out of WonderID goes through a connection. Admin → Integrations → Connection Types lists what WonderID can connect to (HR systems, identity providers, directories, applications, CSV files, MCP runtimes and agent runtimes); choose one and connect to create a connection. Admin → Integrations → Connections lists yours. People come in through Identity Sources.",
-      "A connection's page shows every setting and credential its type declares. With permission to manage integrations you can change them there: settings are edited in place, and a credential field left empty keeps the saved value. Saved credentials are shown masked (only the last four characters of a long one) and never in full; they are encrypted at rest and never returned by any API or written to logs. Outbound calls are checked so a connection can't be pointed at internal network addresses.",
-      "A connection declares its capabilities explicitly. One configured read-only cannot write or remediate — that boundary is enforced, not merely documented. Admin → Integrations → Gateway shows the traffic every connection sends and receives.",
-      "From a connection's page you can test it and run a sync. Sync runs appear under Admin → Integrations → Sync Jobs with their status and errors; a failed sync also notifies you. Admin → Integrations → MCP Servers inventories the servers, tools and resources your agents use, and marks each tool as read or write; run discovery on a server to refresh it. A connection's page also says who created it and who last changed it.",
+      "Every flow of your organization's data into or out of WonderID goes through a connection. Administration › Integrations › Connector Library lists what WonderID can connect to: HR systems, identity providers, directories, applications, infrastructure such as Kubernetes, secrets stores, databases, SCIM, webhooks, CSV files, MCP runtimes and agent runtimes. Choose one and connect to create a connection; an administrator can also write a connection type or upgrade a connection to a newer version of its type. Connections lists yours, and people come in through Authoritative Sources.",
+      "A connection's page shows every setting and credential its type declares. With permission to manage integrations you can change them there; a credential field left empty keeps the saved value. Saved credentials are shown masked and never in full; they are encrypted at rest and never returned by any API or written to logs. Outbound calls are checked so a connection can't be pointed at internal network addresses, and Governance Settings can limit which hosts connections reach.",
+      "A connection declares its capabilities explicitly. One configured read-only cannot write or remediate, and that boundary is enforced. A connection that may make changes is limited to a number of changes an hour, and a sync that finds too much gone waits for a person. Connector Gateway shows the traffic every connection sends and receives.",
+      "From a connection's page you can test it and run a sync, or set it to sync on a schedule. Sync runs appear under Sync Jobs with their status and errors; a failed sync also notifies you. MCP Servers inventories the servers, tools and resources your agents use and marks each tool as read or write.",
     ],
     keywords: ["integration", "connector", "connection", "connection type", "saviynt", "rest", "mcp", "webhook", "sync", "sync failed", "import", "credentials", "masked", "settings", "connect", "field mapping", "test connection", "gateway"],
     href: "/integrations",
@@ -491,12 +585,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "reports-audit",
     title: "Reports, audit and search",
     category: "Operations",
+    updated: "2026-10-16",
     summary:
       "The audit trail records every security-sensitive action, reports export governance evidence, and search spans your organization's records.",
     body: [
-      "Intelligence → Audit Trail records actor, target, action, time and outcome for every security-sensitive operation — including refusals, such as an action an authorization policy denied. Filter it by object type, action, actor and date range, and use Export CSV to take the entries out. The trail can't be edited (see “Audit integrity and financial compliance”).",
-      "Intelligence → Reports has eight reports, each computed live when you open it and exportable as CSV: AI Agent Inventory, Ownership, Access Certification, Rogue Agent, Access Violation, Risk, Audit Evidence and Policy Compliance.",
-      "Search (header box or Ctrl+K / ⌘K) finds records from one box, scoped to your organization and to what your role can read — see “Finding your way around”.",
+      "Administration › Reports & Audit › Audit Log records actor, target, action, time and outcome for every security-sensitive operation, including refusals such as an action an authorization policy denied, and shows what a configuration change changed, field by field. Filter it by object type, action, actor and date range, and use Export CSV to take the entries out. The log can't be edited (see “Audit integrity and financial compliance”).",
+      "Reports has ten reports, each computed live when you open it and exportable as CSV: AI Agent Inventory, Ownership, Access Certification, Rogue Agent, Access Violation, Risk, Audit Evidence, Policy Compliance, Revocation Closure (every access review revoke, and whether the access is confirmed gone) and Leaver Removal SLA (each leaver's removals in the last 90 days against their due date).",
+      "Search (header box or Ctrl+K / ⌘K) finds records from one box, scoped to your organization and to what your roles can read. See “Finding your way around”.",
     ],
     keywords: ["audit", "audit trail", "log", "report", "reports", "export", "csv", "evidence", "history", "who did", "filter"],
     href: "/audit",
@@ -505,11 +600,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "notifications",
     title: "Notifications",
     category: "Operations",
+    updated: "2026-10-16",
     summary:
-      "Notifications alert the right people to critical findings, approvals waiting on them, overdue certifications and failed syncs, in-app and by email when email is configured.",
+      "Notifications alert the right people to critical findings, approvals waiting on them, overdue reviews, tasks and failed syncs, in-app and by email when email is configured.",
     body: [
-      "The bell in the header lists your in-app notifications. Admin → Organization → Notifications shows each notification type — certification due and overdue, critical finding, rogue agent, missing owner, integration failure, lifecycle expiry, runtime alert, approval required, billing alert and privacy deadline. All of them are mandatory today, so they are shown switched on and can't be turned off.",
-      "In-app notifications always work; email delivery additionally needs the deployment's email provider. Without it you still get the in-app copy.",
+      "The bell in the header lists your in-app notifications. Administration › Organization Settings › Notifications lists the notification types that are always sent: certification due and overdue, critical finding, rogue agent, missing owner, integration failure, lifecycle expiry, runtime alert, approval required, billing alert and privacy deadline. They can't be turned off.",
+      "You are also told about your own work: lifecycle and provisioning tasks assigned to you, and access about to end.",
+      "In-app notifications always work; email delivery also needs the deployment's email provider. Without it you still get the in-app copy.",
     ],
     keywords: ["notification", "notifications", "bell", "email", "alert", "mandatory", "subscribe", "announcement"],
     href: "/settings/notifications",
@@ -519,12 +616,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "users",
     title: "Users and membership",
     category: "Administration",
+    updated: "2026-10-16",
     summary:
-      "Admin → Users & Permissions → Users lists the people in your organization; add them by invitation, and suspend, reactivate, deactivate or remove them with a recorded reason.",
+      "Administration › Users & Roles › Users lists the people in your organization; add them by invitation, and suspend, reactivate, deactivate or remove them with a recorded reason.",
     body: [
-      "Add user is three steps: their details (name, email, job title and department), their access (internal or external user, how they sign in — the organization default, email and password, or single sign-on only — and the roles they start with), and a review. Choose Invite, and they join when they accept the invitation, which they find on the organization screen after signing in; or Add now, and they are an active member straight away. Inviting needs the invite permission and adding needs the create permission. If email isn't configured, you're told so and they can use “Forgot password” on the sign-in page.",
-      "Suspending someone ends their sessions at once; reactivating restores access. Removing them also clears their roles and group memberships, while their history stays in the audit trail.",
-      "A user's page shows their roles and groups, their effective permissions with where each comes from, their access history and their live sessions.",
+      "Add user has three steps: Basic details (name, email, job title and department), ID roles (internal or external user, how they sign in, and the roles they start with) and Review. Choose Send invitation, and they join when they accept it, or Add user, and they are an active member straight away. Inviting needs the invite permission and adding needs the create permission. Add user can also start from a person already under Identities; their page has Give WonderID access when they can't sign in yet. Import CSV… on the Users page invites many people at once, with a preview first.",
+      "An invitation expires after the period set in Governance Settings (30 days unless changed). If email isn't configured you're told so, and they can use “Forgot password?” on the sign-in page.",
+      "Suspending someone ends their sessions at once; reactivating restores access. Removing them also clears their roles and group memberships, while their history stays in the audit trail. A user's page shows their roles and groups, their effective permissions with where each comes from, their access history and their live sessions.",
       "Nobody can change their own membership or give themselves a role, and the organization always keeps at least one Tenant Administrator.",
     ],
     keywords: ["user", "users", "invite", "invitation", "add user", "suspend", "deactivate", "remove user", "member", "membership", "sessions", "team"],
@@ -534,10 +632,11 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "groups",
     title: "Groups",
     category: "Administration",
+    updated: "2026-10-16",
     summary:
       "A group gives its roles to every member, so a team's access is managed once instead of person by person.",
     body: [
-      "Admin → User Groups creates a group; give it roles and add its people. Members get the group's roles on their next request, and lose them when they leave the group.",
+      "Administration › Identities › Groups creates a group; give it roles and add its people. Members get the group's roles on their next request, and lose them when they leave the group.",
       "A user's page shows each role that comes “via” a group, and a role's page lists the groups that carry it.",
       "Nobody can add themselves to a group or give roles to a group they belong to, and adding people to a group that carries roles needs role-assignment rights too.",
     ],
@@ -548,12 +647,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "roles-permissions",
     title: "Roles and permissions",
     category: "Administration",
+    updated: "2026-10-16",
     summary:
-      "Access inside WonderID is role-based: system roles cover common jobs, custom roles are built from the permission catalog, and every check happens on the server.",
+      "Access inside WonderID is role-based: system ID roles cover common jobs, custom roles are built from the permission catalog, and every check happens on the server.",
     body: [
-      "Admin → Roles lists system roles (Tenant Administrator, Security Administrator, Identity Administrator, Agent Administrator, Auditor, Read Only and more) and your custom roles. System roles are read-only; copy one to start a custom role.",
+      "Administration › Users & Roles › ID Roles lists the system roles (Tenant Administrator, Security Administrator, Identity Administrator, Agent Administrator, Auditor, Read Only and more) and your custom roles. System roles are read-only; copy one to start a custom role.",
       "The role designer lets you pick permissions by product area. You can only include permissions you hold yourself, so nobody can create a role more powerful than they are. Custom roles can be deactivated; one in use can't be deleted.",
-      "Admin → Users & Permissions → Permission Catalog lists every permission with its resource, action, sensitivity and the roles that grant it.",
+      "Users & Roles › Permissions lists every permission with its resource, action, sensitivity and the roles that grant it.",
       "The interface hides what you can't do, but enforcement happens on the server for every page and action. Platform administration is a separate, vendor-only boundary no customer role can reach.",
     ],
     keywords: ["role", "roles", "permission", "rbac", "admin", "custom role", "system role", "catalog", "read only", "who can"],
@@ -563,6 +663,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "scoped-assignments",
     title: "Scoped and time-limited role assignments",
     category: "Administration",
+    updated: "2026-10-16",
     summary:
       "A role assignment can apply to the whole organization or only to chosen environments, applications or agents, from and until set dates, and only in MFA sessions.",
     body: [
@@ -577,28 +678,44 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "authorization-policies",
     title: "Authorization policies (deny and require approval)",
     category: "Administration",
+    updated: "2026-10-16",
     summary:
       "Authorization policies override roles: deny an action, or hold it for approval, across the organization or in a scope, with exempt roles for break-glass access.",
     body: [
-      "Admin → Policies → Authorization Policies lists them. Pick the permissions a policy covers (or a prefix such as runtime.*), where it applies, and any exempt roles.",
+      "Administration › Users & Roles › Authorization Policies lists them. Pick the permissions a policy covers (or a prefix such as runtime.*), where it applies, and any exempt roles.",
       "A deny wins over every role, including administrators. A require-approval policy currently refuses the direct action and says approval is needed.",
-      "Refused actions are recorded in the audit trail. A policy can never cover tenant.security.manage — the permission that manages policies — so a mistaken policy can always be undone.",
+      "Refused actions are recorded in the audit trail. A policy can never cover tenant.security.manage, the permission that manages policies, so a mistaken policy can always be undone.",
     ],
     keywords: ["authorization policy", "deny", "require approval", "break glass", "exempt", "override", "restriction", "block action"],
     href: "/settings/authorization-policies",
   },
+  {
+    id: "api-clients",
+    title: "API clients",
+    category: "Administration",
+    updated: "2026-10-16",
+    summary:
+      "An API client lets a pipeline or a service call the WonderID API with its own roles; another administrator approves each one before it works.",
+    body: [
+      "Administration › Users & Roles › API Clients creates one for an application identity, with its roles and an expiry of at most a year. Its secret is shown once. It works only after a second administrator approves it, and a role added later pauses it until approved again.",
+      "It can do only what its roles allow, and never approves access, certifies, approves an onboarding or manages API clients: those are people's decisions. Its calls are audited, and refused ones too.",
+    ],
+    keywords: ["api client", "automation credential", "service account", "pipeline", "api", "token", "integration user", "machine access"],
+    href: "/settings/automation",
+  },
   // ------------------------------------------------------------------- Settings
   {
     id: "global-configuration",
-    title: "Global Configuration",
+    title: "Governance Settings",
     category: "Administration",
+    updated: "2026-10-16",
     summary:
-      "Admin → Global Configuration holds the settings that change how WonderID behaves for your whole organization; every save is a version you can restore.",
+      "Administration › Organization Settings › Governance Settings holds the settings that change how WonderID behaves for your whole organization; every save is a version you can restore.",
     body: [
-      "Sessions: sign out after a period of inactivity (5 to 30 minutes) and the longest a session lasts (1 to 12 hours). Your organization can make sessions shorter than WonderID's own limits of 30 minutes and 12 hours, never longer. A change applies to every member within a minute. If you belong to several organizations, the strictest one applies to you.",
-      "Access: when an account counts as dormant (30, 60, 90, 180 or 365 days); the Accounts page starts from it. AI agents and runtime: how similar a new agent must be to an existing one to wait in Duplicate Review; how far back unregistered agent activity is shown; and how often, at most, a runtime alert is raised for the same agent. Risk: when an agent's Runtime Gateway key is overdue for rotation, and how many active keys an agent may have, before either counts as a credential risk. Certifications: the risk score from which an agent is high-risk for a high-risk campaign (a campaign can still set its own). Separation of duties: the period the Control Center's conflict count covers.",
-      "Each setting shows its default, which is how WonderID behaved before the setting existed. Values outside a setting's range are refused, and one invalid value means nothing is saved. Session settings need the security-profile permission; the others need permission to manage organization settings. Anyone with either can see every setting.",
-      "Change history lists every saved version: who saved it, when, and what changed from what. Restore puts an earlier version's values back, as a new version. Saves and restores are recorded in the audit trail. If two people save at once, the second is told to reload rather than overwriting the first.",
+      "Sessions and sign-in: sign out after inactivity (5 to 30 minutes), the longest session (1 to 12 hours), and whether multi-factor authentication is required. Your organization can make sessions shorter than WonderID's own limits of 30 minutes and 12 hours, never longer, and if you belong to several organizations the strictest applies to you. With MFA required, every member verifies with an authenticator app before seeing anything; API clients are exempt.",
+      "Access: when an account counts as dormant (30, 60, 90, 180 or 365 days), how long an invitation stays usable, how long approved access has to be set up, and how long before time-bound access ends its holder is reminded. AI agents and runtime: how similar a new agent must be to wait in Duplicate Review, how far back unregistered agent activity is shown, and how often at most a runtime alert is raised for one agent. Risk: when an agent's gateway key is overdue for rotation and how many active keys it may have. Reviews: the risk score from which an agent counts as high-risk. Separation of duties: the period the Controls Dashboard's conflict count covers.",
+      "Connections: the share of a kind gone from a source above which a full sync waits for a person, the most changes a connection may make in an hour, and the only hosts connections may reach.",
+      "Each setting shows its default, which is how WonderID behaved before the setting existed. A value outside a setting's range is refused, and one invalid value means nothing is saved. Change history lists every saved version, who saved it and what changed; Restore puts an earlier version back as a new version. If two people save at once, the second is told to reload rather than overwriting the first.",
     ],
     keywords: ["global configuration", "configuration", "settings", "organization settings", "session timeout", "idle timeout", "session length", "inactivity", "dormant", "duplicate", "threshold", "key rotation", "high risk", "version", "restore", "rollback", "history"],
     href: "/settings/configuration",
@@ -607,14 +724,15 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "sso-security",
     title: "Sign-in, SSO and security settings",
     category: "Settings",
+    updated: "2026-10-16",
     summary:
       "Sign in with your email and password, with single sign-on, or with Google, Microsoft or LinkedIn where WonderID has switched that provider on; add an authenticator app for MFA. Sessions expire, and signing out ends your sessions everywhere.",
     body: [
       "The sign-in and sign-up pages offer email and password, “Sign in with SSO”, and Google, Microsoft and LinkedIn buttons. A Google, Microsoft or LinkedIn button works only once that provider has been enabled for WonderID. If it hasn't, the page says so (“Google sign-in is not enabled for WonderID yet”) and you can use your email and password or ask your administrator; if a sign-in is cancelled or doesn't finish, you are returned to the sign-in page with a message. On an organization's own address only email and password and SSO are offered.",
       "For SSO, type your work email first, then choose Sign in with SSO. It works for email domains that have an active connection and otherwise says “No SSO connection configured” for the domain. Only an SSO sign-in joins you to your organization automatically; Google, Microsoft and LinkedIn sign in your own account, and an administrator invites you to an organization.",
       "Forgot your password? Use “Forgot password?” on the sign-in screen; the emailed link lets you set a new one. Repeated reset requests are rate-limited.",
-      "Home → My Access → Sign-in Security lets you enroll an authenticator app (TOTP) for multi-factor authentication, and remove it again. An administrator can require an MFA session for a particular role assignment (see “Scoped and time-limited role assignments”); organization-wide MFA requirements are not built yet.",
-      "Sessions end after inactivity (30 minutes) and after an absolute lifetime (12 hours), or sooner if your organization has set shorter limits in Global Configuration; you are told “Your session expired” and asked to sign in again. Signing out is global by design — it ends your other sessions too. Admin → Authentication → Single Sign-On is where administrators add a SAML or OIDC connection for an email domain; a new connection does not grant access by itself.",
+      "My Workspace › Sign-in Security lets you set up an authenticator app (TOTP) for multi-factor authentication, and remove it again. Your organization can require it for everyone in Governance Settings, and an administrator can require an MFA session for one role assignment (see “Scoped and time-limited role assignments”).",
+      "Sessions end after inactivity (30 minutes) and after an absolute lifetime (12 hours), or sooner if your organization set shorter limits; you are told “Your session expired” and asked to sign in again. Signing out ends your other sessions too. Administration › Users & Roles › Single Sign-On is where administrators add a SAML or OIDC connection for an email domain; a new connection does not grant access by itself.",
     ],
     keywords: ["sso", "single sign-on", "saml", "oidc", "google", "microsoft", "azure", "linkedin", "social sign in", "not enabled", "sign in", "sign up", "login", "password", "forgot", "reset", "session", "expired", "timeout", "logout", "mfa", "authenticator", "totp"],
     href: "/settings/sso",
@@ -623,6 +741,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "tenant-address",
     title: "Your organization's sign-in address",
     category: "Settings",
+    updated: "2026-10-16",
     summary:
       "Each organization can have its own address; signing in there shows your organization's name and only ever opens that organization.",
     body: [
@@ -635,13 +754,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "ai-provider",
     title: "AI features and provider keys",
     category: "Settings",
+    updated: "2026-10-16",
     summary:
       "AI summaries and suggestions are advisory only; a tenant can bring its own OpenAI or Gemini key, otherwise the deployment's platform default key is used.",
     body: [
       "AI in WonderID writes summaries and drafts proposals from data that has already been computed. It never makes an authorization, risk, policy or remediation decision.",
-      "Admin → Organization → AI Assistance selects the provider and, optionally, your own API key, stored encrypted and shown masked. Without one, the platform default is used when the deployment has one.",
-      "If neither exists, AI features say so rather than failing silently.",
-      "The “Ask the guide” box on this page answers only from this guide and links the sections it used. Signed out, or without an AI provider for your organization, it shows the matching guide text itself and says it is not AI-generated.",
+      "Administration › Organization Settings › AI Assistance selects the provider and, optionally, your own API key, stored encrypted and shown masked. Without one, the platform default is used when the deployment has one. If neither exists, AI features say so rather than failing silently.",
+      "WonderID AI in the account menu, and the “Ask the guide” box on this page, answer only from this guide and link the sections they used. Without an AI provider for your organization, they show the matching guide text itself and say it is not AI-generated.",
     ],
     keywords: ["ai", "openai", "gemini", "api key", "byok", "summary", "chatbot", "assistant", "ask the guide", "model"],
     href: "/settings/ai",
@@ -650,8 +769,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "billing",
     title: "Billing: plans, payment and invoices",
     category: "Settings",
+    updated: "2026-10-16",
     summary:
-      "Choose or change your plan in Admin → Organization → Billing; you pay on Stripe's or Razorpay's secure page and WonderID never sees card or bank details.",
+      "Choose or change your plan in Administration › Organization Settings › Billing & Subscription; you pay on Stripe's or Razorpay's secure page and WonderID never sees card or bank details.",
     body: [
       "Billing shows your plan, its status, your usage against the plan's limits, and your invoices. Viewing needs the View billing permission; choosing a plan, paying, cancelling or changing billing details needs Manage billing.",
       "Add your billing details first: the legal entity to invoice, its country and, for tax, a GSTIN (India) or VAT number (EU/UK). Indian prices include 18% GST; invoices show CGST and SGST for a supply within the supplier's state, or IGST otherwise, and carry a consecutive invoice number.",
@@ -665,6 +785,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "privacy",
     title: "Privacy: GDPR and DPDP",
     category: "Compliance",
+    updated: "2026-10-16",
     summary:
       "Privacy & Data Protection runs your GDPR and DPDP obligations: rights requests on statutory deadlines, records of processing, consent, retention, legal holds and breach notification.",
     body: [
@@ -680,8 +801,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "my-privacy",
     title: "My privacy: your own data",
     category: "Settings",
+    updated: "2026-10-16",
     summary:
-      "Every member can download their data, give or withdraw consent, and raise a privacy request from My privacy in the account menu.",
+      "Every member can download their data, give or withdraw consent, and raise a privacy request from My Workspace › My Privacy (also in the account menu).",
     body: [
       "Download my data gives you a machine-readable copy of what your organization holds about you in WonderID.",
       "Consents can be withdrawn with one click, as easily as they were given. Requests show the date by which your organization must answer.",
@@ -693,6 +815,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "audit-integrity",
     title: "Audit integrity and financial compliance",
     category: "Compliance",
+    updated: "2026-10-16",
     summary:
       "The audit trail is append-only and hash-chained; Audit Integrity verifies that no entry was changed, removed or reordered, for SOX, PCI DSS and similar audits.",
     body: [
@@ -707,12 +830,13 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "tenancy",
     title: "Organizations and data isolation",
     category: "Settings",
+    updated: "2026-10-16",
     summary:
-      "Every record belongs to one organization and is isolated where it is stored — no query, search, export or AI feature crosses that boundary.",
+      "Every record belongs to one organization and is isolated where it is stored; an organization can also have separate Dev, Test and Staging environments with their own data.",
     body: [
-      "You can belong to more than one organization and switch between them from the header; what you see is always scoped to the active one.",
-      "Isolation is enforced where the data is stored, not only by the screens and application code in front of it, so a bug in a page cannot leak another organization's records.",
-      "This applies everywhere, including caches, search, exports and anything sent to an AI provider.",
+      "You can belong to more than one organization and switch between them, and between an organization's environments, from the switcher at the foot of the sidebar; what you see is always scoped to the active one. Each environment has its own colour, the same in every organization.",
+      "Its last item, Manage organizations, lists the organizations you own: rename one, add an environment (Dev, Test or Staging, each a separate organization with its own data, paid for at a plan's price), or start a new organization. Administration › Organization Settings › Organization Profile holds the organization's own details.",
+      "Isolation is enforced where the data is stored, not only by the screens in front of it, so a bug in a page cannot leak another organization's records. This applies everywhere, including caches, search, exports and anything sent to an AI provider.",
     ],
     keywords: ["tenant", "organization", "isolation", "multi-tenant", "switch", "workspace", "rls", "data separation"],
     href: "/settings",
@@ -722,11 +846,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "faq-no-findings",
     title: "Why do I have no findings?",
     category: "FAQ",
+    updated: "2026-10-16",
     summary:
       "Findings need both sides of a comparison: registered agents with contracts, and imported access or runtime data to compare them against.",
     body: [
       "The usual cause is agents without contracts. With no approved purpose recorded there is no SHOULD, so excessive-access and unauthorized-action checks have nothing to compare against.",
-      "The other common cause is no imported data yet — check Admin → Integrations → Sync Jobs to confirm a sync actually completed. Open an agent's Risk & Findings tab and choose “Run risk evaluation now” to re-run the rules for it.",
+      "The other common cause is no imported data yet: check Administration › Integrations › Sync Jobs to confirm a sync actually completed. Open an agent's Risk & Findings tab and choose “Run risk evaluation now” to re-run the rules for it.",
     ],
     keywords: ["no findings", "empty", "nothing", "missing data", "why", "blank", "not working"],
     href: "/risk",
@@ -735,11 +860,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "faq-cant-see",
     title: "Why can't I see a page or button?",
     category: "FAQ",
+    updated: "2026-10-16",
     summary:
       "Your roles don't include the permission it needs, a scoped role doesn't apply there, a role has expired or needs MFA, or an authorization policy denies it.",
     body: [
-      "Open your own user page, under Admin → Users & Permissions → Users, to see your roles, their scope and dates, and each effective permission with where it comes from.",
-      "A refusal that names a policy, “MFA required” or “approval required” tells you exactly which rule stopped you. Ask an administrator to change your role or the policy — nobody can grant themselves access.",
+      "Ask an administrator to open your user page under Administration › Users & Roles › Users: it shows your roles, their scope and dates, and each effective permission with where it comes from.",
+      "A refusal that names a policy, “MFA required” or “approval required” tells you exactly which rule stopped you. Ask an administrator to change your role or the policy; nobody can grant themselves access.",
     ],
     keywords: ["can't see", "cannot see", "missing button", "forbidden", "403", "not allowed", "denied", "no access", "permission denied", "mfa required"],
     href: "/settings/users",
@@ -748,11 +874,12 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "faq-remediation",
     title: "Can WonderID revoke access automatically?",
     category: "FAQ",
+    updated: "2026-10-16",
     summary:
       "No — consequential changes require a human to initiate them, and a read-only connector cannot write at all.",
     body: [
-      "WonderID recommends remediation, but a person initiates consequential grants, revocations, policy overrides and destructive actions — for example Request remediation on a finding, Revoke on a grant, or a Revoke decision in a certification campaign, each after a confirmation. Expiry of a package assignment opens removal work for a person; it doesn't remove anything by itself.",
-      "The one place access can be approved without a person is a request policy an administrator has set to approve low-risk requests automatically, below a risk threshold they choose.",
+      "WonderID recommends remediation, but a person initiates consequential grants, revocations, policy overrides and destructive actions, for example Request remediation on a finding, Revoke on a grant, a Revoke decision in an access review or Remove access on a rogue account, each after a confirmation.",
+      "Two things follow from a person's decision or an administrator's setup: a connection that may make changes sets up or removes approved access, and a leaver's access becomes removal work. A request policy can also approve low-risk requests automatically, below a threshold an administrator chooses; high-risk access always needs a person.",
       "This is deliberate. An autonomous system that silently revokes production access is a bigger risk than the one it is trying to manage.",
     ],
     keywords: ["remediation", "revoke", "automatic", "automation", "fix", "remove access"],
@@ -762,6 +889,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "faq-ai-decisions",
     title: "Does AI decide my risk scores?",
     category: "FAQ",
+    updated: "2026-10-16",
     summary:
       "No. Risk, policy, authorization and isolation decisions are deterministic; AI only writes summaries and proposals of results it is given.",
     body: [
@@ -775,27 +903,29 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "faq-something-wrong",
     title: "Something isn't working — what should I do?",
     category: "FAQ",
+    updated: "2026-10-16",
     summary:
       "Start with the message on the screen; most failures name the rule or the step that stopped you. Your organization's administrator can fix access, and the WonderID team can be emailed from this page.",
     body: [
-      "Can't sign in: a Google, Microsoft or LinkedIn button that says the provider “is not enabled” means it hasn't been switched on — use your email and password. “Your session expired” means sign in again. A message that your organization is suspended means sign-in is paused; contact your administrator. “Forgot password?” sends a link to set a new one.",
-      "A page or button is missing, or an action is refused: see “Why can't I see a page or button?”. The refusal names the rule — a policy, “MFA required” or “approval required”.",
-      "An import or sync didn't work: for a connector, open Admin → Integrations → Sync Jobs and the connector's page; for an identity source, open the run — it lists the records that couldn't be used and why, and a preview run changes nothing. A failed sync also sends a notification.",
-      "An access request is stuck: open it from Home → Access Governance → Access Requests. Its approval chain shows who is deciding now, which steps timed out or were invalidated by a change, and you can cancel your own request while it waits and submit it again.",
+      "Can't sign in: a Google, Microsoft or LinkedIn button that says the provider “is not enabled” means it hasn't been switched on, so use your email and password. “Your session expired” means sign in again. A message that your organization is suspended means sign-in is paused; contact your administrator. “Forgot password?” sends a link to set a new one.",
+      "A page or button is missing, or an action is refused: see “Why can't I see a page or button?”. The refusal names the rule: a policy, “MFA required” or “approval required”.",
+      "An import or sync didn't work: for a connection, open Administration › Integrations › Sync Jobs and the connection's page; for an identity source, open the run. It lists the records that couldn't be used and why, and a preview run changes nothing. A failed sync also sends a notification.",
+      "An access request is stuck: open it from My Workspace › My Requests. Its approval chain shows who is deciding now and which steps timed out or were invalidated by a change; you can cancel your own request while it waits and submit it again. Approved but not there yet? Its provisioning task shows who is setting it up.",
       "Request remediation changed nothing: the result says whether any grant was revoked. Some findings name no access WonderID can revoke; remove the access in the system that grants it, then run the risk evaluation again.",
-      "Still stuck: ask your organization's administrator first — they can see your roles and live sessions on your user page. To reach the WonderID team, use the email link at the bottom of this page.",
+      "Still stuck: ask your organization's administrator first; they can see your roles and live sessions on your user page. To reach the WonderID team, use the email link at the bottom of this page.",
     ],
     keywords: ["help", "support", "contact", "error", "not working", "broken", "problem", "troubleshoot", "stuck", "failed", "cannot sign in", "can't log in", "sync failed", "import failed", "who do I ask"],
   },
   {
     id: "faq-assistant",
-    title: "How does the “Ask the guide” box work?",
+    title: "How does WonderID AI (“Ask the guide”) work?",
     category: "FAQ",
+    updated: "2026-10-16",
     summary:
       "It looks up the guide sections that match your question and answers from them, with links to those sections; it never invents a page or a feature.",
     body: [
-      "The sections it uses are chosen by plain keyword matching, not by a model, and the links under an answer are exactly those sections.",
-      "If your organization has an AI provider configured and you are signed in, a model may phrase the answer from those sections only. Otherwise — and always when you are signed out — you get the section's own summary, marked “not AI-generated”.",
+      "It looks up the guide sections that match your question by plain keyword matching, not by a model, and the links under an answer are exactly those sections.",
+      "If your organization has an AI provider configured, a model may phrase the answer from those sections only. Otherwise you get the section's own summary, marked “not AI-generated”.",
       "If the guide doesn't cover your question it says so instead of guessing.",
     ],
     keywords: ["ask the guide", "assistant", "help assistant", "chatbot", "search the guide", "how does the assistant work"],
@@ -826,3 +956,13 @@ export function sectionsByCategory(category: GuideCategory): GuideSection[] {
 export function getSection(id: string): GuideSection | undefined {
   return GUIDE_SECTIONS.find((s) => s.id === id);
 }
+
+/** The latest additions, each pointing at the guide section that explains it. */
+export const WHATS_NEW = [
+  { id: "rogue-accounts", label: "Rogue accounts", note: "Access nothing in WonderID explains gets one ticket per account, and is removed through a request." },
+  { id: "fulfilment", label: "Provisioning tasks", note: "Approved access a connection can't set up goes to a person or group, and closes when a sync finds it." },
+  { id: "certification", label: "Access reviews for everyone", note: "Review people's access, WonderID roles, packages and applications, by managers or owners." },
+  { id: "delegations", label: "Delegations and My Team", note: "Hand your approvals to a colleague while away; managers see their direct reports." },
+  { id: "identity-rules", label: "Identity rules", note: "Set attributes from other attributes, report-only until a second person publishes them." },
+  { id: "api-clients", label: "API clients", note: "Let a pipeline call the WonderID API with its own roles, approved by a second administrator." },
+] as const;

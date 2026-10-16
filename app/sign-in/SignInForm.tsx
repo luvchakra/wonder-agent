@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { supabaseBrowser } from "@/lib/db/supabaseBrowser";
 import { signInAction } from "@/app/actions/auth";
+import { safeReturnTo } from "@/lib/auth/returnTo";
 import { AuthShell, Button, NOT_AVAILABLE_HINT, SocialAuthButtons, TenantLogo, TextField, type AuthProviderStatus } from "@/modules/ui";
 
 /** The organization an address names, as the sign-in page may show it (FOUNDATION-P0-22). */
@@ -62,7 +63,9 @@ function SignInForm({ tenant, providers }: { tenant: SignInTenant; providers: Au
     // tenant (a brand-new user with no membership yet), so pushing there
     // unconditionally only made every returning single-tenant user sit
     // through a "Select an organization" interstitial on each sign-in.
-    router.push("/");
+    // A visitor sent here from the help guide goes back to it (safeReturnTo
+    // accepts only help paths).
+    router.push(safeReturnTo(searchParams.get("next")) ?? "/");
     router.refresh();
   }
 

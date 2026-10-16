@@ -1,30 +1,32 @@
 import { NextResponse } from "next/server";
 import { getTenantContext } from "@/lib/tenant/getTenantContext";
+import { getSessionUser } from "@/lib/tenant/session";
 import { answerHelpQuestion, guideOnlyAnswer } from "@/lib/ai/helpAnswer";
 
 /**
- * The `/help` assistant's endpoint. Needs no module permission and no
- * session: `/help` is public (2026-09-18, proxy.ts) and the guide is
- * product documentation, identical for every visitor, containing no
- * customer data.
+ * The help assistant's endpoint. Needs a session (owner request,
+ * 2026-10-16; it was public from 2026-09-18) but no module permission: the
+ * guide is product documentation with no customer data. Without a session
+ * it returns 401 and no guide text.
  *
- * Tenant context is resolved only to decide which AI provider key applies
- * — a signed-in caller with a tenant gets that tenant's configured
- * provider (or the platform default) if one exists, same as before. A
- * caller with no tenant (anonymous, or signed in but not yet onboarded)
- * gets retrieval-only answers, deliberately: an unauthenticated endpoint
- * that can trigger a paid AI provider call, with no tenant to attribute or
- * rate-limit the spend to, is an abuse/cost vector. The design already
- * degrades to retrieval gracefully (`source: "guide"`), so the public
- * assistant stays fully useful without it.
+ * Tenant context decides only which AI provider key applies. A caller with
+ * an organization gets that organization's configured provider (or the
+ * platform default); a caller with none (signed in, not yet onboarded) gets
+ * retrieval-only answers (`source: "guide"`), so no provider call is made
+ * without an organization to attribute it to.
  *
- * Never 501s the way `/api/v1/ai/summarize` does when no provider is
- * configured — the assistant falls back to deterministic retrieval and
- * still returns the right guide sections.
+ * Never 501s when no provider is configured: it falls back to deterministic
+ * retrieval and still returns the right guide sections.
  */
 const MAX_QUESTION_CHARS = 500;
 
 export async function POST(request: Request) {
+  if (!(await getSessionUser())) {
+    return NextResponse.json(
+      { ok: false, error: { code: "UNAUTHENTICATED", message: "Sign in to use the help assistant" } },
+      { status: 401, headers: { "Cache-Control": "no-store" } },
+    );
+  }
   const ctx = await getTenantContext();
 
   let body: unknown;
@@ -55,7 +57,7 @@ export async function POST(request: Request) {
     const result = ctx.tenantId
       ? await answerHelpQuestion(ctx.tenantId, question.trim())
       : guideOnlyAnswer(question.trim());
-    return NextResponse.json({ ok: true, data: result });
+    return NextResponse.json({ ok: true, data: result }, { headers: { "Cache-Control": "private, no-store" } });
   } catch (err) {
     console.error("Help assistant failed", err);
     return NextResponse.json(

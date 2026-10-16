@@ -97,7 +97,7 @@ The everyday cycle looks like this:
 - **Notifications:** in the app, and by email if you choose.
 - **On phones and tablets:** WonderID can be installed like an app, and every screen works at phone size. Install it once from the main address (account menu › Install the app, or id.wonderapps.biz/install): the one app opens every organization and environment you belong to, and switching between them stays in the app. This works in Chrome and Edge on a computer. On phones (Android and iPhone) and in Firefox a switch opens the other address in the browser's overlay, with its own sign-in (owner decision, 14 Oct: keep it that way). An organization's own address no longer installs a separate app. Each address keeps its own sign-in, so the first visit to an organization in the app asks you to sign in there.
 - **Light and dark mode:** both are supported.
-- **Help centre:** open to anyone, no sign-in needed. It has a user guide, an FAQ and an assistant that answers questions from the guide.
+- **Help centre:** for signed-in people only (since 16 Oct 2026). It has a user guide, an FAQ and an assistant (WonderID AI in the account menu) that answers questions from the guide. Signed out, you go to sign-in and come back to the help page you asked for; the sign-in screens offer "Need help? Email us" instead. Each guide section shows when it was last updated.
 
 ---
 
@@ -665,6 +665,8 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 16 Oct 2026 | The help centre needs sign-in, and its guide now matches today's menu and pages, with new sections on rogue accounts, provisioning tasks, delegations and My Team, identity rules and API clients. |
+| 16 Oct 2026 | Merges happen as soon as checks pass, and the full test suite runs every night at 03:00 IST. |
 | 16 Oct 2026 | "Give WonderID access" on a person's page now fills in their details in organizations with more than 500 people too. |
 | 15 Oct 2026 | Access reviews can cover an application's entitlements: each entitlement's owner, or else the application's owner, keeps it or disables it so nobody can request it. |
 | 15 Oct 2026 | Identity rules can open a task about a person, for their manager or identity administrators, instead of only setting a detail. |
