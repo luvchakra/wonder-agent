@@ -2402,3 +2402,21 @@ holds one file).
 
 All of these run in an organization holding thousands of leftover test
 rows. The cleanup SQL waits on the owner.
+
+## 2026-10-16 — Old test data cleaned before every run (owner request)
+
+The owner ran the one-off cleanup SQL, which brought Tenant One down from
+3,359 identities to 234. They then asked for it to run on every run, so the
+data cannot build up again.
+- `pruneThrowawayGovernanceData()` (`tests/e2e/support/seedTestData.ts`)
+  runs in `auth.setup.ts` after the existing prunes. It deletes, in the two
+  `e2e-*` tenants only:
+  - campaigns named "E2E …";
+  - access packages named "E2E …", after their assignments and requests;
+  - identity sources named "E2E …";
+  - identities with no sign-in that are not agents.
+- Only rows older than two hours go, so a run in progress keeps its own.
+- The audit trail, ledger and settings history stay; they are append-only.
+- **Verified:** typecheck and eslint clean; local setup project (seed plus
+  prunes) 7 of 7 passed. Vercel runs do not set `E2E_SKIP_SEED`, so it
+  runs before every nightly part.
