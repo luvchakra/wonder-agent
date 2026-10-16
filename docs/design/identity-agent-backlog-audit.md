@@ -2147,3 +2147,16 @@ catalogue, and it grants nothing.
 **Left out:** "add to a group" and "assign a package". Both grant access
 (groups carry WonderID roles), so they wait for the owner's decision on that
 automation path.
+
+## 2026-10-16 — Add user from an identity in a large organization
+
+`listPeopleWithoutAccess(tenantId, includeId)` reads the person a
+`/settings/users/new?identity=` link names by id, next to the first 500
+by name.
+- **Before:** in an organization with more than 500 people, the form opened
+  empty for anyone past the first 500 by name.
+- **How it reads:** the same filters (tenant, HUMAN, active, has an email,
+  not already a member) and the same RLS client. A malformed id is ignored.
+- **Found by:** the nightly E2E, `users.spec.ts:211`.
+- **Verified:** typecheck and eslint are clean; `next build` passed; local
+  E2E `users.spec.ts`: 16 of 16 passed, including the failing test.

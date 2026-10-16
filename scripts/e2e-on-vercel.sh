@@ -74,10 +74,11 @@ case "${VERCEL_GIT_COMMIT_REF:-}" in
   e2e/nightly-4) HALF=4 ;;
 esac
 if [ -z "$SPECS" ] && [ -n "$HALF" ]; then
-  # The slowest spec (connector-provisioning, about 12 minutes there) has
-  # part 1 to itself among the slow ones; the other slow specs take turns
-  # between parts 2, 3 and 4. On 15 Oct a plain round robin gave part 1 three
-  # slow specs: 35 minutes and cut off, against 22 and 24 for the others.
+  # The slowest spec (connector-provisioning) has part 1 to itself; every
+  # other spec takes turns between parts 2, 3 and 4. On 15 Oct a plain round
+  # robin gave part 1 three slow specs: 35 minutes and cut off. On 16 Oct,
+  # with connector-provisioning plus a quarter of the rest, part 1 was cut
+  # off again at 35 minutes, against 22, 16 and 17 for parts 2 to 4.
   SLOW="connector-provisioning f1-reconciliation design-review bulk-invitations access-packages account-inventory automation-credentials"
   slow=""
   j=0
@@ -92,7 +93,7 @@ if [ -z "$SPECS" ] && [ -n "$HALF" ]; then
   i=0
   for f in $(ls tests/e2e/*.spec.ts | sort); do
     case " $slow " in *" $f "*) continue ;; esac
-    [ $((i % 4 + 1)) = "$HALF" ] && SPECS="$SPECS $f"
+    [ $((i % 3 + 2)) = "$HALF" ] && SPECS="$SPECS $f"
     i=$((i + 1))
   done
 fi
