@@ -1314,7 +1314,8 @@ beats exhaustive pre-push verification.
   A change to `package.json`, the lockfile, `tsconfig.json`, the Vitest, ESLint
   or Next config, or `.github/` runs every test and the whole lint. Push to
   `main` and the nightly run also cover everything. The full Playwright suite
-  runs nightly (`e2e.yml`, 03:00 IST), not per change. It can be started by hand
+  runs nightly (`e2e.yml`, scheduled for 02:47 IST so that it starts by about
+  03:00; GitHub delays runs set at busy minutes), not per change. It can be started by hand
   from the Actions tab, optionally for chosen spec files.
 - **Don't run** end-to-end, accessibility or full-app walkthroughs unless asked or
   the change is genuinely risky. A quick look at the one screen you changed is
@@ -1396,7 +1397,7 @@ beats exhaustive pre-push verification.
     demand. Since 2026-10-10 (user decision) the suite runs inside Vercel
     builds (`scripts/e2e-on-vercel.sh`), where the project's Sensitive
     variables are available.
-    - The full suite runs every night at 03:00 IST in four parts, on the
+    - The full suite runs every night at about 03:00 IST (cron 02:47 IST) in four parts, on the
       `e2e/nightly-1` to `e2e/nightly-4` branches (owner decisions,
       2026-10-15 and 2026-10-16). Part 1 runs connector provisioning alone;
       the other specs are dealt over parts 2 to 4.
