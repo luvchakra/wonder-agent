@@ -4477,3 +4477,90 @@ The owner answered the questions above:
 - E2E `sod.spec.ts` now opens the policy's history and expects the SoD
   rule added, block → flag and active → disabled. Run on Vercel before
   the merge.
+
+## 2026-10-17 — ACCESS-P0-23 part 4: delegation to AI agents, enforced at the Runtime Gateway
+
+Owner decisions, 17 Oct:
+- the directions are person→agent and agent→agent;
+- a person→agent delegation takes effect once an owner of the agent
+  approves it;
+- a request on someone's behalf with no covering delegation requires
+  approval.
+
+**Built:**
+- **Migration 0200**, applied to dev: `agent_delegations`.
+  - Columns:
+    - `delegator_kind` user or agent, with `delegator_user_id` (a member)
+      or `delegator_agent_id`, and `delegate_agent_id`; composite FKs keep
+      everything in the same tenant;
+    - `actions` (1–50), `applications` (0–50, empty means any its contract
+      approves), `reason`, dates (at most 180 days);
+    - `status` pending, active, rejected or revoked, with who asked,
+      decided and revoked.
+  - Checks:
+    - an agent never delegates to itself;
+    - `decided_by <> requested_by`;
+    - an automation member never delegates (trigger, as in 0182).
+  - RLS: the asker and the delegating person read it, access managers
+    read all, nobody writes it directly. It has provenance, and the
+    covering FK indexes for 0198 are added too (performance advisor).
+- `agentDelegationRules.ts` (pure): `validateAgentDelegation`,
+  `delegationDecisionRefusal`, `delegationCovers` and `parseOnBehalfOf`.
+  - The decision belongs to an owner of the receiving agent, never the
+    asker. An access manager decides only when no owner other than the
+    asker exists.
+  - A delegation covers a request only for its delegator, an action it
+    names, an application it names (if it names any), and while in force.
+  - Only an explicit `onBehalfOf: {kind, id}` is a claim. The older free
+    text `context.userId` is not, so existing clients are unaffected. A
+    malformed claim never matches.
+- `agentDelegations.ts`:
+  - request, decide, revoke and list;
+  - service-role writes filtered by tenant;
+  - the delegating agent's owner (or an access manager) speaks for an
+    agent;
+  - the receiving agent's owners are notified;
+  - every step is audited (`access.agent_delegation_*`), with reasons as
+    typed text.
+- **Gateway:**
+  - `RuntimeRequest.onBehalfOf` is parsed by `parseGatewayRequest`;
+  - `runtimeDecisionLoader` loads active delegations for the agent and
+    the delegator; a load failure fails closed with EVALUATION_FAILED;
+  - `decideRuntimeRequest` adds a `delegation` step only when the request
+    names someone: DELEGATION_ACTIVE passes, DELEGATION_REQUIRED means
+    REQUIRE_APPROVAL. It never lifts a denial. In OBSERVE_ONLY mode it is
+    recorded, as every approval outcome is.
+- **API and UI:**
+  - `/api/v1/access/agent-delegations` (GET, POST), `[id]/decision` and
+    `[id]/revoke`;
+  - the Delegations page has "Waiting for you" (Approve, or Reject with a
+    note) and "AI agents acting for someone" (End or Withdraw). The form
+    sits in the existing Actions dialog.
+- Help, the knowledge base, the ownership map, PROGRESS (Done), the
+  backlog and the roadmap are updated.
+
+**Verified:**
+- `tests/access/agent-delegations-isolation.sql` on dev: 9/9.
+- Unit tests:
+  - `agentDelegationRules.test.ts`: 5 tests;
+  - `runtimeDecision.test.ts`: 4 delegation tests;
+  - Access, architecture and provenance: 385 passed;
+  - runtime-assurance and integrations: 612 passed.
+- Typecheck and eslint clean.
+- `tests/e2e/agent-delegations.spec.ts` covers:
+  - held without a delegation, and no step when acting for nobody;
+  - the asker can't approve their own;
+  - still held while waiting;
+  - approved on the page, then DELEGATION_ACTIVE; another action is still
+    held;
+  - ended, then held again;
+  - another organization sees and ends nothing.
+
+  Run on Vercel before the merge, with the gateway specs.
+
+**Left out:**
+- A held request does not resume once approved. That is Phase 9 ("Resume
+  after approval").
+- When the agent has no owner, nobody is notified. An access manager
+  decides from the page.
+- Agent→person delegation, which the owner did not choose.

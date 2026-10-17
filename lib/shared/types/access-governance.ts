@@ -464,6 +464,12 @@ export type RuntimeRequest = {
   identityId?: string;
   intent?: { requestPurpose?: string };
   context?: { environment?: string; sessionId?: string; userId?: string; source?: string; timestamp?: string };
+  /**
+   * ACCESS-P0-23 part 4: the person or agent this agent says it acts for.
+   * Present only when the caller sent `onBehalfOf`; an active, approved
+   * delegation must cover the action, or the request is held for approval.
+   */
+  onBehalfOf?: { kind: "user" | "agent"; id: string };
 };
 
 export type RuntimeDecisionStepName =
@@ -475,7 +481,8 @@ export type RuntimeDecisionStepName =
   | "effective_access"
   | "context"
   | "risk"
-  | "runtime_policy";
+  | "runtime_policy"
+  | "delegation";
 
 export type RuntimeDecisionStep = {
   step: RuntimeDecisionStepName;

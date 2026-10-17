@@ -343,3 +343,33 @@ describe("decideRuntimeRequest — ACCESS-P0-12 policy targets and priority", ()
     expect(decideRuntimeRequest(facts({ runtimePolicies: [flagHigh, blockLow] })).decision).toBe("DENY");
   });
 });
+
+// ACCESS-P0-23 part 4 (owner decision 2026-10-17): acting on someone's behalf needs their delegation, or a human decides.
+describe("decideRuntimeRequest — delegation", () => {
+  const ME = "11111111-1111-4111-8111-111111111111";
+  const now = new Date("2026-10-17T10:00:00Z");
+  const delegation = { delegatorKind: "user" as const, delegatorId: ME, actions: ["READ"], applications: [], startsAt: "2026-10-01T00:00:00Z", endsAt: "2026-11-01T00:00:00Z" };
+
+  it("adds no step when the request acts for nobody", () => {
+    expect(stepOf(decideRuntimeRequest(facts()), "delegation")).toBeUndefined();
+  });
+
+  it("is held for approval without a covering delegation", () => {
+    const d = decideRuntimeRequest(facts({ delegations: [], now }, { onBehalfOf: { kind: "user", id: ME } }));
+    expect(d.decision).toBe("REQUIRE_APPROVAL");
+    expect(d.code).toBe("DELEGATION_REQUIRED");
+    const other = decideRuntimeRequest(facts({ delegations: [delegation], now }, { action: "REPORT", onBehalfOf: { kind: "user", id: ME } }));
+    expect(other.code).toBe("DELEGATION_REQUIRED");
+  });
+
+  it("is allowed when an active delegation covers the action", () => {
+    const d = decideRuntimeRequest(facts({ delegations: [delegation], now }, { onBehalfOf: { kind: "user", id: ME } }));
+    expect(d.decision).toBe("ALLOW");
+    expect(stepOf(d, "delegation")?.code).toBe("DELEGATION_ACTIVE");
+  });
+
+  it("never lifts a denial: a prohibited action stays denied", () => {
+    const d = decideRuntimeRequest(facts({ delegations: [{ ...delegation, actions: ["DELETE"] }], now }, { action: "DELETE", onBehalfOf: { kind: "user", id: ME } }));
+    expect(d.decision).toBe("DENY");
+  });
+});

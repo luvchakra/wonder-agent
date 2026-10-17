@@ -179,6 +179,9 @@ export type { AccessCounts } from "./connectorAccessRules";
 // ACCESS-P0-33: entitlement types per application, and the entitlement's governance fields.
 export { openApprovalLink } from "./approvalLinks";
 export { listDelegations, createDelegation, revokeDelegation, requestsActingFor, type Delegation } from "./delegations";
+// ACCESS-P0-23 part 4: delegation to AI agents, enforced at the Runtime Gateway.
+export { listAgentDelegations, requestAgentDelegation, decideAgentDelegation, revokeAgentDelegation, type AgentDelegation } from "./agentDelegations";
+export { parseOnBehalfOf } from "./agentDelegationRules";
 export { listGovernanceChanges, decideGovernanceChange, type GovernanceChange } from "./governanceChanges";
 export { listIdentityGrantsForReview, requestCertifiedRemoval, type ReviewableGrant } from "./certificationSupport";
 export { listRequestDrafts, saveRequestDraft, deleteRequestDraft, type RequestDraft } from "./requestDrafts";

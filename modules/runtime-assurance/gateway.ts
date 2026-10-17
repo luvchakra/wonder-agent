@@ -7,7 +7,7 @@ import { runAfterResponse } from "@/lib/shared/afterResponse";
 import { ApiError } from "@/lib/shared/types/foundation";
 import type { RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-governance";
 import type { GatewayDecision, GatewayDecisionRecord, GatewayMode, RuntimeEventType } from "@/lib/shared/types/runtime";
-import { evaluateRuntimeRequest, evaluateToolVisibility, type RuntimePrincipal, type ToolVisibility } from "@/modules/access-governance/service";
+import { evaluateRuntimeRequest, evaluateToolVisibility, parseOnBehalfOf, type RuntimePrincipal, type ToolVisibility } from "@/modules/access-governance/service";
 import { loadActiveEmergencyState } from "./emergency";
 import { notifyForDecision } from "./decisionNotifications";
 import { getFeatureFlags } from "@/modules/platform-admin/service";
@@ -92,6 +92,8 @@ export function parseGatewayRequest(raw: unknown): RuntimeRequest {
       source: optionalString(ctx, "source"),
       timestamp: optionalString(ctx, "timestamp"),
     },
+    // ACCESS-P0-23 part 4: only an explicit claim; the decision checks it against approved delegations.
+    ...(body.onBehalfOf !== undefined && body.onBehalfOf !== null ? { onBehalfOf: parseOnBehalfOf(body) } : {}),
   };
 }
 

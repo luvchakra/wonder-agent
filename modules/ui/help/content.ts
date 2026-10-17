@@ -374,14 +374,15 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "delegations",
     title: "Delegations and My Team",
     category: "Access",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Hand your approvals or your requests to a colleague while you are away, and see your direct reports under My Team.",
     body: [
       "On My Workspace › Approvals, Delegate your approvals hands your approvals, or your requests, to someone until a date. They act on your behalf, every decision records both of you, and either of you (or an access manager) can end it. Nobody decides a request they made or that is for them.",
       "My Workspace › My Team lists the people who report to you. Under Disable all access, with a reason, a manager can stop a direct report's access in an emergency: the person is disabled and every access they hold becomes removal work. It is audited.",
+      "An AI agent can act for you, or for an agent you own. From Actions, Or let an AI agent act for you names the agent, the actions it may take (and, if you like, the applications), how many days (at most 180) and why. It waits for an owner of the agent to approve it under Waiting for you; you can't approve your own, and if the agent has no other owner an access manager decides. When an agent tells the Runtime Gateway it acts on someone's behalf, the gateway holds the request for approval unless an approved delegation from them covers that action. End or Withdraw stops it at once.",
     ],
-    keywords: ["delegate", "delegation", "out of office", "away", "on behalf", "my team", "direct reports", "manager", "disable all access"],
+    keywords: ["delegate", "delegation", "out of office", "away", "on behalf", "my team", "direct reports", "manager", "disable all access", "agent delegation", "act for me", "on behalf of", "onBehalfOf"],
     href: "/access/delegations",
   },
   {
@@ -968,7 +969,7 @@ export const WHATS_NEW = [
   { id: "rogue-accounts", label: "Rogue accounts", note: "Access nothing in WonderID explains gets one ticket per account, and is removed through a request." },
   { id: "fulfilment", label: "Provisioning tasks", note: "Approved access a connection can't set up goes to a person or group, and closes when a sync finds it." },
   { id: "certification", label: "Access reviews for everyone", note: "Review people's access, WonderID roles, packages and applications, by managers or owners." },
-  { id: "delegations", label: "Delegations and My Team", note: "Hand your approvals to a colleague while away; managers see their direct reports." },
+  { id: "delegations", label: "AI agents acting for you", note: "Let an agent act for you for named actions, once its owner approves; the Runtime Gateway enforces it." },
   { id: "identity-rules", label: "Identity rules that grant access", note: "Add people to a group or assign a package, after approval or automatically, from a rule a second person published." },
   { id: "api-clients", label: "API clients", note: "Let a pipeline call the WonderID API with its own roles, approved by a second administrator." },
 ] as const;

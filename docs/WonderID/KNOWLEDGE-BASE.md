@@ -321,6 +321,7 @@ An AI assistant can **propose** an onboarding configuration; a person always rev
 - **Changing a policy:** in an organization with two or more Tenant Administrators, a change to a request policy waits, showing each field's old and new value, until someone else who manages access approves it (Request policies → Waiting for approval). Approved, it applies as the policy's next version; rejected, nothing changes. With one administrator a change applies at once. Every applied change is kept as a numbered version.
 - Approvers get a message with a link straight to the request when it reaches them.
 - **Away?** Hand your approvals or your requests to a colleague until a date (Approvals → Delegate your approvals). They act on your behalf, every decision records both of you, and either of you (or an access manager) can end it.
+- **An AI agent acting for you:** let an agent act for you (or for an agent you own) for named actions, optionally named applications, for up to 180 days. It takes effect once an owner of the agent approves it; nobody approves their own. When an agent tells the Runtime Gateway it acts for someone, the request is held for approval unless an approved delegation from them covers that action.
 - **Administration:** someone who manages roles can also hand a person's administration to a colleague. The colleague gets copies of that person's roles until the end date; ending it early removes them at once. The Tenant Administrator role is never handed over, and roles the colleague already holds are left as they are.
 - A request policy can approve low- and medium-risk requests automatically; these are recorded as approved automatically. High-risk requests always wait for a person.
 - Separation-of-duties rules can block a request that would give a conflicting combination of access.
@@ -673,6 +674,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | A person can let an AI agent act for them (or an agent for another agent), once the agent's owner approves; the Runtime Gateway holds any request made on someone's behalf without such a delegation. |
 | 17 Oct 2026 | Every change to a governance policy, including its separation of duties rules, is a new version; the policy's page shows its change history. |
 | 17 Oct 2026 | Global Configuration can be exported as a signed file and imported into another environment, with a preview of every change first. |
 | 17 Oct 2026 | Access review campaigns have a Calendar of what is due each month and Analytics: completion, revocations, time to decide, overdue items and reviewer backlog. |

@@ -77,6 +77,8 @@ export const PROVENANCE_TABLES = [
   "application_onboarding_templates",
   // 0186: COMPLIANCE-P0-14 part 3.
   "certification_consultations",
+  // 0200: ACCESS-P0-23 part 4.
+  "agent_delegations",
 ] as const;
 
 export type ProvenanceTable = (typeof PROVENANCE_TABLES)[number];
