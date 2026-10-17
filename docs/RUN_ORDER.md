@@ -788,3 +788,12 @@ Asked in chat, the owner decided:
    - then COMPLIANCE-P0-10's remainder, IDENTITY-P0-21 and IDENTITY-P0-23;
    - then the medium stories: ACCESS-P0-23, ACCESS-P0-35, PLATFORM-P0-13
      and FOUNDATION-P0-03.4.
+
+Later the same day, asked about ACCESS-P0-35 and ACCESS-P0-23, the owner
+decided:
+6. **Custom role edits** do not wait for a second administrator.
+7. **Governance policy edits**, SoD rules included, get the same output as
+   request policies (a numbered version with what changed), without
+   waiting for a second administrator.
+8. **Delegation to and from AI agents** is enforced at the Runtime Gateway,
+   not only recorded.

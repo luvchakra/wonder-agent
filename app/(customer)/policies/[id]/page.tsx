@@ -3,7 +3,7 @@ import { pageRef } from "@/lib/refs/objectRef";
 import { getRecordProvenance } from "@/lib/provenance/recordProvenance";
 import Link from "next/link";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getPolicy, listPolicyExceptions, listPolicyRules } from "@/modules/access-governance/service";
+import { getPolicy, listPolicyExceptions, listPolicyHistory, listPolicyRules } from "@/modules/access-governance/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { addPolicyRuleAction, addPolicyExceptionAction, revokeExceptionAction } from "@/app/actions/access";
 import { targetsFromScope } from "@/modules/access-governance/policyTargets";
@@ -28,7 +28,13 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
   const policy = await getPolicy(id, ctx.tenantId!);
   if (!policy) notFound();
 
-  const [rules, exceptions, provenance] = await Promise.all([listPolicyRules(id, ctx.tenantId!), listPolicyExceptions(id, ctx.tenantId!), getRecordProvenance(ctx.tenantId!, "policies", id)]);
+  const [rules, exceptions, provenance, history] = await Promise.all([
+    listPolicyRules(id, ctx.tenantId!),
+    listPolicyExceptions(id, ctx.tenantId!),
+    getRecordProvenance(ctx.tenantId!, "policies", id),
+    // ACCESS-P0-35: every change is a version; changes apply at once (owner decision 2026-10-17).
+    listPolicyHistory(id, ctx.tenantId!).catch(() => null),
+  ]);
   const targets = targetsFromScope(policy.scope);
   const canPublish = ctx.permissions.includes("policy.publish");
   const addRuleWithId = addPolicyRuleAction.bind(null, id);
@@ -156,6 +162,37 @@ export default async function PolicyDetailPage({ params }: { params: Promise<{ i
           </form>
         </CardBody>
       </Card>
+
+      <details className="rounded-lg border border-border bg-card" data-testid="policy-history">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-foreground">
+          Change history <span className="text-muted-foreground">({history === null ? "unavailable" : `${history.length} ${history.length === 1 ? "change" : "changes"}`})</span>
+        </summary>
+        <div className="border-t border-border px-4 py-3">
+          {history === null ? (
+            <p role="status" className="text-sm text-muted-foreground">The history could not be loaded just now.</p>
+          ) : history.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No changes since it was created.</p>
+          ) : (
+            <ol className="divide-y divide-border">
+              {history.map((h) => (
+                <li key={h.version} className="py-2.5 text-sm">
+                  <p className="font-medium text-foreground">Version {h.version}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {h.changedByName ?? "Unknown"} · {h.changedAt.slice(0, 16).replace("T", " ")} UTC
+                  </p>
+                  {h.changes.length ? (
+                    <ul className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                      {h.changes.map((c) => (
+                        <li key={c}>{c}</li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

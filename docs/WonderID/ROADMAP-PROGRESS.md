@@ -15,7 +15,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 5 | [AI agents](#5-ai-agents) | `██████████` 100% |
 | 6 | [Risk, reviews and compliance](#6-risk-reviews-and-compliance) | `██████████` 100% |
 | 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `████████░░` 85% |
-| 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `██░░░░░░░░` 20% |
+| 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `███░░░░░░░` 30% |
 | 9 | [Agent ID and trusted credentials](#9-agent-id-and-trusted-credentials) | `░░░░░░░░░░` 0% |
 | 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `██████░░░░` 57% |
 | 11 | [Advanced governance](#11-advanced-governance) | `░░░░░░░░░░` 0% |
@@ -111,12 +111,12 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Merging duplicate people
 - ⬜ Field-level audit detail
 
-## 8. Roles, separation of duties and delegation — 20%
+## 8. Roles, separation of duties and delegation — 30%
 
 - ⬜ Business and IT roles
 - ⬜ Access-combination SoD
 - 🔶 Delegations
-- 🔶 Approved changes to governance objects
+- ✅ Approved changes to governance objects
 - ⬜ SoD violation workflow
 
 ## 9. Agent ID and trusted credentials — 0%

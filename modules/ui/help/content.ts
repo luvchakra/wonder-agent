@@ -403,7 +403,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "policies",
     title: "Governance policies",
     category: "Access",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Governance policies express organization-wide rules that agents are evaluated against, independently of any single agent's contract.",
     body: [
@@ -411,8 +411,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Policies are versioned: a new policy can be saved as a draft, which has no effect until someone with the publish permission publishes it, and each publish keeps the earlier version. Rules are added on the policy's page. Exceptions are recorded with a reason, who granted them, an optional expiry, a business justification, a compensating control and the residual risk, and can be revoked.",
       "Separation of duties is a rule in an identity-category policy that lists actions one person must not both perform for the same AI agent, for example requesting and approving its access. A policy whose action is Block refuses the second action and says why; otherwise the action goes through and the conflict is recorded.",
       "Policy evaluation is deterministic. Violations surface as findings on the Risk Dashboard, and the Runtime Gateway applies the active policies when an agent asks to act. (Rules about who may use WonderID itself are Authorization Policies, under Users & Roles.)",
+      "Every change to a policy, including adding a rule, is saved as a new version and takes effect at once. Change history on the policy's page lists each version, who made it, when, and what changed, for example \"Rule added: separation of duties: request vs approve\" or \"Action: block → flag\".",
     ],
-    keywords: ["policy", "policies", "rule", "violation", "guardrail", "evaluation", "publish", "draft", "exception", "flag", "restrict", "block", "priority", "separation of duties"],
+    keywords: ["policy", "policies", "rule", "violation", "guardrail", "evaluation", "publish", "draft", "exception", "flag", "restrict", "block", "priority", "separation of duties", "history", "version", "change history"],
     href: "/policies",
   },
   {

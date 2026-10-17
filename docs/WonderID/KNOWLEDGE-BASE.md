@@ -460,6 +460,7 @@ Findings are raised for:
 - Define pairs of actions one person must not both perform for the same AI agent, for example requesting access and then approving it.
 - **Preventive:** a policy set to block stops the second action on agent requests and grants; otherwise it is flagged.
 - **Detective:** the Control Center reports people who performed both actions in a recent period.
+- **History:** each change to a policy, including adding a rule, is a new version and applies at once; the policy's page lists every version, who made it and what changed.
 - **Not yet provided:** rules on combinations of access one identity must not hold (for example create vendor and approve payment). Requests, direct assignments and birthright packages are not checked against what a person already holds.
 
 **Compliance**
@@ -672,6 +673,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | Every change to a governance policy, including its separation of duties rules, is a new version; the policy's page shows its change history. |
 | 17 Oct 2026 | Global Configuration can be exported as a signed file and imported into another environment, with a preview of every change first. |
 | 17 Oct 2026 | Access review campaigns have a Calendar of what is due each month and Analytics: completion, revocations, time to decide, overdue items and reviewer backlog. |
 | 17 Oct 2026 | Two records of the same person can be compared side by side and merged, keeping the values you choose, and the merge can be undone. |
