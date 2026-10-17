@@ -80,7 +80,7 @@ test.describe.serial("delegation to AI agents", () => {
     await page.goto("/access/delegations");
     const row = page.getByRole("list", { name: "Agent delegations waiting for you" }).getByRole("listitem").filter({ hasText: `E2E Delegate Agent ${stamp}` });
     await row.getByRole("button", { name: "Approve" }).click();
-    await expect(page.getByRole("list", { name: "Agent delegations" }).getByRole("listitem").filter({ hasText: `E2E Delegate Agent ${stamp}` })).toContainText("In force");
+    await expect(page.getByRole("list", { name: "Agent delegations", exact: true }).getByRole("listitem").filter({ hasText: `E2E Delegate Agent ${stamp}` })).toContainText("In force");
 
     const covered = (await (await anon.post(conn.authorize, { headers: { authorization: `Bearer ${secret}` }, data: { requestId: `e2e-dlg-3-${stamp}`, action: "read", onBehalfOf: { kind: "user", id: requesterId } } })).json()).data;
     expect(stepOf(covered)).toMatchObject({ code: "DELEGATION_ACTIVE" });
