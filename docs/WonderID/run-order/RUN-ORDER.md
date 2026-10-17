@@ -43,12 +43,13 @@ F10 gates release after F9
 
 ## Ways of working
 
-- A story ships on its own branch through a pull request, squash-merged only
-  when the owner says "merge now" or "build now" (CLAUDE.md §19.6, §19.9).
+- A story ships on its own branch through a pull request, squash-merged as
+  soon as CI is green, without asking (owner decision 2026-10-16; CLAUDE.md
+  §19.6, §19.9).
   Docs ride along with code; no docs-only merges.
 - Before a push: typecheck, eslint on changed files, the touched unit tests;
   for a migration, apply it to the dev project and re-check advisories.
-- The nightly Playwright suite runs on Vercel in three parts; a red nightly is
+- The nightly Playwright suite runs on Vercel in four parts; a red nightly is
   fixed before anything else merges.
 - Record before you stop: the module's audit log entry and the Progress
   Tracker row, plus `../progress/PROGRESS.md`.

@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| Last updated | 2026-10-13 |
+| Last updated | 2026-10-17 |
 | Current phase | F3 in progress. The exit scenario runs end to end against a stub system (2026-10-12): rogue access removed through the connector after a reviewer asks, verified, finding resolved |
 | Next story | By priority (owner, 2026-10-13): finish RISK-P0-13, then F4 (lifecycle rules, rule runtime, attribute rules, entitlement types, certification for every identity type) and the High QA sweeps. INTEGRATION stories are Low, implemented later. Up next and blocked lists: `../ROADMAP-STORIES.md` |
 | Plan | `../run-order/RUN-ORDER.md` · Design `../design/DESIGN.md` |
@@ -121,7 +121,7 @@ Exit test: not run.
 | INTEGRATION-P0-25 † HR connector | Integration | | Not started | Needs D9 |
 | INTEGRATION-P0-26 † ServiceNow ticketing | Integration | | Not started | Low (owner, 2026-10-14) |
 | ACCESS-P0-42 Internal fulfilment task assignment | Access | | Done | Owner request 2026-10-14, High. Migration 0173: a person or group per application and per entitlement type; new tasks routed (type, application, technical owner, business owner, access managers); group members claim; reassign with a reason (audited, claim released, new assignee notified); workload per assignee; overdue reminders reach group members |
-| RISK-P0-13 Rogue access remediation | Risk | | Partial | Every remediation action, severity, trend and the finding page; the last, adding access to a package the identity holds, 2026-10-14 (#169). Done once its E2E passes in the nightly run |
+| RISK-P0-13 Rogue access remediation | Risk | | Done | Every remediation action, severity, trend and the finding page; the last, adding access to a package the identity holds, 2026-10-14 (#169). E2E passed in the nightly of 17 Oct |
 | QA-P0-26 Provisioning safety suite | QA | | Done | 2026-10-12, no migration. The mass-change guard on writes: at most `integration.maxWritesPerHour` (default 100) changes per connection per hour; past it nothing is sent and the task goes to its owner with the reason. Tests in `connector-provisioning.spec.ts`: read-only types cannot be turned on, the guard, Try again once the limit allows, no attempt key sent twice, every operation verified |
 
 ## F4: Lifecycle and certification
@@ -212,6 +212,7 @@ Exit test: not run.
 |---|---|---|
 | QA-P0-21 Security hardening pass | QA | Done: database review (migration 0195) and the security test matrix (`docs/security/SECURITY-TEST-MATRIX.md`) |
 | QA-P0-22 Brownfield fixture | QA | Done: HR to verified and removed access end to end, and its certification (`brownfield.spec.ts`) |
+| Full Playwright suite | QA | Done: green on the nightly of 17 Oct, all four parts (553 passed, 0 failed, 2 passed on retry) |
 
 ## History
 

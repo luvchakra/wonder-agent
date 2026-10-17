@@ -107,6 +107,8 @@ const priorityRules = [];
       const ni = header.indexOf("notes");
       const qualifier = /\((finish|rest|runtime part|extended)\)/.exec(c[0])?.[0] ?? "";
       if (id && si >= 0) live.set(id + qualifier, { status: normalize(c[si] ?? ""), notes: ni >= 0 ? (c[ni] ?? "") : "" });
+      // A plan item with no story id (e.g. "Full Playwright suite") is matched by its name.
+      else if (!id && si >= 0 && c[0]) live.set(`name:${c[0].trim()}`, { status: normalize(c[si] ?? ""), notes: ni >= 0 ? (c[ni] ?? "") : "" });
     }
   }
 }
@@ -163,7 +165,10 @@ const phases = [];
 
 /** A phase story's status: the backlog row, unless the phase finishes a story the backlog already closed. */
 function phaseStatus(s) {
-  if (!s.id) return { status: "Not started", source: "" };
+  if (!s.id) {
+    const byName = live.get(`name:${s.label.replace(/\s*†\s*$/, "").trim()}`);
+    return { status: byName?.status ?? "Not started", notes: byName?.notes ?? "" };
+  }
   const fromLive = live.get(s.id + s.qualifier) ?? live.get(s.id);
   if (s.qualifier) return { status: fromLive?.status ?? "Not started", notes: fromLive?.notes ?? "" };
   const row = tracker.get(s.id);

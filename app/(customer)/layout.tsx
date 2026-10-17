@@ -21,6 +21,7 @@ import pkg from "@/package.json";
 import { brandTitle, wonderIdBrand } from "@/modules/ui/brand";
 import { roleLabel } from "@/lib/users/userRules";
 import { WonderIDLogo } from "@/modules/ui/Logo";
+import { AuthShell } from "@/modules/ui";
 
 // EXPERIENCE-P0-01.1. The one shared customer-facing shell every domain
 // module's pages mount into (app/(customer)/* — a Next.js route group, so
@@ -62,6 +63,9 @@ export default async function CustomerLayout({ children }: { children: React.Rea
   const ctx = await getTenantContext();
   // FOUNDATION-P0-27 — the organization requires MFA and this session has not passed it.
   if (ctx.mfaStepUp) redirect("/verify-mfa");
+  // Owner decision 2026-10-17: a failed access read is said as such, never
+  // sent to onboarding or shown as "no access". Nothing is shown meanwhile.
+  if (ctx.unavailable) return <AccessUnavailable />;
   if (!ctx.tenantId) {
     // FOUNDATION-P0-22 — on an organization's own address there is nothing
     // to create or pick: the user either belongs there or has no access.
@@ -185,5 +189,24 @@ export default async function CustomerLayout({ children }: { children: React.Rea
 
       <MobileTabBar />
     </div>
+  );
+}
+
+/** Shown when WonderID could not check the person's access (a database read failed). */
+function AccessUnavailable() {
+  return (
+    <AuthShell
+      title="We couldn't check your access"
+      subtitle="WonderID could not read your organization or roles just now, so nothing is shown until it can."
+      footer={<>Your session was not ended, and nothing was changed.</>}
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">This is usually brief. Try again in a moment.</p>
+        {/* A plain link to the same URL: a full reload checks again. */}
+        <a href="" className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:opacity-90">
+          Try again
+        </a>
+      </div>
+    </AuthShell>
   );
 }

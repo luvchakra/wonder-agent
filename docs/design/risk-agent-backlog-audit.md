@@ -1461,3 +1461,10 @@ lists, search and the create redirect link by number; `toInvestigation`
 and `toAccessFinding` map `ref`; status/assign/note actions revalidate the
 route. The identity page's finding links still use the UUID (they
 redirect). Detail and verification: Foundation audit log, same date.
+
+## 2026-10-17 — RISK-P0-13 done
+
+Every RISK-P0-13 end-to-end test in `connector-provisioning.spec.ts` passed in
+the nightly of 17 Oct (part 1: 24 passed, 1 passed on retry, "F3 exit", whose
+first attempt is explained in the QA log). This was the story's last
+condition, so it is marked Done.

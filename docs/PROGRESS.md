@@ -8,13 +8,13 @@ by hand.** Update the owning module's backlog table, then regenerate:
 npm run progress
 ```
 
-Generated 2026-10-16 from 11 module backlogs.
+Generated 2026-10-17 from 11 module backlogs.
 
 ---
 
 ## Overall
 
-**235 of 277 tracked stories complete — 85%**
+**236 of 277 tracked stories complete — 85%**
 
 ```
 ██████████████████████████████████░░░░░░  85%
@@ -22,9 +22,9 @@ Generated 2026-10-16 from 11 module backlogs.
 
 | Status | Stories |
 |---|---|
-| Done | 235 |
-| Partial | 26 |
-| Deferred | 1 |
+| Done | 236 |
+| Partial | 24 |
+| Deferred | 2 |
 | Not Started | 15 |
 | **Total tracked** | **277** |
 
@@ -43,12 +43,12 @@ and are deliberately excluded from the counts above.
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 27 | 3 | 0 | 0 | 30 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
 | 05 | [Runtime Agent](plan/05-RUNTIME-AGENT-BACKLOG.md) | 13 | 0 | 0 | 0 | 13 | `██████████████████` 100% |
-| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 13 | 3 | 0 | 0 | 16 | `███████████████░░░` 81% |
+| 06 | [Risk Agent](plan/06-RISK-AGENT-BACKLOG.md) | 14 | 2 | 0 | 0 | 16 | `████████████████░░` 88% |
 | 07 | [Compliance Agent](plan/07-COMPLIANCE-AGENT-BACKLOG.md) | 16 | 1 | 0 | 0 | 17 | `█████████████████░` 94% |
 | 08 | [Experience Agent](plan/08-EXPERIENCE-AGENT-BACKLOG.md) | 28 | 3 | 0 | 6 | 37 | `██████████████░░░░` 76% |
 | 09 | [Platform Agent](plan/09-PLATFORM-AGENT-BACKLOG.md) | 14 | 2 | 1 | 1 | 18 | `██████████████░░░░` 78% |
 | 10 | [Operations Agent](plan/10-OPERATIONS-AGENT-BACKLOG.md) | 11 | 1 | 0 | 2 | 14 | `██████████████░░░░` 79% |
-| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 21 | 9 | 0 | 1 | 31 | `████████████░░░░░░` 68% |
+| 11 | [QA Agent](plan/11-QA-AGENT-BACKLOG.md) | 21 | 8 | 1 | 1 | 31 | `████████████░░░░░░` 68% |
 
 ---
 
@@ -247,7 +247,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Risk Engine & Rogue Agent Detection  
 **Backlog status:** DORMANT — do not start until the user says "Run Risk Agent"  
-**Stories:** 13 done · 3 partial · 0 deferred · 0 not started (16 tracked) · 4 P1 / 3 P2 ahead
+**Stories:** 14 done · 2 partial · 0 deferred · 0 not started (16 tracked) · 4 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -266,7 +266,7 @@ and are deliberately excluded from the counts above.
 | RISK-P0-04 | Governance Drift detection | Done — 2026-09-16, unit-tested (7 tests), migration `0054` live-applied. New `governance_drift` category diffs current purpose/autonomy/allowed-tools/approved-actions/owners/IAM-identities/effective-access against the agent's state as of its last `APPROVED` lifecycle transition (no new table, reuses `risk_findings`/`risk_evidence`); "new tool/data source beyond `allowedTools`" and "runtime behavior changed" deliberately not built as separate sub-signals — see audit log |
 | RISK-P0-11 | Investigations as a first-class record (master P0-37) | Done — 2026-09-25: migration 0071 (investigations, investigation_findings, investigation_events; select-only RLS; composite same-tenant FKs), audited service + API, `/risk/investigations` list/detail with timeline; cannot resolve while a finding is open |
 | RISK-P0-12 | New risk signals (master P0-20/P0-21) | Partial — 2026-09-25: suspicious delegation + unapproved tool use findings (migration 0072), certification overdue / destructive capability / credential health factors sourced, Shadow AI signal on /risk; attack-path factor still has no source (needs an Access graph-traversal contract) |
-| RISK-P0-13 | Rogue Access management | Partial — 2026-10-12 (F3 core, migration 0130): "Remove access" / "Disable account" on a rogue-access finding raises a request under the application's policy; the connector removes it, reconciliation verifies it and the finding resolves as verified fixed. Tickets (owner request, 0131–0132): one ticket per rogue account, RA-000001… per organization, holding all its rogue-access findings, quoted in removal requests, resolved when the account's last rogue access is fixed. 2026-10-13: deterministic severity from privilege, sensitive data, privileged or shared account, external or inactive holder, unlinked account and blast radius, re-scored as facts change; weekly trend on Rogue Accounts. 2026-10-13: a finding page (`/risk/rogue-accounts/<id>`: why it is rogue with the severity's reasons, evidence, outcome); approve afterwards or recognize as legacy, optionally until a date (recorded by Access as a fulfilled request, so the ledger counts it as approved and the access is removed at the end date); assign an owner; escalate into an investigation. Quarantine is the existing "Disable account" request. 2026-10-14: add the access to a package the identity already holds (nobody gains access; the approval ends with the assignment). Done once its E2E passes in the nightly run |
+| RISK-P0-13 | Rogue Access management | Done — 2026-10-17: every RISK-P0-13 E2E in `connector-provisioning.spec.ts` passed in the nightly of 17 Oct (part 1, 24 passed). 2026-10-12 (F3 core, migration 0130): "Remove access" / "Disable account" on a rogue-access finding raises a request under the application's policy; the connector removes it, reconciliation verifies it and the finding resolves as verified fixed. Tickets (owner request, 0131–0132): one ticket per rogue account, RA-000001… per organization, holding all its rogue-access findings, quoted in removal requests, resolved when the account's last rogue access is fixed. 2026-10-13: deterministic severity from privilege, sensitive data, privileged or shared account, external or inactive holder, unlinked account and blast radius, re-scored as facts change; weekly trend on Rogue Accounts. 2026-10-13: a finding page (`/risk/rogue-accounts/<id>`: why it is rogue with the severity's reasons, evidence, outcome); approve afterwards or recognize as legacy, optionally until a date (recorded by Access as a fulfilled request, so the ledger counts it as approved and the access is removed at the end date); assign an owner; escalate into an investigation. Quarantine is the existing "Disable account" request. 2026-10-14: add the access to a package the identity already holds (nobody gains access; the approval ends with the assignment). Done once its E2E passes in the nightly run |
 
 ### 07 — Compliance Agent
 
@@ -394,7 +394,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Final Integration, QA & Security Hardening  
 **Backlog status:** DORMANT — do not start until the user says "Run QA Agent". This agent  
-**Stories:** 21 done · 9 partial · 0 deferred · 1 not started (31 tracked) · 7 P1 / 3 P2 ahead
+**Stories:** 21 done · 8 partial · 1 deferred · 1 not started (31 tracked) · 7 P1 / 3 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -409,7 +409,7 @@ and are deliberately excluded from the counts above.
 | QA-P0-04.3 | Responsive & performance spot-check | Partial — the responsive half is now **done for real** (2026-09-16): authenticated, real-browser sweep of 16 customer routes × mobile 390/tablet 768/desktop 1440 × light+dark = 78 renders against the live deployment with real tenant data — horizontal overflow 0px on every render, correct theme token resolution everywhere, no error boundary or placeholder (see `docs/design/experience-agent-backlog-audit.md`). The pagination gap this row named was closed 2026-09-16 via the shared `DEFAULT_LIST_LIMIT` (`lib/shared/pagination.ts`) across 15 `list*()` functions plus Risk's `getFindings()`; 4 completeness-dependent aggregates left uncapped with an inline reason each. Still `Partial` only for the *performance* half — no timing/Lighthouse measurement has been taken against a loaded tenant |
 | QA-P0-04.4 | Regression fixes only, smallest safe change | Done — both fixes this pass were minimal, logged in Foundation's audit log, re-verified |
 | QA-P0-05 | Clean install verification | Partial — 2026-09-16: a genuine from-scratch `git clone` + `npm ci` + typecheck/lint/full test suite (260/260)/production build all verified clean in an isolated directory (no carried-over `node_modules`/`.env.local`); the fresh-database migration-apply half still deliberately not attempted — creating a Supabase branch is a real billable action, and the user chose to skip it rather than incur the cost for this verification pass |
-| QA-P0-06 | Authentication suite (SAML/OIDC/session) | Partial — role-mapping and session-expiry still only unit-tested (idle/absolute-expiry timing isn't practically E2E-testable without waiting real clock time); 2026-09-16 added real browser coverage for what was previously fully uncovered: sign-in success/failure, sign-up (including the already-registered-email and under-minlength-password paths), logout, unauthenticated redirect, and negative-permission/tenant-isolation checks (`tests/e2e/auth.spec.ts`, part of `QA-P0-16`). SAML/OIDC real IdP exchange and wrong-tenant/domain SSO paths remain out of scope (no test IdP available) |
+| QA-P0-06 | Authentication suite (SAML/OIDC/session) | Deferred — owner decision 2026-10-17: the SAML/OIDC part waits until Supabase supports SAML on this project's plan. What exists: role-mapping and session-expiry still only unit-tested (idle/absolute-expiry timing isn't practically E2E-testable without waiting real clock time); 2026-09-16 added real browser coverage for what was previously fully uncovered: sign-in success/failure, sign-up (including the already-registered-email and under-minlength-password paths), logout, unauthenticated redirect, and negative-permission/tenant-isolation checks (`tests/e2e/auth.spec.ts`, part of `QA-P0-16`). SAML/OIDC real IdP exchange and wrong-tenant/domain SSO paths remain out of scope (no test IdP available) |
 | QA-P0-07 | Connector contract tests | Done — 2026-10-14: `modules/integrations/framework/contract.test.ts`, 145 tests; every built-in connector tested for each property or listed in its `GAPS` table with the reason (no read retry, 429 not waited out, no per-connection rate limit on receivers) |
 | QA-P0-08 | Runtime test corpus | Done — 2026-09-19: `tests/runtime/should-can-did-corpus.ts`, six deterministic cases (one per named category), reused (not re-authored) by both `modules/runtime-assurance/compare.test.ts` (QA-P0-09) and `modules/risk/rules.test.ts` — see audit log |
 | QA-P0-09 | SHOULD/CAN/DID reproducibility | Done — `compare.test.ts` directly asserts identical repeated output and evaluator-version stability |

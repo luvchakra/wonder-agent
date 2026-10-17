@@ -4,14 +4,14 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 
 ✅ done · 🔶 partly done · ⬜ not started · progress counts partly done as half
 
-**Overall: 60%** `██████░░░░`
+**Overall: 61%** `██████░░░░`
 
 | # | Phase | Progress |
 |---|---|---|
 | 1 | [Foundation, sign-in and identity](#1-foundation-sign-in-and-identity) | `█████████░` 88% |
 | 2 | [Applications, accounts and connections](#2-applications-accounts-and-connections) | `██████████` 100% |
 | 3 | [Access requests](#3-access-requests) | `██████████` 100% |
-| 4 | [Provisioning](#4-provisioning) | `██████░░░░` 55% |
+| 4 | [Provisioning](#4-provisioning) | `██████░░░░` 59% |
 | 5 | [AI agents](#5-ai-agents) | `██████████` 100% |
 | 6 | [Risk, reviews and compliance](#6-risk-reviews-and-compliance) | `██████████` 100% |
 | 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `███████░░░` 70% |
@@ -61,13 +61,13 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Requests for service accounts and AI agents
 - ✅ Request tracking and one inbox
 
-## 4. Provisioning — 55%
+## 4. Provisioning — 59%
 
 - ✅ Connectors remove access and disable accounts
 - ✅ Connectors grant access and create accounts
 - ✅ Safety guard on automatic changes
 - ✅ Richer connection types (transforms, OAuth, certificates)
-- 🔶 Rogue access removed through connectors
+- ✅ Rogue access removed through connectors
 - 🔶 SCIM, LDAP and HTTP writes
 - ⬜ Relay into private networks
 - ⬜ Microsoft Entra ID connector

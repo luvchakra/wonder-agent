@@ -17,7 +17,7 @@ import { auditRefusal, authorizeContext, noTenantError, refusalError } from "./a
  */
 export async function requirePermission(permission: string): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) throw noTenantError(ctx);
+  if (!ctx.tenantId || ctx.unavailable) throw noTenantError(ctx);
   const result = authorizeContext(ctx, permission);
   if (result.decision !== "ALLOW") {
     await auditRefusal(ctx, result);
@@ -34,7 +34,7 @@ export async function requirePermission(permission: string): Promise<TenantConte
  */
 export async function requireAnyPermission(permissions: string[]): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) throw noTenantError(ctx);
+  if (!ctx.tenantId || ctx.unavailable) throw noTenantError(ctx);
   if (!permissions.some((p) => ctx.permissions.includes(p))) {
     throw new ApiError(403, "FORBIDDEN", `Missing one of: ${permissions.join(", ")}`);
   }
