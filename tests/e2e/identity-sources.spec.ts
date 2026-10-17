@@ -40,7 +40,8 @@ async function runCsv(request: APIRequestContext, sourceId: string, text: string
         run = (await (await request.get(`/api/v1/integrations/identity-sources/runs/${runId}`)).json()).data as Run;
         return run.status;
       },
-      { timeout: 30_000, intervals: [500, 1000] },
+      // 90 s: on the nightly machine a six-row run once took past 30 s (17 Oct).
+      { timeout: 90_000, intervals: [500, 1000] },
     )
     .toMatch(/succeeded|partial|failed/);
   return run!;
@@ -170,6 +171,7 @@ test.describe.serial("identity sources", () => {
   });
 
   test("the leaver guard applies nobody when most of the population is missing", async ({ request }) => {
+    test.setTimeout(240_000); // two runs, each allowed 90 s
     const guardId = await createSource(request, { name: `E2E Guard ${stamp}`, leaverThresholdPercent: 20 });
     const people = Array.from({ length: 6 }, (_, i) => [`G${i}`, `E2E Guard ${i} ${stamp}`, mail(`guard${i}`), "Ops", "", "", "active"]);
     expect(await runCsv(request, guardId, csv(people))).toMatchObject({ status: "succeeded", createdCount: 6 });

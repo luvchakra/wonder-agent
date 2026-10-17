@@ -76,7 +76,7 @@ through a pull request.**
 - Squash-merge as soon as CI (`security.yml`) is green, without asking
   (`CLAUDE.md` §19.9, rule 0, owner decision 2026-10-16; it replaced the
   "merge now" rule of 2026-10-10). The full Playwright suite (`e2e.yml`)
-  runs nightly at 03:00 IST in four parts, not per change.
+  runs nightly at about 03:00 IST (cron 02:47 IST) in four parts, not per change.
 - Then confirm the production deploy is ready, and move to the next story.
 - **Never push directly to `main`.** This replaces the earlier auto-merge and
   "also fast-forward `main` after every push" instructions.

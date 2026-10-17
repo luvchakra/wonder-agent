@@ -7,6 +7,7 @@ import { getAccountAccessLedger, getInventoryAccount, LEDGER_SOURCE_LABEL, LEDGE
 import { listAccessFindings, remediationLabel } from "@/modules/risk/service";
 import { listIdentities } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
+import { safeErrorMessage } from "@/lib/security/redact";
 import { RecordProvenance, Badge, Button, Card, CardBody, CardHeader, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { LinkAccountForm } from "../AccountForms";
 import { RemoveRogueAccessButton } from "./RemoveRogueAccessButton";
@@ -45,11 +46,16 @@ export default async function AccountDetailPage({ params, searchParams }: { para
     getRecordProvenance(tenantId, "accounts", id),
     // ACCESS-P0-25: whether WonderID can prove each piece of this account's access was approved.
     getAccountAccessLedger(tenantId, id).catch(() => null),
-    listAccessFindings(tenantId, { accountId: id, openOnly: true }).catch(() => []),
+    // A failed read is said on the page, never shown as "no rogue access" (§17.5).
+    listAccessFindings(tenantId, { accountId: id, openOnly: true }).catch((err) => {
+      console.error("Account page: rogue-access findings unreadable", safeErrorMessage(err));
+      return null;
+    }),
   ]);
   if (!account) notFound();
   // One ticket per rogue account (0132): open while any of its rogue access is.
-  const openTicket = findings.find((f) => f.ticketStatus === "open" && f.ticketNumber)?.ticketNumber ?? null;
+  const findingsUnreadable = findings === null;
+  const openTicket = (findings ?? []).find((f) => f.ticketStatus === "open" && f.ticketNumber)?.ticketNumber ?? null;
   const identities =
     canManage && !account.agentId
       ? (await listIdentities(tenantId, { types: ["HUMAN", "EXTERNAL", "SERVICE_ACCOUNT", "APPLICATION", "WORKLOAD", "API", "MACHINE"], status: "active", q: find || undefined, pageSize: 50 })).rows
@@ -163,6 +169,9 @@ export default async function AccountDetailPage({ params, searchParams }: { para
           actions={openTicket ? <Badge tone="danger">{`Ticket ${openTicket} open`}</Badge> : undefined}
         />
         <CardBody>
+          {findingsUnreadable ? (
+            <p role="status" className="mb-2 text-sm text-warning">Rogue access on this account could not be checked just now. Reload to try again.</p>
+          ) : null}
           {ledger === null ? (
             <p role="status" className="text-sm text-warning">The access record could not be read just now.</p>
           ) : ledger.length === 0 ? (
@@ -170,7 +179,7 @@ export default async function AccountDetailPage({ params, searchParams }: { para
           ) : (
             <ul className="divide-y divide-border text-sm">
               {ledger.map((e) => {
-                const finding = findings.find((f) => (f.entitlementId ?? null) === (e.entitlementId ?? null));
+                const finding = (findings ?? []).find((f) => (f.entitlementId ?? null) === (e.entitlementId ?? null));
                 return (
                   <li key={e.id} className="flex flex-wrap items-center gap-2 py-2">
                     <span className="min-w-0 flex-1 text-foreground">{e.entitlementName ?? "The account itself"}</span>

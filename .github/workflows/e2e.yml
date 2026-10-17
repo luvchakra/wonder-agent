@@ -21,7 +21,9 @@ name: E2E (Playwright on Vercel)
 # statuses.
 on:
   schedule:
-    - cron: "30 21 * * *" # 03:00 IST
+    # 02:47 IST. GitHub delays scheduled runs at busy minutes: at "30 21" (03:00
+    # IST) both runs of 16 and 17 Oct started 2 h 13 min late, at 05:13 IST.
+    - cron: "17 21 * * *"
   workflow_dispatch:
     inputs:
       specs:
