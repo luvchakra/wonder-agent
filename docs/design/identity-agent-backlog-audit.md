@@ -2219,3 +2219,94 @@ is the approved automation path for the automatic case (NN #15, design
 - `remove_from_group` and `remove_package` effects.
 - A request through the package's own approval chain; the approval task is
   decided by an access or group administrator instead.
+
+## 2026-10-17 — IDENTITY-P0-23: merging two records of the same person
+
+Owner decision 2026-10-17: "go ahead, write it and deploy it" (the
+migration). Saviynt reference study D-6.
+
+**Built:**
+- **Migration 0198**, applied to the dev project:
+  - `identities.merged_into_identity_id`, a same-tenant composite FK that
+    can't point at itself;
+  - `identity_merges`: tenant_id, RLS, select-only policy for members, no
+    write policy. It holds the survivor's values before, the merged
+    record's status and sign-in, and every moved row id per
+    `table.column`;
+  - `merge_identities()` and `unmerge_identities()`: security invoker,
+    execute revoked from public, anon and authenticated, granted to
+    `service_role` only.
+- **What the merge does**, in one transaction:
+  - checks that both records are the same kind of person (HUMAN or
+    EXTERNAL), in the tenant, and not merged;
+  - refuses two sign-ins, the same identity source, the same live
+    package, or the same pending request;
+  - copies the chosen attributes with their provenance;
+  - ends relationships that would duplicate or self-link;
+  - moves the current-state references (`identity_merge_moves()`):
+    - accounts, ledger, live packages, pending requests and open findings;
+    - current relationships, reports, owner and sponsor;
+    - application, entitlement and package owners;
+    - open task assignees and fulfilment assignees;
+    - source records;
+  - moves the sign-in when only the merged record has one;
+  - sets the merged record inactive.
+  
+  History stays with the record it happened to: decided requests,
+  certification items, source changes, lifecycle events and audit.
+- **Undo** restores exactly the recorded rows, the attributes and their
+  provenance, and the sign-in. It needs a reason and runs once.
+- **Code:**
+  - `modules/agent-identity/identityMerge.ts`, pure: `MERGE_FIELDS`,
+    `mergeDifferences`, `chosenColumns` (a blank on the survivor takes the
+    other value), `mergeRefusal`, `duplicateReason`;
+  - `identityMergeService.ts`: `findDuplicatesOf` (same email or name,
+    LIKE-escaped, no `or()` interpolation), `getMergePreview` (counts of
+    what moves), `mergeIdentities`, `listActiveMergesFor` and
+    `undoIdentityMerge`.
+  
+  Merges and undos are audited as `identity.merged` and
+  `identity.merge_undone`, with the reason as typed text, and failures
+  are audited too.
+- **UI:**
+  - the person's page shows "Possible duplicate: … · Compare and merge",
+    or "Merge with another record";
+  - `/identities/<n>/merge` (needs identity.manage) lists duplicates and
+    searches. Compare shows the differing attributes side by side with a
+    radio each and a summary of what moves; Merge records asks for
+    confirmation;
+  - both records show "Merged from/into …" with **Undo the merge**.
+- **Docs:** the help guide (identities section, What's new), the
+  knowledge base and the ownership map.
+
+**Verified:**
+- `tests/identity/identity-merge.sql` against dev: 15 of 15 as expected.
+  It covers:
+  - the merge and its effects;
+  - another organization's record: P0002;
+  - a member reads the merge, another organization's member does not;
+  - a member running the function or writing a record: 42501;
+  - undo restores everything;
+  - undo twice and two sign-ins are both refused.
+- Supabase security advisors: nothing new.
+- Unit tests:
+  - `identityMerge.test.ts`, 6 new tests, including that `MERGE_FIELDS`
+    matches the migration's list;
+  - the full unit suite: 1854 passed.
+- `tests/e2e/identity-merge.spec.ts`: suggest, compare, merge, undo; a
+  read-only member gets no merge; another organization gets "not found".
+  Run on Vercel before the merge (§17.8), three times:
+  - first run: the merge worked, but the undo disclosure and its button
+    shared a label (test selector), so the button became "Confirm undo";
+  - second run: the undo message unmounted with its banner, so undo now
+    redirects to the record with the result;
+  - third run: 15/15 with `global-configuration.spec.ts`, after
+    `identities.spec.ts` and `compliance.spec.ts` had passed in the
+    second.
+- Typecheck and eslint clean.
+
+**Left out:**
+- An organization-wide duplicates list. Detection is per person, on
+  their page.
+- Merging machine identities and AI agents (agents keep IDENTITY-P0-04's
+  merge).

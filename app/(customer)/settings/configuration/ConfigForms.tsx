@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { restoreConfigAction, saveConfigAction, type ConfigFormState } from "@/app/actions/config";
+import { importBundleAction, previewBundleAction, restoreConfigAction, saveConfigAction, type BundleFormState, type ConfigFormState } from "@/app/actions/config";
 import { Card, CardBody, CardHeader, PendingSubmitButton, fieldInputClass, fieldLabelClass } from "@/modules/ui";
 import { CONFIG_SETTINGS, SECTIONS, optionLabel, type TenantConfig } from "@/lib/config/registry";
 import { cn } from "@/lib/utils";
@@ -118,5 +118,65 @@ export function RestoreVersionButton({ version }: { version: number }) {
       </PendingSubmitButton>
       {state.message ? <span className={cn("text-xs", state.ok ? "text-success" : "text-destructive")}>{state.message}</span> : null}
     </form>
+  );
+}
+
+const BUNDLE_IDLE: BundleFormState = { step: "idle" };
+
+/**
+ * PLATFORM-P0-13 — import a configuration file exported from another
+ * environment: Preview shows what would change, Import applies it as a
+ * new version. The file is checked again on import.
+ */
+export function ConfigBundleImport() {
+  const [previewState, preview] = useActionState(previewBundleAction, BUNDLE_IDLE);
+  const [importState, apply] = useActionState(importBundleAction, BUNDLE_IDLE);
+  const shown = importState.step !== "idle" ? importState : previewState;
+  return (
+    <div className="space-y-3">
+      <form action={preview} className="flex flex-wrap items-end gap-3">
+        <div>
+          <label htmlFor="bundle" className={fieldLabelClass}>
+            Configuration file
+          </label>
+          <input id="bundle" name="bundle" type="file" accept="application/json,.json" required className={cn(fieldInputClass, "h-auto py-1.5")} />
+        </div>
+        <PendingSubmitButton pendingLabel="Checking…" variant="outline">
+          Preview
+        </PendingSubmitButton>
+      </form>
+      {shown.step === "error" ? (
+        <p role="alert" className="text-sm text-destructive">
+          {shown.message}
+        </p>
+      ) : null}
+      {shown.step === "done" ? (
+        <p role="status" className="text-sm text-success">
+          {shown.message}
+        </p>
+      ) : null}
+      {shown.step === "preview" ? (
+        <form action={apply} className="space-y-3 rounded-md border border-border p-3">
+          <input type="hidden" name="bundleText" value={shown.text} />
+          <p className="text-sm text-muted-foreground">
+            From {shown.source}, exported {shown.exportedAt.slice(0, 16).replace("T", " ")} UTC.
+          </p>
+          {shown.changes.length ? (
+            <ul className="space-y-0.5 text-sm" aria-label="Changes the import makes">
+              {shown.changes.map((c) => (
+                <li key={c.label}>
+                  {c.label}: {c.from} → {c.to}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm">This organization already has these settings.</p>
+          )}
+          {shown.changes.length ? (
+            <PendingSubmitButton pendingLabel="Importing…">Import {shown.changes.length === 1 ? "1 change" : `${shown.changes.length} changes`}</PendingSubmitButton>
+          ) : null}
+        </form>
+      ) : null}
+    </div>
   );
 }

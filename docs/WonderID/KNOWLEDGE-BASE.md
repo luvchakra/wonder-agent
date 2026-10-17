@@ -128,6 +128,11 @@ The everyday cycle looks like this:
 
 **Duplicates**
 - Possible duplicate AI agents are flagged for review and merged only after a person agrees. A merge cannot be undone.
+- **Two records of the same person** can be merged. When another record has the same email or name, the person's page says "Possible duplicate"; **Compare and merge** shows both records side by side, and you choose which value stays wherever they differ.
+  - The merge moves the other record's accounts and access, access packages, pending requests, open findings, direct reports, source records and WonderID sign-in to the record you keep. The other record becomes inactive and shows which record it went into.
+  - History stays with the record it happened to.
+  - **Undo the merge**, on either record, puts everything back; it needs a reason.
+  - Two records that both sign in, hold the same package, have the same pending request or come from the same identity source can't be merged.
 
 ---
 
@@ -437,6 +442,7 @@ Findings are raised for:
 - **Campaigns:** each campaign covers a chosen set of identities, applications or agents.
 - **Decisions:** reviewers keep, revoke or change each piece of access. For people's access and WonderID roles they can also defer (a new due date, at most 30 days away), escalate (to whoever launched the campaign) or make an exception (keep the access until a date, at most 90 days away; it is then removed automatically). An exception is not available for a role that comes from a group, and nobody makes one for their own access.
 - **Overdue items:** escalated automatically.
+- **Calendar and analytics:** the campaigns page has a **Calendar** tab (open campaigns by the month they are due, past due first) and an **Analytics** tab (items reviewed, completion, share revoked, open and overdue items, average time to decide, outcomes, each scope, and the reviewers with the most overdue items). Every figure is counted from the campaigns' own items; one that can't be computed shows "—".
 - **Templates and preview:** a launch can be saved as a template (scope, who reviews, cadence, days to review) and launched again in one click; Preview counts the items, identities, high-risk items and reviewers a campaign would have before it is launched.
 - **Asking someone:** when a reviewer needs more information, they choose "request information" and can name a colleague by email (the person whose access it is, its owner, anyone who knows). That person is notified, answers once on their own page, and the question and answer stay with the item as evidence. The reviewer still decides.
 - **Evidence:** each decision is captured as evidence.
@@ -605,6 +611,7 @@ runs inside your organization and respects the viewer's permissions.
   - the mass-missing threshold;
   - the hourly limit on changes made by connections;
   - review defaults.
+- **Export and import:** settings tried in Dev or Test can be moved to another environment. Export downloads a signed file. Importing it elsewhere first lists every setting it would change, from and to, then saves them as a new version. A file edited after export is refused.
 
 **AI provider**
 - Choose OpenAI or Gemini, using WonderID's key or your own.
@@ -665,6 +672,9 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | Global Configuration can be exported as a signed file and imported into another environment, with a preview of every change first. |
+| 17 Oct 2026 | Access review campaigns have a Calendar of what is due each month and Analytics: completion, revocations, time to decide, overdue items and reviewer backlog. |
+| 17 Oct 2026 | Two records of the same person can be compared side by side and merged, keeping the values you choose, and the merge can be undone. |
 | 17 Oct 2026 | Identity rules can add a person to a group or assign an access package, either after a person approves it or automatically. |
 | 17 Oct 2026 | When WonderID cannot check someone's access because a database read failed, it now says "We couldn't check your access" instead of "forbidden" or sending them to set up an organization. |
 | 16 Oct 2026 | The help centre needs sign-in, and its guide now matches today's menu and pages, with new sections on rogue accounts, provisioning tasks, delegations and My Team, identity rules and API clients. |

@@ -351,6 +351,8 @@ export type Identity = {
   ownerIdentityId: string | null;
   sponsorIdentityId: string | null;
   managerIdentityId: string | null;
+  /** IDENTITY-P0-23: the record this one was merged into (migration 0198). */
+  mergedIntoIdentityId?: string | null;
   department: string | null;
   title: string | null;
   businessUnit: string | null;

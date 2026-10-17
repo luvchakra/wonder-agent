@@ -23,6 +23,16 @@ test.describe("Compliance module", () => {
     await expect(page.getByRole("dialog", { name: "Launch a new campaign" }).getByLabel("Campaign name")).toBeVisible();
   });
 
+  // COMPLIANCE-P0-10 part 5: the calendar and analytics tabs, counted in the database.
+  test("the Calendar and Analytics tabs show real counts", async ({ page }) => {
+    await page.goto("/compliance/campaigns?tab=analytics");
+    await expect(page.getByRole("tab", { name: "Analytics" })).toHaveAttribute("data-state", "active");
+    await expect(page.getByText(/^Items reviewed$|^No campaigns yet$/).first()).toBeVisible();
+    await expect(page.getByText(/unavailable just now/i)).toHaveCount(0);
+    await page.getByRole("tab", { name: "Calendar" }).click();
+    await expect(page.getByText(/Nothing due|Past due|\d{4}$/).first()).toBeVisible();
+  });
+
   test("launching an agent-scope campaign redirects straight to its detail page with a metrics summary", async ({ page }) => {
     const campaignName = `E2E Campaign ${Date.now()}`;
     await page.goto("/compliance/campaigns");

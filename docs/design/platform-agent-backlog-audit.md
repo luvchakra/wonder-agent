@@ -1347,3 +1347,52 @@ does not order it). The organizations list, environment rows and the
 remove-environment redirect link by number (`PlatformTenant.ref`,
 `Organization.ref`). Detail and verification: Foundation audit log, same
 date.
+
+## 2026-10-17 — PLATFORM-P0-13: configuration bundles (Global Configuration)
+
+Owner decision 2026-10-17: "go ahead with all the items … one by one".
+
+**Built:** no migration.
+- `lib/config/bundle.ts`: `exportConfigBundle` and `readConfigBundle`.
+  - A bundle is every registry setting plus the source (slug and
+    environment) and the export time.
+  - The signature is an HMAC-SHA256 over a canonical form, keyed from
+    SECRET_ENCRYPTION_KEY; a retired SECRET_ENCRYPTION_KEY_PREVIOUS still
+    verifies.
+  - It is not bound to an organization, because environments are separate
+    tenants.
+  - With no key, nothing is signed or accepted.
+  - Files over 64 KB, files of another format or version, and incomplete
+    files are refused, each with its own message.
+- `lib/config/tenantConfig.ts`: `previewConfigBundle` (the save's own
+  `planConfigChange`, without saving) and `importConfigBundle` (the save
+  path, so it is versioned, checks every setting's permission and MFA
+  rule, and never part-applies). It is audited as `tenant.config_imported`
+  alongside `tenant.config_updated`.
+- `GET /api/v1/tenant/configuration/bundle`: downloads the file
+  (tenant.settings or tenant.security.manage), audited as
+  `tenant.config_exported`.
+- Global Configuration has a folded "Export and import" row: an export
+  link, a file chooser with Preview (from and to for each change), then
+  "Import N changes". The import re-verifies the file.
+- Docs: the help article (§19.11.5) and the knowledge base.
+
+**Verified:**
+- `lib/config/bundle.test.ts`, 5 tests:
+  - round trip;
+  - edited values or source refused, key order ignored;
+  - retired key accepted, unknown key refused;
+  - no key;
+  - malformed files.
+- `lib/config` and architecture unit tests pass; typecheck and eslint
+  clean.
+- E2E `global-configuration.spec.ts` passed on Vercel (15/15 with the
+  merge spec). The test exports, previews "already has these settings",
+  and refuses an edited file. It runs inside the serial block, after the
+  tests that change and restore the settings.
+
+**Left:**
+- Bundles for the declarative objects (attributes, request policies,
+  rules, templates).
+- A second person's approval of an import. Today the importer approves by
+  reviewing the preview, as a direct save does.

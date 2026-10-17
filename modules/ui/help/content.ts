@@ -153,16 +153,17 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "identities",
     title: "The identity directory",
     category: "Identities",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Identities lists every governed identity — people, external identities, machine identities and AI agents — with its type, status, owner and source.",
     body: [
       "Administration › Identities › Identity Overview counts identities by type and lists what needs attention: open lifecycle work, non-human identities without an owner, external access ending within 30 days, and external identities still active past their end date. All Identities, Workforce, External Identities and Non-Human Identities each list one slice.",
       "New identity adds a person, an external person or a non-human identity (service account, application account, workload or API client). An external identity needs a sponsor, an organization and a future end date; a non-human identity needs an accountable owner. Orphaned Identities lists the non-human identities nobody owns; access can't be requested for them until they have an owner. To add an AI agent, register it under Self Service › Register Agent; its identity appears here by itself.",
       "Open an identity to see its details, source, owner or sponsor and manager, its relationships to other identities, and its attributes; people also have a Lifecycle tab. A value owned by an identity source is not silently overwritten here. Changes are recorded in the audit trail.",
+      "Two records of the same person can be merged. When another record has the same email or name, the person's page says \"Possible duplicate\"; Compare and merge shows both side by side. Where they differ, choose which value stays; a blank takes the other value. Merge records moves the other record's accounts and access, its access packages, pending requests, open findings, direct reports, source records and WonderID sign-in to this record, and sets the other inactive. History stays with the record it happened to. Undo the merge, on either record, puts everything back and needs a reason. Two records that both sign in, hold the same package, or come from the same identity source can't be merged.",
       "AI Agents › Agent Identities is a separate inventory of the technical identities your connected sources report: service accounts, workload identities, OAuth clients, API keys and MCP server identities. Most are not AI agents, so each unlinked one shows how likely it is to be one. Administration › Organization Settings › Identity Attributes defines the extra attributes your organization tracks.",
     ],
-    keywords: ["identity", "identities", "people", "person", "employee", "contractor", "external", "sponsor", "end date", "machine", "service account", "directory", "nhi", "non-human", "new identity", "orphaned", "relationships"],
+    keywords: ["identity", "identities", "people", "person", "employee", "contractor", "external", "sponsor", "end date", "machine", "service account", "directory", "nhi", "non-human", "new identity", "orphaned", "relationships", "merge", "duplicate", "undo merge"],
     href: "/identities",
   },
   {
@@ -552,16 +553,17 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "certification",
     title: "Access reviews (certification campaigns)",
     category: "Compliance",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Access reviews ask reviewers to keep or remove access, recording each decision with a justification and evidence for audit.",
     body: [
       "Access Reviews › Create Campaigns launches a round: a name, a scope, an optional criticality filter, a cadence (one time, periodic or event driven) and a reviewer. A scope can cover AI agents' access (by agent, application, entitlement, privileged access or high-risk agent), people's access, WonderID roles, what access packages contain (reviewed by each package's owner) or an application's entitlements (reviewed by each entitlement's or the application's owner). People's access can be reviewed by each person's manager or the application's owner. Also save as a template keeps the settings for next time.",
       "Review Campaigns lists them with how many items are pending and overdue. Open one to see its items, each with the evidence a reviewer needs; the counts at the top show pending, decided, overdue and escalated items.",
+      "The Calendar tab puts open campaigns under the month they are due, past due first. The Analytics tab shows how many items were reviewed, the share revoked, what is open and overdue, the average time to a decision, the outcomes, each scope, and the reviewers with the most overdue items. Each item counts once, by its final decision.",
       "Only the item's assigned reviewer can decide it. The decisions are Approve, Revoke, Modify, Delegate and Request information, and each needs a justification. Revoke removes the access through a task or the connection, and counts as done once a sync no longer finds it; Request information can ask a named person, who is told and answers once. Every decision is recorded once, with who made it, when and what the evidence looked like at that moment.",
       "Nobody certifies their own access or role, and a reviewer who owns the agent can't approve its access without an explicit override, which is audited. Items past their due date are escalated, and the owner is notified.",
     ],
-    keywords: ["certification", "campaign", "certify", "certify access", "recertify", "attestation", "review", "reviewer", "recertification", "approve", "revoke", "modify", "delegate", "request information", "overdue", "escalate", "audit", "evidence", "compliance", "control"],
+    keywords: ["certification", "campaign", "certify", "certify access", "recertify", "attestation", "review", "reviewer", "recertification", "approve", "revoke", "modify", "delegate", "request information", "overdue", "escalate", "audit", "evidence", "compliance", "control", "calendar", "analytics", "completion"],
     href: "/compliance/campaigns",
   },
   // --------------------------------------------------------------- Integrations
@@ -709,7 +711,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "global-configuration",
     title: "Governance Settings",
     category: "Administration",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Administration › Organization Settings › Governance Settings holds the settings that change how WonderID behaves for your whole organization; every save is a version you can restore.",
     body: [
@@ -717,8 +719,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Access: when an account counts as dormant (30, 60, 90, 180 or 365 days), how long an invitation stays usable, how long approved access has to be set up, and how long before time-bound access ends its holder is reminded. AI agents and runtime: how similar a new agent must be to wait in Duplicate Review, how far back unregistered agent activity is shown, and how often at most a runtime alert is raised for one agent. Risk: when an agent's gateway key is overdue for rotation and how many active keys it may have. Reviews: the risk score from which an agent counts as high-risk. Separation of duties: the period the Controls Dashboard's conflict count covers.",
       "Connections: the share of a kind gone from a source above which a full sync waits for a person, the most changes a connection may make in an hour, and the only hosts connections may reach.",
       "Each setting shows its default, which is how WonderID behaved before the setting existed. A value outside a setting's range is refused, and one invalid value means nothing is saved. Change history lists every saved version, who saved it and what changed; Restore puts an earlier version back as a new version. If two people save at once, the second is told to reload rather than overwriting the first.",
+      "Export and import moves these settings between your environments, for example from Dev to production. Export these settings downloads a signed file. In the other environment, choose the file and Preview: it lists each setting the import would change, from and to. Import applies them as a new version, which you can restore like any other. A file edited after export, or from another WonderID, is refused, and each setting still needs its own permission.",
     ],
-    keywords: ["global configuration", "configuration", "settings", "organization settings", "session timeout", "idle timeout", "session length", "inactivity", "dormant", "duplicate", "threshold", "key rotation", "high risk", "version", "restore", "rollback", "history"],
+    keywords: ["global configuration", "configuration", "settings", "organization settings", "session timeout", "idle timeout", "session length", "inactivity", "dormant", "duplicate", "threshold", "key rotation", "high risk", "version", "restore", "rollback", "history", "export", "import", "bundle", "promote", "environment"],
     href: "/settings/configuration",
   },
   {
@@ -960,6 +963,7 @@ export function getSection(id: string): GuideSection | undefined {
 
 /** The latest additions, each pointing at the guide section that explains it. */
 export const WHATS_NEW = [
+  { id: "identities", label: "Merging duplicate people", note: "Compare two records of the same person, choose the values that stay, merge them, and undo it if needed." },
   { id: "rogue-accounts", label: "Rogue accounts", note: "Access nothing in WonderID explains gets one ticket per account, and is removed through a request." },
   { id: "fulfilment", label: "Provisioning tasks", note: "Approved access a connection can't set up goes to a person or group, and closes when a sync finds it." },
   { id: "certification", label: "Access reviews for everyone", note: "Review people's access, WonderID roles, packages and applications, by managers or owners." },

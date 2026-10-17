@@ -14,16 +14,16 @@ Generated 2026-10-17 from 11 module backlogs.
 
 ## Overall
 
-**236 of 277 tracked stories complete — 85%**
+**237 of 277 tracked stories complete — 86%**
 
 ```
-██████████████████████████████████░░░░░░  85%
+██████████████████████████████████░░░░░░  86%
 ```
 
 | Status | Stories |
 |---|---|
-| Done | 236 |
-| Partial | 24 |
+| Done | 237 |
+| Partial | 23 |
 | Deferred | 2 |
 | Not Started | 15 |
 | **Total tracked** | **277** |
@@ -38,7 +38,7 @@ and are deliberately excluded from the counts above.
 
 | # | Agent | Done | Partial | Deferred | Not Started | Total | Progress |
 |---|---|---|---|---|---|---|---|
-| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 42 | 3 | 0 | 2 | 47 | `████████████████░░` 89% |
+| 01 | [Foundation Agent](plan/01-FOUNDATION-AGENT-BACKLOG.md) | 43 | 2 | 0 | 2 | 47 | `████████████████░░` 91% |
 | 02 | [Identity Agent](plan/02-IDENTITY-AGENT-BACKLOG.md) | 20 | 0 | 0 | 1 | 21 | `█████████████████░` 95% |
 | 03 | [Integration Agent](plan/03-INTEGRATION-AGENT-BACKLOG.md) | 27 | 3 | 0 | 0 | 30 | `████████████████░░` 90% |
 | 04 | [Access Agent](plan/04-ACCESS-AGENT-BACKLOG.md) | 30 | 1 | 0 | 2 | 33 | `████████████████░░` 91% |
@@ -58,7 +58,7 @@ and are deliberately excluded from the counts above.
 
 **Module:** Foundation, Authentication, Tenancy, Security & RBAC  
 **Backlog status:** ACTIVE (this is the only agent started initially)  
-**Stories:** 42 done · 3 partial · 0 deferred · 2 not started (47 tracked) · 10 P1 / 2 P2 ahead
+**Stories:** 43 done · 2 partial · 0 deferred · 2 not started (47 tracked) · 10 P1 / 2 P2 ahead
 
 | Story | Title | Status |
 |---|---|---|
@@ -73,7 +73,7 @@ and are deliberately excluded from the counts above.
 | FOUNDATION-P0-03.1 | Email/password auth | Done |
 | FOUNDATION-P0-03.2 | Tenant selection / JIT provisioning | Done |
 | FOUNDATION-P0-03.3 | SSO connection foundation (SAML/OIDC) | Partial, intentionally deferred — 2026-09-14: full CRUD service/API/admin UI, domain-based sign-in routing, auth callback + JIT provisioning, live RLS-verified; real end-to-end IdP handshake still unverified. 2026-09-16: confirmed via `mcp__Supabase__get_organization` + Supabase's own docs that this is a hard infrastructure blocker, not a code gap — SAML 2.0 is Pro-plan-and-above only, and this org is on the free plan. User explicitly chose to skip this and close out the P0 gap-closure pass without it (see audit log); resume only if the user upgrades the plan and supplies a real IdP |
-| FOUNDATION-P0-03.4 | MFA foundation | Partial — 2026-09-14: Supabase Auth TOTP enroll/verify/unenroll wired at `/settings/security`; real enrollment against a physical authenticator app not verified in this sandbox, see audit log |
+| FOUNDATION-P0-03.4 | MFA foundation | Done — 2026-09-14: Supabase Auth TOTP enroll/verify/unenroll wired at `/settings/security`. 2026-10-17: real enrollment verified end to end. `tests/e2e/mfa-required.spec.ts` enrolls a TOTP factor through Supabase Auth, computes the RFC 6238 code an authenticator app would show, verifies and challenges it; it passed on Vercel on 2026-10-17 (121 passed) |
 | FOUNDATION-P0-04.1 | `requirePermission()` | Done |
 | FOUNDATION-P0-04.2 | `requirePlatformAdmin()` (higher bar) | Done |
 | FOUNDATION-P0-04.3 | Role management UI (minimal) | Done — 2026-09-14: `/settings/roles`, live RLS-verified |
@@ -289,7 +289,7 @@ and are deliberately excluded from the counts above.
 | COMPLIANCE-P0-07 | Governance Posture (composite score, distinct from risk) | Done — computed read-model across 12 dimensions, `getGovernancePosture()`, `GET /api/v1/compliance/agents/[id]/posture` |
 | COMPLIANCE-P0-08 | Governance Attestation (broad: approver/decision/evidence) | Done — `governance_attestations` table, `recordAttestation()`/`listAttestationsForAgent()`/`getLatestAttestation()`, `GET/POST /api/v1/compliance/agents/[id]/attestations` |
 | COMPLIANCE-P0-09 | Governance Evidence Pack assembly | Done — `assembleGovernanceEvidencePack()`; export handed to Operations' `OPERATIONS-P0-07` via `POST /api/v1/compliance/agents/[id]/evidence-pack` |
-| COMPLIANCE-P0-10 | Certification campaigns for every identity type | Partial — 2026-10-14 part 1 (0180, 0181): people's application access (human, external, service account); reviewer by manager, application owner or named; certify (never one's own) and revoke as an approved, verified removal. Part 2 (0184): defer (30 days), escalate (to the campaign's launcher) and exception (keep until a date, at most 90 days, then removed: Access's time-bound path, or the role's own end date). Part 3 (0193, 2026-10-15): owner reviews of access packages (scope `package_contents`: one item per package resource, reviewed by the package's owner; revoke removes it from the package). Part 4 (0196, 2026-10-15): owner reviews of applications (scope `application_contents`: one item per active, certifiable entitlement, reviewed by the entitlement's owner, else the application's business owner, else the named reviewer; revoke disables the entitlement). Left: owner reviews of business roles (wait on ACCESS-P0-21, not built), calendar and analytics |
+| COMPLIANCE-P0-10 | Certification campaigns for every identity type | Partial — 2026-10-14 part 1 (0180, 0181): people's application access (human, external, service account); reviewer by manager, application owner or named; certify (never one's own) and revoke as an approved, verified removal. Part 2 (0184): defer (30 days), escalate (to the campaign's launcher) and exception (keep until a date, at most 90 days, then removed: Access's time-bound path, or the role's own end date). Part 3 (0193, 2026-10-15): owner reviews of access packages (scope `package_contents`: one item per package resource, reviewed by the package's owner; revoke removes it from the package). Part 4 (0196, 2026-10-15): owner reviews of applications (scope `application_contents`: one item per active, certifiable entitlement, reviewed by the entitlement's owner, else the application's business owner, else the named reviewer; revoke disables the entitlement). Part 5 (0199, 2026-10-17): the campaigns page's Calendar (open campaigns by the month they are due) and Analytics (completion, revoke rate, time to decide, outcomes, per scope, reviewer backlog), counted in the database. Left: owner reviews of business roles (wait on ACCESS-P0-21, not built) |
 | COMPLIANCE-P0-11 | Access certification of WonderID users' role assignments | Done — 2026-10-14 (0183): scope `role_assignments`, direct and group, privileged first or privileged only; manager or named reviewer, never one's own (409 `SELF_CERTIFICATION`); revoke through Foundation's `removeRole` / `removeGroupMember`; audit `compliance.access_certified` / `compliance.access_revoked`; isolation 5/5; E2E `role-reviews.spec.ts` |
 | COMPLIANCE-P0-12 | Privacy programme: GDPR / UK GDPR / DPDP / CCPA rights requests, consent, RoPA, retention, legal holds, breach register (2026-10-01 user request) | Done — 2026-10-01 (`0103`, `modules/privacy`, `/settings/privacy`, `/my-privacy`, `/api/v1/privacy/*`, daily `/api/cron/privacy`; 12 rule tests; live isolation proof 28/28) |
 | COMPLIANCE-P0-13 | Financial and privacy control frameworks (SOX ITGC, SOC 1, PCI DSS, GLBA, DORA, RBI, SEBI CSCRF, CERT-In, GDPR, DPDP) | Done — 2026-10-01 (`0105`, 10 frameworks / 55 controls; shown on `/audit/integrity`) |
@@ -362,7 +362,7 @@ and are deliberately excluded from the counts above.
 | PLATFORM-P0-05.3 | Global Configuration Versioning | Done |
 | PLATFORM-P0-05.4 | Maintenance Mode & Platform Announcements | Done — Experience Agent's customer-facing `AnnouncementsBanner` now renders `getActiveAnnouncements()` in the shared customer shell (`app/(customer)/layout.tsx`), 2026-09-16 |
 | PLATFORM-P0-12 | Enforce feature flags (codebase-map D8, master §26) | Partial — 2026-09-25: 13 master rollout flags seeded (`0065`, safe-rollout defaults); flags now enforced at the gateway (`runtime_observe`/`runtime_enforce`/`tool_filtering` — ENFORCE really enforces, per tenant) and at runtime ingestion, remediation, connector creation and certification launch; batched `getFeatureFlags()`. Remaining: `ai_assistant` (defaults OFF while AI summaries are live — needs a platform decision before enforcing) and the not-yet-built features' flags; see audit log |
-| PLATFORM-P0-13 | Configuration Studio | Partial — 2026-10-10: Global Configuration (versioned organization settings with history and restore, migration 0116); the declarative objects, draft/simulate/approve and environment promotion not yet |
+| PLATFORM-P0-13 | Configuration Studio | Partial — 2026-10-10: Global Configuration (versioned organization settings with history and restore, migration 0116). 2026-10-17: environment promotion of the Global Configuration as a signed bundle (HMAC from SECRET_ENCRYPTION_KEY): export, preview the diff, import as a new version. The declarative objects and draft/simulate/approve not yet |
 | PLATFORM-P0-14 | Tenant list with tenant URLs and the create-tenant wizard | Not Started — 2026-09-26, WonderID Phase 4b |
 | PLATFORM-P0-16 | Organization addresses and environments (owner request 2026-10-13) | Done — 2026-10-13: every organization at `https://<slug>.id.wonderapps.biz` (wildcard domain and BASE_APP_HOST on Vercel); a platform administrator adds Dev, Test or Staging to a production organization from Tenants, each its own organization at `<slug>-dev` / `-test` / `-staging` with the production administrators copied (migration 0156, `create_tenant_environment`). Same day: prefix and environment chosen when creating an organization; a platform administrator changes either at any time from the tenant's page (0157); designated colour per environment and one-click environment switching in the shell (0158–0159) |
 | PLATFORM-P1-04 | Billing integration: Stripe (USD/EUR) and Razorpay (INR), invoices, GST, maker-checker adjustments (brought forward by explicit user request, 2026-10-01) | Done — 2026-10-01 (`0102`, `modules/billing`, `/settings/billing`, `/platform-admin/billing`, webhooks; 30+ unit tests. Not exercised against live provider accounts: no keys in this sandbox, see audit log) |

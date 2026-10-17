@@ -38,3 +38,6 @@ export {
 } from "./attestations";
 export { assembleGovernanceEvidencePack } from "./evidencePack";
 export { countOverdueCertificationItems } from "./overdue";
+// COMPLIANCE-P0-10 (remainder): the campaign calendar and analytics.
+export { summarizeCampaigns, campaignCalendar, OUTCOME_LABEL, type CampaignAnalytics, type CalendarMonth, type DecisionCount } from "./analytics";
+export { listCampaignDecisionCounts, listReviewerBacklog, type ReviewerBacklog } from "./analyticsService";

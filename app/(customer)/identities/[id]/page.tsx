@@ -15,6 +15,8 @@ import {
   getOwnershipFootprint,
   allowedTransitions,
   HUMAN_TRANSITIONS,
+  findDuplicatesOf,
+  listActiveMergesFor,
 } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { getIdentityAccessLedger, LEDGER_SOURCE_LABEL, LEDGER_STATUS_LABEL, type IdentityAccessEntry, type LedgerStatus } from "@/modules/access-governance/service";
@@ -22,7 +24,7 @@ import { RecordProvenance, Badge, Card, EmptyState, LinkButton, SeverityBadge, T
 import { groupsOfUser } from "@/lib/users/groups";
 import { listIdentityFindings } from "@/modules/risk/service";
 import { listObjectActivity } from "@/modules/operations/service";
-import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm, UnlinkSourceRecordButton } from "../IdentityForms";
+import { AddRelationshipForm, EditIdentityForm, EndRelationshipButton, LifecycleTaskActions, LifecycleTransitionForm, UndoMergeForm, UnlinkSourceRecordButton } from "../IdentityForms";
 import { listSourceLinksForIdentity } from "@/modules/integrations/service";
 import { findMemberForPerson, getUserDetail } from "@/lib/users/users";
 import { STATUS_LABEL as MEMBERSHIP_STATUS_LABEL, roleLabel } from "@/lib/users/userRules";
@@ -121,7 +123,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-export default async function IdentityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function IdentityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; merged?: string; unmerged?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("identity.read");
@@ -144,7 +146,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
   const personIdentity = identity.identityType === "HUMAN" || identity.identityType === "EXTERNAL";
   const canAssignIdRoles = ctx.permissions.includes("roles.assign") || ctx.permissions.includes("role.manage");
   const canSeeIdRoles = identity.identityType === "HUMAN" && (canAssignIdRoles || ctx.permissions.includes("users.view") || ctx.permissions.includes("roles.view"));
-  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks, groups, findings, activity, idRoles] = await Promise.all([
+  const [relationships, definitions, refs, people, candidates, lifecycleEvents, lifecycleTasks, ledger, provenance, sourceLinks, groups, findings, activity, idRoles, merges, duplicates] = await Promise.all([
     listIdentityRelationships(tenantId, id),
     listAttributeDefinitions(tenantId),
     getIdentityNames(tenantId, [identity.ownerIdentityId, identity.sponsorIdentityId, identity.managerIdentityId].filter(Boolean) as string[]),
@@ -160,7 +162,11 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
     canReadRisk ? listIdentityFindings(tenantId, { identityId: id, agentId: identity.agentId ?? null }) : Promise.resolve(null),
     canReadAudit ? listObjectActivity(tenantId, [id, identity.userId ?? "", identity.agentId ?? ""], 50) : Promise.resolve(null),
     canSeeIdRoles ? loadIdRoles(tenantId, { userId: identity.userId, email: identity.email }, canAssignIdRoles).catch(() => ({ ok: false as const })) : Promise.resolve(null),
+    // IDENTITY-P0-23: merges in effect, and other records that look like the same person.
+    personIdentity ? listActiveMergesFor(tenantId, id) : Promise.resolve([]),
+    canManage && personIdentity && !identity.mergedIntoIdentityId ? findDuplicatesOf(tenantId, identity).catch(() => []) : Promise.resolve([]),
   ]);
+  const mergeNames = merges.length ? await getIdentityNames(tenantId, merges.map((m) => (m.survivorIdentityId === id ? m.mergedIdentityId : m.survivorIdentityId))) : new Map<string, { displayName: string; ref: number | null }>();
   const idMember = idRoles?.ok ? idRoles.member : null;
   // Nobody changes their own ID roles (the service and database refuse it too).
   const canChangeIdRoles = canAssignIdRoles && !!idMember && idMember.userId !== ctx.userId;
@@ -246,6 +252,37 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
         </p>
       ) : null}
 
+      {search.merged ? (
+        <p role="status" className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+          Merged. The other record&apos;s access now belongs to this one.
+        </p>
+      ) : null}
+      {search.unmerged && !merges.length ? (
+        <p role="status" className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+          The merge was undone. Both records are back as they were.
+        </p>
+      ) : null}
+      {merges.length ? (
+        <div className="space-y-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="identity-merges">
+          {merges.map((m) => {
+            const otherId = m.survivorIdentityId === id ? m.mergedIdentityId : m.survivorIdentityId;
+            const other = mergeNames.get(otherId);
+            const link = (
+              <Link href={`/identities/${other?.ref ?? otherId}`} className="text-primary hover:underline">
+                {other?.displayName ?? "another record"}
+              </Link>
+            );
+            return (
+              <div key={m.id}>
+                {m.survivorIdentityId === id ? <>Merged from {link}</> : <>Merged into {link}</>} on {m.mergedAt.slice(0, 10)}
+                {m.reason ? ` · ${m.reason}` : ""}
+                {canManage ? <UndoMergeForm mergeId={m.id} identityId={id} label={other?.displayName ?? "the merge"} /> : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
       <Card className="p-4">
         <Tabs tabs={tabs} ariaLabel="Identity sections" defaultValue={tabs.some((t) => t.value === requestedTab) ? requestedTab : "overview"}>
           <TabPanel value="overview" className="pt-4">
@@ -288,6 +325,18 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
                   ))}
                 </ul>
               </details>
+            ) : null}
+            {canManage && personIdentity && !identity.mergedIntoIdentityId ? (
+              <p className="mt-5 text-sm">
+                {duplicates.length ? (
+                  <span className="text-muted-foreground">
+                    Possible duplicate: {duplicates.map((d) => d.identity.displayName).join(", ")} ·{" "}
+                  </span>
+                ) : null}
+                <Link href={`/identities/${identity.ref ?? identity.id}/merge`} className="text-primary hover:underline">
+                  {duplicates.length ? "Compare and merge" : "Merge with another record"}
+                </Link>
+              </p>
             ) : null}
             <p className="mt-5 text-xs text-muted-foreground">
               Changes to identities are recorded in the{" "}

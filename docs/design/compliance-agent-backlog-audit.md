@@ -1574,3 +1574,43 @@ applications (all, or one through `scope.applicationId`).
 - Owner reviews of business roles. ACCESS-P0-21 (business and IT roles) is
   not built yet.
 - The campaign calendar and analytics.
+
+## 2026-10-17 — COMPLIANCE-P0-10 part 5: campaign calendar and analytics
+
+Owner decision 2026-10-17: "go ahead with all the items … one by one".
+
+**Built:**
+- **Migration 0199**, applied to dev. It is read-only and additive.
+  - `campaign_decision_counts(p_tenant)`: each item's final decision per
+    campaign and outcome, with the average hours from opening to decision;
+  - `campaign_reviewer_backlog(p_tenant)`: open and overdue items per
+    reviewer in active campaigns, most overdue first, at most 20.
+  
+  Both are security invoker (RLS applies) and take the tenant
+  explicitly. Execute is revoked from public and anon and granted to
+  authenticated.
+- `modules/certification-compliance/analytics.ts` (pure):
+  - `summarizeCampaigns`: items, completion, revoke rate, weighted time to
+    decide, outcomes and per scope. It never estimates: nothing to divide
+    by gives null, shown as "—";
+  - `campaignCalendar`: open (active or draft) campaigns by due month,
+    past due first, with undated ones counted.
+- `analyticsService.ts`: the two calls. It looks up reviewer names only
+  for the ids the tenant's own items name.
+- The campaigns page has Campaigns, Calendar and Analytics tabs. If the
+  analytics reads fail, the tab says "unavailable" rather than showing
+  zeros (§17.5).
+- Help (certification section) and the knowledge base are updated.
+
+**Verified:**
+- Both functions ran against dev data, and the totals match.
+- `analytics.test.ts`: 3 tests (sums and weighting, nothing to compute,
+  calendar order). Compliance and architecture unit tests: 97/97.
+- Typecheck and eslint clean.
+- E2E `compliance.spec.ts` (with the new Calendar and Analytics test)
+  passed on Vercel.
+
+**Left:**
+- Owner reviews of business roles; they wait on ACCESS-P0-21.
+- Periodic cadence still has no scheduler, so the calendar shows due
+  dates, not future launches.
