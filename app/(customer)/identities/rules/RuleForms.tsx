@@ -17,8 +17,12 @@ export type RuleFormValues = {
   triggerType: string;
   triggerAttribute: string;
   condition: string;
-  /** IDENTITY-P0-21: what the rule does: set an attribute, or open a task about the identity. */
-  effectType: "set_attribute" | "open_task";
+  /** IDENTITY-P0-21: what the rule does: set an attribute, open a task, add to a group or assign a package. */
+  effectType: "set_attribute" | "open_task" | "add_to_group" | "assign_package";
+  /** The group or package a grant names. */
+  grantTarget: string;
+  /** Owner decision 2026-10-17: a grant waits for a person's approval, or applies automatically. */
+  approval: "required" | "automatic";
   taskTitle: string;
   taskFor: "manager" | "identity_admins";
   attribute: string;
@@ -46,11 +50,17 @@ function toBody(v: RuleFormValues) {
     effects:
       v.effectType === "open_task"
         ? [{ type: "open_task", params: { assignee: v.taskFor, title: v.taskTitle } }]
-        : [{ type: "set_attribute", params: { attribute: v.attribute, value: v.valueKind === "template" ? { template: v.value } : v.value === "" ? null : v.value } }],
+        : v.effectType === "add_to_group"
+          ? [{ type: "add_to_group", params: { group: v.grantTarget, approval: v.approval } }]
+          : v.effectType === "assign_package"
+            ? [{ type: "assign_package", params: { package: v.grantTarget, approval: v.approval } }]
+            : [{ type: "set_attribute", params: { attribute: v.attribute, value: v.valueKind === "template" ? { template: v.value } : v.value === "" ? null : v.value } }],
   };
 }
 
-export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initial?: RuleFormValues; settable: string[] }) {
+export type GrantTargets = { groups: { id: string; name: string }[]; packages: { id: string; name: string }[] };
+
+export function RuleForm({ ruleId, initial, settable, targets }: { ruleId?: string; initial?: RuleFormValues; settable: string[]; targets: GrantTargets }) {
   const router = useRouter();
   const [v, setV] = useState<RuleFormValues>(
     initial ?? {
@@ -61,6 +71,8 @@ export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initi
       effectType: "set_attribute",
       taskTitle: "",
       taskFor: "manager",
+      grantTarget: "",
+      approval: "required",
       attribute: settable[0] ?? "",
       valueKind: "template",
       value: "",
@@ -123,8 +135,25 @@ export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initi
       <SelectField name="ruleEffect" label="Then" value={v.effectType} onChange={(e) => set("effectType", e.target.value as RuleFormValues["effectType"])}>
         <option value="set_attribute">Set an attribute</option>
         <option value="open_task">Open a task</option>
+        <option value="add_to_group">Add to a group</option>
+        <option value="assign_package">Assign an access package</option>
       </SelectField>
-      {v.effectType === "open_task" ? (
+      {v.effectType === "add_to_group" || v.effectType === "assign_package" ? (
+        <>
+          <SelectField name="ruleGrantTarget" label={v.effectType === "add_to_group" ? "Group" : "Package"} value={v.grantTarget} onChange={(e) => set("grantTarget", e.target.value)}>
+            <option value="">Choose one</option>
+            {(v.effectType === "add_to_group" ? targets.groups : targets.packages).map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </SelectField>
+          <SelectField name="ruleApproval" label="Approval" value={v.approval} onChange={(e) => set("approval", e.target.value as RuleFormValues["approval"])} hint="Automatic grants as soon as the rule fires">
+            <option value="required">A person approves each one</option>
+            <option value="automatic">Automatic</option>
+          </SelectField>
+        </>
+      ) : v.effectType === "open_task" ? (
         <>
           <SelectField name="ruleTaskFor" label="For" value={v.taskFor} onChange={(e) => set("taskFor", e.target.value as RuleFormValues["taskFor"])}>
             <option value="manager">The person&apos;s manager</option>
@@ -163,7 +192,14 @@ export function RuleForm({ ruleId, initial, settable }: { ruleId?: string; initi
         <option value="enforce">Enforce</option>
       </SelectField>
       <div className="flex items-end gap-3 md:col-span-2">
-        <Button type="submit" disabled={pending || !v.name.trim() || (v.effectType === "open_task" ? v.taskTitle.trim().length < 3 : !v.attribute)}>
+        <Button
+          type="submit"
+          disabled={
+            pending ||
+            !v.name.trim() ||
+            (v.effectType === "open_task" ? v.taskTitle.trim().length < 3 : v.effectType === "add_to_group" || v.effectType === "assign_package" ? !v.grantTarget : !v.attribute)
+          }
+        >
           {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
           {ruleId ? "Save changes" : "Create rule"}
         </Button>

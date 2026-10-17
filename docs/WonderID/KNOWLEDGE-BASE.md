@@ -23,7 +23,7 @@
 
 [Revision history](#revision-history) is at the end, newest first.
 
-**Last updated:** 16 October 2026
+**Last updated:** 17 October 2026
 
 A plain-language guide to what WonderID does, how its parts fit together and where to find each feature. It is kept current as the product changes.
 
@@ -118,7 +118,7 @@ The everyday cycle looks like this:
 - A person makes each of these removals, even where a connection could; it counts as removed only when a later read of the system no longer finds it.
 - Where a connection can disable accounts and has changes turned on, it disables the person's account there at once. The next read confirms it. If it fails, the application's owner gets the task with the reason.
 - When a person leaves, what they owned is transferred to someone else, never left without an owner.
-- Identity rules (Identities › Rules) can also run on these moments: when a person becomes active, moves, gets a new manager, leaves, or reaches their end date. Such a rule sets one of the person's details, or opens a task about the person for their manager or for identity administrators (for example "Order a badge"). A rule opens one task at a time per person; the task appears with the other lifecycle tasks.
+- Identity rules (Identities › Rules) can also run on these moments: when a person becomes active, moves, gets a new manager, leaves, or reaches their end date. Such a rule sets one of the person's details, or opens a task about the person for their manager or for identity administrators (for example "Order a badge"). A rule opens one task at a time per person; the task appears with the other lifecycle tasks. A rule can also add the person to a group or assign them an access package. Each such rule says whether a person approves every grant (an approval task with the other lifecycle tasks: Approve gives the access, Reject needs a reason, and nobody approves their own) or whether it applies automatically, which is allowed because every rule is published by a second administrator.
 
 **Identity sources**
 - An HR system or directory can be the source of people's details.
@@ -665,6 +665,8 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | Identity rules can add a person to a group or assign an access package, either after a person approves it or automatically. |
+| 17 Oct 2026 | When WonderID cannot check someone's access because a database read failed, it now says "We couldn't check your access" instead of "forbidden" or sending them to set up an organization. |
 | 16 Oct 2026 | The help centre needs sign-in, and its guide now matches today's menu and pages, with new sections on rogue accounts, provisioning tasks, delegations and My Team, identity rules and API clients. |
 | 16 Oct 2026 | Merges happen as soon as checks pass, and the full test suite runs every night at 03:00 IST. |
 | 16 Oct 2026 | "Give WonderID access" on a person's page now fills in their details in organizations with more than 500 people too. |

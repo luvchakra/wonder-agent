@@ -194,6 +194,82 @@ test.describe.serial("identity attribute rules", () => {
   });
 });
 
+test.describe.serial("identity rules that grant access (owner decision 2026-10-17)", () => {
+  test.use({ storageState: authFile("adminOne") });
+  const grantDept = `Grants ${stamp}`;
+
+  async function grantRule(request: APIRequestContext, name: string, effect: Record<string, unknown>) {
+    const created = await request.post("/api/v1/identities/rules", {
+      data: { name: `${name} ${stamp}`, triggerType: "identity.created", condition: `identity.department = "${grantDept}"`, mode: "enforce", effects: [effect] },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    return ((await created.json()) as Json).data!.id;
+  }
+
+  test("a grant names a group or package of this organization, with an approval choice", async ({ request }) => {
+    const noApproval = await request.post("/api/v1/identities/rules", {
+      data: { name: `E2E Grant bad ${stamp}`, triggerType: "identity.created", effects: [{ type: "add_to_group", params: { group: "00000000-0000-4000-8000-000000000001" } }] },
+    });
+    expect(noApproval.status()).toBe(400);
+    const unknownGroup = await request.post("/api/v1/identities/rules", {
+      data: { name: `E2E Grant unknown ${stamp}`, triggerType: "identity.created", effects: [{ type: "add_to_group", params: { group: "00000000-0000-4000-8000-000000000001", approval: "automatic" } }] },
+    });
+    expect(unknownGroup.status()).toBe(400);
+    expect(((await unknownGroup.json()) as Json).error?.message).toMatch(/no such group/);
+  });
+
+  test("approval required: the rule opens one approval task; approving an impossible grant says why; rejecting needs a reason", async ({ request, browser, page }) => {
+    const pkg = await request.post("/api/v1/access/packages", { data: { name: `E2E Rule Pkg ${stamp}`, eligibleIdentityTypes: ["HUMAN"] } });
+    expect(pkg.status(), await pkg.text()).toBe(201);
+    const pkgId = ((await pkg.json()) as Json).data!.id;
+    ruleId = await grantRule(request, "E2E Grant Pkg", { type: "assign_package", params: { package: pkgId, approval: "required" } });
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    expect(await publish(request, iam.request)).toMatchObject({ publishedVersion: 1, mode: "enforce" });
+
+    const created = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `Rule Grant ${stamp}`, email: `rule-grant-${stamp}@example.test`, department: grantDept } });
+    expect(created.status(), await created.text()).toBe(201);
+    const subject = ((await created.json()) as Json).data!;
+    const { data: tasks } = await db().from("identity_lifecycle_tasks").select("id, task_type, rule_id, status, detail").eq("identity_id", subject.id);
+    expect(tasks).toEqual([{ id: expect.any(String), task_type: "rule_grant", rule_id: ruleId, status: "open", detail: { kind: "package", targetId: pkgId, targetName: `E2E Rule Pkg ${stamp}` } }]);
+    const taskId = tasks![0].id as string;
+
+    await page.goto("/identities/lifecycle");
+    await expect(page.getByText(`Approve assigning the package "E2E Rule Pkg ${stamp}"`).first()).toBeVisible();
+
+    // The package is still a draft: approving is refused truthfully, and the task stays open.
+    const approve = await iam.request.post(`/api/v1/identities/lifecycle-tasks/${taskId}`, { data: { action: "done" } });
+    expect(approve.status()).toBe(409);
+    expect(((await approve.json()) as Json).error?.code).toBe("PACKAGE_NOT_ACTIVE");
+    expect((await iam.request.post(`/api/v1/identities/lifecycle-tasks/${taskId}`, { data: { action: "skipped" } })).status()).toBe(400);
+    expect((await iam.request.post(`/api/v1/identities/lifecycle-tasks/${taskId}`, { data: { action: "skipped", note: "Not for this team" } })).status()).toBe(200);
+    const { data: closed } = await db().from("identity_lifecycle_tasks").select("status").eq("id", taskId).single();
+    expect(closed?.status).toBe("skipped");
+    const { count } = await db().from("access_package_assignments").select("id", { count: "exact", head: true }).eq("identity_id", subject.id);
+    expect(count).toBe(0);
+    await iam.close();
+    expect((await request.post(`/api/v1/identities/rules/${ruleId}/retire`)).status()).toBe(200);
+  });
+
+  test("automatic: a group grant applies at once, and a person with no sign-in is skipped and logged", async ({ request, browser }) => {
+    const group = await request.post("/api/v1/groups", { data: { name: `E2E Rule Group ${stamp}` } });
+    expect(group.status(), await group.text()).toBe(201);
+    const groupId = ((await group.json()) as Json).data!.id;
+    ruleId = await grantRule(request, "E2E Grant Group", { type: "add_to_group", params: { group: groupId, approval: "automatic" } });
+    const iam = await browser.newContext({ storageState: authFile("iamAdminOne") });
+    await publish(request, iam.request);
+    await iam.close();
+
+    const created = await request.post("/api/v1/identities", { data: { identityType: "HUMAN", displayName: `Rule Group ${stamp}`, email: `rule-group-${stamp}@example.test`, department: grantDept } });
+    expect(created.status(), await created.text()).toBe(201);
+    const subject = ((await created.json()) as Json).data!;
+    const runs = ((await (await request.get(`/api/v1/identities/rules/${ruleId}/runs`)).json()) as { data: { subjectId: string; outcome: string; detail?: string }[] }).data;
+    expect(runs.find((r) => r.subjectId === subject.id)).toMatchObject({ outcome: "applied", detail: "group skipped: this identity has no sign-in" });
+    const { data: tasks } = await db().from("identity_lifecycle_tasks").select("id").eq("identity_id", subject.id);
+    expect(tasks).toEqual([]);
+    expect((await request.post(`/api/v1/identities/rules/${ruleId}/retire`)).status()).toBe(200);
+  });
+});
+
 test.describe("identity rules — other organizations and roles", () => {
   test("another organization cannot see or change the rules; read-only cannot write them", async ({ browser }) => {
     const one = await browser.newContext({ storageState: authFile("adminOne") });

@@ -14,7 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (body.action === "transfer") {
       return NextResponse.json({ ok: true, data: await transferOwnership(ctx.tenantId!, ctx.userId, taskId, String(body.toIdentityId ?? "")) });
     }
-    await completeLifecycleTask(ctx.tenantId!, ctx.userId, taskId, { status: body.action, note: body.note });
+    await completeLifecycleTask(ctx.tenantId!, ctx.userId, taskId, { status: body.action, note: body.note }, ctx.permissions);
     return NextResponse.json({ ok: true });
   } catch (err) {
     return errorResponse(err);

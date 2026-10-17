@@ -2160,3 +2160,62 @@ by name.
 - **Found by:** the nightly E2E, `users.spec.ts:211`.
 - **Verified:** typecheck and eslint are clean; `next build` passed; local
   E2E `users.spec.ts`: 16 of 16 passed, including the failing test.
+
+## 2026-10-17 — IDENTITY-P0-21 done: rules that add to a group or assign a package
+
+**Owner decision (17 Oct):** each grant is configurable: a person approves it,
+or it applies automatically. Every rule is published under four-eyes, which
+is the approved automation path for the automatic case (NN #15, design
+§5.2.1).
+
+**Built:**
+- **Effects.** `add_to_group { group, approval }` and
+  `assign_package { package, approval }`, where approval is `required` or
+  `automatic` (runtime catalogue and `shapeRuleInput`). Extra parameters are
+  dropped. The target must be a group or package of this organization,
+  checked when the rule is saved.
+- **Running.** After the attribute write, each enforced grant either
+  applies (`grantByRule`) or opens a `rule_grant` task (migration 0197),
+  one per rule per identity, holding the target's name.
+  - Groups go through `addGroupMemberByRule` (`lib/users/groups.ts`). The
+    person needs a sign-in; otherwise the run log says "group skipped".
+  - Packages go through `assignPackageByRule` (Access): active and
+    eligible, with source `rule`, provisioned like any assignment.
+  - Both are audited as the system, or as the approver.
+- **Approval.** Closing a `rule_grant` task as done makes the grant;
+  rejecting it needs a reason. `ruleGrantRefusal`:
+  - a group needs `groups.manage_members` plus role assignment;
+  - a package needs `access.manage`;
+  - nobody approves their own.
+  A grant that cannot be made says why (for example `PACKAGE_NOT_ACTIVE`),
+  and the task stays open.
+- **Simulation** lists each grant as "Group X" or "Package X": "asks a
+  person to approve" or "granted".
+- **UI:**
+  - the rule form offers "Add to a group" and "Assign an access package",
+    with "A person approves each one" or "Automatic";
+  - the rule page and list show it;
+  - lifecycle tasks show "Approve adding to the group "X"", with
+    Approve / Reject.
+
+**Verified:**
+- Migration 0197 applied to the dev project.
+- Unit tests in `modules/agent-identity`, `modules/operations/rules`,
+  `modules/access-governance` and `lib/users`: 497/497. New tests:
+  - grant parsing (id and approval required, extra parameters dropped);
+  - `ruleGrantRefusal`: permissions and no self-approval.
+
+  Two older assertions were updated to the new contract: package grants
+  are now allowed, and the catalogue has an approval parameter.
+- `identity-rules.spec.ts` gains three E2E tests: target validation; an
+  approval task with an impossible grant refused truthfully, then rejected
+  with a reason; an automatic group grant skipped for a person with no
+  sign-in. They run in the nightly; this container has no local E2E
+  environment.
+- Typecheck clean except for screenshots missing from this checkout;
+  eslint clean.
+
+**Left out:**
+- `remove_from_group` and `remove_package` effects.
+- A request through the package's own approval chain; the approval task is
+  decided by an access or group administrator instead.

@@ -199,7 +199,7 @@ export async function closeLifecycleTaskAction(taskId: string, _prev: IdentityFo
         message: `Transferred: ${r.ownedIdentities} owned, ${r.sponsoredIdentities} sponsored, ${r.directReports} reports, ${r.ownedAgents} AI agents.`,
       };
     }
-    await completeLifecycleTask(ctx.tenantId!, ctx.userId, taskId, { status: action, note: formData.get("note") });
+    await completeLifecycleTask(ctx.tenantId!, ctx.userId, taskId, { status: action, note: formData.get("note") }, ctx.permissions);
   } catch (err) {
     return formError(err);
   }

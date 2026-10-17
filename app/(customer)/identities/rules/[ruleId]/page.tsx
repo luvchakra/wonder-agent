@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { pageRef } from "@/lib/refs/objectRef";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { getIdentityRule, listAttributeDefinitions, SETTABLE_FIELDS } from "@/modules/agent-identity/service";
+import { getIdentityRule, listAttributeDefinitions, listRuleGrantTargets, SETTABLE_FIELDS } from "@/modules/agent-identity/service";
 import { listRuleRuns } from "@/modules/operations/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader } from "@/modules/ui";
@@ -38,12 +38,14 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
   // FOUNDATION-P0-34: the URL carries the rule's number; an old UUID link redirects.
   const ruleId = await pageRef(tenantId, "lifecycle_rules", (await params).ruleId, (n) => `/identities/rules/${n}`);
   const canManage = ctx.permissions.includes("identity.manage");
-  const [rule, runs, definitions] = await Promise.all([
+  const [rule, runs, definitions, targets] = await Promise.all([
     getIdentityRule(tenantId, ruleId),
     listRuleRuns(tenantId, { ruleId, limit: 20 }),
     canManage ? listAttributeDefinitions(tenantId) : Promise.resolve([]),
+    listRuleGrantTargets(tenantId),
   ]);
   if (!rule) notFound();
+  const targetName = (id: string) => [...targets.groups, ...targets.packages].find((t) => t.id === id)?.name ?? "(no longer active)";
 
   const status = ruleStatus(rule);
   const simulatedSinceEdit = Boolean(rule.lastSimulatedAt);
@@ -66,7 +68,9 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
     triggerType: rule.triggerType,
     triggerAttribute: rule.triggerAttribute ?? "",
     condition: rule.condition === "true" ? "" : rule.condition,
-    effectType: effect?.type === "open_task" ? "open_task" : "set_attribute",
+    effectType: effect?.type === "open_task" || effect?.type === "add_to_group" || effect?.type === "assign_package" ? effect.type : "set_attribute",
+    grantTarget: String(effect?.params.group ?? effect?.params.package ?? ""),
+    approval: effect?.params.approval === "automatic" ? "automatic" : "required",
     taskTitle: effect?.type === "open_task" ? String(effect.params.title ?? "") : "",
     taskFor: effect?.params.assignee === "identity_admins" ? "identity_admins" : "manager",
     attribute: String(effect?.params.attribute ?? ""),
@@ -108,7 +112,13 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
             </p>
           ) : null}
           {rule.effects.map((e, i) =>
-            e.type === "open_task" ? (
+            e.type === "add_to_group" || e.type === "assign_package" ? (
+              <p key={i}>
+                <span className="text-muted-foreground">{e.type === "add_to_group" ? "Add to the group " : "Assign the package "}</span>
+                {targetName(String(e.params.group ?? e.params.package ?? ""))}
+                <span className="text-muted-foreground">{e.params.approval === "automatic" ? ", automatically" : ", once a person approves"}</span>
+              </p>
+            ) : e.type === "open_task" ? (
               <p key={i}>
                 <span className="text-muted-foreground">Open a task for {e.params.assignee === "manager" ? "the manager" : "identity administrators"}: </span>
                 {value(e.params.title)}
@@ -157,7 +167,7 @@ export default async function IdentityRulePage({ params }: { params: Promise<{ r
         <details className="rounded-lg border border-border bg-card p-4">
           <summary className="cursor-pointer text-sm font-medium text-foreground">Edit or retire</summary>
           <div className="mt-4 space-y-4">
-            <RuleForm ruleId={rule.id} initial={initial} settable={settable} />
+            <RuleForm ruleId={rule.id} initial={initial} settable={settable} targets={targets} />
             <RetireRuleButton ruleId={rule.id} />
           </div>
         </details>

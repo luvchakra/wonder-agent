@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allowedTransitions, detectLifecycleEvents, endDatePassed, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, whyCannotDisableAll } from "./humanLifecycle";
+import { allowedTransitions, detectLifecycleEvents, endDatePassed, opensAccessRemoval, opensBirthright, ruleGrantRefusal, statusForState, tasksForEvent, whyCannotDisableAll } from "./humanLifecycle";
 
 describe("human lifecycle transitions", () => {
   it("allows the governed path and rehire, never skipping to terminated from active", () => {
@@ -111,5 +111,25 @@ describe("IDENTITY-P0-18 (finish): expiry and the manager's disable", () => {
     expect(whyCannotDisableAll({ actorIdentityId: "m1", canManageIdentities: false, subject: { ...subject, lifecycleState: "DISABLED" } })?.status).toBe(409);
     expect(whyCannotDisableAll({ actorIdentityId: "m1", canManageIdentities: false, subject: { ...subject, lifecycleState: "LEAVE_PENDING" } })).toBeNull();
     expect(whyCannotDisableAll({ actorIdentityId: "a1", canManageIdentities: true, subject: { ...subject, identityType: "SERVICE_ACCOUNT" } })?.status).toBe(400);
+  });
+});
+
+
+describe("ruleGrantRefusal (IDENTITY-P0-21, owner decision 2026-10-17)", () => {
+  const groupPerms = ["groups.manage_members", "roles.assign"];
+  it("lets a group manager who can assign roles approve a group grant for someone else", () => {
+    expect(ruleGrantRefusal({ kind: "group", permissions: groupPerms, actorUserId: "a", subjectUserId: "b" })).toBeNull();
+    expect(ruleGrantRefusal({ kind: "group", permissions: ["groups.manage_members", "role.manage"], actorUserId: "a", subjectUserId: null })).toBeNull();
+  });
+  it("refuses a group grant without role assignment, since groups carry roles", () => {
+    expect(ruleGrantRefusal({ kind: "group", permissions: ["groups.manage_members"], actorUserId: "a", subjectUserId: "b" })?.code).toBe("FORBIDDEN");
+  });
+  it("needs access management for a package", () => {
+    expect(ruleGrantRefusal({ kind: "package", permissions: ["access.manage"], actorUserId: "a", subjectUserId: "b" })).toBeNull();
+    expect(ruleGrantRefusal({ kind: "package", permissions: groupPerms, actorUserId: "a", subjectUserId: "b" })?.code).toBe("FORBIDDEN");
+  });
+  it("never lets anyone approve a grant for themselves", () => {
+    expect(ruleGrantRefusal({ kind: "package", permissions: ["access.manage"], actorUserId: "a", subjectUserId: "a" })?.code).toBe("SELF_APPROVAL");
+    expect(ruleGrantRefusal({ kind: "group", permissions: groupPerms, actorUserId: "a", subjectUserId: "a" })?.code).toBe("SELF_APPROVAL");
   });
 });

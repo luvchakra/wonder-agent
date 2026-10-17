@@ -14,7 +14,7 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 | 4 | [Provisioning](#4-provisioning) | `██████░░░░` 59% |
 | 5 | [AI agents](#5-ai-agents) | `██████████` 100% |
 | 6 | [Risk, reviews and compliance](#6-risk-reviews-and-compliance) | `██████████` 100% |
-| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `███████░░░` 70% |
+| 7 | [Lifecycle and reviews for everyone](#7-lifecycle-and-reviews-for-everyone) | `████████░░` 75% |
 | 8 | [Roles, separation of duties and delegation](#8-roles-separation-of-duties-and-delegation) | `██░░░░░░░░` 20% |
 | 9 | [Agent ID and trusted credentials](#9-agent-id-and-trusted-credentials) | `░░░░░░░░░░` 0% |
 | 10 | [Workflow, forms and configuration](#10-workflow-forms-and-configuration) | `██████░░░░` 57% |
@@ -98,10 +98,10 @@ What WonderID does today and what comes next, phase by phase. Built from the [kn
 - ✅ Ready-made reports and exports
 - ✅ Billing (Stripe, Razorpay)
 
-## 7. Lifecycle and reviews for everyone — 70%
+## 7. Lifecycle and reviews for everyone — 75%
 
 - ✅ Shared rule engine
-- 🔶 Attribute rules
+- ✅ Attribute rules
 - ✅ Lifecycle rules
 - ✅ Identity detail pages
 - ✅ Entitlement types and classification

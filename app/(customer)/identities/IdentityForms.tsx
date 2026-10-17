@@ -472,6 +472,8 @@ export function LifecycleTransitionForm({ identityId, options }: { identityId: s
 export function LifecycleTaskActions({ taskId, taskType, people }: { taskId: string; taskType: string; people: PersonOption[] }) {
   const [state, action, pending] = useActionState(closeLifecycleTaskAction.bind(null, taskId), IDLE);
   const [mode, setMode] = useState<"done" | "skipped" | "transfer">(taskType === "transfer_ownership" ? "transfer" : "done");
+  // IDENTITY-P0-21: a grant from a rule is approved (which gives it) or rejected with a reason.
+  const grant = taskType === "rule_grant";
   return (
     <form action={action} className="space-y-2">
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-foreground" role="radiogroup" aria-label="Close this task">
@@ -483,11 +485,11 @@ export function LifecycleTaskActions({ taskId, taskType, people }: { taskId: str
         ) : null}
         <label className="flex items-center gap-1.5">
           <input type="radio" name="action" value="done" checked={mode === "done"} onChange={() => setMode("done")} className="accent-primary" />
-          Done
+          {grant ? "Approve" : "Done"}
         </label>
         <label className="flex items-center gap-1.5">
           <input type="radio" name="action" value="skipped" checked={mode === "skipped"} onChange={() => setMode("skipped")} className="accent-primary" />
-          Not needed
+          {grant ? "Reject" : "Not needed"}
         </label>
       </div>
       {mode === "transfer" ? (
@@ -501,12 +503,12 @@ export function LifecycleTaskActions({ taskId, taskType, people }: { taskId: str
           ))}
         </select>
       ) : (
-        <input name="note" aria-label="Note" required={mode === "skipped"} maxLength={2000} placeholder={mode === "skipped" ? "Why it is not needed" : "What was done (optional)"} className={fieldInputClass} />
+        <input name="note" aria-label="Note" required={mode === "skipped"} maxLength={2000} placeholder={mode === "skipped" ? (grant ? "Why it is rejected" : "Why it is not needed") : grant ? "Note (optional)" : "What was done (optional)"} className={fieldInputClass} />
       )}
       <div className="flex flex-wrap items-center gap-3">
         <Button type="submit" size="sm" variant="secondary" disabled={pending}>
           {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
-          {mode === "transfer" ? "Transfer ownership" : "Close task"}
+          {mode === "transfer" ? "Transfer ownership" : grant ? (mode === "done" ? "Approve and grant" : "Reject") : "Close task"}
         </Button>
         <Result state={state} />
       </div>

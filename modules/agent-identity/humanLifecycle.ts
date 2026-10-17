@@ -156,3 +156,23 @@ export function whyCannotDisableAll(input: {
   if (subject.lifecycleState !== "ACTIVE" && subject.lifecycleState !== "LEAVE_PENDING") return { status: 409, message: "This person is not working; there is no access to stop" };
   return null;
 }
+
+/**
+ * IDENTITY-P0-21 (owner decision, 2026-10-17): who may approve a grant an
+ * identity rule asked for. A group needs `groups.manage_members` and, since a
+ * group carries WonderID roles, role assignment too; a package needs
+ * `access.manage`. Nobody approves a grant for themselves. Null: allowed.
+ */
+export function ruleGrantRefusal(input: {
+  kind: "group" | "package";
+  permissions: readonly string[];
+  actorUserId: string;
+  subjectUserId: string | null;
+}): { code: string; message: string } | null {
+  if (input.subjectUserId && input.subjectUserId === input.actorUserId) return { code: "SELF_APPROVAL", message: "You can't approve a grant for yourself. Another administrator must do it." };
+  const has = (p: string) => input.permissions.includes(p);
+  if (input.kind === "group" && !(has("groups.manage_members") && (has("roles.assign") || has("role.manage"))))
+    return { code: "FORBIDDEN", message: "Approving a group needs group membership management and role assignment" };
+  if (input.kind === "package" && !has("access.manage")) return { code: "FORBIDDEN", message: "Approving a package needs access management" };
+  return null;
+}
