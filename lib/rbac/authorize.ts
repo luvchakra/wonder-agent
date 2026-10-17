@@ -52,7 +52,16 @@ export function refusalError(result: AuthorizationResult): ApiError {
  * knows to verify rather than to pick an organization.
  */
 export function noTenantError(ctx: TenantContext): ApiError {
+  if (ctx.unavailable) return unavailableError();
   return ctx.mfaStepUp ? new ApiError(403, "MFA_REQUIRED", MFA_STEP_UP_MESSAGE) : new ApiError(401, "NO_TENANT", "No active tenant membership");
+}
+
+/**
+ * Access could not be checked because a database read failed (owner
+ * decision, 2026-10-17): refused, and said truthfully, not "forbidden".
+ */
+export function unavailableError(): ApiError {
+  return new ApiError(503, "TEMPORARILY_UNAVAILABLE", "WonderID could not check your access just now. Try again in a moment.");
 }
 
 /**
@@ -63,7 +72,7 @@ export function noTenantError(ctx: TenantContext): ApiError {
  */
 export async function requirePermissionFor(permission: string, load: (tenantId: string) => Promise<ResourceRef | null>): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) throw noTenantError(ctx);
+  if (!ctx.tenantId || ctx.unavailable) throw noTenantError(ctx);
   const resource = await load(ctx.tenantId);
   const result = authorizeContext(ctx, permission, resource);
   if (result.decision !== "ALLOW") {
@@ -102,7 +111,7 @@ export async function auditRefusal(ctx: TenantContext, result: AuthorizationResu
 /** Like requireAnyPermission(), for an action on one resource: any one of `permissions` allowed there. */
 export async function requireAnyPermissionFor(permissions: string[], load: (tenantId: string) => Promise<ResourceRef | null>): Promise<TenantContext> {
   const ctx = await getTenantContext();
-  if (!ctx.tenantId) throw noTenantError(ctx);
+  if (!ctx.tenantId || ctx.unavailable) throw noTenantError(ctx);
   const resource = await load(ctx.tenantId);
   const results = permissions.map((p) => authorizeContext(ctx, p, resource));
   if (results.some((r) => r.decision === "ALLOW")) return ctx;

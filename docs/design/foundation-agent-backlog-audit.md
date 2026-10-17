@@ -3665,3 +3665,31 @@ policies (measured 0.05 ms and 4 ms). See the QA entry of the same date.
   - the nightly runs at 03:00 IST in four parts;
   - the E2E runs may create test data freely while the app is not live;
   - the help guide is updated with each feature change.
+
+## 2026-10-17 — Access that could not be checked says so (owner decision)
+
+**Before:** a failed read of memberships, roles, groups or policies in
+`getTenantContext()` became "no permissions". The person then saw 403
+FORBIDDEN, or was sent to onboarding as if they had no organization. It was
+safe (fail closed) but untrue (§17.5).
+
+**Now:**
+- `getTenantContext()` sets `unavailable: true` when any of the four reads
+  fails, still with no roles and no permissions.
+- `requirePermission`, `requireAnyPermission`, `requirePermissionFor` and
+  `requireAnyPermissionFor` refuse such a context with 503
+  `TEMPORARILY_UNAVAILABLE` ("WonderID could not check your access just
+  now. Try again in a moment."). A permission list on an unavailable
+  context is never trusted.
+- The customer layout shows "We couldn't check your access", with a Try
+  again link, instead of redirecting to onboarding or no-access.
+- An empty but successful read is unchanged: still plain no access.
+
+**Verified:**
+- `lib/tenant/getTenantContext.test.ts` (new, 6): each of the four failed
+  reads gives unavailable with no permissions; success and empty reads are
+  unchanged.
+- `lib/rbac/requirePermission.test.ts`: 503 for both unavailable cases.
+- `lib/rbac` and `lib/tenant`: all pass.
+- eslint clean. Typecheck clean except for the product screenshots missing
+  from this checkout.

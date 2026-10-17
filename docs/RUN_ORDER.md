@@ -768,3 +768,23 @@ owner's decision of the same day; internal assignment comes first.
 RISK-P0-13 (rogue access remediation through approval and provisioning)
 stays Partial until the nightly E2E passes. Certification (COMPLIANCE-P0-10,
 -11, -14) and the other High items follow this list.
+
+## 2026-10-17 — Owner decisions on the open questions
+
+Asked in chat, the owner decided:
+1. **Identity rules that add to a group or assign a package** are built
+   (IDENTITY-P0-21). Whether each grant needs approval or applies
+   automatically is configurable.
+2. **A failed read while resolving access** is said truthfully: "WonderID
+   could not check your access just now" (503 `TEMPORARILY_UNAVAILABLE`),
+   never 403 "forbidden" or a redirect to onboarding. It still fails closed:
+   nothing is permitted.
+3. **Identity merge (IDENTITY-P0-23):** write the migration and apply it.
+4. **QA-P0-06's SAML/OIDC part is deferred** while Supabase has no SAML on
+   this project's plan.
+5. **Work order:**
+   - close RISK-P0-13 (its E2E passed in the nightly of 17 Oct) and the
+     "Full Playwright suite" gate (green on 17 Oct, all four parts);
+   - then COMPLIANCE-P0-10's remainder, IDENTITY-P0-21 and IDENTITY-P0-23;
+   - then the medium stories: ACCESS-P0-23, ACCESS-P0-35, PLATFORM-P0-13
+     and FOUNDATION-P0-03.4.

@@ -27,9 +27,10 @@ export type Membership = {
  * indistinguishable from "no grants". Logs the operation and a redacted error
  * category, never row data.
  */
-function logReadError(operation: string, error: { code?: string; message?: string } | null): void {
-  if (!error) return;
+function logReadError(operation: string, error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
   console.error("getTenantContext read failed", { operation, category: error.code ?? "unknown", error: safeErrorMessage(error.message ?? "unknown") });
+  return true;
 }
 
 type MembershipRow = { tenant_id: string; name: string; slug: string; account_type: string; mfa_required: boolean };
@@ -55,20 +56,25 @@ const TERMS_SELECT = "scope_type, scope_values, starts_at, expires_at, requires_
  * require MFA (RLS hides those rows from tenant_memberships), so the
  * person is asked for MFA rather than treated as having no organization.
  */
-export const getMyMemberships = cache(async (): Promise<Membership[]> => {
+const readMyMemberships = cache(async (): Promise<{ rows: Membership[]; failed: boolean }> => {
   const user = await getSessionUser();
-  if (!user) return [];
+  if (!user) return { rows: [], failed: false };
   const supabase = await supabaseServer();
   const { data, error } = await supabase.rpc("my_memberships");
-  logReadError("my_memberships", error);
-  return ((data ?? []) as MembershipRow[]).map((m) => ({
-    tenantId: m.tenant_id,
-    name: m.name ?? m.tenant_id,
-    slug: m.slug ?? "",
-    automation: m.account_type === "automation",
-    mfaRequired: m.mfa_required === true,
-  }));
+  const failed = logReadError("my_memberships", error);
+  return {
+    failed,
+    rows: ((data ?? []) as MembershipRow[]).map((m) => ({
+      tenantId: m.tenant_id,
+      name: m.name ?? m.tenant_id,
+      slug: m.slug ?? "",
+      automation: m.account_type === "automation",
+      mfaRequired: m.mfa_required === true,
+    })),
+  };
 });
+
+export const getMyMemberships = cache(async (): Promise<Membership[]> => (await readMyMemberships()).rows);
 
 /**
  * The current user's role rows across every tenant they belong to, once
@@ -83,7 +89,7 @@ export const getMyMemberships = cache(async (): Promise<Membership[]> => {
  * resolve with role.manage, agent.create and the rest. Privilege
  * escalation, not just a cosmetic over-fetch.
  */
-const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
+const getMyRoleRows = cache(async (): Promise<RoleRow[] | null> => {
   const user = await getSessionUser();
   if (!user) return [];
   const supabase = await supabaseServer();
@@ -92,8 +98,7 @@ const getMyRoleRows = cache(async (): Promise<RoleRow[]> => {
     .select(`tenant_id, ${TERMS_SELECT}, ${ROLE_SELECT}`)
     .eq("user_id", user.id)
     .returns<RoleRow[]>();
-  logReadError("user_roles", error);
-  return data ?? [];
+  return logReadError("user_roles", error) ? null : (data ?? []);
 });
 
 type GroupRoleRow = {
@@ -108,7 +113,7 @@ type GroupRoleRow = {
  * group_members RLS policy is tenant-scoped); RLS limits the rows to
  * tenants where the user is an active member.
  */
-const getMyGroupRoleRows = cache(async (): Promise<GroupRoleRow[]> => {
+const getMyGroupRoleRows = cache(async (): Promise<GroupRoleRow[] | null> => {
   const user = await getSessionUser();
   if (!user) return [];
   const supabase = await supabaseServer();
@@ -117,8 +122,7 @@ const getMyGroupRoleRows = cache(async (): Promise<GroupRoleRow[]> => {
     .select(`tenant_id, groups(name, status, group_roles(${TERMS_SELECT}, ${ROLE_SELECT}))`)
     .eq("user_id", user.id)
     .returns<GroupRoleRow[]>();
-  logReadError("group_members", error);
-  return data ?? [];
+  return logReadError("group_members", error) ? null : (data ?? []);
 });
 
 type PolicyRow = {
@@ -146,8 +150,7 @@ const getMyPolicyRows = cache(async (): Promise<PolicyRow[] | null> => {
     .select("id, tenant_id, name, effect, permissions, scope_type, scope_values, exempt_role_ids")
     .eq("status", "active")
     .returns<PolicyRow[]>();
-  logReadError("authorization_policies", error);
-  return error ? null : (data ?? []);
+  return logReadError("authorization_policies", error) ? null : (data ?? []);
 });
 
 function grantOf(terms: Terms, role: NonNullable<RoleOf>, source: Grant["source"], via: string | null): Grant {
@@ -190,14 +193,20 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
     return { userId: "", tenantId: null, tenantSlug: null, roles: [], permissions: [] };
   }
 
-  const [memberships, directRoleRows, groupRoleRows, policyRows, cookieStore, host] = await Promise.all([
-    getMyMemberships(),
+  const [membershipRead, directRoleRows, groupRoleRows, policyRows, cookieStore, host] = await Promise.all([
+    readMyMemberships(),
     getMyRoleRows(),
     getMyGroupRoleRows(),
     getMyPolicyRows(),
     cookies(),
     getHostTenant(),
   ]);
+  const memberships = membershipRead.rows;
+  // A failed read is never "no access" (owner decision, 2026-10-17): still
+  // nothing is permitted, but the context says it could not be checked.
+  if (membershipRead.failed) {
+    return { userId: user.id, tenantId: null, tenantSlug: null, roles: [], permissions: [], unavailable: true };
+  }
 
   // FOUNDATION-P0-22 — on a tenant's own address (`<slug>.<BASE_APP_HOST>`)
   // that tenant is the only candidate: the user must hold an active
@@ -225,6 +234,11 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
   }
 
   const tenantId = activeMembership.tenantId;
+  // Roles, groups or policies that cannot be read are never permission
+  // (CLAUDE.md §17.4): no permissions at all, marked unavailable.
+  if (directRoleRows === null || groupRoleRows === null || policyRows === null) {
+    return { userId: user.id, tenantId, tenantSlug: activeMembership.slug || null, roles: [], permissions: [], grants: [], policies: [], aal: user.aal, unavailable: true };
+  }
   // FOUNDATION-P0-19 — the engine's facts for this tenant: every role
   // assignment, direct and through active groups, with its terms. An
   // inactive role grants nothing (FOUNDATION-P0-25).
@@ -243,11 +257,6 @@ export const getTenantContext = cache(async (): Promise<TenantContext> => {
   if (await getAutomationAccess()) {
     const { HUMAN_ONLY_PERMISSIONS } = await import("@/lib/security/automationCredentialRules");
     for (let i = 0; i < grants.length; i++) grants[i] = { ...grants[i], permissions: grants[i].permissions.filter((k) => !HUMAN_ONLY_PERMISSIONS.includes(k)) };
-  }
-  // Policies that cannot be read are never permission (CLAUDE.md §17.4):
-  // the context then carries no permissions at all.
-  if (policyRows === null) {
-    return { userId: user.id, tenantId, tenantSlug: activeMembership.slug || null, roles: [], permissions: [], grants: [], policies: [], aal: user.aal };
   }
   const policies: AuthorizationPolicy[] = policyRows
     .filter((p) => p.tenant_id === tenantId)

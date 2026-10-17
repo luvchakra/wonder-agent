@@ -27,6 +27,13 @@ export type TenantContext = {
    * permitted until the person verifies a second factor.
    */
   mfaStepUp?: { tenantId: string; name: string };
+  /**
+   * Set when a read needed to resolve access failed (memberships, roles,
+   * groups or policies). Nothing is permitted, as before, but callers say
+   * "temporarily unavailable" (503) instead of "forbidden" (owner decision,
+   * 2026-10-17; CLAUDE.md §17.5).
+   */
+  unavailable?: true;
 };
 
 export type Role = {

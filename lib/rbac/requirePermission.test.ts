@@ -86,3 +86,22 @@ describe("requireAnyPermission", () => {
     await expect(requireAnyPermission(["agent.update"])).rejects.toMatchObject({ status: 401, code: "NO_TENANT" });
   });
 });
+
+describe("access that could not be checked (owner decision, 2026-10-17)", () => {
+  beforeEach(() => {
+    getTenantContextMock.mockReset();
+  });
+
+  it("is 503 TEMPORARILY_UNAVAILABLE, not 401 or 403, when memberships could not be read", async () => {
+    getTenantContextMock.mockResolvedValue({ userId: "u1", tenantId: null, tenantSlug: null, roles: [], permissions: [], unavailable: true });
+    await expect(requirePermission("agent.read")).rejects.toMatchObject({ status: 503, code: "TEMPORARILY_UNAVAILABLE" });
+    await expect(requireAnyPermission(["agent.read"])).rejects.toMatchObject({ status: 503, code: "TEMPORARILY_UNAVAILABLE" });
+  });
+
+  it("still refuses, and says why, when roles or policies could not be read", async () => {
+    // Even a permission list that would allow it is not trusted once a read failed.
+    getTenantContextMock.mockResolvedValue({ userId: "u1", tenantId: "t1", tenantSlug: "acme", roles: [], permissions: ["agent.read"], unavailable: true });
+    await expect(requirePermission("agent.read")).rejects.toMatchObject({ status: 503, code: "TEMPORARILY_UNAVAILABLE" });
+    await expect(requireAnyPermission(["agent.read"])).rejects.toMatchObject({ status: 503, code: "TEMPORARILY_UNAVAILABLE" });
+  });
+});
