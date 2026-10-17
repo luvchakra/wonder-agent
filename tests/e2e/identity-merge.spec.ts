@@ -73,8 +73,9 @@ test.describe.serial("merging duplicate people", () => {
   test("another organization's administrator finds neither record", async ({ browser }) => {
     const ctx = await browser.newContext({ storageState: authFile("adminTwo") });
     const page = await ctx.newPage();
-    const res = await page.goto(`/identities/${keep.id}/merge?with=${other.id}`);
-    expect(res?.status()).toBe(404);
+    await page.goto(`/identities/${keep.id}/merge?with=${other.id}`);
+    await expect(page.getByText("This page could not be found.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Merge records" })).toHaveCount(0);
     await ctx.close();
   });
 });

@@ -44,12 +44,7 @@ test.describe.serial("global configuration", () => {
     await page.getByRole("button", { name: "Save changes" }).click();
     await expect(page.getByRole("status")).toHaveText("Nothing changed.");
   });
-});
-
-// PLATFORM-P0-13: the settings as a signed file, previewed before they are imported.
-test.describe("global configuration — export and import", () => {
-  test.use({ storageState: authFile("adminOne") });
-
+  // PLATFORM-P0-13: the settings as a signed file, previewed before they are imported (after the tests above restore the settings).
   test("an export previews as no change here, and an edited file is refused", async ({ page }) => {
     const res = await page.request.get("/api/v1/tenant/configuration/bundle");
     expect(res.status()).toBe(200);
