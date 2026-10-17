@@ -201,14 +201,15 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "identity-rules",
     title: "Identity rules",
     category: "Identities",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
-      "Identity rules set a person's attributes from their other attributes, or open a task about them, when they are created, imported, change or reach a lifecycle moment.",
+      "Identity rules set a person's attributes, open a task about them, add them to a group or assign them an access package, when they are created, imported, change or reach a lifecycle moment.",
     body: [
-      "Administration › Organization Settings › Identity Rules lists them. A rule says when it runs (when an identity is created, imported or an attribute changes, or when a person becomes active, moves, gets a new manager, leaves or reaches their end date), which identities it applies to, and what it does: set one attribute, or open a task for the person's manager or the identity administrators.",
+      "Administration › Organization Settings › Identity Rules lists them. A rule says when it runs (when an identity is created, imported or an attribute changes, or when a person becomes active, moves, gets a new manager, leaves or reaches their end date), which identities it applies to, and what it does: set one attribute, open a task for the person's manager or the identity administrators, add to a group, or assign an access package.",
+      "Add to a group and Assign an access package give access, so each says how: “A person approves each one” opens an approval task on the lifecycle tasks page, where Approve gives the access and Reject needs a reason; “Automatic” gives it as soon as the rule fires. Nobody approves a grant for themselves. Adding to a group needs the person to have a sign-in; otherwise the run log says it was skipped.",
       "A new rule starts in report-only mode, so its run log shows what it would have done without changing anything. Someone other than its author publishes it, and it changes identities only once it is switched to enforce. A rule never overrides a value a connected source set.",
     ],
-    keywords: ["identity rules", "attribute rules", "derive", "calculated attribute", "birthright", "automation", "report only", "enforce", "publish"],
+    keywords: ["identity rules", "attribute rules", "derive", "calculated attribute", "birthright", "automation", "report only", "enforce", "publish", "add to group", "assign package", "automatic grant", "approve grant"],
     href: "/identities/rules",
   },
   // --------------------------------------------------------------------- Agents
@@ -963,6 +964,6 @@ export const WHATS_NEW = [
   { id: "fulfilment", label: "Provisioning tasks", note: "Approved access a connection can't set up goes to a person or group, and closes when a sync finds it." },
   { id: "certification", label: "Access reviews for everyone", note: "Review people's access, WonderID roles, packages and applications, by managers or owners." },
   { id: "delegations", label: "Delegations and My Team", note: "Hand your approvals to a colleague while away; managers see their direct reports." },
-  { id: "identity-rules", label: "Identity rules", note: "Set attributes from other attributes, report-only until a second person publishes them." },
+  { id: "identity-rules", label: "Identity rules that grant access", note: "Add people to a group or assign a package, after approval or automatically, from a rule a second person published." },
   { id: "api-clients", label: "API clients", note: "Let a pipeline call the WonderID API with its own roles, approved by a second administrator." },
 ] as const;

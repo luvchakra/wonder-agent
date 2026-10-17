@@ -370,6 +370,45 @@ export async function addGroupMember(tenantId: string, actorId: string, groupId:
   });
 }
 
+/**
+ * IDENTITY-P0-21 (owner decision, 2026-10-17): a published identity rule
+ * adds a person to a group, automatically or once a person approved it
+ * (`approvedBy`, never the person added). Service role, explicit tenant
+ * filter on the group and the membership; audited.
+ */
+export async function addGroupMemberByRule(
+  tenantId: string,
+  groupId: string,
+  userId: string,
+  meta: { ruleId: string; ruleVersion: number; approvedBy: string | null },
+): Promise<"added" | "already_member"> {
+  if (!UUID_RE.test(groupId) || !UUID_RE.test(userId)) throw new ApiError(404, "NOT_FOUND", "No such group or person in this organization");
+  if (meta.approvedBy && meta.approvedBy === userId) throw new ApiError(403, "SELF_ESCALATION", "You can't approve adding yourself to a group. Another administrator must do it.");
+  const admin = supabaseServiceRole();
+  const [{ data: g, error: gError }, { data: m, error: mError }] = await Promise.all([
+    admin.from("groups").select("id, tenant_id, name, status").eq("tenant_id", tenantId).eq("id", groupId).maybeSingle<{ id: string; tenant_id: string; name: string; status: string }>(),
+    admin.from("tenant_memberships").select("tenant_id, status").eq("tenant_id", tenantId).eq("user_id", userId).maybeSingle<{ tenant_id: string; status: string }>(),
+  ]);
+  if (gError || mError) throw new ApiError(500, "QUERY_FAILED", (gError ?? mError)!.message);
+  if (!g || g.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "The rule's group is not in this organization");
+  if (g.status !== "active") throw new ApiError(409, "GROUP_NOT_ACTIVE", `"${g.name}" is not active`);
+  if (!m || m.tenant_id !== tenantId || m.status === "removed") throw new ApiError(409, "NOT_A_MEMBER", "This person has no sign-in in this organization");
+  const { error } = await admin.from("group_members").insert({ group_id: g.id, tenant_id: tenantId, user_id: userId, added_by: meta.approvedBy });
+  if (error && error.code !== "23505") throw new ApiError(500, "ADD_FAILED", error.message);
+  if (error) return "already_member";
+  await writeAudit({
+    tenantId,
+    actorId: meta.approvedBy,
+    actorType: meta.approvedBy ? "user" : "system",
+    action: "group.member_added",
+    objectType: "user",
+    objectId: userId,
+    outcome: "success",
+    metadata: { group: g.name, groupId: g.id, ruleId: meta.ruleId, ruleVersion: meta.ruleVersion, approval: meta.approvedBy ? "approved" : "automatic" },
+  });
+  return "added";
+}
+
 export async function removeGroupMember(tenantId: string, actorId: string, groupId: string, userId: string): Promise<void> {
   const g = await groupIn(tenantId, groupId);
   const { data, error } = await supabaseServiceRole().from("group_members").delete().eq("tenant_id", tenantId).eq("group_id", g.id).eq("user_id", userId).select("user_id");

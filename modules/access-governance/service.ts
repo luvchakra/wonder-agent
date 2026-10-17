@@ -146,6 +146,7 @@ export {
   assignPackageDirect,
   setPackageBirthright,
   assignBirthrightPackages,
+  assignPackageByRule,
   listAssignments,
   getAssignment,
   setAssignmentItemStatus,

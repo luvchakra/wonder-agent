@@ -95,6 +95,7 @@ export {
   createIdentityRule,
   updateIdentityRule,
   simulateIdentityRule,
+  listRuleGrantTargets,
   requestIdentityRulePublish,
   approveIdentityRulePublish,
   retireIdentityRule,

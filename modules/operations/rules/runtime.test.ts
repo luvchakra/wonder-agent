@@ -153,7 +153,7 @@ describe("validateRule", () => {
       },
       known,
     );
-    expect(problems.map((p) => p.field)).toEqual(["trigger", "condition", "priority", "effects.0.attribute", "effects.0.value", "effects.1.package", "effects.2"]);
+    expect(problems.map((p) => p.field)).toEqual(["trigger", "condition", "priority", "effects.0.attribute", "effects.0.value", "effects.1.package", "effects.1.approval", "effects.2"]);
     expect(validateRule({ trigger: { type: "identity.created" }, condition: "true", priority: 1, effects: [] }, known)).toEqual([{ field: "effects", message: "Add at least one effect" }]);
   });
 });

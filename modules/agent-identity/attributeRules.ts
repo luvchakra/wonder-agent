@@ -203,6 +203,8 @@ function effectValue(v: unknown): EffectValue | undefined {
  * attributes) is checked by the runtime's validateRule. Attribute rules
  * have one effect kind: set_attribute.
  */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function shapeRuleInput(input: RuleInput, current?: ValidRuleInput): ValidRuleInput | { error: string } {
   const merged = {
     name: input.name !== undefined ? text(input.name, 200) : (current?.name ?? null),
@@ -244,7 +246,17 @@ export function shapeRuleInput(input: RuleInput, current?: ValidRuleInput): Vali
       effects.push({ type: "open_task", params: { assignee: params.assignee, title: title as EffectValue } });
       continue;
     }
-    if (o.type !== "set_attribute") return { error: `effects.${i}: a rule sets an attribute (set_attribute) or opens a task (open_task)` };
+    if (o.type === "add_to_group" || o.type === "assign_package") {
+      // IDENTITY-P0-21 (owner decision 2026-10-17): a grant either waits for a person's approval or applies
+      // automatically; the rule itself is always published under four-eyes.
+      const key = o.type === "add_to_group" ? "group" : "package";
+      const target = params[key];
+      if (typeof target !== "string" || !UUID.test(target)) return { error: `effects.${i}.${key}: which ${key} (an id)` };
+      if (params.approval !== "required" && params.approval !== "automatic") return { error: `effects.${i}.approval: required or automatic` };
+      effects.push({ type: o.type, params: { [key]: target, approval: params.approval } });
+      continue;
+    }
+    if (o.type !== "set_attribute") return { error: `effects.${i}: a rule sets an attribute, opens a task, adds to a group or assigns a package` };
     if (typeof params.attribute !== "string" || !params.attribute) return { error: `effects.${i}.attribute: which attribute to set` };
     const value = effectValue(params.value);
     if (value === undefined) return { error: `effects.${i}.value: a value, { ref } or { template }` };

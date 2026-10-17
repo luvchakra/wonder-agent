@@ -116,6 +116,19 @@ describe("shapeRuleInput", () => {
     expect(shapeRuleInput({ ...base, effects: [{ type: "add_to_group", params: { group: "x" } }] })).toHaveProperty("error");
   });
 
+  it("accepts a group or package grant only with an id and an approval choice (owner decision 2026-10-17)", () => {
+    const id = "00000000-0000-4000-8000-000000000001";
+    const grant = (type: string, params: Record<string, unknown>) => shapeRuleInput({ ...base, effects: [{ type, params }] });
+    expect(grant("add_to_group", { group: id, approval: "required" })).toMatchObject({ effects: [{ type: "add_to_group", params: { group: id, approval: "required" } }] });
+    expect(grant("assign_package", { package: id, approval: "automatic" })).toMatchObject({ effects: [{ type: "assign_package", params: { package: id, approval: "automatic" } }] });
+    expect(grant("add_to_group", { group: id })).toHaveProperty("error");
+    expect(grant("assign_package", { package: id, approval: "sometimes" })).toHaveProperty("error");
+    expect(grant("assign_package", { package: "not-an-id", approval: "required" })).toHaveProperty("error");
+    // Extra parameters are dropped, so nothing else rides along.
+    expect(grant("add_to_group", { group: id, approval: "required", tenantId: "other" })).toMatchObject({ effects: [{ params: { group: id, approval: "required" } }] });
+    expect((grant("add_to_group", { group: id, approval: "required", tenantId: "other" }) as { effects: { params: Record<string, unknown> }[] }).effects[0].params).not.toHaveProperty("tenantId");
+  });
+
   it("accepts a rule and starts it as written", () => {
     expect(shapeRuleInput(base)).toMatchObject({ name: "Region from cost centre", trigger_type: "identity.created", mode: "report_only", priority: 100, scope: {} });
     expect(shapeRuleInput({ ...base, effects: [{ type: "set_attribute", params: { attribute: "displayName", value: { template: "{identity.firstName} {identity.lastName}" } } }] })).not.toHaveProperty(
@@ -133,7 +146,9 @@ describe("shapeRuleInput", () => {
     expect(err({ priority: 1.5 })).toMatch(/^priority/);
     expect(err({ scope: { organizations: ["x"] } })).toMatch(/identityTypes and sources only/);
     expect(err({ effects: [] })).toMatch(/one to twenty/);
-    expect(err({ effects: [{ type: "assign_package", params: { package: "p" } }] })).toMatch(/sets an attribute/);
+    // A package grant needs an id (owner decision 2026-10-17: grants are allowed, with an approval choice).
+    expect(err({ effects: [{ type: "assign_package", params: { package: "p" } }] })).toMatch(/which package/);
+    expect(err({ effects: [{ type: "remove_package", params: { package: "p" } }] })).toMatch(/sets an attribute/);
     expect(err({ effects: [{ type: "set_attribute", params: { attribute: "region", value: { ref: "identity.x", extra: 1 } } }] })).toMatch(/a value/);
   });
 

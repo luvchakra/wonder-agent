@@ -38,7 +38,7 @@ import {
 type Row = Record<string, unknown>;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const IDENTITY_COLUMNS =
-  "id, tenant_id, identity_type, subtype, display_name, username, email, status, lifecycle_state, department, title, business_unit, location, employment_type, organization, purpose, start_date, end_date, privileged, external, source_system, manager_identity_id, attributes, field_provenance, updated_at";
+  "id, tenant_id, user_id, identity_type, subtype, display_name, username, email, status, lifecycle_state, department, title, business_unit, location, employment_type, organization, purpose, start_date, end_date, privileged, external, source_system, manager_identity_id, attributes, field_provenance, updated_at";
 /** A simulation over more identities than this reports the first ones only (by id). */
 const SIMULATION_LIMIT = 50_000;
 const SIMULATION_PAGE = 1000;
@@ -143,6 +143,15 @@ async function validated(tenantId: string, input: RuleInput, current?: ValidRule
   shaped.effects.forEach((e, i) => {
     if (e.type === "set_attribute" && !settable.has(String(e.params.attribute).toLowerCase())) problems.push({ field: `effects.${i}.attribute`, message: `"${e.params.attribute}" cannot be set by a rule` });
   });
+  // IDENTITY-P0-21: a grant names a group or package of this organization.
+  for (const [i, e] of shaped.effects.entries()) {
+    if (e.type !== "add_to_group" && e.type !== "assign_package") continue;
+    const table = e.type === "add_to_group" ? "groups" : "access_packages";
+    const id = String(e.type === "add_to_group" ? e.params.group : e.params.package);
+    const { data, error } = await supabaseServiceRole().from(table).select("id").eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+    if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+    if (!data) problems.push({ field: `effects.${i}`, message: e.type === "add_to_group" ? "no such group in this organization" : "no such package in this organization" });
+  }
   if (problems.length) throw new ApiError(400, "VALIDATION_FAILED", problems.map((p) => `${p.field}: ${p.message}`).join("; "));
   return shaped;
 }
@@ -278,6 +287,14 @@ export async function simulateIdentityRule(tenantId: string, actorId: string, ru
   const event: RuleEvent = { type: rule.trigger.type, changedAttributes: rule.trigger.attribute ? [rule.trigger.attribute] : [], source: rule.trigger.source };
   const result: RuleSimulation = { evaluated: 0, truncated: false, matched: 0, wouldChange: 0, share: 0, changes: [], skipped: [], errors: [] };
   const now = new Date().toISOString();
+  // IDENTITY-P0-21: grants are listed by the group's or package's name ("who gains what", design §5.2.1).
+  const grantLabels = new Map<string, string>();
+  for (const e of rule.effects.filter((x) => x.type === "add_to_group" || x.type === "assign_package")) {
+    const group = e.type === "add_to_group";
+    const id = String(group ? e.params.group : e.params.package);
+    const { data } = await supabaseServiceRole().from(group ? "groups" : "access_packages").select("name").eq("tenant_id", tenantId).eq("id", id).maybeSingle<{ name: string }>();
+    grantLabels.set(id, `${group ? "Group" : "Package"} ${data?.name ?? "(not found)"}`);
+  }
 
   // Every identity in scope, a page at a time (keyset on id), up to SIMULATION_LIMIT.
   let after: string | null = null;
@@ -309,7 +326,13 @@ export async function simulateIdentityRule(tenantId: string, actorId: string, ru
       if (entry.outcome !== "applied") continue;
       result.matched++;
       const plan = planAttributeWrites(identity, [{ ruleId: rule.id, ruleVersion: rule.version, effects: entry.effects }], definitions, now);
-      if (plan.written.length) result.wouldChange++;
+      const grants = entry.effects.filter((x) => x.type === "add_to_group" || x.type === "assign_package");
+      if (plan.written.length || grants.length) result.wouldChange++;
+      for (const g of grants) {
+        const id = String(g.type === "add_to_group" ? g.params.group : g.params.package);
+        if (result.changes.length < 50)
+          result.changes.push({ identityId: identity.id as string, displayName: name, attribute: grantLabels.get(id) ?? id, before: null, after: g.params.approval === "required" ? "asks a person to approve" : "granted" });
+      }
       for (const w of plan.written)
         if (result.changes.length < 50) result.changes.push({ identityId: identity.id as string, displayName: name, attribute: w.attribute, before: w.before, after: w.after });
       for (const s of plan.skipped) if (result.skipped.length < 50) result.skipped.push({ identityId: identity.id as string, displayName: name, attribute: s.attribute, reason: s.reason });
@@ -554,9 +577,39 @@ export async function applyIdentityRules(
       }
     }
 
+    // IDENTITY-P0-21 (owner decision 2026-10-17): grants of enforced rules. "automatic" applies now (the rule
+    // was published under four-eyes); "required" opens one approval task per rule per identity.
+    const grantNotes = new Map<string, string[]>();
+    const note = (ruleId: string, text: string) => grantNotes.set(ruleId, [...(grantNotes.get(ruleId) ?? []), text]);
+    if (!writeError) {
+      for (const run of applied) {
+        for (const e of run.effects.filter((x) => x.type === "add_to_group" || x.type === "assign_package")) {
+          const kind = e.type === "add_to_group" ? "group" : "package";
+          const targetId = String(kind === "group" ? e.params.group : e.params.package);
+          if (e.params.approval === "required") {
+            const { data: target } = await supabaseServiceRole().from(kind === "group" ? "groups" : "access_packages").select("name").eq("tenant_id", tenantId).eq("id", targetId).maybeSingle<{ name: string }>();
+            const { error } = await supabaseServiceRole()
+              .from("identity_lifecycle_tasks")
+              .insert({ tenant_id: tenantId, identity_id: identityId, task_type: "rule_grant", rule_id: run.ruleId, rule_version: run.ruleVersion, detail: { kind, targetId, targetName: target?.name ?? null } });
+            if (error && error.code !== "23505") note(run.ruleId, `approval task not opened: ${error.message}`);
+            else note(run.ruleId, error ? `${kind} already waiting for approval` : `${kind} waiting for approval`);
+            continue;
+          }
+          try {
+            const result = await grantByRule(tenantId, identity, kind, targetId, { ruleId: run.ruleId, ruleVersion: run.ruleVersion, approvedBy: null });
+            note(run.ruleId, result);
+          } catch (err) {
+            note(run.ruleId, `${kind} not granted: ${err instanceof Error ? err.message : "failed"}`);
+          }
+        }
+      }
+    }
+
     const records: RuleRunRecord[] = log.map((entry) => {
       if (entry.outcome !== "applied") return entry;
       if (writeError) return { ...entry, outcome: "error" as const, detail: writeError };
+      const grants = grantNotes.get(entry.ruleId);
+      if (grants && !plan.written.some((w) => w.ruleId === entry.ruleId)) return { ...entry, detail: grants.join("; ") };
       const mine = plan.written.filter((w) => w.ruleId === entry.ruleId);
       const skips = plan.skipped.filter((s) => s.ruleId === entry.ruleId);
       if (!mine.length && skips.length) return { ...entry, outcome: "skipped" as const, detail: skips.map((s) => `${s.attribute}: ${s.reason}`).join("; ") };
@@ -592,4 +645,43 @@ export async function applyIdentityRules(
     await recordRuleRuns(tenantId, "lifecycle_rules", "identity", failed, opts.correlationId).catch(() => undefined);
     return { changed: false, error: message };
   }
+}
+
+/**
+ * IDENTITY-P0-21: makes one rule grant, automatically (`approvedBy` null) or
+ * after a person's approval. A group needs the identity's sign-in; a
+ * package needs an eligible identity. Says what happened, for the run log.
+ */
+export async function grantByRule(
+  tenantId: string,
+  identity: Row,
+  kind: "group" | "package",
+  targetId: string,
+  meta: { ruleId: string; ruleVersion: number; approvedBy: string | null },
+): Promise<string> {
+  if (identity.tenant_id !== tenantId) throw new ApiError(404, "NOT_FOUND", "No such identity in this organization");
+  if (kind === "group") {
+    if (!identity.user_id) return "group skipped: this identity has no sign-in";
+    const { addGroupMemberByRule } = await import("@/lib/users/groups");
+    return (await addGroupMemberByRule(tenantId, targetId, identity.user_id as string, meta)) === "added" ? "added to the group" : "already in the group";
+  }
+  const { assignPackageByRule } = await import("@/modules/access-governance/service");
+  return (await assignPackageByRule(tenantId, identity.id as string, targetId, meta)).outcome === "assigned" ? "package assigned" : "package already held";
+}
+
+/** IDENTITY-P0-21: the identity a rule grant task is about, read for its approval. */
+export async function identityForRuleGrant(tenantId: string, identityId: string): Promise<Row | null> {
+  return (await rowsById(tenantId, [identityId])).get(identityId) ?? null;
+}
+
+/** IDENTITY-P0-21: the active groups and packages a rule may grant, by name, for the rule editor. */
+export async function listRuleGrantTargets(tenantId: string): Promise<{ groups: { id: string; name: string }[]; packages: { id: string; name: string }[] }> {
+  const admin = supabaseServiceRole();
+  const [groups, packages] = await Promise.all([
+    admin.from("groups").select("id, tenant_id, name").eq("tenant_id", tenantId).eq("status", "active").order("name").limit(500),
+    admin.from("access_packages").select("id, tenant_id, name").eq("tenant_id", tenantId).eq("status", "active").order("name").limit(500),
+  ]);
+  if (groups.error || packages.error) throw new ApiError(500, "QUERY_FAILED", (groups.error ?? packages.error)!.message);
+  const pick = (rows: Row[] | null) => (rows ?? []).filter((r) => r.tenant_id === tenantId).map((r) => ({ id: r.id as string, name: r.name as string }));
+  return { groups: pick(groups.data as Row[] | null), packages: pick(packages.data as Row[] | null) };
 }

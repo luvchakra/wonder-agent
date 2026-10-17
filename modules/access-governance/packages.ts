@@ -402,6 +402,44 @@ export async function assignBirthrightPackages(
   return { assigned, skipped };
 }
 
+/**
+ * IDENTITY-P0-21 (owner decision, 2026-10-17): a published identity rule
+ * assigns a package, automatically or once a person approved it
+ * (`approvedBy`). The package must be active and the identity eligible; one
+ * already held is left as it is. Provisioned and verified like any other
+ * assignment. Service role, explicit tenant filter; audited.
+ */
+export async function assignPackageByRule(
+  tenantId: string,
+  identityId: string,
+  packageId: string,
+  meta: { ruleId: string; ruleVersion: number; approvedBy: string | null },
+): Promise<{ outcome: "assigned" | "already_held"; assignmentId: string | null }> {
+  const admin = supabaseServiceRole();
+  const [pkg, subject] = await Promise.all([getPackage(tenantId, packageId), getIdentity(tenantId, identityId)]);
+  if (!pkg) throw new ApiError(404, "NOT_FOUND", "The rule's package is not in this organization");
+  if (!subject) throw new ApiError(404, "NOT_FOUND", "No such identity in this organization");
+  if (pkg.status !== "active") throw new ApiError(409, "PACKAGE_NOT_ACTIVE", `"${pkg.name}" is not active`);
+  const eligibility = checkEligibility(pkg, { identityType: subject.identityType, department: subject.department, status: subject.status });
+  if (!eligibility.eligible) throw new ApiError(403, "NOT_ELIGIBLE", eligibility.reasons.join("; "));
+  const { data: held, error: heldError } = await admin.from("access_package_assignments").select("id").eq("tenant_id", tenantId).eq("identity_id", identityId).eq("package_id", pkg.id).in("status", LIVE).limit(1).maybeSingle();
+  if (heldError) throw new ApiError(500, "QUERY_FAILED", heldError.message);
+  if (held) return { outcome: "already_held", assignmentId: held.id as string };
+  const expiry = assignmentExpiry(new Date(), null, pkg);
+  const assignmentId = await createAssignment(tenantId, meta.approvedBy, { packageId: pkg.id, identityId, requestId: null, source: "rule", justification: `Identity rule (version ${meta.ruleVersion})`, expiresAt: expiry.expiresAt });
+  await writeAudit({
+    tenantId,
+    actorId: meta.approvedBy,
+    actorType: meta.approvedBy ? "user" : "system",
+    action: "access.package_rule_assigned",
+    objectType: "access_package_assignment",
+    objectId: assignmentId,
+    outcome: "success",
+    metadata: { packageId: pkg.id, identityId, ruleId: meta.ruleId, ruleVersion: meta.ruleVersion, approval: meta.approvedBy ? "approved" : "automatic" },
+  });
+  return { outcome: "assigned", assignmentId };
+}
+
 export type MoverReview = { assignmentId: string; packageId: string; packageName: string; dueAt: string };
 
 /**
@@ -691,7 +729,7 @@ export type PackageAssignment = {
 async function createAssignment(
   tenantId: string,
   actorId: string | null,
-  input: { packageId: string; identityId: string; requestId: string | null; justification: string | null; expiresAt: string | null; source?: "birthright" },
+  input: { packageId: string; identityId: string; requestId: string | null; justification: string | null; expiresAt: string | null; source?: "birthright" | "rule" },
 ): Promise<string> {
   const admin = supabaseServiceRole();
   const resources = (await resourcesOf(tenantId, [input.packageId], "service")).get(input.packageId) ?? [];

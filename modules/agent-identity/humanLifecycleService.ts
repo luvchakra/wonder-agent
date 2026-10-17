@@ -14,7 +14,7 @@ import type {
   LifecycleTaskStatus,
   LifecycleTaskType,
 } from "@/lib/shared/types/agent-identity";
-import { endDatePassed, HUMAN_TRANSITIONS, opensAccessRemoval, opensBirthright, statusForState, tasksForEvent, whyCannotDisableAll, type DetectedEvent } from "./humanLifecycle";
+import { endDatePassed, HUMAN_TRANSITIONS, opensAccessRemoval, opensBirthright, ruleGrantRefusal, statusForState, tasksForEvent, whyCannotDisableAll, type DetectedEvent } from "./humanLifecycle";
 import { assignOwner, removeOwner } from "./owners";
 import { lifecycleRuleTriggers } from "./attributeRules";
 import { applyIdentityRules } from "./identityRulesService";
@@ -71,6 +71,7 @@ function toTask(r: Row): IdentityLifecycleTask {
     id: r.id as string,
     eventId: (r.event_id as string | null) ?? null,
     ruleId: (r.rule_id as string | null) ?? null,
+    ruleVersion: (r.rule_version as number | null) ?? null,
     identityId: r.identity_id as string,
     taskType: r.task_type as LifecycleTaskType,
     status: r.status as LifecycleTaskStatus,
@@ -592,7 +593,13 @@ async function closeTask(tenantId: string, actorId: string, task: IdentityLifecy
  * target system). Skipping needs a reason. The ownership transfer is
  * closed by transferOwnership(), which actually does it.
  */
-export async function completeLifecycleTask(tenantId: string, actorId: string, taskId: string, input: { status?: unknown; note?: unknown }): Promise<void> {
+export async function completeLifecycleTask(
+  tenantId: string,
+  actorId: string,
+  taskId: string,
+  input: { status?: unknown; note?: unknown },
+  actorPermissions: readonly string[] = [],
+): Promise<void> {
   const status = input.status;
   if (status !== "done" && status !== "skipped") throw new ApiError(400, "VALIDATION_FAILED", "status: done or skipped");
   const note = typeof input.note === "string" && input.note.trim() ? input.note.trim().slice(0, 2000) : null;
@@ -602,6 +609,19 @@ export async function completeLifecycleTask(tenantId: string, actorId: string, t
     const footprint = await getOwnershipFootprint(tenantId, task.identityId);
     const remaining = footprint.ownedIdentities + footprint.sponsoredIdentities + footprint.directReports + footprint.ownedAgents;
     if (remaining > 0) throw new ApiError(409, "STILL_OWNS", "This person still owns or manages things; transfer them first, or skip with a reason");
+  }
+  // IDENTITY-P0-21 (owner decision 2026-10-17): approving a rule's grant makes it; rejecting needs a reason.
+  if (task.taskType === "rule_grant" && status === "done") {
+    const kind = task.detail.kind === "group" ? "group" : "package";
+    const targetId = String(task.detail.targetId ?? "");
+    const { grantByRule, identityForRuleGrant } = await import("./identityRulesService");
+    const identity = await identityForRuleGrant(tenantId, task.identityId);
+    if (!identity) throw new ApiError(404, "NOT_FOUND", "No such identity in this organization");
+    const refusal = ruleGrantRefusal({ kind, permissions: actorPermissions, actorUserId: actorId, subjectUserId: (identity.user_id as string | null) ?? null });
+    if (refusal) throw new ApiError(403, refusal.code, refusal.message);
+    const result = await grantByRule(tenantId, identity, kind, targetId, { ruleId: task.ruleId ?? "", ruleVersion: task.ruleVersion ?? 0, approvedBy: actorId });
+    await closeTask(tenantId, actorId, task, status, note, { result });
+    return;
   }
   await closeTask(tenantId, actorId, task, status, note);
 }

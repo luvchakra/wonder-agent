@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
-import { listAttributeDefinitions, listIdentityRules, SETTABLE_FIELDS } from "@/modules/agent-identity/service";
+import { listAttributeDefinitions, listIdentityRules, listRuleGrantTargets, SETTABLE_FIELDS } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader, EmptyState, TableContainer, Td, Th, Thead, Tr, ObjectActionsMenu } from "@/modules/ui";
 import { RuleForm } from "./RuleForms";
@@ -23,7 +23,11 @@ export default async function IdentityRulesPage() {
   }
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("identity.manage");
-  const [rules, definitions] = await Promise.all([listIdentityRules(tenantId), canManage ? listAttributeDefinitions(tenantId) : Promise.resolve([])]);
+  const [rules, definitions, targets] = await Promise.all([
+    listIdentityRules(tenantId),
+    canManage ? listAttributeDefinitions(tenantId) : Promise.resolve([]),
+    canManage ? listRuleGrantTargets(tenantId) : Promise.resolve({ groups: [], packages: [] }),
+  ]);
   const settable = [...Object.keys(SETTABLE_FIELDS), ...definitions.filter((d) => d.active).map((d) => d.name)];
 
   return (
@@ -33,7 +37,7 @@ export default async function IdentityRulesPage() {
           <h1 className="text-[22px] font-semibold tracking-[-0.015em] text-foreground">Identity rules</h1>
           <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Set an identity&apos;s attributes from its other attributes. A rule never overrides a value a connected source set.</p>
         </div>
-        <ObjectActionsMenu create={canManage ? { label: "New rule…", title: "New rule", content: <RuleForm settable={settable} /> } : undefined} />
+        <ObjectActionsMenu create={canManage ? { label: "New rule…", title: "New rule", content: <RuleForm settable={settable} targets={targets} /> } : undefined} />
       </div>
 
       <Card>
@@ -60,7 +64,7 @@ export default async function IdentityRulesPage() {
                           {r.name}
                         </Link>
                         <span className="block text-xs text-muted-foreground">
-                          {r.effects.map((e) => (e.type === "open_task" ? "Opens a task" : `Sets ${String(e.params.attribute)}`)).join(", ")} · {r.mode === "enforce" ? "Enforce" : "Report only"}
+                          {r.effects.map((e) => (e.type === "open_task" ? "Opens a task" : e.type === "add_to_group" ? "Adds to a group" : e.type === "assign_package" ? "Assigns a package" : `Sets ${String(e.params.attribute)}`)).join(", ")} · {r.mode === "enforce" ? "Enforce" : "Report only"}
                         </span>
                       </Td>
                       <Td hideBelow="lg">{TRIGGER_LABEL[r.triggerType] ?? r.triggerType}</Td>

@@ -457,7 +457,7 @@ export type SourceAuthority = {
 export const LIFECYCLE_EVENT_TYPES = ["joiner", "mover", "leaver", "rehire", "conversion", "manager_change", "leaver_cancelled", "disabled", "terminated", "archived", "hire_cancelled"] as const;
 export type LifecycleEventType = (typeof LIFECYCLE_EVENT_TYPES)[number];
 
-export const LIFECYCLE_TASK_TYPES = ["request_baseline_access", "review_access", "transfer_ownership", "revoke_access", "disable_sign_in", "rule_task"] as const;
+export const LIFECYCLE_TASK_TYPES = ["request_baseline_access", "review_access", "transfer_ownership", "revoke_access", "disable_sign_in", "rule_task", "rule_grant"] as const;
 export type LifecycleTaskType = (typeof LIFECYCLE_TASK_TYPES)[number];
 
 export type LifecycleTaskStatus = "open" | "done" | "skipped";
@@ -482,6 +482,7 @@ export type IdentityLifecycleTask = {
   /** Null for a task an identity rule opened (IDENTITY-P0-21); it names its rule instead. */
   eventId: string | null;
   ruleId: string | null;
+  ruleVersion: number | null;
   identityId: string;
   taskType: LifecycleTaskType;
   status: LifecycleTaskStatus;

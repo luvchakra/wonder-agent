@@ -89,11 +89,16 @@ export const LIFECYCLE_TASK_LABEL: Record<string, { title: string; help: string 
   revoke_access: { title: "Revoke access", help: "Remove this person's access in every connected system." },
   disable_sign_in: { title: "Disable sign-in", help: "Suspend their WonderID membership under Administration → Organization." },
   rule_task: { title: "Task from a rule", help: "An identity rule asked for this." },
+  rule_grant: { title: "Approve a grant from a rule", help: "An identity rule asks to give this access. Approving gives it; rejecting needs a reason." },
 };
 
 /** A task's title: a rule's task says what to do in its own words (IDENTITY-P0-21). */
 export function lifecycleTaskTitle(t: { taskType: string; detail: Record<string, unknown> }): string {
   if (t.taskType === "rule_task" && typeof t.detail.title === "string" && t.detail.title) return t.detail.title;
+  if (t.taskType === "rule_grant") {
+    const name = typeof t.detail.targetName === "string" && t.detail.targetName ? `"${t.detail.targetName}"` : "";
+    return t.detail.kind === "group" ? `Approve adding to the group ${name}`.trim() : `Approve assigning the package ${name}`.trim();
+  }
   return LIFECYCLE_TASK_LABEL[t.taskType]?.title ?? t.taskType;
 }
 
