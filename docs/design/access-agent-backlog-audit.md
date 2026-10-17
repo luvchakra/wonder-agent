@@ -4438,3 +4438,42 @@ than being guessed.
   (delegation grants and gateway-issued tokens). It is open whether these
   are WonderID-side records only, or must be enforced at the Runtime
   Gateway.
+
+## 2026-10-17 — ACCESS-P0-35 done: owner decisions, and policy versions with what changed
+
+The owner answered the questions above:
+- custom role edits do not wait for a second administrator;
+- governance policy edits, SoD rules included, get the same output as
+  request policies (a numbered version with what changed), without
+  waiting;
+- delegation to and from AI agents is enforced at the Runtime Gateway.
+  ACCESS-P0-23 continues with that.
+
+**Built:** no migration. `policy_versions` already holds jsonb snapshots.
+- `modules/access-governance/policies.ts`:
+  - each version's snapshot now includes the policy's rules
+    (`stateOf`), for updates, publishes and rule additions;
+  - `addPolicyRule(…, actorId)` now records the prior state, bumps the
+    version and audits `policy.rule_added`. Before, adding a rule (how an
+    SoD rule is made) changed the policy with no version and no audit
+    event. Both callers (the form action and
+    `POST /api/v1/policies/[id]/rules`) pass the actor;
+  - `listPolicyHistory`: each version with who, when and what changed,
+    with names looked up only for the people named.
+- `policyHistory.ts` (pure): changed fields, plus rules added and
+  removed. An SoD rule reads "separation of duties: a vs b". A version
+  saved before rules were kept claims no rule change (§19.2).
+- The policy page has a folded "Change history" disclosure. A failed read
+  says so.
+- Roles: unchanged by decision. `role.updated` already records old and
+  new name, description and permissions. Lifecycle and attribute rules
+  keep their four-eyes publish. Workflows join when Phase 10 builds them.
+- Help (policies) and the knowledge base are updated.
+
+**Verified:**
+- `policyHistory.test.ts`: 4 tests. Access and architecture unit tests:
+  374/374.
+- Typecheck and eslint clean.
+- E2E `sod.spec.ts` now opens the policy's history and expects the SoD
+  rule added, block → flag and active → disabled. Run on Vercel before
+  the merge.

@@ -20,7 +20,18 @@ import type {
   UpdatePolicyInput,
 } from "@/lib/shared/types/access-governance";
 import { validateTargets } from "./policyTargets";
+import { policyHistory, type PolicyHistoryEntry } from "./policyHistory";
 import { toPolicy, toPolicyException, toPolicyRule, toPolicyVersionRecord } from "./mappers";
+
+/**
+ * ACCESS-P0-35 (owner decision 2026-10-17): a version records the policy's
+ * rules too, so a change to a separation of duties rule shows in the
+ * policy's history. Changes apply at once; no second approver.
+ */
+async function stateOf(policy: Policy, tenantId: string): Promise<Record<string, unknown>> {
+  const rules = await listPolicyRules(policy.id, tenantId);
+  return { ...policy, rules: rules.map((r) => ({ ruleType: r.ruleType, condition: r.condition })) };
+}
 
 export type CreatePolicyInput = {
   name: string;
@@ -98,7 +109,7 @@ export async function publishPolicy(tenantId: string, actorId: string, policyId:
   if (!current || current.tenantId !== tenantId) throw new ApiError(404, "POLICY_NOT_FOUND");
   if (current.status === "active") throw new ApiError(409, "ALREADY_PUBLISHED", "This policy is already in effect");
   const supabase = await supabaseServer();
-  const { error: versionError } = await supabase.from("policy_versions").insert({ policy_id: policyId, version: current.version, snapshot: current, changed_by: actorId });
+  const { error: versionError } = await supabase.from("policy_versions").insert({ policy_id: policyId, version: current.version, snapshot: await stateOf(current, tenantId), changed_by: actorId });
   if (versionError) throw new ApiError(500, "CREATE_FAILED", versionError.message);
   const { data, error } = await supabase
     .from("policies")
@@ -166,7 +177,7 @@ export async function updatePolicy(
   const { error: versionError } = await supabase.from("policy_versions").insert({
     policy_id: policyId,
     version: current.version,
-    snapshot: current,
+    snapshot: await stateOf(current, tenantId),
     changed_by: actorId,
   });
   if (versionError) throw new ApiError(500, "CREATE_FAILED", versionError.message);
@@ -221,23 +232,46 @@ export async function listPolicyVersions(policyId: string, tenantId: string): Pr
   return (data ?? []).map(toPolicyVersionRecord);
 }
 
+/**
+ * Adds a rule (a separation of duties rule is an `rbac` rule naming its
+ * conflicting actions). ACCESS-P0-35: it is a new version of the policy,
+ * with the state before it kept in policy_versions, and audited.
+ */
 export async function addPolicyRule(
   tenantId: string,
   policyId: string,
   ruleType: PolicyRuleType,
   condition: PolicyCondition,
+  actorId: string | null = null,
 ): Promise<PolicyRule> {
   // QA-P0-17: the policy must be in the active organization. RLS would
   // also admit the user's other organizations, where the caller's
   // permission was never checked.
-  if (!(await getPolicy(policyId, tenantId))) throw new ApiError(404, "POLICY_NOT_FOUND");
+  const current = await getPolicy(policyId, tenantId);
+  if (!current || current.tenantId !== tenantId) throw new ApiError(404, "POLICY_NOT_FOUND");
   const supabase = await supabaseServer();
+  const { error: versionError } = await supabase
+    .from("policy_versions")
+    .insert({ policy_id: policyId, version: current.version, snapshot: await stateOf(current, tenantId), changed_by: actorId });
+  if (versionError) throw new ApiError(500, "CREATE_FAILED", versionError.message);
   const { data, error } = await supabase
     .from("policy_rules")
     .insert({ policy_id: policyId, rule_type: ruleType, condition })
     .select()
     .single();
   if (error || !data) throw new ApiError(500, "CREATE_FAILED", error?.message ?? "Failed to add policy rule");
+  const { error: bumpError } = await supabase.from("policies").update({ version: current.version + 1 }).eq("id", policyId).eq("tenant_id", tenantId);
+  if (bumpError) throw new ApiError(500, "UPDATE_FAILED", bumpError.message);
+  await writeAudit({
+    tenantId,
+    actorId,
+    actorType: "user",
+    action: "policy.rule_added",
+    objectType: "policy",
+    objectId: policyId,
+    outcome: "success",
+    metadata: { ruleId: data.id, ruleType, condition, fromVersion: current.version, toVersion: current.version + 1 },
+  });
   return toPolicyRule(data);
 }
 
@@ -473,4 +507,26 @@ export async function sendExpiredExceptionRemindersForAllTenants(): Promise<Exce
     }
   }
   return results;
+}
+
+/**
+ * ACCESS-P0-35: the policy's versions, newest first, each with who made it,
+ * when, and what changed (rules included). Read as the user under RLS,
+ * filtered by tenant; only the names of the people named are looked up.
+ */
+export async function listPolicyHistory(policyId: string, tenantId: string): Promise<(PolicyHistoryEntry & { changedByName: string | null })[]> {
+  const [policy, versions] = await Promise.all([getPolicy(policyId, tenantId), listPolicyVersions(policyId, tenantId)]);
+  if (!policy) return [];
+  const history = policyHistory(
+    versions.map((v) => ({ version: v.version, snapshot: v.snapshot, changedBy: v.changedBy, changedAt: v.changedAt })),
+    { ...(await stateOf(policy, tenantId)), version: policy.version },
+  );
+  const ids = [...new Set(history.map((h) => h.changedBy).filter((x): x is string => Boolean(x)))];
+  const names = new Map<string, string>();
+  if (ids.length) {
+    // users is global (no tenant_id); only the people this tenant's own versions name are looked up.
+    const { data: people } = await supabaseServiceRole().from("users").select("id, email, display_name").in("id", ids);
+    for (const p of (people ?? []) as { id: string; email: string | null; display_name: string | null }[]) names.set(p.id, p.display_name || p.email || "A former member");
+  }
+  return history.map((h) => ({ ...h, changedByName: h.changedBy ? (names.get(h.changedBy) ?? "A former member") : null }));
 }

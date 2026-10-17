@@ -59,5 +59,13 @@ test.describe.serial("separation of duties", () => {
     } finally {
       await page.request.patch(`/api/v1/policies/${policy.id}`, { data: { status: "disabled" } });
     }
+
+    // ACCESS-P0-35 (owner decision 2026-10-17): every change, the SoD rule included, is a version with what changed; nothing waits for a second person.
+    await page.goto(`/policies/${policy.id}`);
+    const history = page.getByTestId("policy-history");
+    await history.locator("summary").click();
+    await expect(history).toContainText("Rule added: separation of duties: access.request_submitted vs access.request_approved");
+    await expect(history).toContainText("Action: block → flag");
+    await expect(history).toContainText("Status: active → disabled");
   });
 });

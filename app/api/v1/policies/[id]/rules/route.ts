@@ -19,7 +19,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const ctx = await requirePermission("policy.update");
     const { id } = await params;
     const body = await request.json();
-    const rule = await addPolicyRule(ctx.tenantId!, id, body.ruleType, body.condition);
+    const rule = await addPolicyRule(ctx.tenantId!, id, body.ruleType, body.condition, ctx.userId);
     return NextResponse.json({ ok: true, data: rule }, { status: 201 });
   } catch (err) {
     return errorResponse(err);

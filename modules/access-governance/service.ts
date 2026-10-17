@@ -39,6 +39,7 @@ export {
   getPolicy,
   updatePolicy,
   listPolicyVersions,
+  listPolicyHistory,
   addPolicyRule,
   listPolicyRules,
   addPolicyException,

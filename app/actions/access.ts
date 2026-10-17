@@ -110,7 +110,7 @@ export async function publishPolicyAction(policyId: string): Promise<{ ok: boole
 export async function addPolicyRuleAction(policyId: string, formData: FormData) {
   const ctx = await requirePermission("policy.update");
   const condition = JSON.parse(String(formData.get("condition") ?? "{}"));
-  await addPolicyRule(ctx.tenantId!, policyId, formData.get("ruleType") as PolicyRuleType, condition);
+  await addPolicyRule(ctx.tenantId!, policyId, formData.get("ruleType") as PolicyRuleType, condition, ctx.userId);
   redirect(await policyPath(ctx.tenantId!, policyId));
 }
 
