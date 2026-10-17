@@ -1386,6 +1386,10 @@ Owner decision 2026-10-17: "go ahead with all the items … one by one".
   - malformed files.
 - `lib/config` and architecture unit tests pass; typecheck and eslint
   clean.
+- E2E `global-configuration.spec.ts` passed on Vercel (15/15 with the
+  merge spec). The test exports, previews "already has these settings",
+  and refuses an edited file. It runs inside the serial block, after the
+  tests that change and restore the settings.
 
 **Left:**
 - Bundles for the declarative objects (attributes, request policies,

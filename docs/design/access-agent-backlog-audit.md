@@ -4410,3 +4410,31 @@ It is a service-role read, because a campaign builds after the response,
 and it filters every query and row by tenant. Compliance revokes an
 entitlement through the existing `updateEntitlement(…, { status: "inactive" })`.
 See the Compliance entry of the same date.
+
+## 2026-10-17 — ACCESS-P0-35 and ACCESS-P0-23: open questions for the owner
+
+These were looked at after the owner's "go ahead with all the items" (17
+Oct). Each remaining part is an authorization design choice the backlog
+does not settle, so per ORCHESTRATION §7 it waits for the owner rather
+than being guessed.
+
+- **ACCESS-P0-35, roles.** The request-policy rule (0179) has a change
+  wait for a second person who manages access when there are two or more
+  active Tenant Administrators. For custom roles, three points are open:
+  - who approves: holders of `role.manage`, who today don't see the
+    approvals page (gated on `access.manage`);
+  - whether the approver must also hold every permission the change
+    adds, the same no-escalation rule the designer meets;
+  - whether a role change waits at all, since role edits are frequent and
+    already audited with field-level diffs.
+- **ACCESS-P0-35, the rest.**
+  - SoD rules live inside authorization policies, so it is open whether
+    policy edits get the same flow.
+  - Lifecycle and attribute rules already publish only with a second
+    person's approval (IDENTITY-P0-21), so they are covered.
+  - Workflows don't exist yet (Phase 10).
+- **ACCESS-P0-23, agent directions.** Delegation from a person to an
+  agent, an agent to a person, and agent to agent overlaps Phase 9
+  (delegation grants and gateway-issued tokens). It is open whether these
+  are WonderID-side records only, or must be enforced at the Runtime
+  Gateway.

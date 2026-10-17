@@ -2294,9 +2294,15 @@ migration). Saviynt reference study D-6.
     matches the migration's list;
   - the full unit suite: 1854 passed.
 - `tests/e2e/identity-merge.spec.ts`: suggest, compare, merge, undo; a
-  read-only member gets no merge; another organization gets 404. It runs
-  on Vercel before the merge, because migrations are security-related
-  (§17.8).
+  read-only member gets no merge; another organization gets "not found".
+  Run on Vercel before the merge (§17.8), three times:
+  - first run: the merge worked, but the undo disclosure and its button
+    shared a label (test selector), so the button became "Confirm undo";
+  - second run: the undo message unmounted with its banner, so undo now
+    redirects to the record with the result;
+  - third run: 15/15 with `global-configuration.spec.ts`, after
+    `identities.spec.ts` and `compliance.spec.ts` had passed in the
+    second.
 - Typecheck and eslint clean.
 
 **Left out:**

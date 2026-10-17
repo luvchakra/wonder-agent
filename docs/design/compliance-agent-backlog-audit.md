@@ -1607,6 +1607,8 @@ Owner decision 2026-10-17: "go ahead with all the items … one by one".
 - `analytics.test.ts`: 3 tests (sums and weighting, nothing to compute,
   calendar order). Compliance and architecture unit tests: 97/97.
 - Typecheck and eslint clean.
+- E2E `compliance.spec.ts` (with the new Calendar and Analytics test)
+  passed on Vercel.
 
 **Left:**
 - Owner reviews of business roles; they wait on ACCESS-P0-21.
