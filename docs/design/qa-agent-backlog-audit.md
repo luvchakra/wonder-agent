@@ -2420,3 +2420,38 @@ data cannot build up again.
 - **Verified:** typecheck and eslint clean; local setup project (seed plus
   prunes) 7 of 7 passed. Vercel runs do not set `E2E_SKIP_SEED`, so it
   runs before every nightly part.
+
+## 2026-10-17 — Nightly of 17 Oct: all four parts green
+
+The first nightly with clean test data and the new split.
+- **Start:** GitHub started the run at 05:13 IST, 2 h 13 min after its
+  `30 21` (03:00 IST) schedule, exactly as on 16 Oct.
+- **Results:**
+  - part 1: 24 passed, 1 flaky (20 min);
+  - part 2: 203 passed (24 min);
+  - part 3: 173 passed (13 min);
+  - part 4: 153 passed, 1 flaky (25 min).
+  - In all, 553 passed, 0 failed. The parts ran one after another, ending
+    at 06:43 IST.
+- **The four retried tests from 16 Oct passed first time:** the WID-C02
+  leaver, `users.spec.ts:102`, navigation `/controls` and the `iamAdminOne`
+  sign-in setup.
+
+**Flaky, and what changed:**
+- **`connector-provisioning.spec.ts:387` (F3 exit).** On the first try, the
+  account page showed no "Ticket RA-000165 open", although the database had
+  the finding and ticket open (checked afterwards). The page turned a failed
+  findings read into "none" (`.catch(() => [])`). It now says "Rogue access
+  on this account could not be checked just now" and logs the redacted
+  reason, so the next occurrence names its cause. The retry passed.
+- **`identity-sources.spec.ts:172` (leaver guard).** A six-row CSV run had
+  not finished within `runCsv`'s 30 s poll on the nightly machine. The poll
+  is now 90 s, and the test has 240 s.
+
+**Schedule:** the cron moved from `30 21` to `17 21` UTC (02:47 IST), off
+the busy minute, so the run should start by about 03:00. CLAUDE.md §19.6
+and §19.8 and ORCHESTRATION.md say so.
+
+**Verified:** eslint clean on the changed files. Typecheck is clean except
+for product screenshots missing from this container's checkout
+(`app/welcome`), which CI has.
