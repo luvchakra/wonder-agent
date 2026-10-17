@@ -3693,3 +3693,17 @@ safe (fail closed) but untrue (§17.5).
 - `lib/rbac` and `lib/tenant`: all pass.
 - eslint clean. Typecheck clean except for the product screenshots missing
   from this checkout.
+
+## 2026-10-17 — FOUNDATION-P0-03.4 closed: MFA enrollment verified end to end
+
+The story was Partial only because "real enrollment against a physical
+authenticator app" had not been verified in a sandbox. That is now
+covered by `tests/e2e/mfa-required.spec.ts`:
+- it enrolls a TOTP factor through Supabase Auth's `mfa.enroll` on the
+  verify page;
+- it computes the RFC 6238 code an authenticator app would show from the
+  returned secret;
+- it verifies the code, then signs in again through the challenge.
+
+It passed on Vercel on 2026-10-17 in the access-unavailable run (121
+passed). No code changed. The tracker row is Done.

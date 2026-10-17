@@ -442,6 +442,7 @@ Findings are raised for:
 - **Campaigns:** each campaign covers a chosen set of identities, applications or agents.
 - **Decisions:** reviewers keep, revoke or change each piece of access. For people's access and WonderID roles they can also defer (a new due date, at most 30 days away), escalate (to whoever launched the campaign) or make an exception (keep the access until a date, at most 90 days away; it is then removed automatically). An exception is not available for a role that comes from a group, and nobody makes one for their own access.
 - **Overdue items:** escalated automatically.
+- **Calendar and analytics:** the campaigns page has a **Calendar** tab (open campaigns by the month they are due, past due first) and an **Analytics** tab (items reviewed, completion, share revoked, open and overdue items, average time to decide, outcomes, each scope, and the reviewers with the most overdue items). Every figure is counted from the campaigns' own items; one that can't be computed shows "—".
 - **Templates and preview:** a launch can be saved as a template (scope, who reviews, cadence, days to review) and launched again in one click; Preview counts the items, identities, high-risk items and reviewers a campaign would have before it is launched.
 - **Asking someone:** when a reviewer needs more information, they choose "request information" and can name a colleague by email (the person whose access it is, its owner, anyone who knows). That person is notified, answers once on their own page, and the question and answer stay with the item as evidence. The reviewer still decides.
 - **Evidence:** each decision is captured as evidence.
@@ -670,6 +671,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | Access review campaigns have a Calendar of what is due each month and Analytics: completion, revocations, time to decide, overdue items and reviewer backlog. |
 | 17 Oct 2026 | Two records of the same person can be compared side by side and merged, keeping the values you choose, and the merge can be undone. |
 | 17 Oct 2026 | Identity rules can add a person to a group or assign an access package, either after a person approves it or automatically. |
 | 17 Oct 2026 | When WonderID cannot check someone's access because a database read failed, it now says "We couldn't check your access" instead of "forbidden" or sending them to set up an organization. |

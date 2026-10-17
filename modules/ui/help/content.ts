@@ -553,16 +553,17 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "certification",
     title: "Access reviews (certification campaigns)",
     category: "Compliance",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Access reviews ask reviewers to keep or remove access, recording each decision with a justification and evidence for audit.",
     body: [
       "Access Reviews › Create Campaigns launches a round: a name, a scope, an optional criticality filter, a cadence (one time, periodic or event driven) and a reviewer. A scope can cover AI agents' access (by agent, application, entitlement, privileged access or high-risk agent), people's access, WonderID roles, what access packages contain (reviewed by each package's owner) or an application's entitlements (reviewed by each entitlement's or the application's owner). People's access can be reviewed by each person's manager or the application's owner. Also save as a template keeps the settings for next time.",
       "Review Campaigns lists them with how many items are pending and overdue. Open one to see its items, each with the evidence a reviewer needs; the counts at the top show pending, decided, overdue and escalated items.",
+      "The Calendar tab puts open campaigns under the month they are due, past due first. The Analytics tab shows how many items were reviewed, the share revoked, what is open and overdue, the average time to a decision, the outcomes, each scope, and the reviewers with the most overdue items. Each item counts once, by its final decision.",
       "Only the item's assigned reviewer can decide it. The decisions are Approve, Revoke, Modify, Delegate and Request information, and each needs a justification. Revoke removes the access through a task or the connection, and counts as done once a sync no longer finds it; Request information can ask a named person, who is told and answers once. Every decision is recorded once, with who made it, when and what the evidence looked like at that moment.",
       "Nobody certifies their own access or role, and a reviewer who owns the agent can't approve its access without an explicit override, which is audited. Items past their due date are escalated, and the owner is notified.",
     ],
-    keywords: ["certification", "campaign", "certify", "certify access", "recertify", "attestation", "review", "reviewer", "recertification", "approve", "revoke", "modify", "delegate", "request information", "overdue", "escalate", "audit", "evidence", "compliance", "control"],
+    keywords: ["certification", "campaign", "certify", "certify access", "recertify", "attestation", "review", "reviewer", "recertification", "approve", "revoke", "modify", "delegate", "request information", "overdue", "escalate", "audit", "evidence", "compliance", "control", "calendar", "analytics", "completion"],
     href: "/compliance/campaigns",
   },
   // --------------------------------------------------------------- Integrations

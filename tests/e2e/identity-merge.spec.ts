@@ -49,9 +49,9 @@ test.describe.serial("merging duplicate people", () => {
     await page.goto(`/identities/${other.ref}`);
     await expect(page.getByTestId("identity-merges")).toContainText(`Merged into E2E Merge Ada ${stamp}`);
 
-    await page.getByText("Undo the merge").click();
+    await page.locator("summary", { hasText: "Undo the merge" }).click();
     await page.getByLabel("Why undo it?").fill("Two different people after all");
-    await page.getByRole("button", { name: "Undo the merge" }).click();
+    await page.getByRole("button", { name: "Confirm undo" }).click();
     await expect(page.getByText("The merge was undone. Both records are back as they were.")).toBeVisible();
 
     await page.goto(`/identities/${keep.ref}`);

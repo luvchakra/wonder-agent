@@ -217,6 +217,9 @@ export async function pruneThrowawayGovernanceData(tenantIds: string[]): Promise
     // Source links, runs and changes cascade.
     const sources = await supabase.from("identity_sources").delete().eq("tenant_id", tenantId).like("name", "E2E %").lt("created_at", cut);
     if (sources.error) throw new Error(`prune throwaway identity sources(${tenantId}) failed: ${sources.error.message}`);
+    // IDENTITY-P0-23: merge records name the identities, so they go first.
+    const merges = await supabase.from("identity_merges").delete().eq("tenant_id", tenantId).lt("merged_at", cut);
+    if (merges.error) throw new Error(`prune identity merges(${tenantId}) failed: ${merges.error.message}`);
     const people = await supabase
       .from("identities")
       .delete()

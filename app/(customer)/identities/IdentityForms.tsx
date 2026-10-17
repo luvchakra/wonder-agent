@@ -619,7 +619,7 @@ export function UndoMergeForm({ mergeId, label }: { mergeId: string; label: stri
       <form action={action} className="mt-2 space-y-3">
         <TextareaField label="Why undo it?" name="reason" rows={2} maxLength={500} required />
         <div className="flex flex-wrap items-center gap-3">
-          <Submit pending={pending} idle="Undo the merge" busy="Undoing…" variant="outline" />
+          <Submit pending={pending} idle="Confirm undo" busy="Undoing…" variant="outline" />
           <span className="sr-only">{label}</span>
           <Result state={state} />
         </div>
