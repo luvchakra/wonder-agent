@@ -796,4 +796,9 @@ decided:
    request policies (a numbered version with what changed), without
    waiting for a second administrator.
 8. **Delegation to and from AI agents** is enforced at the Runtime Gateway,
-   not only recorded.
+   not only recorded. Asked further:
+   - the directions are person→agent and agent→agent;
+   - a request on someone's behalf with no covering delegation requires
+     approval;
+   - a person→agent delegation takes effect once an owner of the agent
+     approves it.

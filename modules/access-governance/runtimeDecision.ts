@@ -11,6 +11,7 @@ import type {
 import { classifyAction } from "./actionGovernance";
 import { evaluateCondition } from "./conditions";
 import { policyAppliesTo } from "./policyTargets";
+import { delegationCovers, type ActiveAgentDelegation } from "./agentDelegationRules";
 
 /**
  * ACCESS-P0-11 — the deterministic runtime decision (master stories
@@ -82,6 +83,9 @@ export type RuntimeDecisionFacts = {
     suspendedAgents?: string[];
   };
   runtimePolicies: RuntimePolicyFacts[];
+  /** ACCESS-P0-23 part 4: active delegations to this agent from whom the request acts for (loaded only when it names one). */
+  delegations?: ActiveAgentDelegation[];
+  now?: Date;
 };
 
 const SEVERITY: Record<RuntimeDecisionOutcome, number> = {
@@ -227,6 +231,25 @@ export function decideRuntimeRequest(facts: RuntimeDecisionFacts): RuntimeDecisi
       });
     } else {
       pass("approved_access", "APPROVED", `Action ${request.action} is approved.`);
+    }
+  }
+
+  // 5b. Delegation (ACCESS-P0-23 part 4, owner decision 2026-10-17): a
+  //     request that acts on someone's behalf needs an active delegation
+  //     from them for this action; otherwise a human decides.
+  if (request.onBehalfOf) {
+    const who = request.onBehalfOf.kind === "agent" ? "agent" : "person";
+    if (fatal) {
+      skip("delegation", "No verified agent.");
+    } else if (delegationCovers(facts.delegations ?? [], request.onBehalfOf, request, facts.now ?? new Date())) {
+      pass("delegation", "DELEGATION_ACTIVE", `An active delegation from this ${who} covers ${request.action}.`);
+    } else {
+      step({
+        step: "delegation",
+        outcome: "REQUIRE_APPROVAL",
+        code: "DELEGATION_REQUIRED",
+        reason: `The agent says it acts for a ${who}, but no active delegation from them covers ${request.action}.`,
+      });
     }
   }
 

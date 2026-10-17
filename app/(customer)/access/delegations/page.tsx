@@ -2,10 +2,11 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/rbac/requirePermission";
 import { listTenantMembersWithRoles } from "@/lib/rbac/roles";
-import { listDelegations } from "@/modules/access-governance/service";
+import { listAgentDelegations, listDelegations } from "@/modules/access-governance/service";
+import { listAgents, listOwnersForTenant } from "@/modules/agent-identity/service";
 import { ApiError } from "@/lib/shared/types/foundation";
 import { Badge, Card, CardBody, CardHeader, EmptyState, ObjectActionsMenu } from "@/modules/ui";
-import { DelegationForm, RevokeDelegation } from "./DelegationForms";
+import { AgentDelegationForm, DecideAgentDelegation, DelegationForm, EndAgentDelegation, RevokeDelegation } from "./DelegationForms";
 
 export const metadata = { title: "Delegations" };
 
@@ -23,7 +24,22 @@ export default async function DelegationsPage() {
   }
   const tenantId = ctx.tenantId!;
   const canManage = ctx.permissions.includes("access.manage");
-  const [delegations, members] = await Promise.all([listDelegations(tenantId), listTenantMembersWithRoles(tenantId)]);
+  const caller = { userId: ctx.userId, canManageAccess: canManage };
+  const [delegations, members, agentDelegations, agents, owners] = await Promise.all([
+    listDelegations(tenantId),
+    listTenantMembersWithRoles(tenantId),
+    // ACCESS-P0-23 part 4: delegations to AI agents.
+    listAgentDelegations(tenantId, caller),
+    listAgents(tenantId),
+    listOwnersForTenant(tenantId),
+  ]);
+  const agentName = (id: string | null) => {
+    const a = agents.find((x) => x.id === id);
+    return a ? a.displayName || a.agentName : "An agent";
+  };
+  const agentOptions = agents.map((a) => ({ id: a.id, label: a.displayName || a.agentName }));
+  const ownAgents = agentOptions.filter((a) => owners.some((o) => o.agentId === a.id && o.userId === ctx.userId && !o.removedAt));
+  const from = (d: (typeof agentDelegations.mine)[number]) => (d.delegatorKind === "agent" ? `Agent ${agentName(d.delegatorAgentId)}` : name(d.delegatorUserId ?? ""));
   const name = (userId: string) => (userId === ctx.userId ? "You" : (members.find((m) => m.userId === userId)?.displayName ?? members.find((m) => m.userId === userId)?.email ?? "A former member"));
   const people = members.map((m) => ({ id: m.userId, label: m.displayName || m.email || "Member" }));
   return (
@@ -44,7 +60,17 @@ export default async function DelegationsPage() {
           create={{
             label: "New delegation…",
             title: "New delegation",
-            content: <DelegationForm people={people.filter((p) => p.id !== ctx.userId)} everyone={canManage ? people : null} canDelegateAdministration={ctx.permissions.includes("role.manage")} />,
+            content: (
+              <div className="space-y-5">
+                <DelegationForm people={people.filter((p) => p.id !== ctx.userId)} everyone={canManage ? people : null} canDelegateAdministration={ctx.permissions.includes("role.manage")} />
+                {agentOptions.length ? (
+                  <div className="space-y-3 border-t border-border pt-4">
+                    <p className="text-sm font-medium text-foreground">Or let an AI agent act for you</p>
+                    <AgentDelegationForm agents={agentOptions} ownAgents={ownAgents} />
+                  </div>
+                ) : null}
+              </div>
+            ),
           }}
         />
       </div>
@@ -68,6 +94,53 @@ export default async function DelegationsPage() {
                   <span className="flex items-center gap-2">
                     <Badge tone={d.active ? "success" : "neutral"}>{d.active ? "In force" : "Scheduled"}</Badge>
                     <RevokeDelegation id={d.id} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardBody>
+      </Card>
+      {agentDelegations.toDecide.length ? (
+        <Card>
+          <CardHeader title="Waiting for you" description="You own these agents. Approve before they may act for someone." />
+          <CardBody>
+            <ul className="divide-y divide-border text-sm" aria-label="Agent delegations waiting for you">
+              {agentDelegations.toDecide.map((d) => (
+                <li key={d.id} className="space-y-2 py-2.5">
+                  <p>
+                    {agentName(d.delegateAgentId)} acts for {from(d)} <span className="text-muted-foreground">· {d.actions.join(", ")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {d.applications.length ? `${d.applications.join(", ")} · ` : ""}until {day(d.endsAt)} · {d.reason}
+                    </span>
+                  </p>
+                  <DecideAgentDelegation id={d.id} />
+                </li>
+              ))}
+            </ul>
+          </CardBody>
+        </Card>
+      ) : null}
+      <Card>
+        <CardHeader title="AI agents acting for someone" description="The Runtime Gateway holds an agent's request on someone's behalf for approval unless one of these covers it." />
+        <CardBody>
+          {agentDelegations.mine.length === 0 ? (
+            <EmptyState title="None" description="Let an agent act for you from Actions." />
+          ) : (
+            <ul className="divide-y divide-border text-sm" aria-label="Agent delegations">
+              {agentDelegations.mine.map((d) => (
+                <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                  <span className="min-w-0">
+                    {agentName(d.delegateAgentId)} acts for {from(d)}
+                    <span className="text-muted-foreground"> · {d.actions.join(", ")}</span>
+                    <span className="block text-xs text-muted-foreground">
+                      {d.applications.length ? `${d.applications.join(", ")} · ` : ""}
+                      {day(d.startsAt)} – {day(d.endsAt)} · {d.reason}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <Badge tone={d.inForce ? "success" : d.status === "pending" ? "warning" : "neutral"}>{d.status === "pending" ? "Waiting for the agent's owner" : d.inForce ? "In force" : "Scheduled"}</Badge>
+                    <EndAgentDelegation id={d.id} pendingApproval={d.status === "pending"} />
                   </span>
                 </li>
               ))}

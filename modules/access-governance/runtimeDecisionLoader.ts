@@ -7,6 +7,35 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import type { PolicyCondition, RuntimeDecision, RuntimeRequest } from "@/lib/shared/types/access-governance";
 import { decideRuntimeRequest, filterToolsForAgent, type RuntimeContractFacts, type RuntimePolicyFacts, type ToolVisibility } from "./runtimeDecision";
 import type { AgentContract } from "@/lib/shared/types/agent-identity";
+import type { ActiveAgentDelegation } from "./agentDelegationRules";
+
+/** ACCESS-P0-23 part 4: approved, unexpired delegations to this agent from the principal the request names. */
+async function loadDelegations(tenantId: string, agentId: string, onBehalfOf: RuntimeRequest["onBehalfOf"]): Promise<ActiveAgentDelegation[]> {
+  if (!onBehalfOf || onBehalfOf.id === "invalid") return [];
+  const now = new Date().toISOString();
+  const { data, error } = await supabaseServiceRole()
+    .from("agent_delegations")
+    .select("tenant_id, delegate_agent_id, delegator_kind, delegator_user_id, delegator_agent_id, actions, applications, starts_at, ends_at")
+    .eq("tenant_id", tenantId)
+    .eq("delegate_agent_id", agentId)
+    .eq("status", "active")
+    .eq("delegator_kind", onBehalfOf.kind)
+    .eq(onBehalfOf.kind === "user" ? "delegator_user_id" : "delegator_agent_id", onBehalfOf.id)
+    .lte("starts_at", now)
+    .gt("ends_at", now)
+    .limit(50);
+  if (error) throw new ApiError(500, "QUERY_FAILED", error.message);
+  return ((data ?? []) as Record<string, unknown>[])
+    .filter((r) => r.tenant_id === tenantId && r.delegate_agent_id === agentId)
+    .map((r) => ({
+      delegatorKind: r.delegator_kind as "user" | "agent",
+      delegatorId: (r.delegator_kind === "user" ? r.delegator_user_id : r.delegator_agent_id) as string,
+      actions: (r.actions as string[]) ?? [],
+      applications: (r.applications as string[]) ?? [],
+      startsAt: r.starts_at as string,
+      endsAt: r.ends_at as string,
+    }));
+}
 
 function contractFacts(c: AgentContract): RuntimeContractFacts {
   return {
@@ -122,11 +151,12 @@ export async function evaluateRuntimeRequest(
   },
 ): Promise<RuntimeDecision> {
   try {
-    const [profile, effectiveApplications, runtimePolicies, emergency] = await Promise.all([
+    const [profile, effectiveApplications, runtimePolicies, emergency, delegations] = await Promise.all([
       getAgentRuntimeProfile(principal.tenantId, principal.agentId),
       loadEffectiveApplications(principal.tenantId, principal.agentId),
       loadRuntimePolicies(principal.tenantId),
       Promise.resolve(gateway.emergency ?? NO_EMERGENCY),
+      loadDelegations(principal.tenantId, principal.agentId, request.onBehalfOf),
     ]);
 
     return decideRuntimeRequest({
@@ -138,6 +168,7 @@ export async function evaluateRuntimeRequest(
       effectiveApplications,
       emergency,
       runtimePolicies,
+      delegations,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
