@@ -4,7 +4,7 @@ import { ApiError } from "@/lib/shared/types/foundation";
 import { getTenantConfig, listTenantConfigVersions } from "@/lib/config/tenantConfig";
 import { formatConfigValue, settingFor } from "@/lib/config/registry";
 import { Card, CardBody } from "@/modules/ui";
-import { ConfigForm, RestoreVersionButton } from "./ConfigForms";
+import { ConfigBundleImport, ConfigForm, RestoreVersionButton } from "./ConfigForms";
 
 // Admin › Global Configuration (owner request, 2026-10-10): the settings
 // that change how WonderID behaves for this organization (lib/config).
@@ -35,6 +35,20 @@ export default async function GlobalConfigurationPage() {
       </div>
 
       <ConfigForm config={config} permissions={ctx.permissions} />
+
+      {/* PLATFORM-P0-13: move these settings between environments as a signed file. */}
+      <details className="group rounded-lg border border-border bg-card" data-testid="config-bundle">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-foreground">Export and import</summary>
+        <div className="space-y-4 border-t border-border px-4 py-4">
+          <p className="text-sm text-muted-foreground">
+            <a href="/api/v1/tenant/configuration/bundle" download className="text-primary hover:underline">
+              Export these settings
+            </a>{" "}
+            as a signed file, then import it into another environment. Importing shows what changes first.
+          </p>
+          <ConfigBundleImport />
+        </div>
+      </details>
 
       <details className="group rounded-lg border border-border bg-card">
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium text-foreground">

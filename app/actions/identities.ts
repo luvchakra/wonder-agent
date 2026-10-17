@@ -230,13 +230,16 @@ export async function mergeIdentitiesAction(survivorId: string, mergedId: string
   redirect(`/identities/${ref}?merged=1`);
 }
 
-export async function undoIdentityMergeAction(mergeId: string, _prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
+// Undoing removes the banner the form sits in, so the result is shown on the page it returns to.
+export async function undoIdentityMergeAction(mergeId: string, identityId: string, _prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
   const ctx = await requirePermission("identity.manage");
+  let ref: string;
   try {
     await undoIdentityMerge(ctx.tenantId!, ctx.userId, mergeId, String(formData.get("reason") ?? ""));
+    ref = await refOf(ctx.tenantId!, "identities", identityId);
   } catch (err) {
     return formError(err);
   }
   revalidatePath("/identities", "layout");
-  return { status: "saved", message: "The merge was undone. Both records are back as they were." };
+  redirect(`/identities/${ref}?unmerged=1`);
 }

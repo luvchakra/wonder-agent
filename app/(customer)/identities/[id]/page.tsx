@@ -123,7 +123,7 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-export default async function IdentityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; merged?: string }> }) {
+export default async function IdentityDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; merged?: string; unmerged?: string }> }) {
   let ctx;
   try {
     ctx = await requirePermission("identity.read");
@@ -257,6 +257,11 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
           Merged. The other record&apos;s access now belongs to this one.
         </p>
       ) : null}
+      {search.unmerged && !merges.length ? (
+        <p role="status" className="rounded-lg border border-success/30 bg-success/10 px-3 py-2 text-sm text-success">
+          The merge was undone. Both records are back as they were.
+        </p>
+      ) : null}
       {merges.length ? (
         <div className="space-y-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="identity-merges">
           {merges.map((m) => {
@@ -271,7 +276,7 @@ export default async function IdentityDetailPage({ params, searchParams }: { par
               <div key={m.id}>
                 {m.survivorIdentityId === id ? <>Merged from {link}</> : <>Merged into {link}</>} on {m.mergedAt.slice(0, 10)}
                 {m.reason ? ` · ${m.reason}` : ""}
-                {canManage ? <UndoMergeForm mergeId={m.id} label={other?.displayName ?? "the merge"} /> : null}
+                {canManage ? <UndoMergeForm mergeId={m.id} identityId={id} label={other?.displayName ?? "the merge"} /> : null}
               </div>
             );
           })}

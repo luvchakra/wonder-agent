@@ -611,6 +611,7 @@ runs inside your organization and respects the viewer's permissions.
   - the mass-missing threshold;
   - the hourly limit on changes made by connections;
   - review defaults.
+- **Export and import:** settings tried in Dev or Test can be moved to another environment. Export downloads a signed file. Importing it elsewhere first lists every setting it would change, from and to, then saves them as a new version. A file edited after export is refused.
 
 **AI provider**
 - Choose OpenAI or Gemini, using WonderID's key or your own.
@@ -671,6 +672,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | Global Configuration can be exported as a signed file and imported into another environment, with a preview of every change first. |
 | 17 Oct 2026 | Access review campaigns have a Calendar of what is due each month and Analytics: completion, revocations, time to decide, overdue items and reviewer backlog. |
 | 17 Oct 2026 | Two records of the same person can be compared side by side and merged, keeping the values you choose, and the merge can be undone. |
 | 17 Oct 2026 | Identity rules can add a person to a group or assign an access package, either after a person approves it or automatically. |

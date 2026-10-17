@@ -172,7 +172,7 @@ Exit test: not run.
 | OPERATIONS-P0-09 Workflow designer and runs | Operations | | Not started | Backlog: Not Started |
 | OPERATIONS-P0-11 (rest) Event subscriptions; channels | Operations | #72 | Not started | |
 | OPERATIONS-P0-12 † Forms, e-mail templates, jobs page, run log | Operations | | Not started | |
-| PLATFORM-P0-13 (finish) Configuration bundles | Platform | | Partial | Backlog: Partial (Global Configuration built) |
+| PLATFORM-P0-13 (finish) Configuration bundles | Platform | | Partial | Global Configuration built (0116). 2026-10-17: signed export of the Global Configuration, preview of every change, and import as a new version (no migration). Left: bundles for the declarative objects (attributes, request policies, rules), and a second person's approval of an import |
 | PLATFORM-P0-15 † Certified definitions | Platform | | Not started | |
 | ACCESS-P0-34 Onboarding templates and questionnaire | Access | #74 | Done | 2026-10-14: templates per connection type (connector definition key) with configuration defaults, default owners, entitlement types and a questionnaire (0171, 0172); onboarding starts from a fitting template; required questions block validation; a changed answer means validating and approving again |
 | ACCESS-P0-38 † Baskets, model-after, drafts, signed links | Access | | Done | 2026-10-14. Part 1 (#180, 0174): baskets of many lines for many people, each its own checked request; model-after with reasons. Part 2 (0175): approvers notified when a stage opens, each with a single-use 72-hour link that still needs their session; saved drafts |

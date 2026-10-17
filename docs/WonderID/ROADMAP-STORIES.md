@@ -12,7 +12,7 @@ Every story counts equally here, so the many finished product-base stories weigh
 
 ## Completed recently
 
-- ✅ **FOUNDATION-P0-03.4** MFA foundation · this change
+- ✅ **FOUNDATION-P0-03.4** MFA foundation
 - ✅ **RISK-P0-13** Rogue Access management · [#237](https://github.com/luvchakra/wonder-agent/pull/237)
 - ✅ **QA-P0-21** WonderID security hardening pass · [#229](https://github.com/luvchakra/wonder-agent/pull/229)
 - ✅ **FOUNDATION-P0-33** Attribute-level old and new values in audit detail for configuration objects · [#224](https://github.com/luvchakra/wonder-agent/pull/224)

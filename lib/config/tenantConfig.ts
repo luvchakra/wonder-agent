@@ -4,6 +4,7 @@ import { cache } from "react";
 import { supabaseServer, supabaseServiceRole } from "@/lib/db/supabaseServer";
 import { writeAudit } from "@/lib/audit/writeAudit";
 import { DEFAULT_CONFIG, planConfigChange, resolveConfig, type ConfigChange, type TenantConfig } from "./registry";
+import type { ConfigBundle } from "./bundle";
 
 /**
  * An organization's Global Configuration (lib/config/registry.ts; migration
@@ -147,4 +148,40 @@ export async function restoreTenantConfigVersion(tenantId: string, actor: Config
   if (error) return { ok: false, message: "That version could not be read. Try again." };
   if (!data || data.tenant_id !== tenantId) return { ok: false, message: "Not a saved version." };
   return save(tenantId, actor, resolveConfig(data.config), version);
+}
+
+export type BundlePreview = { ok: true; changes: ConfigChange[]; source: { organization: string; environment: string | null }; exportedAt: string } | { ok: false; message: string; errors?: Record<string, string> };
+
+/**
+ * PLATFORM-P0-13: what importing a configuration bundle (lib/config/bundle.ts)
+ * would change here, checked as a save would be, without saving.
+ */
+export async function previewConfigBundle(tenantId: string, actor: ConfigActor, bundle: ConfigBundle): Promise<BundlePreview> {
+  let current;
+  try {
+    current = await load(tenantId);
+  } catch {
+    return { ok: false, message: "The configuration could not be read. Try again." };
+  }
+  const plan = planConfigChange(current.config, bundle.settings, actor.permissions, { aal: actor.aal });
+  if (!plan.ok) return { ok: false, message: "This file can't be imported here.", errors: plan.errors };
+  return { ok: true, changes: plan.changes, source: bundle.source, exportedAt: bundle.exportedAt };
+}
+
+/** Applies a verified bundle as a new version: every setting checked, nothing part-applied, audited as an import. */
+export async function importConfigBundle(tenantId: string, actor: ConfigActor, bundle: ConfigBundle): Promise<SaveConfigResult> {
+  const result = await save(tenantId, actor, bundle.settings, null);
+  if (result.ok && result.changes.length) {
+    await writeAudit({
+      tenantId,
+      actorId: actor.userId,
+      actorType: "user",
+      action: "tenant.config_imported",
+      objectType: "tenant_config",
+      objectId: tenantId,
+      outcome: "success",
+      metadata: { version: result.version, source: bundle.source, exportedAt: bundle.exportedAt, changes: result.changes.length },
+    });
+  }
+  return result;
 }

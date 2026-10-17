@@ -610,9 +610,8 @@ export function MergeForm({ survivorId, mergedId, survivorName, otherName, rows,
   );
 }
 
-export function UndoMergeForm({ mergeId, label }: { mergeId: string; label: string }) {
-  const [state, action, pending] = useActionState(undoIdentityMergeAction.bind(null, mergeId), IDLE);
-  if (state.status === "saved") return <Result state={state} />;
+export function UndoMergeForm({ mergeId, identityId, label }: { mergeId: string; identityId: string; label: string }) {
+  const [state, action, pending] = useActionState(undoIdentityMergeAction.bind(null, mergeId, identityId), IDLE);
   return (
     <details className="mt-2">
       <summary className="cursor-pointer text-sm text-primary">Undo the merge</summary>

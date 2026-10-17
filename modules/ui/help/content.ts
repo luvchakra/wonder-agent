@@ -711,7 +711,7 @@ export const GUIDE_SECTIONS: GuideSection[] = [
     id: "global-configuration",
     title: "Governance Settings",
     category: "Administration",
-    updated: "2026-10-16",
+    updated: "2026-10-17",
     summary:
       "Administration › Organization Settings › Governance Settings holds the settings that change how WonderID behaves for your whole organization; every save is a version you can restore.",
     body: [
@@ -719,8 +719,9 @@ export const GUIDE_SECTIONS: GuideSection[] = [
       "Access: when an account counts as dormant (30, 60, 90, 180 or 365 days), how long an invitation stays usable, how long approved access has to be set up, and how long before time-bound access ends its holder is reminded. AI agents and runtime: how similar a new agent must be to wait in Duplicate Review, how far back unregistered agent activity is shown, and how often at most a runtime alert is raised for one agent. Risk: when an agent's gateway key is overdue for rotation and how many active keys it may have. Reviews: the risk score from which an agent counts as high-risk. Separation of duties: the period the Controls Dashboard's conflict count covers.",
       "Connections: the share of a kind gone from a source above which a full sync waits for a person, the most changes a connection may make in an hour, and the only hosts connections may reach.",
       "Each setting shows its default, which is how WonderID behaved before the setting existed. A value outside a setting's range is refused, and one invalid value means nothing is saved. Change history lists every saved version, who saved it and what changed; Restore puts an earlier version back as a new version. If two people save at once, the second is told to reload rather than overwriting the first.",
+      "Export and import moves these settings between your environments, for example from Dev to production. Export these settings downloads a signed file. In the other environment, choose the file and Preview: it lists each setting the import would change, from and to. Import applies them as a new version, which you can restore like any other. A file edited after export, or from another WonderID, is refused, and each setting still needs its own permission.",
     ],
-    keywords: ["global configuration", "configuration", "settings", "organization settings", "session timeout", "idle timeout", "session length", "inactivity", "dormant", "duplicate", "threshold", "key rotation", "high risk", "version", "restore", "rollback", "history"],
+    keywords: ["global configuration", "configuration", "settings", "organization settings", "session timeout", "idle timeout", "session length", "inactivity", "dormant", "duplicate", "threshold", "key rotation", "high risk", "version", "restore", "rollback", "history", "export", "import", "bundle", "promote", "environment"],
     href: "/settings/configuration",
   },
   {

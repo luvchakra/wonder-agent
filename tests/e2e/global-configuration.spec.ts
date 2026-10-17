@@ -46,6 +46,34 @@ test.describe.serial("global configuration", () => {
   });
 });
 
+// PLATFORM-P0-13: the settings as a signed file, previewed before they are imported.
+test.describe("global configuration — export and import", () => {
+  test.use({ storageState: authFile("adminOne") });
+
+  test("an export previews as no change here, and an edited file is refused", async ({ page }) => {
+    const res = await page.request.get("/api/v1/tenant/configuration/bundle");
+    expect(res.status()).toBe(200);
+    expect(res.headers()["content-disposition"]).toContain("attachment");
+    const bundle = await res.json();
+    expect(bundle.format).toBe("wonderid-config-bundle");
+    expect(bundle.signature).toMatch(/^[0-9a-f]{64}$/);
+
+    await page.goto("/settings/configuration");
+    const box = page.getByTestId("config-bundle");
+    await box.locator("summary").click();
+    const upload = async (body: unknown) => {
+      await box.getByLabel("Configuration file").setInputFiles({ name: "configuration.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(body)) });
+      await box.getByRole("button", { name: "Preview" }).click();
+    };
+    await upload(bundle);
+    await expect(box.getByText("This organization already has these settings.")).toBeVisible();
+
+    const dormant = bundle.settings["access.dormantDays"] === 30 ? 60 : 30;
+    await upload({ ...bundle, settings: { ...bundle.settings, "access.dormantDays": dormant } });
+    await expect(box.getByText(/changed after it was exported/)).toBeVisible();
+  });
+});
+
 test.describe("global configuration — who sees it", () => {
   test.use({ storageState: authFile("readOnly") });
 
