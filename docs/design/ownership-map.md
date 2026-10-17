@@ -57,6 +57,7 @@ excluded (list in the migration's header).
 | `lifecycle_rules` | IA | The organization's identity rules (IDENTITY-P0-21, migration 0166): attribute rules now, lifecycle rules with IDENTITY-P0-18's finish. A working copy and the published copy that runs; four-eyes publishing. Evaluated by OA's shared rule runtime (D12). Member reads; service-role writes from IA's `identityRulesService` |
 | `lifecycle_rule_versions` | IA | Every published version of an identity rule, with who asked and who approved; append-only (migration 0166) |
 | `identity_relationships` | IA | Relationships between identities (manager_of, owns, sponsors, …) with validity windows (IDENTITY-P0-16) |
+| `identity_merges` | IA | Merges of two records of the same person, with what moved, so they can be undone (IDENTITY-P0-23, 0198); written only by `merge_identities()` / `unmerge_identities()` |
 | `identity_lifecycle_events` | IA | Human lifecycle events (joiner, mover, leaver, rehire, …), from sources or people (IDENTITY-P0-18) |
 | `identity_lifecycle_tasks` | IA | Governed work each lifecycle event opens; closed by people with a note (IDENTITY-P0-18) |
 | `identity_sources` | INT | Identity source configuration: template, authority, precedence, mappings, correlation rules, leaver strategy (INTEGRATION-P0-08) |

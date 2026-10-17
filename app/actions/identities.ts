@@ -13,7 +13,10 @@ import {
   transitionHumanLifecycle,
   completeLifecycleTask,
   transferOwnership,
+  mergeIdentities,
+  undoIdentityMerge,
 } from "@/modules/agent-identity/service";
+import { refOf } from "@/lib/refs/objectRef";
 import { HUMAN_LIFECYCLE_STATES, type HumanLifecycleState } from "@/lib/shared/types/agent-identity";
 import { unlinkSourceRecord } from "@/modules/integrations/service";
 
@@ -205,4 +208,35 @@ export async function closeLifecycleTaskAction(taskId: string, _prev: IdentityFo
   }
   revalidatePath("/identities", "layout");
   return { status: "saved", message: "Task closed." };
+}
+
+// IDENTITY-P0-23 — merging two records of the same person, and undoing it.
+// The merge redirects to the surviving record only once it has happened.
+export async function mergeIdentitiesAction(survivorId: string, mergedId: string, _prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
+  const ctx = await requirePermission("identity.manage");
+  let ref: string;
+  try {
+    await mergeIdentities(ctx.tenantId!, ctx.userId, {
+      survivorId,
+      mergedId,
+      takeFromMerged: [...formData.entries()].filter(([k, v]) => k.startsWith("pick.") && v === "take").map(([k]) => k.slice(5)),
+      reason: String(formData.get("reason") ?? ""),
+    });
+    ref = await refOf(ctx.tenantId!, "identities", survivorId);
+  } catch (err) {
+    return formError(err);
+  }
+  revalidatePath("/identities", "layout");
+  redirect(`/identities/${ref}?merged=1`);
+}
+
+export async function undoIdentityMergeAction(mergeId: string, _prev: IdentityFormState, formData: FormData): Promise<IdentityFormState> {
+  const ctx = await requirePermission("identity.manage");
+  try {
+    await undoIdentityMerge(ctx.tenantId!, ctx.userId, mergeId, String(formData.get("reason") ?? ""));
+  } catch (err) {
+    return formError(err);
+  }
+  revalidatePath("/identities", "layout");
+  return { status: "saved", message: "The merge was undone. Both records are back as they were." };
 }

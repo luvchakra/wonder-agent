@@ -128,6 +128,11 @@ The everyday cycle looks like this:
 
 **Duplicates**
 - Possible duplicate AI agents are flagged for review and merged only after a person agrees. A merge cannot be undone.
+- **Two records of the same person** can be merged. When another record has the same email or name, the person's page says "Possible duplicate"; **Compare and merge** shows both records side by side, and you choose which value stays wherever they differ.
+  - The merge moves the other record's accounts and access, access packages, pending requests, open findings, direct reports, source records and WonderID sign-in to the record you keep. The other record becomes inactive and shows which record it went into.
+  - History stays with the record it happened to.
+  - **Undo the merge**, on either record, puts everything back; it needs a reason.
+  - Two records that both sign in, hold the same package, have the same pending request or come from the same identity source can't be merged.
 
 ---
 
@@ -665,6 +670,7 @@ Newest first.
 
 | Date | What changed |
 |---|---|
+| 17 Oct 2026 | Two records of the same person can be compared side by side and merged, keeping the values you choose, and the merge can be undone. |
 | 17 Oct 2026 | Identity rules can add a person to a group or assign an access package, either after a person approves it or automatically. |
 | 17 Oct 2026 | When WonderID cannot check someone's access because a database read failed, it now says "We couldn't check your access" instead of "forbidden" or sending them to set up an organization. |
 | 16 Oct 2026 | The help centre needs sign-in, and its guide now matches today's menu and pages, with new sections on rogue accounts, provisioning tasks, delegations and My Team, identity rules and API clients. |

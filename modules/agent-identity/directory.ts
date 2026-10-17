@@ -42,7 +42,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 type Row = Record<string, unknown>;
 
-function toIdentity(r: Row): Identity {
+export function toIdentity(r: Row): Identity {
   return {
     id: r.id as string,
     ref: r.ref === null || r.ref === undefined ? null : Number(r.ref),
@@ -62,6 +62,7 @@ function toIdentity(r: Row): Identity {
     ownerIdentityId: (r.owner_identity_id as string | null) ?? null,
     sponsorIdentityId: (r.sponsor_identity_id as string | null) ?? null,
     managerIdentityId: (r.manager_identity_id as string | null) ?? null,
+    mergedIntoIdentityId: (r.merged_into_identity_id as string | null) ?? null,
     department: (r.department as string | null) ?? null,
     title: (r.title as string | null) ?? null,
     businessUnit: (r.business_unit as string | null) ?? null,

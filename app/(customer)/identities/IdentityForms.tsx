@@ -12,6 +12,8 @@ import {
   unlinkSourceRecordAction,
   setAttributeActiveAction,
   updateIdentityAction,
+  mergeIdentitiesAction,
+  undoIdentityMergeAction,
   type IdentityFormState,
 } from "@/app/actions/identities";
 import { Button, SelectField, TextField, TextareaField, fieldInputClass, fieldLabelClass, useCloseCreateDialog } from "@/modules/ui";
@@ -534,5 +536,94 @@ export function AssignOwnerForm({ identityId, people }: { identityId: string; pe
       <Submit pending={pending} idle="Assign" busy="Assigning…" variant="secondary" />
       <Result state={state} />
     </form>
+  );
+}
+
+// ---------------------------------------------------------------- merge (IDENTITY-P0-23)
+
+export type MergeRow = { column: string; label: string; keep: string | null; other: string | null };
+
+/**
+ * The side-by-side choice: for each attribute that differs, keep this
+ * record's value or take the other's. A blank here takes the other value.
+ */
+export function MergeForm({ survivorId, mergedId, survivorName, otherName, rows, summary }: { survivorId: string; mergedId: string; survivorName: string; otherName: string; rows: MergeRow[]; summary: string }) {
+  const [state, action, pending] = useActionState(mergeIdentitiesAction.bind(null, survivorId, mergedId), IDLE);
+  return (
+    <form
+      action={action}
+      className="space-y-4"
+      onSubmit={(e) => {
+        if (!window.confirm(`Merge "${otherName}" into "${survivorName}"? ${summary} You can undo it from either record.`)) e.preventDefault();
+      }}
+    >
+      {rows.length ? (
+        <div className="overflow-x-auto rounded-lg border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-left text-xs text-muted-foreground">
+              <tr>
+                <th className="px-3 py-2 font-medium">Attribute</th>
+                <th className="px-3 py-2 font-medium">{survivorName}</th>
+                <th className="px-3 py-2 font-medium">{otherName}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {rows.map((r) => (
+                <tr key={r.column}>
+                  <td className="px-3 py-2 text-muted-foreground">{r.label}</td>
+                  <td className="px-3 py-2">
+                    {r.keep === null ? (
+                      <span className="text-muted-foreground">— (takes the other value)</span>
+                    ) : (
+                      <label className="flex items-center gap-2">
+                        <input type="radio" name={`pick.${r.column}`} defaultChecked value="keep" />
+                        <span className="break-words">{r.keep}</span>
+                      </label>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {r.other === null ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : r.keep === null ? (
+                      <span className="break-words">{r.other}</span>
+                    ) : (
+                      <label className="flex items-center gap-2">
+                        <input type="radio" name={`pick.${r.column}`} value="take" />
+                        <span className="break-words">{r.other}</span>
+                      </label>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-sm text-muted-foreground">The two records have the same details.</p>
+      )}
+      <TextareaField label="Reason (optional)" name="reason" rows={2} maxLength={500} />
+      <div className="flex flex-wrap items-center gap-3">
+        <Submit pending={pending} idle="Merge records" busy="Merging…" />
+        <Result state={state} />
+      </div>
+    </form>
+  );
+}
+
+export function UndoMergeForm({ mergeId, label }: { mergeId: string; label: string }) {
+  const [state, action, pending] = useActionState(undoIdentityMergeAction.bind(null, mergeId), IDLE);
+  if (state.status === "saved") return <Result state={state} />;
+  return (
+    <details className="mt-2">
+      <summary className="cursor-pointer text-sm text-primary">Undo the merge</summary>
+      <form action={action} className="mt-2 space-y-3">
+        <TextareaField label="Why undo it?" name="reason" rows={2} maxLength={500} required />
+        <div className="flex flex-wrap items-center gap-3">
+          <Submit pending={pending} idle="Undo the merge" busy="Undoing…" variant="outline" />
+          <span className="sr-only">{label}</span>
+          <Result state={state} />
+        </div>
+      </form>
+    </details>
   );
 }
